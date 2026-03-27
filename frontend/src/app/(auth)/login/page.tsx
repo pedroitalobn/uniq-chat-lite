@@ -361,7 +361,7 @@ export default function LoginPage() {
   }, []);
 
   const onSuccess = () => {
-    window.location.href = "/instances";
+    window.location.href = "/dashboard";
   };
 
   const handleTabChange = (t: Tab) => {
