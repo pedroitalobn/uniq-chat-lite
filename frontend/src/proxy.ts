@@ -4,12 +4,16 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Rotas públicas: apenas /login e callbacks internos do NextAuth
-  const isPublic =
+  // Bypass explícito para assets estáticos e rotas públicas
+  // (defesa em profundidade caso o matcher não exclua corretamente)
+  if (
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/api/auth") ||
     pathname === "/login" ||
-    pathname.startsWith("/api/auth");
-
-  if (isPublic) return NextResponse.next();
+    pathname === "/favicon.ico"
+  ) {
+    return NextResponse.next();
+  }
 
   const token = await getToken({
     req,

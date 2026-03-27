@@ -123,3 +123,9 @@ volumes:
   rabbitmq_data:
   minio_data:
   sessions_data:
+
+# Rede com nome fixo — garante que todos os containers se enxerguem
+# independente do project name que o Dokploy usa a cada deploy.
+networks:
+  default:
+    name: uniqchat-network
