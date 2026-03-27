@@ -97,7 +97,7 @@ services:
     volumes:
       - sessions_data:/app/sessions
     ports:
-      - "8080:8080"
+      - "8181:8080"
 
   # ── Frontend ───────────────────────────────────────────────────────────────
   frontend:
