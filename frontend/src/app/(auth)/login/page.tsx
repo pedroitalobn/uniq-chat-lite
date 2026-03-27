@@ -361,8 +361,7 @@ export default function LoginPage() {
   }, []);
 
   const onSuccess = () => {
-    router.push("/instances");
-    router.refresh();
+    window.location.href = "/instances";
   };
 
   const handleTabChange = (t: Tab) => {
