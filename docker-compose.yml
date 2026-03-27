@@ -75,8 +75,8 @@ services:
       DATABASE_URL: postgres://uniqchat:${POSTGRES_PASSWORD}@postgres:5432/uniqchat?sslmode=disable
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
-      FRONTEND_URL: https://uniq.chat
-      APP_URL: https://uniq.chat
+      FRONTEND_URL: https://app.uniq.chat
+      APP_URL: https://app.uniq.chat
       APP_NAME: Uniq.chat
       LOG_LEVEL: ${LOG_LEVEL:-info}
       SESSION_DIR: /app/sessions
@@ -114,7 +114,7 @@ services:
       - backend
     environment:
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
-      NEXTAUTH_URL: https://uniq.chat
+      NEXTAUTH_URL: https://app.uniq.chat
     ports:
       - "3010:3000"
 

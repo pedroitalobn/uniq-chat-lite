@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
       allowedOrigins: [
         "localhost:3010",
         "localhost:3000",
+        "app.uniq.chat",
         "uniq.chat",
         "www.uniq.chat",
         "api.uniq.chat",
