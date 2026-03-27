@@ -1,10 +1,12 @@
 import NextAuth from "next-auth";
 import { authConfig } from "@/auth.config";
 
-// Usa apenas a config edge-safe (sem axios/Node.js).
-// O NextAuth com providers: [] valida o JWT do cookie sem precisar
-// chamar nenhum provider externo — funciona 100% no Edge Runtime.
-export const { auth: proxy } = NextAuth(authConfig);
+// Next.js 16 exige default export ou named export "proxy".
+// Usamos apenas authConfig (edge-safe, sem axios/providers) para
+// validar o JWT do cookie no Edge Runtime.
+const { auth } = NextAuth(authConfig);
+
+export default auth;
 
 export const config = {
   matcher: [
