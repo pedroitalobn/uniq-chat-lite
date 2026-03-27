@@ -5,7 +5,12 @@ import GithubProvider from "next-auth/providers/github";
 import axios from "axios";
 import { authConfig } from "@/auth.config";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+// API_URL (server-side): usa hostname interno do Docker em produção.
+// NEXT_PUBLIC_API_URL (client-side): domínio externo para o browser.
+const API_URL =
+  process.env.API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:8080";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
