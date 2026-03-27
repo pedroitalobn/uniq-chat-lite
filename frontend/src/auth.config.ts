@@ -7,6 +7,7 @@ import type { NextAuthConfig } from "next-auth";
  */
 export const authConfig: NextAuthConfig = {
   trustHost: true,
+  secret: process.env.NEXTAUTH_SECRET,
   pages: {
     signIn: "/login",
     error: "/login",
