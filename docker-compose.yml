@@ -11,6 +11,8 @@ services:
       POSTGRES_DB: uniqchat
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - dokploy-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U uniqchat"]
       interval: 5s
@@ -30,6 +32,8 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     ports:
       - "15672:15672"   # Management UI — feche após configurar
+    networks:
+      - dokploy-network
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -50,6 +54,8 @@ services:
     ports:
       - "9010:9000"   # S3 API (usado internamente pelo backend)
       - "9011:9001"   # Console UI — feche após configurar
+    networks:
+      - dokploy-network
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 5s
@@ -72,7 +78,8 @@ services:
         condition: service_healthy
     environment:
       PORT: 8080
-      DATABASE_URL: postgres://uniqchat:${POSTGRES_PASSWORD}@postgres:5432/uniqchat?sslmode=disable
+      # Usa container_name como hostname — DNS do dokploy-network resolve por nome do container
+      DATABASE_URL: postgres://uniqchat:${POSTGRES_PASSWORD}@uniqchat-postgres:5432/uniqchat?sslmode=disable
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       FRONTEND_URL: https://app.uniq.chat
@@ -87,8 +94,8 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
       STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO}
       STRIPE_PRICE_BUSINESS: ${STRIPE_PRICE_BUSINESS}
-      RABBITMQ_URI: amqp://${RABBITMQ_USER:-uniqchat}:${RABBITMQ_PASS}@rabbitmq:5672/
-      MINIO_ENDPOINT: minio:9000
+      RABBITMQ_URI: amqp://${RABBITMQ_USER:-uniqchat}:${RABBITMQ_PASS}@uniqchat-rabbitmq:5672/
+      MINIO_ENDPOINT: uniqchat-minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-uniqchat}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       MINIO_BUCKET: ${MINIO_BUCKET:-uniqchat-media}
@@ -98,6 +105,8 @@ services:
       - sessions_data:/app/sessions
     ports:
       - "8181:8080"
+    networks:
+      - dokploy-network
 
   # ── Frontend ───────────────────────────────────────────────────────────────
   frontend:
@@ -117,6 +126,8 @@ services:
       NEXTAUTH_URL: https://app.uniq.chat
     ports:
       - "3010:3000"
+    networks:
+      - dokploy-network
 
 volumes:
   postgres_data:
@@ -124,8 +135,8 @@ volumes:
   minio_data:
   sessions_data:
 
-# Rede com nome fixo — garante que todos os containers se enxerguem
-# independente do project name que o Dokploy usa a cada deploy.
+# dokploy-network é a rede externa gerenciada pelo Dokploy/Traefik.
+# Todos os serviços precisam estar nela para se comunicarem via DNS interno.
 networks:
-  default:
-    name: uniqchat-network
+  dokploy-network:
+    external: true
