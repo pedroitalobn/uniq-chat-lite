@@ -3,10 +3,12 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import GithubProvider from "next-auth/providers/github";
 import axios from "axios";
+import { authConfig } from "@/auth.config";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   providers: [
     // ── Email / Username + Password ────────────────────────────────────────
     CredentialsProvider({
@@ -135,11 +137,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       (session.user as unknown as Record<string, unknown>).username = token.username;
       return session;
     },
-  },
-
-  pages: {
-    signIn: "/login",
-    error: "/login",
   },
 
   session: {
