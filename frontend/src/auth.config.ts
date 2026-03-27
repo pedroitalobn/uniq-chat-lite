@@ -6,6 +6,7 @@ import type { NextAuthConfig } from "next-auth";
  * Os providers (que usam axios) ficam apenas em auth.ts.
  */
 export const authConfig: NextAuthConfig = {
+  trustHost: true,
   pages: {
     signIn: "/login",
     error: "/login",
