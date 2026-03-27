@@ -1,0 +1,151 @@
+import NextAuth from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
+import GithubProvider from "next-auth/providers/github";
+import axios from "axios";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  providers: [
+    // ── Email / Username + Password ────────────────────────────────────────
+    CredentialsProvider({
+      id: "credentials",
+      name: "Email ou Username",
+      credentials: {
+        identifier: { label: "Email ou Username", type: "text" },
+        password:   { label: "Senha", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.identifier || !credentials?.password) return null;
+        try {
+          const response = await axios.post(`${API_URL}/auth/login`, {
+            identifier: credentials.identifier,
+            password: credentials.password,
+          });
+          const { access_token, user } = response.data;
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            username: user.username,
+            role: user.role,
+            plan: user.plan,
+            accessToken: access_token,
+          };
+        } catch (error: unknown) {
+          const msg = axios.isAxiosError(error)
+            ? error.response?.data?.error || "Credenciais inválidas"
+            : "Erro de conexão";
+          throw new Error(msg);
+        }
+      },
+    }),
+
+    // ── Anthropic API Key (legacy) ─────────────────────────────────────────
+    CredentialsProvider({
+      id: "anthropic-key",
+      name: "Anthropic API Key",
+      credentials: {
+        anthropicApiKey: { label: "Anthropic API Key", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.anthropicApiKey) return null;
+        try {
+          const response = await axios.post(
+            `${API_URL}/auth/login`,
+            { anthropic_api_key: credentials.anthropicApiKey },
+            { withCredentials: false }
+          );
+          const { access_token, user } = response.data;
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            plan: user.plan,
+            accessToken: access_token,
+          };
+        } catch (error: unknown) {
+          const msg = axios.isAxiosError(error)
+            ? error.response?.data?.error || "Falha ao autenticar"
+            : "Erro de conexão";
+          throw new Error(msg);
+        }
+      },
+    }),
+
+    // ── Google OAuth ───────────────────────────────────────────────────────
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+      ? [GoogleProvider({
+          clientId: process.env.GOOGLE_CLIENT_ID,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        })]
+      : []),
+
+    // ── GitHub OAuth ───────────────────────────────────────────────────────
+    ...(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET
+      ? [GithubProvider({
+          clientId: process.env.GITHUB_CLIENT_ID,
+          clientSecret: process.env.GITHUB_CLIENT_SECRET,
+        })]
+      : []),
+  ],
+
+  callbacks: {
+    async signIn({ user, account }) {
+      // For OAuth providers, create/login the user on our backend
+      if (account?.provider === "google" || account?.provider === "github") {
+        try {
+          const response = await axios.post(`${API_URL}/auth/login`, {
+            identifier: user.email,
+            // Use a deterministic password derived from provider + sub
+            oauth_provider: account.provider,
+            oauth_token: account.access_token,
+          });
+          const { access_token, user: backendUser } = response.data;
+          user.id = backendUser.id;
+          (user as unknown as Record<string, unknown>).accessToken = access_token;
+          (user as unknown as Record<string, unknown>).role = backendUser.role;
+          (user as unknown as Record<string, unknown>).plan = backendUser.plan;
+        } catch {
+          // Allow sign-in even if backend sync fails — token won't have role/plan
+        }
+      }
+      return true;
+    },
+
+    async jwt({ token, user }) {
+      if (user) {
+        const u = user as unknown as Record<string, unknown>;
+        token.accessToken = u.accessToken as string;
+        token.role = u.role as string;
+        token.plan = u.plan;
+        token.userId = user.id;
+        token.username = u.username as string;
+      }
+      return token;
+    },
+
+    async session({ session, token }) {
+      session.accessToken = token.accessToken as string;
+      session.user.role = token.role as "admin" | "user";
+      session.user.plan = token.plan as Record<string, unknown>;
+      session.user.id = token.userId as string;
+      (session.user as unknown as Record<string, unknown>).username = token.username;
+      return session;
+    },
+  },
+
+  pages: {
+    signIn: "/login",
+    error: "/login",
+  },
+
+  session: {
+    strategy: "jwt",
+    maxAge: 7 * 24 * 60 * 60,
+  },
+
+  secret: process.env.NEXTAUTH_SECRET,
+});

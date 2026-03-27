@@ -1,0 +1,180 @@
+package middleware
+
+import (
+	"strings"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/uniq-chat/backend/internal/config"
+	"github.com/uniq-chat/backend/internal/models"
+	"gorm.io/gorm"
+)
+
+type Claims struct {
+	UserID uuid.UUID        `json:"user_id"`
+	Email  string           `json:"email"`
+	Role   models.UserRole  `json:"role"`
+	jwt.RegisteredClaims
+}
+
+type RefreshClaims struct {
+	UserID uuid.UUID `json:"user_id"`
+	jwt.RegisteredClaims
+}
+
+func GenerateAccessToken(user *models.User) (string, error) {
+	claims := Claims{
+		UserID: user.ID,
+		Email:  user.Email,
+		Role:   user.Role,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(config.AppConfig.JWTSecret))
+}
+
+func GenerateRefreshToken(userID uuid.UUID) (string, error) {
+	claims := RefreshClaims{
+		UserID: userID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(config.AppConfig.JWTRefreshSecret))
+}
+
+func ParseAccessToken(tokenStr string) (*Claims, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fiber.ErrUnauthorized
+		}
+		return []byte(config.AppConfig.JWTSecret), nil
+	})
+	if err != nil || !token.Valid {
+		return nil, fiber.ErrUnauthorized
+	}
+	claims, ok := token.Claims.(*Claims)
+	if !ok {
+		return nil, fiber.ErrUnauthorized
+	}
+	return claims, nil
+}
+
+func ParseRefreshToken(tokenStr string) (*RefreshClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &RefreshClaims{}, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fiber.ErrUnauthorized
+		}
+		return []byte(config.AppConfig.JWTRefreshSecret), nil
+	})
+	if err != nil || !token.Valid {
+		return nil, fiber.ErrUnauthorized
+	}
+	claims, ok := token.Claims.(*RefreshClaims)
+	if !ok {
+		return nil, fiber.ErrUnauthorized
+	}
+	return claims, nil
+}
+
+// RequireAuth validates JWT from Bearer header or cookie
+func RequireAuth(db *gorm.DB) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		tokenStr := extractToken(c)
+		if tokenStr == "" {
+			// Try API Key
+			return tryAPIKey(c, db)
+		}
+
+		claims, err := ParseAccessToken(tokenStr)
+		if err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "token inválido ou expirado"})
+		}
+
+		// Load user
+		var user models.User
+		if err := db.Preload("Plan").First(&user, "id = ?", claims.UserID).Error; err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "usuário não encontrado"})
+		}
+		if user.IsBlocked() {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "conta desativada ou bloqueada"})
+		}
+
+		c.Locals("user", &user)
+		c.Locals("user_id", user.ID)
+		return c.Next()
+	}
+}
+
+// RequireAdmin ensures the authenticated user has admin role
+func RequireAdmin() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		user, ok := c.Locals("user").(*models.User)
+		if !ok || user == nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+		}
+		if user.Role != models.RoleAdmin {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso restrito a administradores"})
+		}
+		return c.Next()
+	}
+}
+
+func extractToken(c *fiber.Ctx) string {
+	auth := c.Get("Authorization")
+	if strings.HasPrefix(auth, "Bearer ") {
+		return strings.TrimPrefix(auth, "Bearer ")
+	}
+	if cookie := c.Cookies("access_token"); cookie != "" {
+		return cookie
+	}
+	// Support ?token= for WebSocket/SSE clients that can't set headers.
+	// Only treat it as a JWT if it has the two-dot structure; otherwise
+	// tryAPIKey will pick it up as an API key.
+	if t := c.Query("token"); strings.Count(t, ".") == 2 {
+		return t
+	}
+	return ""
+}
+
+func tryAPIKey(c *fiber.Ctx, db *gorm.DB) error {
+	key := c.Get("X-API-Key")
+	if key == "" {
+		// Also accept ?token= query param (used by MCP SSE clients)
+		key = c.Query("token")
+	}
+	if key == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "autenticação necessária"})
+	}
+
+	hash := models.HashAPIKey(key)
+	var apiKey models.APIKey
+	if err := db.Preload("User.Plan").First(&apiKey, "key_hash = ? AND is_active = true", hash).Error; err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "API key inválida"})
+	}
+
+	if apiKey.User.IsBlocked() {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "conta desativada ou bloqueada"})
+	}
+
+	// Update last_used_at
+	now := time.Now()
+	db.Model(&apiKey).Update("last_used_at", now)
+
+	c.Locals("user", apiKey.User)
+	c.Locals("user_id", apiKey.UserID)
+	return c.Next()
+}
+
+// GetCurrentUser helper
+func GetCurrentUser(c *fiber.Ctx) *models.User {
+	user, _ := c.Locals("user").(*models.User)
+	return user
+}
