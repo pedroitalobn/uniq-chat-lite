@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Check, ArrowRight, Zap, Building2, Sparkles,
   MessageSquare, Shield, Globe, Headphones,
-  Users, Loader2, ChevronLeft,
+  Users, Loader2, ChevronLeft, Star, Flame,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
@@ -33,8 +33,10 @@ interface PlanMeta {
 // Static style/icon per plan name
 const PLAN_META: Record<string, PlanMeta> = {
   Free:     { icon: <MessageSquare className="w-5 h-5" />, color: "#60a5fa" },
+  Starter:  { icon: <Flame className="w-5 h-5" />,         color: "#fb923c" },
   Pro:      { icon: <Zap className="w-5 h-5" />,           color: "#00d46a", badge: "Mais Popular" },
   Business: { icon: <Building2 className="w-5 h-5" />,     color: "#a78bfa" },
+  Lifetime: { icon: <Star className="w-5 h-5" />,          color: "#fbbf24", badge: "Vitalício" },
 };
 
 const FEATURE_LABELS: Record<string, string> = {

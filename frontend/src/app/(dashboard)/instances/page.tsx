@@ -281,7 +281,7 @@ function InstancesContent() {
   return (
     <div className="space-y-7">
       {/* Header */}
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
             Instâncias
@@ -296,7 +296,7 @@ function InstancesContent() {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {servers.length > 0 && (
             <select
               value={serverFilter || ""}
@@ -304,8 +304,8 @@ function InstancesContent() {
                 if (e.target.value) router.push(`/instances?server=${e.target.value}`);
                 else router.push("/instances");
               }}
-              className="input-field text-sm py-2 pr-8"
-              style={{ minWidth: 160 }}
+              className="input-field text-sm py-2 pr-8 flex-1 sm:flex-none"
+              style={{ minWidth: 140 }}
             >
               <option value="">Todos os servers</option>
               {servers.map((s) => (
@@ -315,7 +315,7 @@ function InstancesContent() {
           )}
           <button
             onClick={() => setCreateOpen(true)}
-            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-all duration-150 active:scale-[0.97] whitespace-nowrap"
+            className="inline-flex items-center justify-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-all duration-150 active:scale-[0.97] whitespace-nowrap flex-1 sm:flex-none"
             style={{
               background: "rgba(0,212,106,0.12)",
               border: "1px solid rgba(0,212,106,0.3)",
