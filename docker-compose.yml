@@ -127,8 +127,8 @@ services:
       # URL interna do backend — usada pelo auth.ts (server-side) para
       # evitar hairpin NAT via domínio externo dentro do container.
       API_URL: http://uniqchat-backend:8080
-    ports:
-      - "3010:3000"
+    expose:
+      - "3000"
     networks:
       - dokploy-network
 
