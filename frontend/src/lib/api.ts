@@ -7,8 +7,21 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Attach JWT token from session
+let memoryToken: string | null = null;
+let isRefreshing = false;
+let refreshSubscribers: ((token: string) => void)[] = [];
+
+function onRefreshed(token: string) {
+  refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers = [];
+}
+
+// Attach JWT token from session or memory
 api.interceptors.request.use(async (config) => {
+  if (memoryToken) {
+    config.headers.Authorization = `Bearer ${memoryToken}`;
+    return config;
+  }
   const session = await getSession();
   if (session?.accessToken) {
     config.headers.Authorization = `Bearer ${session.accessToken}`;
@@ -16,22 +29,45 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Auto-refresh on 401
+// Auto-refresh on 401 with concurrency lock
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
-    if (error.response?.status === 401) {
+    const originalRequest = error.config;
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      // If already refreshing, wait for the new token
+      if (isRefreshing) {
+        return new Promise((resolve) => {
+          refreshSubscribers.push((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            resolve(api(originalRequest));
+          });
+        });
+      }
+
+      isRefreshing = true;
       try {
         const refresh = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`,
+          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/auth/refresh`,
           {},
           { withCredentials: true }
         );
         const newToken = refresh.data.access_token;
-        error.config.headers.Authorization = `Bearer ${newToken}`;
-        return api(error.config);
-      } catch {
+        memoryToken = newToken;
+        
+        isRefreshing = false;
+        onRefreshed(newToken);
+
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        isRefreshing = false;
+        memoryToken = null;
+        refreshSubscribers = [];
         window.location.href = "/login";
+        return Promise.reject(refreshError);
       }
     }
     return Promise.reject(error);
