@@ -7,8 +7,14 @@ import { Contact, Tag } from "@/types";
 import {
   Plus, Search, Tag as TagIcon, Trash2, Phone, Mail, Edit2,
   X, Check, User, StickyNote, GitBranch, Layers, Route,
-  Hash, UserCheck, ChevronDown, Filter,
+  Hash, UserCheck, ChevronDown, Filter, List as ListIcon, KanbanSquare, GripVertical,
 } from "lucide-react";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+} from "@hello-pangea/dnd";
 import { toast } from "sonner";
 import { showConfirm } from "@/lib/confirm";
 import { cn } from "@/lib/utils";
@@ -421,6 +427,32 @@ export default function CRMPage() {
   const [editContact, setEditContact]     = useState<Contact | null>(null);
   const [tagsOpen, setTagsOpen]           = useState(false);
   const [filterOpen, setFilterOpen]       = useState(false);
+  const [viewMode, setViewMode]           = useState<"list" | "kanban">("list");
+  const [kanbanGroup, setKanbanGroup]     = useState<"stage" | "journey" | "funnel">("stage");
+
+  const updateContactMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Partial<Contact> }) => crmApi.updateContact(id, payload),
+    onSuccess: () => {
+      // Background refetch
+      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+    },
+    onError: () => toast.error("Erro ao mover contato"),
+  });
+
+  const onDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    const contactId = result.draggableId;
+    let newCol = result.destination.droppableId;
+    if (newCol === "Sem categoria") newCol = "";
+    
+    // Optimistic update
+    queryClient.setQueryData<Contact[]>(["contacts", search, activeTagFilter, pipelineFilters], (old) => {
+      if (!old) return old;
+      return old.map(c => c.id === contactId ? { ...c, [kanbanGroup]: newCol } : c);
+    });
+
+    updateContactMutation.mutate({ id: contactId, payload: { [kanbanGroup]: newCol } });
+  };
 
   const activeFilterCount = Object.values(pipelineFilters).filter(Boolean).length;
 
@@ -470,6 +502,24 @@ export default function CRMPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {/* View toggle */}
+          <div className="flex bg-white/5 p-1 rounded-xl items-center" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+            <button
+              onClick={() => setViewMode("list")}
+              className="p-1.5 rounded-lg transition-colors"
+              style={{ background: viewMode === "list" ? "rgba(255,255,255,0.1)" : "transparent", color: viewMode === "list" ? "white" : "hsl(240 8% 62%)" }}
+            >
+              <ListIcon className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode("kanban")}
+              className="p-1.5 rounded-lg transition-colors"
+              style={{ background: viewMode === "kanban" ? "rgba(255,255,255,0.1)" : "transparent", color: viewMode === "kanban" ? "white" : "hsl(240 8% 62%)" }}
+            >
+              <KanbanSquare className="w-4 h-4" />
+            </button>
+          </div>
+
           <button
             onClick={() => setTagsOpen(true)}
             className="flex items-center gap-2 text-sm font-medium px-3.5 py-2.5 rounded-xl transition-all"
@@ -543,6 +593,23 @@ export default function CRMPage() {
         )}
       </div>
 
+      {/* Kanban Group Selector */}
+      {viewMode === "kanban" && contacts.length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold" style={{ color: "hsl(240 8% 46%)" }}>Agrupar colunas por:</span>
+          <select
+            value={kanbanGroup}
+            onChange={(e) => setKanbanGroup(e.target.value as any)}
+            className="text-sm rounded-xl px-3 py-1.5 outline-none font-medium transition-colors"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "white" }}
+          >
+            <option value="stage">Etapa / Fase</option>
+            <option value="journey">Jornada</option>
+            <option value="funnel">Funil</option>
+          </select>
+        </div>
+      )}
+
       {/* Active pipeline filter chips */}
       {activeFilterCount > 0 && (
         <div className="flex flex-wrap gap-2 items-center">
@@ -561,7 +628,7 @@ export default function CRMPage() {
         </div>
       )}
 
-      {/* Contact list */}
+      {/* Contact View rendering */}
       {isLoading ? (
         <div className="space-y-2">{[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}</div>
       ) : contacts.length === 0 ? (
@@ -585,7 +652,7 @@ export default function CRMPage() {
             </button>
           )}
         </div>
-      ) : (
+      ) : viewMode === "list" ? (
         <div className="rounded-2xl overflow-hidden" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
           {contacts.map((contact, i) => (
             <div
@@ -663,6 +730,93 @@ export default function CRMPage() {
             </div>
           ))}
         </div>
+      ) : (
+        <DragDropContext onDragEnd={onDragEnd}>
+          <div className="flex gap-4 overflow-x-auto pb-4 snap-x">
+            {(() => {
+              const columnsInfo = Array.from(new Set(contacts.map(c => c[kanbanGroup] || "Sem categoria"))).sort();
+              // Ensure 'Sem categoria' goes last
+              const sortedCols = columnsInfo.filter(c => c !== "Sem categoria").concat(columnsInfo.includes("Sem categoria") ? ["Sem categoria"] : []);
+              
+              return sortedCols.map((colName) => {
+                const colContacts = contacts.filter(c => (c[kanbanGroup] || "Sem categoria") === colName);
+                return (
+                  <div key={colName} className="flex-shrink-0 w-80 flex flex-col snap-start rounded-2xl"
+                    style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                      <h3 className="text-sm font-semibold truncate" style={{ color: "hsl(240 15% 90%)" }}>
+                        {colName}
+                      </h3>
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full" 
+                        style={{ background: "rgba(255,255,255,0.08)", color: "hsl(240 8% 62%)" }}>
+                        {colContacts.length}
+                      </span>
+                    </div>
+                    
+                    <Droppable droppableId={colName}>
+                      {(provided, snapshot) => (
+                        <div
+                          {...provided.droppableProps}
+                          ref={provided.innerRef}
+                          className="flex-1 p-3 space-y-3 min-h-[150px] transition-colors"
+                          style={{ background: snapshot.isDraggingOver ? "rgba(255,255,255,0.02)" : "transparent" }}
+                        >
+                          {colContacts.map((contact, index) => (
+                            <Draggable key={contact.id} draggableId={contact.id} index={index}>
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  className="group rounded-xl p-3 shadow-xl transition-shadow"
+                                  style={{
+                                    ...provided.draggableProps.style,
+                                    background: "hsl(240 18% 8%)",
+                                    border: `1px solid ${snapshot.isDragging ? "var(--green)" : "hsl(240 12% 16%)"}`,
+                                    boxShadow: snapshot.isDragging ? "0 12px 24px rgba(0,0,0,0.5)" : "0 4px 12px rgba(0,0,0,0.2)",
+                                  }}
+                                  onClick={(e) => {
+                                    // Make click open edit modal but don't steal drag
+                                    if (!(e.target as HTMLElement).closest("button")) {
+                                      setEditContact(contact);
+                                    }
+                                  }}
+                                >
+                                  <div className="flex items-start justify-between gap-2 mb-2">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-semibold truncate" style={{ color: "hsl(240 15% 93%)" }}>{contact.name}</p>
+                                      <p className="text-xs font-mono truncate" style={{ color: "hsl(240 8% 46%)" }}>{contact.phone}</p>
+                                    </div>
+                                    <GripVertical className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 cursor-grab active:cursor-grabbing" style={{ color: "hsl(240 8% 38%)" }} />
+                                  </div>
+                                  
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    {contact.tags?.map((tag) => <TagBadge key={tag.id} tag={tag} />)}
+                                  </div>
+                                  
+                                  <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                                    <div className="flex items-center gap-1">
+                                      {contact.owner && <span className="text-[10px]" style={{ color: "hsl(240 8% 42%)" }}>👤 {contact.owner}</span>}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button onClick={(e) => { e.stopPropagation(); setEditContact(contact); }} className="hover:text-white" style={{ color: "hsl(240 8% 42%)" }}><Edit2 className="w-3.5 h-3.5" /></button>
+                                      <button onClick={async (e) => { e.stopPropagation(); if (!await showConfirm(`Remover "${contact.name}"?`)) return; deleteContact.mutate(contact.id); }} className="hover:text-red-400" style={{ color: "hsl(240 8% 42%)" }}><Trash2 className="w-3.5 h-3.5" /></button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        </DragDropContext>
       )}
 
       {/* Modals */}
