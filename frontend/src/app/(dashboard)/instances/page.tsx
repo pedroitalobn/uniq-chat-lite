@@ -13,6 +13,7 @@ import type { Instance, Server, ChannelType } from "@/types";
 const CHANNEL_META: Record<ChannelType, { label: string; color: string }> = {
   whatsapp:  { label: "WhatsApp",  color: "#25d366" },
   instagram: { label: "Instagram", color: "#e1306c" },
+  facebook:  { label: "Facebook",  color: "#1877f2" },
   telegram:  { label: "Telegram",  color: "#229ed9" },
   linkedin:  { label: "LinkedIn",  color: "#0a66c2" },
   tiktok:    { label: "TikTok",    color: "#ff0050" },
