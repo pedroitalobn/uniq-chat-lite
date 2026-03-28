@@ -246,7 +246,7 @@ export default function PlansPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
-            {plans.map((plan) => (
+            {plans.filter(p => p.name !== "Free").map((plan) => (
               <PlanCard key={plan.id} plan={plan} onSelect={handleSelect} loading={selecting === plan.id} />
             ))}
           </div>

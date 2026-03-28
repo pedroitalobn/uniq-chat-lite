@@ -1,4 +1,4 @@
-# Story-Chat — WhatsApp API SaaS
+# Uniq Chat — WhatsApp API SaaS
 
 Multi-tenant WhatsApp API platform powered by [whatsmeow](https://github.com/tulir/whatsmeow). Connect multiple WhatsApp numbers, send/receive messages via REST API, configure per-instance proxies, and manage everything through a modern dashboard.
 
@@ -22,15 +22,15 @@ Multi-tenant WhatsApp API platform powered by [whatsmeow](https://github.com/tul
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/your-org/story-chat
-cd story-chat
+git clone https://github.com/your-org/uniq-chat
+cd uniq-chat
 cp .env.example .env
 ```
 
 Edit `.env` — the only required values are:
 
 ```env
-DATABASE_URL=postgres://storychat:storychat@localhost:5432/storychat?sslmode=disable
+DATABASE_URL=postgres://uniqchat:uniqchat@localhost:5432/uniqchat?sslmode=disable
 JWT_SECRET=change-me-32-chars-minimum-secret
 PROXY_ENCRYPTION_KEY=exactly-32-bytes-key-here-padded!   # must be exactly 32 bytes
 ANTHROPIC_VALIDATE_KEYS=true
@@ -56,7 +56,7 @@ The platform validates the key against Anthropic's API — no passwords stored.
 
 ## Authentication
 
-Story-Chat uses **Anthropic API Keys** as the authentication credential.
+Uniq Chat uses **Anthropic API Keys** as the authentication credential.
 
 1. User submits their `sk-ant-...` key
 2. Backend calls `GET https://api.anthropic.com/v1/models` to validate
@@ -385,7 +385,7 @@ Plans can be edited by an admin via the dashboard or API.
 ## Default Admin
 
 The first deploy seeds an admin account:
-- **Email**: `admin@storychat.app`
+- **Email**: `admin@uniqchat.app`
 - **Password**: The admin logs in using an Anthropic API key like any user, then their role is promoted to `admin` via direct DB update or via `/admin/users`.
 
 To promote a user to admin via SQL:
@@ -428,7 +428,7 @@ npm run dev
 ## Project Structure
 
 ```
-story-chat/
+uniq-chat/
 ├── backend/
 │   ├── cmd/server/main.go          # Entry point
 │   ├── internal/

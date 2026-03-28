@@ -14,7 +14,7 @@ INSERT INTO users (id, name, email, password_hash, role, plan_id, is_active)
 VALUES (
     '00000000-0000-0000-0000-000000000010',
     'Admin',
-    'admin@storychat.app',
+    'admin@uniqchat.app',
     '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4oKZ9F6K9.',
     'admin',
     '00000000-0000-0000-0000-000000000003',
