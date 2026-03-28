@@ -15,8 +15,8 @@ interface Props {
 
 // Fallback channels if API is unavailable
 const FALLBACK_CHANNELS: ChannelInfo[] = [
-  { id: "whatsapp",  label: "WhatsApp",  color: "#25d366", description: "Conecte números WhatsApp via QR ou código de pareamento", available: false },
-  { id: "instagram", label: "Instagram", color: "#e1306c", description: "Conecte Instagram e gerencie DMs",                        available: true },
+  { id: "whatsapp",  label: "WhatsApp",  color: "#25d366", description: "Conecte números WhatsApp via QR ou código de pareamento", available: true },
+  { id: "instagram", label: "Instagram", color: "#e1306c", description: "Conecte Instagram e gerencie DMs",                        available: false },
   { id: "facebook",  label: "Facebook",  color: "#1877f2", description: "Gerencie mensagens do Facebook Messenger via Meta API",   available: false },
   { id: "telegram",  label: "Telegram",  color: "#229ed9", description: "Bots e mensagens via Telegram Bot API",                    available: false },
   { id: "linkedin",  label: "LinkedIn",  color: "#0a66c2", description: "Mensagens e InMails via LinkedIn API",                     available: false },
