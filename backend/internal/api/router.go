@@ -62,8 +62,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 			Available   bool   `json:"available"`
 		}
 		channels := []channelInfo{
-			{ID: "whatsapp",  Label: "WhatsApp",  Color: "#25d366", Description: "Conecte números WhatsApp via QR ou código de pareamento",          Available: true},
+			{ID: "whatsapp",  Label: "WhatsApp",  Color: "#25d366", Description: "Conecte números WhatsApp via QR ou código de pareamento",          Available: false},
 			{ID: "instagram", Label: "Instagram", Color: "#e1306c", Description: "Conecte Instagram e gerencie DMs (instagram-cli / Meta Graph API)", Available: true},
+			{ID: "facebook",  Label: "Facebook",  Color: "#1877f2", Description: "Gerencie mensagens do Facebook Messenger via Meta API",             Available: false},
 			{ID: "telegram",  Label: "Telegram",  Color: "#229ed9", Description: "Crie bots e gerencie mensagens via Telegram Bot API",               Available: false},
 			{ID: "linkedin",  Label: "LinkedIn",  Color: "#0a66c2", Description: "Automatize mensagens e InMails via LinkedIn API",                   Available: false},
 			{ID: "tiktok",    Label: "TikTok",    Color: "#ff0050", Description: "Gerencie mensagens diretas e comentários via TikTok",               Available: false},
