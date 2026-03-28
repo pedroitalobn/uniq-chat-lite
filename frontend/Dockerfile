@@ -35,8 +35,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/public        ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next         ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules  ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/package.json  ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/server.js     ./server.js
 
 USER nextjs
 EXPOSE 3000
 
-CMD ["node_modules/.bin/next", "start"]
+CMD ["node", "server.js"]
