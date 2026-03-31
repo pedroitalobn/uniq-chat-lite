@@ -44,6 +44,7 @@ export interface ChannelInfo {
 }
 
 export type InstanceStatus = "disconnected" | "connecting" | "connected" | "banned";
+export type ProxyMode = "none" | "manual" | "residencial";
 export type ProxyStatus = "untested" | "ok" | "failed";
 export type ProxyType = "http" | "https" | "socks5";
 
@@ -66,6 +67,8 @@ export interface Instance {
   channel: ChannelType;
   phone_number?: string;
   status: InstanceStatus;
+  // Proxy
+  proxy_mode?: ProxyMode;
   proxy_enabled: boolean;
   proxy_type?: ProxyType;
   proxy_host?: string;
@@ -75,6 +78,7 @@ export interface Instance {
   proxy_last_tested?: string;
   proxy_external_ip?: string;
   proxy_error?: string;
+  proxy_pool_id?: string;
   connected_at?: string;
   // MCP
   mcp_enabled: boolean;

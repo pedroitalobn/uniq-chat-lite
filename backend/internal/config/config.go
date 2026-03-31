@@ -38,6 +38,16 @@ type Config struct {
 	FromEmail    string
 	AppName      string
 	AppURL       string
+
+	// Bright Data — residential proxy
+	BrightDataCustomerID string
+	BrightDataZone       string
+	BrightDataPassword   string
+	BrightDataHost       string
+	BrightDataPort       int
+
+	// Taktik — Instagram/TikTok automation
+	TaktikBaseURL string
 }
 
 var AppConfig *Config
@@ -77,6 +87,16 @@ func Load() *Config {
 		FromEmail:    getEnv("FROM_EMAIL", "mail@mrstpry.org"),
 		AppName:      getEnv("APP_NAME", "Uniq.chat"),
 		AppURL:       getEnv("APP_URL", getEnv("FRONTEND_URL", "http://localhost:3000")),
+
+		// Bright Data
+		BrightDataCustomerID: getEnv("BRIGHTDATA_CUSTOMER_ID", ""),
+		BrightDataZone:       getEnv("BRIGHTDATA_ZONE", "residential"),
+		BrightDataPassword:   getEnv("BRIGHTDATA_PASSWORD", ""),
+		BrightDataHost:       getEnv("BRIGHTDATA_HOST", "brd.superproxy.io"),
+		BrightDataPort:       getEnvInt("BRIGHTDATA_PORT", 33335),
+
+		// Taktik — Instagram/TikTok automation
+		TaktikBaseURL: getEnv("TAKTIK_BASE_URL", "http://localhost:8090"),
 	}
 
 	AppConfig = cfg

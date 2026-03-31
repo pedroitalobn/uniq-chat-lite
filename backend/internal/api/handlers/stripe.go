@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	stripe "github.com/stripe/stripe-go/v76"
 	"github.com/stripe/stripe-go/v76/checkout/session"
 	stripecustomer "github.com/stripe/stripe-go/v76/customer"
@@ -12,17 +13,23 @@ import (
 	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/email"
 	"github.com/uniq-chat/backend/internal/models"
+	"github.com/uniq-chat/backend/internal/services"
 	"gorm.io/gorm"
 )
 
 type StripeHandler struct {
 	db       *gorm.DB
 	emailSvc *email.Service
+	proxyMgr *services.ProxyManager
 }
 
 func NewStripeHandler(db *gorm.DB, emailSvc *email.Service) *StripeHandler {
 	stripe.Key = config.AppConfig.StripeSecretKey
-	return &StripeHandler{db: db, emailSvc: emailSvc}
+	return &StripeHandler{
+		db:       db,
+		emailSvc: emailSvc,
+		proxyMgr: services.NewProxyManager(db),
+	}
 }
 
 // GET /stripe/plans — list plans with Stripe info (public)
@@ -121,7 +128,7 @@ func (h *StripeHandler) GetSubscription(c *fiber.Ctx) error {
 	h.db.Preload("Plan").First(user, "id = ?", user.ID)
 
 	return c.JSON(fiber.Map{
-		"plan":                  user.Plan,
+		"plan":                       user.Plan,
 		"stripe_subscription_id":     user.StripeSubscriptionID,
 		"stripe_subscription_status": user.StripeSubscriptionStatus,
 	})
@@ -197,6 +204,13 @@ func (h *StripeHandler) handleCheckoutCompleted(sess *stripe.CheckoutSession) {
 		"stripe_subscription_status": "active",
 	})
 
+	// Provision residential proxy pool capacity if plan allows
+	if plan.AllowProxyResidencial {
+		if uid, err := uuid.Parse(sess.ClientReferenceID); err == nil {
+			h.proxyMgr.EnsurePoolHasCapacity(uid, &plan)
+		}
+	}
+
 	// Send payment confirmed email
 	var user models.User
 	if h.db.First(&user, "id = ?", userID).Error == nil {
@@ -235,6 +249,20 @@ func (h *StripeHandler) handleSubscriptionUpdated(sub *stripe.Subscription) {
 			if oldPlanName != "" && oldPlanName != newPlan.Name {
 				h.emailSvc.SendPlanChanged(user.Email, user.Name, oldPlanName, newPlan.Name)
 			}
+
+			// If upgrading to a plan with proxy residencial, provision pool
+			if newPlan.AllowProxyResidencial {
+				if uid, err := uuid.Parse(userID); err == nil {
+					h.proxyMgr.EnsurePoolHasCapacity(uid, &newPlan)
+				}
+			}
+
+			// If downgrading to a plan without proxy, release proxies
+			if user.Plan != nil && user.Plan.AllowProxyResidencial && !newPlan.AllowProxyResidencial {
+				if uid, err := uuid.Parse(userID); err == nil {
+					h.proxyMgr.ReleaseAllForUser(uid)
+				}
+			}
 		}
 	}
 }
@@ -246,6 +274,11 @@ func (h *StripeHandler) handleSubscriptionDeleted(sub *stripe.Subscription) {
 	}
 	if userID == "" {
 		return
+	}
+
+	// Release all proxies for this user (downgrade protection)
+	if uid, err := uuid.Parse(userID); err == nil {
+		h.proxyMgr.ReleaseAllForUser(uid)
 	}
 
 	var freePlan models.Plan

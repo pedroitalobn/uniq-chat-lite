@@ -2,7 +2,7 @@ import axios from "axios";
 import { getSession } from "next-auth/react";
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080",
+  baseURL: "http://localhost:8080",
   withCredentials: true,
   headers: { "Content-Type": "application/json" },
 });
@@ -151,15 +151,6 @@ export const proxyApi = {
   delete: (id: string) => api.delete(`/instances/${id}/proxy`),
 };
 
-export const instagramApi = {
-  connect: (id: string, data: { username?: string; password?: string; access_token?: string }) =>
-    api.post(`/instagram/instances/${id}/connect`, data),
-  disconnect: (id: string) => api.post(`/instagram/instances/${id}/disconnect`),
-  getDMs: (id: string) => api.get(`/instagram/instances/${id}/messages/dm`),
-  sendDM: (id: string, to: string, text: string) =>
-    api.post(`/instagram/instances/${id}/messages/dm`, { to, text }),
-};
-
 export const messagesApi = {
   list: (id: string, params?: { limit?: number; offset?: number }) =>
     api.get(`/instances/${id}/messages`, { params }),
@@ -273,10 +264,15 @@ export const crmApi = {
 
 export const campaignsApi = {
   list: () => api.get("/campaigns"),
+  segmentOptions: () => api.get("/campaigns/segment-options"),
+  segmentPreview: (data: {
+    funnel?: string; stage?: string; journey?: string;
+    tags?: string[]; owner?: string;
+  }) => api.post("/campaigns/segment-preview", data),
   create: (data: {
     instance_id: string;
     name: string;
-    recipient_type: "contacts" | "groups";
+    recipient_type: "contacts" | "groups" | "crm" | "segment";
     message_type?: string;
     message_text?: string;
     caption?: string;
@@ -289,7 +285,11 @@ export const campaignsApi = {
     times_per_day?: number;
     schedule_hours?: string;
     delay_seconds?: number;
-    recipients: Array<{ phone: string; name?: string }>;
+    recipients?: Array<{ phone: string; name?: string }>;
+    segment_filter?: {
+      funnel?: string; stage?: string; journey?: string;
+      tags?: string[]; owner?: string;
+    };
   }) => api.post("/campaigns", data),
   get: (id: string) => api.get(`/campaigns/${id}`),
   start: (id: string) => api.post(`/campaigns/${id}/start`),
@@ -329,6 +329,27 @@ export const integrationsApi = {
   }) => api.put(`/instances/${instanceId}/agent`, data),
 };
 
+export const agentsApi = {
+  chat: (message: string, integrationId?: string) =>
+    api.post("/ai/chat", { message, integration_id: integrationId }),
+  stats: () => api.get("/agent/stats"),
+  activity: (limit?: number) => api.get("/agent/activity", { params: limit ? { limit } : undefined }),
+  instances: () => api.get("/agent/instances"),
+  stopExecution: (executionId: string) => api.post(`/agent/executions/${executionId}/stop`),
+};
+
+export const journeysApi = {
+  list: () => api.get("/journeys"),
+  create: (prompt: string, integrationId?: string, instanceId?: string) =>
+    api.post("/journeys", { prompt, integration_id: integrationId, instance_id: instanceId }),
+  get: (id: string) => api.get(`/journeys/${id}`),
+  updateStatus: (id: string, status: "active" | "paused") =>
+    api.patch(`/journeys/${id}/status`, { status }),
+  delete: (id: string) => api.delete(`/journeys/${id}`),
+  executions: (id: string, limit?: number, offset?: number) =>
+    api.get(`/journeys/${id}/executions`, { params: { limit: limit || 20, offset: offset || 0 } }),
+};
+
 export const aiApi = {
   generate: (data: {
     integration_id: string;
@@ -361,6 +382,77 @@ export const adminApi = {
   createPlan: (data: Record<string, unknown>) => api.post("/admin/plans", data),
   updatePlan: (id: string, data: Record<string, unknown>) =>
     api.put(`/admin/plans/${id}`, data),
+};
+
+export const plansApi = {
+  list: () => api.get("/stripe/plans"),
+  checkout: (data: { price_id: string }) => api.post("/stripe/checkout", data),
+  subscription: () => api.get("/stripe/subscription"),
+};
+
+// ─── Instagram ───────────────────────────────────────────────────────────────
+
+export const instagramApi = {
+  health: () => api.get("/instagram/health"),
+  listAccounts: () => api.get("/instagram/accounts"),
+  createAccount: (data: { username: string; password: string }) =>
+    api.post("/instagram/accounts", data),
+  getAccount: (id: string) => api.get(`/instagram/accounts/${id}`),
+  deleteAccount: (id: string) => api.delete(`/instagram/accounts/${id}`),
+  connect: (id: string) => api.post(`/instagram/accounts/${id}/connect`),
+  disconnect: (id: string) => api.post(`/instagram/accounts/${id}/disconnect`),
+  updateSettings: (id: string, data: {
+    auto_reply?: boolean; ai_enabled?: boolean; integration_id?: string | null;
+  }) => api.put(`/instagram/accounts/${id}/settings`, data),
+  sendDM: (id: string, target: string, message: string) =>
+    api.post(`/instagram/accounts/${id}/dm`, { target, message }),
+  readDMs: (id: string) => api.get(`/instagram/accounts/${id}/dm`),
+  follow: (id: string, target: string) =>
+    api.post(`/instagram/accounts/${id}/follow`, { target }),
+  unfollow: (id: string, target: string) =>
+    api.post(`/instagram/accounts/${id}/unfollow`, { target }),
+  scrapeFollowers: (id: string, target: string, limit?: number) =>
+    api.post(`/instagram/accounts/${id}/scrape/followers`, { target, limit: limit || 100 }),
+  scrapeHashtag: (id: string, hashtag: string, limit?: number) =>
+    api.post(`/instagram/accounts/${id}/scrape/hashtag`, { hashtag, limit: limit || 100 }),
+  scrapePostLikers: (id: string, post_url: string, limit?: number) =>
+    api.post(`/instagram/accounts/${id}/scrape/post`, { post_url, limit: limit || 100 }),
+  publishPost: (id: string, image_url: string, caption: string) =>
+    api.post(`/instagram/accounts/${id}/post`, { image_url, caption }),
+  listTargets: (params?: { platform?: string; source?: string; search?: string }) =>
+    api.get("/instagram/targets", { params }),
+  listDMs: (accountId?: string) =>
+    api.get("/instagram/dms", { params: accountId ? { account_id: accountId } : {} }),
+};
+
+// ─── TikTok ─────────────────────────────────────────────────────────────────
+
+export const tiktokApi = {
+  health: () => api.get("/tiktok/health"),
+  listAccounts: () => api.get("/tiktok/accounts"),
+  createAccount: (data: { username: string; password: string }) =>
+    api.post("/tiktok/accounts", data),
+  getAccount: (id: string) => api.get(`/tiktok/accounts/${id}`),
+  deleteAccount: (id: string) => api.delete(`/tiktok/accounts/${id}`),
+  connect: (id: string) => api.post(`/tiktok/accounts/${id}/connect`),
+  disconnect: (id: string) => api.post(`/tiktok/accounts/${id}/disconnect`),
+  updateSettings: (id: string, data: {
+    auto_reply?: boolean; ai_enabled?: boolean; integration_id?: string | null;
+  }) => api.put(`/tiktok/accounts/${id}/settings`, data),
+  sendDM: (id: string, target: string, message: string) =>
+    api.post(`/tiktok/accounts/${id}/dm`, { target, message }),
+  readDMs: (id: string) => api.get(`/tiktok/accounts/${id}/dm`),
+  follow: (id: string, target: string) =>
+    api.post(`/tiktok/accounts/${id}/follow`, { target }),
+  unfollow: (id: string, target: string) =>
+    api.post(`/tiktok/accounts/${id}/unfollow`, { target }),
+  scrapeFollowers: (id: string, target: string, limit?: number) =>
+    api.post(`/tiktok/accounts/${id}/scrape/followers`, { target, limit: limit || 100 }),
+  scrapeHashtag: (id: string, hashtag: string, limit?: number) =>
+    api.post(`/tiktok/accounts/${id}/scrape/hashtag`, { hashtag, limit: limit || 100 }),
+  listTargets: () => api.get("/tiktok/targets"),
+  listDMs: (accountId?: string) =>
+    api.get("/tiktok/dms", { params: accountId ? { account_id: accountId } : {} }),
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────

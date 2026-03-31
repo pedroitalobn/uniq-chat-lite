@@ -23,6 +23,7 @@ export function Sidebar() {
 
   const navItems = [
     { href: "/dashboard",    label: t("nav_dashboard"),    icon: LayoutDashboard, exact: true },
+    { href: "/agents",       label: "Agentes IA",          icon: Zap,             exact: false },
     { href: "/servers",      label: t("nav_servers"),      icon: Server,          exact: false },
     { href: "/instances",    label: t("nav_instances"),    icon: Smartphone,      exact: false },
     { href: "/crm",          label: t("nav_crm"),          icon: Contact,         exact: false },

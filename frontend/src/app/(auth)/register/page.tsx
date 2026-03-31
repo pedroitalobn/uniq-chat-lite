@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Eye, EyeOff, AlertCircle, ArrowRight, Loader2,
   User, Lock, Mail, AtSign, ChevronLeft, Zap, Building2, MessageSquare,
+  Flame, Star,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -16,8 +17,10 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 const PLAN_META: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
   Free:     { icon: <MessageSquare className="w-3.5 h-3.5" />, color: "#60a5fa", label: "Grátis" },
+  Starter:  { icon: <Flame className="w-3.5 h-3.5" />,         color: "#fb923c", label: "R$49/mês" },
   Pro:      { icon: <Zap className="w-3.5 h-3.5" />,           color: "#00d46a", label: "R$99/mês" },
   Business: { icon: <Building2 className="w-3.5 h-3.5" />,     color: "#a78bfa", label: "R$149/mês" },
+  Lifetime: { icon: <Star className="w-3.5 h-3.5" />,          color: "#fbbf24", label: "Vitalício" },
 };
 
 function Field({
@@ -82,6 +85,8 @@ function RegisterForm() {
   const params = useSearchParams();
   const planName = params.get("plan") || "Free";
   const planId   = params.get("plan_id") || "";
+  const planPrice = parseFloat(params.get("price") || "0");
+  const isPaidPlan = planPrice > 0;
 
   const meta = PLAN_META[planName] ?? PLAN_META.Free;
 
@@ -139,7 +144,7 @@ function RegisterForm() {
       }
 
       // 3. If paid plan, create Stripe Checkout session
-      if (planName !== "Free" && planId) {
+      if (isPaidPlan && planId) {
         try {
           const checkoutRes = await api.post("/stripe/checkout", { plan_id: planId });
           const { url } = checkoutRes.data;
@@ -247,13 +252,13 @@ function RegisterForm() {
               type="submit"
               disabled={loading}
               className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] disabled:opacity-40 mt-1"
-              style={{ background: meta.color, color: planName === "Free" ? "hsl(240 15% 90%)" : "#03170a" }}
+              style={{ background: meta.color, color: !isPaidPlan ? "hsl(240 15% 90%)" : "#03170a" }}
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <>
-                  <span>{planName === "Free" ? "Criar conta grátis" : "Criar conta e pagar"}</span>
+                  <span>{!isPaidPlan ? "Criar conta grátis" : "Criar conta e pagar"}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

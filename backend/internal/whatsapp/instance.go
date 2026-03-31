@@ -38,6 +38,7 @@ type InstanceClient struct {
 	container  *sqlstore.Container
 	qrChan     chan string
 	statusChan chan string
+	manager    *Manager
 
 	mu       sync.Mutex
 	wsConns  []wsConn
@@ -538,8 +539,8 @@ func (ic *InstanceClient) GetGroupInfo(groupJID string) (map[string]interface{},
 	participants := make([]map[string]interface{}, len(info.Participants))
 	for i, p := range info.Participants {
 		participants[i] = map[string]interface{}{
-			"jid":        p.JID.String(),
-			"is_admin":   p.IsAdmin,
+			"jid":           p.JID.String(),
+			"is_admin":      p.IsAdmin,
 			"is_superadmin": p.IsSuperAdmin,
 		}
 	}
@@ -643,8 +644,8 @@ func (ic *InstanceClient) UpdateGroupParticipants(groupJID, action string, parti
 	results := make([]map[string]interface{}, 0, len(resp))
 	for _, r := range resp {
 		results = append(results, map[string]interface{}{
-			"jid":    r.JID.String(),
-			"error":  r.Error,
+			"jid":   r.JID.String(),
+			"error": r.Error,
 		})
 	}
 	return results, nil
@@ -1402,14 +1403,14 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		}
 
 		data := map[string]interface{}{
-			"id":         v.Info.ID,
-			"from":       v.Info.Sender.String(),
-			"chat":       v.Info.Chat.String(),
-			"timestamp":  v.Info.Timestamp,
-			"type":       msgType,
-			"is_group":   isGroup,
-			"from_me":    isFromMe,
-			"push_name":  v.Info.PushName,
+			"id":        v.Info.ID,
+			"from":      v.Info.Sender.String(),
+			"chat":      v.Info.Chat.String(),
+			"timestamp": v.Info.Timestamp,
+			"type":      msgType,
+			"is_group":  isGroup,
+			"from_me":   isFromMe,
+			"push_name": v.Info.PushName,
 		}
 		if text != "" {
 			data["text"] = text
@@ -1428,6 +1429,19 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		}
 		ic.broadcastWS(evName, data)
 		ic.dispatchEvent(evName, data, ctx)
+
+		// Check and execute journeys for incoming messages
+		if evName == "message.received" && text != "" && !isFromMe {
+			if GlobalManager != nil {
+				chatJID := v.Info.Chat.String()
+				senderJID := v.Info.Sender.String()
+				pushName := v.Info.PushName
+				if pushName == "" {
+					pushName = "Cliente"
+				}
+				go GlobalManager.CheckJourneys(ic.ID, senderJID, pushName, chatJID, text)
+			}
+		}
 
 	// ── Read receipts / delivery ─────────────────────────────────────────────
 	case *events.Receipt:

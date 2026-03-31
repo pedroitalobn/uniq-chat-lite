@@ -135,6 +135,21 @@ func autoMigrate(db *gorm.DB) error {
 		&models.RecoverySnapshot{},
 		&models.InstanceAgent{},
 		&models.PasswordResetToken{},
+		&models.ProxyPool{},
+		&models.InstanceProxyAssignment{},
+		&models.InstagramAccount{},
+		&models.TikTokAccount{},
+		&models.SocialDM{},
+		&models.SocialTarget{},
+		&models.TaktikDevice{},
+	)
+}
+
+func migrateJourneys(db *gorm.DB) error {
+	return db.AutoMigrate(
+	// Journey models commented out for now - will add back properly
+	// &models.Journey{},
+	// &models.JourneyExecution{},
 	)
 }
 
@@ -179,34 +194,51 @@ func seedPlans(db *gorm.DB) {
 
 	plans := []models.Plan{
 		{
-			Name:              "Free",
-			Price:             0,
-			MaxInstances:      1,
-			MaxMessagesPerDay: 100,
-			Features:          `{"support":"community","channels":["whatsapp"]}`,
-			AllowProxy:        false,
-			IsActive:          true,
-			// StripePriceID: not needed for free plan
+			Name:                  "Free",
+			Price:                 0,
+			MaxInstances:          1,
+			MaxMessagesPerDay:     100,
+			Features:              `{"support":"community","channels":["whatsapp"]}`,
+			AllowProxy:            false,
+			AllowProxyResidencial: false,
+			IsActive:              true,
 		},
 		{
-			Name:              "Pro",
-			Price:             99,
-			MaxInstances:      150,
-			MaxMessagesPerDay: -1,
-			Features:          `{"support":"email","webhooks":true,"channels":["whatsapp","instagram"]}`,
-			AllowProxy:        true,
-			IsActive:          true,
-			// StripePriceID: set via STRIPE_PRICE_PRO env or admin panel after seeding
+			Name:                  "Starter",
+			Price:                 29,
+			MaxInstances:          1,
+			MaxMessagesPerDay:     100,
+			Features:              `{"whatsapp":true,"instagram":false,"crm":true,"campaigns":false,"integrations":false,"api":false,"webhooks":false,"mcp":false,"description":"Para pequenos negócios","stripe_price_id":"price_1TFmWyGKxdRCOZrXWqqZU28y"}`,
+			AllowProxy:            false,
+			AllowProxyResidencial: false,
+			IsActive:              true,
+			StripePriceID:         "price_1TFmWyGKxdRCOZrXWqqZU28y",
 		},
 		{
-			Name:              "Business",
-			Price:             149,
-			MaxInstances:      -1,
-			MaxMessagesPerDay: -1,
-			Features:          `{"support":"priority","webhooks":true,"channels":["whatsapp","instagram","telegram","linkedin"],"custom_domain":true,"mcp":true}`,
-			AllowProxy:        true,
-			IsActive:          true,
-			// StripePriceID: set via STRIPE_PRICE_BUSINESS env or admin panel after seeding
+			Name:                  "Pro",
+			Price:                 99,
+			MaxInstances:          150,
+			MaxMessagesPerDay:     -1,
+			Features:              `{"support":"email","webhooks":true,"channels":["whatsapp","instagram"]}`,
+			AllowProxy:            true,
+			AllowProxyResidencial: true,
+			MaxInstancesPerProxy:  5,
+			MaxProxyPool:          10,
+			IsActive:              true,
+			StripePriceID:         os.Getenv("STRIPE_PRICE_PRO"),
+		},
+		{
+			Name:                  "Business",
+			Price:                 149,
+			MaxInstances:          300,
+			MaxMessagesPerDay:     -1,
+			Features:              `{"support":"priority","webhooks":true,"channels":["whatsapp","instagram","telegram","linkedin"],"custom_domain":true,"mcp":true}`,
+			AllowProxy:            true,
+			AllowProxyResidencial: true,
+			MaxInstancesPerProxy:  3,
+			MaxProxyPool:          50,
+			IsActive:              true,
+			StripePriceID:         os.Getenv("STRIPE_PRICE_BUSINESS"),
 		},
 	}
 
@@ -218,8 +250,8 @@ func seedPlans(db *gorm.DB) {
 			// Update numeric limits only — do NOT overwrite features or allow_proxy
 			// so that admin edits made via the panel are preserved across restarts.
 			db.Model(&existing).Updates(map[string]interface{}{
-				"price":               plans[i].Price,
-				"max_instances":       plans[i].MaxInstances,
+				"price":                plans[i].Price,
+				"max_instances":        plans[i].MaxInstances,
 				"max_messages_per_day": plans[i].MaxMessagesPerDay,
 			})
 		}

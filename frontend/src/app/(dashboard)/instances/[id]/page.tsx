@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { instancesApi, webhooksApi, messagesApi, settingsApi, mcpApi, recoveryApi, type WebhookPayload } from "@/lib/api";
+import { instancesApi, webhooksApi, messagesApi, settingsApi, mcpApi, recoveryApi, instagramApi, tiktokApi, type WebhookPayload } from "@/lib/api";
 import {
   Smartphone, ArrowLeft, Globe, AlertTriangle,
   QrCode, Power, Trash2, Plus, X, Send, ChevronRight,
@@ -20,7 +20,7 @@ import Link from "next/link";
 import { QRCodeModal } from "@/components/instances/QRCodeModal";
 import { ProxyConfigForm } from "@/components/instances/ProxyConfigForm";
 
-type Tab = "geral" | "proxy" | "webhooks" | "logs" | "recovery";
+type Tab = "geral" | "proxy" | "webhooks" | "logs" | "recovery" | "dm" | "actions" | "scraping";
 
 const STATUS_MAP: Record<string, { label: string; dot: string; bg: string; color: string }> = {
   connected:    { label: "Conectado",    dot: "#00d46a", bg: "rgba(0,212,106,0.08)",   color: "#00d46a" },
@@ -614,6 +614,12 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
   const [btnItems, setBtnItems] = useState("Sim\nNão\nTalvez");
   // list
 
+  const isWhatsApp = !instance?.channel || instance.channel === "whatsapp";
+  const isInstagram = instance?.channel === "instagram";
+  const isTikTok = instance?.channel === "tiktok";
+  const isSocial = isInstagram || isTikTok;
+  const channelColor = isWhatsApp ? "#25d366" : isInstagram ? "#e1306c" : "#ff0050";
+
   const { data: profile } = useQuery<InstanceProfile>({
     queryKey: ["profile", instanceId],
     queryFn: () => instancesApi.profile(instanceId).then((r) => r.data),
@@ -778,22 +784,26 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
               src={profile.profile_pic_url}
               alt="Foto de perfil"
               className="w-14 h-14 rounded-full object-cover flex-shrink-0"
-              style={{ border: "2px solid rgba(0,212,106,0.2)" }}
+              style={{ border: `2px solid ${channelColor}30` }}
             />
           ) : (
             <div
               className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+              style={{ background: `${channelColor}15`, border: `1px solid ${channelColor}25` }}
             >
-              <Smartphone className="w-6 h-6" style={{ color: "hsl(240 8% 30%)" }} />
+              {isWhatsApp ? <Smartphone className="w-6 h-6" style={{ color: channelColor }} /> :
+               isInstagram ? <Camera className="w-6 h-6" style={{ color: channelColor }} /> :
+               <Video className="w-6 h-6" style={{ color: channelColor }} />}
             </div>
           )}
           <div>
             <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 93%)" }}>{instance.name}</h3>
             <p className="text-xs font-mono mt-0.5" style={{ color: "hsl(240 8% 52%)" }}>
-              {profile?.phone_number || instance.phone_number || "Sem número"}
+              {isWhatsApp ? (profile?.phone_number || instance.phone_number || "Sem número") :
+               isInstagram ? `@${instance.name}` :
+               `@${instance.name}`}
             </p>
-            {profile?.conversations !== undefined && (
+            {profile?.conversations !== undefined && isWhatsApp && (
               <p className="text-xs mt-1" style={{ color: "hsl(240 8% 40%)" }}>
                 {profile.conversations} conversa{profile.conversations !== 1 ? "s" : ""}
               </p>
@@ -808,10 +818,28 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
             <p className="text-xs mb-1.5" style={labelStyle}>Status</p>
             <StatusBadge status={instance.status} />
           </div>
-          <div>
-            <p className="text-xs mb-1.5" style={labelStyle}>Número</p>
-            <p className="text-sm font-mono" style={valueStyle}>{profile?.phone_number || instance.phone_number || "—"}</p>
-          </div>
+          {isWhatsApp && (
+            <div>
+              <p className="text-xs mb-1.5" style={labelStyle}>Número</p>
+              <p className="text-sm font-mono" style={valueStyle}>{profile?.phone_number || instance.phone_number || "—"}</p>
+            </div>
+          )}
+          {isInstagram && (
+            <div>
+              <p className="text-xs mb-1.5" style={labelStyle}>Canal</p>
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "rgba(225,48,108,0.1)", color: "#e1306c", border: "1px solid rgba(225,48,108,0.2)" }}>
+                Instagram Beta
+              </span>
+            </div>
+          )}
+          {isTikTok && (
+            <div>
+              <p className="text-xs mb-1.5" style={labelStyle}>Canal</p>
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "rgba(255,0,80,0.1)", color: "#ff0050", border: "1px solid rgba(255,0,80,0.2)" }}>
+                TikTok Beta
+              </span>
+            </div>
+          )}
           <div>
             <p className="text-xs mb-1.5" style={labelStyle}>Criado em</p>
             <p className="text-sm" style={valueStyle}>{new Date(instance.created_at).toLocaleDateString("pt-BR")}</p>
@@ -935,7 +963,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
       <div className="rounded-2xl p-5 space-y-3" style={cardStyle}>
         <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>Ações</h3>
         <div className="grid grid-cols-2 gap-2">
-          {instance.status !== "connected" && (
+          {isWhatsApp && instance.status !== "connected" && (
             <button
               onClick={() => setShowQR(true)}
               className="flex items-center justify-center gap-2 text-sm font-medium py-2.5 px-4 rounded-xl transition-all"
@@ -945,6 +973,20 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
             >
               <QrCode className="w-4 h-4" />
               QR Code
+            </button>
+          )}
+          {isSocial && instance.status !== "connected" && (
+            <button
+              onClick={() => reconnectMutation.mutate()}
+              disabled={reconnectMutation.isPending}
+              className="flex items-center justify-center gap-2 text-sm font-medium py-2.5 px-4 rounded-xl transition-all disabled:opacity-50"
+              style={{ background: `${channelColor}15`, border: `1px solid ${channelColor}25`, color: channelColor }}
+            >
+              {reconnectMutation.isPending
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <Power className="w-4 h-4" />
+              }
+              Conectar
             </button>
           )}
           {instance.status === "connected" ? (
@@ -1436,12 +1478,40 @@ export default function InstanceDetailPage() {
     }
   };
 
+  const isWhatsApp = !instance?.channel || instance.channel === "whatsapp";
+  const isInstagram = instance?.channel === "instagram";
+  const isTikTok = instance?.channel === "tiktok";
+  const isSocial = isInstagram || isTikTok;
+
   const tabs: { id: Tab; label: string; icon: React.ReactNode; alert?: boolean }[] = [
-    { id: "geral",    label: "Geral",        icon: <Settings className="w-3.5 h-3.5" /> },
-    { id: "proxy",    label: "Proxy",        icon: <Globe className="w-3.5 h-3.5" /> },
-    { id: "webhooks", label: "Integrações",  icon: <WebhookIcon className="w-3.5 h-3.5" /> },
-    { id: "logs",     label: "Logs",         icon: <Activity className="w-3.5 h-3.5" /> },
-    { id: "recovery", label: "Recovery",     icon: <ShieldAlert className="w-3.5 h-3.5" />, alert: instance?.status === "banned" },
+    // WhatsApp-specific tabs
+    ...(isWhatsApp ? [
+      { id: "geral" as Tab, label: "Geral", icon: <Settings className="w-3.5 h-3.5" /> },
+      { id: "proxy" as Tab, label: "Proxy", icon: <Globe className="w-3.5 h-3.5" /> },
+      { id: "webhooks" as Tab, label: "Integrações", icon: <WebhookIcon className="w-3.5 h-3.5" /> },
+      { id: "logs" as Tab, label: "Logs", icon: <Activity className="w-3.5 h-3.5" /> },
+      { id: "recovery" as Tab, label: "Recovery", icon: <ShieldAlert className="w-3.5 h-3.5" />, alert: instance?.status === "banned" },
+    ] : []),
+    // Instagram-specific tabs
+    ...(isInstagram ? [
+      { id: "geral" as Tab, label: "Geral", icon: <Settings className="w-3.5 h-3.5" /> },
+      { id: "dm" as Tab, label: "Mensagens", icon: <MessageSquareText className="w-3.5 h-3.5" /> },
+      { id: "actions" as Tab, label: "Ações", icon: <Users className="w-3.5 h-3.5" /> },
+      { id: "scraping" as Tab, label: "Scraping", icon: <Download className="w-3.5 h-3.5" /> },
+      { id: "proxy" as Tab, label: "Proxy", icon: <Globe className="w-3.5 h-3.5" /> },
+      { id: "webhooks" as Tab, label: "Integrações", icon: <WebhookIcon className="w-3.5 h-3.5" /> },
+      { id: "logs" as Tab, label: "Logs", icon: <Activity className="w-3.5 h-3.5" /> },
+    ] : []),
+    // TikTok-specific tabs
+    ...(isTikTok ? [
+      { id: "geral" as Tab, label: "Geral", icon: <Settings className="w-3.5 h-3.5" /> },
+      { id: "dm" as Tab, label: "Mensagens", icon: <MessageSquareText className="w-3.5 h-3.5" /> },
+      { id: "actions" as Tab, label: "Ações", icon: <Users className="w-3.5 h-3.5" /> },
+      { id: "scraping" as Tab, label: "Scraping", icon: <Download className="w-3.5 h-3.5" /> },
+      { id: "proxy" as Tab, label: "Proxy", icon: <Globe className="w-3.5 h-3.5" /> },
+      { id: "webhooks" as Tab, label: "Integrações", icon: <WebhookIcon className="w-3.5 h-3.5" /> },
+      { id: "logs" as Tab, label: "Logs", icon: <Activity className="w-3.5 h-3.5" /> },
+    ] : []),
   ];
 
   if (isLoading) {
@@ -1582,7 +1652,220 @@ export default function InstanceDetailPage() {
         {activeTab === "webhooks" && <WebhooksTab instanceId={instanceId} instance={instance} />}
         {activeTab === "logs"     && <LogsTab instanceId={instanceId} />}
         {activeTab === "recovery" && <RecoveryTab instance={instance} instanceId={instanceId} />}
+        {activeTab === "dm"       && <DMTab instance={instance} />}
+        {activeTab === "actions"  && <ActionsTab instance={instance} />}
+        {activeTab === "scraping" && <ScrapingTab instance={instance} />}
       </div>
+    </div>
+  );
+}
+
+// ─── Instagram/TikTok: DM Tab ───────────────────────────────────────────
+function DMTab({ instance }: { instance: Instance }) {
+  const channel = instance.channel || "whatsapp";
+  const api = channel === "instagram" ? instagramApi : tiktokApi;
+  const [target, setTarget] = useState("");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const sendDM = async () => {
+    if (!target.trim() || !message.trim()) return;
+    setSending(true);
+    try {
+      await api.sendDM(instance.id, target.trim(), message.trim());
+      toast.success("DM enviado com sucesso!");
+      setMessage("");
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Erro ao enviar DM");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl p-5 space-y-5" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+      <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: "hsl(240 15% 93%)" }}>
+        <MessageSquareText className="w-4 h-4" style={{ color: channel === "instagram" ? "#e1306c" : "#ff0050" }} />
+        Enviar DM
+      </h3>
+      <div className="space-y-3">
+        <div>
+          <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>Usuário destino</label>
+          <input type="text" value={target} onChange={e => setTarget(e.target.value)} placeholder="username" className="input-field w-full" />
+        </div>
+        <div>
+          <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>Mensagem</label>
+          <textarea value={message} onChange={e => setMessage(e.target.value)} rows={3} placeholder="Digite sua mensagem..." className="input-field w-full resize-none" />
+        </div>
+        <button onClick={sendDM} disabled={sending || !target.trim() || !message.trim()}
+          className="btn-primary flex items-center gap-2 px-4 py-2 text-sm disabled:opacity-40">
+          {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          Enviar DM
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Instagram/TikTok: Actions Tab (Follow/Unfollow) ─────────────────────
+function ActionsTab({ instance }: { instance: Instance }) {
+  const channel = instance.channel || "whatsapp";
+  const api = channel === "instagram" ? instagramApi : tiktokApi;
+  const [target, setTarget] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleAction = async (action: "follow" | "unfollow") => {
+    if (!target.trim()) return;
+    setLoading(true);
+    try {
+      if (action === "follow") {
+        await api.follow(instance.id, target.trim());
+        toast.success(`Seguiu @${target.trim()} com sucesso!`);
+      } else {
+        await api.unfollow(instance.id, target.trim());
+        toast.success(`Deixou de seguir @${target.trim()} com sucesso!`);
+      }
+      setTarget("");
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Erro ao executar ação");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl p-5 space-y-5" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+      <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: "hsl(240 15% 93%)" }}>
+        <Users className="w-4 h-4" style={{ color: channel === "instagram" ? "#e1306c" : "#ff0050" }} />
+        Ações de Seguimento
+      </h3>
+      <div className="space-y-3">
+        <div>
+          <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>Usuário destino</label>
+          <input type="text" value={target} onChange={e => setTarget(e.target.value)} placeholder="username" className="input-field w-full" />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => handleAction("follow")} disabled={loading || !target.trim()}
+            className="btn-primary flex-1 flex items-center justify-center gap-2 py-2 text-sm disabled:opacity-40">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+            Seguir
+          </button>
+          <button onClick={() => handleAction("unfollow")} disabled={loading || !target.trim()}
+            className="btn-ghost flex-1 flex items-center justify-center gap-2 py-2 text-sm disabled:opacity-40">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <User className="w-4 h-4" />}
+            Deixar de Seguir
+          </button>
+        </div>
+      </div>
+
+      <div className="border-t pt-4" style={{ borderColor: "hsl(240 12% 13%)" }}>
+        <p className="text-xs mb-2" style={{ color: "hsl(240 8% 46%)" }}>Filtros avançados (Insomniac)</p>
+        <div className="grid grid-cols-2 gap-2">
+          <input type="number" placeholder="Mín. seguidores" className="input-field text-xs" />
+          <input type="number" placeholder="Máx. seguindo" className="input-field text-xs" />
+          <input type="number" placeholder="Mín. posts" className="input-field text-xs" />
+          <input type="number" placeholder="Razão mín. (followers/following)" className="input-field text-xs" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Instagram/TikTok: Scraping Tab ─────────────────────────────────────
+function ScrapingTab({ instance }: { instance: Instance }) {
+  const channel = instance.channel || "whatsapp";
+  const api = channel === "instagram" ? instagramApi : tiktokApi;
+  const [source, setSource] = useState<"followers" | "hashtag" | "post">("followers");
+  const [target, setTarget] = useState("");
+  const [limit, setLimit] = useState(100);
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<any[]>([]);
+
+  const handleScrape = async () => {
+    if (!target.trim()) return;
+    setLoading(true);
+    try {
+      let res;
+      if (source === "followers") {
+        res = await api.scrapeFollowers(instance.id, target.trim(), limit);
+      } else if (source === "hashtag") {
+        res = await api.scrapeHashtag(instance.id, target.trim(), limit);
+      } else {
+        res = await (api as any).scrapePostLikers(instance.id, target.trim(), limit);
+      }
+      setResults(res.data?.users || []);
+      toast.success(`Scraped ${res.data?.scraped || 0} perfis (${res.data?.saved || 0} salvos)`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Erro ao fazer scraping");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl p-5 space-y-5" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+      <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: "hsl(240 15% 93%)" }}>
+        <Download className="w-4 h-4" style={{ color: channel === "instagram" ? "#e1306c" : "#ff0050" }} />
+        Scraping de Perfis
+      </h3>
+      <div className="space-y-3">
+        <div>
+          <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>Fonte</label>
+          <div className="flex gap-2">
+            {[
+              { id: "followers", label: "Seguidores" },
+              { id: "hashtag", label: "Hashtag" },
+              { id: "post", label: "Post (likers)" },
+            ].map(s => (
+              <button key={s.id} onClick={() => setSource(s.id as any)}
+                className="flex-1 py-2 text-xs font-medium rounded-lg transition-colors"
+                style={source === s.id
+                  ? { background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)", color: "#00d46a" }
+                  : { background: "hsl(240 12% 10%)", border: "1px solid hsl(240 12% 15%)", color: "hsl(240 8% 50%)" }
+                }>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>
+            {source === "followers" ? "Nome de usuário" : source === "hashtag" ? "Hashtag (sem #)" : "URL do post"}
+          </label>
+          <input type="text" value={target} onChange={e => setTarget(e.target.value)}
+            placeholder={source === "followers" ? "@username" : source === "hashtag" ? "instagram" : "https://www.instagram.com/p/..."}
+            className="input-field w-full" />
+        </div>
+        <div>
+          <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>Limite</label>
+          <input type="number" value={limit} onChange={e => setLimit(Number(e.target.value))} min={1} max={500}
+            className="input-field w-full" />
+        </div>
+        <button onClick={handleScrape} disabled={loading || !target.trim()}
+          className="btn-primary w-full flex items-center justify-center gap-2 py-2 text-sm disabled:opacity-40">
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          Iniciar Scraping
+        </button>
+      </div>
+
+      {results.length > 0 && (
+        <div className="border-t pt-4" style={{ borderColor: "hsl(240 12% 13%)" }}>
+          <p className="text-xs font-medium mb-2" style={{ color: "hsl(240 8% 55%)" }}>
+            Resultados ({results.length})
+          </p>
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {results.slice(0, 20).map((u, i) => (
+              <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs"
+                style={{ background: "hsl(240 12% 10%)" }}>
+                <span style={{ color: "hsl(240 15% 80%)" }}>{u.username}</span>
+                {u.followers > 0 && (
+                  <span style={{ color: "hsl(240 8% 40%)" }}>{u.followers} seguidores</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

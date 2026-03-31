@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { instancesApi } from "@/lib/api";
 import { getSession } from "next-auth/react";
-import { X, RefreshCw, QrCode, CheckCircle2, Smartphone, Copy, Check } from "lucide-react";
+import { X, RefreshCw, QrCode, CheckCircle2, Smartphone, Copy, Check, Clock } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
 interface Props {
@@ -21,6 +21,8 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [qrShown, setQrShown] = useState(false); // Track if QR was actually shown
+  const [qrCountdown, setQrCountdown] = useState<number | null>(null);
 
   // Pairing code state
   const [phone, setPhone] = useState("");
@@ -33,58 +35,119 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fetchAttemptRef = useRef(0);
 
   const markConnected = () => {
+    if (connected) return; // Prevent double calls
     setConnected(true);
     onConnected?.();
     setTimeout(onClose, 2000);
   };
 
-  // Poll instance status as a reliable fallback
-  const startPolling = () => {
-    if (pollRef.current) return;
-    pollRef.current = setInterval(async () => {
-      try {
-        const res = await instancesApi.status(instanceId);
-        if (res.data.status === "connected") {
-          clearInterval(pollRef.current!);
-          pollRef.current = null;
-          markConnected();
-        }
-      } catch { /* ignore */ }
-    }, 2000);
-  };
-
-  const stopPolling = () => {
+  const stopAllTimers = () => {
     if (pollRef.current) {
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
   };
 
-  // Fetch QR code
-  const fetchQR = async () => {
+  // Poll instance status - ONLY start after QR is shown
+  const startPolling = () => {
+    if (pollRef.current) return;
+    if (!qrShown) return; // Don't poll until QR is shown
+    
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await instancesApi.status(instanceId);
+        // Only mark connected if we've shown a QR and status is truly connected
+        if (res.data.status === "connected" && qrShown) {
+          stopAllTimers();
+          markConnected();
+        }
+      } catch { /* ignore */ }
+    }, 3000);
+  };
+
+  // Start QR countdown timer (60 seconds before auto-refresh)
+  const startQrCountdown = () => {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    
+    setQrCountdown(60);
+    countdownRef.current = setInterval(() => {
+      setQrCountdown(prev => {
+        if (prev === null || prev <= 1) {
+          // Time expired - fetch new QR
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          countdownRef.current = null;
+          fetchNewQR();
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // Fetch QR code - separate from auto-refresh
+  const fetchNewQR = async () => {
+    if (connected) return;
+    fetchAttemptRef.current++;
+    
+    // Prevent too many attempts
+    if (fetchAttemptRef.current > 5) {
+      setError(" muitas tentativas. Feche e tente novamente.");
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError("");
     setQrCode(null);
+    setQrShown(false);
+    
     try {
       const res = await instancesApi.getQR(instanceId);
+      
+      // Check if already connected (edge case)
       if (res.data.message?.includes("conectada")) {
         markConnected();
-      } else {
+      } else if (res.data.qr) {
         setQrCode(res.data.qr);
+        setQrShown(true);
+        // Start countdown for auto-refresh
+        startQrCountdown();
+        // Start polling now that we have a QR
+        startPolling();
       }
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
         "Erro ao obter QR Code";
+      
+      // Auto-retry on timeout
+      if (msg.includes("timeout") && fetchAttemptRef.current < 3) {
+        setTimeout(fetchNewQR, 2000);
+        return;
+      }
+      
       setError(msg);
+      setQrShown(false);
     } finally {
       setLoading(false);
     }
   };
 
-  // Open authenticated WebSocket for real-time events
+  // Manual refresh button
+  const refreshQR = () => {
+    stopAllTimers();
+    fetchNewQR();
+  };
+
+  // Open WebSocket for real-time connected event
   const openWebSocket = async () => {
     wsRef.current?.close();
     const session = await getSession();
@@ -98,37 +161,45 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
-        if (msg.type === "status" && msg.data?.status === "connected") {
+        // Only accept connected event if we've shown QR first
+        if (msg.type === "status" && msg.data?.status === "connected" && qrShown) {
+          stopAllTimers();
           markConnected();
         }
         if (msg.type === "qr" && msg.data?.qr) {
           setQrCode(msg.data.qr);
+          setQrShown(true);
+          startQrCountdown();
         }
       } catch { /* ignore */ }
     };
+
+    ws.onerror = () => {
+      // WebSocket error - rely on polling
+    };
   };
 
-  // On mount: fetch QR, open WS, start polling
+  // On mount
   useEffect(() => {
     if (mode !== "qr") return;
-    fetchQR();
+    fetchNewQR();
     openWebSocket();
-    startPolling();
+    
     return () => {
+      stopAllTimers();
       wsRef.current?.close();
-      stopPolling();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, instanceId]);
 
-  // Start polling when switching to pairing mode too
+  // Pairing mode
   useEffect(() => {
     if (mode !== "pairing") return;
-    startPolling();
+    stopAllTimers();
     openWebSocket();
+    
     return () => {
       wsRef.current?.close();
-      stopPolling();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, instanceId]);
@@ -136,8 +207,8 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      stopAllTimers();
       wsRef.current?.close();
-      stopPolling();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -244,11 +315,14 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
           ) : mode === "qr" ? (
             /* ── QR mode ── */
             loading ? (
-              <div
-                className="w-56 h-56 rounded-2xl flex items-center justify-center"
-                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
-              >
-                <RefreshCw className="w-7 h-7 animate-spin" style={{ color: "hsl(240 8% 38%)" }} />
+              <div className="flex flex-col items-center gap-3">
+                <div
+                  className="w-56 h-56 rounded-2xl flex items-center justify-center"
+                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+                >
+                  <RefreshCw className="w-7 h-7 animate-spin" style={{ color: "hsl(240 8% 38%)" }} />
+                </div>
+                <p className="text-xs" style={{ color: "hsl(240 8% 42%)" }}>Gerando QR Code...</p>
               </div>
             ) : error ? (
               <div
@@ -257,7 +331,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
               >
                 <p className="text-sm mb-3" style={{ color: "#f87171" }}>{error}</p>
                 <button
-                  onClick={fetchQR}
+                  onClick={refreshQR}
                   className="text-xs transition-colors"
                   style={{ color: "hsl(240 8% 46%)" }}
                   onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 15% 80%)")}
@@ -269,26 +343,54 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
             ) : qrCode ? (
               <>
                 <div
-                  className="p-3 rounded-2xl"
+                  className="p-3 rounded-2xl relative"
                   style={{ background: "#ffffff", boxShadow: "0 0 0 1px rgba(0,212,106,0.2), 0 8px 32px rgba(0,0,0,0.4)" }}
                 >
+                   {/* Countdown overlay */}
+                   {qrCountdown !== null && (
+                    <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium"
+                      style={{ background: qrCountdown < 15 ? "rgba(239,68,68,0.9)" : "rgba(0,0,0,0.7)", color: "white" }}>
+                      <Clock className="w-3 h-3" />
+                      {qrCountdown}s
+                    </div>
+                  )}
                   <QRCodeSVG value={qrCode} size={200} />
                 </div>
                 <p className="text-xs text-center leading-relaxed" style={{ color: "hsl(240 8% 46%)" }}>
-                  Abra o WhatsApp → Dispositivos Vinculados → Vincular dispositivo
+                  Escaneie com o WhatsApp<br/>
+                  <span className="text-[10px]" style={{ color: "hsl(240 8% 36%)" }}>
+                    Abra WhatsApp → Ajustes → Dispositivos Vinculados → Vincular dispositivo
+                  </span>
                 </p>
+                {qrCountdown !== null && qrCountdown < 15 && (
+                  <p className="text-[10px] text-center" style={{ color: "#f87171" }}>
+                    QR expira em breve - novo código será gerado automaticamente
+                  </p>
+                )}
                 <button
-                  onClick={fetchQR}
+                  onClick={refreshQR}
                   className="flex items-center gap-1.5 text-xs transition-colors"
                   style={{ color: "hsl(240 8% 38%)" }}
                   onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
                   onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}
                 >
                   <RefreshCw className="w-3 h-3" />
-                  Atualizar QR Code
+                  Gerar novo QR Code
                 </button>
               </>
-            ) : null
+            ) : (
+              <div className="flex flex-col items-center gap-3 py-8">
+                <p className="text-sm" style={{ color: "hsl(240 8% 46%)" }}>Aguardando QR Code...</p>
+                <button
+                  onClick={refreshQR}
+                  className="flex items-center gap-1.5 text-xs transition-colors"
+                  style={{ color: "hsl(240 8% 38%)" }}
+                >
+                  <RefreshCw className="w-3 h-3 animate-spin" style={{ animationDuration: "2s" }} />
+                  Tentar novamente
+                </button>
+              </div>
+            )
 
           ) : (
             /* ── Pairing code mode ── */

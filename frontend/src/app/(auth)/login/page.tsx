@@ -195,22 +195,40 @@ function LoginForm({ onSuccess, tr }: { onSuccess: () => void; tr: (typeof LOGIN
     if (!identifier.trim() || !password.trim()) return;
     setLoading(true);
     setError("");
-    const result = await signIn("credentials", {
-      identifier: identifier.trim(),
-      password: password.trim(),
-      redirect: false,
-    });
-    setLoading(false);
-    if (result?.error) {
-      setError(result.error);
-    } else {
-      toast.success(tr.welcome);
-      onSuccess();
+    try {
+      const result = await signIn("credentials", {
+        identifier: identifier.trim(),
+        password: password.trim(),
+        redirect: false,
+      });
+      setLoading(false);
+      if (result?.error) {
+        // Map NextAuth errors to friendly messages
+        const msg = result.error === "CredentialsSignin" || result.error === "configuration"
+          ? "Credenciais incorretas"
+          : result.error === "AccessDenied"
+          ? "Acesso negado"
+          : "Credenciais incorretas";
+        setError(msg);
+      } else {
+        toast.success(tr.welcome);
+        onSuccess();
+      }
+    } catch {
+      setLoading(false);
+      setError("Erro de conexão. Tente novamente.");
     }
   };
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      {error && (
+        <div className="rounded-xl px-3.5 py-2.5 flex items-center gap-2"
+          style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.18)" }}>
+          <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+          <p className="text-xs text-red-400">{error}</p>
+        </div>
+      )}
       <Field
         label={tr.label_identifier}
         value={identifier}
@@ -219,7 +237,6 @@ function LoginForm({ onSuccess, tr }: { onSuccess: () => void; tr: (typeof LOGIN
         icon={<AtSign className="w-3.5 h-3.5" />}
         autoFocus
         autoComplete="username"
-        error={error && !password ? error : undefined}
       />
       <Field
         label={tr.label_password}
@@ -229,13 +246,7 @@ function LoginForm({ onSuccess, tr }: { onSuccess: () => void; tr: (typeof LOGIN
         placeholder={tr.ph_password}
         icon={<Lock className="w-3.5 h-3.5" />}
         autoComplete="current-password"
-        error={error && password ? error : undefined}
       />
-      {error && !(!identifier.trim() || !password.trim()) && (
-        <p className="text-xs flex items-center gap-1.5 text-red-400 -mt-1">
-          <AlertCircle className="w-3 h-3 flex-shrink-0" />{error}
-        </p>
-      )}
       <button
         type="submit"
         disabled={loading || !identifier.trim() || !password.trim()}
@@ -349,7 +360,6 @@ function RegisterForm({ onSuccess, tr }: { onSuccess: () => void; tr: (typeof LO
 export default function LoginPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("login");
-  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [lang, setLang] = useState<Lang>("pt");
   const tr = LOGIN_TR[lang];
 
@@ -370,17 +380,6 @@ export default function LoginPage() {
       return;
     }
     setTab(t);
-  };
-
-  const oauthSignIn = async (provider: string) => {
-    setOauthLoading(provider);
-    try {
-      await signIn(provider, { callbackUrl: "/instances" });
-    } catch {
-      toast.error(`Erro ao autenticar com ${provider}`);
-    } finally {
-      setOauthLoading(null);
-    }
   };
 
   return (
@@ -432,16 +431,14 @@ export default function LoginPage() {
                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                 </svg>}
-                onClick={() => oauthSignIn("google")}
-                loading={oauthLoading === "google"}
+                onClick={() => toast.info("Google Login em breve")}
               />
               <OAuthButton
                 provider="github" label="GitHub"
                 icon={<svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
                 </svg>}
-                onClick={() => oauthSignIn("github")}
-                loading={oauthLoading === "github"}
+                onClick={() => toast.info("GitHub Login em breve")}
               />
               <OAuthButton
                 provider="apple" label="Apple"
@@ -476,6 +473,21 @@ export default function LoginPage() {
             {tr.terms}
           </span>
         </p>
+
+        {/* API Docs link */}
+        <div className="text-center mt-3">
+          <a
+            href="/api-docs"
+            className="text-[11px] inline-flex items-center gap-1 transition-opacity hover:opacity-80"
+            style={{ color: "hsl(240 8% 40%)" }}
+          >
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            API Docs
+          </a>
+        </div>
       </div>
     </div>
   );

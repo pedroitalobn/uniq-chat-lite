@@ -7,10 +7,12 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/websocket/v2"
 	"github.com/uniq-chat/backend/internal/api/handlers"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/email"
+	"github.com/uniq-chat/backend/internal/services"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
 )
@@ -62,13 +64,13 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 			Available   bool   `json:"available"`
 		}
 		channels := []channelInfo{
-			{ID: "whatsapp",  Label: "WhatsApp",  Color: "#25d366", Description: "Conecte números WhatsApp via QR ou código de pareamento",          Available: true},
-			{ID: "instagram", Label: "Instagram", Color: "#e1306c", Description: "Conecte Instagram e gerencie DMs (instagram-cli / Meta Graph API)", Available: false},
-			{ID: "facebook",  Label: "Facebook",  Color: "#1877f2", Description: "Gerencie mensagens do Facebook Messenger via Meta API",             Available: false},
-			{ID: "telegram",  Label: "Telegram",  Color: "#229ed9", Description: "Crie bots e gerencie mensagens via Telegram Bot API",               Available: false},
-			{ID: "linkedin",  Label: "LinkedIn",  Color: "#0a66c2", Description: "Automatize mensagens e InMails via LinkedIn API",                   Available: false},
-			{ID: "tiktok",    Label: "TikTok",    Color: "#ff0050", Description: "Gerencie mensagens diretas e comentários via TikTok",               Available: false},
-			{ID: "kwai",      Label: "Kwai",      Color: "#ff6600", Description: "Gerencie mensagens e interações via Kwai",                          Available: false},
+			{ID: "whatsapp", Label: "WhatsApp", Color: "#25d366", Description: "Conecte números WhatsApp via QR ou código de pareamento", Available: true},
+			{ID: "instagram", Label: "Instagram", Color: "#e1306c", Description: "DMs, scraping, follow/unfollow, publicação de conteúdo", Available: false},
+			{ID: "tiktok", Label: "TikTok", Color: "#ff0050", Description: "DMs, scraping, follow/unfollow, interação com conteúdo", Available: false},
+			{ID: "facebook", Label: "Facebook", Color: "#1877f2", Description: "Gerencie mensagens do Facebook Messenger via Meta API", Available: false},
+			{ID: "telegram", Label: "Telegram", Color: "#229ed9", Description: "Crie bots e gerencie mensagens via Telegram Bot API", Available: false},
+			{ID: "linkedin", Label: "LinkedIn", Color: "#0a66c2", Description: "Automatize mensagens e InMails via LinkedIn API", Available: false},
+			{ID: "kwai", Label: "Kwai", Color: "#ff6600", Description: "Gerencie mensagens e interações via Kwai", Available: false},
 		}
 		return c.JSON(channels)
 	})
@@ -98,9 +100,25 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	campaignH := handlers.NewCampaignHandler(db, manager)
 	otpH := handlers.NewOTPHandler(db, manager)
 	serverH := handlers.NewServerHandler(db)
-	instagramH := handlers.NewInstagramHandler(db)
 	integrationH := handlers.NewIntegrationHandler(db)
 	recoveryH := handlers.NewRecoveryHandler(db, manager)
+
+	// Taktik — Instagram/TikTok automation
+	taktikSvc := services.NewTaktikService(db)
+	instagramH := handlers.NewInstagramHandler(db, taktikSvc)
+	tiktokH := handlers.NewTikTokHandler(db, taktikSvc)
+
+	// Proxy Manager (residential proxy pool)
+	proxyMgr := services.NewProxyManager(db)
+	resProxyH := handlers.NewResidencialProxyHandler(db, proxyMgr)
+
+	// AI Services
+	llmService := services.NewLLMService()
+	toolsH := handlers.NewToolsHandler(db, manager)
+	chatH := handlers.NewChatHandler(db, llmService)
+	chatH.SetToolsHandler(toolsH)
+	journeyH := handlers.NewJourneyHandler(db, llmService, manager)
+	agentH := handlers.NewAgentHandler(db)
 
 	// Plans (public — used by pricing/register page)
 	app.Get("/stripe/plans", stripeH.ListPlans)
@@ -156,6 +174,12 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	instance.Put("/proxy", proxyH.Set)
 	instance.Post("/proxy/test", proxyH.Test)
 	instance.Delete("/proxy", proxyH.Delete)
+
+	// Proxy residencial (residential proxy pool)
+	instance.Get("/proxy/residencial", resProxyH.GetInstanceProxy)
+	instance.Post("/proxy/residencial/assign", resProxyH.AssignProxy)
+	instance.Delete("/proxy/residencial/release", resProxyH.ReleaseProxy)
+	instance.Put("/proxy/mode", resProxyH.SetProxyMode)
 
 	// Messages
 	msgs := instance.Group("/messages")
@@ -216,13 +240,45 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	webhooks.Put("/:webhookId", webhookH.Update)
 	webhooks.Delete("/:webhookId", webhookH.Delete)
 
-	// ─── Instagram channel routes ─────────────────────────────────────────────
-	// Reuses OwnsInstance middleware — instance must have channel = "instagram"
-	igInst := api.Group("/instagram/instances/:id", middleware.OwnsInstance(db))
-	igInst.Post("/connect", instagramH.Connect)
-	igInst.Post("/disconnect", instagramH.Disconnect)
-	igInst.Get("/messages/dm", instagramH.GetDMs)
-	igInst.Post("/messages/dm", instagramH.SendDM)
+	// ─── Instagram routes ────────────────────────────────────────────────────
+	ig := api.Group("/instagram")
+	ig.Get("/health", instagramH.Health)
+	ig.Get("/accounts", instagramH.List)
+	ig.Post("/accounts", instagramH.Create)
+	ig.Get("/accounts/:id", instagramH.Get)
+	ig.Delete("/accounts/:id", instagramH.Delete)
+	ig.Put("/accounts/:id/settings", instagramH.UpdateSettings)
+	ig.Post("/accounts/:id/connect", instagramH.Connect)
+	ig.Post("/accounts/:id/disconnect", instagramH.Disconnect)
+	ig.Post("/accounts/:id/dm", instagramH.SendDM)
+	ig.Get("/accounts/:id/dm", instagramH.ReadDMs)
+	ig.Post("/accounts/:id/follow", instagramH.Follow)
+	ig.Post("/accounts/:id/unfollow", instagramH.Unfollow)
+	ig.Post("/accounts/:id/scrape/followers", instagramH.ScrapeFollowers)
+	ig.Post("/accounts/:id/scrape/hashtag", instagramH.ScrapeHashtag)
+	ig.Post("/accounts/:id/scrape/post", instagramH.ScrapePostLikers)
+	ig.Post("/accounts/:id/post", instagramH.PublishPost)
+	ig.Get("/targets", instagramH.ListTargets)
+	ig.Get("/dms", instagramH.ListDMs)
+
+	// ─── TikTok routes ──────────────────────────────────────────────────────
+	tk := api.Group("/tiktok")
+	tk.Get("/health", tiktokH.Health)
+	tk.Get("/accounts", tiktokH.List)
+	tk.Post("/accounts", tiktokH.Create)
+	tk.Get("/accounts/:id", tiktokH.Get)
+	tk.Delete("/accounts/:id", tiktokH.Delete)
+	tk.Put("/accounts/:id/settings", tiktokH.UpdateSettings)
+	tk.Post("/accounts/:id/connect", tiktokH.Connect)
+	tk.Post("/accounts/:id/disconnect", tiktokH.Disconnect)
+	tk.Post("/accounts/:id/dm", tiktokH.SendDM)
+	tk.Get("/accounts/:id/dm", tiktokH.ReadDMs)
+	tk.Post("/accounts/:id/follow", tiktokH.Follow)
+	tk.Post("/accounts/:id/unfollow", tiktokH.Unfollow)
+	tk.Post("/accounts/:id/scrape/followers", tiktokH.ScrapeFollowers)
+	tk.Post("/accounts/:id/scrape/hashtag", tiktokH.ScrapeHashtag)
+	tk.Get("/targets", tiktokH.ListTargets)
+	tk.Get("/dms", tiktokH.ListDMs)
 
 	// ─── CRM routes ───────────────────────────────────────────────────────────
 	crm := api.Group("/crm")
@@ -243,6 +299,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	campaigns := api.Group("/campaigns")
 	campaigns.Get("/", campaignH.List)
 	campaigns.Post("/", campaignH.Create)
+	campaigns.Get("/segment-options", campaignH.SegmentOptions)
+	campaigns.Post("/segment-preview", campaignH.SegmentPreview)
 	campaigns.Get("/:id", campaignH.Get)
 	campaigns.Post("/:id/start", campaignH.Start)
 	campaigns.Post("/:id/pause", campaignH.Pause)
@@ -265,6 +323,29 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// AI generation (uses user integrations)
 	api.Post("/ai/generate", integrationH.GenerateVariations)
 
+	// AI Chat & Journeys
+	api.Post("/ai/chat", chatH.HandleChat)
+	api.Get("/ai/tools", chatH.GetTools)
+	journeys := api.Group("/journeys")
+	journeys.Get("/", journeyH.ListJourneys)
+	journeys.Post("/", journeyH.CreateJourney)
+	journeys.Patch("/:id/status", journeyH.ToggleStatus)
+	journeys.Delete("/:id", journeyH.DeleteJourney)
+	journeys.Get("/:id", journeyH.GetJourney)
+	journeys.Get("/:id/executions", agentH.GetJourneyExecutions)
+
+	// Agent Center
+	agent := api.Group("/agent")
+	agent.Get("/stats", agentH.GetStats)
+	agent.Get("/activity", agentH.GetActivity)
+	agent.Get("/instances", agentH.GetInstances)
+	agent.Post("/executions/:id/stop", agentH.StopExecution)
+
+	// Agent WebSocket
+	app.Get("/ws/agent-activity", websocket.New(func(c *websocket.Conn) {
+		agentH.ActivityWS(c)
+	}))
+
 	// Instance agent (AI agent config per instance)
 	instance.Get("/agent", integrationH.GetAgent)
 	instance.Put("/agent", integrationH.UpdateAgent)
@@ -274,6 +355,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	apiKeys.Get("/", apiKeyH.List)
 	apiKeys.Post("/", apiKeyH.Create)
 	apiKeys.Delete("/:id", apiKeyH.Delete)
+
+	// Proxy pool (admin only)
+	proxyPool := api.Group("/proxy")
+	proxyPool.Get("/pool", resProxyH.ListPool)
+	proxyPool.Get("/stats", resProxyH.GetPoolStats)
 
 	// ─── Servers ──────────────────────────────────────────────────────────────
 	servers := api.Group("/servers")

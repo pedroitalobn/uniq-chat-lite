@@ -3,7 +3,7 @@
 import { useState, Suspense } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { instancesApi, serversApi } from "@/lib/api";
-import { Plus, Globe, AlertTriangle, Smartphone, Trash2, QrCode, RefreshCw, Server as ServerIcon, X, MessageSquare, Hash } from "lucide-react";
+import { Plus, Globe, AlertTriangle, Smartphone, Trash2, QrCode, RefreshCw, Server as ServerIcon, X, MessageSquare, Hash, Shield, Wifi } from "lucide-react";
 import { showConfirm } from "@/lib/confirm";
 import { usePreferences } from "@/lib/preferences";
 import { toast } from "sonner";
@@ -87,12 +87,18 @@ function InstanceCard({
                 <img src={profile.profile_pic_url} alt="" className="w-10 h-10 rounded-xl object-cover"
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
               ) : (
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center relative"
                   style={{
                     background: isConnected ? "rgba(0,212,106,0.1)" : "rgba(255,255,255,0.04)",
                     border: isConnected ? "1px solid rgba(0,212,106,0.2)" : "1px solid rgba(255,255,255,0.06)",
                   }}>
                   <Smartphone className="w-4 h-4" style={{ color: isConnected ? "var(--green)" : "#64748b" }} />
+                  {instance.proxy_mode === "residencial" && instance.proxy_status === "ok" && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[8px]"
+                      style={{ background: "#a855f7", color: "white" }}>
+                      <Shield className="w-2.5 h-2.5" />
+                    </span>
+                  )}
                 </div>
               )}
               {isConnected && (
@@ -157,14 +163,39 @@ function InstanceCard({
             </span>
           )}
           {instance.proxy_enabled && instance.proxy_status === "ok" && (
-            <span className="status-badge" style={{
-              background: "rgba(59,130,246,0.08)",
-              color: "#60a5fa",
-              borderColor: "rgba(59,130,246,0.18)",
-            }}>
-              <Globe className="w-3 h-3" />
-              Proxy
-            </span>
+            instance.proxy_mode === "residencial" ? (
+              <span className="status-badge" style={{
+                background: "rgba(168,85,247,0.08)",
+                color: "#a855f7",
+                borderColor: "rgba(168,85,247,0.18)",
+              }}>
+                <Shield className="w-3 h-3" />
+                Residencial
+                {(() => {
+                  // Extract country from proxy_host or proxy_username
+                  const username = instance.proxy_username || "";
+                  const countryMatch = username.match(/country-([a-z]{2})/i);
+                  const country = countryMatch ? countryMatch[1].toUpperCase() : "BR";
+                  const flags: Record<string, string> = {
+                    BR: "🇧🇷", US: "🇺🇸", GB: "🇬🇧", DE: "🇩🇪", FR: "🇫🇷",
+                    CA: "🇨🇦", AU: "🇦🇺", JP: "🇯🇵", IN: "🇮🇳", MX: "🇲🇽",
+                    AR: "🇦🇷", CL: "🇨🇱", CO: "🇨🇴", PT: "🇵🇹", ES: "🇪🇸",
+                  };
+                  return (
+                    <span className="ml-1 text-[10px]">{flags[country] || "🌍"} {country}</span>
+                  );
+                })()}
+              </span>
+            ) : (
+              <span className="status-badge" style={{
+                background: "rgba(59,130,246,0.08)",
+                color: "#60a5fa",
+                borderColor: "rgba(59,130,246,0.18)",
+              }}>
+                <Globe className="w-3 h-3" />
+                Proxy manual
+              </span>
+            )
           )}
           {instance.proxy_enabled && instance.proxy_status === "failed" && (
             <span className="status-badge" style={{
@@ -174,6 +205,16 @@ function InstanceCard({
             }}>
               <AlertTriangle className="w-3 h-3" />
               Proxy erro
+            </span>
+          )}
+          {instance.proxy_enabled && instance.proxy_status === "untested" && (
+            <span className="status-badge" style={{
+              background: "rgba(234,179,8,0.08)",
+              color: "#fbbf24",
+              borderColor: "rgba(234,179,8,0.18)",
+            }}>
+              <Wifi className="w-3 h-3" />
+              Proxy teste
             </span>
           )}
         </div>

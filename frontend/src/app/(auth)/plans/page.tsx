@@ -205,7 +205,7 @@ export default function PlansPage() {
 
   const handleSelect = (plan: Plan) => {
     setSelecting(plan.id);
-    router.push(`/register?plan=${encodeURIComponent(plan.name)}&plan_id=${plan.id}`);
+    router.push(`/register?plan=${encodeURIComponent(plan.name)}&plan_id=${plan.id}&price=${plan.price}`);
   };
 
   return (
@@ -245,8 +245,8 @@ export default function PlansPage() {
             <Loader2 className="w-6 h-6 animate-spin" style={{ color: "hsl(240 8% 40%)" }} />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
-            {plans.filter(p => p.name !== "Free").map((plan) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
+            {plans.map((plan) => (
               <PlanCard key={plan.id} plan={plan} onSelect={handleSelect} loading={selecting === plan.id} />
             ))}
           </div>

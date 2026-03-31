@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api";
 import {
-  CreditCard, Shield, Edit2, Check, X, Loader2, Globe, Zap, Plus, GripVertical, Trash2,
+  CreditCard, Shield, Edit2, Check, X, Loader2, Globe, Zap, Plus, GripVertical, Trash2, Flame,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Plan } from "@/types";
@@ -35,7 +35,9 @@ const FEATURE_KEYS = [
 
 const PLAN_STYLES: Record<string, { icon: string; accent: string; bg: string; border: string; gradient: string }> = {
   Free:       { icon: "#64748b", accent: "#64748b", bg: "rgba(100,116,139,0.05)", border: "rgba(100,116,139,0.12)", gradient: "linear-gradient(135deg,rgba(100,116,139,0.12),rgba(100,116,139,0.04))" },
+  Starter:    { icon: "#fb923c", accent: "#fb923c", bg: "rgba(251,146,60,0.05)",  border: "rgba(251,146,60,0.15)",  gradient: "linear-gradient(135deg,rgba(251,146,60,0.12),rgba(251,146,60,0.04))" },
   Pro:        { icon: "#60a5fa", accent: "#60a5fa", bg: "rgba(96,165,250,0.05)",  border: "rgba(96,165,250,0.15)",  gradient: "linear-gradient(135deg,rgba(96,165,250,0.12),rgba(96,165,250,0.04))" },
+  Business:   { icon: "#a78bfa", accent: "#a78bfa", bg: "rgba(167,139,250,0.05)", border: "rgba(167,139,250,0.15)", gradient: "linear-gradient(135deg,rgba(167,139,250,0.12),rgba(167,139,250,0.04))" },
   Enterprise: { icon: "#a78bfa", accent: "#a78bfa", bg: "rgba(167,139,250,0.05)", border: "rgba(167,139,250,0.15)", gradient: "linear-gradient(135deg,rgba(167,139,250,0.12),rgba(167,139,250,0.04))" },
   _default:   { icon: "#c084fc", accent: "#c084fc", bg: "rgba(192,132,252,0.05)", border: "rgba(192,132,252,0.15)", gradient: "linear-gradient(135deg,rgba(192,132,252,0.12),rgba(192,132,252,0.04))" },
 };
@@ -181,13 +183,13 @@ function FeatureGrid({
       <p className="text-xs font-medium mb-2" style={{ color: "hsl(240 8% 46%)" }}>Recursos incluídos</p>
       <div className="grid grid-cols-2 gap-2">
         {FEATURE_KEYS.map(({ key, label, icon }) => (
-          <label key={key} className="flex items-center gap-2.5 cursor-pointer p-2 rounded-xl transition-colors"
+          <label key={key} className="flex items-center gap-2 cursor-pointer p-2 rounded-xl transition-colors overflow-hidden min-w-0"
             style={{
               background: checkboxes[key] ? "rgba(0,212,106,0.06)" : "rgba(255,255,255,0.02)",
               border: checkboxes[key] ? "1px solid rgba(0,212,106,0.18)" : "1px solid rgba(255,255,255,0.05)",
             }}>
-            <span className="text-sm leading-none">{icon}</span>
-            <span className="text-xs flex-1" style={{ color: checkboxes[key] ? "hsl(240 15% 88%)" : "hsl(240 8% 50%)" }}>{label}</span>
+            <span className="text-sm leading-none flex-shrink-0">{icon}</span>
+            <span className="text-xs flex-1 truncate min-w-0" style={{ color: checkboxes[key] ? "hsl(240 15% 88%)" : "hsl(240 8% 50%)" }}>{label}</span>
             <Toggle checked={checkboxes[key]} onChange={(v) => onChange(key, v)} />
           </label>
         ))}
@@ -292,12 +294,12 @@ function PlanEditForm({
       />
 
       {/* Toggles */}
-      <div className="flex items-center gap-5">
-        <label className="flex items-center gap-2.5 cursor-pointer">
+      <div className="flex items-center gap-5 flex-wrap">
+        <label className="flex items-center gap-2.5 cursor-pointer flex-shrink-0">
           <Toggle checked={form.allow_proxy} onChange={(v) => setForm({ ...form, allow_proxy: v })} color="rgba(96,165,250,0.8)" />
           <span className="text-xs" style={{ color: "hsl(240 8% 60%)" }}>Proxy</span>
         </label>
-        <label className="flex items-center gap-2.5 cursor-pointer">
+        <label className="flex items-center gap-2.5 cursor-pointer flex-shrink-0">
           <Toggle checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
           <span className="text-xs" style={{ color: "hsl(240 8% 60%)" }}>Ativo</span>
         </label>
@@ -390,10 +392,12 @@ function PlanCard({ plan }: { plan: Plan }) {
             className="w-10 h-10 rounded-xl flex items-center justify-center"
             style={{ background: style.gradient, border: `1px solid ${style.border}` }}
           >
-            {plan.name === "Enterprise"
+            {plan.name === "Enterprise" || plan.name === "Business"
               ? <Zap className="w-5 h-5" style={{ color: style.icon }} />
               : plan.name === "Pro"
               ? <CreditCard className="w-5 h-5" style={{ color: style.icon }} />
+              : plan.name === "Starter"
+              ? <Flame className="w-5 h-5" style={{ color: style.icon }} />
               : <Shield className="w-5 h-5" style={{ color: style.icon }} />
             }
           </div>
@@ -630,11 +634,11 @@ export default function AdminPlansPage() {
 
       {/* Plans grid */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => <div key={i} className="skeleton h-52 rounded-2xl" />)}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-52 rounded-2xl" />)}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {plans.map((plan) => <PlanCard key={plan.id} plan={plan} />)}
         </div>
       )}

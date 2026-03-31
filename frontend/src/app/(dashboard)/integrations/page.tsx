@@ -9,6 +9,105 @@ import {
 import { integrationsApi } from "@/lib/api";
 import { toast } from "sonner";
 
+// ─── Provider icons (inline SVG) ─────────────────────────────────────────────
+
+const ProviderIcon = ({ id, color }: { id: string; color: string }) => {
+  const icons: Record<string, React.ReactNode> = {
+    // OpenAI — star/sparkle
+    openai: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5">
+        <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" fill="none"/>
+        <path d="M12 4.5l1.8 4.5 4.7.2-3.5 2.8 1.2 4.5L12 13.5l-4.2 3 1.2-4.5-3.5-2.8 4.7-.2z" fill={color} stroke={color} strokeWidth="0.5"/>
+      </svg>
+    ),
+    // Claude — Anthropic "A" shape
+    claude: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5">
+        <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" fill="none"/>
+        <path d="M7 16l2.5-8h2l2 4h1.5l1.5-4h1" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      </svg>
+    ),
+    // DeepSeek — whale/diver icon
+    deepseek: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5">
+        <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" fill="none"/>
+        <path d="M6 13c1.5-2 4-3 6-3s4.5 1 6 3" stroke={color} strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+        <path d="M9 10c.5-.8 1.5-1.5 3-1.5s2.5.7 3 1.5" stroke={color} strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+        <circle cx="9" cy="11" r="1.2" fill={color}/>
+        <circle cx="15" cy="11" r="1.2" fill={color}/>
+      </svg>
+    ),
+    // Gemini — four-point star
+    gemini: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5">
+        <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" fill="none"/>
+        <path d="M12 4c0 4-2 6-6 6 4 0 6 2 6 6 0-4 2-6 6-6-4 0-6-2-6-6z" fill={color}/>
+      </svg>
+    ),
+    // OpenRouter — network/routing
+    openrouter: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5">
+        <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" fill="none"/>
+        <circle cx="12" cy="12" r="2.5" fill={color}/>
+        <path d="M12 9.5V6M12 14.5V18M9.5 12H6M14.5 12H18" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      </svg>
+    ),
+    // n8n — stylized n
+    n8n: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5">
+        <rect x="3" y="3" width="18" height="18" rx="4" stroke={color} strokeWidth="1.5" fill="none"/>
+        <path d="M8 16V8l4 4 4-4v8" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      </svg>
+    ),
+    // Kilo — K
+    kilo: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5">
+        <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" fill="none"/>
+        <path d="M8 8v8M8 12l4-4M8 12l4 4" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    ),
+    // Z.AI — Z letter
+    zai: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5">
+        <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" fill="none"/>
+        <path d="M8 8h8l-8 8h8" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      </svg>
+    ),
+    // Kimi (Moonshot) — crescent moon
+    kimi: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5">
+        <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" fill="none"/>
+        <path d="M15 8.5A6 6 0 0 0 9.5 15 4.5 4.5 0 0 1 15 8.5z" fill={color}/>
+        <circle cx="16" cy="8" r="0.8" fill={color}/>
+        <circle cx="18" cy="11" r="0.5" fill={color}/>
+      </svg>
+    ),
+    // Qwen (Alibaba) — cloud shape
+    qwen: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5">
+        <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" fill="none"/>
+        <path d="M7 14a3 3 0 0 1 0-4h1a4 4 0 0 1 7.5-2h.5A2.5 2.5 0 0 1 16 10.5a3 3 0 0 1-1 5.5H7z" fill={color}/>
+      </svg>
+    ),
+    // MiniMax — double M
+    minimax: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5">
+        <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" fill="none"/>
+        <path d="M6 15V9l2 4 2-4v6M14 15V9l2 4 2-4v6" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      </svg>
+    ),
+    // Manus — hexagon with eye
+    manus: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5">
+        <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" fill="none"/>
+        <path d="M6 12c0 0 3-4 6-4s6 4 6 4-3 4-6 4-6-4-6-4z" stroke={color} strokeWidth="1.5" fill="none"/>
+        <circle cx="12" cy="12" r="2" fill={color}/>
+      </svg>
+    ),
+  };
+  return icons[id] || <Plug className="w-5 h-5" style={{ color }} />;
+};
+
 // ─── Provider metadata ────────────────────────────────────────────────────────
 
 const PROVIDERS = [
@@ -75,16 +174,64 @@ const PROVIDERS = [
     keyLabel: "API Key (opcional)",
   },
   {
-    id: "webhook",
-    name: "Webhook Genérico",
-    description: "Integre qualquer serviço via HTTP webhook",
-    color: "#64748b",
-    bg: "rgba(100,116,139,0.08)",
-    border: "rgba(100,116,139,0.2)",
-    models: [],
-    hasBaseURL: true,
-    urlLabel: "Endpoint URL",
-    keyLabel: "Secret / Token (opcional)",
+    id: "kilo",
+    name: "Kilo",
+    description: "LLM Kilo - Modelo de linguagem avançado",
+    color: "#00d46a",
+    bg: "rgba(0,212,106,0.08)",
+    border: "rgba(0,212,106,0.2)",
+    models: ["kilo/kilo-auto/balanced", "kilo/kilo-auto/reasoning", "kilo/kilo-auto/fast"],
+    hasBaseURL: false,
+  },
+  {
+    id: "zai",
+    name: "Z.AI",
+    description: "Z.AI - Modelo de IA brasileiro",
+    color: "#f97316",
+    bg: "rgba(249,115,22,0.08)",
+    border: "rgba(249,115,22,0.2)",
+    models: ["zai/balanco-7b", "zai/pro-7b", "zai/fast-3b"],
+    hasBaseURL: false,
+  },
+  {
+    id: "kimi",
+    name: "Kimi (Moonshot)",
+    description: "Moonshot AI - Assistente chinês com contexto longo",
+    color: "#00a6ed",
+    bg: "rgba(0,166,237,0.08)",
+    border: "rgba(0,166,237,0.2)",
+    models: ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"],
+    hasBaseURL: false,
+  },
+  {
+    id: "qwen",
+    name: "Qwen (Alibaba)",
+    description: "Qwen - Modelo da Alibaba Cloud",
+    color: "#ff6a00",
+    bg: "rgba(255,106,0,0.08)",
+    border: "rgba(255,106,0,0.2)",
+    models: ["qwen-turbo", "qwen-plus", "qwen-max", "qwen2.5-72b-instruct"],
+    hasBaseURL: false,
+  },
+  {
+    id: "minimax",
+    name: "MiniMax",
+    description: "MiniMax - Modelo chinês de alta performance",
+    color: "#7c3aed",
+    bg: "rgba(124,58,237,0.08)",
+    border: "rgba(124,58,237,0.2)",
+    models: ["abab6.5-chat", "abab6.5s-chat", "MiniMax-M1"],
+    hasBaseURL: false,
+  },
+  {
+    id: "manus",
+    name: "Manus",
+    description: "Manus - Modelo de IA avançado",
+    color: "#ec4899",
+    bg: "rgba(236,72,153,0.08)",
+    border: "rgba(236,72,153,0.2)",
+    models: ["manus-base", "manus-pro"],
+    hasBaseURL: false,
   },
 ] as const;
 
@@ -149,12 +296,12 @@ function ConnectModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-md rounded-2xl border p-6 space-y-5"
-        style={{ background: "hsl(var(--card))", borderColor: "var(--border)" }}>
+        style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
         {/* Header */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center"
             style={{ background: provider.bg, border: `1px solid ${provider.border}` }}>
-            <Plug className="w-5 h-5" style={{ color: provider.color }} />
+            <ProviderIcon id={provider.id} color={provider.color} />
           </div>
           <div>
             <h2 className="font-semibold text-sm" style={{ color: "var(--text-1)" }}>
@@ -170,7 +317,7 @@ function ConnectModal({
           <input
             className="w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-1"
             style={{
-              background: "hsl(var(--input))", borderColor: "var(--border)",
+              background: "var(--surface-3)", borderColor: "var(--surface-border)",
               color: "var(--text-1)",
             }}
             value={form.name}
@@ -181,14 +328,13 @@ function ConnectModal({
         {/* API Key */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium" style={{ color: "var(--text-2)" }}>
-            {provider.id === "n8n" ? "API Key (opcional)" :
-             provider.id === "webhook" ? "Secret / Token (opcional)" : "API Key"}
+            {provider.id === "n8n" ? "API Key (opcional)" : "API Key"}
           </label>
           <div className="relative">
             <input
               type={showKey ? "text" : "password"}
               className="w-full rounded-xl border px-3 py-2 pr-10 text-sm outline-none focus:ring-1"
-              style={{ background: "hsl(var(--input))", borderColor: "var(--border)", color: "var(--text-1)" }}
+              style={{ background: "var(--surface-3)", borderColor: "var(--surface-border)", color: "var(--text-1)" }}
               placeholder={`sk-...`}
               value={form.api_key}
               onChange={(e) => setForm({ ...form, api_key: e.target.value })}
@@ -208,12 +354,11 @@ function ConnectModal({
         {(provider.hasBaseURL || providerId === "openrouter") && (
           <div className="space-y-1.5">
             <label className="text-xs font-medium" style={{ color: "var(--text-2)" }}>
-              {provider.id === "n8n" ? "Webhook URL do n8n" :
-               provider.id === "webhook" ? "Endpoint URL" : "Base URL (opcional)"}
+              {provider.id === "n8n" ? "Webhook URL do n8n" : "Base URL (opcional)"}
             </label>
             <input
               className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-              style={{ background: "hsl(var(--input))", borderColor: "var(--border)", color: "var(--text-1)" }}
+              style={{ background: "var(--surface-3)", borderColor: "var(--surface-border)", color: "var(--text-1)" }}
               placeholder="https://..."
               value={form.base_url}
               onChange={(e) => setForm({ ...form, base_url: e.target.value })}
@@ -229,7 +374,7 @@ function ConnectModal({
               <div className="relative">
                 <select
                   className="w-full rounded-xl border px-3 py-2 text-sm appearance-none outline-none"
-                  style={{ background: "hsl(var(--input))", borderColor: "var(--border)", color: "var(--text-1)" }}
+                  style={{ background: "var(--surface-3)", borderColor: "var(--surface-border)", color: "var(--text-1)" }}
                   value={form.model}
                   onChange={(e) => setForm({ ...form, model: e.target.value })}
                 >
@@ -243,7 +388,7 @@ function ConnectModal({
             ) : (
               <input
                 className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                style={{ background: "hsl(var(--input))", borderColor: "var(--border)", color: "var(--text-1)" }}
+                style={{ background: "var(--surface-3)", borderColor: "var(--surface-border)", color: "var(--text-1)" }}
                 placeholder="nome-do-modelo"
                 value={form.model}
                 onChange={(e) => setForm({ ...form, model: e.target.value })}
@@ -265,13 +410,13 @@ function ConnectModal({
           <button
             onClick={onClose}
             className="flex-1 py-2 rounded-xl border text-sm font-medium transition-opacity hover:opacity-70"
-            style={{ borderColor: "var(--border)", color: "var(--text-2)" }}
+            style={{ borderColor: "var(--surface-border)", color: "var(--text-2)" }}
           >
             Cancelar
           </button>
           <button
             onClick={() => create.mutate()}
-            disabled={create.isPending || (!form.api_key && providerId !== "webhook" && providerId !== "n8n")}
+            disabled={create.isPending || (!form.api_key && providerId !== "n8n")}
             className="flex-1 py-2 rounded-xl text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
             style={{ background: "var(--green)", color: "#000" }}
           >
@@ -315,7 +460,7 @@ function IntegrationCard({ integration }: { integration: Integration }) {
 
   return (
     <div className="rounded-2xl border p-4 flex items-center gap-4"
-      style={{ background: "hsl(var(--card))", borderColor: "var(--border)" }}>
+      style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
       {/* Icon */}
       <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
         style={{ background: bg, border: `1px solid ${border}` }}>
@@ -357,7 +502,7 @@ function IntegrationCard({ integration }: { integration: Integration }) {
         <button
           onClick={() => test.mutate()}
           disabled={test.isPending}
-          className="p-2 rounded-xl transition-colors hover:bg-white/5"
+          className="p-2 rounded-xl transition-colors hover:bg-neutral-500/10"
           style={{ color: "var(--text-3)" }}
           title="Testar conexão"
         >
@@ -392,6 +537,7 @@ function ProviderButton({
     <button
       onClick={onClick}
       className="relative flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition-all hover:scale-[1.01]"
+      suppressHydrationWarning
       style={{
         background: provider.bg,
         borderColor: connected ? provider.color : provider.border,
@@ -403,9 +549,9 @@ function ProviderButton({
           <CheckCircle2 className="w-2.5 h-2.5" /> conectado
         </span>
       )}
-      <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-        style={{ background: `${provider.color}18` }}>
-        <Plug className="w-4 h-4" style={{ color: provider.color }} />
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+        style={{ background: `${provider.color}18` }} suppressHydrationWarning>
+        <ProviderIcon id={provider.id} color={provider.color} />
       </div>
       <div>
         <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>{provider.name}</p>
@@ -444,7 +590,7 @@ export default function IntegrationsPage() {
   const connectedProviders = new Set(integrations.map((i) => i.provider));
 
   return (
-    <div className="min-h-screen p-6 lg:p-8" style={{ background: "var(--bg)" }}>
+    <div className="min-h-screen p-6 lg:p-8" style={{ background: "var(--bg)" }} suppressHydrationWarning>
       <div className="max-w-4xl mx-auto space-y-8">
 
         {/* Header */}
@@ -452,7 +598,7 @@ export default function IntegrationsPage() {
           <div>
             <div className="flex items-center gap-2.5 mb-1">
               <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-                style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}>
+                style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }} suppressHydrationWarning>
                 <Plug className="w-4 h-4" style={{ color: "var(--green)" }} />
               </div>
               <h1 className="text-xl font-bold" style={{ color: "var(--text-1)" }}>Integrações</h1>
@@ -486,7 +632,7 @@ export default function IntegrationsPage() {
             },
           ].map((card) => (
             <div key={card.title} className="rounded-2xl border p-4"
-              style={{ background: "hsl(var(--card))", borderColor: "var(--border)" }}>
+              style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
               <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2.5"
                 style={{ background: `${card.color}15` }}>
                 <card.icon className="w-3.5 h-3.5" style={{ color: card.color }} />
@@ -526,7 +672,7 @@ export default function IntegrationsPage() {
           )}
           {!isLoading && integrations.length === 0 && (
             <div className="rounded-2xl border border-dashed py-12 flex flex-col items-center gap-3"
-              style={{ borderColor: "var(--border)" }}>
+              style={{ borderColor: "var(--surface-border)" }}>
               <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
                 style={{ background: "rgba(0,212,106,0.06)", border: "1px solid rgba(0,212,106,0.12)" }}>
                 <Plug className="w-5 h-5" style={{ color: "var(--green)", opacity: 0.5 }} />

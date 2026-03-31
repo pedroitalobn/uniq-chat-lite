@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/queue"
@@ -15,11 +17,11 @@ import (
 
 // Manager manages all active WhatsApp instance clients.
 type Manager struct {
-	mu           sync.RWMutex
-	clients      map[string]*InstanceClient
-	consumers    map[string]context.CancelFunc // instanceID → queue consumer cancel
-	sessionDir   string
-	db           *gorm.DB
+	mu         sync.RWMutex
+	clients    map[string]*InstanceClient
+	consumers  map[string]context.CancelFunc // instanceID → queue consumer cancel
+	sessionDir string
+	db         *gorm.DB
 }
 
 var GlobalManager *Manager
@@ -329,4 +331,278 @@ func parseEventsJSON(raw string) []string {
 		return []string{"*"}
 	}
 	return events
+}
+
+// CheckJourneys checks if any journey should be triggered for the given message
+// and executes them asynchronously.
+func (m *Manager) CheckJourneys(instanceID, fromJID, fromName, groupJID, messageText string) {
+	instUUID, err := uuid.Parse(instanceID)
+	if err != nil {
+		return
+	}
+
+	var journeys []models.Journey
+	if err := m.db.Preload("Instance").Where("instance_id = ? AND status = 'active'", instUUID).Find(&journeys).Error; err != nil {
+		return
+	}
+
+	for i := range journeys {
+		journey := &journeys[i]
+		if !journey.ShouldTrigger(messageText, groupJID) {
+			continue
+		}
+
+		// Se a jornada tem fluxo multi-step, usar o executor
+		if journey.HasFlow() {
+			go func(j *models.Journey) {
+				m.executeJourneyWithFlow(j, fromJID, fromName, groupJID, messageText)
+			}(journey)
+		} else {
+			go func(j *models.Journey) {
+				if err := m.executeJourney(j, fromJID, fromName, messageText); err != nil {
+					log.Error().Err(err).Str("journey", j.ID).Msg("failed to execute journey")
+				}
+			}(journey)
+		}
+	}
+}
+
+// executeJourneyWithFlow executa uma jornada com fluxo multi-step
+func (m *Manager) executeJourneyWithFlow(journey *models.Journey, fromJID, fromName, groupJID, messageText string) {
+	client := m.GetInstance(journey.InstanceID)
+	if client == nil {
+		log.Error().Str("journey", journey.ID).Msg("instance not running for journey with flow")
+		return
+	}
+
+	// Criar executor
+	sendFunc := func(instanceID, recipientJID, message string) error {
+		c := m.GetInstance(instanceID)
+		if c == nil {
+			return fmt.Errorf("instance not running")
+		}
+		_, err := c.SendTextMessage(recipientJID, message)
+		return err
+	}
+
+	// Importar o serviço - aqui fazemos uma referência circular que precisa ser resolvida
+	// Por enquanto, usamos o método simples até que o executor seja injetado
+	log.Info().
+		Str("journey", journey.ID).
+		Str("from", fromJID).
+		Str("group", groupJID).
+		Msg("executando jornada com fluxo")
+
+	// Criar execução no banco
+	execution := &models.JourneyExecution{
+		JourneyID:   journey.ID,
+		InstanceID:  journey.InstanceID,
+		ContactJID:  fromJID,
+		ContactName: fromName,
+		GroupJID:    groupJID,
+		Status:      models.ExecutionActive,
+		StartedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	flow := journey.GetFlow()
+	if flow != nil {
+		execution.TotalSteps = len(flow.Steps)
+		if flow.StartStep != "" {
+			execution.CurrentStep = flow.StartStep
+		} else if len(flow.Steps) > 0 {
+			execution.CurrentStep = flow.Steps[0].ID
+		}
+	} else {
+		execution.TotalSteps = 1
+	}
+
+	m.db.Create(execution)
+
+	// Adicionar mensagem de entrada
+	execution.AddMessage("inbound", messageText, "")
+	m.db.Save(execution)
+
+	// Executar cada passo do fluxo
+	if flow != nil {
+		m.executeFlowSteps(journey, execution, flow, fromJID, fromName, groupJID)
+	} else {
+		// Fallback: enviar a mensagem template como passo único
+		responseMsg := buildJourneyResponse(journey, fromName, messageText)
+		recipientJID := fromJID
+		if journey.ResponseMode == "group" && groupJID != "" {
+			recipientJID = groupJID
+		} else if !strings.Contains(recipientJID, "@") {
+			recipientJID = recipientJID + "@s.whatsapp.net"
+		}
+
+		if _, err := client.SendTextMessage(recipientJID, responseMsg); err == nil {
+			execution.AddMessage("outbound", responseMsg, "")
+		}
+		m.completeExecution(execution, journey)
+	}
+
+	// Ativar sendFunc variável não usada
+	_ = sendFunc
+}
+
+// executeFlowSteps executa os passos do fluxo
+func (m *Manager) executeFlowSteps(journey *models.Journey, execution *models.JourneyExecution, flow *models.JourneyFlow, fromJID, fromName, groupJID string) {
+	client := m.GetInstance(journey.InstanceID)
+	if client == nil {
+		m.failExecution(execution, "instance not running")
+		return
+	}
+
+	for i, step := range flow.Steps {
+		if execution.Status != models.ExecutionActive {
+			break
+		}
+
+		execution.CurrentStep = step.ID
+		execution.StepIndex = i
+		execution.UpdatedAt = time.Now()
+		m.db.Save(execution)
+
+		switch step.Type {
+		case models.StepTypeMessage:
+			var config struct {
+				Message string `json:"message"`
+				Mode    string `json:"mode"`
+			}
+			if err := json.Unmarshal(step.Config, &config); err != nil {
+				log.Error().Err(err).Str("step", step.ID).Msg("falha ao parsear config")
+				continue
+			}
+
+			msg := strings.ReplaceAll(config.Message, "{{name}}", fromName)
+			msg = strings.ReplaceAll(msg, "{{contact_name}}", fromName)
+
+			recipientJID := fromJID
+			if config.Mode == "group" && groupJID != "" {
+				recipientJID = groupJID
+			} else if !strings.Contains(recipientJID, "@") {
+				recipientJID = recipientJID + "@s.whatsapp.net"
+			}
+
+			if _, err := client.SendTextMessage(recipientJID, msg); err != nil {
+				log.Error().Err(err).Str("step", step.ID).Msg("falha ao enviar mensagem")
+				continue
+			}
+			execution.AddMessage("outbound", msg, step.ID)
+			m.db.Save(execution)
+
+		case models.StepTypeWait:
+			var config struct {
+				Duration string `json:"duration"`
+			}
+			if err := json.Unmarshal(step.Config, &config); err == nil {
+				duration, err := time.ParseDuration(config.Duration)
+				if err != nil {
+					duration = 5 * time.Second
+				}
+				if duration > 0 && duration <= 24*time.Hour {
+					time.Sleep(duration)
+				}
+			}
+		}
+
+		// Pequeno delay entre passos
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	m.completeExecution(execution, journey)
+}
+
+// completeExecution marca uma execução como completa
+func (m *Manager) completeExecution(execution *models.JourneyExecution, journey *models.Journey) {
+	now := time.Now()
+	execution.Status = models.ExecutionCompleted
+	execution.CompletedAt = &now
+	execution.UpdatedAt = now
+	m.db.Save(execution)
+
+	m.db.Model(journey).Updates(map[string]interface{}{
+		"invocations":     journey.Invocations + 1,
+		"completed_count": journey.CompletedCount + 1,
+		"last_run_at":     now,
+	})
+
+	log.Info().
+		Str("journey", journey.ID).
+		Str("contato", execution.ContactJID).
+		Msg("execução de jornada completa")
+}
+
+// failExecution marca uma execução como falha
+func (m *Manager) failExecution(execution *models.JourneyExecution, errMsg string) {
+	now := time.Now()
+	execution.Status = models.ExecutionFailed
+	execution.ErrorMessage = errMsg
+	execution.UpdatedAt = now
+	if execution.CompletedAt == nil {
+		execution.CompletedAt = &now
+	}
+	m.db.Save(execution)
+
+	log.Error().
+		Str("execution", execution.ID).
+		Str("erro", errMsg).
+		Msg("execução de jornada falhou")
+}
+
+func (m *Manager) executeJourney(journey *models.Journey, fromJID, fromName, messageText string) error {
+	client := m.GetInstance(journey.InstanceID)
+	if client == nil {
+		return fmt.Errorf("instance not running")
+	}
+
+	responseMsg := buildJourneyResponse(journey, fromName, messageText)
+
+	recipientJID := fromJID
+	if !strings.Contains(fromJID, "@") {
+		recipientJID = fromJID + "@s.whatsapp.net"
+	}
+
+	if _, err := client.SendTextMessage(recipientJID, responseMsg); err != nil {
+		return fmt.Errorf("failed to send message: %w", err)
+	}
+
+	now := time.Now()
+	m.db.Model(journey).Updates(map[string]interface{}{
+		"invocations": journey.Invocations + 1,
+		"last_run_at": now,
+	})
+
+	log.Info().Str("journey", journey.ID).Str("to", recipientJID).Msg("journey executed")
+	return nil
+}
+
+func buildJourneyResponse(journey *models.Journey, fromName, originalMessage string) string {
+	if journey.MessageTemplate != "" {
+		return strings.ReplaceAll(strings.ReplaceAll(journey.MessageTemplate, "{{name}}", fromName), "{{message}}", originalMessage)
+	}
+
+	defaultResponses := []string{
+		"Olá " + fromName + "! Recebi sua mensagem. Como posso ajudar?",
+		"Oi " + fromName + "! Obrigado por entrar em contato. Em que posso ser útil?",
+		"Olá! " + fromName + ", agradecemos o contato. Retornaremos em breve!",
+	}
+	response := defaultResponses[time.Now().UnixNano()%int64(len(defaultResponses))]
+
+	var rules struct {
+		Trigger struct {
+			Filter string `json:"filter"`
+		} `json:"trigger"`
+		Actions []struct {
+			Text string `json:"text"`
+		} `json:"actions"`
+	}
+
+	rulesJSON, _ := json.Marshal(journey.ParsedRules)
+	if err := json.Unmarshal(rulesJSON, &rules); err == nil && len(rules.Actions) > 0 && rules.Actions[0].Text != "" {
+		response = "Olá " + fromName + "! " + rules.Actions[0].Text
+	}
+
+	return response
 }

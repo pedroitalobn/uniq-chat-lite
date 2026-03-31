@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { instancesApi, serversApi, channelsApi } from "@/lib/api";
-import { X, Server, Key, ChevronRight, Check } from "lucide-react";
+import { instancesApi, serversApi, channelsApi, instagramApi, tiktokApi } from "@/lib/api";
+import { X, Server, Key, ChevronRight, Check, Eye, EyeOff, User, Lock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Server as ServerType, ChannelInfo } from "@/types";
 
@@ -13,15 +13,14 @@ interface Props {
   onCreated: () => void;
 }
 
-// Fallback channels if API is unavailable
 const FALLBACK_CHANNELS: ChannelInfo[] = [
   { id: "whatsapp",  label: "WhatsApp",  color: "#25d366", description: "Conecte números WhatsApp via QR ou código de pareamento", available: true },
-  { id: "instagram", label: "Instagram", color: "#e1306c", description: "Conecte Instagram e gerencie DMs",                        available: false },
-  { id: "facebook",  label: "Facebook",  color: "#1877f2", description: "Gerencie mensagens do Facebook Messenger via Meta API",   available: false },
-  { id: "telegram",  label: "Telegram",  color: "#229ed9", description: "Bots e mensagens via Telegram Bot API",                    available: false },
-  { id: "linkedin",  label: "LinkedIn",  color: "#0a66c2", description: "Mensagens e InMails via LinkedIn API",                     available: false },
-  { id: "tiktok",    label: "TikTok",    color: "#ff0050", description: "Mensagens diretas e comentários via TikTok",               available: false },
-  { id: "kwai",      label: "Kwai",      color: "#ff6600", description: "Mensagens e interações via Kwai",                          available: false },
+  { id: "instagram", label: "Instagram", color: "#e1306c", description: "DMs, scraping, follow/unfollow, publicação de conteúdo", available: false },
+  { id: "tiktok",    label: "TikTok",    color: "#ff0050", description: "DMs, scraping, follow/unfollow, interação com conteúdo", available: false },
+  { id: "facebook",  label: "Facebook",  color: "#1877f2", description: "Gerencie mensagens do Facebook Messenger via Meta API", available: false },
+  { id: "telegram",  label: "Telegram",  color: "#229ed9", description: "Bots e mensagens via Telegram Bot API", available: false },
+  { id: "linkedin",  label: "LinkedIn",  color: "#0a66c2", description: "Mensagens e InMails via LinkedIn API", available: false },
+  { id: "kwai",      label: "Kwai",      color: "#ff6600", description: "Mensagens e interações via Kwai", available: false },
 ];
 
 const CHANNEL_ICONS: Record<string, React.ReactNode> = {
@@ -68,6 +67,12 @@ export function CreateInstanceModal({ open, onClose, onCreated }: Props) {
   const [name, setName] = useState("");
   const [serverId, setServerId] = useState("");
   const [customToken, setCustomToken] = useState("");
+  const [igUsername, setIgUsername] = useState("");
+  const [igPassword, setIgPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  const isSocial = selectedChannel === "instagram" || selectedChannel === "tiktok";
 
   const { data: channels = FALLBACK_CHANNELS } = useQuery<ChannelInfo[]>({
     queryKey: ["channels"],
@@ -82,22 +87,46 @@ export function CreateInstanceModal({ open, onClose, onCreated }: Props) {
     enabled: open && step === "config",
   });
 
-  const mutation = useMutation({
-    mutationFn: () =>
-      instancesApi.create(name.trim(), selectedChannel, serverId || undefined, customToken.trim() || undefined),
-    onSuccess: () => {
+  const handleCreate = async () => {
+    if (!name.trim()) return;
+    if (isSocial && (!igUsername.trim() || !igPassword.trim())) {
+      toast.error("Username e password são obrigatórios para este canal");
+      return;
+    }
+
+    setCreating(true);
+    try {
+      // First create the instance
+      await instancesApi.create(
+        name.trim(),
+        selectedChannel,
+        serverId || undefined,
+        customToken.trim() || undefined
+      );
+
+      // Then, for social channels, register the account
+      if (isSocial) {
+        const accountData = { username: igUsername.trim().toLowerCase(), password: igPassword.trim() };
+        if (selectedChannel === "instagram") {
+          await instagramApi.createAccount(accountData);
+        } else if (selectedChannel === "tiktok") {
+          await tiktokApi.createAccount(accountData);
+        }
+      }
+
       toast.success("Instância criada com sucesso!");
       reset();
       onCreated();
       onClose();
-    },
-    onError: (err: unknown) => {
+    } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
         "Erro ao criar instância";
       toast.error(msg);
-    },
-  });
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const reset = () => {
     setStep("channel");
@@ -105,6 +134,9 @@ export function CreateInstanceModal({ open, onClose, onCreated }: Props) {
     setName("");
     setServerId("");
     setCustomToken("");
+    setIgUsername("");
+    setIgPassword("");
+    setShowPassword(false);
   };
 
   const handleClose = () => { reset(); onClose(); };
@@ -181,6 +213,12 @@ export function CreateInstanceModal({ open, onClose, onCreated }: Props) {
                     <span className="text-sm font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
                       {channel.label}
                     </span>
+                    {(channel.id === "instagram" || channel.id === "tiktok") && channel.available && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                        style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)" }}>
+                        Beta
+                      </span>
+                    )}
                     {!channel.available && (
                       <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
                         style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 8% 50%)" }}>
@@ -204,7 +242,7 @@ export function CreateInstanceModal({ open, onClose, onCreated }: Props) {
         {/* Step 2: Config */}
         {step === "config" && ch && (
           <form
-            onSubmit={(e) => { e.preventDefault(); if (name.trim()) mutation.mutate(); }}
+            onSubmit={(e) => { e.preventDefault(); handleCreate(); }}
             className="px-6 pb-6 space-y-4"
           >
             {/* Channel badge */}
@@ -235,18 +273,69 @@ export function CreateInstanceModal({ open, onClose, onCreated }: Props) {
               />
             </div>
 
-            {/* Server (optional) */}
-            <div>
-              <label className="text-xs font-medium flex items-center gap-1.5 mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
-                <Server className="w-3 h-3" /> Server (opcional)
-              </label>
-              <select value={serverId} onChange={(e) => setServerId(e.target.value)} className="input-field w-full">
-                <option value="">— sem server —</option>
-                {servers.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.slug})</option>
-                ))}
-              </select>
-            </div>
+            {/* Instagram/TikTok credentials */}
+            {isSocial && (
+              <>
+                <div className="border-t pt-3" style={{ borderColor: "hsl(240 12% 13%)" }}>
+                  <p className="text-xs font-medium mb-2 flex items-center gap-1.5" style={{ color: ch.color }}>
+                    <User className="w-3 h-3" />
+                    Credenciais da conta {ch.label}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+                    Username
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "hsl(240 8% 35%)" }} />
+                    <input
+                      type="text"
+                      value={igUsername}
+                      onChange={(e) => setIgUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._]/g, ""))}
+                      placeholder="username"
+                      className="input-field w-full pl-9"
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+                    Senha
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "hsl(240 8% 35%)" }} />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={igPassword}
+                      onChange={(e) => setIgPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="input-field w-full pl-9 pr-10"
+                      autoComplete="new-password"
+                    />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2"
+                      style={{ color: "hsl(240 8% 40%)" }}>
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Server (optional for WhatsApp) */}
+            {!isSocial && (
+              <div>
+                <label className="text-xs font-medium flex items-center gap-1.5 mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+                  <Server className="w-3 h-3" /> Server (opcional)
+                </label>
+                <select value={serverId} onChange={(e) => setServerId(e.target.value)} className="input-field w-full">
+                  <option value="">— sem server —</option>
+                  {servers.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name} ({s.slug})</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Custom token (optional) */}
             <div>
@@ -269,13 +358,12 @@ export function CreateInstanceModal({ open, onClose, onCreated }: Props) {
               </button>
               <button
                 type="submit"
-                disabled={!name.trim() || mutation.isPending}
+                disabled={!name.trim() || creating || (isSocial && (!igUsername.trim() || !igPassword.trim()))}
                 className="btn-primary flex-1 py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 style={{ background: ch.color, color: ch.id === "whatsapp" ? "#03170a" : "white" }}
               >
-                {mutation.isPending ? "Criando..." : (
-                  <><Check className="w-4 h-4" /><span>Criar instância</span></>
-                )}
+                {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                <span>{creating ? "Criando..." : "Criar instância"}</span>
               </button>
             </div>
           </form>

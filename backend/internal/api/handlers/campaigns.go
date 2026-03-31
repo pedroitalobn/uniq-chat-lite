@@ -244,7 +244,7 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 	var req struct {
 		InstanceID    string     `json:"instance_id"`
 		Name          string     `json:"name"`
-		RecipientType string     `json:"recipient_type"` // "contacts" | "groups"
+		RecipientType string     `json:"recipient_type"` // "contacts" | "groups" | "crm" | "segment"
 		MessageType   string     `json:"message_type"`   // "text" | "image" | "audio" | "document"
 		MessageText   string     `json:"message_text"`
 		Caption       string     `json:"caption"`
@@ -261,12 +261,20 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 			Phone string `json:"phone"` // phone number or group JID
 			Name  string `json:"name"`
 		} `json:"recipients"`
+		// CRM segmentation filters
+		SegmentFilter struct {
+			Funnel  string   `json:"funnel,omitempty"`
+			Stage   string   `json:"stage,omitempty"`
+			Journey string   `json:"journey,omitempty"`
+			Tags    []string `json:"tags,omitempty"`
+			Owner   string   `json:"owner,omitempty"`
+		} `json:"segment_filter"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
 	}
-	if req.Name == "" || req.InstanceID == "" || len(req.Recipients) == 0 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name, instance_id e recipients são obrigatórios"})
+	if req.Name == "" || req.InstanceID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name e instance_id são obrigatórios"})
 	}
 	instanceID, err := uuid.Parse(req.InstanceID)
 	if err != nil {
@@ -303,11 +311,19 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		status = models.CampaignStatusScheduled
 	}
 
+	// Serialize segment filter
+	segmentJSON := "{}"
+	if req.SegmentFilter.Funnel != "" || req.SegmentFilter.Stage != "" || len(req.SegmentFilter.Tags) > 0 {
+		b, _ := json.Marshal(req.SegmentFilter)
+		segmentJSON = string(b)
+	}
+
 	campaign := models.Campaign{
 		UserID:        user.ID,
 		InstanceID:    instanceID,
 		Name:          req.Name,
 		RecipientType: recipientType,
+		SegmentFilter: segmentJSON,
 		MessageType:   msgType,
 		MessageText:   req.MessageText,
 		Caption:       req.Caption,
@@ -321,21 +337,70 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		ScheduleHours: schedHours,
 		DelaySeconds:  delay,
 		Status:        status,
-		TotalCount:    len(req.Recipients),
 	}
 	if err := h.db.Create(&campaign).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar campanha"})
 	}
 
-	for _, r := range req.Recipients {
-		h.db.Create(&models.CampaignRecipient{
-			CampaignID: campaign.ID,
-			Phone:      r.Phone,
-			Name:       r.Name,
-		})
+	// Resolve recipients based on type
+	switch recipientType {
+	case "segment", "crm":
+		// Resolve contacts from CRM based on segmentation filter
+		resolved := h.resolveSegmentedContacts(user.ID, req.SegmentFilter)
+		for _, contact := range resolved {
+			h.db.Create(&models.CampaignRecipient{
+				CampaignID: campaign.ID,
+				Phone:      contact.Phone,
+				Name:       contact.Name,
+			})
+		}
+		h.db.Model(&campaign).Update("total_count", len(resolved))
+	default:
+		// Manual recipients list
+		for _, r := range req.Recipients {
+			h.db.Create(&models.CampaignRecipient{
+				CampaignID: campaign.ID,
+				Phone:      r.Phone,
+				Name:       r.Name,
+			})
+		}
+		h.db.Model(&campaign).Update("total_count", len(req.Recipients))
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(campaign)
+}
+
+// resolveSegmentedContacts queries contacts matching the segment filter
+func (h *CampaignHandler) resolveSegmentedContacts(userID uuid.UUID, filter struct {
+	Funnel  string   `json:"funnel,omitempty"`
+	Stage   string   `json:"stage,omitempty"`
+	Journey string   `json:"journey,omitempty"`
+	Tags    []string `json:"tags,omitempty"`
+	Owner   string   `json:"owner,omitempty"`
+}) []models.Contact {
+	query := h.db.Where("user_id = ?", userID)
+
+	if filter.Funnel != "" {
+		query = query.Where("funnel = ?", filter.Funnel)
+	}
+	if filter.Stage != "" {
+		query = query.Where("stage = ?", filter.Stage)
+	}
+	if filter.Journey != "" {
+		query = query.Where("journey = ?", filter.Journey)
+	}
+	if filter.Owner != "" {
+		query = query.Where("owner = ?", filter.Owner)
+	}
+	if len(filter.Tags) > 0 {
+		query = query.Joins("INNER JOIN contact_tags ON contact_tags.contact_id = contacts.id").
+			Joins("INNER JOIN tags ON tags.id = contact_tags.tag_id").
+			Where("tags.name IN ?", filter.Tags)
+	}
+
+	var contacts []models.Contact
+	query.Distinct().Find(&contacts)
+	return contacts
 }
 
 // Get godoc
@@ -424,4 +489,78 @@ func (h *CampaignHandler) Delete(c *fiber.Ctx) error {
 	h.db.Where("campaign_id = ?", campaign.ID).Delete(&models.CampaignRecipient{})
 	h.db.Delete(&campaign)
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// SegmentOptions returns available CRM segmentation options for campaigns
+// GET /campaigns/segment-options
+func (h *CampaignHandler) SegmentOptions(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+
+	var funnels []string
+	var stages []string
+	var journeys []string
+	var owners []string
+	var tags []models.Tag
+
+	h.db.Model(&models.Contact{}).Distinct("funnel").Where("user_id = ? AND funnel != ''", user.ID).Pluck("funnel", &funnels)
+	h.db.Model(&models.Contact{}).Distinct("stage").Where("user_id = ? AND stage != ''", user.ID).Pluck("stage", &stages)
+	h.db.Model(&models.Contact{}).Distinct("journey").Where("user_id = ? AND journey != ''", user.ID).Pluck("journey", &journeys)
+	h.db.Model(&models.Contact{}).Distinct("owner").Where("user_id = ? AND owner != ''", user.ID).Pluck("owner", &owners)
+	h.db.Where("user_id = ?", user.ID).Find(&tags)
+
+	return c.JSON(fiber.Map{
+		"funnels":  funnels,
+		"stages":   stages,
+		"journeys": journeys,
+		"owners":   owners,
+		"tags":     tags,
+	})
+}
+
+// SegmentPreview returns the count and sample contacts for a given filter
+// POST /campaigns/segment-preview
+func (h *CampaignHandler) SegmentPreview(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+
+	var filter struct {
+		Funnel  string   `json:"funnel,omitempty"`
+		Stage   string   `json:"stage,omitempty"`
+		Journey string   `json:"journey,omitempty"`
+		Tags    []string `json:"tags,omitempty"`
+		Owner   string   `json:"owner,omitempty"`
+	}
+	if err := c.BodyParser(&filter); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	query := h.db.Model(&models.Contact{}).Where("user_id = ?", user.ID)
+	if filter.Funnel != "" {
+		query = query.Where("funnel = ?", filter.Funnel)
+	}
+	if filter.Stage != "" {
+		query = query.Where("stage = ?", filter.Stage)
+	}
+	if filter.Journey != "" {
+		query = query.Where("journey = ?", filter.Journey)
+	}
+	if filter.Owner != "" {
+		query = query.Where("owner = ?", filter.Owner)
+	}
+	if len(filter.Tags) > 0 {
+		query = query.Joins("INNER JOIN contact_tags ON contact_tags.contact_id = contacts.id").
+			Joins("INNER JOIN tags ON tags.id = contact_tags.tag_id").
+			Where("tags.name IN ?", filter.Tags).
+			Distinct()
+	}
+
+	var count int64
+	query.Count(&count)
+
+	var sample []models.Contact
+	query.Limit(5).Find(&sample)
+
+	return c.JSON(fiber.Map{
+		"total":  count,
+		"sample": sample,
+	})
 }
