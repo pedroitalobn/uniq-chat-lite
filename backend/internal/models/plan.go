@@ -18,6 +18,10 @@ type Plan struct {
 	IsActive          bool      `gorm:"default:true" json:"is_active"`
 	StripePriceID     string    `gorm:"type:varchar(255)" json:"stripe_price_id,omitempty"`
 
+	// Users & Workspaces
+	MaxUsers      int `gorm:"not null;default:1" json:"max_users"`      // max users per workspace (-1 = unlimited)
+	MaxWorkspaces int `gorm:"not null;default:1" json:"max_workspaces"` // max workspaces per user (-1 = unlimited)
+
 	// Proxy residencial
 	AllowProxyResidencial bool `gorm:"default:false" json:"allow_proxy_residencial"` // enables residential proxy option
 	MaxInstancesPerProxy  int  `gorm:"default:0" json:"max_instances_per_proxy"`     // max instances sharing one proxy entry
@@ -25,6 +29,14 @@ type Plan struct {
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (p *Plan) IsUnlimitedUsers() bool {
+	return p.MaxUsers == -1
+}
+
+func (p *Plan) IsUnlimitedWorkspaces() bool {
+	return p.MaxWorkspaces == -1
 }
 
 func (p *Plan) BeforeCreate(tx *gorm.DB) error {

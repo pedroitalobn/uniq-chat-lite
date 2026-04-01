@@ -31,6 +31,7 @@ func (h *ChatHandler) SetToolsHandler(toolsH *ToolsHandler) {
 
 type ChatRequest struct {
 	IntegrationID string `json:"integration_id"`
+	Model         string `json:"model"` // specific model to use (optional)
 	Message       string `json:"message"`
 	UseTools      bool   `json:"use_tools"`
 }
@@ -99,10 +100,81 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 
 		triggerType, triggerFilter, keywords, messageTemplate := parsePromptForJourney(req.Message, parsedRules)
 
-		// Generate a name from keywords or prompt
-		journeyName := "Jornada " + time.Now().Format("02/01 15:04")
+		// Check if this is a confirmation request
+		lowerConfirm := strings.ToLower(req.Message)
+		isConfirmation := strings.Contains(lowerConfirm, "confirmo") || strings.Contains(lowerConfirm, "confirmar") ||
+			strings.Contains(lowerConfirm, "sim") || strings.Contains(lowerConfirm, "criar") ||
+			strings.Contains(lowerConfirm, "ok") || strings.Contains(lowerConfirm, "pode criar")
+
+		// If not a confirmation, show preview and ask for confirmation
+		if !isConfirmation {
+			var kwList []string
+			json.Unmarshal([]byte(keywords), &kwList)
+
+			// Detect if action is private reply
+			isPrivateReply := strings.Contains(strings.ToLower(req.Message), "no privado") ||
+				strings.Contains(strings.ToLower(req.Message), "responde no privado")
+
+			// Build confirmation message with proper markdown
+			response := "📋 **Confirmação de Jornada**\n\n"
+			response += "Por favor, confirme se esta configuração está correta:\n\n"
+			response += "**Gatilho (trigger):**\n"
+			response += "- Tipo: " + string(triggerType) + "\n"
+			response += "- Filtro: " + triggerFilter + "\n"
+
+			if len(kwList) > 0 {
+				response += "- Palavras-chave: " + strings.Join(kwList, ", ") + "\n"
+			}
+
+			if instanceID != uuid.Nil {
+				var inst models.Instance
+				if h.db.First(&inst, instanceID.String()).Error == nil {
+					response += "- **Instância:** " + inst.Name + "\n"
+				}
+			}
+
+			// Resolve group
+			var groupJID string
+			if instanceID != uuid.Nil {
+				groupJID = journeyHandler.resolveGroupFromPrompt(req.Message, instanceID.String())
+			}
+			if groupJID != "" {
+				response += "- Grupo: " + groupJID + "\n"
+			}
+
+			response += "\n**Ação após gatilho:**\n"
+			if isPrivateReply {
+				response += "- Responder no **privado** com: \"" + messageTemplate + "\"\n"
+			} else if messageTemplate != "" {
+				response += "- Enviar mensagem: \"" + messageTemplate + "\"\n"
+			} else {
+				response += "- Responder ao contato/grupo\n"
+			}
+
+			response += "\n**Responda com 'confirmo' ou 'sim' para criar a jornada.**"
+
+			return c.JSON(fiber.Map{
+				"response":        response,
+				"journey_preview": true,
+				"pending_journey": map[string]interface{}{
+					"trigger_type":     string(triggerType),
+					"trigger_filter":   triggerFilter,
+					"keywords":         keywords,
+					"message_template": messageTemplate,
+					"instance_id":      instanceID.String(),
+					"group_jid":        groupJID,
+					"parsed_rules":     parsedRules,
+					"prompt":           req.Message,
+					"is_private_reply": isPrivateReply,
+				},
+			})
+		}
+
+		// User confirmed - create the journey
 		var kwList []string
 		json.Unmarshal([]byte(keywords), &kwList)
+
+		journeyName := "Jornada " + time.Now().Format("02/01 15:04")
 		if len(kwList) > 0 {
 			journeyName = "Palavra: " + strings.Join(kwList, ", ")
 		}
@@ -130,8 +202,7 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 			return c.JSON(fiber.Map{"response": "Entendi o pedido, mas ocorreu um erro ao salvar a jornada: " + err.Error()})
 		}
 
-		// Build confirmation response
-
+		// Build success response
 		response := "✅ Jornada criada com sucesso!\n\n"
 		response += "**Resumo da automação:**\n"
 		response += "- **Gatilho:** " + triggerFilter + "\n"
@@ -199,7 +270,7 @@ func buildContextPrompt(instances []models.Instance, journeys []models.Journey, 
 	if len(integrations) > 0 {
 		prompt += "INTEGRAÇÕES DE IA:\n"
 		for _, i := range integrations {
-			model := i.Model
+			model := i.GetFirstModel()
 			if model == "" {
 				model = "padrão"
 			}

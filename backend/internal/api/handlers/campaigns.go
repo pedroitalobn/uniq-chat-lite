@@ -231,8 +231,15 @@ func (h *CampaignHandler) processCampaign(c models.Campaign, today string) {
 // GET /campaigns
 func (h *CampaignHandler) List(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
+	workspaceID := c.Query("workspace_id")
+	query := h.db.Where("user_id = ?", user.ID)
+	if workspaceID != "" {
+		if wid, err := uuid.Parse(workspaceID); err == nil {
+			query = query.Where("workspace_id = ?", wid)
+		}
+	}
 	var campaigns []models.Campaign
-	h.db.Where("user_id = ?", user.ID).Order("created_at DESC").Find(&campaigns)
+	query.Order("created_at DESC").Find(&campaigns)
 	return c.JSON(fiber.Map{"data": campaigns, "total": len(campaigns)})
 }
 
@@ -242,6 +249,7 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 
 	var req struct {
+		WorkspaceID   string     `json:"workspace_id"`
 		InstanceID    string     `json:"instance_id"`
 		Name          string     `json:"name"`
 		RecipientType string     `json:"recipient_type"` // "contacts" | "groups" | "crm" | "segment"
@@ -263,11 +271,12 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		} `json:"recipients"`
 		// CRM segmentation filters
 		SegmentFilter struct {
-			Funnel  string   `json:"funnel,omitempty"`
-			Stage   string   `json:"stage,omitempty"`
-			Journey string   `json:"journey,omitempty"`
-			Tags    []string `json:"tags,omitempty"`
-			Owner   string   `json:"owner,omitempty"`
+			Funnel     string   `json:"funnel,omitempty"`
+			Stage      string   `json:"stage,omitempty"`
+			Journey    string   `json:"journey,omitempty"`
+			Tags       []string `json:"tags,omitempty"`
+			Owner      string   `json:"owner,omitempty"`
+			ExternalID string   `json:"external_id,omitempty"`
 		} `json:"segment_filter"`
 	}
 	if err := c.BodyParser(&req); err != nil {
@@ -338,6 +347,11 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		DelaySeconds:  delay,
 		Status:        status,
 	}
+	if req.WorkspaceID != "" {
+		if wid, err := uuid.Parse(req.WorkspaceID); err == nil {
+			campaign.WorkspaceID = &wid
+		}
+	}
 	if err := h.db.Create(&campaign).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar campanha"})
 	}
@@ -372,11 +386,12 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 
 // resolveSegmentedContacts queries contacts matching the segment filter
 func (h *CampaignHandler) resolveSegmentedContacts(userID uuid.UUID, filter struct {
-	Funnel  string   `json:"funnel,omitempty"`
-	Stage   string   `json:"stage,omitempty"`
-	Journey string   `json:"journey,omitempty"`
-	Tags    []string `json:"tags,omitempty"`
-	Owner   string   `json:"owner,omitempty"`
+	Funnel     string   `json:"funnel,omitempty"`
+	Stage      string   `json:"stage,omitempty"`
+	Journey    string   `json:"journey,omitempty"`
+	Tags       []string `json:"tags,omitempty"`
+	Owner      string   `json:"owner,omitempty"`
+	ExternalID string   `json:"external_id,omitempty"`
 }) []models.Contact {
 	query := h.db.Where("user_id = ?", userID)
 
@@ -391,6 +406,9 @@ func (h *CampaignHandler) resolveSegmentedContacts(userID uuid.UUID, filter stru
 	}
 	if filter.Owner != "" {
 		query = query.Where("owner = ?", filter.Owner)
+	}
+	if filter.ExternalID != "" {
+		query = query.Where("external_id = ?", filter.ExternalID)
 	}
 	if len(filter.Tags) > 0 {
 		query = query.Joins("INNER JOIN contact_tags ON contact_tags.contact_id = contacts.id").
@@ -500,20 +518,23 @@ func (h *CampaignHandler) SegmentOptions(c *fiber.Ctx) error {
 	var stages []string
 	var journeys []string
 	var owners []string
+	var externalIDs []string
 	var tags []models.Tag
 
 	h.db.Model(&models.Contact{}).Distinct("funnel").Where("user_id = ? AND funnel != ''", user.ID).Pluck("funnel", &funnels)
 	h.db.Model(&models.Contact{}).Distinct("stage").Where("user_id = ? AND stage != ''", user.ID).Pluck("stage", &stages)
 	h.db.Model(&models.Contact{}).Distinct("journey").Where("user_id = ? AND journey != ''", user.ID).Pluck("journey", &journeys)
 	h.db.Model(&models.Contact{}).Distinct("owner").Where("user_id = ? AND owner != ''", user.ID).Pluck("owner", &owners)
+	h.db.Model(&models.Contact{}).Distinct("external_id").Where("user_id = ? AND external_id != ''", user.ID).Pluck("external_id", &externalIDs)
 	h.db.Where("user_id = ?", user.ID).Find(&tags)
 
 	return c.JSON(fiber.Map{
-		"funnels":  funnels,
-		"stages":   stages,
-		"journeys": journeys,
-		"owners":   owners,
-		"tags":     tags,
+		"funnels":      funnels,
+		"stages":       stages,
+		"journeys":     journeys,
+		"owners":       owners,
+		"external_ids": externalIDs,
+		"tags":         tags,
 	})
 }
 
@@ -523,11 +544,12 @@ func (h *CampaignHandler) SegmentPreview(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 
 	var filter struct {
-		Funnel  string   `json:"funnel,omitempty"`
-		Stage   string   `json:"stage,omitempty"`
-		Journey string   `json:"journey,omitempty"`
-		Tags    []string `json:"tags,omitempty"`
-		Owner   string   `json:"owner,omitempty"`
+		Funnel     string   `json:"funnel,omitempty"`
+		Stage      string   `json:"stage,omitempty"`
+		Journey    string   `json:"journey,omitempty"`
+		Tags       []string `json:"tags,omitempty"`
+		Owner      string   `json:"owner,omitempty"`
+		ExternalID string   `json:"external_id,omitempty"`
 	}
 	if err := c.BodyParser(&filter); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
@@ -545,6 +567,9 @@ func (h *CampaignHandler) SegmentPreview(c *fiber.Ctx) error {
 	}
 	if filter.Owner != "" {
 		query = query.Where("owner = ?", filter.Owner)
+	}
+	if filter.ExternalID != "" {
+		query = query.Where("external_id = ?", filter.ExternalID)
 	}
 	if len(filter.Tags) > 0 {
 		query = query.Joins("INNER JOIN contact_tags ON contact_tags.contact_id = contacts.id").

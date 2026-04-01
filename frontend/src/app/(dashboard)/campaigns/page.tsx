@@ -7,13 +7,14 @@ import { Campaign, Instance } from "@/types";
 import {
   Plus, Megaphone, Play, Pause, X, Trash2, Clock, CheckCircle2,
   AlertCircle, Loader2, Users, Calendar, FileText, Image, Mic,
-  File, ChevronLeft, ChevronRight, Users2,
+  File, ChevronLeft, ChevronRight, Users2, Database, UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { showConfirm } from "@/lib/confirm";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { usePreferences } from "@/lib/preferences";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 function fmtDate(s: string) {
   const d = new Date(s);
@@ -60,12 +61,13 @@ function parseHours(json: string): number[] {
 interface Group { id: string; name: string; jid: string; participant_count?: number; is_admin?: boolean }
 
 function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const { currentWorkspace } = useWorkspace();
   const [step, setStep] = useState(1);
 
   // Step 1 – basics
   const [name, setName]             = useState("");
   const [instanceId, setInstanceId] = useState("");
-  const [recipientType, setRecipientType] = useState<"contacts" | "groups">("contacts");
+  const [recipientType, setRecipientType] = useState<"contacts" | "groups" | "crm">("contacts");
 
   // Step 2 – recipients
   const [recipientsText, setRecipientsText] = useState(""); // contacts
@@ -73,6 +75,17 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
   const [groupSearch, setGroupSearch]       = useState("");
   const [groupSort, setGroupSort]           = useState<"name" | "members">("name");
   const [groupAdminOnly, setGroupAdminOnly] = useState(false);
+
+  // Step 2 – CRM filters
+  const [crmFilter, setCrmFilter] = useState<{
+    funnel?: string;
+    stage?: string;
+    journey?: string;
+    tags?: string[];
+    owner?: string;
+    external_id?: string;
+  }>({});
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   // Step 3 – message
   const [msgType, setMsgType]   = useState<"text" | "image" | "audio" | "document">("text");
@@ -92,8 +105,8 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
   const [saving, setSaving] = useState(false);
 
   const { data: instances = [] } = useQuery<Instance[]>({
-    queryKey: ["instances"],
-    queryFn: () => instancesApi.list().then((r) => r.data),
+    queryKey: ["instances", currentWorkspace?.id],
+    queryFn: () => instancesApi.list(undefined, currentWorkspace?.id).then((r) => r.data),
   });
   const connectedInstances = instances.filter((i) => i.status === "connected");
 
@@ -101,6 +114,20 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
     queryKey: ["groups", instanceId],
     queryFn: () => groupsApi.list(instanceId).then((r) => r.data.groups ?? []),
     enabled: !!instanceId && recipientType === "groups",
+  });
+
+  // CRM segment options
+  const { data: segmentOptions } = useQuery({
+    queryKey: ["segment-options"],
+    queryFn: () => campaignsApi.segmentOptions().then((r) => r.data),
+    enabled: recipientType === "crm",
+  });
+
+  // CRM segment preview
+  const { data: segmentPreview } = useQuery({
+    queryKey: ["segment-preview", crmFilter],
+    queryFn: () => campaignsApi.segmentPreview(crmFilter).then((r) => r.data),
+    enabled: recipientType === "crm" && Object.keys(crmFilter).some(k => crmFilter[k as keyof typeof crmFilter]),
   });
 
   const parseContacts = () =>
@@ -116,7 +143,9 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
     setSelectedGroups((prev) => prev.find((x) => x.jid === g.jid) ? prev.filter((x) => x.jid !== g.jid) : [...prev, g]);
 
   const canNext1 = name.trim() && instanceId;
-  const canNext2 = recipientType === "contacts" ? parseContacts().length > 0 : selectedGroups.length > 0;
+  const canNext2 = recipientType === "contacts" ? parseContacts().length > 0 :
+                   recipientType === "groups" ? selectedGroups.length > 0 :
+                   true; // CRM always valid (filters can be empty = all contacts)
   const canNext3 = msgType === "text" ? msgText.trim().length > 0 : !!file;
 
   const handleCreate = async () => {
@@ -136,6 +165,7 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
         : selectedGroups.map((g) => ({ phone: g.jid, name: g.name }));
 
       await campaignsApi.create({
+        workspace_id:   currentWorkspace?.id,
         instance_id:    instanceId,
         name:           name.trim(),
         recipient_type: recipientType,
@@ -152,6 +182,14 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
         schedule_hours: JSON.stringify(selectedHours),
         delay_seconds:  delaySeconds,
         recipients,
+        segment_filter: recipientType === "crm" ? {
+          funnel: crmFilter.funnel || undefined,
+          stage: crmFilter.stage || undefined,
+          journey: crmFilter.journey || undefined,
+          owner: crmFilter.owner || undefined,
+          external_id: crmFilter.external_id || undefined,
+          tags: selectedTags.length > 0 ? selectedTags : undefined,
+        } : undefined,
       });
       toast.success("Campanha criada!");
       onCreated();
@@ -164,6 +202,9 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
   };
 
   const stepLabel = ["Básico", "Destinatários", "Mensagem", "Agendamento"];
+  const stepLabelFull = recipientType === "crm" 
+    ? ["Básico", "Filtros CRM", "Mensagem", "Agendamento"]
+    : ["Básico", "Destinatários", "Mensagem", "Agendamento"];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -178,10 +219,10 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
               style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}>
               <Megaphone className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
             </div>
-            <div>
+              <div>
               <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Nova Campanha</h2>
-              <p className="text-[11px]" style={{ color: "hsl(240 8% 40%)" }}>Passo {step} de 4 — {stepLabel[step - 1]}</p>
-            </div>
+              <p className="text-[11px]" style={{ color: "hsl(240 8% 40%)" }}>Passo {step} de 4 — {stepLabelFull[step - 1]}</p>
+              </div>
           </div>
           <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }} className="hover:opacity-70 transition-opacity">
             <X className="w-4.5 h-4.5" />
@@ -220,10 +261,10 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
 
               <div>
                 <label className="text-xs font-medium block mb-2" style={{ color: "hsl(240 8% 50%)" }}>Tipo de destinatário</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {([["contacts", "Contatos", Users], ["groups", "Grupos", Users2]] as const).map(([val, lbl, Icon]) => (
+                <div className="grid grid-cols-3 gap-2">
+                  {([["contacts", "Contatos", Users], ["groups", "Grupos", Users2], ["crm", "CRM", Database]] as const).map(([val, lbl, Icon]) => (
                     <button key={val} type="button" onClick={() => setRecipientType(val)}
-                      className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl border text-sm font-medium transition-all"
+                      className="flex items-center gap-2 px-3 py-3 rounded-xl border text-xs font-medium transition-all"
                       style={recipientType === val
                         ? { background: "rgba(0,212,106,0.08)", borderColor: "rgba(0,212,106,0.25)", color: "var(--green)" }
                         : { background: "rgba(255,255,255,0.02)", borderColor: "hsl(240 12% 14%)", color: "hsl(240 8% 52%)" }}>
@@ -232,6 +273,11 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
                     </button>
                   ))}
                 </div>
+                {recipientType === "crm" && (
+                  <p className="text-[10px] mt-1.5" style={{ color: "hsl(240 8% 42%)" }}>
+                    Filtra contatos do CRM por funil, estágio, jornada, tags e mais
+                  </p>
+                )}
               </div>
             </>
           )}
@@ -352,6 +398,130 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
               </>
             );
           })()}
+
+          {/* ── Step 2: CRM Recipients ── */}
+          {step === 2 && recipientType === "crm" && (
+            <>
+              <div className="rounded-xl px-3.5 py-2.5" style={{ background: "rgba(168,85,247,0.06)", border: "1px solid rgba(168,85,247,0.12)" }}>
+                <p className="text-xs flex items-center gap-2" style={{ color: "#a855f7" }}>
+                  <Database className="w-3.5 h-3.5" />
+                  Filtros do CRM — deixe vazio para selecionar todos os contatos
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Funil */}
+                <div>
+                  <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>Funil</label>
+                  <select value={crmFilter.funnel || ""} onChange={(e) => setCrmFilter({...crmFilter, funnel: e.target.value || undefined})}
+                    className="input-field w-full text-xs">
+                    <option value="">Qualquer funil</option>
+                    {(segmentOptions?.funnels || []).map((f: string) => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Estágio */}
+                <div>
+                  <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>Estágio</label>
+                  <select value={crmFilter.stage || ""} onChange={(e) => setCrmFilter({...crmFilter, stage: e.target.value || undefined})}
+                    className="input-field w-full text-xs">
+                    <option value="">Qualquer estágio</option>
+                    {(segmentOptions?.stages || []).map((s: string) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Jornada */}
+                <div>
+                  <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>Jornada</label>
+                  <select value={crmFilter.journey || ""} onChange={(e) => setCrmFilter({...crmFilter, journey: e.target.value || undefined})}
+                    className="input-field w-full text-xs">
+                    <option value="">Qualquer jornada</option>
+                    {(segmentOptions?.journeys || []).map((j: string) => (
+                      <option key={j} value={j}>{j}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Responsável */}
+                <div>
+                  <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>Responsável</label>
+                  <select value={crmFilter.owner || ""} onChange={(e) => setCrmFilter({...crmFilter, owner: e.target.value || undefined})}
+                    className="input-field w-full text-xs">
+                    <option value="">Qualquer responsável</option>
+                    {(segmentOptions?.owners || []).map((o: string) => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* ID Externo */}
+                <div className="col-span-2">
+                  <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>ID Externo</label>
+                  <select value={crmFilter.external_id || ""} onChange={(e) => setCrmFilter({...crmFilter, external_id: e.target.value || undefined})}
+                    className="input-field w-full text-xs">
+                    <option value="">Qualquer ID externo</option>
+                    {(segmentOptions?.external_ids || []).map((id: string) => (
+                      <option key={id} value={id}>{id}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div>
+                <label className="text-xs font-medium block mb-2" style={{ color: "hsl(240 8% 50%)" }}>Tags</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {(segmentOptions?.tags || []).map((tag: { id: string; name: string; color?: string }) => {
+                    const isSelected = selectedTags.includes(tag.name);
+                    return (
+                      <button key={tag.id} type="button"
+                        onClick={() => setSelectedTags(isSelected ? selectedTags.filter((t) => t !== tag.name) : [...selectedTags, tag.name])}
+                        className="text-[11px] px-2.5 py-1 rounded-full border transition-all"
+                        style={{
+                          background: isSelected ? "rgba(168,85,247,0.15)" : "rgba(255,255,255,0.02)",
+                          borderColor: isSelected ? "rgba(168,85,247,0.3)" : "hsl(240 12% 14%)",
+                          color: isSelected ? "#a855f7" : "hsl(240 8% 52%)",
+                        }}>
+                        {tag.name}
+                      </button>
+                    );
+                  })}
+                  {(segmentOptions?.tags || []).length === 0 && (
+                    <p className="text-[11px]" style={{ color: "hsl(240 8% 36%)" }}>Nenhuma tag criada no CRM</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Preview */}
+              {segmentPreview ? (
+                <div className="rounded-xl p-3" style={{ background: "rgba(168,85,247,0.06)", border: "1px solid rgba(168,85,247,0.12)" }}>
+                  <p className="text-xs font-medium flex items-center gap-2" style={{ color: "#a855f7" }}>
+                    <UserCheck className="w-3.5 h-3.5" />
+                    {segmentPreview.total} contato{segmentPreview.total !== 1 ? "s" : ""} selecionado{segmentPreview.total !== 1 ? "s" : ""}
+                  </p>
+                  {segmentPreview.sample?.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {segmentPreview.sample.slice(0, 3).map((c: { id: string; name: string; phone: string }) => (
+                        <p key={c.id} className="text-[10px]" style={{ color: "hsl(240 8% 50%)" }}>
+                          {c.name} · {c.phone}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.02)", border: "1px dashed hsl(240 12% 14%)" }}>
+                  <p className="text-xs" style={{ color: "hsl(240 8% 36%)" }}>
+                    Aplique filtros para ver a prévia de contatos
+                  </p>
+                </div>
+              )}
+            </>
+          )}
 
           {/* ── Step 3: Message ── */}
           {step === 3 && (
@@ -679,13 +849,14 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function CampaignsPage() {
+  const { currentWorkspace } = useWorkspace();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const { t, timezone } = usePreferences();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["campaigns"],
-    queryFn: () => campaignsApi.list().then((r) => r.data),
+    queryKey: ["campaigns", currentWorkspace?.id],
+    queryFn: () => campaignsApi.list(currentWorkspace?.id).then((r) => r.data),
     refetchInterval: 5000,
   });
   const campaigns: Campaign[] = data?.data ?? [];
@@ -709,7 +880,14 @@ export default function CampaignsPage() {
             style={{ background: "rgba(96,165,250,0.08)", color: "#60a5fa", border: "1px solid rgba(96,165,250,0.15)" }}>
             🕐 {timezone}
           </span>
-          <button onClick={() => setCreateOpen(true)} className="btn-primary">
+          <button onClick={() => setCreateOpen(true)} 
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+            style={{ 
+              background: "rgba(0, 212, 106, 0.12)", 
+              border: "1px solid rgba(0, 212, 106, 0.3)", 
+              color: "var(--green)", 
+              backdropFilter: "blur(8px)" 
+            }}>
             <Plus className="w-4 h-4" /> {t("campaigns_new")}
           </button>
         </div>

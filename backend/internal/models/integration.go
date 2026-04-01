@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,7 +36,7 @@ type UserIntegration struct {
 	APIKey       string              `gorm:"type:text" json:"-"`            // never exposed in JSON
 	MaskedKey    string              `gorm:"-" json:"masked_key,omitempty"` // computed on read
 	BaseURL      string              `gorm:"type:varchar(255)" json:"base_url,omitempty"`
-	Model        string              `gorm:"type:varchar(100)" json:"model,omitempty"`
+	Models       string              `gorm:"type:text" json:"models,omitempty"`              // JSON array of model names, e.g. ["gpt-4o","gpt-4o-mini"]
 	Config       string              `gorm:"type:text;default:'{}'" json:"config,omitempty"` // JSON extra config
 	IsActive     bool                `gorm:"default:true" json:"is_active"`
 	LastTestedAt *time.Time          `json:"last_tested_at,omitempty"`
@@ -49,6 +50,27 @@ func (i *UserIntegration) BeforeCreate(tx *gorm.DB) error {
 		i.ID = uuid.New()
 	}
 	return nil
+}
+
+// GetModels returns the models as a slice of strings.
+func (i *UserIntegration) GetModels() []string {
+	if i.Models == "" || i.Models == "[]" {
+		return nil
+	}
+	var models []string
+	if err := json.Unmarshal([]byte(i.Models), &models); err != nil {
+		return nil
+	}
+	return models
+}
+
+// GetFirstModel returns the first model in the list.
+func (i *UserIntegration) GetFirstModel() string {
+	models := i.GetModels()
+	if len(models) > 0 {
+		return models[0]
+	}
+	return ""
 }
 
 // MaskAPIKey returns the last 4 chars of the API key with stars prefix.

@@ -8,14 +8,27 @@ import {
   Trash2, Wand2, ChevronRight, ChevronUp, ChevronDown, Loader2, Play, Pause,
   CheckCircle2, Zap, ArrowRight, Hash, Users, Contact, Megaphone, Tag,
   Copy, Check, SparklesIcon, Circle, Activity, TrendingUp, Eye, Clock,
-  Server, Globe, AlertCircle
+  Server, Globe, AlertCircle, Edit3, X, Maximize2
 } from "lucide-react";
 import { integrationsApi, agentsApi, journeysApi, groupsApi, instancesApi } from "@/lib/api";
+import api from "@/lib/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import ReactMarkdown from "react-markdown";
+import type { ChannelType } from "@/types";
 
 type AgentSection = "chat" | "journeys" | "activity";
+
+const CHANNELS: { id: ChannelType; label: string; color: string }[] = [
+  { id: "whatsapp", label: "WhatsApp", color: "#25d366" },
+  { id: "instagram", label: "Instagram", color: "#e1306c" },
+  { id: "facebook", label: "Facebook", color: "#1877f2" },
+  { id: "telegram", label: "Telegram", color: "#229ed9" },
+  { id: "linkedin", label: "LinkedIn", color: "#0a66c2" },
+  { id: "tiktok", label: "TikTok", color: "#ff0050" },
+  { id: "kwai", label: "Kwai", color: "#ff6600" },
+];
 
 const SECTIONS: { id: AgentSection; label: string; icon: React.ElementType; description: string }[] = [
   { id: "chat",     label: "Chat IA",    icon: MessageSquare, description: "Converse e crie jornadas" },
@@ -40,28 +53,47 @@ const WELCOME_SUGGESTIONS = [
 /* ── Typewriter effect for AI responses ── */
 function TypewriterText({ text }: { text: string }) {
   const [displayed, setDisplayed] = useState(0);
+  const [done, setDone] = useState(false);
 
   useEffect(() => {
     setDisplayed(0);
+    setDone(false);
   }, [text]);
 
   useEffect(() => {
-    if (displayed >= text.length) return;
+    if (displayed >= text.length) {
+      setDone(true);
+      return;
+    }
     const speed = text.length > 200 ? 6 : 12;
     const t = setTimeout(() => setDisplayed(d => d + 1), speed);
     return () => clearTimeout(t);
   }, [displayed, text]);
 
+  const displayText = text.slice(0, displayed);
+
   return (
-    <span>
-      {text.slice(0, displayed)}
-      {displayed < text.length && (
+    <div>
+      <ReactMarkdown
+        components={{
+          p({ children }) { return <p className="mb-2 last:mb-0">{children}</p>; },
+          strong({ children }) { return <strong className="font-bold">{children}</strong>; },
+          em({ children }) { return <em className="italic opacity-90">{children}</em>; },
+          ol({ children }) { return <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>; },
+          ul({ children }) { return <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>; },
+          li({ children }) { return <li className="leading-relaxed">{children}</li>; },
+          a({ href, children }) { return <a href={href} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "var(--green)" }}>{children}</a>; },
+        }}
+      >
+        {displayText}
+      </ReactMarkdown>
+      {!done && (
         <span
           className="inline-block w-[2px] h-[1em] ml-[1px] align-middle animate-pulse"
           style={{ background: "var(--green)", borderRadius: 1 }}
         />
       )}
-    </span>
+    </div>
   );
 }
 
@@ -364,19 +396,51 @@ function ChatSection() {
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedIntegration, setSelectedIntegration] = useState<string>("");
+  const [selectedModel, setSelectedModel] = useState<string>("");
   const [selectedInstance, setSelectedInstance] = useState<string>("");
   const [groupedIntegrations, setGroupedIntegrations] = useState<Record<string, any[]>>({});
   const [isCreatingJourney, setIsCreatingJourney] = useState(false);
   const [pendingJourneyPrompt, setPendingJourneyPrompt] = useState<string>("");
+  const [pendingJourneyData, setPendingJourneyData] = useState<any>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoadingIntegrations, setIsLoadingIntegrations] = useState(true);
+  const [editingJourney, setEditingJourney] = useState<any>(null);
+  const [editMessages, setEditMessages] = useState<Message[]>([]);
+  const [editPrompt, setEditPrompt] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const editScrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
   const { data: instances = [] } = useQuery({
     queryKey: ["instances"],
     queryFn: async () => (await instancesApi.list()).data,
   });
+
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("agents_chat_history");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setMessages(parsed.map((m: any) => ({ ...m, createdAt: new Date(m.createdAt) })));
+      } catch { /* ignore */ }
+    }
+  }, []);
+
+  // Save chat history to localStorage on change
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem("agents_chat_history", JSON.stringify(messages));
+    }
+  }, [messages]);
+
+  // Clear chat history
+  const clearChatHistory = () => {
+    setMessages([]);
+    localStorage.removeItem("agents_chat_history");
+    toast.success("Histórico limpo");
+  };
 
   const loadIntegrations = useCallback(async () => {
     setIsLoadingIntegrations(true);
@@ -429,8 +493,15 @@ function ChatSection() {
     setIsStreaming(true);
     
     try {
-      const res = await agentsApi.chat(messageText, selectedIntegration || undefined);
+      const res = await agentsApi.chat(messageText, selectedIntegration || undefined, selectedModel || undefined);
       const content = res.data?.response || res.data?.content || res.data || "";
+      
+      // Check if this is a journey preview that needs confirmation
+      if (res.data?.journey_preview && res.data?.pending_journey) {
+        setIsCreatingJourney(true);
+        setPendingJourneyPrompt(messageText);
+        setPendingJourneyData(res.data.pending_journey);
+      }
       
       setMessages(prev => [...prev, {
         id: assistantMessageId,
@@ -448,7 +519,22 @@ function ChatSection() {
     } finally {
       setIsStreaming(false);
     }
-  }, [isStreaming, selectedIntegration]);
+  }, [isStreaming, selectedIntegration, selectedModel]);
+
+  // Update selected model when integration changes
+  useEffect(() => {
+    if (!selectedIntegration) {
+      setSelectedModel("");
+      return;
+    }
+    const allIntegrations = Object.values(groupedIntegrations).flat();
+    const integration = allIntegrations.find((i: any) => i.id === selectedIntegration);
+    if (integration?.models && integration.models.length > 0) {
+      setSelectedModel(integration.models[0]);
+    } else {
+      setSelectedModel("");
+    }
+  }, [selectedIntegration, groupedIntegrations]);
 
   const createJourneyMutation = useMutation({
     mutationFn: async (data: { prompt: string; integrationId?: string; instanceId?: string }) => {
@@ -557,6 +643,7 @@ Responda de forma clara e pergunte se o usuário confirma.`);
   const cancelJourneyCreation = () => {
     setIsCreatingJourney(false);
     setPendingJourneyPrompt("");
+    setPendingJourneyData(null);
     setMessages((prev) => [...prev, {
       role: "assistant",
       content: "Entendido. Pode me perguntar outras coisas ou criar uma jornada quando quiser.",
@@ -605,33 +692,60 @@ Responda de forma clara e pergunte se o usuário confirma.`);
           </div>
 
           {/* Model selector */}
-          <div className="relative">
-            <select
-              value={selectedIntegration || ""}
-              onChange={(e) => setSelectedIntegration(e.target.value)}
-              className="appearance-none outline-none text-xs font-medium rounded-lg px-3 py-2 pr-8 cursor-pointer min-w-[180px] max-w-[250px]"
-              style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
-            >
-              {isLoadingIntegrations ? (
-                <option value="">Carregando...</option>
-              ) : Object.keys(groupedIntegrations).length === 0 ? (
-                <option value="">Nenhum modelo</option>
-              ) : (
-                <>
-                  {!selectedIntegration && <option value="">Modelo...</option>}
-                  {Object.entries(groupedIntegrations).map(([provider, items]: [string, any]) => (
-                    <optgroup key={provider} label={`── ${provider} ──`}>
-                      {(items as any[]).map((i: any) => (
-                        <option key={i.id} value={i.id}>
-                          {i.name}{i.model ? ` (${i.model})` : ""}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </>
-              )}
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "var(--text-3)" }} />
+          <div className="flex items-center gap-1">
+            <div className="relative">
+              <select
+                value={selectedIntegration || ""}
+                onChange={(e) => setSelectedIntegration(e.target.value)}
+                className="appearance-none outline-none text-xs font-medium rounded-lg px-3 py-2 pr-8 cursor-pointer min-w-[140px] max-w-[200px]"
+                style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+              >
+                {isLoadingIntegrations ? (
+                  <option value="">Carregando...</option>
+                ) : Object.keys(groupedIntegrations).length === 0 ? (
+                  <option value="">Nenhum modelo</option>
+                ) : (
+                  <>
+                    {!selectedIntegration && <option value="">LLM...</option>}
+                    {Object.entries(groupedIntegrations).map(([provider, items]: [string, any]) => (
+                      <optgroup key={provider} label={`── ${provider} ──`}>
+                        {(items as any[]).map((i: any) => (
+                          <option key={i.id} value={i.id}>
+                            {i.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </>
+                )}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "var(--text-3)" }} />
+            </div>
+            
+            {/* Model sub-selector */}
+            {selectedIntegration && (() => {
+              const allIntegrations = Object.values(groupedIntegrations).flat();
+              const currentIntegration = allIntegrations.find((i: any) => i.id === selectedIntegration);
+              const hasModels = currentIntegration?.models && currentIntegration.models.length > 1;
+              
+              if (!hasModels) return null;
+              
+              return (
+                <div className="relative">
+                  <select
+                    value={selectedModel || ""}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="appearance-none outline-none text-xs font-medium rounded-lg px-3 py-2 pr-8 cursor-pointer min-w-[120px]"
+                    style={{ background: "var(--green)", color: "#000", border: "none" }}
+                  >
+                    {currentIntegration.models.map((m: string) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "#000" }} />
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -711,8 +825,9 @@ Responda de forma clara e pergunte se o usuário confirma.`);
   );
 }
 
-function JourneysSection() {
+function JourneysSection({ onEditJourney }: { onEditJourney?: (journey: any) => void }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [deleteConfirm, setDeleteConfirm] = useState<{id: string; name: string} | null>(null);
   const queryClient = useQueryClient();
 
   const { data: journeys = [], isLoading } = useQuery({
@@ -728,21 +843,101 @@ function JourneysSection() {
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      await journeysApi.updateStatus(id, status as "active" | "paused");
+      const session = await import("next-auth/react").then(m => m.getSession());
+      const token = (session as any)?.accessToken;
+      console.log("Toggling journey:", id, status, "Token exists:", !!token);
+      
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+      const res = await fetch(`${baseURL}/journeys/${id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ status }),
+        credentials: "include",
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Erro ao atualizar status");
+      }
+      
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["journeys"] });
       toast.success("Status atualizado!");
     },
+    onError: (err) => {
+      console.error("Toggle error:", err);
+      toast.error("Erro: " + (err as Error).message);
+    },
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: async (journey: any) => {
+      const session = await import("next-auth/react").then(m => m.getSession());
+      const token = (session as any)?.accessToken;
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+      
+      const res = await fetch(`${baseURL}/journeys`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          prompt: `Cópia de ${journey.prompt}`,
+          instance_id: journey.instance_id
+        }),
+        credentials: "include",
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Erro ao duplicar jornada");
+      }
+      
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["journeys"] });
+      toast.success("Jornada duplicada!");
+    },
+    onError: (err) => {
+      toast.error("Erro ao duplicar: " + (err as Error).message);
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await journeysApi.delete(id);
+      const session = await import("next-auth/react").then(m => m.getSession());
+      const token = (session as any)?.accessToken;
+      
+      const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+      const res = await fetch(`${baseURL}/journeys/${id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        credentials: "include",
+      });
+      
+      if (!res.ok) {
+        throw new Error("Erro ao deletar jornada");
+      }
+      
+      return true;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["journeys"] });
       toast.success("Jornada removida!");
+    },
+    onError: (err) => {
+      console.error("Delete error:", err);
+      toast.error("Erro: " + (err as Error).message);
     },
   });
 
@@ -825,18 +1020,23 @@ function JourneysSection() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 ml-4">
+                <div className="flex items-center gap-1 ml-4" onClick={(e) => e.stopPropagation()}>
                   <button
-                    onClick={(e) => { e.stopPropagation(); toggleMutation.mutate({ id: j.id, status: j.status === "active" ? "paused" : "active" }); }}
+                    onClick={() => { console.log("Click on pause/delete buttons, journey id:", j.id); toggleMutation.mutate({ id: j.id, status: j.status === "active" ? "paused" : "active" }); }}
                     className="p-2 rounded-lg transition-colors"
-                    style={{ color: j.status === "active" ? "#00d46a" : "var(--text-3)" }}
+                    style={{ color: j.status === "active" ? "#00d46a" : "var(--text-3)", background: j.status === "active" ? "rgba(0,212,106,0.1)" : "transparent" }}
                     title={j.status === "active" ? "Pausar" : "Ativar"}
                   >
                     {j.status === "active" ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                   </button>
-                  <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${j.status === "active" ? "bg-emerald-500/10 text-emerald-500" : "bg-zinc-500/10 text-zinc-500"}`}>
-                    {j.status}
-                  </span>
+                  <button
+                    onClick={() => setDeleteConfirm({ id: j.id, name: j.name || j.prompt?.slice(0, 30) || 'Jornada' })}
+                    className="p-2 rounded-lg transition-colors hover:text-red-400"
+                    style={{ color: "var(--text-3)" }}
+                    title="Excluir"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                   {expanded[j.id] ? <ChevronUp className="w-4 h-4" style={{ color: "var(--text-3)" }} /> : <ChevronDown className="w-4 h-4" style={{ color: "var(--text-3)" }} />}
                 </div>
               </div>
@@ -886,12 +1086,12 @@ function JourneysSection() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: "var(--surface-border)" }}>
-                    <button onClick={() => { if (confirm("Deseja realmente excluir esta jornada?")) deleteMutation.mutate(j.id); }} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:bg-red-500/10 hover:text-red-400" style={{ color: "var(--text-3)" }}>
-                      <Trash2 className="w-3.5 h-3.5" /> Excluir
+                  <div className="flex items-center gap-2 mt-3 pt-3 border-t flex-wrap" style={{ borderColor: "var(--surface-border)" }}>
+                    <button onClick={() => onEditJourney?.(j)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors" style={{ background: "rgba(139,92,246,0.1)", color: "#8b5cf6", border: "1px solid rgba(139,92,246,0.2)" }}>
+                      <Edit3 className="w-3.5 h-3.5" /> Editar
                     </button>
-                    <button onClick={() => toggleMutation.mutate({ id: j.id, status: j.status === "active" ? "paused" : "active" })} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors" style={{ background: j.status === "active" ? "rgba(234,179,8,0.1)" : "rgba(0,212,106,0.1)", color: j.status === "active" ? "#eab308" : "#00d46a", border: `1px solid ${j.status === "active" ? "rgba(234,179,8,0.2)" : "rgba(0,212,106,0.2)"}` }}>
-                      {j.status === "active" ? <><Pause className="w-3.5 h-3.5" /> Pausar</> : <><Play className="w-3.5 h-3.5" /> Ativar</>}
+                    <button onClick={() => duplicateMutation.mutate(j)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors" style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6", border: "1px solid rgba(59,130,246,0.2)" }}>
+                      <Copy className="w-3.5 h-3.5" /> Duplicar
                     </button>
                   </div>
                 </div>
@@ -900,6 +1100,58 @@ function JourneysSection() {
           ))
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 backdrop-blur-sm" 
+            style={{ background: "rgba(0,0,0,0.7)" }} 
+            onClick={() => setDeleteConfirm(null)} 
+          />
+          <motion.div
+            className="relative w-full max-w-sm rounded-2xl p-6 shadow-2xl"
+            style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+          >
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                <Trash2 className="w-6 h-6" style={{ color: "#ef4444" }} />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Excluir Jornada</h3>
+                <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 46%)" }}>Esta ação não pode ser desfeita</p>
+              </div>
+            </div>
+            
+            <p className="text-sm mb-6" style={{ color: "hsl(240 8% 60%)" }}>
+              Tem certeza que deseja excluir a jornada <span className="font-semibold" style={{ color: "hsl(240 15% 93%)" }}>"{deleteConfirm.name}"</span>?
+            </p>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
+                style={{ background: "hsl(240 12% 10%)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 8% 60%)" }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  deleteMutation.mutate(deleteConfirm.id);
+                  setDeleteConfirm(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
+                style={{ background: "#ef4444", color: "white" }}
+              >
+                {deleteMutation.isPending ? "Excluindo..." : "Excluir"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
@@ -908,7 +1160,7 @@ function ActivitySection() {
   const { data: activityData, isLoading } = useQuery({
     queryKey: ["agent-activity"],
     queryFn: async () => (await agentsApi.activity(50)).data,
-    refetchInterval: 10000,
+    refetchInterval: 5000,
   });
 
   const { data: stats } = useQuery({
@@ -919,17 +1171,51 @@ function ActivitySection() {
 
   const items = activityData?.items || [];
 
+  const getActivityIcon = (item: any) => {
+    if (item.last_message_type === "inbound") return <MessageSquare className="w-4 h-4" style={{ color: "#60a5fa" }} />;
+    if (item.last_message_type === "outbound") return <Send className="w-4 h-4" style={{ color: "#00d46a" }} />;
+    if (item.last_message_type === "wait") return <Clock className="w-4 h-4" style={{ color: "#f59e0b" }} />;
+    return <Zap className="w-4 h-4" style={{ color: "#8b5cf6" }} />;
+  };
+
+  const getActivityMessage = (item: any) => {
+    if (item.last_message_type === "inbound") {
+      return `Recebeu "${item.last_message?.slice(0, 30) || 'mensagem'}..." de ${item.contact_name || item.contact_jid?.split('@')[0]}`;
+    }
+    if (item.last_message_type === "outbound") {
+      const mode = item.response_mode === "private" ? "no privado" : "no grupo";
+      return `Enviou mensagem ${mode}: "${item.last_message?.slice(0, 40) || '...'}..."`;
+    }
+    if (item.status === "completed") {
+      return `Jornada concluída com sucesso!`;
+    }
+    if (item.status === "failed") {
+      return `Falhou: ${item.error_message || 'erro desconhecido'}`;
+    }
+    return item.last_message || `Executando passo ${(item.step_index || 0) + 1}/${item.total_steps || '?'}`;
+  };
+
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case "active": return { color: "#10b981", bg: "rgba(16,185,129,0.1)", label: "Executando" };
+      case "completed": return { color: "#3b82f6", bg: "rgba(59,130,246,0.1)", label: "Concluída" };
+      case "failed": return { color: "#ef4444", bg: "rgba(239,68,68,0.1)", label: "Falhou" };
+      case "pending": return { color: "#f59e0b", bg: "rgba(245,158,11,0.1)", label: "Pendente" };
+      default: return { color: "#6b7280", bg: "rgba(107,114,128,0.1)", label: status };
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header with stats */}
       <div className="flex items-center gap-4 px-4 py-3 border-b flex-shrink-0" style={{ borderColor: "var(--surface-border)", background: "var(--surface-2)" }}>
         <div className="flex items-center gap-2">
           <Activity className="w-4 h-4" style={{ color: "#10b981" }} />
-          <h2 className="text-sm font-bold" style={{ color: "var(--text-1)" }}>Atividade</h2>
+          <h2 className="text-sm font-bold" style={{ color: "var(--text-1)" }}>Atividade em Tempo Real</h2>
         </div>
         <div className="flex-1" />
         {stats && (
-          <div className="flex items-center gap-4 text-xs" style={{ color: "var(--text-3)" }}>
+          <div className="flex items-center gap-3 text-xs" style={{ color: "var(--text-3)" }}>
             <span className="flex items-center gap-1.5 px-2 py-1 rounded-full" style={{ background: "rgba(0,212,106,0.1)" }}>
               <Activity className="w-3 h-3" style={{ color: "var(--green)" }} />
               {stats.journeys.active_executions} ativa{stats.journeys.active_executions !== 1 ? "s" : ""}
@@ -951,7 +1237,7 @@ function ActivitySection() {
         {isLoading ? (
           <div className="p-4 space-y-3">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-16 rounded-xl animate-pulse" style={{ background: "var(--surface-3)" }} />
+              <div key={i} className="h-20 rounded-xl animate-pulse" style={{ background: "var(--surface-3)" }} />
             ))}
           </div>
         ) : items.length === 0 ? (
@@ -961,66 +1247,75 @@ function ActivitySection() {
             <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>As execuções aparecerão aqui em tempo real</p>
           </div>
         ) : (
-          <div className="divide-y" style={{ borderColor: "var(--surface-border)" }}>
-            {items.map((item: any, i: number) => (
-              <div key={i} className="flex items-center gap-4 px-4 py-3 hover:bg-[var(--surface-3)] transition-colors">
-                {/* Status indicator */}
-                <div className="flex-shrink-0">
-                  <span className={`w-2.5 h-2.5 rounded-full block ${
-                    item.status === "active" ? "bg-emerald-500 animate-pulse" :
-                    item.status === "completed" ? "bg-blue-500" :
-                    item.status === "failed" ? "bg-red-500" :
-                    "bg-zinc-500"
-                  }`} />
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>
-                      {item.contact_name || item.contact_jid}
-                    </span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded" style={{
-                      background: item.status === "active" ? "rgba(16,185,129,0.1)" :
-                                 item.status === "completed" ? "rgba(59,130,246,0.1)" :
-                                 "rgba(107,114,128,0.1)",
-                      color: item.status === "active" ? "#10b981" :
-                             item.status === "completed" ? "#3b82f6" :
-                             "var(--text-3)"
-                    }}>
-                      {item.status}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[10px]" style={{ color: "var(--text-3)" }}>
-                      {item.journey_name}
-                    </span>
-                    {item.group_name && (
-                      <>
-                        <span className="text-[10px] opacity-30">·</span>
-                        <span className="text-[10px]" style={{ color: "var(--text-3)" }}>
-                          {item.group_name}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Steps & message */}
-                <div className="flex-shrink-0 text-right max-w-[200px]">
-                  {item.total_steps > 0 && (
-                    <div className="text-[10px] mb-1" style={{ color: "var(--text-3)" }}>
-                      Passo {item.step_index + 1}/{item.total_steps}
+          <div className="space-y-2 p-4">
+            {items.map((item: any, i: number) => {
+              const statusConfig = getStatusConfig(item.status);
+              return (
+                <div key={i} className="rounded-xl p-4 transition-all hover:scale-[1.01]" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+                  <div className="flex items-start gap-3">
+                    {/* Icon */}
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: statusConfig.bg }}>
+                      {getActivityIcon(item)}
                     </div>
-                  )}
-                  {item.last_message && (
-                    <p className="text-[10px] truncate" style={{ color: "var(--text-3)" }}>
-                      {item.last_message}
-                    </p>
-                  )}
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      {/* Header */}
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
+                          {item.journey_name || 'Jornada'}
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: statusConfig.bg, color: statusConfig.color }}>
+                          {statusConfig.label}
+                        </span>
+                      </div>
+
+                      {/* Action message */}
+                      <p className="text-sm mb-2" style={{ color: item.last_message_type === "outbound" ? "#00d46a" : "var(--text-2)" }}>
+                        {getActivityMessage(item)}
+                      </p>
+
+                      {/* Meta info */}
+                      <div className="flex items-center gap-3 text-[11px]" style={{ color: "var(--text-3)" }}>
+                        {item.contact_name && (
+                          <span className="flex items-center gap-1">
+                            <User className="w-3 h-3" />
+                            {item.contact_name}
+                          </span>
+                        )}
+                        {item.instance_name && (
+                          <span className="flex items-center gap-1">
+                            <Server className="w-3 h-3" />
+                            {item.instance_name}
+                          </span>
+                        )}
+                        {item.group_name && (
+                          <span className="flex items-center gap-1">
+                            <Users className="w-3 h-3" />
+                            {item.group_name}
+                          </span>
+                        )}
+                        {item.total_steps > 0 && (
+                          <span className="flex items-center gap-1">
+                            <TrendingUp className="w-3 h-3" />
+                            Passo {(item.step_index || 0) + 1}/{item.total_steps}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Time */}
+                    <div className="flex-shrink-0 text-right">
+                      {item.started_at && (
+                        <span className="text-[10px]" style={{ color: "var(--text-3)" }}>
+                          {new Date(item.started_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -1029,7 +1324,81 @@ function ActivitySection() {
 }
 
 function AgentsPageClient() {
+  const { currentWorkspace } = useWorkspace();
   const [active, setActive] = useState<AgentSection>("chat");
+  const [editingJourney, setEditingJourney] = useState<any>(null);
+  const [editMessages, setEditMessages] = useState<Message[]>([]);
+  const [editPrompt, setEditPrompt] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [isEditStreaming, setIsEditStreaming] = useState(false);
+  const [selectedChannels, setSelectedChannels] = useState<ChannelType[]>(["whatsapp"]);
+  const editScrollRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+
+  const { data: instData = [] } = useQuery<any[]>({
+    queryKey: ["instances", currentWorkspace?.id],
+    queryFn: () => instancesApi.list(undefined, currentWorkspace?.id).then(r => r.data),
+  });
+
+  const chAvail = CHANNELS.filter(c => instData.some((i: any) => i.channel === c.id && i.status === "connected"));
+
+  const handleEditJourney = (journey: any) => {
+    setEditingJourney(journey);
+    setEditMessages([{
+      id: crypto.randomUUID(),
+      role: "assistant",
+      content: `Editando jornada: **${journey.name || journey.prompt?.slice(0, 50) || 'Jornada'}**\n\nPrompt original:\n${journey.prompt}\n\nO que você gostaria de alterar? Pode me dizer em linguagem natural, por exemplo:\n- "Mude a mensagem de resposta para 'Olá!'\n- "Adicione um passo de esperar 5 segundos"\n- "Mude o grupo para 'vendas'"`
+    }]);
+    setIsEditing(true);
+  };
+
+  const closeEditModal = () => {
+    setIsEditing(false);
+    setEditingJourney(null);
+    setEditMessages([]);
+    setEditPrompt("");
+  };
+
+  const sendEditMessage = async () => {
+    if (!editPrompt.trim() || isEditStreaming) return;
+    
+    const userMessage: Message = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: editPrompt.trim(),
+      createdAt: new Date(),
+    };
+    
+    setEditMessages(prev => [...prev, userMessage]);
+    setEditPrompt("");
+    setIsEditStreaming(true);
+    
+    try {
+      const res = await agentsApi.chat(editPrompt.trim());
+      const content = res.data?.response || res.data?.content || "";
+      
+      setEditMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: content,
+      }]);
+      
+      // Check if journey was updated
+      if (content.includes("atualizada") || content.includes("modificada") || content.includes("alterada")) {
+        queryClient.invalidateQueries({ queryKey: ["journeys"] });
+        toast.success("Jornada atualizada!");
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || error.message || "Erro ao editar jornada");
+      setEditMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: "Desculpe, ocorreu um erro ao processar sua solicitação.",
+      }]);
+    } finally {
+      setIsEditStreaming(false);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -1046,7 +1415,7 @@ function AgentsPageClient() {
 
       <div className="flex gap-6 flex-1 min-h-0">
         {/* Submenu sidebar */}
-        <aside className="w-52 flex-shrink-0">
+        <aside className="w-52 flex-shrink-0 space-y-4">
           <nav className="rounded-2xl overflow-hidden" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
             {SECTIONS.map((section, i) => {
               const Icon = section.icon;
@@ -1089,15 +1458,127 @@ function AgentsPageClient() {
               );
             })}
           </nav>
+
+          {/* Channel Selector */}
+          <div className="rounded-2xl p-4" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+            <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-3)" }}>Canais</p>
+            <div className="flex flex-wrap gap-1.5">
+              {chAvail.map(ch => {
+                const isSelected = selectedChannels.includes(ch.id);
+                return (
+                  <button key={ch.id}
+                    onClick={() => {
+                      if (isSelected && selectedChannels.length > 1) {
+                        setSelectedChannels(selectedChannels.filter(c => c !== ch.id));
+                      } else if (!isSelected) {
+                        setSelectedChannels([...selectedChannels, ch.id]);
+                      }
+                    }}
+                    className="px-2 py-1 rounded-lg text-[10px] font-semibold transition-all"
+                    style={{
+                      background: isSelected ? ch.color : "var(--surface-3)",
+                      color: isSelected ? "#fff" : "var(--text-3)",
+                    }}>
+                    {ch.label.slice(0, 3)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </aside>
 
         {/* Content area */}
         <div className="flex-1 min-w-0 min-h-0 rounded-2xl overflow-hidden border" style={{ borderColor: "var(--surface-border)" }}>
           {active === "chat" && <ChatSection />}
-          {active === "journeys" && <JourneysSection />}
+          {active === "journeys" && <JourneysSection onEditJourney={handleEditJourney} />}
           {active === "activity" && <ActivitySection />}
         </div>
       </div>
+
+      {/* Edit Journey Modal */}
+      {isEditing && editingJourney && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.7)" }} onClick={closeEditModal} />
+          <motion.div
+            className="relative w-full max-w-2xl max-h-[80vh] rounded-2xl flex flex-col shadow-2xl"
+            style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0" style={{ borderColor: "var(--surface-border)" }}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(139,92,246,0.15)" }}>
+                  <Edit3 className="w-4 h-4" style={{ color: "#8b5cf6" }} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Editar Jornada</h3>
+                  <p className="text-[10px]" style={{ color: "var(--text-3)" }}>Descreva as alterações em linguagem natural</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={closeEditModal} className="p-2 rounded-lg transition-colors hover:bg-[var(--surface-3)]" style={{ color: "var(--text-3)" }}>
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Chat */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4" ref={editScrollRef}>
+              {editMessages.map((msg) => (
+                <div key={msg.id} className={cn("flex gap-3", msg.role === "user" && "flex-row-reverse")}>
+                  <div className={cn("w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0", msg.role === "user" ? "bg-[var(--surface-3)]" : "bg-[#8b5cf6]")}>
+                    {msg.role === "user" ? <User className="w-4 h-4" style={{ color: "var(--text-2)" }} /> : <SparklesIcon className="w-4 h-4 text-white" />}
+                  </div>
+                  <div className={cn("flex-1 max-w-[85%]", msg.role === "user" && "text-right")}>
+                    <p className="text-xs font-medium mb-1" style={{ color: "var(--text-3)" }}>{msg.role === "user" ? "Você" : "Assistente IA"}</p>
+                    <div className={cn("rounded-xl p-3 text-sm", msg.role === "user" ? "bg-[var(--surface-3)]" : "bg-[var(--surface-2)]")} style={{ color: "var(--text-1)" }}>
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {isEditStreaming && (
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-[#8b5cf6]">
+                    <SparklesIcon className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <ThinkingDots />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Input */}
+            <div className="p-4 border-t flex-shrink-0" style={{ borderColor: "var(--surface-border)" }}>
+              <div className="flex items-end gap-2">
+                <textarea
+                  value={editPrompt}
+                  onChange={(e) => setEditPrompt(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendEditMessage(); } }}
+                  placeholder="Descreva a alteração que deseja fazer..."
+                  rows={1}
+                  className="flex-1 rounded-xl px-4 py-3 text-sm resize-none outline-none"
+                  style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+                />
+                <button
+                  onClick={sendEditMessage}
+                  disabled={!editPrompt.trim() || isEditStreaming}
+                  className="w-10 h-10 rounded-xl flex items-center justify-center transition-all disabled:opacity-40"
+                  style={{ background: "#8b5cf6" }}
+                >
+                  {isEditStreaming ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <Send className="w-4 h-4 text-white" />}
+                </button>
+              </div>
+              <p className="text-[10px] mt-2" style={{ color: "var(--text-3)" }}>
+                Enter para enviar · Shift+Enter para nova linha
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

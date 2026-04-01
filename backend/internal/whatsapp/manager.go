@@ -120,6 +120,73 @@ func (m *Manager) IsRunning(instanceID string) bool {
 	return ok
 }
 
+// SaveMessage saves a message to the database for inbox display.
+func (m *Manager) SaveMessage(instanceID string, toJID string, content string, direction models.MessageDirection, msgType string) error {
+	if m.db == nil {
+		return nil
+	}
+
+	instUUID, err := uuid.Parse(instanceID)
+	if err != nil {
+		return err
+	}
+
+	contentJSON, _ := json.Marshal(content)
+
+	// Extract phone from JID
+	phone := extractPhoneFromJID(toJID)
+
+	// Try to get contact info from WhatsApp
+	var contactName string
+	var contactAvatar string
+
+	client := m.GetInstance(instanceID)
+	if client != nil && client.IsConnected() {
+		// Get avatar from WhatsApp
+		if picURL := client.GetContactProfilePicture(toJID); picURL != "" {
+			contactAvatar = picURL
+		}
+		// Get contact name from WhatsApp
+		if _, pushName := client.GetContactInfo(toJID); pushName != "" {
+			contactName = pushName
+		}
+	}
+
+	// If no name from WhatsApp, try CRM
+	if contactName == "" {
+		var contact models.Contact
+		if err := m.db.Where("phone LIKE ?", "%"+phone+"%").First(&contact).Error; err == nil {
+			contactName = contact.Name
+		}
+	}
+
+	// Fallback to phone number
+	if contactName == "" {
+		contactName = phone
+	}
+
+	logEntry := models.MessageLog{
+		ID:            uuid.New(),
+		InstanceID:    instUUID,
+		Direction:     direction,
+		Type:          msgType,
+		ToJID:         toJID,
+		ContactName:   contactName,
+		ContactAvatar: contactAvatar,
+		Content:       string(contentJSON),
+		Status:        models.MessageStatusSent,
+	}
+
+	return m.db.Create(&logEntry).Error
+}
+
+func extractPhoneFromJID(jid string) string {
+	if idx := strings.Index(jid, "@"); idx > 0 {
+		return jid[:idx]
+	}
+	return jid
+}
+
 // RestartWithProxy stops the instance and restarts it with updated proxy configuration.
 func (m *Manager) RestartWithProxy(instance *models.Instance) error {
 	return m.StartInstance(instance)
@@ -335,22 +402,35 @@ func parseEventsJSON(raw string) []string {
 
 // CheckJourneys checks if any journey should be triggered for the given message
 // and executes them asynchronously.
-func (m *Manager) CheckJourneys(instanceID, fromJID, fromName, groupJID, messageText string) {
-	instUUID, err := uuid.Parse(instanceID)
-	if err != nil {
+func (m *Manager) CheckJourneys(instanceID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) {
+	var journeys []models.Journey
+	if err := m.db.Where("instance_id = ? AND status = 'active'", instanceID).Find(&journeys).Error; err != nil {
+		log.Error().Err(err).Str("instance", instanceID).Msg("failed to query journeys")
 		return
 	}
 
-	var journeys []models.Journey
-	if err := m.db.Preload("Instance").Where("instance_id = ? AND status = 'active'", instUUID).Find(&journeys).Error; err != nil {
+	if len(journeys) == 0 {
 		return
 	}
+
+	log.Info().
+		Str("instance", instanceID).
+		Str("from", fromJID).
+		Str("group", groupJID).
+		Str("message", messageText).
+		Str("type", messageType).
+		Bool("isGroup", isGroup).
+		Int("journeys_found", len(journeys)).
+		Msg("checking journeys")
 
 	for i := range journeys {
 		journey := &journeys[i]
-		if !journey.ShouldTrigger(messageText, groupJID) {
+		if !journey.ShouldTrigger(messageText, groupJID, messageType, isGroup) {
+			log.Debug().Str("journey", journey.ID).Msg("journey not triggered")
 			continue
 		}
+
+		log.Info().Str("journey", journey.ID).Str("name", journey.Name).Msg("triggering journey")
 
 		// Se a jornada tem fluxo multi-step, usar o executor
 		if journey.HasFlow() {
@@ -359,7 +439,7 @@ func (m *Manager) CheckJourneys(instanceID, fromJID, fromName, groupJID, message
 			}(journey)
 		} else {
 			go func(j *models.Journey) {
-				if err := m.executeJourney(j, fromJID, fromName, messageText); err != nil {
+				if err := m.executeJourney(j, fromJID, fromName, groupJID, messageText, isGroup); err != nil {
 					log.Error().Err(err).Str("journey", j.ID).Msg("failed to execute journey")
 				}
 			}(journey)
@@ -551,30 +631,80 @@ func (m *Manager) failExecution(execution *models.JourneyExecution, errMsg strin
 		Msg("execução de jornada falhou")
 }
 
-func (m *Manager) executeJourney(journey *models.Journey, fromJID, fromName, messageText string) error {
+func (m *Manager) executeJourney(journey *models.Journey, fromJID, fromName, groupJID, messageText string, isGroup bool) error {
 	client := m.GetInstance(journey.InstanceID)
 	if client == nil {
+		log.Error().Str("journey", journey.ID).Str("instance", journey.InstanceID).Msg("instance not running for journey")
 		return fmt.Errorf("instance not running")
 	}
 
+	log.Info().
+		Str("journey", journey.ID).
+		Str("name", journey.Name).
+		Str("from", fromJID).
+		Str("fromName", fromName).
+		Str("groupJID", groupJID).
+		Bool("isGroup", isGroup).
+		Str("messageTemplate", journey.MessageTemplate).
+		Msg("executing journey - sending message")
+
+	// Create execution record
+	execution := &models.JourneyExecution{
+		ID:          uuid.New().String(),
+		JourneyID:   journey.ID,
+		InstanceID:  journey.InstanceID,
+		ContactJID:  fromJID,
+		ContactName: fromName,
+		GroupJID:    groupJID,
+		Status:      models.ExecutionActive,
+		TotalSteps:  1,
+		CurrentStep: "send",
+		StepIndex:   0,
+		StartedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	m.db.Create(execution)
+
+	// Add inbound message
+	execution.AddMessage("inbound", messageText, "trigger")
+
 	responseMsg := buildJourneyResponse(journey, fromName, messageText)
 
+	// Determine recipient based on journey type and group context
 	recipientJID := fromJID
-	if !strings.Contains(fromJID, "@") {
-		recipientJID = fromJID + "@s.whatsapp.net"
+	if isGroup && journey.GroupJID != "" {
+		// For group triggers, send to the group
+		recipientJID = journey.GroupJID
+	} else if !strings.Contains(recipientJID, "@") {
+		recipientJID = recipientJID + "@s.whatsapp.net"
 	}
 
 	if _, err := client.SendTextMessage(recipientJID, responseMsg); err != nil {
+		log.Error().Err(err).Str("journey", journey.ID).Str("to", recipientJID).Msg("failed to send journey message")
+		execution.Status = models.ExecutionFailed
+		execution.ErrorMessage = err.Error()
+		execution.UpdatedAt = time.Now()
+		execution.CompletedAt = &execution.UpdatedAt
+		m.db.Save(execution)
 		return fmt.Errorf("failed to send message: %w", err)
 	}
 
+	// Add outbound message
+	execution.AddMessage("outbound", responseMsg, "send")
+
 	now := time.Now()
+	execution.Status = models.ExecutionCompleted
+	execution.CompletedAt = &now
+	execution.UpdatedAt = now
+	m.db.Save(execution)
+
 	m.db.Model(journey).Updates(map[string]interface{}{
-		"invocations": journey.Invocations + 1,
-		"last_run_at": now,
+		"invocations":     gorm.Expr("invocations + 1"),
+		"completed_count": gorm.Expr("completed_count + 1"),
+		"last_run_at":     now,
 	})
 
-	log.Info().Str("journey", journey.ID).Str("to", recipientJID).Msg("journey executed")
+	log.Info().Str("journey", journey.ID).Str("to", recipientJID).Str("message", responseMsg).Msg("journey executed successfully")
 	return nil
 }
 

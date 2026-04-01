@@ -3,7 +3,7 @@ export interface User {
   name: string;
   email: string;
   username?: string;
-  role: "admin" | "user";
+  role: "super_admin" | "customer";
   plan?: Plan;
   is_active: boolean;
   blocked_until?: string;
@@ -27,6 +27,8 @@ export interface Plan {
   price: number;
   max_instances: number;
   max_messages_per_day: number;
+  max_users: number;
+  max_workspaces: number;
   features: string; // JSON-encoded string from API
   allow_proxy: boolean;
   is_active: boolean;
@@ -233,4 +235,63 @@ export interface Campaign {
   recipients?: CampaignRecipient[];
   created_at: string;
   updated_at: string;
+}
+
+// ─── Workspace & Multi-tenancy ──────────────────────────────────────────────
+
+export interface Workspace {
+  id: string;
+  owner_id: string;
+  name: string;
+  slug: string;
+  plan_id?: string;
+  is_active: boolean;
+  is_owner: boolean;
+  role?: Role;
+  joined_at: string;
+  created_at: string;
+}
+
+export interface Role {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description?: string;
+  permissions: Permission[];
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Permission {
+  id: string;
+  key: string;
+  name: string;
+  description?: string;
+  category: string;
+  created_at: string;
+}
+
+export interface UserWorkspace {
+  id: string;
+  user_id: string;
+  workspace_id: string;
+  user?: User;
+  role?: Role;
+  is_owner: boolean;
+  joined_at: string;
+}
+
+export interface Invite {
+  id: string;
+  workspace_id: string;
+  email: string;
+  role_id: string;
+  role?: Role;
+  invited_by: string;
+  inviter?: User;
+  token: string;
+  status: "pending" | "accepted" | "expired" | "revoked";
+  expires_at: string;
+  created_at: string;
 }

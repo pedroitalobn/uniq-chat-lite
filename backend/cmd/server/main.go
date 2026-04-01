@@ -42,6 +42,9 @@ func main() {
 	// Seed default plans
 	seedPlans(db)
 
+	// Seed default permissions
+	seedPermissions(db)
+
 	// Backfill slug and token for existing instances that predate these fields
 	backfillInstances(db)
 
@@ -142,14 +145,17 @@ func autoMigrate(db *gorm.DB) error {
 		&models.SocialDM{},
 		&models.SocialTarget{},
 		&models.TaktikDevice{},
-	)
-}
-
-func migrateJourneys(db *gorm.DB) error {
-	return db.AutoMigrate(
-	// Journey models commented out for now - will add back properly
-	// &models.Journey{},
-	// &models.JourneyExecution{},
+		&models.Journey{},
+		&models.JourneyExecution{},
+		// Workspace / RBAC
+		&models.Workspace{},
+		&models.UserWorkspace{},
+		&models.Role{},
+		&models.Permission{},
+		&models.RolePermission{},
+		&models.Invite{},
+		&models.InviteCode{},
+		&models.SystemSetting{},
 	)
 }
 
@@ -198,6 +204,8 @@ func seedPlans(db *gorm.DB) {
 			Price:                 0,
 			MaxInstances:          1,
 			MaxMessagesPerDay:     100,
+			MaxUsers:              1,
+			MaxWorkspaces:         1,
 			Features:              `{"support":"community","channels":["whatsapp"]}`,
 			AllowProxy:            false,
 			AllowProxyResidencial: false,
@@ -208,6 +216,8 @@ func seedPlans(db *gorm.DB) {
 			Price:                 29,
 			MaxInstances:          1,
 			MaxMessagesPerDay:     100,
+			MaxUsers:              3,
+			MaxWorkspaces:         1,
 			Features:              `{"whatsapp":true,"instagram":false,"crm":true,"campaigns":false,"integrations":false,"api":false,"webhooks":false,"mcp":false,"description":"Para pequenos negócios","stripe_price_id":"price_1TFmWyGKxdRCOZrXWqqZU28y"}`,
 			AllowProxy:            false,
 			AllowProxyResidencial: false,
@@ -219,6 +229,8 @@ func seedPlans(db *gorm.DB) {
 			Price:                 99,
 			MaxInstances:          150,
 			MaxMessagesPerDay:     -1,
+			MaxUsers:              5,
+			MaxWorkspaces:         2,
 			Features:              `{"support":"email","webhooks":true,"channels":["whatsapp","instagram"]}`,
 			AllowProxy:            true,
 			AllowProxyResidencial: true,
@@ -232,6 +244,8 @@ func seedPlans(db *gorm.DB) {
 			Price:                 149,
 			MaxInstances:          300,
 			MaxMessagesPerDay:     -1,
+			MaxUsers:              10,
+			MaxWorkspaces:         -1,
 			Features:              `{"support":"priority","webhooks":true,"channels":["whatsapp","instagram","telegram","linkedin"],"custom_domain":true,"mcp":true}`,
 			AllowProxy:            true,
 			AllowProxyResidencial: true,
@@ -253,6 +267,8 @@ func seedPlans(db *gorm.DB) {
 				"price":                plans[i].Price,
 				"max_instances":        plans[i].MaxInstances,
 				"max_messages_per_day": plans[i].MaxMessagesPerDay,
+				"max_users":            plans[i].MaxUsers,
+				"max_workspaces":       plans[i].MaxWorkspaces,
 			})
 		}
 	}
@@ -274,4 +290,18 @@ func seedPlans(db *gorm.DB) {
 	}
 	setPriceID("Pro", "STRIPE_PRICE_PRO")
 	setPriceID("Business", "STRIPE_PRICE_BUSINESS")
+}
+
+func seedPermissions(db *gorm.DB) {
+	perms := models.GetAllPermissions()
+	for i := range perms {
+		db.Where(models.Permission{Key: perms[i].Key}).
+			Assign(models.Permission{
+				Name:        perms[i].Name,
+				Description: perms[i].Description,
+				Category:    perms[i].Category,
+			}).
+			FirstOrCreate(&perms[i])
+	}
+	log.Info().Msg("permissions seeded")
 }

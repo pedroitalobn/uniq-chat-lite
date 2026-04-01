@@ -14,6 +14,8 @@ interface EditState {
   price: number;
   max_instances: number;
   max_messages_per_day: number;
+  max_users: number;
+  max_workspaces: number;
   allow_proxy: boolean;
   is_active: boolean;
   stripe_price_id: string;
@@ -255,6 +257,24 @@ function PlanEditForm({
             className="input-field w-full"
           />
         </div>
+        <div>
+          <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Usuários (-1 = ∞)</label>
+          <input
+            type="number"
+            value={form.max_users}
+            onChange={(e) => setForm({ ...form, max_users: Number(e.target.value) })}
+            className="input-field w-full"
+          />
+        </div>
+        <div>
+          <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Workspaces (-1 = ∞)</label>
+          <input
+            type="number"
+            value={form.max_workspaces}
+            onChange={(e) => setForm({ ...form, max_workspaces: Number(e.target.value) })}
+            className="input-field w-full"
+          />
+        </div>
       </div>
 
       {/* Stripe Price ID */}
@@ -335,6 +355,8 @@ function PlanCard({ plan }: { plan: Plan }) {
     price: plan.price,
     max_instances: plan.max_instances,
     max_messages_per_day: plan.max_messages_per_day,
+    max_users: plan.max_users,
+    max_workspaces: plan.max_workspaces,
     allow_proxy: plan.allow_proxy,
     is_active: plan.is_active,
     stripe_price_id: plan.stripe_price_id ?? "",
@@ -355,6 +377,8 @@ function PlanCard({ plan }: { plan: Plan }) {
         price: form.price,
         max_instances: form.max_instances,
         max_messages_per_day: form.max_messages_per_day,
+        max_users: form.max_users,
+        max_workspaces: form.max_workspaces,
         allow_proxy: form.allow_proxy,
         is_active: form.is_active,
         stripe_price_id: form.stripe_price_id || undefined,
@@ -461,6 +485,18 @@ function PlanCard({ plan }: { plan: Plan }) {
                 {plan.max_messages_per_day === -1 ? "∞" : plan.max_messages_per_day.toLocaleString("pt-BR")}
               </p>
             </div>
+            <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
+              <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Usuários</p>
+              <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>
+                {plan.max_users === -1 ? "∞" : plan.max_users}
+              </p>
+            </div>
+            <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
+              <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Workspaces</p>
+              <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>
+                {plan.max_workspaces === -1 ? "∞" : plan.max_workspaces}
+              </p>
+            </div>
             <div
               className="col-span-2 rounded-xl p-3 flex items-center gap-2"
               style={plan.allow_proxy ? {
@@ -514,6 +550,8 @@ function NewPlanForm({ onDone }: { onDone: () => void }) {
     price: 0,
     max_instances: 1,
     max_messages_per_day: 100,
+    max_users: 1,
+    max_workspaces: 1,
     allow_proxy: false,
     is_active: true,
     stripe_price_id: "",
@@ -535,6 +573,8 @@ function NewPlanForm({ onDone }: { onDone: () => void }) {
         price: form.price,
         max_instances: form.max_instances,
         max_messages_per_day: form.max_messages_per_day,
+        max_users: form.max_users,
+        max_workspaces: form.max_workspaces,
         allow_proxy: form.allow_proxy,
         is_active: form.is_active,
         stripe_price_id: form.stripe_price_id || undefined,

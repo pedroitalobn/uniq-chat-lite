@@ -245,7 +245,7 @@ interface Integration {
   name: string;
   masked_key: string;
   base_url?: string;
-  model?: string;
+  models?: string[];
   is_active: boolean;
   test_status?: string;
   last_tested_at?: string;
@@ -267,10 +267,9 @@ function ConnectModal({
     name: provider.name as string,
     api_key: "",
     base_url: "",
-    model: (provider.models[0] ?? "") as string,
+    models: [] as string[],
   });
   const [showKey, setShowKey] = useState(false);
-  const [customModel, setCustomModel] = useState(false);
 
   const create = useMutation({
     mutationFn: () =>
@@ -279,7 +278,7 @@ function ConnectModal({
         name: form.name,
         api_key: form.api_key,
         base_url: form.base_url || undefined,
-        model: form.model || undefined,
+        models: form.models.length > 0 ? form.models : undefined,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["integrations"] });
@@ -291,6 +290,19 @@ function ConnectModal({
       toast.error(msg || "Erro ao conectar integração");
     },
   });
+
+  const toggleModel = (model: string) => {
+    setForm(f => ({
+      ...f,
+      models: f.models.includes(model)
+        ? f.models.filter(m => m !== model)
+        : [...f.models, model]
+    }));
+  };
+
+  const selectAllModels = () => {
+    setForm(f => ({ ...f, models: [...provider.models] }));
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -366,42 +378,42 @@ function ConnectModal({
           </div>
         )}
 
-        {/* Model */}
+        {/* Models */}
         {provider.models.length > 0 && (
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium" style={{ color: "var(--text-2)" }}>Modelo</label>
-            {!customModel ? (
-              <div className="relative">
-                <select
-                  className="w-full rounded-xl border px-3 py-2 text-sm appearance-none outline-none"
-                  style={{ background: "var(--surface-3)", borderColor: "var(--surface-border)", color: "var(--text-1)" }}
-                  value={form.model}
-                  onChange={(e) => setForm({ ...form, model: e.target.value })}
-                >
-                  {provider.models.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
-                  style={{ color: "var(--text-3)" }} />
-              </div>
-            ) : (
-              <input
-                className="w-full rounded-xl border px-3 py-2 text-sm outline-none"
-                style={{ background: "var(--surface-3)", borderColor: "var(--surface-border)", color: "var(--text-1)" }}
-                placeholder="nome-do-modelo"
-                value={form.model}
-                onChange={(e) => setForm({ ...form, model: e.target.value })}
-              />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium" style={{ color: "var(--text-2)" }}>
+                Modelos
+              </label>
+              <button
+                type="button"
+                onClick={selectAllModels}
+                className="text-xs underline"
+                style={{ color: provider.color }}
+              >
+                Selecionar todos
+              </button>
+            </div>
+            <div className="rounded-xl border p-3 space-y-1.5 max-h-40 overflow-y-auto"
+              style={{ background: "var(--surface-3)", borderColor: "var(--surface-border)" }}>
+              {provider.models.map((m) => (
+                <label key={m} className="flex items-center gap-2.5 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={form.models.includes(m)}
+                    onChange={() => toggleModel(m)}
+                    className="w-4 h-4 rounded"
+                    style={{ accentColor: provider.color }}
+                  />
+                  <span className="text-sm" style={{ color: "var(--text-1)" }}>{m}</span>
+                </label>
+              ))}
+            </div>
+            {form.models.length > 0 && (
+              <p className="text-xs" style={{ color: "var(--text-3)" }}>
+                {form.models.length} modelo(s) selecionado(s)
+              </p>
             )}
-            <button
-              type="button"
-              onClick={() => setCustomModel(!customModel)}
-              className="text-xs underline"
-              style={{ color: "var(--text-3)" }}
-            >
-              {customModel ? "Usar lista de modelos" : "Digitar modelo personalizado"}
-            </button>
           </div>
         )}
 
@@ -481,7 +493,9 @@ function IntegrationCard({ integration }: { integration: Integration }) {
           )}
         </div>
         <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
-          {provider?.name} {integration.model ? `· ${integration.model}` : ""}
+          {provider?.name} {integration.models && integration.models.length > 0 
+            ? `· ${integration.models.length} modelo(s)` 
+            : ""}
           {integration.masked_key ? ` · ${integration.masked_key}` : ""}
         </p>
       </div>

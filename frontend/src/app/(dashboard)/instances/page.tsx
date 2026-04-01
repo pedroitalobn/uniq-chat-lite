@@ -3,12 +3,13 @@
 import { useState, Suspense } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { instancesApi, serversApi } from "@/lib/api";
-import { Plus, Globe, AlertTriangle, Smartphone, Trash2, QrCode, RefreshCw, Server as ServerIcon, X, MessageSquare, Hash, Shield, Wifi } from "lucide-react";
+import { Plus, Globe, AlertTriangle, Smartphone, Trash2, QrCode, RefreshCw, Server as ServerIcon, X, MessageSquare, Hash, Shield, Wifi, Copy, Check } from "lucide-react";
 import { showConfirm } from "@/lib/confirm";
 import { usePreferences } from "@/lib/preferences";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Instance, Server, ChannelType } from "@/types";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 const CHANNEL_META: Record<ChannelType, { label: string; color: string }> = {
   whatsapp:  { label: "WhatsApp",  color: "#25d366" },
@@ -54,6 +55,15 @@ function InstanceCard({
     onSuccess: () => { toast.success("Instância removida"); onDeleted(); },
     onError: () => toast.error("Erro ao remover instância"),
   });
+
+  const [idCopied, setIdCopied] = useState(false);
+
+  const copyId = () => {
+    navigator.clipboard.writeText(instance.id);
+    setIdCopied(true);
+    toast.success("ID copiado!");
+    setTimeout(() => setIdCopied(false), 2000);
+  };
 
   const handleDelete = async () => {
     if (!await showConfirm(`Remover a instância "${instance.name}"? Esta ação é irreversível.`, { title: "Remover instância", confirmLabel: "Remover" })) return;
@@ -106,10 +116,26 @@ function InstanceCard({
                   style={{ background: "var(--green)" }} />
               )}
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-sm leading-tight" style={{ color: "hsl(240 15% 93%)" }}>
                 {instance.name}
               </h3>
+              {/* Instance ID - destacado */}
+              <button
+                onClick={copyId}
+                className="flex items-center gap-1 mt-0.5 group/id"
+                title="Clique para copiar o ID"
+              >
+                <code className="text-[10px] font-mono px-1.5 py-0.5 rounded-md truncate max-w-[180px]"
+                  style={{ background: "rgba(255,255,255,0.04)", color: "hsl(240 8% 50%)" }}>
+                  {instance.id}
+                </code>
+                {idCopied ? (
+                  <Check className="w-3 h-3 flex-shrink-0" style={{ color: "var(--green)" }} />
+                ) : (
+                  <Copy className="w-3 h-3 flex-shrink-0 opacity-0 group-hover/id:opacity-100 transition-opacity" style={{ color: "hsl(240 8% 40%)" }} />
+                )}
+              </button>
               <p className="text-xs mt-0.5 font-mono" style={{ color: "hsl(240 8% 42%)" }}>
                 {instance.phone_number || "—"}
               </p>
@@ -296,16 +322,17 @@ function InstancesContent() {
   const [createOpen, setCreateOpen] = useState(false);
   const [qrInstanceId, setQrInstanceId] = useState<string | null>(null);
   const [channelFilter, setChannelFilter] = useState<ChannelType | "all">("all");
+  const { currentWorkspace } = useWorkspace();
 
   const { data: instances = [], isLoading } = useQuery<Instance[]>({
-    queryKey: ["instances"],
-    queryFn: () => instancesApi.list().then((r) => r.data),
+    queryKey: ["instances", currentWorkspace?.id],
+    queryFn: () => instancesApi.list(undefined, currentWorkspace?.id).then((r) => r.data),
     refetchInterval: 10_000,
   });
 
   const { data: servers = [] } = useQuery<Server[]>({
-    queryKey: ["servers"],
-    queryFn: () => serversApi.list().then((r) => r.data),
+    queryKey: ["servers", currentWorkspace?.id],
+    queryFn: () => serversApi.list(currentWorkspace?.id).then((r) => r.data),
   });
 
   const serverMap = Object.fromEntries(servers.map((s) => [s.id, s]));
@@ -489,6 +516,7 @@ function InstancesContent() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={() => queryClient.invalidateQueries({ queryKey: ["instances"] })}
+        workspaceId={currentWorkspace?.id}
       />
       {qrInstanceId && (
         <QRCodeModal instanceId={qrInstanceId} onClose={() => setQrInstanceId(null)} />

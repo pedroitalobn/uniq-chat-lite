@@ -2,10 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import {
   Eye, EyeOff, AlertCircle, ArrowRight,
-  Loader2, User, Lock, Mail, AtSign,
+  Loader2, Lock, AtSign,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -13,7 +12,6 @@ import { Logo } from "@/components/Logo";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
-type Tab = "login" | "register";
 type Lang = "pt" | "en" | "es";
 
 const LOGIN_TR = {
@@ -261,105 +259,8 @@ function LoginForm({ onSuccess, tr }: { onSuccess: () => void; tr: (typeof LOGIN
   );
 }
 
-// ─── Register Form ────────────────────────────────────────────────────────────
-function RegisterForm({ onSuccess, tr }: { onSuccess: () => void; tr: (typeof LOGIN_TR)[Lang] }) {
-  const [name, setName]           = useState("");
-  const [email, setEmail]         = useState("");
-  const [username, setUsername]   = useState("");
-  const [password, setPassword]   = useState("");
-  const [confirm, setConfirm]     = useState("");
-  const [loading, setLoading]     = useState(false);
-  const [errors, setErrors]       = useState<Record<string, string>>({});
-
-  const validate = () => {
-    const e: Record<string, string> = {};
-    if (!name.trim()) e.name = tr.err_name;
-    if (!email.trim()) e.email = tr.err_email;
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = tr.err_email_invalid;
-    if (password.length < 8) e.password = tr.err_pass_min;
-    if (password !== confirm) e.confirm = tr.err_pass_match;
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), email: email.trim(), username: username.trim() || undefined, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setErrors({ global: data.error || "Erro ao criar conta" });
-        return;
-      }
-      // Auto sign-in after register
-      const result = await signIn("credentials", {
-        identifier: email.trim(),
-        password,
-        redirect: false,
-      });
-      if (result?.error) {
-        setErrors({ global: result.error });
-      } else {
-        toast.success("Conta criada com sucesso! Bem-vindo!");
-        onSuccess();
-      }
-    } catch {
-      setErrors({ global: "Erro de conexão" });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <form onSubmit={submit} className="space-y-3.5">
-      {errors.global && (
-        <div className="rounded-xl px-3.5 py-2.5 flex items-center gap-2"
-          style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.18)" }}>
-          <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
-          <p className="text-xs text-red-400">{errors.global}</p>
-        </div>
-      )}
-      <Field label={tr.label_name} value={name} onChange={v => { setName(v); setErrors(p => ({ ...p, name: "" })); }}
-        placeholder={tr.ph_name} icon={<User className="w-3.5 h-3.5" />}
-        autoFocus autoComplete="name" error={errors.name} />
-      <Field label={tr.label_email} value={email} onChange={v => { setEmail(v); setErrors(p => ({ ...p, email: "" })); }}
-        placeholder={tr.ph_email} icon={<Mail className="w-3.5 h-3.5" />}
-        autoComplete="email" error={errors.email} />
-      <Field label={tr.label_username} value={username} onChange={setUsername}
-        placeholder={tr.ph_username} icon={<AtSign className="w-3.5 h-3.5" />}
-        autoComplete="username" />
-      <Field label={tr.label_newpass} value={password} onChange={v => { setPassword(v); setErrors(p => ({ ...p, password: "" })); }}
-        type="password" placeholder={tr.ph_newpass}
-        icon={<Lock className="w-3.5 h-3.5" />}
-        autoComplete="new-password" error={errors.password} />
-      <Field label={tr.label_confirm} value={confirm} onChange={v => { setConfirm(v); setErrors(p => ({ ...p, confirm: "" })); }}
-        type="password" placeholder={tr.ph_confirm}
-        icon={<Lock className="w-3.5 h-3.5" />}
-        autoComplete="new-password" error={errors.confirm} />
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] disabled:opacity-40 mt-1"
-        style={{ background: "var(--green)", color: "#03170a" }}
-      >
-        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
-          <><span>{tr.btn_register}</span><ArrowRight className="w-4 h-4" /></>
-        )}
-      </button>
-    </form>
-  );
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function LoginPage() {
-  const router = useRouter();
-  const [tab, setTab] = useState<Tab>("login");
   const [lang, setLang] = useState<Lang>("pt");
   const tr = LOGIN_TR[lang];
 
@@ -372,14 +273,6 @@ export default function LoginPage() {
 
   const onSuccess = () => {
     window.location.href = "/dashboard";
-  };
-
-  const handleTabChange = (t: Tab) => {
-    if (t === "register") {
-      router.push("/plans");
-      return;
-    }
-    setTab(t);
   };
 
   return (
@@ -404,20 +297,11 @@ export default function LoginPage() {
             boxShadow: "0 0 0 1px hsl(240 12% 13%), 0 24px 64px rgba(0,0,0,0.5)",
           }}>
 
-          {/* Tabs */}
-          <div className="flex border-b" style={{ borderColor: "hsl(240 12% 11%)" }}>
-            {(["login", "register"] as Tab[]).map((t) => (
-              <button key={t} onClick={() => handleTabChange(t)}
-                className={cn("flex-1 py-3.5 text-sm font-semibold transition-all duration-150",
-                  tab === t ? "text-white" : "text-slate-500 hover:text-slate-400")}
-                style={tab === t ? {
-                  borderBottom: "2px solid var(--green)",
-                  color: "hsl(240 15% 92%)",
-                } : { borderBottom: "2px solid transparent" }}
-              >
-                {t === "login" ? tr.tab_login : tr.tab_register}
-              </button>
-            ))}
+          {/* Header */}
+          <div className="py-3.5 text-center border-b" style={{ borderColor: "hsl(240 12% 11%)" }}>
+            <span className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+              {tr.tab_login}
+            </span>
           </div>
 
           <div className="p-6 space-y-5">
@@ -456,13 +340,10 @@ export default function LoginPage() {
               />
             </div>
 
-            <Divider label={tab === "login" ? tr.divider_login : tr.divider_register} />
+            <Divider label={tr.divider_login} />
 
             {/* Form */}
-            {tab === "login"
-              ? <LoginForm onSuccess={onSuccess} tr={tr} />
-              : <RegisterForm onSuccess={onSuccess} tr={tr} />
-            }
+            <LoginForm onSuccess={onSuccess} tr={tr} />
           </div>
         </div>
 

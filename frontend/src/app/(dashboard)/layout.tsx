@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { LayoutClient } from "./LayoutClient";
+import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 
 export default async function DashboardLayout({
   children,
@@ -11,11 +13,11 @@ export default async function DashboardLayout({
   if (!session) redirect("/login");
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar />
-      <main className="flex-1 overflow-hidden bg-dot-grid">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 lg:py-8 pt-16 lg:pt-8 h-full overflow-y-auto">{children}</div>
-      </main>
-    </div>
+    <WorkspaceProvider>
+      <div className="flex h-screen overflow-hidden bg-background">
+        <Sidebar />
+        <LayoutClient>{children}</LayoutClient>
+      </div>
+    </WorkspaceProvider>
   );
 }

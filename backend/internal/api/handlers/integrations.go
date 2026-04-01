@@ -42,12 +42,12 @@ func (h *IntegrationHandler) List(c *fiber.Ctx) error {
 func (h *IntegrationHandler) Create(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 	var req struct {
-		Provider string `json:"provider"`
-		Name     string `json:"name"`
-		APIKey   string `json:"api_key"`
-		BaseURL  string `json:"base_url"`
-		Model    string `json:"model"`
-		Config   string `json:"config"`
+		Provider string   `json:"provider"`
+		Name     string   `json:"name"`
+		APIKey   string   `json:"api_key"`
+		BaseURL  string   `json:"base_url"`
+		Models   []string `json:"models"`
+		Config   string   `json:"config"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -56,13 +56,19 @@ func (h *IntegrationHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "provider e api_key são obrigatórios"})
 	}
 
+	modelsJSON := "[]"
+	if len(req.Models) > 0 {
+		b, _ := json.Marshal(req.Models)
+		modelsJSON = string(b)
+	}
+
 	integration := models.UserIntegration{
 		UserID:   user.ID,
 		Provider: models.IntegrationProvider(req.Provider),
 		Name:     req.Name,
 		APIKey:   req.APIKey,
 		BaseURL:  req.BaseURL,
-		Model:    req.Model,
+		Models:   modelsJSON,
 		Config:   req.Config,
 		IsActive: true,
 	}
@@ -96,24 +102,37 @@ func (h *IntegrationHandler) Update(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		Name     *string `json:"name"`
-		APIKey   *string `json:"api_key"`
-		BaseURL  *string `json:"base_url"`
-		Model    *string `json:"model"`
-		Config   *string `json:"config"`
-		IsActive *bool   `json:"is_active"`
+		Name     *string   `json:"name"`
+		APIKey   *string   `json:"api_key"`
+		BaseURL  *string   `json:"base_url"`
+		Models   *[]string `json:"models"`
+		Config   *string   `json:"config"`
+		IsActive *bool     `json:"is_active"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
 	}
 
 	updates := map[string]interface{}{}
-	if req.Name != nil    { updates["name"] = *req.Name }
-	if req.APIKey != nil  { updates["api_key"] = *req.APIKey }
-	if req.BaseURL != nil { updates["base_url"] = *req.BaseURL }
-	if req.Model != nil   { updates["model"] = *req.Model }
-	if req.Config != nil  { updates["config"] = *req.Config }
-	if req.IsActive != nil { updates["is_active"] = *req.IsActive }
+	if req.Name != nil {
+		updates["name"] = *req.Name
+	}
+	if req.APIKey != nil {
+		updates["api_key"] = *req.APIKey
+	}
+	if req.BaseURL != nil {
+		updates["base_url"] = *req.BaseURL
+	}
+	if req.Models != nil {
+		b, _ := json.Marshal(*req.Models)
+		updates["models"] = string(b)
+	}
+	if req.Config != nil {
+		updates["config"] = *req.Config
+	}
+	if req.IsActive != nil {
+		updates["is_active"] = *req.IsActive
+	}
 
 	h.db.Model(&integration).Updates(updates)
 	integration.MaskedKey = models.MaskAPIKey(integration.APIKey)
@@ -253,11 +272,21 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 			agent.IntegrationID = &pid
 		}
 	}
-	if req.SystemPrompt  != nil { agent.SystemPrompt  = *req.SystemPrompt }
-	if req.IsActive      != nil { agent.IsActive      = *req.IsActive }
-	if req.WebhookURL    != nil { agent.WebhookURL    = *req.WebhookURL }
-	if req.WebhookSecret != nil { agent.WebhookSecret = *req.WebhookSecret }
-	if req.MCPServerURL  != nil { agent.MCPServerURL  = *req.MCPServerURL }
+	if req.SystemPrompt != nil {
+		agent.SystemPrompt = *req.SystemPrompt
+	}
+	if req.IsActive != nil {
+		agent.IsActive = *req.IsActive
+	}
+	if req.WebhookURL != nil {
+		agent.WebhookURL = *req.WebhookURL
+	}
+	if req.WebhookSecret != nil {
+		agent.WebhookSecret = *req.WebhookSecret
+	}
+	if req.MCPServerURL != nil {
+		agent.MCPServerURL = *req.MCPServerURL
+	}
 
 	h.db.Save(&agent)
 	return c.JSON(agent)
@@ -354,11 +383,11 @@ Responda APENAS com JSON: ["variação 1", "variação 2", ...]`,
 
 	switch i.Provider {
 	case models.ProviderClaude:
-		return callClaude(i.APIKey, i.Model, prompt)
+		return callClaude(i.APIKey, i.GetFirstModel(), prompt)
 	case models.ProviderOpenAI, models.ProviderDeepSeek, models.ProviderOpenRouter:
 		return callOpenAICompat(i, prompt)
 	case models.ProviderGemini:
-		return callGemini(i.APIKey, i.Model, prompt)
+		return callGemini(i.APIKey, i.GetFirstModel(), prompt)
 	default:
 		return nil, fmt.Errorf("provider %s não suporta geração de texto", i.Provider)
 	}
@@ -409,7 +438,7 @@ func callOpenAICompat(i *models.UserIntegration, prompt string) ([]string, error
 			baseURL = "https://api.openai.com"
 		}
 	}
-	model := i.Model
+	model := i.GetFirstModel()
 	if model == "" {
 		switch i.Provider {
 		case models.ProviderDeepSeek:
@@ -498,11 +527,17 @@ func parseVariations(text string) ([]string, error) {
 	// Try to extract JSON array from text
 	start := -1
 	for i, ch := range text {
-		if ch == '[' { start = i; break }
+		if ch == '[' {
+			start = i
+			break
+		}
 	}
 	end := -1
 	for i := len(text) - 1; i >= 0; i-- {
-		if text[i] == ']' { end = i; break }
+		if text[i] == ']' {
+			end = i
+			break
+		}
 	}
 	if start >= 0 && end > start {
 		if err := json.Unmarshal([]byte(text[start:end+1]), &variations); err == nil {

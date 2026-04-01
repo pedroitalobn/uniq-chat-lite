@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/queue"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waCommon"
@@ -213,6 +214,42 @@ func (ic *InstanceClient) GetProfilePicture() string {
 		return ""
 	}
 	return pic.URL
+}
+
+// GetContactProfilePicture fetches the profile picture URL for a contact JID.
+func (ic *InstanceClient) GetContactProfilePicture(jidStr string) string {
+	if !ic.client.IsConnected() {
+		return ""
+	}
+	jid, err := types.ParseJID(jidStr)
+	if err != nil {
+		return ""
+	}
+	pic, err := ic.client.GetProfilePictureInfo(context.Background(), jid, &whatsmeow.GetProfilePictureParams{Preview: true})
+	if err != nil || pic == nil {
+		return ""
+	}
+	return pic.URL
+}
+
+// GetContactInfo fetches contact name from WhatsApp server.
+func (ic *InstanceClient) GetContactInfo(jidStr string) (name string, pushName string) {
+	if !ic.client.IsConnected() {
+		return "", ""
+	}
+	jid, err := types.ParseJID(jidStr)
+	if err != nil {
+		return "", ""
+	}
+	// Get contact info from store
+	contact, err := ic.client.Store.Contacts.GetContact(context.Background(), jid)
+	if err == nil {
+		pushName = contact.FullName
+		if pushName == "" {
+			pushName = contact.PushName
+		}
+	}
+	return "", pushName
 }
 
 // GetQRChan returns the channel that emits QR code strings.
@@ -1430,6 +1467,42 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		ic.broadcastWS(evName, data)
 		ic.dispatchEvent(evName, data, ctx)
 
+		// Save message to database for inbox
+		if !isGroup {
+			var direction models.MessageDirection
+			if isFromMe {
+				direction = models.DirectionOut
+			} else {
+				direction = models.DirectionIn
+			}
+			msgText := text
+			if msgText == "" {
+				switch msgType {
+				case "audio":
+					msgText = "🔊 Áudio"
+				case "sticker":
+					msgText = "😊 Sticker"
+				case "image":
+					msgText = "📷 Imagem"
+				case "video":
+					msgText = "🎬 Vídeo"
+				case "document":
+					msgText = "📄 Documento"
+				case "location":
+					msgText = "📍 Localização"
+				case "contact":
+					msgText = "👤 Contato"
+				default:
+					msgText = msgType
+				}
+			}
+			go func() {
+				if GlobalManager != nil {
+					_ = GlobalManager.SaveMessage(ic.ID, v.Info.Chat.String(), msgText, direction, msgType)
+				}
+			}()
+		}
+
 		// Check and execute journeys for incoming messages
 		if evName == "message.received" && text != "" && !isFromMe {
 			if GlobalManager != nil {
@@ -1439,7 +1512,8 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 				if pushName == "" {
 					pushName = "Cliente"
 				}
-				go GlobalManager.CheckJourneys(ic.ID, senderJID, pushName, chatJID, text)
+				isGroup := v.Info.Chat.Server == "g.us"
+				go GlobalManager.CheckJourneys(ic.ID, senderJID, pushName, chatJID, text, msgType, isGroup)
 			}
 		}
 

@@ -23,14 +23,40 @@ func NewInstanceHandler(db *gorm.DB, manager *whatsapp.Manager) *InstanceHandler
 
 // List godoc
 // GET /instances
+// Query params: workspace_id (optional)
 func (h *InstanceHandler) List(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
+	workspaceID := c.Query("workspace_id")
 
 	var instances []models.Instance
 	q := h.db.Preload("Server").Order("created_at DESC")
-	if user.Role != models.RoleAdmin {
-		q = q.Where("user_id = ?", user.ID)
+
+	// SuperAdmins can see all or filter by workspace
+	if user.Role == models.RoleSuperAdmin {
+		if workspaceID != "" {
+			wsUUID, err := uuid.Parse(workspaceID)
+			if err == nil {
+				q = q.Where("workspace_id = ?", wsUUID)
+			}
+		}
+	} else {
+		// For regular users, check if they have workspace membership
+		if workspaceID != "" {
+			wsUUID, err := uuid.Parse(workspaceID)
+			if err == nil {
+				// Verify user is member of workspace
+				var uw models.UserWorkspace
+				if err := h.db.Where("user_id = ? AND workspace_id = ?", user.ID, wsUUID).First(&uw).Error; err != nil {
+					return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado ao workspace"})
+				}
+				q = q.Where("workspace_id = ?", wsUUID)
+			}
+		} else {
+			// No workspace filter: show owned instances OR instances in workspaces they belong to
+			q = q.Where("user_id = ? OR workspace_id IN (SELECT workspace_id FROM user_workspaces WHERE user_id = ?)", user.ID, user.ID)
+		}
 	}
+
 	if err := q.Find(&instances).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar instâncias"})
 	}
@@ -52,17 +78,34 @@ func (h *InstanceHandler) List(c *fiber.Ctx) error {
 
 // Create godoc
 // POST /instances
+// Body: { "name": "...", "server_id": "...", "token": "...", "channel": "...", "workspace_id": "..." }
 func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 
 	var req struct {
-		Name     string `json:"name"`
-		ServerID string `json:"server_id"`
-		Token    string `json:"token"`
-		Channel  string `json:"channel"`
+		Name        string  `json:"name"`
+		ServerID    string  `json:"server_id"`
+		Token       string  `json:"token"`
+		Channel     string  `json:"channel"`
+		WorkspaceID *string `json:"workspace_id"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.Name == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nome é obrigatório"})
+	}
+
+	// Validate workspace if provided
+	var wsUUID *uuid.UUID
+	if req.WorkspaceID != nil && *req.WorkspaceID != "" {
+		parsed, err := uuid.Parse(*req.WorkspaceID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "workspace_id inválido"})
+		}
+		wsUUID = &parsed
+		// Verify user has access to workspace
+		var uw models.UserWorkspace
+		if err := h.db.Where("user_id = ? AND workspace_id = ?", user.ID, parsed).First(&uw).Error; err != nil {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado ao workspace"})
+		}
 	}
 
 	// Check plan limits
@@ -88,18 +131,23 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 	}
 
 	instance := models.Instance{
-		UserID:  user.ID,
-		Name:    req.Name,
-		Channel: channel,
-		Status:  models.StatusDisconnected,
+		UserID:      user.ID,
+		WorkspaceID: wsUUID,
+		Name:        req.Name,
+		Channel:     channel,
+		Status:      models.StatusDisconnected,
 	}
 
-	// Link to server if provided (and owned by user)
+	// Link to server if provided (and accessible by user)
 	if req.ServerID != "" {
 		if sid, err := uuid.Parse(req.ServerID); err == nil {
 			var srv models.Server
-			if h.db.First(&srv, "id = ? AND user_id = ?", sid, user.ID).Error == nil {
-				instance.ServerID = &sid
+			// Check server ownership OR workspace membership
+			if h.db.First(&srv, "id = ?", sid).Error == nil {
+				// Server must be in same workspace or owned by user
+				if srv.UserID == user.ID || (srv.WorkspaceID != nil && wsUUID != nil && *srv.WorkspaceID == *wsUUID) {
+					instance.ServerID = &sid
+				}
 			}
 		}
 	}

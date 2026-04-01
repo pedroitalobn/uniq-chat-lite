@@ -343,7 +343,8 @@ func (h *ToolsHandler) listIntegrations(userID uuid.UUID) interface{} {
 			"id":          i.ID.String(),
 			"name":        i.Name,
 			"provider":    i.Provider,
-			"model":       i.Model,
+			"model":       i.GetFirstModel(),
+			"models":      i.GetModels(),
 			"test_status": i.TestStatus,
 		})
 	}

@@ -46,7 +46,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 		},
 		AllowCredentials: true,
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-API-Key",
-		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS",
+		AllowMethods:     "GET, POST, PUT, DELETE, PATCH, OPTIONS",
 	}))
 
 	// Health check
@@ -119,9 +119,17 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	chatH.SetToolsHandler(toolsH)
 	journeyH := handlers.NewJourneyHandler(db, llmService, manager)
 	agentH := handlers.NewAgentHandler(db)
+	inboxH := handlers.NewInboxHandler(db, manager)
+	workspaceH := handlers.NewWorkspaceHandler(db)
+	roleH := handlers.NewRoleHandler(db)
+	inviteH := handlers.NewInviteHandler(db)
 
 	// Plans (public — used by pricing/register page)
 	app.Get("/stripe/plans", stripeH.ListPlans)
+
+	// Invite system (public)
+	app.Get("/invites/status", inviteH.GetStatus)
+	app.Post("/invites/validate", inviteH.Validate)
 
 	// Stripe webhook (public — must receive raw body, Stripe signature verified internally)
 	app.Post("/stripe/webhook", stripeH.Webhook)
@@ -141,6 +149,39 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 
 	// ─── Protected routes ─────────────────────────────────────────────────────
 	api := app.Group("/", middleware.RequireAuth(db), middleware.RateLimit(300))
+
+	// Workspaces
+	workspaces := api.Group("/workspaces")
+	workspaces.Get("/", workspaceH.List)
+	workspaces.Post("/", workspaceH.Create)
+	workspaces.Post("/accept-invite/:token", workspaceH.AcceptInvite)
+
+	// Workspace-specific routes
+	workspace := workspaces.Group("/:id")
+	workspace.Get("/", workspaceH.Get)
+	workspace.Put("/", workspaceH.Update)
+	workspace.Delete("/", workspaceH.Delete)
+	workspace.Get("/members", workspaceH.ListMembers)
+	workspace.Delete("/members/:member_id", workspaceH.RemoveMember)
+	workspace.Post("/invites", workspaceH.CreateInvite)
+	workspace.Get("/invites", workspaceH.ListInvites)
+	workspace.Delete("/invites/:invite_id", workspaceH.RevokeInvite)
+
+	// Roles (nested under workspace)
+	roles := workspace.Group("/roles")
+	roles.Get("/", roleH.List)
+	roles.Post("/", roleH.Create)
+	roles.Get("/:role_id", roleH.Get)
+	roles.Put("/:role_id", roleH.Update)
+	roles.Delete("/:role_id", roleH.Delete)
+
+	// Permissions (global)
+	api.Get("/permissions", roleH.ListPermissions)
+	api.Post("/permissions/seed", middleware.RequireAdmin(), roleH.SeedPermissions)
+
+	// Invite system (protected)
+	api.Post("/invites/generate", inviteH.Generate)
+	api.Get("/invites/mine", inviteH.ListMine)
 
 	// Instances
 	instances := api.Group("/instances")
@@ -211,7 +252,6 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	recovery.Put("/schedule", recoveryH.SetSchedule)
 
 	instance.Post("/media/upload", msgH.UploadMedia)
-	instance.Get("/chats", msgH.GetChats)
 	instance.Get("/contacts", msgH.GetContacts)
 	instance.Post("/check-number", msgH.CheckNumber)
 	instance.Post("/bulk-check", msgH.BulkCheckNumbers)
@@ -350,6 +390,19 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	instance.Get("/agent", integrationH.GetAgent)
 	instance.Put("/agent", integrationH.UpdateAgent)
 
+	// Inbox (WhatsApp-style chat interface) - must be before /messages
+	inbox := instance.Group("/inbox")
+	inbox.Get("/chats", inboxH.GetChats)
+	inbox.Get("/chats/:jid", inboxH.GetChat)
+	inbox.Get("/chats/:jid/messages", inboxH.GetMessages)
+	inbox.Post("/chats/:jid/messages", inboxH.SendMessage)
+	inbox.Post("/chats/:jid/messages/media", inboxH.SendMedia)
+	inbox.Post("/chats/:jid/read", inboxH.MarkRead)
+	inbox.Post("/chats/:jid/typing", inboxH.Typing)
+
+	// Legacy chats endpoint
+	instance.Get("/chats", msgH.GetChats)
+
 	// API Keys
 	apiKeys := api.Group("/api-keys")
 	apiKeys.Get("/", apiKeyH.List)
@@ -436,6 +489,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	admin.Post("/plans", adminH.CreatePlan)
 	admin.Put("/plans/:id", adminH.UpdatePlan)
 	admin.Get("/stats", adminH.Stats)
+	admin.Post("/invites/toggle", inviteH.ToggleSystem)
+	admin.Get("/invites", inviteH.AdminList)
 
 	return app
 }

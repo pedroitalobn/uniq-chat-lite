@@ -11,6 +11,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
+  workspaceId?: string;
 }
 
 const FALLBACK_CHANNELS: ChannelInfo[] = [
@@ -61,7 +62,7 @@ const CHANNEL_ICONS: Record<string, React.ReactNode> = {
   ),
 };
 
-export function CreateInstanceModal({ open, onClose, onCreated }: Props) {
+export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: Props) {
   const [step, setStep] = useState<"channel" | "config">("channel");
   const [selectedChannel, setSelectedChannel] = useState<string>("whatsapp");
   const [name, setName] = useState("");
@@ -101,7 +102,8 @@ export function CreateInstanceModal({ open, onClose, onCreated }: Props) {
         name.trim(),
         selectedChannel,
         serverId || undefined,
-        customToken.trim() || undefined
+        customToken.trim() || undefined,
+        workspaceId
       );
 
       // Then, for social channels, register the account

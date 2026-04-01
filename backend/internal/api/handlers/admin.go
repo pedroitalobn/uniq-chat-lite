@@ -49,9 +49,9 @@ func (h *AdminHandler) CreateUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name, email e password são obrigatórios"})
 	}
 
-	role := models.RoleUser
-	if req.Role == "admin" {
-		role = models.RoleAdmin
+	role := models.RoleCustomer
+	if req.Role == "super_admin" {
+		role = models.RoleSuperAdmin
 	}
 
 	user := models.User{
@@ -213,13 +213,15 @@ func (h *AdminHandler) ListPlans(c *fiber.Ctx) error {
 // POST /admin/plans
 func (h *AdminHandler) CreatePlan(c *fiber.Ctx) error {
 	var req struct {
-		Name               string  `json:"name"`
-		Price              float64 `json:"price"`
-		MaxInstances       int     `json:"max_instances"`
-		MaxMessagesPerDay  int     `json:"max_messages_per_day"`
-		Features           string  `json:"features"`
-		AllowProxy         bool    `json:"allow_proxy"`
-		StripePriceID      string  `json:"stripe_price_id"`
+		Name              string  `json:"name"`
+		Price             float64 `json:"price"`
+		MaxInstances      int     `json:"max_instances"`
+		MaxMessagesPerDay int     `json:"max_messages_per_day"`
+		MaxUsers          int     `json:"max_users"`
+		MaxWorkspaces     int     `json:"max_workspaces"`
+		Features          string  `json:"features"`
+		AllowProxy        bool    `json:"allow_proxy"`
+		StripePriceID     string  `json:"stripe_price_id"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.Name == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'name' é obrigatório"})
@@ -235,6 +237,8 @@ func (h *AdminHandler) CreatePlan(c *fiber.Ctx) error {
 		Price:             req.Price,
 		MaxInstances:      req.MaxInstances,
 		MaxMessagesPerDay: req.MaxMessagesPerDay,
+		MaxUsers:          req.MaxUsers,
+		MaxWorkspaces:     req.MaxWorkspaces,
 		Features:          features,
 		AllowProxy:        req.AllowProxy,
 		StripePriceID:     req.StripePriceID,
@@ -262,14 +266,16 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		Name               string   `json:"name"`
-		Price              *float64 `json:"price"`
-		MaxInstances       *int     `json:"max_instances"`
-		MaxMessagesPerDay  *int     `json:"max_messages_per_day"`
-		Features           string   `json:"features"`
-		AllowProxy         *bool    `json:"allow_proxy"`
-		IsActive           *bool    `json:"is_active"`
-		StripePriceID      string   `json:"stripe_price_id"`
+		Name              string   `json:"name"`
+		Price             *float64 `json:"price"`
+		MaxInstances      *int     `json:"max_instances"`
+		MaxMessagesPerDay *int     `json:"max_messages_per_day"`
+		MaxUsers          *int     `json:"max_users"`
+		MaxWorkspaces     *int     `json:"max_workspaces"`
+		Features          string   `json:"features"`
+		AllowProxy        *bool    `json:"allow_proxy"`
+		IsActive          *bool    `json:"is_active"`
+		StripePriceID     string   `json:"stripe_price_id"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -287,6 +293,12 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 	}
 	if req.MaxMessagesPerDay != nil {
 		updates["max_messages_per_day"] = *req.MaxMessagesPerDay
+	}
+	if req.MaxUsers != nil {
+		updates["max_users"] = *req.MaxUsers
+	}
+	if req.MaxWorkspaces != nil {
+		updates["max_workspaces"] = *req.MaxWorkspaces
 	}
 	if req.Features != "" {
 		updates["features"] = req.Features

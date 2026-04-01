@@ -7,20 +7,21 @@ import { authApi, stripeApi } from "@/lib/api";
 import { usePreferences, TIMEZONES, type Language, type ThemeMode } from "@/lib/preferences";
 import {
   User, Lock, Check, Loader2, Eye, EyeOff, Globe, Sun, Moon, Monitor,
-  Clock, CreditCard, Zap, ArrowRight, Star, Info, ChevronRight,
+  Clock, CreditCard, Zap, ArrowRight, Star, Info, ChevronRight, Ticket, Copy, Link2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Plan } from "@/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Section = "billing" | "profile" | "security" | "preferences" | "account";
+type Section = "billing" | "profile" | "security" | "preferences" | "account" | "invites";
 
 const SECTIONS: { id: Section; label: string; icon: React.ElementType; description: string }[] = [
   { id: "billing",     label: "Plano & Billing",  icon: CreditCard, description: "Assinatura e recursos" },
   { id: "profile",     label: "Perfil",            icon: User,       description: "Nome e username" },
   { id: "security",    label: "Segurança",          icon: Lock,       description: "Senha de acesso" },
   { id: "preferences", label: "Preferências",       icon: Globe,      description: "Idioma, tema e fuso" },
+  { id: "invites",     label: "Convites",           icon: Ticket,     description: "Indique e ganhe" },
   { id: "account",     label: "Conta",              icon: Info,       description: "Informações da conta" },
 ];
 
@@ -177,6 +178,8 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
               {[
                 { label: "Instâncias", value: currentPlan.max_instances === -1 ? "∞" : currentPlan.max_instances },
                 { label: "Msgs/dia", value: currentPlan.max_messages_per_day === -1 ? "∞" : currentPlan.max_messages_per_day.toLocaleString("pt-BR") },
+                { label: "Usuários", value: currentPlan.max_users === -1 ? "∞" : currentPlan.max_users },
+                { label: "Workspaces", value: currentPlan.max_workspaces === -1 ? "∞" : currentPlan.max_workspaces },
                 { label: "Proxy", value: currentPlan.allow_proxy ? "Ativo" : "Inativo", colored: currentPlan.allow_proxy },
               ].map(({ label, value, colored }, i, arr) => (
                 <div key={label} className="flex items-center gap-6">
@@ -214,7 +217,8 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
                       </p>
                       <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
                         {plan.price === 0 ? "Gratuito" : `R$ ${plan.price}/mês`}
-                        {plan.max_instances !== -1 && ` · ${plan.max_instances} instância${plan.max_instances !== 1 ? "s" : ""}`}
+                        {plan.max_users !== -1 && ` · ${plan.max_users} usuário${plan.max_users !== 1 ? "s" : ""}`}
+                        {plan.max_workspaces !== -1 && ` · ${plan.max_workspaces} workspace${plan.max_workspaces !== 1 ? "s" : ""}`}
                       </p>
                     </div>
                     {!isCurrent && (
@@ -451,7 +455,7 @@ function AccountSection({ session }: { session: ReturnType<typeof useSession>["d
     { label: "ID da conta",  value: user?.id || "—" },
     { label: "E-mail",       value: user?.email || "—" },
     { label: "Plano",        value: planName },
-    { label: "Função",       value: user?.role === "admin" ? "Administrador" : "Usuário" },
+    { label: "Função",       value: user?.role === "super_admin" ? "Super Admin" : user?.role === "customer" ? "Cliente" : "—" },
   ];
 
   return (
@@ -465,6 +469,129 @@ function AccountSection({ session }: { session: ReturnType<typeof useSession>["d
             </div>
           ))}
         </div>
+      </Card>
+    </SectionWrap>
+  );
+}
+
+// ─── Invite Section ────────────────────────────────────────────────────────────
+function InviteSection() {
+  const [codes, setCodes] = useState<Array<{ id: string; code: string; link: string; used_by?: string; created_at: string }>>([]);
+  const [loading, setLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [inviteEnabled, setInviteEnabled] = useState(false);
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+
+  const getToken = async () => {
+    const { getSession } = await import("next-auth/react");
+    const session = await getSession();
+    return (session as unknown as { accessToken?: string })?.accessToken || "";
+  };
+
+  const loadCodes = async () => {
+    setLoading(true);
+    try {
+      const t = await getToken();
+      const [statusRes, codesRes] = await Promise.all([
+        fetch(`${API_BASE}/invites/status`),
+        fetch(`${API_BASE}/invites/mine`, { headers: { Authorization: `Bearer ${t}` } }),
+      ]);
+      const status = await statusRes.json();
+      const myCodes = await codesRes.json();
+      setInviteEnabled(status.enabled);
+      setCodes(Array.isArray(myCodes) ? myCodes : []);
+    } catch {} finally {
+      setLoading(false);
+    }
+  };
+
+  useState(() => { loadCodes(); });
+
+  const generate = async () => {
+    setGenerating(true);
+    try {
+      const t = await getToken();
+      const res = await fetch(`${API_BASE}/invites/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+      });
+      if (res.ok) {
+        toast.success("Código gerado!");
+        loadCodes();
+      }
+    } catch {
+      toast.error("Erro ao gerar código");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const copyLink = (link: string) => {
+    navigator.clipboard.writeText(link);
+    toast.success("Link copiado!");
+  };
+
+  const copyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    toast.success("Código copiado!");
+  };
+
+  return (
+    <SectionWrap title="Convites" description="Gere códigos de convite e indique novos usuários">
+      <Card>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Seus códigos de convite</p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
+              {inviteEnabled
+                ? "Compartilhe o código ou link para que novos usuários possam se cadastrar"
+                : "Gere códigos para indicar novos usuários"}
+            </p>
+          </div>
+          <button onClick={generate} disabled={generating}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
+            style={{ background: "var(--green)", color: "#03170a" }}>
+            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ticket className="w-4 h-4" />}
+            Gerar código
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--text-3)" }} />
+          </div>
+        ) : codes.length === 0 ? (
+          <div className="text-center py-8">
+            <Ticket className="w-8 h-8 mx-auto mb-2" style={{ color: "var(--text-3)" }} />
+            <p className="text-xs" style={{ color: "var(--text-3)" }}>Nenhum código gerado ainda</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {codes.map((c) => (
+              <div key={c.id} className="flex items-center justify-between p-3 rounded-xl"
+                style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <code className="text-sm font-mono font-bold shrink-0" style={{ color: "var(--green)" }}>{c.code}</code>
+                  {c.used_by ? (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>Usado</span>
+                  ) : (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "rgba(0,212,106,0.1)", color: "var(--green)" }}>Disponível</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button onClick={() => copyCode(c.code)} title="Copiar código"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/5" style={{ color: "var(--text-3)" }}>
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => copyLink(c.link)} title="Copiar link"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/5" style={{ color: "var(--text-3)" }}>
+                    <Link2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
     </SectionWrap>
   );
@@ -546,6 +673,7 @@ export default function SettingsPage() {
           {active === "profile"     && <ProfileSection session={session} update={update} t={t} />}
           {active === "security"    && <SecuritySection />}
           {active === "preferences" && <PreferencesSection t={t} />}
+          {active === "invites"     && <InviteSection />}
           {active === "account"     && <AccountSection session={session} />}
         </div>
       </div>

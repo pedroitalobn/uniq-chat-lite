@@ -30,10 +30,11 @@ const (
 // Recipients can be CRM contacts (phone numbers) or WhatsApp groups (JIDs).
 // The scheduler respects StartDate/EndDate, TimesPerDay and ScheduleHours.
 type Campaign struct {
-	ID         uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	UserID     uuid.UUID `gorm:"type:uuid;not null;index" json:"user_id"`
-	InstanceID uuid.UUID `gorm:"type:uuid;not null;index" json:"instance_id"`
-	Name       string    `gorm:"not null" json:"name"`
+	ID          uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
+	UserID      uuid.UUID  `gorm:"type:uuid;not null;index" json:"user_id"`
+	WorkspaceID *uuid.UUID `gorm:"type:uuid;index" json:"workspace_id,omitempty"`
+	InstanceID  uuid.UUID  `gorm:"type:uuid;not null;index" json:"instance_id"`
+	Name        string     `gorm:"not null" json:"name"`
 
 	// "contacts", "groups", "crm" or "segment"
 	RecipientType string `gorm:"type:varchar(20);default:'contacts'" json:"recipient_type"`

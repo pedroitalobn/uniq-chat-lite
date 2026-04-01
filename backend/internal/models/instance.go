@@ -72,6 +72,8 @@ type Instance struct {
 	ID          uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id"`
 	UserID      uuid.UUID      `gorm:"type:uuid;not null;index" json:"user_id"`
 	User        *User          `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	WorkspaceID *uuid.UUID     `gorm:"type:uuid;index" json:"workspace_id,omitempty"`
+	Workspace   *Workspace     `gorm:"foreignKey:WorkspaceID" json:"workspace,omitempty"`
 	ServerID    *uuid.UUID     `gorm:"type:uuid;index" json:"server_id,omitempty"`
 	Server      *Server        `gorm:"foreignKey:ServerID" json:"server,omitempty"`
 	Name        string         `gorm:"not null" json:"name"`

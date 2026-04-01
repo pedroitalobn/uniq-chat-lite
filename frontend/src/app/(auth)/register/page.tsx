@@ -1,12 +1,12 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Eye, EyeOff, AlertCircle, ArrowRight, Loader2,
   User, Lock, Mail, AtSign, ChevronLeft, Zap, Building2, MessageSquare,
-  Flame, Star,
+  Flame, Star, Ticket,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -86,6 +86,7 @@ function RegisterForm() {
   const planName = params.get("plan") || "Free";
   const planId   = params.get("plan_id") || "";
   const planPrice = parseFloat(params.get("price") || "0");
+  const inviteFromUrl = params.get("invite") || "";
   const isPaidPlan = planPrice > 0;
 
   const meta = PLAN_META[planName] ?? PLAN_META.Free;
@@ -95,8 +96,34 @@ function RegisterForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm]   = useState("");
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [inviteCode, setInviteCode] = useState(inviteFromUrl);
   const [loading, setLoading]   = useState(false);
   const [errors, setErrors]     = useState<Record<string, string>>({});
+  const [inviteEnabled, setInviteEnabled] = useState(false);
+  const [inviteValid, setInviteValid] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/invites/status`)
+      .then(r => r.json())
+      .then(d => setInviteEnabled(d.enabled))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (inviteCode.trim().length >= 6) {
+      fetch(`${API_BASE}/invites/validate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: inviteCode.trim() }),
+      })
+        .then(r => r.json())
+        .then(d => setInviteValid(d.valid))
+        .catch(() => setInviteValid(null));
+    } else {
+      setInviteValid(null);
+    }
+  }, [inviteCode]);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -105,6 +132,8 @@ function RegisterForm() {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = "E-mail inválido";
     if (password.length < 8) e.password = "Mínimo 8 caracteres";
     if (password !== confirm) e.confirm = "Senhas não conferem";
+    if (inviteEnabled && !inviteCode.trim()) e.invite_code = "Código de convite é obrigatório";
+    if (inviteEnabled && inviteCode.trim() && inviteValid === false) e.invite_code = "Código de convite inválido";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -124,6 +153,8 @@ function RegisterForm() {
           email: email.trim(),
           username: username.trim() || undefined,
           password,
+          workspace_name: workspaceName.trim() || undefined,
+          invite_code: inviteCode.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -247,6 +278,50 @@ function RegisterForm() {
               type="password" placeholder="Repita a senha"
               icon={<Lock className="w-3.5 h-3.5" />}
               autoComplete="new-password" error={errors.confirm} />
+
+            <Field label="Nome da empresa (opcional)" value={workspaceName}
+              onChange={v => { setWorkspaceName(v); setErrors(p => ({ ...p, workspace: "" })); }}
+              placeholder="Minha Empresa"
+              icon={<Building2 className="w-3.5 h-3.5" />}
+              autoComplete="organization" />
+
+            {inviteEnabled && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium block" style={{ color: "hsl(240 8% 58%)" }}>
+                  Código de convite *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                    style={{ color: "hsl(240 8% 36%)" }}>
+                    <Ticket className="w-3.5 h-3.5" />
+                  </span>
+                  <input
+                    value={inviteCode}
+                    onChange={e => { setInviteCode(e.target.value); setErrors(p => ({ ...p, invite_code: "" })); }}
+                    placeholder="Código do convite"
+                    className={cn(
+                      "w-full rounded-xl py-2.5 pl-9 pr-10 text-sm outline-none transition-all duration-150",
+                      errors.invite_code ? "ring-1 ring-red-500/30" : "focus:ring-1 focus:ring-white/10"
+                    )}
+                    style={{
+                      background: "hsl(240 12% 8%)",
+                      border: errors.invite_code ? "1px solid rgba(239,68,68,0.35)" : "1px solid hsl(240 12% 13%)",
+                      color: "hsl(240 15% 90%)",
+                    }}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {inviteValid === true && <span className="text-green-400 text-xs font-medium">Válido</span>}
+                    {inviteValid === false && <span className="text-red-400 text-xs font-medium">Inválido</span>}
+                    {inviteCode.trim().length >= 6 && inviteValid === null && <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: "hsl(240 8% 40%)" }} />}
+                  </span>
+                </div>
+                {errors.invite_code && (
+                  <p className="text-xs flex items-center gap-1.5 text-red-400">
+                    <AlertCircle className="w-3 h-3 flex-shrink-0" />{errors.invite_code}
+                  </p>
+                )}
+              </div>
+            )}
 
             <button
               type="submit"

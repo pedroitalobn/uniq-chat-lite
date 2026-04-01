@@ -74,6 +74,7 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 	triggerType, triggerFilter, keywords, messageTemplate := parsePromptForJourney(req.Prompt, parsedRules)
 
 	journey := models.Journey{
+		ID:              uuid.New().String(),
 		UserID:          userID.String(),
 		Prompt:          req.Prompt,
 		TriggerType:     string(triggerType),
@@ -234,23 +235,64 @@ func parsePromptForJourney(prompt string, rules services.ParsedRules) (models.Tr
 	triggerType := models.TriggerGroupKeyword
 	lowerPrompt := strings.ToLower(prompt)
 
-	// Determine trigger type
-	if strings.Contains(lowerPrompt, "privado") || strings.Contains(lowerPrompt, " dm") || strings.Contains(lowerPrompt, " mp") {
-		if !strings.Contains(lowerPrompt, "grupo") {
+	// Determine trigger type based on context
+	isGroup := strings.Contains(lowerPrompt, "grupo")
+	isPrivate := strings.Contains(lowerPrompt, "privado") || strings.Contains(lowerPrompt, " dm") || strings.Contains(lowerPrompt, " mp")
+	isMediaVideo := strings.Contains(lowerPrompt, "vídeo") || strings.Contains(lowerPrompt, "video")
+	isMediaAudio := strings.Contains(lowerPrompt, "áudio") || strings.Contains(lowerPrompt, "audio") || strings.Contains(lowerPrompt, "gravar")
+	isMediaDocument := strings.Contains(lowerPrompt, "documento") || strings.Contains(lowerPrompt, "pdf") || strings.Contains(lowerPrompt, "arquivo")
+	isMediaImage := strings.Contains(lowerPrompt, "imagem") || strings.Contains(lowerPrompt, "foto") || strings.Contains(lowerPrompt, "picture")
+	isCall := strings.Contains(lowerPrompt, "ligação") || strings.Contains(lowerPrompt, "ligar") || strings.Contains(lowerPrompt, "chamada")
+	isFirstMessage := strings.Contains(lowerPrompt, "primeira mensagem") || strings.Contains(lowerPrompt, "novo contato") || strings.Contains(lowerPrompt, "primeiro contato")
+	isNoResponse := strings.Contains(lowerPrompt, "não responder") || strings.Contains(lowerPrompt, "sem resposta") || strings.Contains(lowerPrompt, "horas")
+
+	// Set trigger type
+	if isGroup {
+		if isMediaVideo {
+			triggerType = models.TriggerContactVideo
+		} else if isMediaAudio {
+			triggerType = models.TriggerContactAudio
+		} else if isMediaDocument {
+			triggerType = models.TriggerContactDocument
+		} else if isMediaImage {
+			triggerType = models.TriggerContactImage
+		} else {
+			triggerType = models.TriggerGroupKeyword
+		}
+	} else if isPrivate {
+		if isMediaVideo {
+			triggerType = models.TriggerContactVideo
+		} else if isMediaAudio {
+			triggerType = models.TriggerContactAudio
+		} else if isMediaDocument {
+			triggerType = models.TriggerContactDocument
+		} else if isMediaImage {
+			triggerType = models.TriggerContactImage
+		} else {
 			triggerType = models.TriggerPrivateKeyword
 		}
+	} else if isCall {
+		triggerType = models.TriggerContactCall
+	} else if isFirstMessage {
+		triggerType = models.TriggerFirstMessage
+	} else if isNoResponse {
+		triggerType = models.TriggerNoResponse
 	}
 
-	// Extract keywords between quotes or after "palavra", "falar", "escrever", "digitar", "mencionar"
+	// Extract keywords from quotes
 	keywords := extractKeywords(prompt, lowerPrompt)
 
-	// Extract message template from prompt
+	// Extract message template - look for content after "com" in quotes
 	messageTemplate := extractMessageTemplate(prompt, lowerPrompt)
 
-	// Use rule filter or default
-	triggerFilter := rules.Trigger.Filter
-	if triggerFilter == "" {
-		triggerFilter = string(triggerType)
+	// Build trigger filter description
+	triggerFilter := buildTriggerFilter(triggerType, keywords, rules)
+
+	// Extract group name if mentioned
+	if isGroup {
+		if groupName := extractGroupName(prompt, lowerPrompt); groupName != "" {
+			triggerFilter = "Grupo: " + groupName
+		}
 	}
 
 	keywordsJSON, _ := json.Marshal(keywords)
@@ -303,16 +345,36 @@ func extractKeywords(prompt, lower string) []string {
 
 // extractMessageTemplate extracts the message to send from the prompt
 func extractMessageTemplate(prompt, lower string) string {
-	// Look for "mande/envie/responda ... 'message'" or "mensagem de ..."
+	// Look for quoted text first - this is the most reliable
+	for _, sep := range []string{"'", `"`} {
+		parts := strings.Split(prompt, sep)
+		// If we have odd number of parts, we have complete quotes
+		if len(parts) >= 3 {
+			// Return the content between the first pair of quotes
+			content := strings.TrimSpace(parts[1])
+			if content != "" && len(content) < 200 {
+				return content
+			}
+		}
+	}
+
+	// Look for patterns like "responda ... com 'tchau'" or "responda no privado com 'tchau'"
 	messagePhrases := []string{
-		"mande ",
-		"envie ",
+		"responda no privado com ",
+		"responda no grupo com ",
 		"responda com ",
 		"responda ",
+		"responder no privado com ",
+		"responder no grupo com ",
+		"responder com ",
+		"responder ",
+		"mande ",
+		"envie ",
 		"mensagem de ",
 		"mensagem: ",
 		"diga ",
 		"fale ",
+		"com ",
 	}
 
 	for _, phrase := range messagePhrases {
@@ -322,7 +384,7 @@ func extractMessageTemplate(prompt, lower string) string {
 		}
 		rest := strings.TrimSpace(prompt[idx+len(phrase):])
 
-		// Extract quoted string first
+		// Extract quoted string
 		for _, sep := range []string{`"`, "'"} {
 			if strings.HasPrefix(rest, sep) {
 				end := strings.Index(rest[1:], sep)
@@ -333,7 +395,7 @@ func extractMessageTemplate(prompt, lower string) string {
 		}
 
 		// Get up to end of sentence
-		for _, delim := range []string{"\n", ".", ";", " e ", " para "} {
+		for _, delim := range []string{"\n", ".", ";", " para ", " quando ", " no "} {
 			if i := strings.Index(rest, delim); i > 0 && i < 80 {
 				return strings.TrimSpace(rest[:i])
 			}
@@ -346,6 +408,71 @@ func extractMessageTemplate(prompt, lower string) string {
 	return ""
 }
 
+// buildTriggerFilter creates a human-readable trigger filter description
+func buildTriggerFilter(triggerType models.TriggerType, keywords []string, rules services.ParsedRules) string {
+	if rules.Trigger.Filter != "" {
+		return rules.Trigger.Filter
+	}
+
+	keywordsStr := ""
+	if len(keywords) > 0 {
+		keywordsStr = " (" + strings.Join(keywords, ", ") + ")"
+	}
+
+	switch triggerType {
+	case models.TriggerGroupKeyword:
+		return "Palavra-chave no grupo" + keywordsStr
+	case models.TriggerGroupMessage:
+		return "Mensagem no grupo"
+	case models.TriggerPrivateKeyword:
+		return "Palavra-chave no privado" + keywordsStr
+	case models.TriggerPrivateMessage:
+		return "Mensagem privada"
+	case models.TriggerContactVideo:
+		return "Vídeo recebido"
+	case models.TriggerContactAudio:
+		return "Áudio recebido"
+	case models.TriggerContactDocument:
+		return "Documento recebido"
+	case models.TriggerContactImage:
+		return "Imagem recebida"
+	case models.TriggerContactCall:
+		return "Chamada recebida"
+	case models.TriggerFirstMessage:
+		return "Primeira mensagem"
+	case models.TriggerNoResponse:
+		return "Sem resposta"
+	default:
+		return string(triggerType)
+	}
+}
+
+// extractGroupName extracts the group name from the prompt
+func extractGroupName(prompt, lower string) string {
+	patterns := []string{
+		"no grupo ",
+		"do grupo ",
+		"grupo ",
+	}
+
+	for _, pattern := range patterns {
+		idx := strings.Index(lower, pattern)
+		if idx == -1 {
+			continue
+		}
+		rest := strings.TrimSpace(prompt[idx+len(pattern):])
+		for _, delim := range []string{" ", ",", ".", ";", "\n", " ela ", " ele ", " responde ", " envia "} {
+			if i := strings.Index(rest, delim); i > 0 {
+				return strings.TrimSpace(rest[:i])
+			}
+		}
+		if len(rest) < 50 {
+			return strings.TrimSpace(rest)
+		}
+	}
+	return ""
+}
+
 // ListJourneys GET /api/journeys
 func (h *JourneyHandler) ListJourneys(c *fiber.Ctx) error {
 	userID, err := h.currentUserID(c)
@@ -354,7 +481,7 @@ func (h *JourneyHandler) ListJourneys(c *fiber.Ctx) error {
 	}
 
 	var journeys []models.Journey
-	if err := h.db.Preload("Instance").Where("user_id = ?", userID).Order("created_at DESC").Find(&journeys).Error; err != nil {
+	if err := h.db.Where("user_id = ?", userID.String()).Order("created_at DESC").Find(&journeys).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar jornadas"})
 	}
 
@@ -367,8 +494,8 @@ func (h *JourneyHandler) ListJourneys(c *fiber.Ctx) error {
 		CompletionRate float64 `json:"completion_rate"`
 	}
 
-	result := make([]JourneyWithStats, len(journeys))
-	for i, j := range journeys {
+	result := make([]JourneyWithStats, 0, len(journeys))
+	for _, j := range journeys {
 		var activeExecs, completedExecs int64
 		h.db.Model(&models.JourneyExecution{}).Where("journey_id = ? AND status = 'active'", j.ID).Count(&activeExecs)
 		h.db.Model(&models.JourneyExecution{}).Where("journey_id = ? AND status = 'completed'", j.ID).Count(&completedExecs)
@@ -387,13 +514,13 @@ func (h *JourneyHandler) ListJourneys(c *fiber.Ctx) error {
 			}
 		}
 
-		result[i] = JourneyWithStats{
+		result = append(result, JourneyWithStats{
 			Journey:        j,
 			InstanceName:   instanceName,
 			ActiveExecs:    activeExecs,
 			CompletedExecs: completedExecs,
 			CompletionRate: completionRate,
-		}
+		})
 	}
 
 	return c.JSON(result)

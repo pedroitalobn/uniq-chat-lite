@@ -16,16 +16,17 @@ import (
 	"gorm.io/gorm"
 )
 
-
 // Register godoc
 // POST /auth/register
-// Body: { "name": "...", "email": "...", "username": "...", "password": "..." }
+// Body: { "name": "...", "email": "...", "username": "...", "password": "...", "workspace_name": "...", "invite_code": "..." }
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	var req struct {
-		Name     string `json:"name"`
-		Email    string `json:"email"`
-		Username string `json:"username"`
-		Password string `json:"password"`
+		Name          string `json:"name"`
+		Email         string `json:"email"`
+		Username      string `json:"username"`
+		Password      string `json:"password"`
+		WorkspaceName string `json:"workspace_name"`
+		InviteCode    string `json:"invite_code"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
@@ -34,12 +35,32 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
 	req.Username = strings.TrimSpace(strings.ToLower(req.Username))
 	req.Password = strings.TrimSpace(req.Password)
+	req.WorkspaceName = strings.TrimSpace(req.WorkspaceName)
+	req.InviteCode = strings.TrimSpace(req.InviteCode)
 
 	if req.Name == "" || req.Email == "" || req.Password == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name, email e password são obrigatórios"})
 	}
 	if len(req.Password) < 8 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "senha deve ter ao menos 8 caracteres"})
+	}
+
+	// Check if invite system is enabled
+	var inviteSetting models.SystemSetting
+	inviteEnabled := false
+	if err := h.db.First(&inviteSetting, "key = ?", "invite_system_enabled").Error; err == nil {
+		inviteEnabled = inviteSetting.Value == "true"
+	}
+
+	// If invite system is enabled, require a valid invite code
+	if inviteEnabled {
+		if req.InviteCode == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "código de convite é obrigatório"})
+		}
+		valid, _ := IsInviteCodeValid(h.db, req.InviteCode)
+		if !valid {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "código de convite inválido ou já utilizado"})
+		}
 	}
 
 	// Check email uniqueness
@@ -61,7 +82,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	user := models.User{
 		Name:     req.Name,
 		Email:    req.Email,
-		Role:     models.RoleUser,
+		Role:     models.RoleCustomer,
 		IsActive: true,
 	}
 	if req.Username != "" {
@@ -77,9 +98,55 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar conta"})
 	}
 
+	// Mark invite code as used
+	if req.InviteCode != "" {
+		MarkInviteCodeUsed(h.db, req.InviteCode, user.ID)
+	}
+
 	h.emailSvc.SendWelcome(user.Email, user.Name)
 
 	h.db.Preload("Plan").First(&user, "id = ?", user.ID)
+
+	// Create workspace if workspace_name is provided
+	var workspace *models.Workspace
+	if req.WorkspaceName != "" {
+		workspace = &models.Workspace{
+			OwnerID: user.ID,
+			Name:    req.WorkspaceName,
+		}
+		if err := h.db.Create(workspace).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar workspace"})
+		}
+
+		// Create default admin role with all permissions
+		adminRole := models.Role{
+			WorkspaceID: workspace.ID,
+			Name:        "Admin",
+			Description: "Acesso total ao workspace",
+			IsDefault:   true,
+		}
+		h.db.Create(&adminRole)
+
+		// Add all permissions to admin role
+		var permissions []models.Permission
+		h.db.Find(&permissions)
+		for _, p := range permissions {
+			h.db.Create(&models.RolePermission{
+				RoleID:       adminRole.ID,
+				PermissionID: p.ID,
+			})
+		}
+
+		// Add user as owner
+		h.db.Create(&models.UserWorkspace{
+			UserID:      user.ID,
+			WorkspaceID: workspace.ID,
+			RoleID:      &adminRole.ID,
+			IsOwner:     true,
+		})
+
+		h.db.Preload("Role").First(workspace, workspace.ID)
+	}
 
 	accessToken, err := middleware.GenerateAccessToken(&user)
 	if err != nil {
@@ -96,7 +163,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		Path:     "/",
 	})
 
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+	resp := fiber.Map{
 		"access_token": accessToken,
 		"token_type":   "Bearer",
 		"expires_in":   900,
@@ -108,7 +175,11 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 			"role":     user.Role,
 			"plan":     user.Plan,
 		},
-	})
+	}
+	if workspace != nil {
+		resp["workspace"] = workspace
+	}
+	return c.Status(fiber.StatusCreated).JSON(resp)
 }
 
 type AuthHandler struct {
@@ -304,7 +375,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 			user = models.User{
 				Name:     "User " + keyPrefix,
 				Email:    pseudoEmail,
-				Role:     models.RoleUser,
+				Role:     models.RoleCustomer,
 				IsActive: true,
 			}
 			if freePlan.ID.String() != "00000000-0000-0000-0000-000000000000" {

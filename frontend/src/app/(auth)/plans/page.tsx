@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   Check, ArrowRight, Zap, Building2, Sparkles,
@@ -19,6 +19,8 @@ interface Plan {
   price: number;
   max_instances: number;
   max_messages_per_day: number;
+  max_users: number;
+  max_workspaces: number;
   features: string;
   allow_proxy: boolean;
   stripe_price_id?: string;
@@ -73,6 +75,12 @@ function parsePlanFeatures(plan: Plan): { description: string; highlights: strin
     ? "Mensagens ilimitadas"
     : `${plan.max_messages_per_day.toLocaleString("pt-BR")} msgs/dia`;
   highlights.push(maxMsg);
+
+  const maxUsr = plan.max_users === -1 ? "Usuários ilimitados" : `${plan.max_users} usuário${plan.max_users !== 1 ? "s" : ""}`;
+  highlights.push(maxUsr);
+
+  const maxWs = plan.max_workspaces === -1 ? "Workspaces ilimitados" : `${plan.max_workspaces} workspace${plan.max_workspaces !== 1 ? "s" : ""}`;
+  highlights.push(maxWs);
 
   if (plan.allow_proxy) highlights.push("Proxy dedicado");
 
@@ -195,7 +203,17 @@ function PlanCard({ plan, onSelect, loading }: {
 }
 
 export default function PlansPage() {
+  return (
+    <Suspense>
+      <PlansContent />
+    </Suspense>
+  );
+}
+
+function PlansContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const inviteCode = searchParams.get("invite") || "";
   const [selecting, setSelecting] = useState<string | null>(null);
 
   const { data: plans = [], isLoading } = useQuery<Plan[]>({
@@ -205,7 +223,9 @@ export default function PlansPage() {
 
   const handleSelect = (plan: Plan) => {
     setSelecting(plan.id);
-    router.push(`/register?plan=${encodeURIComponent(plan.name)}&plan_id=${plan.id}&price=${plan.price}`);
+    let url = `/register?plan=${encodeURIComponent(plan.name)}&plan_id=${plan.id}&price=${plan.price}`;
+    if (inviteCode) url += `&invite=${encodeURIComponent(inviteCode)}`;
+    router.push(url);
   };
 
   return (
@@ -245,7 +265,7 @@ export default function PlansPage() {
             <Loader2 className="w-6 h-6 animate-spin" style={{ color: "hsl(240 8% 40%)" }} />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
+          <div className="grid gap-5 mb-10 justify-center overflow-x-auto pb-2" style={{ gridTemplateColumns: `repeat(${plans.length}, 280px)` }}>
             {plans.map((plan) => (
               <PlanCard key={plan.id} plan={plan} onSelect={handleSelect} loading={selecting === plan.id} />
             ))}

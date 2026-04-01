@@ -22,14 +22,16 @@ const (
 )
 
 type MessageLog struct {
-	ID         uuid.UUID        `gorm:"type:uuid;primaryKey" json:"id"`
-	InstanceID uuid.UUID        `gorm:"type:uuid;not null;index" json:"instance_id"`
-	Direction  MessageDirection `gorm:"type:varchar(5);not null" json:"direction"`
-	Type       string           `gorm:"type:varchar(30);not null" json:"type"`
-	ToJID      string           `gorm:"type:varchar(100)" json:"to_jid,omitempty"`
-	Content    string           `gorm:"type:text" json:"content"` // JSON
-	Status     MessageStatus    `gorm:"type:varchar(20);default:'pending'" json:"status"`
-	CreatedAt  time.Time        `json:"created_at"`
+	ID            uuid.UUID        `gorm:"type:uuid;primaryKey" json:"id"`
+	InstanceID    uuid.UUID        `gorm:"type:uuid;not null;index" json:"instance_id"`
+	Direction     MessageDirection `gorm:"type:varchar(5);not null" json:"direction"`
+	Type          string           `gorm:"type:varchar(30);not null" json:"type"`
+	ToJID         string           `gorm:"column:to_j_id;type:varchar(100)" json:"to_jid,omitempty"`
+	ContactName   string           `gorm:"type:varchar(255)" json:"contact_name,omitempty"`
+	ContactAvatar string           `gorm:"type:text" json:"contact_avatar,omitempty"`
+	Content       string           `gorm:"type:text" json:"content"` // JSON
+	Status        MessageStatus    `gorm:"type:varchar(20);default:'pending'" json:"status"`
+	CreatedAt     time.Time        `json:"created_at"`
 }
 
 func (m *MessageLog) BeforeCreate(tx *gorm.DB) error {

@@ -8,13 +8,14 @@ import (
 )
 
 type Contact struct {
-	ID         uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	UserID     uuid.UUID `gorm:"type:uuid;not null;index" json:"user_id"`
-	Name       string    `gorm:"not null" json:"name"`
-	Phone      string    `gorm:"not null;index" json:"phone"`
-	Email      string    `gorm:"type:varchar(255)" json:"email,omitempty"`
-	Notes      string    `gorm:"type:text" json:"notes,omitempty"`
-	AvatarURL  string    `gorm:"type:text" json:"avatar_url,omitempty"`
+	ID          uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
+	UserID      uuid.UUID  `gorm:"type:uuid;not null;index" json:"user_id"`
+	WorkspaceID *uuid.UUID `gorm:"type:uuid;index" json:"workspace_id,omitempty"`
+	Name        string     `gorm:"not null" json:"name"`
+	Phone       string     `gorm:"not null;index" json:"phone"`
+	Email       string     `gorm:"type:varchar(255)" json:"email,omitempty"`
+	Notes       string     `gorm:"type:text" json:"notes,omitempty"`
+	AvatarURL   string     `gorm:"type:text" json:"avatar_url,omitempty"`
 	// CRM pipeline fields
 	Funnel     string    `gorm:"type:varchar(120);index" json:"funnel,omitempty"`
 	Stage      string    `gorm:"type:varchar(120);index" json:"stage,omitempty"`
@@ -34,11 +35,12 @@ func (c *Contact) BeforeCreate(tx *gorm.DB) error {
 }
 
 type Tag struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	UserID    uuid.UUID `gorm:"type:uuid;not null;index" json:"user_id"`
-	Name      string    `gorm:"not null" json:"name"`
-	Color     string    `gorm:"type:varchar(20);default:'#64748b'" json:"color"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
+	UserID      uuid.UUID  `gorm:"type:uuid;not null;index" json:"user_id"`
+	WorkspaceID *uuid.UUID `gorm:"type:uuid;index" json:"workspace_id,omitempty"`
+	Name        string     `gorm:"not null" json:"name"`
+	Color       string     `gorm:"type:varchar(20);default:'#64748b'" json:"color"`
+	CreatedAt   time.Time  `json:"created_at"`
 }
 
 func (t *Tag) BeforeCreate(tx *gorm.DB) error {

@@ -3,8 +3,6 @@ package models
 import (
 	"encoding/json"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 // JourneyExecutionStatus representa o status de uma execução
@@ -107,7 +105,7 @@ type AgentStats struct {
 // ActivityItem representa um item na lista de atividade
 type ActivityItem struct {
 	JourneyName string                 `json:"journey_name"`
-	InstanceID  uuid.UUID              `json:"instance_id"`
+	InstanceID  string                 `json:"instance_id"`
 	ContactJID  string                 `json:"contact_jid"`
 	ContactName string                 `json:"contact_name"`
 	GroupName   string                 `json:"group_name,omitempty"`

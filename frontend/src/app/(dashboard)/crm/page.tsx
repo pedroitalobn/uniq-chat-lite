@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner";
 import { showConfirm } from "@/lib/confirm";
 import { cn } from "@/lib/utils";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -81,9 +82,9 @@ function FieldInput({
 // ─── Contact Modal ─────────────────────────────────────────────────────────────
 
 function ContactModal({
-  contact, tags, onClose, onSaved,
+  contact, tags, onClose, onSaved, workspaceId,
 }: {
-  contact?: Contact; tags: Tag[]; onClose: () => void; onSaved: () => void;
+  contact?: Contact; tags: Tag[]; onClose: () => void; onSaved: () => void; workspaceId?: string;
 }) {
   const [name, setName]           = useState(contact?.name ?? "");
   const [phone, setPhone]         = useState(contact?.phone ?? "");
@@ -109,7 +110,7 @@ function ContactModal({
       return;
     }
     setSaving(true);
-    const payload = { name, phone, email, notes, funnel, stage, journey, external_id: externalId, owner };
+    const payload = { name, phone, email, notes, funnel, stage, journey, external_id: externalId, owner, workspace_id: workspaceId };
     try {
       if (contact) {
         await crmApi.updateContact(contact.id, payload);
@@ -257,14 +258,14 @@ function ContactModal({
 
 const PRESET_COLORS = ["#00d46a", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
 
-function TagManager({ onClose }: { onClose: () => void }) {
+function TagManager({ onClose, workspaceId }: { onClose: () => void; workspaceId?: string }) {
   const queryClient = useQueryClient();
-  const { data: tags = [] } = useQuery<Tag[]>({ queryKey: ["tags"], queryFn: () => crmApi.listTags().then(r => r.data) });
+  const { data: tags = [] } = useQuery<Tag[]>({ queryKey: ["tags", workspaceId], queryFn: () => crmApi.listTags(workspaceId).then(r => r.data) });
   const [name, setName] = useState("");
   const [color, setColor] = useState(PRESET_COLORS[0]);
 
   const createTag = useMutation({
-    mutationFn: () => crmApi.createTag(name.trim(), color),
+    mutationFn: () => crmApi.createTag(name.trim(), color, workspaceId),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["tags"] }); setName(""); toast.success("Tag criada"); },
     onError: () => toast.error("Erro ao criar tag"),
   });
@@ -420,6 +421,7 @@ function FilterPanel({
 
 export default function CRMPage() {
   const queryClient = useQueryClient();
+  const { currentWorkspace } = useWorkspace();
   const [search, setSearch]               = useState("");
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   const [pipelineFilters, setPipelineFilters] = useState<Record<string, string>>({});
@@ -433,7 +435,6 @@ export default function CRMPage() {
   const updateContactMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Partial<Contact> }) => crmApi.updateContact(id, payload),
     onSuccess: () => {
-      // Background refetch
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
     },
     onError: () => toast.error("Erro ao mover contato"),
@@ -445,8 +446,7 @@ export default function CRMPage() {
     let newCol = result.destination.droppableId;
     if (newCol === "Sem categoria") newCol = "";
     
-    // Optimistic update
-    queryClient.setQueryData<Contact[]>(["contacts", search, activeTagFilter, pipelineFilters], (old) => {
+    queryClient.setQueryData<Contact[]>(["contacts", currentWorkspace?.id, search, activeTagFilter, pipelineFilters], (old) => {
       if (!old) return old;
       return old.map(c => c.id === contactId ? { ...c, [kanbanGroup]: newCol } : c);
     });
@@ -459,23 +459,23 @@ export default function CRMPage() {
   const queryParams = {
     search: search || undefined,
     tag_id: activeTagFilter || undefined,
+    workspace_id: currentWorkspace?.id,
     ...Object.fromEntries(Object.entries(pipelineFilters).filter(([, v]) => v !== "")),
   };
 
   const { data: contacts = [], isLoading } = useQuery<Contact[]>({
-    queryKey: ["contacts", search, activeTagFilter, pipelineFilters],
+    queryKey: ["contacts", currentWorkspace?.id, search, activeTagFilter, pipelineFilters],
     queryFn: () => crmApi.listContacts(queryParams).then((r) => r.data.data),
   });
 
   const { data: tags = [] } = useQuery<Tag[]>({
-    queryKey: ["tags"],
-    queryFn: () => crmApi.listTags().then((r) => r.data),
+    queryKey: ["tags", currentWorkspace?.id],
+    queryFn: () => crmApi.listTags(currentWorkspace?.id).then((r) => r.data),
   });
 
-  // All contacts (unfiltered) for populating filter dropdowns
   const { data: allContacts = [] } = useQuery<Contact[]>({
-    queryKey: ["contacts-all"],
-    queryFn: () => crmApi.listContacts({ limit: 500 } as never).then((r) => r.data.data),
+    queryKey: ["contacts-all", currentWorkspace?.id],
+    queryFn: () => crmApi.listContacts({ limit: 500, workspace_id: currentWorkspace?.id }).then((r) => r.data.data),
     staleTime: 60_000,
   });
 
@@ -824,11 +824,12 @@ export default function CRMPage() {
         <ContactModal
           contact={editContact ?? undefined}
           tags={tags}
+          workspaceId={currentWorkspace?.id}
           onClose={() => { setCreateOpen(false); setEditContact(null); }}
           onSaved={() => { queryClient.invalidateQueries({ queryKey: ["contacts"] }); queryClient.invalidateQueries({ queryKey: ["contacts-all"] }); }}
         />
       )}
-      {tagsOpen  && <TagManager onClose={() => setTagsOpen(false)} />}
+      {tagsOpen  && <TagManager onClose={() => setTagsOpen(false)} workspaceId={currentWorkspace?.id} />}
       {filterOpen && (
         <FilterPanel
           contacts={allContacts}

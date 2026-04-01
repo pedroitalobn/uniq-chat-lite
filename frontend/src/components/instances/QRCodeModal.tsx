@@ -342,18 +342,20 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
               </div>
             ) : qrCode ? (
               <>
+                {/* Countdown badge - above QR code */}
+                {qrCountdown !== null && (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-medium"
+                    style={{ background: qrCountdown < 15 ? "rgba(239,68,68,0.15)" : "rgba(0,212,106,0.1)", 
+                             border: `1px solid ${qrCountdown < 15 ? "rgba(239,68,68,0.3)" : "rgba(0,212,106,0.2)"}`,
+                             color: qrCountdown < 15 ? "#f87171" : "var(--green)" }}>
+                    <Clock className="w-3 h-3" />
+                    Expira em {qrCountdown}s
+                  </div>
+                )}
                 <div
-                  className="p-3 rounded-2xl relative"
+                  className="p-3 rounded-2xl"
                   style={{ background: "#ffffff", boxShadow: "0 0 0 1px rgba(0,212,106,0.2), 0 8px 32px rgba(0,0,0,0.4)" }}
                 >
-                   {/* Countdown overlay */}
-                   {qrCountdown !== null && (
-                    <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium"
-                      style={{ background: qrCountdown < 15 ? "rgba(239,68,68,0.9)" : "rgba(0,0,0,0.7)", color: "white" }}>
-                      <Clock className="w-3 h-3" />
-                      {qrCountdown}s
-                    </div>
-                  )}
                   <QRCodeSVG value={qrCode} size={200} />
                 </div>
                 <p className="text-xs text-center leading-relaxed" style={{ color: "hsl(240 8% 46%)" }}>

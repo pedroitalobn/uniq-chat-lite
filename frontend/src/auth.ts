@@ -136,7 +136,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
     async session({ session, token }) {
       session.accessToken = token.accessToken as string;
-      session.user.role = token.role as "admin" | "user";
+      session.user.role = token.role as "super_admin" | "customer";
       session.user.plan = token.plan as Record<string, unknown>;
       session.user.id = token.userId as string;
       (session.user as unknown as Record<string, unknown>).username = token.username;

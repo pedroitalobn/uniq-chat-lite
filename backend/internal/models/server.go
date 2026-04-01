@@ -12,15 +12,17 @@ import (
 // Server is a workspace that groups multiple instances.
 // It has a system-wide unique slug used as subdomain.
 type Server struct {
-	ID          uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	UserID      uuid.UUID `gorm:"type:uuid;not null;index" json:"user_id"`
-	User        *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Name        string    `gorm:"not null" json:"name"`
-	Slug        string    `gorm:"uniqueIndex;not null" json:"slug"` // subdomain-safe, e.g. "acme-corp"
-	Description string    `gorm:"type:text" json:"description,omitempty"`
-	IsActive    bool      `gorm:"default:true" json:"is_active"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
+	UserID      uuid.UUID  `gorm:"type:uuid;not null;index" json:"user_id"`
+	User        *User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	WorkspaceID *uuid.UUID `gorm:"type:uuid;index" json:"workspace_id,omitempty"`
+	Workspace   *Workspace `gorm:"foreignKey:WorkspaceID" json:"workspace,omitempty"`
+	Name        string     `gorm:"not null" json:"name"`
+	Slug        string     `gorm:"uniqueIndex;not null" json:"slug"` // subdomain-safe, e.g. "acme-corp"
+	Description string     `gorm:"type:text" json:"description,omitempty"`
+	IsActive    bool       `gorm:"default:true" json:"is_active"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 func (s *Server) BeforeCreate(tx *gorm.DB) error {

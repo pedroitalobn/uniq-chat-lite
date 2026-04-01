@@ -96,9 +96,9 @@ export const authApi = {
 };
 
 export const serversApi = {
-  list: () => api.get("/servers"),
+  list: (workspaceId?: string) => api.get("/servers", { params: workspaceId ? { workspace_id: workspaceId } : undefined }),
   get: (id: string) => api.get(`/servers/${id}`),
-  create: (data: { name: string; slug?: string; description?: string }) =>
+  create: (data: { name: string; slug?: string; description?: string; workspace_id?: string }) =>
     api.post("/servers", data),
   update: (id: string, data: { name?: string; description?: string; is_active?: boolean }) =>
     api.put(`/servers/${id}`, data),
@@ -111,14 +111,20 @@ export const channelsApi = {
 };
 
 export const instancesApi = {
-  list: (channel?: string) => api.get("/instances", { params: channel ? { channel } : undefined }),
+  list: (channel?: string, workspaceId?: string) => {
+    const params: Record<string, string> = {};
+    if (channel) params.channel = channel;
+    if (workspaceId) params.workspace_id = workspaceId;
+    return api.get("/instances", { params: Object.keys(params).length ? params : undefined });
+  },
   get: (id: string) => api.get(`/instances/${id}`),
-  create: (name: string, channel?: string, serverId?: string, token?: string) =>
+  create: (name: string, channel?: string, serverId?: string, token?: string, workspaceId?: string) =>
     api.post("/instances", {
       name,
       channel: channel || "whatsapp",
       server_id: serverId || undefined,
       token: token || undefined,
+      workspace_id: workspaceId || undefined,
     }),
   delete: (id: string) => api.delete(`/instances/${id}`),
   getQR: (id: string) => api.get(`/instances/${id}/qr`),
@@ -180,6 +186,23 @@ export const messagesApi = {
     api.post(`/instances/${id}/messages/list`, data),
 };
 
+export const inboxApi = {
+  getChats: (instanceId: string, search?: string) =>
+    api.get(`/instances/${instanceId}/inbox/chats`, { params: search ? { search } : undefined }),
+  getChat: (instanceId: string, jid: string) =>
+    api.get(`/instances/${instanceId}/inbox/chats/${jid}`),
+  getMessages: (instanceId: string, jid: string, params?: { limit?: number; offset?: number; before?: string }) =>
+    api.get(`/instances/${instanceId}/inbox/chats/${jid}/messages`, { params }),
+  sendMessage: (instanceId: string, jid: string, data: { content: string; type?: string }) =>
+    api.post(`/instances/${instanceId}/inbox/chats/${jid}/messages`, data),
+  sendMedia: (instanceId: string, jid: string, data: { url: string; caption?: string; mime_type?: string }) =>
+    api.post(`/instances/${instanceId}/inbox/chats/${jid}/messages/media`, data),
+  markRead: (instanceId: string, jid: string) =>
+    api.post(`/instances/${instanceId}/inbox/chats/${jid}/read`),
+  sendTyping: (instanceId: string, jid: string, typing: boolean) =>
+    api.post(`/instances/${instanceId}/inbox/chats/${jid}/typing`, { typing }),
+};
+
 export interface WebhookPayload {
   name?: string;
   url?: string;
@@ -226,6 +249,41 @@ export const mcpApi = {
   tools: (id: string) => api.get(`/instances/${id}/mcp/tools`),
 };
 
+// ─── Workspace API ────────────────────────────────────────────────────────────
+
+export const workspacesApi = {
+  list: () => api.get("/workspaces"),
+  create: (data: { name: string }) => api.post("/workspaces", data),
+  get: (id: string) => api.get(`/workspaces/${id}`),
+  update: (id: string, data: { name: string }) => api.put(`/workspaces/${id}`, data),
+  delete: (id: string) => api.delete(`/workspaces/${id}`),
+  // Members
+  listMembers: (id: string) => api.get(`/workspaces/${id}/members`),
+  removeMember: (id: string, memberId: string) => api.delete(`/workspaces/${id}/members/${memberId}`),
+  // Invites
+  createInvite: (id: string, data: { email: string; role_id: string }) => api.post(`/workspaces/${id}/invites`, data),
+  listInvites: (id: string) => api.get(`/workspaces/${id}/invites`),
+  revokeInvite: (id: string, inviteId: string) => api.delete(`/workspaces/${id}/invites/${inviteId}`),
+  acceptInvite: (token: string) => api.post(`/workspaces/accept-invite/${token}`),
+};
+
+// ─── Roles API ────────────────────────────────────────────────────────────────
+
+export const rolesApi = {
+  list: (workspaceId: string) => api.get(`/workspaces/${workspaceId}/roles`),
+  get: (workspaceId: string, roleId: string) => api.get(`/workspaces/${workspaceId}/roles/${roleId}`),
+  create: (workspaceId: string, data: { name: string; description?: string; permission_ids: string[] }) =>
+    api.post(`/workspaces/${workspaceId}/roles`, data),
+  update: (workspaceId: string, roleId: string, data: { name?: string; description?: string; permission_ids?: string[] }) =>
+    api.put(`/workspaces/${workspaceId}/roles/${roleId}`, data),
+  delete: (workspaceId: string, roleId: string) => api.delete(`/workspaces/${workspaceId}/roles/${roleId}`),
+};
+
+export const permissionsApi = {
+  list: () => api.get("/permissions"),
+  seed: () => api.post("/permissions/seed"),
+};
+
 export const apiKeysApi = {
   list: () => api.get("/api-keys"),
   create: (name: string) => api.post("/api-keys", { name }),
@@ -248,28 +306,29 @@ export const groupsApi = {
 };
 
 export const crmApi = {
-  listContacts: (params?: { search?: string; tag_id?: string; limit?: number; offset?: number }) =>
+  listContacts: (params?: { search?: string; tag_id?: string; limit?: number; offset?: number; workspace_id?: string }) =>
     api.get("/crm/contacts", { params }),
-  createContact: (data: { name: string; phone: string; email?: string; notes?: string; avatar_url?: string }) =>
+  createContact: (data: { name: string; phone: string; email?: string; notes?: string; avatar_url?: string; workspace_id?: string }) =>
     api.post("/crm/contacts", data),
   getContact: (id: string) => api.get(`/crm/contacts/${id}`),
   updateContact: (id: string, data: Partial<{ name: string; phone: string; email: string; notes: string; avatar_url: string }>) =>
     api.put(`/crm/contacts/${id}`, data),
   deleteContact: (id: string) => api.delete(`/crm/contacts/${id}`),
   assignTags: (id: string, tagIds: string[]) => api.put(`/crm/contacts/${id}/tags`, { tag_ids: tagIds }),
-  listTags: () => api.get("/crm/tags"),
-  createTag: (name: string, color: string) => api.post("/crm/tags", { name, color }),
+  listTags: (workspaceId?: string) => api.get("/crm/tags", { params: workspaceId ? { workspace_id: workspaceId } : undefined }),
+  createTag: (name: string, color: string, workspaceId?: string) => api.post("/crm/tags", { name, color, workspace_id: workspaceId }),
   deleteTag: (id: string) => api.delete(`/crm/tags/${id}`),
 };
 
 export const campaignsApi = {
-  list: () => api.get("/campaigns"),
+  list: (workspaceId?: string) => api.get("/campaigns", { params: workspaceId ? { workspace_id: workspaceId } : undefined }),
   segmentOptions: () => api.get("/campaigns/segment-options"),
   segmentPreview: (data: {
     funnel?: string; stage?: string; journey?: string;
-    tags?: string[]; owner?: string;
+    tags?: string[]; owner?: string; external_id?: string;
   }) => api.post("/campaigns/segment-preview", data),
   create: (data: {
+    workspace_id?: string;
     instance_id: string;
     name: string;
     recipient_type: "contacts" | "groups" | "crm" | "segment";
@@ -288,7 +347,7 @@ export const campaignsApi = {
     recipients?: Array<{ phone: string; name?: string }>;
     segment_filter?: {
       funnel?: string; stage?: string; journey?: string;
-      tags?: string[]; owner?: string;
+      tags?: string[]; owner?: string; external_id?: string;
     };
   }) => api.post("/campaigns", data),
   get: (id: string) => api.get(`/campaigns/${id}`),
@@ -305,14 +364,14 @@ export const integrationsApi = {
     name: string;
     api_key: string;
     base_url?: string;
-    model?: string;
+    models?: string[];
     config?: string;
   }) => api.post("/integrations", data),
   update: (id: string, data: {
     name?: string;
     api_key?: string;
     base_url?: string;
-    model?: string;
+    models?: string[];
     config?: string;
     is_active?: boolean;
   }) => api.put(`/integrations/${id}`, data),
@@ -330,8 +389,8 @@ export const integrationsApi = {
 };
 
 export const agentsApi = {
-  chat: (message: string, integrationId?: string) =>
-    api.post("/ai/chat", { message, integration_id: integrationId }),
+  chat: (message: string, integrationId?: string, model?: string) =>
+    api.post("/ai/chat", { message, integration_id: integrationId, model }),
   stats: () => api.get("/agent/stats"),
   activity: (limit?: number) => api.get("/agent/activity", { params: limit ? { limit } : undefined }),
   instances: () => api.get("/agent/instances"),

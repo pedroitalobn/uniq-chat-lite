@@ -13,9 +13,9 @@ import (
 )
 
 type Claims struct {
-	UserID uuid.UUID        `json:"user_id"`
-	Email  string           `json:"email"`
-	Role   models.UserRole  `json:"role"`
+	UserID uuid.UUID       `json:"user_id"`
+	Email  string          `json:"email"`
+	Role   models.UserRole `json:"role"`
 	jwt.RegisteredClaims
 }
 
@@ -120,7 +120,7 @@ func RequireAdmin() fiber.Handler {
 		if !ok || user == nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
 		}
-		if user.Role != models.RoleAdmin {
+		if user.Role != models.RoleSuperAdmin {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso restrito a administradores"})
 		}
 		return c.Next()
@@ -177,4 +177,69 @@ func tryAPIKey(c *fiber.Ctx, db *gorm.DB) error {
 func GetCurrentUser(c *fiber.Ctx) *models.User {
 	user, _ := c.Locals("user").(*models.User)
 	return user
+}
+
+// GetCurrentUserID helper
+func GetCurrentUserID(c *fiber.Ctx) uuid.UUID {
+	user := GetCurrentUser(c)
+	if user == nil {
+		return uuid.Nil
+	}
+	return user.ID
+}
+
+// RequirePermission checks if user has a specific permission in the workspace
+func RequirePermission(db *gorm.DB, permissionKey string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		user := GetCurrentUser(c)
+		if user == nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+		}
+
+		workspaceID := c.Params("workspace_id")
+		if workspaceID == "" {
+			return c.Next()
+		}
+
+		wsUUID, err := uuid.Parse(workspaceID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "workspace_id inválido"})
+		}
+
+		// Check if user is owner (owners have all permissions)
+		var uw models.UserWorkspace
+		if err := db.Where("user_id = ? AND workspace_id = ?", user.ID, wsUUID).First(&uw).Error; err != nil {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado ao workspace"})
+		}
+
+		if uw.IsOwner {
+			return c.Next()
+		}
+
+		// Check permission
+		if uw.RoleID == nil {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "sem função definida"})
+		}
+
+		var count int64
+		db.Model(&models.RolePermission{}).
+			Joins("JOIN permissions ON permissions.id = role_permissions.permission_id").
+			Where("role_permissions.role_id = ? AND permissions.key = ?", uw.RoleID, permissionKey).
+			Count(&count)
+
+		if count == 0 {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "permissão insuficiente"})
+		}
+
+		return c.Next()
+	}
+}
+
+// GetUserWorkspace retrieves the user's workspace membership
+func GetUserWorkspace(db *gorm.DB, userID uuid.UUID, workspaceID uuid.UUID) (*models.UserWorkspace, error) {
+	var uw models.UserWorkspace
+	err := db.Preload("Role.Permissions").
+		Where("user_id = ? AND workspace_id = ?", userID, workspaceID).
+		First(&uw).Error
+	return &uw, err
 }

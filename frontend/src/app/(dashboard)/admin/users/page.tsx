@@ -5,20 +5,20 @@ import { adminApi } from "@/lib/api";
 import {
   Users, Shield, User as UserIcon, Trash2, Ban, CheckCircle2,
   Loader2, Plus, X, Eye, EyeOff, Clock, Search, RotateCcw,
-  ChevronDown, Lock,
+  ChevronDown, Lock, Ticket,
 } from "lucide-react";
 import { toast } from "sonner";
 import { showConfirm } from "@/lib/confirm";
 import { cn } from "@/lib/utils";
 import type { User, Plan } from "@/types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // ─── Create User Modal ────────────────────────────────────────────────────────
 function CreateUserModal({ plans, onClose, onCreated }: {
   plans: Plan[]; onClose: () => void; onCreated: () => void;
 }) {
   const [form, setForm] = useState({
-    name: "", email: "", username: "", password: "", role: "user", plan_id: "",
+    name: "", email: "", username: "", password: "", role: "customer", plan_id: "",
   });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -44,7 +44,7 @@ function CreateUserModal({ plans, onClose, onCreated }: {
         role: form.role,
         plan_id: form.plan_id || undefined,
       });
-      toast.success("Usuário criado com sucesso!");
+      toast.success("Customer criado com sucesso!");
       onCreated();
       onClose();
     } catch (err: unknown) {
@@ -106,8 +106,8 @@ function CreateUserModal({ plans, onClose, onCreated }: {
             <div>
               <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>Role</label>
               <select value={form.role} onChange={e => f("role")(e.target.value)} className="input-field w-full">
-                <option value="user">Usuário</option>
-                <option value="admin">Admin</option>
+                <option value="customer">Customer</option>
+                <option value="super_admin">Super Admin</option>
               </select>
             </div>
             <div>
@@ -290,6 +290,71 @@ function planBadge(plan?: Plan) {
   return { bg: "rgba(255,255,255,0.04)", color: "hsl(240 8% 46%)" };
 }
 
+// ─── Invite System Toggle ─────────────────────────────────────────────────────
+function InviteSystemToggle() {
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+
+  useEffect(() => {
+    fetch(`${API_BASE}/invites/status`)
+      .then(r => r.json())
+      .then(d => setEnabled(d.enabled))
+      .catch(() => {});
+  }, []);
+
+  const toggle = async () => {
+    setLoading(true);
+    try {
+      const { getSession } = await import("next-auth/react");
+      const session = await getSession();
+      const t = (session as unknown as { accessToken?: string })?.accessToken;
+      const res = await fetch(`${API_BASE}/admin/invites/toggle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+        body: JSON.stringify({ enabled: !enabled }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEnabled(data.enabled);
+        toast.success(data.enabled ? "Sistema de convites ativado" : "Sistema de convites desativado");
+      }
+    } catch {
+      toast.error("Erro ao alterar sistema de convites");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-between px-5 py-4 rounded-2xl"
+      style={{ background: "hsl(240 18% 6%)", border: `1px solid ${enabled ? "rgba(0,212,106,0.3)" : "hsl(240 12% 13%)"}` }}>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+          style={{ background: enabled ? "rgba(0,212,106,0.1)" : "var(--surface-3)" }}>
+          <Ticket className="w-5 h-5" style={{ color: enabled ? "var(--green)" : "hsl(240 8% 40%)" }} />
+        </div>
+        <div>
+          <p className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+            Sistema de Convites
+          </p>
+          <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 46%)" }}>
+            {enabled
+              ? "Cadastro apenas via código de convite"
+              : "Cadastro liberado para todos"}
+          </p>
+        </div>
+      </div>
+      <button onClick={toggle} disabled={loading}
+        className="relative w-12 h-7 rounded-full transition-all duration-200 disabled:opacity-50"
+        style={{ background: enabled ? "var(--green)" : "hsl(240 12% 15%)" }}>
+        <span className="absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-all duration-200"
+          style={{ left: enabled ? "26px" : "4px" }} />
+      </button>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AdminUsersPage() {
   const queryClient = useQueryClient();
@@ -314,7 +379,7 @@ export default function AdminUsersPage() {
     mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
       adminApi.updateUser(id, data),
     onSuccess: () => {
-      toast.success("Usuário atualizado");
+      toast.success("Customer atualizado");
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       setActionId(null);
     },
@@ -324,7 +389,7 @@ export default function AdminUsersPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => adminApi.deleteUser(id),
     onSuccess: () => {
-      toast.success("Usuário removido");
+      toast.success("Customer removido");
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       setActionId(null);
     },
@@ -358,7 +423,7 @@ export default function AdminUsersPage() {
   };
 
   const handleRoleToggle = async (user: User) => {
-    const newRole = user.role === "admin" ? "user" : "admin";
+    const newRole = user.role === "super_admin" ? "customer" : "super_admin";
     if (!await showConfirm(`Alterar o role de "${user.email}" para ${newRole}?`, { title: "Alterar permissão", confirmLabel: "Confirmar", danger: false })) return;
     updateMutation.mutate({ id: user.id, data: { role: newRole } });
   };
@@ -376,7 +441,7 @@ export default function AdminUsersPage() {
       {/* Header */}
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Usuários</h1>
+          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Customers</h1>
           <p className="text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
             {users.length} usuário{users.length !== 1 ? "s" : ""} cadastrado{users.length !== 1 ? "s" : ""}
           </p>
@@ -385,7 +450,7 @@ export default function AdminUsersPage() {
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
             style={{ background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.15)" }}>
             <Shield className="w-3.5 h-3.5" style={{ color: "#fbbf24" }} />
-            <span className="text-xs font-semibold" style={{ color: "#fbbf24" }}>Admin</span>
+            <span className="text-xs font-semibold" style={{ color: "#fbbf24" }}>Super Admin</span>
           </div>
           <button onClick={() => setShowCreate(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
@@ -406,12 +471,15 @@ export default function AdminUsersPage() {
           className="input-field w-full pl-9" />
       </div>
 
+      {/* Invite System Toggle */}
+      <InviteSystemToggle />
+
       {/* Table */}
       <div className="rounded-2xl overflow-hidden animate-fade-in-up"
         style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
         <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-3 text-[10px] font-semibold uppercase tracking-widest"
           style={{ color: "hsl(240 8% 36%)", borderBottom: "1px solid hsl(240 12% 10%)" }}>
-          <span>Usuário</span>
+          <span>Customer</span>
           <span className="text-center">Plano</span>
           <span className="text-center">Status</span>
           <span className="text-center">Role</span>
@@ -452,10 +520,10 @@ export default function AdminUsersPage() {
                     {/* User info */}
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-8 h-8 rounded-xl flex items-center justify-center border flex-shrink-0"
-                        style={user.role === "admin" ? {
+                        style={user.role === "super_admin" ? {
                           background: "rgba(251,191,36,0.08)", borderColor: "rgba(251,191,36,0.18)",
                         } : { background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.07)" }}>
-                        {user.role === "admin"
+                        {user.role === "super_admin"
                           ? <Shield className="w-3.5 h-3.5" style={{ color: "#fbbf24" }} />
                           : <UserIcon className="w-3.5 h-3.5" style={{ color: "hsl(240 8% 42%)" }} />}
                       </div>
@@ -494,7 +562,7 @@ export default function AdminUsersPage() {
                     {/* Role */}
                     <div className="text-center">
                       <span className="text-xs font-medium px-2.5 py-1 rounded-lg"
-                        style={user.role === "admin"
+                        style={user.role === "super_admin"
                           ? { background: "rgba(251,191,36,0.08)", color: "#fbbf24" }
                           : { background: "rgba(255,255,255,0.04)", color: "hsl(240 8% 50%)" }}>
                         {user.role}
@@ -528,15 +596,15 @@ export default function AdminUsersPage() {
                       </select>
 
                       {/* Toggle role (non-self protection built in backend) */}
-                      {user.role !== "admin" && (
+                      {user.role !== "super_admin" && (
                         <ActionBtn
                           icon={<Shield className="w-3.5 h-3.5" />}
-                          label="Tornar Admin"
+                          label="Tornar Super Admin"
                           color="#fbbf24"
                           onClick={(e) => { e.stopPropagation(); handleRoleToggle(user); }}
                         />
                       )}
-                      {user.role === "admin" && (
+                      {user.role === "super_admin" && (
                         <ActionBtn
                           icon={<UserIcon className="w-3.5 h-3.5" />}
                           label="Rebaixar para User"
@@ -571,7 +639,7 @@ export default function AdminUsersPage() {
                       )}
 
                       {/* Delete */}
-                      {user.role !== "admin" && (
+                      {user.role !== "super_admin" && (
                         <ActionBtn
                           icon={<Trash2 className="w-3.5 h-3.5" />}
                           label="Remover"

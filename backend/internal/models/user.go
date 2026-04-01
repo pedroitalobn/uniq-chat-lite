@@ -11,26 +11,27 @@ import (
 type UserRole string
 
 const (
-	RoleAdmin UserRole = "admin"
-	RoleUser  UserRole = "user"
+	RoleSuperAdmin UserRole = "super_admin"
+	RoleCustomer   UserRole = "customer"
 )
 
 type User struct {
-	ID                      uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
-	Name                    string     `gorm:"not null" json:"name"`
-	Email                   string     `gorm:"uniqueIndex;not null" json:"email"`
-	Username                *string    `gorm:"uniqueIndex" json:"username,omitempty"`
-	PasswordHash            string     `gorm:"not null" json:"-"`
-	Role                    UserRole   `gorm:"type:varchar(10);default:'user'" json:"role"`
-	PlanID                  *uuid.UUID `gorm:"type:uuid" json:"plan_id"`
-	Plan                    *Plan      `gorm:"foreignKey:PlanID" json:"plan,omitempty"`
-	IsActive                bool       `gorm:"default:true" json:"is_active"`
-	BlockedUntil            *time.Time `json:"blocked_until,omitempty"`
-	StripeCustomerID        string     `gorm:"type:varchar(255)" json:"stripe_customer_id,omitempty"`
-	StripeSubscriptionID    string     `gorm:"type:varchar(255)" json:"stripe_subscription_id,omitempty"`
-	StripeSubscriptionStatus string    `gorm:"type:varchar(50)" json:"stripe_subscription_status,omitempty"`
-	CreatedAt               time.Time  `json:"created_at"`
-	UpdatedAt               time.Time  `json:"updated_at"`
+	ID                       uuid.UUID       `gorm:"type:uuid;primaryKey" json:"id"`
+	Name                     string          `gorm:"not null" json:"name"`
+	Email                    string          `gorm:"uniqueIndex;not null" json:"email"`
+	Username                 *string         `gorm:"uniqueIndex" json:"username,omitempty"`
+	PasswordHash             string          `gorm:"not null" json:"-"`
+	Role                     UserRole        `gorm:"type:varchar(15);default:'customer'" json:"role"`
+	PlanID                   *uuid.UUID      `gorm:"type:uuid" json:"plan_id"`
+	Plan                     *Plan           `gorm:"foreignKey:PlanID" json:"plan,omitempty"`
+	IsActive                 bool            `gorm:"default:true" json:"is_active"`
+	BlockedUntil             *time.Time      `json:"blocked_until,omitempty"`
+	StripeCustomerID         string          `gorm:"type:varchar(255)" json:"stripe_customer_id,omitempty"`
+	StripeSubscriptionID     string          `gorm:"type:varchar(255)" json:"stripe_subscription_id,omitempty"`
+	StripeSubscriptionStatus string          `gorm:"type:varchar(50)" json:"stripe_subscription_status,omitempty"`
+	Workspaces               []UserWorkspace `gorm:"foreignKey:UserID" json:"workspaces,omitempty"`
+	CreatedAt                time.Time       `json:"created_at"`
+	UpdatedAt                time.Time       `json:"updated_at"`
 }
 
 // IsBlocked returns true if the user is either permanently inactive or temporarily blocked.

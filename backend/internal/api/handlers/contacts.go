@@ -34,17 +34,23 @@ func (h *ContactHandler) ListContacts(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	search     := c.Query("search")
-	tagID      := c.Query("tag_id")
-	funnel     := c.Query("funnel")
-	stage      := c.Query("stage")
-	journey    := c.Query("journey")
-	owner      := c.Query("owner")
+	search := c.Query("search")
+	tagID := c.Query("tag_id")
+	funnel := c.Query("funnel")
+	stage := c.Query("stage")
+	journey := c.Query("journey")
+	owner := c.Query("owner")
 	externalID := c.Query("external_id")
-	limit  := c.QueryInt("limit", 50)
+	workspaceID := c.Query("workspace_id")
+	limit := c.QueryInt("limit", 50)
 	offset := c.QueryInt("offset", 0)
 
 	query := h.db.Model(&models.Contact{}).Where("user_id = ?", userID).Preload("Tags")
+	if workspaceID != "" {
+		if wid, err := uuid.Parse(workspaceID); err == nil {
+			query = query.Where("workspace_id = ?", wid)
+		}
+	}
 	if search != "" {
 		like := "%" + search + "%"
 		query = query.Where("name ILIKE ? OR phone ILIKE ? OR email ILIKE ? OR external_id ILIKE ? OR owner ILIKE ?",
@@ -88,16 +94,17 @@ func (h *ContactHandler) CreateContact(c *fiber.Ctx) error {
 		return err
 	}
 	var req struct {
-		Name       string `json:"name"`
-		Phone      string `json:"phone"`
-		Email      string `json:"email"`
-		Notes      string `json:"notes"`
-		AvatarURL  string `json:"avatar_url"`
-		Funnel     string `json:"funnel"`
-		Stage      string `json:"stage"`
-		Journey    string `json:"journey"`
-		ExternalID string `json:"external_id"`
-		Owner      string `json:"owner"`
+		WorkspaceID string `json:"workspace_id"`
+		Name        string `json:"name"`
+		Phone       string `json:"phone"`
+		Email       string `json:"email"`
+		Notes       string `json:"notes"`
+		AvatarURL   string `json:"avatar_url"`
+		Funnel      string `json:"funnel"`
+		Stage       string `json:"stage"`
+		Journey     string `json:"journey"`
+		ExternalID  string `json:"external_id"`
+		Owner       string `json:"owner"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.Name == "" || req.Phone == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campos 'name' e 'phone' são obrigatórios"})
@@ -114,6 +121,11 @@ func (h *ContactHandler) CreateContact(c *fiber.Ctx) error {
 		Journey:    req.Journey,
 		ExternalID: req.ExternalID,
 		Owner:      req.Owner,
+	}
+	if req.WorkspaceID != "" {
+		if wid, err := uuid.Parse(req.WorkspaceID); err == nil {
+			contact.WorkspaceID = &wid
+		}
 	}
 	if err := h.db.Create(&contact).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar contato"})
@@ -234,8 +246,15 @@ func (h *ContactHandler) ListTags(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+	workspaceID := c.Query("workspace_id")
+	query := h.db.Where("user_id = ?", userID)
+	if workspaceID != "" {
+		if wid, err := uuid.Parse(workspaceID); err == nil {
+			query = query.Where("workspace_id = ?", wid)
+		}
+	}
 	var tags []models.Tag
-	h.db.Where("user_id = ?", userID).Order("name ASC").Find(&tags)
+	query.Order("name ASC").Find(&tags)
 	return c.JSON(tags)
 }
 
@@ -247,8 +266,9 @@ func (h *ContactHandler) CreateTag(c *fiber.Ctx) error {
 		return err
 	}
 	var req struct {
-		Name  string `json:"name"`
-		Color string `json:"color"`
+		WorkspaceID string `json:"workspace_id"`
+		Name        string `json:"name"`
+		Color       string `json:"color"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.Name == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'name' é obrigatório"})
@@ -256,6 +276,11 @@ func (h *ContactHandler) CreateTag(c *fiber.Ctx) error {
 	tag := models.Tag{UserID: userID, Name: req.Name, Color: req.Color}
 	if tag.Color == "" {
 		tag.Color = "#64748b"
+	}
+	if req.WorkspaceID != "" {
+		if wid, err := uuid.Parse(req.WorkspaceID); err == nil {
+			tag.WorkspaceID = &wid
+		}
 	}
 	if err := h.db.Create(&tag).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar tag"})

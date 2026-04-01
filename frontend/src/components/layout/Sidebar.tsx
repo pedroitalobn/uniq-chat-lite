@@ -2,36 +2,41 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
   LayoutDashboard, Smartphone, Key, LogOut,
   Users, CreditCard, Shield, BookOpen, Contact, Megaphone, Server, Settings, Plug, Zap, Menu, X,
+  MessageSquare, Building2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePreferences } from "@/lib/preferences";
 import { Logo } from "@/components/Logo";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session } = useSession();
   const { t } = usePreferences();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const isAdmin = session?.user?.role === "admin";
+  const { currentWorkspace } = useWorkspace();
+  const isAdmin = session?.user?.role === "super_admin";
   const planName = (session?.user?.plan as { name?: string } | undefined)?.name ?? session?.user?.role;
   const initials = session?.user?.name?.[0]?.toUpperCase() || "U";
 
   const navItems = [
     { href: "/dashboard",    label: t("nav_dashboard"),    icon: LayoutDashboard, exact: true },
     { href: "/agents",       label: "Agentes IA",          icon: Zap,             exact: false },
-    { href: "/servers",      label: t("nav_servers"),      icon: Server,          exact: false },
-    { href: "/instances",    label: t("nav_instances"),    icon: Smartphone,      exact: false },
-    { href: "/crm",          label: t("nav_crm"),          icon: Contact,         exact: false },
-    { href: "/campaigns",    label: t("nav_campaigns"),    icon: Megaphone,       exact: false },
+    { href: "/servers",     label: t("nav_servers"),      icon: Server,          exact: false },
+    { href: "/instances",   label: t("nav_instances"),    icon: Smartphone,      exact: false },
+    { href: "/inbox",       label: "Inbox",               icon: MessageSquare,    exact: false },
+    { href: "/crm",         label: t("nav_crm"),          icon: Contact,         exact: false },
+    { href: "/campaigns",   label: t("nav_campaigns"),    icon: Megaphone,       exact: false },
     { href: "/integrations", label: t("nav_integrations"), icon: Plug,            exact: false },
     { href: "/api-keys",     label: t("nav_api_keys"),     icon: Key,             exact: false },
     { href: "/docs",         label: t("nav_api_docs"),     icon: BookOpen,        exact: false },
-    { href: "/settings",     label: t("nav_settings"),     icon: Settings,        exact: false },
+    { href: "/settings",     label: "Conta",               icon: Settings,        exact: false },
   ];
 
   const adminItems = [
@@ -55,6 +60,34 @@ export function Sidebar() {
           style={{ color: "var(--text-3)" }}
         >
           <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Workspace info */}
+      <div className="px-3 py-3 border-b" style={{ borderColor: "var(--sidebar-border)" }}>
+        <button
+          onClick={() => router.push("/workspace")}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all"
+          style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.15)" }}
+          onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = "rgba(124,58,237,0.12)")}
+          onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = "rgba(124,58,237,0.08)")}
+        >
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(124,58,237,0.15)" }}>
+            <Building2 className="w-4 h-4" style={{ color: "#a78bfa" }} />
+          </div>
+          <div className="flex-1 min-w-0 text-left">
+            <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>
+              {currentWorkspace?.name || "Selecione workspace"}
+            </p>
+            {currentWorkspace?.is_owner ? (
+              <p className="text-[10px]" style={{ color: "#fbbf24" }}>Proprietário</p>
+            ) : currentWorkspace ? (
+              <p className="text-[10px]" style={{ color: "hsl(240 8% 45%)" }}>Membro</p>
+            ) : null}
+          </div>
+          <span className="text-[10px] px-2 py-1 rounded-lg" style={{ background: "rgba(124,58,237,0.1)", color: "#a78bfa" }}>
+            Trocar
+          </span>
         </button>
       </div>
 
@@ -139,7 +172,7 @@ export function Sidebar() {
           </Link>
         </div>
       )}
-      {planName?.toLowerCase() !== "free" && planName?.toLowerCase() !== "admin" && !isAdmin && (
+      {planName?.toLowerCase() !== "free" && !isAdmin && (
         <div className="px-2.5 pb-2">
           <Link href="/settings" onClick={closeMobile}
             className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-xs font-medium transition-all"

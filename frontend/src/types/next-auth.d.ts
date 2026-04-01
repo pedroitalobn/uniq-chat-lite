@@ -9,13 +9,13 @@ declare module "next-auth" {
       name?: string | null;
       email?: string | null;
       image?: string | null;
-      role: "admin" | "user";
+      role: "super_admin" | "customer";
       plan?: Record<string, unknown>;
     };
   }
 
   interface User {
-    role: "admin" | "user";
+    role: "super_admin" | "customer";
     plan?: Record<string, unknown>;
     accessToken?: string;
   }

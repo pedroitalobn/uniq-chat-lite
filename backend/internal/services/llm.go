@@ -92,28 +92,94 @@ func (s *LLMService) CallChatWithSystem(ctx context.Context, i *models.UserInteg
 func (s *LLMService) CallChat(ctx context.Context, i *models.UserIntegration, prompt string, jsonMode bool) (string, error) {
 	systemPrompt := "Você é um assistente útil e conciso. Responda de forma direta e amigável."
 	if jsonMode {
-		systemPrompt = `
-Você é um orquestrador de automação que converte intenções de usuários escritas em linguagem natural em um pipeline estruturado (Gatilho -> Múltiplas Ações).
-Sua resposta final DEVE ser SOMENTE um JSON válido com o seguinte schema exato:
+		systemPrompt = `Você é um orquestrador de automação que converte intenções de usuários em linguagem natural para um pipeline estruturado (Gatilho → Ações).
+
+Sua resposta DEVE ser SOMENTE um JSON válido com este schema:
 
 {
   "trigger": {
-    "type": "string_identifier_for_trigger",
-    "filter": "Descrição curta e clara do gatilho para a UI. Ex: Grupo VIP, Nova Mensagem"
+    "type": "tipo_do_gatilho",
+    "filter": "Descrição curta do gatilho para UI",
+    "keywords": ["palavra1", "palavra2"],
+    "target": "grupo ou contato específico se houver"
   },
   "actions": [
     {
-      "icon": "LucideReactIconName", 
-      "text": "Descrição curta da ação. Ex: Adicionar Tag VIP",
-      "condition": "Condição se houver, ex: '> 18:00'. Deixe vazio se não houver.",
-      "color": "Hexadecimal. '#10b981' para finalização/sucesso, '#3b82f6' para CRM/Usuários, '#f59e0b' para Tags/Alertas, '#8b5cf6' para IA/Bots."
+      "icon": "LucideIcon",
+      "text": "Descrição da ação",
+      "condition": "Condição se houver",
+      "color": "#hex"
     }
   ]
 }
 
-Ícones Lucide permitidos: Tag, Users, MessageSquare, Bot, CheckCircle2, Send, Clock, Workflow, Zap.
-Responda APENAS com o JSON, sem markdown ou explicações.
-`
+=== TIPOS DE GATILHOS SUPORTADOS ===
+
+1. GROUP_MESSAGE - Qualquer mensagem em grupo específico
+   - Ex: "quando alguém enviar mensagem no grupo X"
+   - target: nome ou JID do grupo
+
+2. GROUP_KEYWORD - Palavra-chave em grupo
+   - Ex: "quando alguém mandar 'oi' no grupo X"
+   - keywords: ["oi"]
+
+3. GROUP_MENTION - Menção a contato em grupo
+   - Ex: "quando me mencionarem no grupo X"
+   - target: nome do contato mencionado
+
+4. PRIVATE_MESSAGE - Qualquer mensagem privada
+   - Ex: "quando alguém me mandar mensagem"
+
+5. PRIVATE_KEYWORD - Palavra-chave em mensagem privada
+   - Ex: "quando alguém mandar 'suporte' no privado"
+   - keywords: ["suporte"]
+
+6. CONTACT_CALL - Chamada recebida
+   - Ex: "quando alguém me ligar"
+
+7. CONTACT_MEDIA_VIDEO - Envio de vídeo
+   - Ex: "quando alguém enviar um vídeo"
+
+8. CONTACT_MEDIA_AUDIO - Envio de áudio
+   - Ex: "quando alguém enviar um áudio"
+
+9. CONTACT_MEDIA_DOCUMENT - Envio de documento
+   - Ex: "quando alguém enviar um documento"
+
+10. CONTACT_MEDIA_IMAGE - Envio de imagem
+    - Ex: "quando alguém enviar uma foto"
+
+11. ANY_MESSAGE - Qualquer mensagem (grupo ou privado)
+    - Ex: "toda vez que receber uma mensagem"
+
+12. NO_RESPONSE - Sem resposta após X horas
+    - Ex: "se não responder em 2 horas"
+    - condition: "hours:2"
+
+13. FIRST_MESSAGE - Primeira mensagem do contato
+    - Ex: "quando um novo contato me mandar mensagem"
+
+=== EXEMPLOS DE AÇÕES ===
+
+- send_message: Enviar mensagem de texto
+- send_private: Enviar mensagem privada (se gatilho for grupo)
+- add_tag: Adicionar tag ao contato
+- remove_tag: Remover tag
+- assign_agent: Atribuir a agente
+- create_ticket: Criar ticket de suporte
+- webhook: Chamar webhook
+
+=== ÍCONES LUCIDE ===
+Tag, Users, MessageSquare, Bot, CheckCircle2, Send, Clock, Workflow, Zap, Phone, Video, FileText, Image, Mic
+
+=== CORES ===
+- #10b981 (verde): sucesso/finalização
+- #3b82f6 (azul): CRM/usuários
+- #f59e0b (amarelo): tags/alertas
+- #8b5cf6 (roxo): IA/bots
+- #ef4444 (vermelho): erros/urgente
+
+Responda APENAS com JSON, sem markdown.`
 	}
 
 	if i != nil && i.ID != [16]byte{} {
@@ -162,7 +228,7 @@ func (s *LLMService) callProvider(ctx context.Context, i *models.UserIntegration
 // ─── Provider Specific Calls (logic moved from IntegrationHandler) ───────────
 
 func (s *LLMService) callClaude(i *models.UserIntegration, system, user string, jsonMode bool) (string, error) {
-	model := i.Model
+	model := i.GetFirstModel()
 	if model == "" {
 		model = "claude-3-5-sonnet-latest"
 	}
@@ -231,7 +297,7 @@ func (s *LLMService) callOpenAICompat(i *models.UserIntegration, system, user st
 			baseURL = "https://api.openai.com"
 		}
 	}
-	model := i.Model
+	model := i.GetFirstModel()
 	if model == "" {
 		switch i.Provider {
 		case models.ProviderDeepSeek:
@@ -302,7 +368,7 @@ func (s *LLMService) callOpenAICompat(i *models.UserIntegration, system, user st
 }
 
 func (s *LLMService) callGemini(i *models.UserIntegration, prompt string, jsonMode bool) (string, error) {
-	model := i.Model
+	model := i.GetFirstModel()
 	if model == "" {
 		model = "gemini-1.5-flash"
 	}

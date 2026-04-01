@@ -20,14 +20,40 @@ func NewServerHandler(db *gorm.DB) *ServerHandler {
 
 // List godoc
 // GET /servers
+// Query params: workspace_id (optional)
 func (h *ServerHandler) List(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
+	workspaceID := c.Query("workspace_id")
 
 	var servers []models.Server
 	q := h.db.Order("created_at DESC")
-	if user.Role != models.RoleAdmin {
-		q = q.Where("user_id = ?", user.ID)
+
+	// SuperAdmins can see all or filter by workspace
+	if user.Role == models.RoleSuperAdmin {
+		if workspaceID != "" {
+			wsUUID, err := uuid.Parse(workspaceID)
+			if err == nil {
+				q = q.Where("workspace_id = ?", wsUUID)
+			}
+		}
+	} else {
+		// For regular users, filter by workspace membership
+		if workspaceID != "" {
+			wsUUID, err := uuid.Parse(workspaceID)
+			if err == nil {
+				// Verify user is member of workspace
+				var uw models.UserWorkspace
+				if err := h.db.Where("user_id = ? AND workspace_id = ?", user.ID, wsUUID).First(&uw).Error; err != nil {
+					return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado ao workspace"})
+				}
+				q = q.Where("workspace_id = ?", wsUUID)
+			}
+		} else {
+			// No workspace filter: show servers in workspaces they belong to OR owned directly
+			q = q.Where("workspace_id IN (SELECT workspace_id FROM user_workspaces WHERE user_id = ?) OR user_id = ?", user.ID, user.ID)
+		}
 	}
+
 	if err := q.Find(&servers).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar servers"})
 	}
@@ -36,7 +62,7 @@ func (h *ServerHandler) List(c *fiber.Ctx) error {
 
 // Create godoc
 // POST /servers
-// Body: { "name": "Acme Corp", "slug": "acme-corp" (optional), "description": "..." }
+// Body: { "name": "Acme Corp", "slug": "acme-corp" (optional), "description": "...", "workspace_id": "..." }
 func (h *ServerHandler) Create(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 	if user == nil {
@@ -44,9 +70,10 @@ func (h *ServerHandler) Create(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		Name        string `json:"name"`
-		Slug        string `json:"slug"`
-		Description string `json:"description"`
+		Name        string  `json:"name"`
+		Slug        string  `json:"slug"`
+		Description string  `json:"description"`
+		WorkspaceID *string `json:"workspace_id"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
@@ -54,6 +81,21 @@ func (h *ServerHandler) Create(c *fiber.Ctx) error {
 	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'name' é obrigatório"})
+	}
+
+	// Validate workspace if provided
+	var wsUUID *uuid.UUID
+	if req.WorkspaceID != nil && *req.WorkspaceID != "" {
+		parsed, err := uuid.Parse(*req.WorkspaceID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "workspace_id inválido"})
+		}
+		wsUUID = &parsed
+		// Verify user has access to workspace
+		var uw models.UserWorkspace
+		if err := h.db.Where("user_id = ? AND workspace_id = ?", user.ID, parsed).First(&uw).Error; err != nil {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado ao workspace"})
+		}
 	}
 
 	slug := strings.TrimSpace(req.Slug)
@@ -75,6 +117,7 @@ func (h *ServerHandler) Create(c *fiber.Ctx) error {
 
 	server := models.Server{
 		UserID:      user.ID,
+		WorkspaceID: wsUUID,
 		Name:        req.Name,
 		Slug:        slug,
 		Description: req.Description,
@@ -174,7 +217,7 @@ func (h *ServerHandler) getOwned(c *fiber.Ctx) *models.Server {
 	}
 
 	user := middleware.GetCurrentUser(c)
-	if user.Role != models.RoleAdmin && server.UserID != user.ID {
+	if user.Role != models.RoleSuperAdmin && server.UserID != user.ID {
 		c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado"})
 		return nil
 	}

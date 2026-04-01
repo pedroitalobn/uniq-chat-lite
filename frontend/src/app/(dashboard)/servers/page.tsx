@@ -11,12 +11,13 @@ import {
 import { toast } from "sonner";
 import { showConfirm } from "@/lib/confirm";
 import { cn } from "@/lib/utils";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 // ─── Create / Edit Modal ──────────────────────────────────────────────────────
 function ServerModal({
-  server, onClose, onSaved,
+  server, onClose, onSaved, workspaceId,
 }: {
-  server?: Server; onClose: () => void; onSaved: () => void;
+  server?: Server; onClose: () => void; onSaved: () => void; workspaceId?: string;
 }) {
   const isEdit = !!server;
   const [name, setName]         = useState(server?.name || "");
@@ -43,7 +44,7 @@ function ServerModal({
       if (isEdit) {
         await serversApi.update(server.id, { name: name.trim(), description });
       } else {
-        await serversApi.create({ name: name.trim(), slug: slug || undefined, description });
+        await serversApi.create({ name: name.trim(), slug: slug || undefined, description, workspace_id: workspaceId });
       }
       toast.success(isEdit ? "Server atualizado!" : "Server criado!");
       onSaved();
@@ -228,10 +229,11 @@ export default function ServersPage() {
   const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [editServer, setEditServer]   = useState<Server | null>(null);
+  const { currentWorkspace } = useWorkspace();
 
   const { data: servers = [], isLoading } = useQuery<Server[]>({
-    queryKey: ["servers"],
-    queryFn: () => serversApi.list().then(r => r.data),
+    queryKey: ["servers", currentWorkspace?.id],
+    queryFn: () => serversApi.list(currentWorkspace?.id).then(r => r.data),
   });
 
   const deleteMutation = useMutation({
@@ -260,7 +262,14 @@ export default function ServersPage() {
             Workspaces para organizar instâncias por empresa ou projeto
           </p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="btn-primary">
+        <button onClick={() => setShowCreate(true)} 
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+          style={{ 
+            background: "rgba(0, 212, 106, 0.12)", 
+            border: "1px solid rgba(0, 212, 106, 0.3)", 
+            color: "var(--green)", 
+            backdropFilter: "blur(8px)" 
+          }}>
           <Plus className="w-4 h-4" />
           Novo server
         </button>
@@ -333,10 +342,10 @@ export default function ServersPage() {
 
       {/* Modals */}
       {showCreate && (
-        <ServerModal onClose={() => setShowCreate(false)} onSaved={onSaved} />
+        <ServerModal onClose={() => setShowCreate(false)} onSaved={onSaved} workspaceId={currentWorkspace?.id} />
       )}
       {editServer && (
-        <ServerModal server={editServer} onClose={() => setEditServer(null)} onSaved={onSaved} />
+        <ServerModal server={editServer} onClose={() => setEditServer(null)} onSaved={onSaved} workspaceId={currentWorkspace?.id} />
       )}
     </div>
   );
