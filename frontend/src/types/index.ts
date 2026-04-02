@@ -17,8 +17,41 @@ export interface Server {
   slug: string;
   description?: string;
   is_active: boolean;
+  proxy_pool_id?: string;
+  proxy_pool?: ProxyPool;
+  webhook_url?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ProxyPool {
+  id: string;
+  name: string;
+  provider: string;
+  status: string;
+  current_instances?: number;
+  max_instances?: number;
+}
+
+export interface ProxyProviderConfig {
+  id: string;
+  user_id: string;
+  provider: string;
+  name: string;
+  api_key_masked?: string;
+  country: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ServerStats {
+  total_instances: number;
+  connected: number;
+  disconnected: number;
+  connecting: number;
+  banned: number;
+  total_messages: number;
 }
 
 export interface Plan {

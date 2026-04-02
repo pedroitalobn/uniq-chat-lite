@@ -151,7 +151,15 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 				response += "- Responder ao contato/grupo\n"
 			}
 
-			response += "\n**Responda com 'confirmo' ou 'sim' para criar a jornada.**"
+			// Add instance info to confirmation prompt
+			if instanceID != uuid.Nil {
+				var inst models.Instance
+				if h.db.First(&inst, instanceID.String()).Error == nil {
+					response += "\n_Esta jornada será executada na instância: **" + inst.Name + "_**"
+				}
+			}
+
+			response += "\n\n**Responda com 'confirmo' ou 'sim' para criar a jornada.**"
 
 			return c.JSON(fiber.Map{
 				"response":        response,

@@ -345,7 +345,7 @@ function PlanEditForm({
 // ─── Plan Card ────────────────────────────────────────────────────────────────
 function PlanCard({ plan }: { plan: Plan }) {
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const featObj = parseFeaturesObj(plan);
   const [checkboxes, setCheckboxes] = useState<Record<string, boolean>>(() => featuresObjToCheckboxes(featObj));
@@ -390,7 +390,8 @@ function PlanCard({ plan }: { plan: Plan }) {
       toast.success("Plano atualizado!");
       queryClient.invalidateQueries({ queryKey: ["admin-plans"] });
       queryClient.invalidateQueries({ queryKey: ["plans-public"] });
-      setEditing(false);
+      queryClient.invalidateQueries({ queryKey: ["stripe-plans"] });
+      setShowEditModal(false);
     },
     onError: () => toast.error("Erro ao atualizar plano"),
   });
@@ -448,7 +449,7 @@ function PlanCard({ plan }: { plan: Plan }) {
             {plan.is_active ? "Ativo" : "Inativo"}
           </span>
           <button
-            onClick={() => setEditing(!editing)}
+            onClick={() => setShowEditModal(true)}
             className="p-1.5 rounded-lg transition-colors"
             style={{ color: "hsl(240 8% 38%)" }}
             onMouseEnter={e => {
@@ -460,81 +461,152 @@ function PlanCard({ plan }: { plan: Plan }) {
               (e.currentTarget as HTMLElement).style.color = "hsl(240 8% 38%)";
             }}
           >
-            {editing ? <X className="w-4 h-4" /> : <Edit2 className="w-4 h-4" />}
+            <Edit2 className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {!editing ? (
-        <div className="space-y-3">
-          {/* Description */}
-          {description && (
-            <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 55%)" }}>{description}</p>
-          )}
+      {/* Display only - click edit to modify */}
+      <div className="space-y-3">
+        {description && (
+          <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 55%)" }}>{description}</p>
+        )}
 
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
-              <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Instâncias</p>
-              <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>
-                {plan.max_instances === -1 ? "∞" : plan.max_instances}
-              </p>
-            </div>
-            <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
-              <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Msgs/dia</p>
-              <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>
-                {plan.max_messages_per_day === -1 ? "∞" : plan.max_messages_per_day.toLocaleString("pt-BR")}
-              </p>
-            </div>
-            <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
-              <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Usuários</p>
-              <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>
-                {plan.max_users === -1 ? "∞" : plan.max_users}
-              </p>
-            </div>
-            <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
-              <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Workspaces</p>
-              <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>
-                {plan.max_workspaces === -1 ? "∞" : plan.max_workspaces}
-              </p>
-            </div>
-            <div
-              className="col-span-2 rounded-xl p-3 flex items-center gap-2"
-              style={plan.allow_proxy ? {
-                background: "rgba(96,165,250,0.06)",
-                border: "1px solid rgba(96,165,250,0.12)",
-              } : {
-                background: "rgba(0,0,0,0.15)",
-              }}
-            >
-              <Globe className="w-3.5 h-3.5" style={{ color: plan.allow_proxy ? "#60a5fa" : "hsl(240 8% 28%)" }} />
-              <span className="text-xs font-medium" style={{ color: plan.allow_proxy ? "#93c5fd" : "hsl(240 8% 36%)" }}>
-                Proxy {plan.allow_proxy ? "habilitado" : "desabilitado"}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
+            <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Instâncias</p>
+            <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>
+              {plan.max_instances === -1 ? "∞" : plan.max_instances}
+            </p>
+          </div>
+          <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
+            <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Msgs/dia</p>
+            <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>
+              {plan.max_messages_per_day === -1 ? "∞" : plan.max_messages_per_day.toLocaleString("pt-BR")}
+            </p>
+          </div>
+          <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
+            <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Usuários</p>
+            <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>
+              {plan.max_users === -1 ? "∞" : plan.max_users}
+            </p>
+          </div>
+          <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
+            <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Workspaces</p>
+            <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>
+              {plan.max_workspaces === -1 ? "∞" : plan.max_workspaces}
+            </p>
+          </div>
+          <div
+            className="col-span-2 rounded-xl p-3 flex items-center gap-2"
+            style={plan.allow_proxy ? {
+              background: "rgba(96,165,250,0.06)",
+              border: "1px solid rgba(96,165,250,0.12)",
+            } : {
+              background: "rgba(0,0,0,0.15)",
+            }}
+          >
+            <Globe className="w-3.5 h-3.5" style={{ color: plan.allow_proxy ? "#60a5fa" : "hsl(240 8% 28%)" }} />
+            <span className="text-xs font-medium" style={{ color: plan.allow_proxy ? "#93c5fd" : "hsl(240 8% 36%)" }}>
+              Proxy {plan.allow_proxy ? "habilitado" : "desabilitado"}
+            </span>
+          </div>
+        </div>
+
+        {enabledFeatures.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {enabledFeatures.map(({ key, label, icon }) => (
+              <span key={key} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 8% 62%)" }}>
+                {icon} {label}
               </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+        {/* Edit Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowEditModal(false)} />
+          <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl max-h-[90dvh] sm:max-h-[85vh] rounded-xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            style={{ background: "hsl(240 12% 8%)", border: `1px solid ${style.border}` }}>
+            <div className="flex items-center justify-between p-3 sm:p-4 border-b flex-shrink-0"
+              style={{ borderColor: "hsl(240 12% 15%)", background: "hsl(240 12% 8%)" }}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: style.gradient }}>
+                  {plan.name === "Enterprise" || plan.name === "Business"
+                    ? <Zap className="w-4 h-4" style={{ color: style.icon }} />
+                    : plan.name === "Pro"
+                    ? <CreditCard className="w-4 h-4" style={{ color: style.icon }} />
+                    : plan.name === "Starter"
+                    ? <Flame className="w-4 h-4" style={{ color: style.icon }} />
+                    : <Shield className="w-4 h-4" style={{ color: style.icon }} />
+                  }
+                </div>
+                <h3 className="font-bold text-sm" style={{ color: "hsl(240 15% 93%)" }}>Editar {plan.name}</h3>
+              </div>
+              <button onClick={() => setShowEditModal(false)} className="p-1.5 rounded-lg" style={{ color: "hsl(240 8% 40%)" }}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-3 sm:p-4 space-y-3 sm:space-y-4 overflow-y-auto flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                <div>
+                  <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Nome do plano</label>
+                  <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field w-full" />
+                </div>
+                <div>
+                  <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Preço (R$)</label>
+                  <input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} className="input-field w-full" />
+                </div>
+                <div>
+                  <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Instâncias (-1 = ∞)</label>
+                  <input type="number" value={form.max_instances} onChange={(e) => setForm({ ...form, max_instances: Number(e.target.value) })} className="input-field w-full" />
+                </div>
+                <div>
+                  <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Msgs/dia (-1 = ∞)</label>
+                  <input type="number" value={form.max_messages_per_day} onChange={(e) => setForm({ ...form, max_messages_per_day: Number(e.target.value) })} className="input-field w-full" />
+                </div>
+                <div>
+                  <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Usuários (-1 = ∞)</label>
+                  <input type="number" value={form.max_users} onChange={(e) => setForm({ ...form, max_users: Number(e.target.value) })} className="input-field w-full" />
+                </div>
+                <div>
+                  <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Workspaces (-1 = ∞)</label>
+                  <input type="number" value={form.max_workspaces} onChange={(e) => setForm({ ...form, max_workspaces: Number(e.target.value) })} className="input-field w-full" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Stripe Price ID</label>
+                <input type="text" value={form.stripe_price_id} onChange={(e) => setForm({ ...form, stripe_price_id: e.target.value })} placeholder="price_xxxxxxxx" className="input-field w-full font-mono text-xs" />
+              </div>
+              <div>
+                <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Descrição</label>
+                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} className="input-field w-full resize-none text-sm" />
+              </div>
+              <FeatureGrid checkboxes={checkboxes} onChange={(key, val) => setCheckboxes({ ...checkboxes, [key]: val })} />
+              <HighlightsEditor highlights={form.highlights} onChange={(h) => setForm({ ...form, highlights: h })} />
+              <div className="flex items-center gap-5 flex-wrap">
+                <label className="flex items-center gap-2.5 cursor-pointer flex-shrink-0">
+                  <Toggle checked={form.allow_proxy} onChange={(v) => setForm({ ...form, allow_proxy: v })} color="rgba(96,165,250,0.8)" />
+                  <span className="text-xs" style={{ color: "hsl(240 8% 60%)" }}>Proxy</span>
+                </label>
+                <label className="flex items-center gap-2.5 cursor-pointer flex-shrink-0">
+                  <Toggle checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
+                  <span className="text-xs" style={{ color: "hsl(240 8% 60%)" }}>Ativo</span>
+                </label>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => setShowEditModal(false)} className="btn-ghost flex-1 py-2 text-sm">Cancelar</button>
+                <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending} className="btn-primary flex-1 flex items-center justify-center gap-2 py-2 text-sm disabled:opacity-40">
+                  {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  Salvar
+                </button>
+              </div>
             </div>
           </div>
-
-          {/* Features */}
-          {enabledFeatures.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {enabledFeatures.map(({ key, label, icon }) => (
-                <span key={key} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full"
-                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 8% 62%)" }}>
-                  {icon} {label}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
-      ) : (
-        <PlanEditForm
-          form={form}
-          setForm={setForm}
-          checkboxes={checkboxes}
-          setCheckboxes={setCheckboxes}
-          onCancel={() => setEditing(false)}
-          onSave={() => updateMutation.mutate()}
-          isPending={updateMutation.isPending}
-        />
       )}
     </div>
   );

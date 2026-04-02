@@ -13,6 +13,7 @@ import (
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/email"
 	"github.com/uniq-chat/backend/internal/models"
+	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
 )
 
@@ -185,10 +186,11 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 type AuthHandler struct {
 	db       *gorm.DB
 	emailSvc *email.Service
+	manager  *whatsapp.Manager
 }
 
-func NewAuthHandler(db *gorm.DB, emailSvc *email.Service) *AuthHandler {
-	return &AuthHandler{db: db, emailSvc: emailSvc}
+func NewAuthHandler(db *gorm.DB, emailSvc *email.Service, manager *whatsapp.Manager) *AuthHandler {
+	return &AuthHandler{db: db, emailSvc: emailSvc, manager: manager}
 }
 
 // validateAnthropicKey checks if the key is valid by hitting Anthropic Models API.
@@ -258,10 +260,11 @@ func (h *AuthHandler) loginWithCredentials(c *fiber.Ctx, identifier, password st
 	var user models.User
 	q := h.db.Preload("Plan")
 
+	lowerId := strings.ToLower(identifier)
 	if strings.Contains(identifier, "@") {
-		q = q.Where("email = ?", strings.ToLower(identifier))
+		q = q.Where("LOWER(email) = ?", lowerId)
 	} else {
-		q = q.Where("username = ?", strings.ToLower(identifier))
+		q = q.Where("LOWER(username) = ?", lowerId)
 	}
 
 	if err := q.First(&user).Error; err != nil {
@@ -480,8 +483,13 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao gerar token"})
 	}
-
 	newRefresh, _ := middleware.GenerateRefreshToken(user.ID)
+
+	// Reconnect WhatsApp instances on token refresh
+	if h.manager != nil {
+		go h.manager.ReconnectAll(user.ID.String())
+	}
+
 	c.Cookie(&fiber.Cookie{
 		Name:     "refresh_token",
 		Value:    newRefresh,

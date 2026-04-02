@@ -100,14 +100,32 @@ export const serversApi = {
   get: (id: string) => api.get(`/servers/${id}`),
   create: (data: { name: string; slug?: string; description?: string; workspace_id?: string }) =>
     api.post("/servers", data),
-  update: (id: string, data: { name?: string; description?: string; is_active?: boolean }) =>
-    api.put(`/servers/${id}`, data),
+  update: (id: string, data: { 
+    name?: string; 
+    description?: string; 
+    is_active?: boolean;
+    proxy_pool_id?: string;
+    webhook_url?: string;
+    apply_webhook?: boolean;
+  }) => api.put(`/servers/${id}`, data),
   delete: (id: string) => api.delete(`/servers/${id}`),
   instances: (id: string) => api.get(`/servers/${id}/instances`),
+  stats: (id: string) => api.get(`/servers/${id}/stats`),
+  action: (id: string, action: string) => api.post(`/servers/${id}/actions`, { action }),
 };
 
 export const channelsApi = {
   list: () => api.get("/channels"),
+};
+
+export const proxyPoolsApi = {
+  list: () => api.get("/proxy/pool"),
+  listProviders: () => api.get("/proxy/providers"),
+  createProvider: (data: { provider: string; name: string; api_key: string; country?: string }) =>
+    api.post("/proxy/providers", data),
+  updateProvider: (id: string, data: { name?: string; api_key?: string; country?: string; is_active?: boolean }) =>
+    api.put(`/proxy/providers/${id}`, data),
+  deleteProvider: (id: string) => api.delete(`/proxy/providers/${id}`),
 };
 
 export const instancesApi = {
@@ -187,8 +205,8 @@ export const messagesApi = {
 };
 
 export const inboxApi = {
-  getChats: (instanceId: string, search?: string) =>
-    api.get(`/instances/${instanceId}/inbox/chats`, { params: search ? { search } : undefined }),
+  getChats: (instanceId: string, search?: string, filter?: string) =>
+    api.get(`/instances/${instanceId}/inbox/chats`, { params: { search, filter } }),
   getChat: (instanceId: string, jid: string) =>
     api.get(`/instances/${instanceId}/inbox/chats/${jid}`),
   getMessages: (instanceId: string, jid: string, params?: { limit?: number; offset?: number; before?: string }) =>
@@ -201,6 +219,10 @@ export const inboxApi = {
     api.post(`/instances/${instanceId}/inbox/chats/${jid}/read`),
   sendTyping: (instanceId: string, jid: string, typing: boolean) =>
     api.post(`/instances/${instanceId}/inbox/chats/${jid}/typing`, { typing }),
+  updateContact: (instanceId: string, contactId: string, data: { name?: string; phone?: string; email?: string; notes?: string; funnel?: string; stage?: string; journey?: string; owner?: string; tag_ids?: string[] }) =>
+    api.put(`/instances/${instanceId}/inbox/contacts/${contactId}`, data),
+  updateMessage: (instanceId: string, messageId: string, data: { is_pinned?: boolean; is_favorite?: boolean; is_archived?: boolean; is_deleted?: boolean }) =>
+    api.patch(`/instances/${instanceId}/inbox/messages/${messageId}`, data),
 };
 
 export interface WebhookPayload {
@@ -235,6 +257,15 @@ export const webhooksApi = {
     api.put(`/instances/${id}/webhooks/${webhookId}`, data),
   delete: (id: string, webhookId: string) =>
     api.delete(`/instances/${id}/webhooks/${webhookId}`),
+};
+
+export const globalWebhooksApi = {
+  listEvents: () => api.get("/webhooks/system/events"),
+  list: () => api.get("/webhooks/system"),
+  create: (data: { name: string; url: string; events: string[] }) =>
+    api.post("/webhooks/system", data),
+  delete: (id: string) => api.delete(`/webhooks/system/${id}`),
+  test: (id: string) => api.post(`/webhooks/system/${id}/test`, {}),
 };
 
 export const recoveryApi = {

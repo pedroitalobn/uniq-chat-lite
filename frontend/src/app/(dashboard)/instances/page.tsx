@@ -24,6 +24,7 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { QRCodeModal } from "@/components/instances/QRCodeModal";
 import { CreateInstanceModal } from "@/components/instances/CreateInstanceModal";
+import { useInstanceStatus } from "@/contexts/WebSocketContext";
 
 const STATUS_MAP: Record<string, { label: string; cls: string; dotColor: string }> = {
   connected:    { label: "Conectado",    cls: "status-connected",    dotColor: "var(--green)" },
@@ -32,7 +33,7 @@ const STATUS_MAP: Record<string, { label: string; cls: string; dotColor: string 
   banned:       { label: "Banido",       cls: "status-banned",       dotColor: "#ef4444" },
 };
 
-interface InstanceProfile { profile_pic_url?: string; conversations?: number }
+interface InstanceProfile { profile_pic_url?: string; conversations?: number; phone_number?: string }
 
 function InstanceCard({
   instance, onQR, onDeleted, index, serverName,
@@ -40,8 +41,12 @@ function InstanceCard({
   instance: Instance; onQR: (id: string) => void; onDeleted: () => void;
   index: number; serverName?: string;
 }) {
-  const s = STATUS_MAP[instance.status] ?? STATUS_MAP.disconnected;
-  const isConnected = instance.status === "connected";
+  const { instanceStatuses } = useInstanceStatus();
+  // Use real-time status from WebSocket, fall back to instance.status
+  const realTimeStatus = instanceStatuses[instance.id];
+  const currentStatus = realTimeStatus || instance.status;
+  const s = STATUS_MAP[currentStatus] ?? STATUS_MAP.disconnected;
+  const isConnected = currentStatus === "connected";
 
   const { data: profile } = useQuery<InstanceProfile>({
     queryKey: ["instance-profile", instance.id],
@@ -117,13 +122,18 @@ function InstanceCard({
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm leading-tight" style={{ color: "hsl(240 15% 93%)" }}>
+              <h3 className="font-bold text-base leading-tight" style={{ color: "hsl(240 15% 95%)" }}>
                 {instance.name}
               </h3>
+              {profile?.phone_number && profile.phone_number !== instance.name && (
+                <p className="text-xs mt-0.5 font-medium" style={{ color: "var(--green)" }}>
+                  {profile.phone_number}
+                </p>
+              )}
               {/* Instance ID - destacado */}
               <button
                 onClick={copyId}
-                className="flex items-center gap-1 mt-0.5 group/id"
+                className="flex items-center gap-1 mt-1 group/id"
                 title="Clique para copiar o ID"
               >
                 <code className="text-[10px] font-mono px-1.5 py-0.5 rounded-md truncate max-w-[180px]"
@@ -136,11 +146,8 @@ function InstanceCard({
                   <Copy className="w-3 h-3 flex-shrink-0 opacity-0 group-hover/id:opacity-100 transition-opacity" style={{ color: "hsl(240 8% 40%)" }} />
                 )}
               </button>
-              <p className="text-xs mt-0.5 font-mono" style={{ color: "hsl(240 8% 42%)" }}>
-                {instance.phone_number || "—"}
-              </p>
               {profile?.conversations != null && profile.conversations > 0 && (
-                <p className="flex items-center gap-1 text-[10px] mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>
+                <p className="flex items-center gap-1 text-[10px] mt-1" style={{ color: "hsl(240 8% 38)" }}>
                   <MessageSquare className="w-2.5 h-2.5" />
                   {profile.conversations} conversa{profile.conversations !== 1 ? "s" : ""}
                 </p>
@@ -327,7 +334,6 @@ function InstancesContent() {
   const { data: instances = [], isLoading } = useQuery<Instance[]>({
     queryKey: ["instances", currentWorkspace?.id],
     queryFn: () => instancesApi.list(undefined, currentWorkspace?.id).then((r) => r.data),
-    refetchInterval: 10_000,
   });
 
   const { data: servers = [] } = useQuery<Server[]>({

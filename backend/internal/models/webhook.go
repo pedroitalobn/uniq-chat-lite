@@ -53,3 +53,22 @@ func (w *Webhook) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
+// GlobalWebhook is a system-wide webhook that fires on platform events
+type GlobalWebhook struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	UserID    uuid.UUID `gorm:"type:uuid;not null;index" json:"user_id"`
+	Name      string    `gorm:"type:varchar(100)" json:"name"`
+	IsActive  bool      `gorm:"default:true" json:"is_active"`
+	URL       string    `gorm:"type:text" json:"url"`
+	Secret    string    `gorm:"type:varchar(100)" json:"-"`
+	Events    string    `gorm:"type:text;default:'[]'" json:"events"` // JSON array
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (w *GlobalWebhook) BeforeCreate(tx *gorm.DB) error {
+	if w.ID == uuid.Nil {
+		w.ID = uuid.New()
+	}
+	return nil
+}

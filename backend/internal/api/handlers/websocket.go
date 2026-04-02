@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"time"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
 	"github.com/uniq-chat/backend/internal/api/middleware"
@@ -64,6 +66,77 @@ func (h *WSHandler) InstanceWS(c *fiber.Ctx) error {
 				break
 			}
 		}
+	})(c)
+}
+
+// EventsWS godoc
+// GET /ws/events - Global WebSocket for real-time events
+func (h *WSHandler) EventsWS(c *fiber.Ctx) error {
+	if !websocket.IsWebSocketUpgrade(c) {
+		return fiber.ErrUpgradeRequired
+	}
+
+	user := middleware.GetCurrentUser(c)
+	if user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+	}
+
+	hub := whatsapp.GetHub()
+	if hub == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "serviço indisponível"})
+	}
+
+	return websocket.New(func(ws *websocket.Conn) {
+		// Subscribe to events
+		client := hub.Subscribe(user.ID.String())
+		defer hub.Unsubscribe(client)
+
+		done := make(chan struct{})
+
+		// Send events to client
+		go func() {
+			for {
+				select {
+				case data, ok := <-client.Conn:
+					if !ok {
+						close(done)
+						return
+					}
+					if err := ws.WriteMessage(websocket.TextMessage, data); err != nil {
+						close(done)
+						return
+					}
+				case <-done:
+					return
+				}
+			}
+		}()
+
+		// Heartbeat to keep connection alive
+		go func() {
+			ticker := time.NewTicker(25 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					if err := ws.WriteMessage(websocket.TextMessage, []byte(`{"type":"ping"}`)); err != nil {
+						return
+					}
+				case <-done:
+					return
+				}
+			}
+		}()
+
+		// Read loop (handle incoming messages)
+		for {
+			_, _, err := ws.ReadMessage()
+			if err != nil {
+				break
+			}
+		}
+
+		close(done)
 	})(c)
 }
 

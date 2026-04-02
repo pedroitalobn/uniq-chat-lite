@@ -7,7 +7,7 @@ import {
   Users, Phone, Video, MessageSquare, User, Archive, Trash2, Star,
   MoreHorizontal, ChevronRight, Filter, EyeOff, Pin, Tag, BellOff
 } from "lucide-react";
-import { instancesApi, inboxApi } from "@/lib/api";
+import { instancesApi, inboxApi, crmApi, workspacesApi } from "@/lib/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -34,11 +34,13 @@ interface ChatContact {
 interface ChatMessage {
   id: string; content: string; from_me: boolean;
   timestamp: number; status: string; type: string;
+  is_pinned?: boolean; is_favorite?: boolean; is_archived?: boolean; is_deleted?: boolean;
 }
 
 interface ContactInfo {
   jid: string; name: string; phone: string; avatar?: string;
   email?: string; tags: string[]; funnel?: string; stage?: string;
+  contact_id?: string; owner?: string; owner_name?: string; notes?: string;
 }
 
 function fmtTime(d: string) {
@@ -78,8 +80,15 @@ export default function InboxPage() {
   const [search, setSearch] = useState("");
   const [input, setInput] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [showChatMenu, setShowChatMenu] = useState(false);
+  const [chatContextMenu, setChatContextMenu] = useState<{ x: number; y: number; jid: string } | null>(null);
+  const [selectedMessages, setSelectedMessages] = useState<string[]>([]);
+  const [selectedMsgId, setSelectedMsgId] = useState<string | null>(null);
+  const [contactNotes, setContactNotes] = useState("");
+  const [contactOwner, setContactOwner] = useState("");
+  const [contactStage, setContactStage] = useState("");
+  const [newTag, setNewTag] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const inpRef = useRef<HTMLInputElement>(null);
 
@@ -101,11 +110,11 @@ export default function InboxPage() {
   }, [chAvail]);
 
   const { data: chatsD } = useQuery({
-    queryKey: ["chats", instance, search],
+    queryKey: ["chats", instance, search, filter],
     enabled: !!instance,
     refetchInterval: 3000,
     queryFn: async () => {
-      try { return (await inboxApi.getChats(instance, search)).data; }
+      try { return (await inboxApi.getChats(instance, search, filter)).data; }
       catch { return { chats: [] }; }
     }
   });
@@ -129,6 +138,24 @@ export default function InboxPage() {
     }
   });
 
+  const { data: membersD } = useQuery({
+    queryKey: ["workspaceMembers", currentWorkspace?.id],
+    enabled: !!currentWorkspace?.id,
+    queryFn: async () => {
+      try { return (await workspacesApi.listMembers(currentWorkspace!.id)).data; }
+      catch { return { members: [] }; }
+    }
+  });
+
+  const { data: tagsD } = useQuery({
+    queryKey: ["crmTags", currentWorkspace?.id],
+    enabled: !!currentWorkspace?.id,
+    queryFn: async () => {
+      try { return (await crmApi.listTags(currentWorkspace!.id)).data; }
+      catch { return { tags: [] }; }
+    }
+  });
+
   const sendMut = useMutation({
     mutationFn: (content: string) => inboxApi.sendMessage(instance, chat!, { content, type: "text" }),
     onSuccess: () => { setInput(""); qc.invalidateQueries({ queryKey: ["msgs", instance, chat] }); qc.invalidateQueries({ queryKey: ["chats", instance] }); inpRef.current?.focus(); },
@@ -140,16 +167,117 @@ export default function InboxPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["chats", instance] }),
   });
 
+  const updateMessageMut = useMutation({
+    mutationFn: (data: { is_pinned?: boolean; is_favorite?: boolean; is_archived?: boolean; is_deleted?: boolean }) => 
+      inboxApi.updateMessage(instance, selectedMsgId || selectedMessages[0] || "", data),
+    onSuccess: () => { 
+      toast.success("Mensagem atualizada!");
+      qc.invalidateQueries({ queryKey: ["msgs", instance, chat] });
+      qc.invalidateQueries({ queryKey: ["chats", instance] });
+      setSelectedMessages([]);
+      setSelectedMsgId(null);
+    },
+    onError: (e: any) => toast.error(e.response?.data?.error || "Erro"),
+  });
+
+  // CRM mutations
+  const updateContactMut = useMutation({
+    mutationFn: (data: { name?: string; email?: string; notes?: string; funnel?: string; stage?: string; journey?: string; owner?: string }) => 
+      crmApi.updateContact(ct.contact_id!, data),
+    onSuccess: () => { 
+      toast.success("Contato atualizado!");
+      qc.invalidateQueries({ queryKey: ["contact", instance, chat] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.error || "Erro ao atualizar"),
+  });
+
+  const assignTagsMut = useMutation({
+    mutationFn: (tagIds: string[]) => crmApi.assignTags(ct.contact_id!, tagIds),
+    onSuccess: () => { 
+      toast.success("Tags atualizadas!");
+      qc.invalidateQueries({ queryKey: ["contact", instance, chat] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.error || "Erro ao atualizar tags"),
+  });
+
+  const handleMsgAction = (action: string) => {
+    setSelectedMsgId(null);
+    switch (action) {
+      case "star":
+        updateMessageMut.mutate({ is_favorite: true });
+        break;
+      case "pin":
+        updateMessageMut.mutate({ is_pinned: true });
+        break;
+      case "delete":
+        updateMessageMut.mutate({ is_deleted: true });
+        break;
+      case "archive":
+        updateMessageMut.mutate({ is_archived: true });
+        break;
+    }
+  };
+
   useEffect(() => { if (chat) readMut.mutate(); }, [chat]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgsD]);
 
+  // Close context menu on click outside
+  useEffect(() => {
+    const handleClick = () => setChatContextMenu(null);
+    if (chatContextMenu) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [chatContextMenu]);
+
+  // Close message menu on click outside
+  useEffect(() => {
+    const handleClick = () => setSelectedMsgId(null);
+    if (selectedMsgId) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [selectedMsgId]);
+
   const list: ChatContact[] = chatsD?.chats || [];
   const msgs: ChatMessage[] = msgsD?.messages || [];
-  const ct: ContactInfo = contactD?.contact || { jid: chat || "", name: chat?.split("@")[0] || "", phone: chat || "", tags: [] };
+  const ct: ContactInfo = contactD?.contact || { jid: chat || "", name: chat?.split("@")[0] || "", phone: chat || "", tags: [], notes: "" };
+
+  // Update contact sidebar state when contact data changes
+  useEffect(() => {
+    if (contactD?.contact) {
+      setContactNotes(contactD.contact.notes || "");
+      setContactOwner(contactD.contact.owner || "");
+      setContactStage(contactD.contact.stage || "");
+    }
+  }, [contactD]);
 
   const handleAction = (action: string) => {
     setShowChatMenu(false);
-    toast.success(`Ação: ${action}`);
+    if (!chat) return;
+    const phone = chat.split("@")[0];
+    const currentContact = list.find(c => c.jid === chat);
+    const name = currentContact?.name || phone;
+    
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/crm/contacts/search`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({ 
+        phone,
+        instance_id: instance,
+        name,
+        ...(action === "star" && { favorite: true }),
+        ...(action === "archive" && { archived: true }),
+        ...(action === "mute" && { muted: true }),
+        ...(action === "delete" && { deleted: true }),
+      })
+    }).then(() => {
+      toast.success(action === "star" ? "Conversa favoritada!" : action === "archive" ? "Conversa arquivada!" : action === "mute" ? "Conversa silenciada!" : "Conversa excluída!");
+      qc.invalidateQueries({ queryKey: ["chats", instance] });
+    }).catch(() => toast.error("Erro ao realizar ação"));
   };
 
   const curChannel = CHANNELS.find(c => c.id === channels[0]) || CHANNELS[0];
@@ -209,7 +337,7 @@ export default function InboxPage() {
         <div className="flex-1 min-h-0 rounded-2xl overflow-hidden" style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>
           <div className="h-full flex">
             {/* Conversations List */}
-            <div className="w-[208px] flex-shrink-0 flex flex-col border-r min-w-0" style={{ borderColor: "var(--surface-border)", background: "var(--surface-2)" }}>
+            <div className="w-[207px] min-w-[207px] max-w-[207px] flex-shrink-0 flex flex-col border-r min-w-0" style={{ borderColor: "var(--surface-border)", background: "var(--surface-2)" }}>
               {/* Search & Filter */}
               <div className="p-3 border-b" style={{ borderColor: "var(--surface-border)" }}>
                 <div className="flex items-center gap-2 mb-2">
@@ -265,6 +393,11 @@ export default function InboxPage() {
                   <div className="flex items-center justify-center h-32 text-xs" style={{ color: "var(--text-3)" }}>Sem conversas</div>
                 ) : list.map(c => (
                   <button key={c.jid} onClick={() => setChat(c.jid)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setChat(c.jid);
+                      setChatContextMenu({ x: e.clientX, y: e.clientY, jid: c.jid });
+                    }}
                     className={cn("w-full flex items-center gap-3 px-3 py-3 transition-colors border-b",
                       chat === c.jid ? "bg-white/[0.07]" : "hover:bg-white/[0.04]")}
                     style={{ borderColor: "var(--surface-border)" }}>
@@ -300,7 +433,7 @@ export default function InboxPage() {
             </div>
 
             {/* Chat Area */}
-            <div className="flex-1 flex flex-col min-w-0" style={{ background: "var(--surface-1)" }}>
+            <div className="flex-1 min-w-[400px] flex flex-col min-w-0" style={{ background: "var(--surface-1)" }}>
               {!chat ? (
                 <div className="flex-1 flex flex-col items-center justify-center">
                   <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: `${curChannel.color}12` }}>
@@ -385,7 +518,13 @@ export default function InboxPage() {
                       msgs.map(m => {
                         const sent = m.from_me;
                         return (
-                          <div key={m.id} className={cn("flex", sent ? "justify-end" : "items-start gap-2")}>
+                          <div key={m.id} className={cn("flex", sent ? "justify-end" : "items-start gap-2")}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              if (!sent) {
+                                setSelectedMsgId(m.id);
+                              }
+                            }}>
                             {!sent && (
                               ct.avatar ? <img src={ct.avatar} className="w-7 h-7 rounded-full object-cover mt-1" />
                               : <div className="w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-semibold mt-1"
@@ -443,7 +582,7 @@ export default function InboxPage() {
             </div>
 
             {/* Contact Sidebar */}
-            <div className="w-[480px] flex-shrink-0 flex flex-col overflow-y-auto border-l" style={{ borderColor: "var(--surface-border)", background: "var(--surface-2)" }}>
+            <div className="w-[336px] min-w-[336px] max-w-[336px] flex-shrink-0 flex flex-col overflow-y-auto border-l" style={{ borderColor: "var(--surface-border)", background: "var(--surface-2)" }}>
               {!chat ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
                   <div className="w-14 h-14 rounded-full flex items-center justify-center mb-3" style={{ background: "var(--surface-3)" }}>
@@ -478,15 +617,39 @@ export default function InboxPage() {
 
                   {/* Info sections */}
                   <div className="p-3 space-y-3">
+                    {/* Responsible */}
+                    {ct.contact_id && membersD?.members && (
+                      <div className="p-3 rounded-xl" style={{ background: "var(--surface-1)" }}>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-3)" }}>Responsável</p>
+                        <select value={contactOwner} onChange={(e) => {
+                          setContactOwner(e.target.value);
+                          if (ct.contact_id) updateContactMut.mutate({ owner: e.target.value });
+                        }}
+                          disabled={!ct.contact_id || updateContactMut.isPending}
+                          className="w-full p-2 rounded-lg text-xs outline-none"
+                          style={{ background: "var(--surface-3)", color: "var(--text-1)", border: "1px solid var(--surface-border)" }}>
+                          <option value="">Selecionar...</option>
+                          {membersD.members.map((m: any) => (
+                            <option key={m.user_id || m.id} value={m.user_id || m.id}>{m.user?.name || m.name || "Membro"}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
                     {/* Pipeline */}
                     <div className="p-3 rounded-xl" style={{ background: "var(--surface-1)" }}>
                       <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-3)" }}>Pipeline</p>
                       <div className="space-y-1.5">
                         {["Novo Lead", "Contatado", "Qualificado", "Fechado"].map((stage, i) => (
-                          <div key={i} className="p-2 rounded-lg text-xs"
-                            style={{ background: ct.stage === stage ? curChannel.color : "var(--surface-3)", color: ct.stage === stage ? "#fff" : "var(--text-2)" }}>
+                          <button key={i} onClick={() => {
+                            setContactStage(stage);
+                            if (ct.contact_id) updateContactMut.mutate({ stage });
+                          }}
+                            disabled={!ct.contact_id || updateContactMut.isPending}
+                            className="w-full p-2 rounded-lg text-xs text-left transition-all"
+                            style={{ background: contactStage === stage ? curChannel.color : "var(--surface-3)", color: contactStage === stage ? "#fff" : "var(--text-2)" }}>
                             {stage}
-                          </div>
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -496,20 +659,54 @@ export default function InboxPage() {
                       <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-3)" }}>Tags</p>
                       <div className="flex flex-wrap gap-1.5">
                         {ct.tags?.length > 0 ? ct.tags.map(tag => (
-                          <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full"
+                          <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1"
                             style={{ background: `${curChannel.color}20`, color: curChannel.color }}>
                             {tag}
                           </span>
                         )) : <span className="text-xs" style={{ color: "var(--text-3)" }}>Nenhuma tag</span>}
                       </div>
+                      {ct.contact_id && tagsD?.tags && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {tagsD.tags.map((tag: any) => (
+                            <button key={tag.id} onClick={() => {
+                              const currentTags = ct.tags || [];
+                              const tagNames = tagsD.tags.map((t: any) => t.name);
+                              const tagId = tag.id;
+                              // Toggle tag - if already has it, remove it, else add it
+                              const hasTag = currentTags.includes(tag.name);
+                              // Need to get tag IDs
+                              const currentTagObjs = tagsD.tags.filter((t: any) => currentTags.includes(t.name));
+                              const newTagIds = hasTag 
+                                ? currentTagObjs.filter((t: any) => t.id !== tag.id).map((t: any) => t.id)
+                                : [...currentTagObjs.map((t: any) => t.id), tagId];
+                              assignTagsMut.mutate(newTagIds);
+                            }}
+                              className="text-[10px] px-2 py-0.5 rounded-full border"
+                              style={{ borderColor: curChannel.color, color: curChannel.color }}>
+                              + {tag.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Notes */}
                     <div className="p-3 rounded-xl" style={{ background: "var(--surface-1)" }}>
                       <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-3)" }}>Notas</p>
-                      <textarea placeholder="Adicionar nota..." rows={2}
+                      <textarea 
+                        value={contactNotes} 
+                        onChange={(e) => setContactNotes(e.target.value)}
+                        onBlur={() => {
+                          if (ct.contact_id && contactNotes !== (contactD?.contact?.notes || "")) {
+                            updateContactMut.mutate({ notes: contactNotes });
+                          }
+                        }}
+                        placeholder="Adicionar nota..." 
+                        rows={3}
+                        disabled={!ct.contact_id}
                         className="w-full p-2 rounded-lg text-xs outline-none resize-none"
-                        style={{ background: "var(--surface-3)", color: "var(--text-1)", border: "1px solid var(--surface-border)" }} />
+                        style={{ background: "var(--surface-3)", color: "var(--text-1)", border: "1px solid var(--surface-border)" }} 
+                      />
                     </div>
                   </div>
                 </>
@@ -518,6 +715,66 @@ export default function InboxPage() {
           </div>
         </div>
       </div>
+
+      {/* Chat Context Menu */}
+      {chatContextMenu && (
+        <div 
+          className="fixed w-48 rounded-xl shadow-lg z-50 py-1"
+          style={{ left: chatContextMenu.x, top: chatContextMenu.y, background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {[
+            { icon: Star, label: "Favoritar", action: "star" },
+            { icon: Pin, label: "Fixar", action: "pin" },
+            { icon: Archive, label: "Arquivar", action: "archive" },
+            { icon: BellOff, label: "Silenciar", action: "mute" },
+            { icon: Trash2, label: "Excluir", action: "delete", color: "#ef4444" },
+          ].map((item, i) => (
+            <button key={i} onClick={() => { handleAction(item.action); setChatContextMenu(null); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/5"
+              style={{ color: item.color || "var(--text-2)" }}>
+              <item.icon className="w-3.5 h-3.5" />
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Message Context Menu */}
+      {selectedMsgId && (
+        <div 
+          className="fixed w-40 rounded-xl shadow-lg z-50 py-1"
+          style={{ 
+            left: "50%", 
+            top: "50%", 
+            transform: "translate(-50%, -50%)",
+            background: "var(--surface-2)", 
+            border: "1px solid var(--surface-border)" 
+          }}
+        >
+          <div className="px-3 py-2 text-xs font-medium border-b" style={{ borderColor: "var(--surface-border)", color: "var(--text-2)" }}>
+            Mensagem
+          </div>
+          {[
+            { icon: Star, label: "Favoritar", action: "star" },
+            { icon: Pin, label: "Fixar", action: "pin" },
+            { icon: Archive, label: "Arquivar", action: "archive" },
+            { icon: Trash2, label: "Excluir", action: "delete", color: "#ef4444" },
+          ].map((item, i) => (
+            <button key={i} onClick={() => { handleMsgAction(item.action); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/5"
+              style={{ color: item.color || "var(--text-2)" }}>
+              <item.icon className="w-3.5 h-3.5" />
+              {item.label}
+            </button>
+          ))}
+          <button onClick={() => setSelectedMsgId(null)}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/5"
+            style={{ color: "var(--text-3)" }}>
+            Cancelar
+          </button>
+        </div>
+      )}
     </div>
   );
 }

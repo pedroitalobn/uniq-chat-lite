@@ -31,19 +31,25 @@ type InboxChat struct {
 	UnreadCount int    `json:"unread_count"`
 	IsOnline    bool   `json:"is_online"`
 	Typing      bool   `json:"typing"`
+	IsGroup     bool   `json:"is_group"`
 }
 
 type InboxMessage struct {
-	ID        string `json:"id"`
-	Content   string `json:"content"`
-	FromMe    bool   `json:"from_me"`
-	Timestamp int64  `json:"timestamp"`
-	Status    string `json:"status"`
-	Type      string `json:"type"`
+	ID         string `json:"id"`
+	Content    string `json:"content"`
+	FromMe     bool   `json:"from_me"`
+	Timestamp  int64  `json:"timestamp"`
+	Status     string `json:"status"`
+	Type       string `json:"type"`
+	IsPinned   *bool  `json:"is_pinned,omitempty"`
+	IsFavorite *bool  `json:"is_favorite,omitempty"`
+	IsArchived *bool  `json:"is_archived,omitempty"`
+	IsDeleted  *bool  `json:"is_deleted,omitempty"`
 }
 
 type InboxContact struct {
 	JID         string   `json:"jid"`
+	ContactID   string   `json:"contact_id,omitempty"`
 	Name        string   `json:"name"`
 	Phone       string   `json:"phone"`
 	Avatar      string   `json:"avatar,omitempty"`
@@ -54,6 +60,9 @@ type InboxContact struct {
 	Funnel      string   `json:"funnel,omitempty"`
 	Stage       string   `json:"stage,omitempty"`
 	Journey     string   `json:"journey,omitempty"`
+	Owner       string   `json:"owner,omitempty"`
+	OwnerName   string   `json:"owner_name,omitempty"`
+	Notes       string   `json:"notes,omitempty"`
 }
 
 // GetChats returns all conversations for an instance
@@ -64,6 +73,20 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 	}
 
 	search := c.Query("search", "")
+	filter := c.Query("filter", "all") // all, unread, starred, archived
+
+	// Determine which is_favorite/is_archived value to filter by
+	var isFavorite, isArchived *bool
+	switch filter {
+	case "starred":
+		isFavoriteVal := true
+		isFavorite = &isFavoriteVal
+	case "archived":
+		isArchivedVal := true
+		isArchived = &isArchivedVal
+	case "unread":
+		// Unread filter handled separately
+	}
 
 	type rawChat struct {
 		ToJID         string `gorm:"column:to_j_id"`
@@ -72,57 +95,118 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 		MsgCount      int64  `gorm:"column:cnt"`
 		ContactName   string `gorm:"column:contact_name"`
 		ContactAvatar string `gorm:"column:contact_avatar"`
+		Direction     string `gorm:"column:direction"`
 	}
 
 	var rawChatsResult []rawChat
 
-	// Use normalized JID to avoid duplicates when instance reconnects
-	h.db.Raw(`
-		SELECT 
-			SUBSTR(m.to_j_id, 1, CASE WHEN INSTR(m.to_j_id, '@') > 0 THEN INSTR(m.to_j_id, '@') - 1 ELSE LENGTH(m.to_j_id) END) as normalized_jid,
-			m.to_j_id,
-			m.content,
-			m.created_at as max_time,
-			cnt.cnt,
-			m.contact_name,
-			m.contact_avatar
-		FROM message_logs m
-		JOIN (
-			SELECT 
-				SUBSTR(to_j_id, 1, CASE WHEN INSTR(to_j_id, '@') > 0 THEN INSTR(to_j_id, '@') - 1 ELSE LENGTH(to_j_id) END) as norm_jid,
-				COUNT(*) as cnt
+	instancePhoneNormalized := ""
+	if instance.PhoneNumber != "" {
+		// Normalize the instance phone number to match the format in to_j_id
+		phoneNum := strings.ReplaceAll(instance.PhoneNumber, "+", "")
+		phoneNum = strings.ReplaceAll(phoneNum, " ", "")
+		phoneNum = strings.ReplaceAll(phoneNum, "-", "")
+		phoneNum = strings.ReplaceAll(phoneNum, "(", "")
+		phoneNum = strings.ReplaceAll(phoneNum, ")", "")
+		instancePhoneNormalized = phoneNum
+	}
+
+	// Base filter to exclude the instance's own number
+	excludeSelf := ""
+	if instancePhoneNormalized != "" {
+		excludeSelf = "AND SUBSTR(to_j_id, 1, INSTR(to_j_id, '@') - 1) != '" + instancePhoneNormalized + "'"
+	}
+
+	// Base filter conditions
+	baseWhere := "instance_id = ? AND to_j_id != '' " + excludeSelf + " AND to_j_id NOT LIKE '%@newsletter%' AND to_j_id NOT LIKE '%@lid%' AND to_j_id != 'status@broadcast' AND is_deleted = 0"
+
+	// Add filter conditions
+	if isFavorite != nil {
+		baseWhere += " AND is_favorite = 1"
+	}
+	if isArchived != nil {
+		baseWhere += " AND is_archived = 1"
+	}
+
+	// Simple query: get latest message per phone number using window function
+	// Include groups (@g.us) but filter out newsletter
+	query := `
+		SELECT to_j_id, content, created_at as max_time, cnt, contact_name, contact_avatar, direction
+		FROM (
+			SELECT *,
+				ROW_NUMBER() OVER (PARTITION BY 
+					CASE 
+						WHEN to_j_id LIKE '%@g.us' THEN to_j_id  -- groups kept as-is
+						ELSE SUBSTR(to_j_id, 1, CASE WHEN INSTR(to_j_id, '@') > 0 THEN INSTR(to_j_id, '@') - 1 ELSE LENGTH(to_j_id) END)  -- normalize phones
+					END
+				ORDER BY created_at DESC) as rn,
+				COUNT(*) OVER (PARTITION BY 
+					CASE 
+						WHEN to_j_id LIKE '%@g.us' THEN to_j_id
+						ELSE SUBSTR(to_j_id, 1, CASE WHEN INSTR(to_j_id, '@') > 0 THEN INSTR(to_j_id, '@') - 1 ELSE LENGTH(to_j_id) END)
+					END
+				) as cnt
 			FROM message_logs
-			WHERE instance_id = ? AND to_j_id != '' AND to_j_id NOT LIKE '%@g.us%'
-			GROUP BY norm_jid
-		) cnt ON SUBSTR(m.to_j_id, 1, CASE WHEN INSTR(m.to_j_id, '@') > 0 THEN INSTR(m.to_j_id, '@') - 1 ELSE LENGTH(m.to_j_id) END) = cnt.norm_jid
-		JOIN (
-			SELECT 
-				SUBSTR(to_j_id, 1, CASE WHEN INSTR(to_j_id, '@') > 0 THEN INSTR(to_j_id, '@') - 1 ELSE LENGTH(to_j_id) END) as norm_jid,
-				MAX(created_at) as max_created_at
-			FROM message_logs
-			WHERE instance_id = ? AND to_j_id != '' AND to_j_id NOT LIKE '%@g.us%'
-			GROUP BY norm_jid
-		) latest ON SUBSTR(m.to_j_id, 1, CASE WHEN INSTR(m.to_j_id, '@') > 0 THEN INSTR(m.to_j_id, '@') - 1 ELSE LENGTH(m.to_j_id) END) = latest.norm_jid AND m.created_at = latest.max_created_at
-		WHERE m.instance_id = ?
-	`, instance.ID, instance.ID, instance.ID).
-		Where("m.to_j_id LIKE ?", "%"+search+"%").
-		Order("m.created_at DESC").
-		Limit(50).
-		Scan(&rawChatsResult)
+			WHERE ` + baseWhere + `
+		)
+		WHERE rn = 1
+		ORDER BY created_at DESC
+		LIMIT 50
+	`
+
+	params := []interface{}{instance.ID}
+
+	if search != "" {
+		searchWhere := baseWhere + " AND to_j_id LIKE ?"
+		query = `
+			SELECT to_j_id, content, created_at as max_time, cnt, contact_name, contact_avatar, direction
+			FROM (
+				SELECT *,
+					ROW_NUMBER() OVER (PARTITION BY 
+						CASE 
+							WHEN to_j_id LIKE '%@g.us' THEN to_j_id
+							ELSE SUBSTR(to_j_id, 1, CASE WHEN INSTR(to_j_id, '@') > 0 THEN INSTR(to_j_id, '@') - 1 ELSE LENGTH(to_j_id) END)
+						END
+					ORDER BY created_at DESC) as rn,
+					COUNT(*) OVER (PARTITION BY 
+						CASE 
+							WHEN to_j_id LIKE '%@g.us' THEN to_j_id
+							ELSE SUBSTR(to_j_id, 1, CASE WHEN INSTR(to_j_id, '@') > 0 THEN INSTR(to_j_id, '@') - 1 ELSE LENGTH(to_j_id) END)
+						END
+					) as cnt
+				FROM message_logs
+				WHERE ` + searchWhere + `
+			)
+			WHERE rn = 1
+			ORDER BY created_at DESC
+			LIMIT 50
+		`
+		params = append(params, "%"+search+"%")
+	}
+
+	h.db.Raw(query, params...).Scan(&rawChatsResult)
 
 	// Track seen JIDs to prevent duplicates
+	// For non-groups, use normalized phone; for groups, use full JID
 	seenJIDs := make(map[string]bool)
 	chats := make([]InboxChat, 0, len(rawChatsResult))
 
 	for _, rc := range rawChatsResult {
-		// Normalize JID - use phone number only
-		phone := extractPhoneFromJID(rc.ToJID)
+		// Determine unique key based on chat type
+		var chatKey string
+		var phone string
+		if strings.Contains(rc.ToJID, "@g.us") {
+			chatKey = rc.ToJID // Groups use full JID
+			phone = extractPhoneFromJID(rc.ToJID)
+		} else {
+			phone = extractPhoneFromJID(rc.ToJID)
+			chatKey = phone // Individual chats use phone
+		}
 
-		// Skip if we've already seen this contact
-		if seenJIDs[phone] {
+		if seenJIDs[chatKey] {
 			continue
 		}
-		seenJIDs[phone] = true
+		seenJIDs[chatKey] = true
 
 		lastMsg := rc.Content
 		var msgContent string
@@ -131,27 +215,23 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 		}
 
 		name := rc.ContactName
-		avatar := rc.ContactAvatar
-
-		// Fallback if no stored info
 		if name == "" {
 			name = phone
-			// Try CRM
-			if contact := h.findContactByPhone(phone); contact != nil {
-				name = contact.Name
-			}
 		}
 
-		chat := InboxChat{
+		// Determine if this is a group chat
+		isGroup := strings.Contains(rc.ToJID, "@g.us")
+
+		chats = append(chats, InboxChat{
 			JID:         rc.ToJID,
 			Name:        name,
 			Phone:       phone,
-			Avatar:      avatar,
+			Avatar:      rc.ContactAvatar,
 			LastMessage: truncateMessage(lastMsg, 60),
 			LastTime:    rc.MaxTime,
-			UnreadCount: 0,
-		}
-		chats = append(chats, chat)
+			UnreadCount: int(rc.MsgCount),
+			IsGroup:     isGroup,
+		})
 	}
 
 	return c.JSON(fiber.Map{
@@ -174,7 +254,24 @@ func (h *InboxHandler) GetChat(c *fiber.Ctx) error {
 	}
 
 	phone := extractPhoneFromJID(jid)
-	contact := h.findContactByPhone(phone)
+	contact := h.findContactByPhone(c, phone)
+
+	// Auto-create contact if it doesn't exist
+	if contact == nil {
+		userID, _ := c.Locals("user_id").(uuid.UUID)
+		workspaceID, _ := c.Locals("workspace_id").(uuid.UUID)
+
+		newContact := models.Contact{
+			ID:          uuid.New(),
+			UserID:      userID,
+			WorkspaceID: &workspaceID,
+			Name:        phone,
+			Phone:       phone,
+		}
+		if err := h.db.Create(&newContact).Error; err == nil {
+			contact = &newContact
+		}
+	}
 
 	contactInfo := InboxContact{
 		JID:   jid,
@@ -206,39 +303,58 @@ func (h *InboxHandler) GetChat(c *fiber.Ctx) error {
 		contactInfo.Avatar = storedInfo.ContactAvatar
 	}
 
-	// If no stored info, try WhatsApp
-	client := h.manager.GetInstance(instance.ID.String())
-	if client != nil && client.IsConnected() {
-		// Ensure JID has proper format for WhatsApp
-		queryJID := jid
-		if !strings.Contains(jid, "@") {
-			queryJID = jid + "@s.whatsapp.net"
-		}
-		if contactInfo.Avatar == "" {
-			if picURL := client.GetContactProfilePicture(queryJID); picURL != "" {
-				contactInfo.Avatar = picURL
+	// If no stored info, try WhatsApp (only if connected, with timeout)
+	if contactInfo.Avatar == "" || contactInfo.Name == phone {
+		client := h.manager.GetInstance(instance.ID.String())
+		if client != nil && client.IsConnected() {
+			queryJID := jid
+			if !strings.Contains(jid, "@") {
+				queryJID = jid + "@s.whatsapp.net"
 			}
-		}
-		if contactInfo.Name == phone {
-			if _, pushName := client.GetContactInfo(queryJID); pushName != "" {
-				contactInfo.Name = pushName
+			if contactInfo.Avatar == "" {
+				if picURL := client.GetContactProfilePicture(queryJID); picURL != "" {
+					contactInfo.Avatar = picURL
+					// Also update stored info for future queries
+					h.db.Model(&models.MessageLog{}).
+						Where("instance_id = ? AND to_j_id LIKE ?", instance.ID, phone+"%").
+						Update("contact_avatar", picURL)
+				}
+			}
+			if contactInfo.Name == phone {
+				if _, pushName := client.GetContactInfo(queryJID); pushName != "" {
+					contactInfo.Name = pushName
+					h.db.Model(&models.MessageLog{}).
+						Where("instance_id = ? AND to_j_id LIKE ?", instance.ID, phone+"%").
+						Update("contact_name", pushName)
+				}
 			}
 		}
 	}
 
 	// CRM data overrides/supplements WhatsApp data
 	if contact != nil {
+		contactInfo.ContactID = contact.ID.String()
 		contactInfo.Name = contact.Name
 		contactInfo.Email = contact.Email
 		contactInfo.Description = contact.Notes
 		contactInfo.Funnel = contact.Funnel
 		contactInfo.Stage = contact.Stage
 		contactInfo.Journey = contact.Journey
+		contactInfo.Owner = contact.Owner
+		contactInfo.Notes = contact.Notes
 		tags := make([]string, len(contact.Tags))
 		for i, t := range contact.Tags {
 			tags[i] = t.Name
 		}
 		contactInfo.Tags = tags
+
+		// Get owner name if owner is set
+		if contact.Owner != "" {
+			var ownerUser models.User
+			if err := h.db.Where("id = ?", contact.Owner).First(&ownerUser).Error; err == nil {
+				contactInfo.OwnerName = ownerUser.Name
+			}
+		}
 	}
 
 	type statsResult struct {
@@ -283,7 +399,8 @@ func (h *InboxHandler) GetMessages(c *fiber.Ctx) error {
 	before := c.Query("before", "")
 
 	var logs []models.MessageLog
-	query := h.db.Where("instance_id = ? AND to_j_id = ?", instance.ID, jid).
+	// Filter by to_j_id and exclude deleted messages
+	query := h.db.Where("instance_id = ? AND to_j_id = ? AND is_deleted = ?", instance.ID, jid, false).
 		Order("created_at DESC")
 
 	if before != "" {
@@ -311,12 +428,16 @@ func (h *InboxHandler) GetMessages(c *fiber.Ctx) error {
 		}
 
 		messages = append(messages, InboxMessage{
-			ID:        log.ID.String(),
-			Content:   content,
-			FromMe:    log.Direction == models.DirectionOut,
-			Timestamp: timestamp,
-			Status:    string(log.Status),
-			Type:      log.Type,
+			ID:         log.ID.String(),
+			Content:    content,
+			FromMe:     log.Direction == models.DirectionOut,
+			Timestamp:  timestamp,
+			Status:     string(log.Status),
+			Type:       log.Type,
+			IsPinned:   boolPtr(log.IsPinned),
+			IsFavorite: boolPtr(log.IsFavorite),
+			IsArchived: boolPtr(log.IsArchived),
+			IsDeleted:  boolPtr(log.IsDeleted),
 		})
 	}
 
@@ -330,6 +451,56 @@ func (h *InboxHandler) GetMessages(c *fiber.Ctx) error {
 		"total":    total,
 		"has_more": offset+len(logs) < int(total),
 	})
+}
+
+// UpdateMessage updates message status (pin, favorite, archive, delete)
+func (h *InboxHandler) UpdateMessage(c *fiber.Ctx) error {
+	instance, ok := c.Locals("instance").(*models.Instance)
+	if !ok {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	messageID := c.Params("id")
+	if messageID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "message ID é obrigatório"})
+	}
+
+	var req struct {
+		IsPinned   *bool `json:"is_pinned,omitempty"`
+		IsFavorite *bool `json:"is_favorite,omitempty"`
+		IsArchived *bool `json:"is_archived,omitempty"`
+		IsDeleted  *bool `json:"is_deleted,omitempty"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "requisição inválida"})
+	}
+
+	var log models.MessageLog
+	if err := h.db.Where("id = ? AND instance_id = ?", messageID, instance.ID).First(&log).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "mensagem não encontrada"})
+	}
+
+	updates := map[string]interface{}{}
+	if req.IsPinned != nil {
+		updates["is_pinned"] = *req.IsPinned
+	}
+	if req.IsFavorite != nil {
+		updates["is_favorite"] = *req.IsFavorite
+	}
+	if req.IsArchived != nil {
+		updates["is_archived"] = *req.IsArchived
+	}
+	if req.IsDeleted != nil {
+		updates["is_deleted"] = *req.IsDeleted
+	}
+
+	if len(updates) > 0 {
+		if err := h.db.Model(&log).Updates(updates).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao atualizar mensagem"})
+		}
+	}
+
+	return c.JSON(fiber.Map{"success": true, "message": "mensagem atualizada"})
 }
 
 // SendMessage sends a message to a contact
@@ -503,6 +674,78 @@ func (h *InboxHandler) Typing(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
+// UpdateContact updates a contact's CRM info from inbox
+func (h *InboxHandler) UpdateContact(c *fiber.Ctx) error {
+	userID, ok := c.Locals("user_id").(string)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autorizado"})
+	}
+
+	contactID := c.Params("id")
+	if contactID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id do contato é obrigatório"})
+	}
+
+	var contact models.Contact
+	if err := h.db.Where("id = ? AND user_id = ?", contactID, userID).First(&contact).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "contato não encontrado"})
+	}
+
+	var req struct {
+		Name    string   `json:"name"`
+		Phone   string   `json:"phone"`
+		Email   string   `json:"email"`
+		Notes   string   `json:"notes"`
+		Funnel  string   `json:"funnel"`
+		Stage   string   `json:"stage"`
+		Journey string   `json:"journey"`
+		Owner   string   `json:"owner"`
+		TagIDs  []string `json:"tag_ids"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
+	}
+
+	updates := map[string]interface{}{}
+	if req.Name != "" {
+		updates["name"] = req.Name
+	}
+	if req.Phone != "" {
+		updates["phone"] = req.Phone
+	}
+	if req.Email != "" {
+		updates["email"] = req.Email
+	}
+	if req.Notes != "" {
+		updates["notes"] = req.Notes
+	}
+	if req.Funnel != "" {
+		updates["funnel"] = req.Funnel
+	}
+	if req.Stage != "" {
+		updates["stage"] = req.Stage
+	}
+	if req.Journey != "" {
+		updates["journey"] = req.Journey
+	}
+	if req.Owner != "" {
+		updates["owner"] = req.Owner
+	}
+
+	if len(updates) > 0 {
+		h.db.Model(&contact).Updates(updates)
+	}
+
+	if len(req.TagIDs) > 0 {
+		var tags []models.Tag
+		h.db.Where("id IN ? AND user_id = ?", req.TagIDs, userID).Find(&tags)
+		h.db.Model(&contact).Association("Tags").Replace(tags)
+	}
+
+	h.db.Preload("Tags").First(&contact)
+	return c.JSON(contact)
+}
+
 // Helper functions
 
 func extractPhoneFromJID(jid string) string {
@@ -519,12 +762,24 @@ func truncateMessage(msg string, maxLen int) string {
 	return msg[:maxLen-3] + "..."
 }
 
-func (h *InboxHandler) findContactByPhone(phone string) *models.Contact {
+func (h *InboxHandler) findContactByPhone(c *fiber.Ctx, phone string) *models.Contact {
 	var contact models.Contact
 	normalized := normalizePhone(phone)
 
-	if err := h.db.Where("REPLACE(REPLACE(REPLACE(REPLACE(phone, '-', ''), ' ', ''), '(', ''), ')', '') LIKE ?", "%"+normalized+"%").
-		First(&contact).Error; err == nil {
+	userID := c.Locals("user_id")
+	workspaceID := c.Locals("workspace_id")
+
+	query := h.db.Where("REPLACE(REPLACE(REPLACE(REPLACE(phone, '-', ''), ' ', ''), '(', ''), ')', '') LIKE ?", "%"+normalized+"%")
+
+	// Filter by workspace if available
+	if wsID, ok := workspaceID.(string); ok && wsID != "" {
+		query = query.Where("workspace_id = ?", wsID)
+	} else if uID, ok := userID.(uuid.UUID); ok {
+		// Fallback to user's contacts
+		query = query.Where("user_id = ?", uID)
+	}
+
+	if err := query.First(&contact).Error; err == nil {
 		return &contact
 	}
 	return nil
@@ -538,6 +793,10 @@ func normalizePhone(phone string) string {
 		}
 	}
 	return result
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
 
 func reverseMessages(msgs []InboxMessage) {

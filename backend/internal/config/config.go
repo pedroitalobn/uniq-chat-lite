@@ -57,6 +57,8 @@ func Load() *Config {
 		log.Debug().Msg("No .env file found, using environment variables")
 	}
 
+	isProduction := getEnv("ENV", "development") == "production"
+
 	cfg := &Config{
 		Port:               getEnv("PORT", "8080"),
 		DatabaseURL:        getEnv("DATABASE_URL", ""),
@@ -97,6 +99,20 @@ func Load() *Config {
 
 		// Taktik — Instagram/TikTok automation
 		TaktikBaseURL: getEnv("TAKTIK_BASE_URL", "http://localhost:8090"),
+	}
+
+	// Validate critical secrets in production
+	if isProduction {
+		if cfg.JWTSecret == "change_me_in_production_jwt_secret" {
+			log.Fatal().Msg("FATAL: JWT_SECRET must be set in production!")
+		}
+		if cfg.JWTRefreshSecret == "change_me_in_production_refresh" {
+			log.Fatal().Msg("FATAL: JWT_REFRESH_SECRET must be set in production!")
+		}
+		if cfg.DatabaseURL == "" {
+			log.Fatal().Msg("FATAL: DATABASE_URL must be set in production!")
+		}
+		log.Info().Msg("Production mode: critical secrets validated")
 	}
 
 	AppConfig = cfg

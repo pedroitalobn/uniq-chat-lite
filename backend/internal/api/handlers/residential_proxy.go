@@ -209,3 +209,133 @@ func (h *ResidencialProxyHandler) SetProxyMode(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"mode": newMode})
 }
+
+// ─── Proxy Provider Configs (Third-party) ───────────────────────────────────
+
+// GET /proxy/providers — list user's configured proxy providers
+func (h *ResidencialProxyHandler) ListProviderConfigs(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+
+	var configs []models.ProxyProviderConfig
+	h.db.Where("user_id = ?", user.ID).Order("created_at DESC").Find(&configs)
+
+	return c.JSON(configs)
+}
+
+// POST /proxy/providers — create a new proxy provider config
+func (h *ResidencialProxyHandler) CreateProviderConfig(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+
+	var req struct {
+		Provider string `json:"provider"`
+		Name     string `json:"name"`
+		APIKey   string `json:"api_key"`
+		Country  string `json:"country"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	if req.Provider == "" || req.Name == "" || req.APIKey == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "provider, name e api_key são obrigatórios"})
+	}
+
+	// Validate provider
+	provider := models.ProxyProvider(req.Provider)
+	validProviders := []models.ProxyProvider{
+		models.ProxyProviderBrightData,
+		models.ProxyProviderOxylabs,
+		models.ProxyProviderProxyCheap,
+		models.ProxyProviderSmartProxy,
+	}
+	valid := false
+	for _, p := range validProviders {
+		if provider == p {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "provider inválido"})
+	}
+
+	// Mask API key for display (show last 4 chars)
+	masked := req.APIKey
+	if len(req.APIKey) > 8 {
+		masked = req.APIKey[:8] + "..." + req.APIKey[len(req.APIKey)-4:]
+	}
+
+	config := models.ProxyProviderConfig{
+		UserID:       user.ID,
+		Provider:     provider,
+		Name:         req.Name,
+		APIKey:       req.APIKey, // TODO: encrypt this
+		APIKeyMasked: masked,
+		Country:      req.Country,
+		IsActive:     true,
+	}
+
+	if err := h.db.Create(&config).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar configuração"})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(config)
+}
+
+// PUT /proxy/providers/:id — update a proxy provider config
+func (h *ResidencialProxyHandler) UpdateProviderConfig(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	id := c.Params("id")
+
+	var config models.ProxyProviderConfig
+	if err := h.db.Where("id = ? AND user_id = ?", id, user.ID).First(&config).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "configuração não encontrada"})
+	}
+
+	var req struct {
+		Name     string `json:"name"`
+		APIKey   string `json:"api_key"`
+		Country  string `json:"country"`
+		IsActive *bool  `json:"is_active"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	updates := map[string]any{}
+	if req.Name != "" {
+		updates["name"] = req.Name
+	}
+	if req.Country != "" {
+		updates["country"] = req.Country
+	}
+	if req.APIKey != "" {
+		updates["api_key"] = req.APIKey
+		masked := req.APIKey
+		if len(req.APIKey) > 8 {
+			masked = req.APIKey[:8] + "..." + req.APIKey[len(req.APIKey)-4:]
+		}
+		updates["api_key_masked"] = masked
+	}
+	if req.IsActive != nil {
+		updates["is_active"] = *req.IsActive
+	}
+
+	h.db.Model(&config).Updates(updates)
+	h.db.First(&config, config.ID)
+	return c.JSON(config)
+}
+
+// DELETE /proxy/providers/:id — delete a proxy provider config
+func (h *ResidencialProxyHandler) DeleteProviderConfig(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	id := c.Params("id")
+
+	var config models.ProxyProviderConfig
+	if err := h.db.Where("id = ? AND user_id = ?", id, user.ID).First(&config).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "configuração não encontrada"})
+	}
+
+	h.db.Delete(&config)
+	return c.JSON(fiber.Map{"message": "configuração removida"})
+}

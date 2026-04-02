@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   Check, ArrowRight, Zap, Building2, Sparkles,
   MessageSquare, Shield, Globe, Headphones,
-  Users, Loader2, ChevronLeft, Star, Flame,
+  Users, Loader2, ChevronLeft, Star, Flame, Ticket,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
@@ -105,10 +105,11 @@ function parsePlanFeatures(plan: Plan): { description: string; highlights: strin
   return { description, highlights };
 }
 
-function PlanCard({ plan, onSelect, loading }: {
+function PlanCard({ plan, onSelect, loading, disabled }: {
   plan: Plan;
   onSelect: (plan: Plan) => void;
   loading: boolean;
+  disabled: boolean;
 }) {
   const meta: PlanMeta = PLAN_META[plan.name] ?? {
     icon: <Sparkles className="w-5 h-5" />,
@@ -122,15 +123,16 @@ function PlanCard({ plan, onSelect, loading }: {
   return (
     <div
       className={cn(
-        "relative flex flex-col rounded-2xl p-6 transition-all duration-200 cursor-pointer",
-        isPopular ? "ring-2" : "hover:ring-1"
+        "relative flex flex-col rounded-2xl p-6 transition-all duration-200",
+        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
+        isPopular ? "ring-2" : !disabled ? "hover:ring-1" : ""
       )}
       style={{
         background: isPopular ? "hsl(240 18% 7%)" : "hsl(240 18% 6%)",
         border: isPopular ? `2px solid ${meta.color}` : "1px solid hsl(240 12% 13%)",
         boxShadow: isPopular ? `0 0 40px ${meta.color}18` : undefined,
       }}
-      onClick={() => onSelect(plan)}
+      onClick={() => !disabled && onSelect(plan)}
     >
       {meta.badge && (
         <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
@@ -183,7 +185,7 @@ function PlanCard({ plan, onSelect, loading }: {
 
       {/* CTA */}
       <button
-        disabled={loading}
+        disabled={loading || disabled}
         className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] disabled:opacity-60"
         style={isPopular
           ? { background: meta.color, color: "#03170a" }
@@ -213,18 +215,48 @@ export default function PlansPage() {
 function PlansContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const inviteCode = searchParams.get("invite") || "";
+  const inviteFromUrl = searchParams.get("invite") || "";
   const [selecting, setSelecting] = useState<string | null>(null);
+  const [inviteCode, setInviteCode] = useState(inviteFromUrl);
+  const [inviteValid, setInviteValid] = useState<boolean | null>(null);
+  const [inviteEnabled, setInviteEnabled] = useState(false);
+  const [checkingInvite, setCheckingInvite] = useState(false);
 
   const { data: plans = [], isLoading } = useQuery<Plan[]>({
     queryKey: ["plans-public"],
     queryFn: () => fetch(`${API_BASE}/stripe/plans`).then((r) => r.json()),
   });
 
+  useEffect(() => {
+    fetch(`${API_BASE}/invites/status`)
+      .then(r => r.json())
+      .then(d => setInviteEnabled(d.enabled))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (inviteCode.trim().length >= 6) {
+      setCheckingInvite(true);
+      fetch(`${API_BASE}/invites/validate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: inviteCode.trim() }),
+      })
+        .then(r => r.json())
+        .then(d => { setInviteValid(d.valid); setCheckingInvite(false); })
+        .catch(() => { setInviteValid(null); setCheckingInvite(false); });
+    } else {
+      setInviteValid(null);
+    }
+  }, [inviteCode]);
+
+  const canSelect = !inviteEnabled || inviteValid === true;
+
   const handleSelect = (plan: Plan) => {
+    if (!canSelect) return;
     setSelecting(plan.id);
     let url = `/register?plan=${encodeURIComponent(plan.name)}&plan_id=${plan.id}&price=${plan.price}`;
-    if (inviteCode) url += `&invite=${encodeURIComponent(inviteCode)}`;
+    if (inviteCode.trim()) url += `&invite=${encodeURIComponent(inviteCode.trim())}`;
     router.push(url);
   };
 
@@ -255,19 +287,67 @@ function PlansContent() {
             Escolha seu plano
           </h1>
           <p className="text-sm max-w-md mx-auto" style={{ color: "hsl(240 8% 50%)" }}>
-            Comece grátis e escale conforme o seu negócio cresce.
-            Cancele quando quiser, sem fidelidade.
+            {inviteEnabled
+              ? "Insira seu código de convite para liberar os planos e começar."
+              : "Comece grátis e escale conforme o seu negócio cresce. Cancele quando quiser, sem fidelidade."}
           </p>
         </div>
+
+        {/* Invite Code Input */}
+        {inviteEnabled && (
+          <div className="max-w-sm mx-auto mb-8">
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                style={{ color: "hsl(240 8% 36%)" }}>
+                <Ticket className="w-4 h-4" />
+              </span>
+              <input
+                value={inviteCode}
+                onChange={e => setInviteCode(e.target.value)}
+                placeholder="Insira seu código de convite"
+                className={cn(
+                  "w-full rounded-xl py-3 pl-10 pr-24 text-sm outline-none transition-all duration-150",
+                  inviteValid === false ? "ring-1 ring-red-500/30" : "focus:ring-1 focus:ring-white/10"
+                )}
+                style={{
+                  background: "hsl(240 12% 8%)",
+                  border: inviteValid === false
+                    ? "1px solid rgba(239,68,68,0.35)"
+                    : inviteValid === true
+                    ? "1px solid rgba(0,212,106,0.4)"
+                    : "1px solid hsl(240 12% 13%)",
+                  color: "hsl(240 15% 90%)",
+                }}
+              />
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                {checkingInvite && <Loader2 className="w-4 h-4 animate-spin" style={{ color: "hsl(240 8% 40%)" }} />}
+                {!checkingInvite && inviteValid === true && (
+                  <span className="text-xs font-semibold text-green-400">Válido</span>
+                )}
+                {!checkingInvite && inviteValid === false && (
+                  <span className="text-xs font-semibold text-red-400">Inválido</span>
+                )}
+              </span>
+            </div>
+            {inviteValid === false && (
+              <p className="text-xs text-red-400 mt-1.5 ml-1">Código de convite inválido ou já utilizado</p>
+            )}
+            {inviteValid === true && (
+              <p className="text-xs text-green-400 mt-1.5 ml-1">Código válido! Escolha seu plano abaixo.</p>
+            )}
+          </div>
+        )}
 
         {isLoading ? (
           <div className="flex justify-center py-16">
             <Loader2 className="w-6 h-6 animate-spin" style={{ color: "hsl(240 8% 40%)" }} />
           </div>
         ) : (
-          <div className="grid gap-5 mb-10 justify-center overflow-x-auto pb-2" style={{ gridTemplateColumns: `repeat(${plans.length}, 280px)` }}>
+          <div className="flex flex-wrap justify-center gap-5 mb-10 pb-6 pt-2">
             {plans.map((plan) => (
-              <PlanCard key={plan.id} plan={plan} onSelect={handleSelect} loading={selecting === plan.id} />
+              <div key={plan.id} className="w-[300px] flex-shrink-0">
+                <PlanCard plan={plan} onSelect={handleSelect} loading={selecting === plan.id} disabled={!canSelect} />
+              </div>
             ))}
           </div>
         )}

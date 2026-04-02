@@ -1467,44 +1467,46 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		ic.broadcastWS(evName, data)
 		ic.dispatchEvent(evName, data, ctx)
 
-		// Save message to database for inbox
-		if !isGroup {
-			var direction models.MessageDirection
-			if isFromMe {
-				direction = models.DirectionOut
-			} else {
-				direction = models.DirectionIn
-			}
-			msgText := text
-			if msgText == "" {
-				switch msgType {
-				case "audio":
-					msgText = "🔊 Áudio"
-				case "sticker":
-					msgText = "😊 Sticker"
-				case "image":
-					msgText = "📷 Imagem"
-				case "video":
-					msgText = "🎬 Vídeo"
-				case "document":
-					msgText = "📄 Documento"
-				case "location":
-					msgText = "📍 Localização"
-				case "contact":
-					msgText = "👤 Contato"
-				default:
-					msgText = msgType
-				}
-			}
-			go func() {
-				if GlobalManager != nil {
-					_ = GlobalManager.SaveMessage(ic.ID, v.Info.Chat.String(), msgText, direction, msgType)
-				}
-			}()
+		// Save message to database for inbox (including groups)
+		var direction models.MessageDirection
+		if isFromMe {
+			direction = models.DirectionOut
+		} else {
+			direction = models.DirectionIn
 		}
+		msgText := text
+		if msgText == "" {
+			switch msgType {
+			case "audio":
+				msgText = "🔊 Áudio"
+			case "sticker":
+				msgText = "😊 Sticker"
+			case "image":
+				msgText = "📷 Imagem"
+			case "video":
+				msgText = "🎬 Vídeo"
+			case "document":
+				msgText = "📄 Documento"
+			case "location":
+				msgText = "📍 Localização"
+			case "contact":
+				msgText = "👤 Contato"
+			default:
+				msgText = msgType
+			}
+		}
+		chatJID := v.Info.Chat.String()
+		pushName := v.Info.PushName
+		isGroupMsg := v.Info.Chat.Server == "g.us"
+		log.Printf("DEBUG: Saving message - chatJID=%s, pushName=%s, isGroup=%v", chatJID, pushName, isGroupMsg)
+		go func() {
+			if GlobalManager != nil {
+				_ = GlobalManager.SaveMessage(ic.ID, chatJID, msgText, direction, msgType, pushName, isGroupMsg)
+			}
+		}()
 
 		// Check and execute journeys for incoming messages
-		if evName == "message.received" && text != "" && !isFromMe {
+		if evName == "message.received" && !isFromMe {
 			if GlobalManager != nil {
 				chatJID := v.Info.Chat.String()
 				senderJID := v.Info.Sender.String()
@@ -1513,6 +1515,7 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 					pushName = "Cliente"
 				}
 				isGroup := v.Info.Chat.Server == "g.us"
+				// Check journeys for both text and media messages
 				go GlobalManager.CheckJourneys(ic.ID, senderJID, pushName, chatJID, text, msgType, isGroup)
 			}
 		}

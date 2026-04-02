@@ -51,18 +51,18 @@ const SECTIONS: Section[] = [
       { method: "POST",   path: "/instances",                        summary: "Criar instância",
         body: { name: { type: "string", required: true, description: "Nome da instância", example: "Suporte Principal" } },
         response: `{ "id": "uuid", "name": "Suporte Principal", "status": "disconnected" }` },
-      { method: "GET",    path: "/instances/:id",                    summary: "Buscar instância",       pathParams: ["id"] },
-      { method: "DELETE", path: "/instances/:id",                    summary: "Remover instância",      pathParams: ["id"] },
-      { method: "GET",    path: "/instances/:id/qr",                 summary: "Obter QR Code",          pathParams: ["id"] },
-      { method: "POST",   path: "/instances/:id/pairing-code",       summary: "Gerar código de pareamento", pathParams: ["id"],
+      { method: "GET",    path: "/instances/{id}",                    summary: "Buscar instância",       pathParams: ["id"] },
+      { method: "DELETE", path: "/instances/{id}",                    summary: "Remover instância",      pathParams: ["id"] },
+      { method: "GET",    path: "/instances/{id}/qr",                 summary: "Obter QR Code",          pathParams: ["id"] },
+      { method: "POST",   path: "/instances/{id}/pairing-code",       summary: "Gerar código de pareamento", pathParams: ["id"],
         body: { phone: { type: "string", required: true, description: "Número com DDI", example: "5511999999999" } },
         response: `{ "code": "ABCD-1234" }` },
-      { method: "POST",   path: "/instances/:id/disconnect",         summary: "Desconectar instância",  pathParams: ["id"] },
-      { method: "POST",   path: "/instances/:id/reconnect",          summary: "Reconectar instância",   pathParams: ["id"] },
-      { method: "GET",    path: "/instances/:id/status",             summary: "Status da instância",    pathParams: ["id"] },
-      { method: "GET",    path: "/instances/:id/profile",            summary: "Perfil do número conectado", pathParams: ["id"] },
-      { method: "GET",    path: "/instances/:id/settings",           summary: "Buscar configurações",   pathParams: ["id"] },
-      { method: "PUT",    path: "/instances/:id/settings",           summary: "Atualizar configurações", pathParams: ["id"],
+      { method: "POST",   path: "/instances/{id}/disconnect",         summary: "Desconectar instância",  pathParams: ["id"] },
+      { method: "POST",   path: "/instances/{id}/reconnect",          summary: "Reconectar instância",   pathParams: ["id"] },
+      { method: "GET",    path: "/instances/{id}/status",             summary: "Status da instância",    pathParams: ["id"] },
+      { method: "GET",    path: "/instances/{id}/profile",            summary: "Perfil do número conectado", pathParams: ["id"] },
+      { method: "GET",    path: "/instances/{id}/settings",           summary: "Buscar configurações",   pathParams: ["id"] },
+      { method: "PUT",    path: "/instances/{id}/settings",           summary: "Atualizar configurações", pathParams: ["id"],
         body: {
           always_online:  { type: "boolean", required: false, description: "Manter status online", example: "false" },
           reject_calls:   { type: "boolean", required: false, description: "Rejeitar chamadas",     example: "false" },
@@ -79,92 +79,92 @@ const SECTIONS: Section[] = [
     label: "Mensagens",
     icon: <MessageSquare className="w-3.5 h-3.5" />,
     endpoints: [
-      { method: "GET",  path: "/instances/:id/messages",              summary: "Histórico de mensagens",     pathParams: ["id"] },
-      { method: "POST", path: "/instances/:id/messages/text",         summary: "Enviar texto",               pathParams: ["id"],
+      { method: "GET",  path: "/instances/{id}/messages",              summary: "Histórico de mensagens",     pathParams: ["id"] },
+      { method: "POST", path: "/instances/{id}/messages/text",         summary: "Enviar texto",               pathParams: ["id"],
         body: {
           to:   { type: "string", required: true,  description: "Número com DDI",      example: "5511999999999" },
           text: { type: "string", required: true,  description: "Conteúdo da mensagem", example: "Olá! Tudo bem?" },
           reply_to: { type: "string", required: false, description: "ID da mensagem a responder" },
         },
         response: `{ "message_id": "uuid", "status": "queued" }` },
-      { method: "POST", path: "/instances/:id/messages/image",        summary: "Enviar imagem",              pathParams: ["id"],
+      { method: "POST", path: "/instances/{id}/messages/image",        summary: "Enviar imagem",              pathParams: ["id"],
         body: {
           to:      { type: "string", required: true,  description: "Número destinatário",  example: "5511999999999" },
           url:     { type: "string", required: false, description: "URL da imagem",        example: "https://exemplo.com/foto.jpg" },
           base64:  { type: "string", required: false, description: "Imagem em base64 (alternativa a url)" },
           caption: { type: "string", required: false, description: "Legenda",              example: "Confira!" },
         } },
-      { method: "POST", path: "/instances/:id/messages/document",     summary: "Enviar documento",           pathParams: ["id"],
+      { method: "POST", path: "/instances/{id}/messages/document",     summary: "Enviar documento",           pathParams: ["id"],
         body: {
           to:       { type: "string", required: true,  description: "Número destinatário", example: "5511999999999" },
           url:      { type: "string", required: false, description: "URL do documento",    example: "https://exemplo.com/doc.pdf" },
           base64:   { type: "string", required: false, description: "Documento em base64" },
           filename: { type: "string", required: false, description: "Nome do arquivo",     example: "proposta.pdf" },
         } },
-      { method: "POST", path: "/instances/:id/messages/audio",        summary: "Enviar áudio (PTT)",         pathParams: ["id"],
+      { method: "POST", path: "/instances/{id}/messages/audio",        summary: "Enviar áudio (PTT)",         pathParams: ["id"],
         body: {
           to:     { type: "string", required: true,  description: "Número destinatário",   example: "5511999999999" },
           url:    { type: "string", required: false, description: "URL do áudio (.ogg/.mp3)" },
           base64: { type: "string", required: false, description: "Áudio em base64" },
           ptt:    { type: "boolean",required: false, description: "Enviar como mensagem de voz", example: "true" },
         } },
-      { method: "POST", path: "/instances/:id/messages/video",        summary: "Enviar vídeo",               pathParams: ["id"],
+      { method: "POST", path: "/instances/{id}/messages/video",        summary: "Enviar vídeo",               pathParams: ["id"],
         body: {
           to:      { type: "string", required: true,  description: "Número destinatário",  example: "5511999999999" },
           url:     { type: "string", required: false, description: "URL do vídeo" },
           base64:  { type: "string", required: false, description: "Vídeo em base64" },
           caption: { type: "string", required: false, description: "Legenda" },
         } },
-      { method: "POST", path: "/instances/:id/messages/location",     summary: "Enviar localização",         pathParams: ["id"],
+      { method: "POST", path: "/instances/{id}/messages/location",     summary: "Enviar localização",         pathParams: ["id"],
         body: {
           to:        { type: "string", required: true,  description: "Número destinatário", example: "5511999999999" },
           latitude:  { type: "number", required: true,  description: "Latitude",            example: "-23.550520" },
           longitude: { type: "number", required: true,  description: "Longitude",           example: "-46.633308" },
           name:      { type: "string", required: false, description: "Nome do local",        example: "São Paulo, SP" },
         } },
-      { method: "POST", path: "/instances/:id/messages/contact",      summary: "Enviar contato (vCard)",     pathParams: ["id"],
+      { method: "POST", path: "/instances/{id}/messages/contact",      summary: "Enviar contato (vCard)",     pathParams: ["id"],
         body: {
           to:           { type: "string", required: true,  description: "Número destinatário",    example: "5511999999999" },
           contact_name: { type: "string", required: true,  description: "Nome do contato",        example: "João Silva" },
           contact_phone:{ type: "string", required: true,  description: "Telefone do contato",    example: "5511988887777" },
         } },
-      { method: "POST", path: "/instances/:id/messages/reaction",     summary: "Reagir a uma mensagem",      pathParams: ["id"],
+      { method: "POST", path: "/instances/{id}/messages/reaction",     summary: "Reagir a uma mensagem",      pathParams: ["id"],
         body: {
           to:         { type: "string", required: true, description: "Número do chat",        example: "5511999999999" },
           message_id: { type: "string", required: true, description: "ID da mensagem alvo",  example: "ABCD1234..." },
           emoji:      { type: "string", required: true, description: "Emoji de reação",       example: "👍" },
         } },
-      { method: "POST", path: "/instances/:id/messages/poll",         summary: "Enviar enquete",             pathParams: ["id"],
+      { method: "POST", path: "/instances/{id}/messages/poll",         summary: "Enviar enquete",             pathParams: ["id"],
         body: {
           to:       { type: "string",   required: true,  description: "Número destinatário",  example: "5511999999999" },
           question: { type: "string",   required: true,  description: "Pergunta da enquete",  example: "Qual sua preferência?" },
           options:  { type: "string[]", required: true,  description: "Opções de resposta",   example: '["Opção A","Opção B"]' },
         } },
-      { method: "POST", path: "/instances/:id/messages/revoke",       summary: "Revogar/apagar mensagem",    pathParams: ["id"],
+      { method: "POST", path: "/instances/{id}/messages/revoke",       summary: "Revogar/apagar mensagem",    pathParams: ["id"],
         body: {
           to:         { type: "string", required: true, description: "Número do chat",        example: "5511999999999" },
           message_id: { type: "string", required: true, description: "ID da mensagem",        example: "ABCD1234..." },
         } },
-      { method: "POST", path: "/instances/:id/messages/typing",       summary: "Simular digitando",          pathParams: ["id"],
+      { method: "POST", path: "/instances/{id}/messages/typing",       summary: "Simular digitando",          pathParams: ["id"],
         body: {
           to:       { type: "string",  required: true,  description: "Número do chat",        example: "5511999999999" },
           duration: { type: "number",  required: false, description: "Duração em ms",         example: "3000" },
         } },
-      { method: "POST", path: "/instances/:id/messages/read",         summary: "Marcar mensagens como lidas", pathParams: ["id"],
+      { method: "POST", path: "/instances/{id}/messages/read",         summary: "Marcar mensagens como lidas", pathParams: ["id"],
         body: {
           chat_jid: { type: "string", required: true, description: "JID do chat",             example: "5511999999999@s.whatsapp.net" },
         } },
-      { method: "POST", path: "/instances/:id/media/upload",          summary: "Upload de mídia para MinIO", pathParams: ["id"],
+      { method: "POST", path: "/instances/{id}/media/upload",          summary: "Upload de mídia para MinIO", pathParams: ["id"],
         body: {
           file: { type: "file", required: true, description: "Arquivo (multipart/form-data, máx 64 MB)" },
         },
         response: `{ "url": "http://minio:9010/uniqchat-media/media/inst/2026/03/uuid.jpg", "mime_type": "image/jpeg", "size": 102400 }` },
-      { method: "GET",  path: "/instances/:id/chats",                 summary: "Listar conversas abertas",   pathParams: ["id"] },
-      { method: "GET",  path: "/instances/:id/contacts",              summary: "Listar contatos do WhatsApp", pathParams: ["id"] },
-      { method: "POST", path: "/instances/:id/check-number",          summary: "Verificar se número tem WhatsApp", pathParams: ["id"],
+      { method: "GET",  path: "/instances/{id}/chats",                 summary: "Listar conversas abertas",   pathParams: ["id"] },
+      { method: "GET",  path: "/instances/{id}/contacts",              summary: "Listar contatos do WhatsApp", pathParams: ["id"] },
+      { method: "POST", path: "/instances/{id}/check-number",          summary: "Verificar se número tem WhatsApp", pathParams: ["id"],
         body: { phone: { type: "string", required: true, description: "Número a verificar", example: "5511999999999" } },
         response: `{ "phone": "5511999999999", "exists": true, "jid": "5511999999999@s.whatsapp.net" }` },
-      { method: "POST", path: "/instances/:id/bulk-check",            summary: "Verificar vários números de uma vez", pathParams: ["id"],
+      { method: "POST", path: "/instances/{id}/bulk-check",            summary: "Verificar vários números de uma vez", pathParams: ["id"],
         body: { phones: { type: "string[]", required: true, description: "Lista de números", example: '["5511999999999","5511988887777"]' } },
         response: `[{ "phone": "...", "exists": true }, ...]` },
     ],
@@ -176,7 +176,7 @@ const SECTIONS: Section[] = [
     label: "OTP",
     icon: <ShieldCheck className="w-3.5 h-3.5" />,
     endpoints: [
-      { method: "POST", path: "/instances/:id/otp/send",     summary: "Enviar OTP via WhatsApp",          pathParams: ["id"],
+      { method: "POST", path: "/instances/{id}/otp/send",     summary: "Enviar OTP via WhatsApp",          pathParams: ["id"],
         body: {
           phone:           { type: "string", required: true,  description: "Número destinatário",             example: "5511999999999" },
           template:        { type: "string", required: false, description: "Template da mensagem. Use {{code}} e {{expiry}}", example: "Seu código: {{code}} — válido por {{expiry}} min." },
@@ -184,19 +184,19 @@ const SECTIONS: Section[] = [
           expires_minutes: { type: "number", required: false, description: "Expiração em minutos (padrão: 5)", example: "5" },
         },
         response: `{ "session_id": "uuid", "phone": "5511999999999", "expires_at": "2026-03-25T10:05:00Z", "status": "queued" }` },
-      { method: "POST", path: "/instances/:id/otp/verify",   summary: "Verificar código OTP",             pathParams: ["id"],
+      { method: "POST", path: "/instances/{id}/otp/verify",   summary: "Verificar código OTP",             pathParams: ["id"],
         body: {
           session_id: { type: "string", required: true, description: "ID da sessão retornado em /send", example: "uuid" },
           code:       { type: "string", required: true, description: "Código recebido pelo usuário",    example: "482931" },
         },
         response: `{ "valid": true, "session_id": "uuid", "phone": "...", "verified_at": "2026-03-25T10:02:12Z" }` },
-      { method: "POST", path: "/instances/:id/otp/resend",   summary: "Reenviar OTP (novo código)",       pathParams: ["id"],
+      { method: "POST", path: "/instances/{id}/otp/resend",   summary: "Reenviar OTP (novo código)",       pathParams: ["id"],
         body: {
           session_id: { type: "string", required: true,  description: "ID da sessão original", example: "uuid" },
           template:   { type: "string", required: false, description: "Template alternativo" },
         },
         response: `{ "session_id": "uuid", "expires_at": "...", "resends": 1, "status": "queued" }` },
-      { method: "GET",  path: "/instances/:id/otp/sessions", summary: "Histórico de sessões OTP",         pathParams: ["id"],
+      { method: "GET",  path: "/instances/{id}/otp/sessions", summary: "Histórico de sessões OTP",         pathParams: ["id"],
         response: `{ "sessions": [{ "id": "uuid", "phone": "...", "status": "verified", "attempts": 1, ... }], "total": 1 }` },
     ],
   },
@@ -207,27 +207,27 @@ const SECTIONS: Section[] = [
     label: "Grupos",
     icon: <Users className="w-3.5 h-3.5" />,
     endpoints: [
-      { method: "GET",  path: "/instances/:id/groups",                     summary: "Listar grupos",               pathParams: ["id"] },
-      { method: "POST", path: "/instances/:id/groups",                     summary: "Criar grupo",                 pathParams: ["id"],
+      { method: "GET",  path: "/instances/{id}/groups",                     summary: "Listar grupos",               pathParams: ["id"] },
+      { method: "POST", path: "/instances/{id}/groups",                     summary: "Criar grupo",                 pathParams: ["id"],
         body: {
           name:         { type: "string",   required: true,  description: "Nome do grupo",           example: "Time de Vendas" },
           participants: { type: "string[]", required: true,  description: "Números dos participantes", example: '["5511999999999"]' },
         },
         response: `{ "jid": "120363xxx@g.us", "name": "Time de Vendas", "participants": [...] }` },
-      { method: "GET",  path: "/instances/:id/groups/:jid",                summary: "Detalhes do grupo",           pathParams: ["id", "jid"] },
-      { method: "PUT",  path: "/instances/:id/groups/:jid",                summary: "Atualizar grupo",             pathParams: ["id", "jid"],
+      { method: "GET",  path: "/instances/{id}/groups/:jid",                summary: "Detalhes do grupo",           pathParams: ["id", "jid"] },
+      { method: "PUT",  path: "/instances/{id}/groups/:jid",                summary: "Atualizar grupo",             pathParams: ["id", "jid"],
         body: {
           name:        { type: "string", required: false, description: "Novo nome do grupo" },
           description: { type: "string", required: false, description: "Nova descrição do grupo" },
         } },
-      { method: "POST", path: "/instances/:id/groups/:jid/participants",   summary: "Adicionar/remover participantes", pathParams: ["id", "jid"],
+      { method: "POST", path: "/instances/{id}/groups/:jid/participants",   summary: "Adicionar/remover participantes", pathParams: ["id", "jid"],
         body: {
           action:       { type: "string",   required: true, description: "add | remove | promote | demote", example: "add" },
           participants: { type: "string[]", required: true, description: "Lista de números",                example: '["5511999999999"]' },
         } },
-      { method: "GET",  path: "/instances/:id/groups/:jid/invite",         summary: "Obter link de convite",       pathParams: ["id", "jid"],
+      { method: "GET",  path: "/instances/{id}/groups/:jid/invite",         summary: "Obter link de convite",       pathParams: ["id", "jid"],
         response: `{ "invite_link": "https://chat.whatsapp.com/..." }` },
-      { method: "POST", path: "/instances/:id/groups/:jid/leave",          summary: "Sair do grupo",               pathParams: ["id", "jid"] },
+      { method: "POST", path: "/instances/{id}/groups/:jid/leave",          summary: "Sair do grupo",               pathParams: ["id", "jid"] },
     ],
   },
 
@@ -247,8 +247,8 @@ const SECTIONS: Section[] = [
           notes:       { type: "string", required: false, description: "Observações" },
         },
         response: `{ "id": "uuid", "name": "João Silva", "phone": "5511999999999", "tags": [] }` },
-      { method: "GET",    path: "/crm/contacts/:id",    summary: "Buscar contato",       pathParams: ["id"] },
-      { method: "PUT",    path: "/crm/contacts/:id",    summary: "Atualizar contato",    pathParams: ["id"],
+      { method: "GET",    path: "/crm/contacts/{id}",    summary: "Buscar contato",       pathParams: ["id"] },
+      { method: "PUT",    path: "/crm/contacts/{id}",    summary: "Atualizar contato",    pathParams: ["id"],
         body: {
           name:    { type: "string", required: false, description: "Nome" },
           phone:   { type: "string", required: false, description: "Telefone" },
@@ -256,8 +256,8 @@ const SECTIONS: Section[] = [
           company: { type: "string", required: false, description: "Empresa" },
           notes:   { type: "string", required: false, description: "Observações" },
         } },
-      { method: "DELETE", path: "/crm/contacts/:id",    summary: "Remover contato",      pathParams: ["id"] },
-      { method: "PUT",    path: "/crm/contacts/:id/tags", summary: "Associar tags",      pathParams: ["id"],
+      { method: "DELETE", path: "/crm/contacts/{id}",    summary: "Remover contato",      pathParams: ["id"] },
+      { method: "PUT",    path: "/crm/contacts/{id}/tags", summary: "Associar tags",      pathParams: ["id"],
         body: {
           tag_ids: { type: "string[]", required: true, description: "IDs das tags", example: '["uuid1","uuid2"]' },
         } },
@@ -267,7 +267,7 @@ const SECTIONS: Section[] = [
           name:  { type: "string", required: true,  description: "Nome da tag",  example: "Cliente VIP" },
           color: { type: "string", required: false, description: "Cor hex",       example: "#00d46a" },
         } },
-      { method: "DELETE", path: "/crm/tags/:id",        summary: "Remover tag",          pathParams: ["id"] },
+      { method: "DELETE", path: "/crm/tags/{id}",        summary: "Remover tag",          pathParams: ["id"] },
     ],
   },
 
@@ -288,11 +288,11 @@ const SECTIONS: Section[] = [
           recipients:  { type: "array",  required: true,  description: '[{ "phone": "55119...", "name": "João" }]', example: '[{"phone":"5511999999999","name":"João"}]' },
         },
         response: `{ "id": "uuid", "name": "Black Friday 2026", "status": "draft", "total": 1 }` },
-      { method: "GET",    path: "/campaigns/:id",     summary: "Detalhes da campanha",  pathParams: ["id"] },
-      { method: "POST",   path: "/campaigns/:id/start",  summary: "Iniciar campanha",   pathParams: ["id"] },
-      { method: "POST",   path: "/campaigns/:id/pause",  summary: "Pausar campanha",    pathParams: ["id"] },
-      { method: "POST",   path: "/campaigns/:id/cancel", summary: "Cancelar campanha",  pathParams: ["id"] },
-      { method: "DELETE", path: "/campaigns/:id",     summary: "Remover campanha",      pathParams: ["id"] },
+      { method: "GET",    path: "/campaigns/{id}",     summary: "Detalhes da campanha",  pathParams: ["id"] },
+      { method: "POST",   path: "/campaigns/{id}/start",  summary: "Iniciar campanha",   pathParams: ["id"] },
+      { method: "POST",   path: "/campaigns/{id}/pause",  summary: "Pausar campanha",    pathParams: ["id"] },
+      { method: "POST",   path: "/campaigns/{id}/cancel", summary: "Cancelar campanha",  pathParams: ["id"] },
+      { method: "DELETE", path: "/campaigns/{id}",     summary: "Remover campanha",      pathParams: ["id"] },
     ],
   },
 
@@ -302,20 +302,20 @@ const SECTIONS: Section[] = [
     label: "Webhooks",
     icon: <Webhook className="w-3.5 h-3.5" />,
     endpoints: [
-      { method: "GET",    path: "/instances/:id/webhooks",            summary: "Listar webhooks",    pathParams: ["id"] },
-      { method: "POST",   path: "/instances/:id/webhooks",            summary: "Criar webhook",      pathParams: ["id"],
+      { method: "GET",    path: "/instances/{id}/webhooks",            summary: "Listar webhooks",    pathParams: ["id"] },
+      { method: "POST",   path: "/instances/{id}/webhooks",            summary: "Criar webhook",      pathParams: ["id"],
         body: {
           url:    { type: "string",   required: true, description: "URL de destino",       example: "https://seu-servidor.com/webhook" },
           events: { type: "string[]", required: true, description: "Eventos a escutar",    example: '["message.received","status.changed"]' },
         },
         response: `{ "id": "uuid", "url": "...", "events": "message.received,...", "is_active": true }` },
-      { method: "PUT",    path: "/instances/:id/webhooks/:webhookId", summary: "Atualizar webhook",  pathParams: ["id", "webhookId"],
+      { method: "PUT",    path: "/instances/{id}/webhooks/:webhookId", summary: "Atualizar webhook",  pathParams: ["id", "webhookId"],
         body: {
           url:       { type: "string",  required: false, description: "Nova URL" },
           events:    { type: "string[]",required: false, description: "Novos eventos" },
           is_active: { type: "boolean", required: false, description: "Ativar/pausar" },
         } },
-      { method: "DELETE", path: "/instances/:id/webhooks/:webhookId", summary: "Remover webhook",    pathParams: ["id", "webhookId"] },
+      { method: "DELETE", path: "/instances/{id}/webhooks/:webhookId", summary: "Remover webhook",    pathParams: ["id", "webhookId"] },
     ],
   },
 
@@ -325,19 +325,22 @@ const SECTIONS: Section[] = [
     label: "Proxy",
     icon: <Globe className="w-3.5 h-3.5" />,
     endpoints: [
-      { method: "GET",    path: "/instances/:id/proxy",      summary: "Buscar proxy",         pathParams: ["id"] },
-      { method: "PUT",    path: "/instances/:id/proxy",      summary: "Configurar proxy",     pathParams: ["id"],
+      { method: "GET",    path: "/proxy/pool",       summary: "Listar proxy pools disponíveis",
+        response: `[{ "id": "uuid", "name": "Brasil Residencial", "provider": "brightdata", "status": "active", "current_instances": 5 }]` },
+      { method: "GET",    path: "/instances/{id}/proxy",      summary: "Buscar proxy",         pathParams: ["id"] },
+      { method: "PUT",    path: "/instances/{id}/proxy",      summary: "Configurar proxy (manual ou pool)",     pathParams: ["id"],
         body: {
           enabled:  { type: "boolean", required: true,  description: "Ativar proxy" },
-          type:     { type: "string",  required: true,  description: "http | https | socks5",  example: "socks5" },
-          host:     { type: "string",  required: true,  description: "Endereço do proxy",       example: "proxy.exemplo.com" },
-          port:     { type: "number",  required: true,  description: "Porta",                   example: "1080" },
+          type:     { type: "string",  required: true,  description: "http | https | socks5 | residencial",  example: "residencial" },
+          host:     { type: "string",  required: false, description: "Endereço do proxy manual", example: "proxy.exemplo.com" },
+          port:     { type: "number",  required: false, description: "Porta do proxy manual",  example: "1080" },
           username: { type: "string",  required: false, description: "Usuário (opcional)" },
           password: { type: "string",  required: false, description: "Senha (opcional)" },
+          proxy_pool_id: { type: "string", required: false, description: "ID do proxy pool (para modo residencial)", example: "uuid" },
         } },
-      { method: "POST",   path: "/instances/:id/proxy/test", summary: "Testar proxy",         pathParams: ["id"],
+      { method: "POST",   path: "/instances/{id}/proxy/test", summary: "Testar proxy",         pathParams: ["id"],
         response: `{ "success": true, "external_ip": "1.2.3.4", "latency_ms": 120 }` },
-      { method: "DELETE", path: "/instances/:id/proxy",      summary: "Remover proxy",        pathParams: ["id"] },
+      { method: "DELETE", path: "/instances/{id}/proxy",      summary: "Remover proxy",        pathParams: ["id"] },
     ],
   },
 
@@ -351,7 +354,7 @@ const SECTIONS: Section[] = [
       { method: "POST",   path: "/api-keys",     summary: "Criar API key",
         body: { name: { type: "string", required: true, description: "Nome da chave", example: "Produção" } },
         response: `{ "id": "uuid", "name": "Produção", "key": "sc_...", "masked_key": "sc_***...***" }` },
-      { method: "DELETE", path: "/api-keys/:id", summary: "Revogar API key", pathParams: ["id"] },
+      { method: "DELETE", path: "/api-keys/{id}", summary: "Revogar API key", pathParams: ["id"] },
     ],
   },
 
@@ -362,23 +365,35 @@ const SECTIONS: Section[] = [
     icon: <ServerIcon className="w-3.5 h-3.5" />,
     endpoints: [
       { method: "GET",    path: "/servers",         summary: "Listar seus servers (workspaces)",
-        response: `[{ "id": "uuid", "name": "Acme Corp", "slug": "acme-corp", "description": "...", "is_active": true }]` },
+        response: `[{ "id": "uuid", "name": "Acme Corp", "slug": "acme-corp", "description": "...", "is_active": true, "proxy_pool_id": "uuid", "webhook_url": "https://..." }]` },
       { method: "POST",   path: "/servers",         summary: "Criar server",
         body: {
           name:        { type: "string", required: true,  description: "Nome do workspace",          example: "Acme Corp" },
           slug:        { type: "string", required: false, description: "Slug único (auto-gerado se omitido)", example: "acme-corp" },
           description: { type: "string", required: false, description: "Descrição opcional" },
+          workspace_id:{ type: "string", required: false, description: "ID do workspace opcional" },
         },
         response: `{ "id": "uuid", "name": "Acme Corp", "slug": "acme-corp", "is_active": true }` },
-      { method: "GET",    path: "/servers/:id",     summary: "Buscar server",      pathParams: ["id"] },
-      { method: "PUT",    path: "/servers/:id",     summary: "Atualizar server",   pathParams: ["id"],
+      { method: "GET",    path: "/servers/{id}",     summary: "Buscar server",      pathParams: ["id"] },
+      { method: "PUT",    path: "/servers/{id}",     summary: "Atualizar server (inclui proxy e webhook)",   pathParams: ["id"],
         body: {
-          name:        { type: "string",  required: false, description: "Novo nome" },
-          description: { type: "string",  required: false, description: "Nova descrição" },
-          is_active:   { type: "boolean", required: false, description: "Ativar/desativar" },
-        } },
-      { method: "DELETE", path: "/servers/:id",     summary: "Remover server (instâncias são desassociadas)", pathParams: ["id"] },
-      { method: "GET",    path: "/servers/:id/instances", summary: "Instâncias vinculadas ao server", pathParams: ["id"] },
+          name:          { type: "string",  required: false, description: "Novo nome" },
+          description:   { type: "string",  required: false, description: "Nova descrição" },
+          is_active:     { type: "boolean", required: false, description: "Ativar/desativar" },
+          proxy_pool_id: { type: "string",  required: false, description: "ID do proxy pool (ou vazio para remover)", example: "uuid-uuid" },
+          webhook_url:   { type: "string",  required: false, description: "URL do webhook padrão para instâncias", example: "https://webhook.com.br/hook" },
+          apply_webhook: { type: "boolean", required: false, description: "Aplicar webhook a todas as instâncias do server" },
+        },
+        response: `{ "id": "uuid", "name": "...", "proxy_pool_id": "...", "webhook_url": "..." }` },
+      { method: "DELETE", path: "/servers/{id}",     summary: "Remover server (instâncias são desassociadas)", pathParams: ["id"] },
+      { method: "GET",    path: "/servers/{id}/instances", summary: "Listar instâncias do server", pathParams: ["id"] },
+      { method: "POST",   path: "/servers/{id}/actions", summary: "Ações em massa nas instâncias", pathParams: ["id"],
+        body: {
+          action: { type: "string", required: true, description: "Ação: pause, resume, reconnect, disconnect, delete, apply_proxy, rotate_proxy", example: "pause" },
+        },
+        response: `{ "message": "ação concluída", "action": "pause", "total": 5, "success": 5, "errors": 0, "results": ["instância 1 pausada", ...] }` },
+      { method: "GET",    path: "/servers/{id}/stats", summary: "Estatísticas agregadas do server", pathParams: ["id"],
+        response: `{ "total_instances": 5, "connected": 3, "disconnected": 1, "connecting": 1, "banned": 0, "total_messages": 1250 }` },
     ],
   },
 
@@ -409,6 +424,239 @@ const SECTIONS: Section[] = [
       { method: "POST", path: "/auth/refresh",      summary: "Renovar access token (usa cookie refresh_token)" },
       { method: "POST", path: "/auth/logout",       summary: "Logout (limpa cookie)" },
       { method: "GET",  path: "/auth/me",           summary: "Dados do usuário autenticado" },
+      { method: "PUT",  path: "/auth/me",           summary: "Atualizar dados do usuário",
+        body: {
+          name:  { type: "string", required: false, description: "Nome", example: "João Silva" },
+          avatar:{ type: "string", required: false, description: "URL do avatar" },
+        } },
+      { method: "POST", path: "/auth/change-password", summary: "Alterar senha",
+        body: {
+          current_password: { type: "string", required: true, description: "Senha atual" },
+          new_password:     { type: "string", required: true, description: "Nova senha" },
+        } },
+    ],
+  },
+
+  // ── Workspaces ───────────────────────────────────────────────────────────────
+  {
+    id: "workspaces",
+    label: "Workspaces",
+    icon: <Users className="w-3.5 h-3.5" />,
+    endpoints: [
+      { method: "GET",    path: "/workspaces",           summary: "Listar workspaces" },
+      { method: "POST",   path: "/workspaces",           summary: "Criar workspace",
+        body: {
+          name:        { type: "string", required: true,  description: "Nome do workspace",   example: "Minha Empresa" },
+          description: { type: "string", required: false, description: "Descrição" },
+        } },
+      { method: "GET",    path: "/workspaces/{id}",       summary: "Buscar workspace",      pathParams: ["id"] },
+      { method: "PUT",    path: "/workspaces/{id}",       summary: "Atualizar workspace",   pathParams: ["id"],
+        body: {
+          name:        { type: "string", required: false, description: "Nome" },
+          description: { type: "string", required: false, description: "Descrição" },
+          is_active:   { type: "boolean", required: false, description: "Ativar/desativar" },
+        } },
+      { method: "DELETE", path: "/workspaces/{id}",       summary: "Desativar workspace",   pathParams: ["id"] },
+      { method: "GET",    path: "/workspaces/{id}/members",      summary: "Listar membros",   pathParams: ["id"] },
+      { method: "DELETE", path: "/workspaces/{id}/members/:member_id", summary: "Remover membro", pathParams: ["id", "member_id"] },
+      { method: "POST",   path: "/workspaces/{id}/invites",       summary: "Criar convite",   pathParams: ["id"],
+        body: {
+          email:    { type: "string", required: true,  description: "E-mail do convidado", example: "colaborador@empresa.com" },
+          role_id:  { type: "string", required: true,  description: "ID do cargo",          example: "uuid" },
+        },
+        response: `{ "token": "abc123...", "expires_at": "2026-04-10T...", "role": "SDR" }` },
+      { method: "GET",    path: "/workspaces/{id}/invites",      summary: "Listar convites",   pathParams: ["id"] },
+      { method: "DELETE", path: "/workspaces/{id}/invites/:invite_id", summary: "Revogar convite", pathParams: ["id", "invite_id"] },
+    ],
+  },
+
+  // ── Roles ────────────────────────────────────────────────────────────────────
+  {
+    id: "roles",
+    label: "Cargos e Permissões",
+    icon: <ShieldCheck className="w-3.5 h-3.5" />,
+    endpoints: [
+      { method: "GET",    path: "/workspaces/:workspace_id/roles",       summary: "Listar cargos",        pathParams: ["workspace_id"] },
+      { method: "POST",   path: "/workspaces/:workspace_id/roles",       summary: "Criar cargo",          pathParams: ["workspace_id"],
+        body: {
+          name:        { type: "string", required: true,  description: "Nome do cargo",    example: "SDR" },
+          description: { type: "string", required: false, description: "Descrição" },
+          permissions: { type: "string[]", required: true, description: "Chaves de permissões", example: '["instances:view","inbox:send"]' },
+        } },
+      { method: "GET",    path: "/workspaces/:workspace_id/roles/:role_id", summary: "Buscar cargo",     pathParams: ["workspace_id", "role_id"] },
+      { method: "PUT",    path: "/workspaces/:workspace_id/roles/:role_id", summary: "Atualizar cargo",  pathParams: ["workspace_id", "role_id"],
+        body: {
+          name:        { type: "string", required: false, description: "Nome" },
+          description: { type: "string", required: false, description: "Descrição" },
+          permissions: { type: "string[]", required: false, description: "Permissões" },
+        } },
+      { method: "DELETE", path: "/workspaces/:workspace_id/roles/:role_id", summary: "Deletar cargo",  pathParams: ["workspace_id", "role_id"] },
+      { method: "GET",    path: "/permissions",          summary: "Listar todas as permissões disponíveis" },
+    ],
+  },
+
+  // ── Inbox ───────────────────────────────────────────────────────────────────
+  {
+    id: "inbox",
+    label: "Inbox (Chat)",
+    icon: <MessageSquare className="w-3.5 h-3.5" />,
+    endpoints: [
+      { method: "GET",    path: "/instances/{id}/inbox/chats",              summary: "Listar conversas",      pathParams: ["id"],
+        response: `{ "chats": [{ "jid": "...", "name": "João", "phone": "...", "last_message": "Olá!", "unread_count": 2 }], "total": 10, "connected": true }` },
+      { method: "GET",    path: "/instances/{id}/inbox/chats/:jid",        summary: "Detalhes do chat + contato", pathParams: ["id", "jid"],
+        response: `{ "contact": { "jid": "...", "name": "João", "phone": "...", "email": "...", "tags": ["VIP"], "stage": "Novo Lead" }, "stats": { "total_sent": 5, "total_received": 10 } }` },
+      { method: "GET",    path: "/instances/{id}/inbox/chats/:jid/messages", summary: "Mensagens do chat", pathParams: ["id", "jid"],
+        body: {
+          limit:  { type: "number", required: false, description: "Limite (padrão 50)", example: "50" },
+          offset: { type: "number", required: false, description: "Offset para paginação" },
+          before: { type: "string", required: false, description: "RFC3339 timestamp para carregar anteriores" },
+        },
+        response: `{ "messages": [{ "id": "uuid", "content": "Olá!", "from_me": false, "timestamp": 1234567890 }], "total": 100, "has_more": true }` },
+      { method: "POST",   path: "/instances/{id}/inbox/chats/:jid/messages", summary: "Enviar mensagem", pathParams: ["id", "jid"],
+        body: {
+          content: { type: "string", required: true,  description: "Texto da mensagem", example: "Olá! Como posso ajudar?" },
+          type:    { type: "string", required: false, description: "Tipo (padrão: text)", example: "text" },
+        },
+        response: `{ "id": "uuid", "status": "sending", "timestamp": 1234567890 }` },
+      { method: "POST",   path: "/instances/{id}/inbox/chats/:jid/messages/media", summary: "Enviar mídia", pathParams: ["id", "jid"],
+        body: {
+          url:      { type: "string", required: true,  description: "URL da mídia",       example: "https://exemplo.com/foto.jpg" },
+          caption:  { type: "string", required: false, description: "Legenda da mídia" },
+          mime_type:{ type: "string", required: false, description: "Tipo MIME",          example: "image/jpeg" },
+        } },
+      { method: "POST",   path: "/instances/{id}/inbox/chats/:jid/read",      summary: "Marcar como lido", pathParams: ["id", "jid"] },
+      { method: "POST",   path: "/instances/{id}/inbox/chats/:jid/typing",   summary: "Enviar indicador de digitação", pathParams: ["id", "jid"],
+        body: { typing: { type: "boolean", required: true, description: "true = digitando, false = parar", example: "true" } } },
+      { method: "PUT",    path: "/instances/{id}/inbox/contacts/{id}",       summary: "Atualizar contato CRM", pathParams: ["id"],
+        body: {
+          name:    { type: "string", required: false, description: "Nome" },
+          email:   { type: "string", required: false, description: "E-mail" },
+          notes:   { type: "string", required: false, description: "Notas" },
+          stage:   { type: "string", required: false, description: "Pipeline/Stage", example: "Novo Lead" },
+          journey: { type: "string", required: false, description: "Jornada", example: "Bem-vindo" },
+          tag_ids: { type: "string[]", required: false, description: "IDs das tags", example: '["uuid1","uuid2"]' },
+        },
+        response: `{ "id": "uuid", "name": "João", "stage": "Novo Lead", "tags": [...] }` },
+    ],
+  },
+
+  // ── AI & Journeys ───────────────────────────────────────────────────────────
+  {
+    id: "ai-journeys",
+    label: "AI & Journeys",
+    icon: <Activity className="w-3.5 h-3.5" />,
+    endpoints: [
+      { method: "POST", path: "/ai/chat",          summary: "Chat com IA",
+        body: {
+          message:      { type: "string", required: true,  description: "Mensagem do usuário",        example: "Crie uma jornada para..." },
+          instance_id:  { type: "string", required: true,  description: "ID da instância",            example: "uuid" },
+          context:      { type: "string", required: false, description: "Contexto adicional" },
+        },
+        response: `{ "response": "Entendi! Vou criar...", "journey_id": "uuid" }` },
+      { method: "GET",  path: "/ai/tools",        summary: "Listar ferramentas disponíveis para IA" },
+      { method: "POST", path: "/ai/generate",      summary: "Gerar variações de texto com IA",
+        body: {
+          text:       { type: "string", required: true,  description: "Texto original",        example: "Olá, tudo bem?" },
+          count:      { type: "number", required: false, description: "Quantidade (padrão 3)", example: "5" },
+          variation:  { type: "string", required: false, description: "Tipo: casual|formal|sales", example: "sales" },
+        },
+        response: `{ "variations": ["E aí, beleza?", "Olá! Como vai?"] }` },
+      { method: "GET",  path: "/journeys",            summary: "Listar jornadas" },
+      { method: "POST", path: "/journeys",            summary: "Criar jornada",
+        body: {
+          name:        { type: "string", required: true,  description: "Nome da jornada",    example: "Boas-vindas" },
+          instance_id: { type: "string", required: true,  description: "ID da instância",    example: "uuid" },
+          prompt:      { type: "string", required: true,  description: "Descrição da jornada", example: "Quando alguém enviar 'oi', enviar mensagem de boas-vindas..." },
+        },
+        response: `{ "id": "uuid", "name": "Boas-vindas", "status": "active", "trigger_type": "keyword" }` },
+      { method: "GET",  path: "/journeys/{id}",        summary: "Detalhes da jornada", pathParams: ["id"] },
+      { method: "PUT",  path: "/journeys/{id}/status", summary: "Ativar/desativar jornada", pathParams: ["id"],
+        body: { is_active: { type: "boolean", required: true, description: "true = ativar", example: "true" } } },
+      { method: "DELETE",path: "/journeys/{id}",       summary: "Deletar jornada",   pathParams: ["id"] },
+      { method: "GET",  path: "/journeys/{id}/executions", summary: "Execuções da jornada", pathParams: ["id"] },
+    ],
+  },
+
+  // ── Agent Center ─────────────────────────────────────────────────────────────
+  {
+    id: "agent",
+    label: "Agent Center",
+    icon: <Activity className="w-3.5 h-3.5" />,
+    endpoints: [
+      { method: "GET",  path: "/agent/stats",          summary: "Estatísticas do agente" },
+      { method: "GET",  path: "/agent/activity",       summary: "Atividade recente do agente" },
+      { method: "GET",  path: "/agent/instances",      summary: "Instâncias com agente configurado" },
+      { method: "POST", path: "/agent/executions/{id}/stop", summary: "Parar execução", pathParams: ["id"] },
+      { method: "GET",  path: "/instances/{id}/agent", summary: "Configuração do agente na instância", pathParams: ["id"] },
+      { method: "PUT",  path: "/instances/{id}/agent", summary: "Atualizar configuração do agente", pathParams: ["id"],
+        body: {
+          enabled:   { type: "boolean", required: false, description: "Ativar agente" },
+          system_prompt: { type: "string", required: false, description: "Prompt do sistema" },
+          trigger_keywords: { type: "string[]", required: false, description: "Palavras-chave", example: '["/ai", "assistant"]' },
+        } },
+    ],
+  },
+
+  // ── Integrations ───────────────────────────────────────────────────────────
+  {
+    id: "integrations",
+    label: "Integrações",
+    icon: <Key className="w-3.5 h-3.5" />,
+    endpoints: [
+      { method: "GET",    path: "/integrations",            summary: "Listar integrações" },
+      { method: "POST",   path: "/integrations",            summary: "Criar integração",
+        body: {
+          type:       { type: "string", required: true,  description: "Tipo: anthropic|openai|google", example: "anthropic" },
+          name:       { type: "string", required: true,  description: "Nome da integração",  example: "Minha Key" },
+          api_key:    { type: "string", required: true,  description: "Chave da API",       example: "sk-..." },
+          config:     { type: "object", required: false, description: "Configurações adicionais" },
+        } },
+      { method: "PUT",    path: "/integrations/{id}",        summary: "Atualizar integração",  pathParams: ["id"],
+        body: { api_key: { type: "string", required: false, description: "Nova chave" } } },
+      { method: "DELETE", path: "/integrations/{id}",        summary: "Deletar integração",    pathParams: ["id"] },
+      { method: "POST",   path: "/integrations/{id}/test",   summary: "Testar integração",     pathParams: ["id"] },
+    ],
+  },
+
+  // ── Admin ───────────────────────────────────────────────────────────────────
+  {
+    id: "admin",
+    label: "Admin",
+    icon: <ShieldCheck className="w-3.5 h-3.5" />,
+    endpoints: [
+      { method: "GET",    path: "/admin/users",              summary: "Listar usuários",      pathParams: [] },
+      { method: "POST",   path: "/admin/users",              summary: "Criar usuário",
+        body: {
+          name:     { type: "string", required: true,  description: "Nome",         example: "João Silva" },
+          email:    { type: "string", required: true,  description: "E-mail",      example: "joao@empresa.com" },
+          password: { type: "string", required: true,  description: "Senha inicial" },
+          role:     { type: "string", required: false, description: "super_admin|admin|user", example: "user" },
+        } },
+      { method: "PUT",    path: "/admin/users/{id}",          summary: "Atualizar usuário",  pathParams: ["id"],
+        body: {
+          name:    { type: "string", required: false, description: "Nome" },
+          email:   { type: "string", required: false, description: "E-mail" },
+          role:    { type: "string", required: false, description: "Cargo" },
+          plan_id: { type: "string", required: false, description: "ID do plano" },
+        } },
+      { method: "POST",   path: "/admin/users/{id}/reset-password", summary: "Resetar senha", pathParams: ["id"] },
+      { method: "DELETE", path: "/admin/users/{id}",          summary: "Deletar usuário",    pathParams: ["id"] },
+      { method: "GET",    path: "/admin/plans",              summary: "Listar planos" },
+      { method: "POST",   path: "/admin/plans",              summary: "Criar plano" },
+      { method: "PUT",    path: "/admin/plans/{id}",          summary: "Atualizar plano",    pathParams: ["id"] },
+      { method: "GET",    path: "/admin/stats",              summary: "Estatísticas da plataforma" },
+    ],
+  },
+
+  // ── Recovery ────────────────────────────────────────────────────────────────
+  {
+    id: "recovery",
+    label: "Recovery",
+    icon: <Activity className="w-3.5 h-3.5" />,
+    endpoints: [
+      { method: "GET",    path: "/instances/{id}/recovery",         summary: "Listar snapshots",      pathParams: ["id"] },
+      { method: "POST",   path: "/instances/{id}/recovery/restore", summary: "Restaurar snapshot",   pathParams: ["id"],
+        body: { snapshot_id: { type: "string", required: true, description: "ID do snapshot", example: "uuid" } } },
     ],
   },
 ];
@@ -551,24 +799,24 @@ function EndpointRow({ endpoint, apiKey, instanceId }: {
   const [copied, setCopied] = useState(false);
   const m = METHOD_STYLE[endpoint.method];
 
-  const isV1Route = endpoint.path.startsWith("/instances/:id/messages") ||
-    endpoint.path.startsWith("/instances/:id/otp") ||
-    endpoint.path.startsWith("/instances/:id/groups") ||
-    endpoint.path.startsWith("/instances/:id/chats") ||
-    endpoint.path.startsWith("/instances/:id/contacts") ||
-    endpoint.path.startsWith("/instances/:id/check-number") ||
-    endpoint.path.startsWith("/instances/:id/bulk-check") ||
-    endpoint.path.startsWith("/instances/:id/media") ||
-    endpoint.path.startsWith("/instances/:id/qr") ||
-    endpoint.path.startsWith("/instances/:id/pairing-code") ||
-    endpoint.path.startsWith("/instances/:id/status") ||
-    endpoint.path.startsWith("/instances/:id/profile");
+  const isV1Route = endpoint.path.startsWith("/instances/{id}/messages") ||
+    endpoint.path.startsWith("/instances/{id}/otp") ||
+    endpoint.path.startsWith("/instances/{id}/groups") ||
+    endpoint.path.startsWith("/instances/{id}/chats") ||
+    endpoint.path.startsWith("/instances/{id}/contacts") ||
+    endpoint.path.startsWith("/instances/{id}/check-number") ||
+    endpoint.path.startsWith("/instances/{id}/bulk-check") ||
+    endpoint.path.startsWith("/instances/{id}/media") ||
+    endpoint.path.startsWith("/instances/{id}/qr") ||
+    endpoint.path.startsWith("/instances/{id}/pairing-code") ||
+    endpoint.path.startsWith("/instances/{id}/status") ||
+    endpoint.path.startsWith("/instances/{id}/profile");
 
   const curlExample = () => {
     let path = endpoint.path;
     let authHeader = "X-API-Key: sc_...";
     if (isV1Route) {
-      path = path.replace("/instances/:id", "/v1/{server-slug}/{instance-slug}");
+      path = path.replace("/instances/{id}", "/v1/{server-slug}/{instance-slug}");
       authHeader = "Authorization: Bearer it_...";
       endpoint.pathParams?.forEach((p) => { if (p !== "id") path = path.replace(`:${p}`, `{${p}}`); });
     } else {
@@ -644,7 +892,7 @@ const INSTAGRAM_SECTIONS: Section[] = [
       { method: "POST", path: "/instances",      summary: "Criar instância Instagram",
         body: { name: { type: "string", required: true, description: "Nome da instância", example: "Instagram DMs" },
                 channel: { type: "string", required: true, description: "Canal", example: "instagram" } } },
-      { method: "DELETE", path: "/instances/:id", summary: "Remover instância", pathParams: ["id"] },
+      { method: "DELETE", path: "/instances/{id}", summary: "Remover instância", pathParams: ["id"] },
     ],
   },
   {
@@ -652,14 +900,14 @@ const INSTAGRAM_SECTIONS: Section[] = [
     label: "Conexão",
     icon: <Key className="w-3.5 h-3.5" />,
     endpoints: [
-      { method: "POST", path: "/instagram/instances/:id/connect",    summary: "Conectar conta Instagram", pathParams: ["id"],
+      { method: "POST", path: "/instagram/instances/{id}/connect",    summary: "Conectar conta Instagram", pathParams: ["id"],
         body: {
           username:     { type: "string", required: false, description: "Usuário Instagram (instagram-cli)", example: "minha_conta" },
           password:     { type: "string", required: false, description: "Senha (instagram-cli)", example: "••••••••" },
           access_token: { type: "string", required: false, description: "Token Meta Graph API", example: "EAA..." },
         },
         response: `{ "message": "Instagram connection initiated", "instance_id": "uuid" }` },
-      { method: "POST", path: "/instagram/instances/:id/disconnect", summary: "Desconectar conta", pathParams: ["id"] },
+      { method: "POST", path: "/instagram/instances/{id}/disconnect", summary: "Desconectar conta", pathParams: ["id"] },
     ],
   },
   {
@@ -667,9 +915,9 @@ const INSTAGRAM_SECTIONS: Section[] = [
     label: "Mensagens DM",
     icon: <MessageSquare className="w-3.5 h-3.5" />,
     endpoints: [
-      { method: "GET",  path: "/instagram/instances/:id/messages/dm", summary: "Listar DMs recebidas", pathParams: ["id"],
+      { method: "GET",  path: "/instagram/instances/{id}/messages/dm", summary: "Listar DMs recebidas", pathParams: ["id"],
         response: `{ "dms": [{ "from": "user123", "text": "Olá!", "timestamp": "..." }] }` },
-      { method: "POST", path: "/instagram/instances/:id/messages/dm", summary: "Enviar DM", pathParams: ["id"],
+      { method: "POST", path: "/instagram/instances/{id}/messages/dm", summary: "Enviar DM", pathParams: ["id"],
         body: {
           to:   { type: "string", required: true, description: "Username ou ID do destinatário", example: "user123" },
           text: { type: "string", required: true, description: "Conteúdo da mensagem", example: "Olá! Como posso ajudar?" },
@@ -732,7 +980,7 @@ export default function DocsPage() {
         </div>
         <div>
           <label className="text-[10px] font-semibold uppercase tracking-widest block mb-1.5" style={{ color: "hsl(240 8% 42%)" }}>
-            Instância padrão (para :id)
+            Instância padrão (para {`{id}`})
           </label>
           <select value={selectedInstance} onChange={(e) => setSelectedInstance(e.target.value)} className="input-field w-full text-sm">
             <option value="">— selecione uma instância —</option>
@@ -827,7 +1075,7 @@ export default function DocsPage() {
             <div className="space-y-3 animate-fade-in-up">
               <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 88%)" }}>Eventos de Webhook</h2>
               <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>
-                Configure por instância em <code className="font-mono">POST /instances/:id/webhooks</code>.
+                Configure por instância em <code className="font-mono">POST /instances/<code className="font-mono">{'{' + 'id}'}</code>/webhooks</code>.
                 O payload é enviado via <strong>HTTP POST</strong> para a URL configurada.
               </p>
               <div className="space-y-2">

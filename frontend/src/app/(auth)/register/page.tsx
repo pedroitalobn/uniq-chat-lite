@@ -15,13 +15,14 @@ import api from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
-const PLAN_META: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
-  Free:     { icon: <MessageSquare className="w-3.5 h-3.5" />, color: "#60a5fa", label: "Grátis" },
-  Starter:  { icon: <Flame className="w-3.5 h-3.5" />,         color: "#fb923c", label: "R$49/mês" },
-  Pro:      { icon: <Zap className="w-3.5 h-3.5" />,           color: "#00d46a", label: "R$99/mês" },
-  Business: { icon: <Building2 className="w-3.5 h-3.5" />,     color: "#a78bfa", label: "R$149/mês" },
-  Lifetime: { icon: <Star className="w-3.5 h-3.5" />,          color: "#fbbf24", label: "Vitalício" },
-};
+function getPlanMeta(plan: { name: string; price: number } | null) {
+  if (!plan) return { icon: <MessageSquare className="w-3.5 h-3.5" />, color: "#60a5fa", label: "Grátis" };
+  const price = plan.price;
+  if (price === 0) return { icon: <MessageSquare className="w-3.5 h-3.5" />, color: "#60a5fa", label: "Grátis" };
+  if (price < 50) return { icon: <Flame className="w-3.5 h-3.5" />, color: "#fb923c", label: `R$${price}/mês` };
+  if (price < 120) return { icon: <Zap className="w-3.5 h-3.5" />, color: "#00d46a", label: `R$${price}/mês` };
+  return { icon: <Building2 className="w-3.5 h-3.5" />, color: "#a78bfa", label: `R$${price}/mês` };
+}
 
 function Field({
   label, value, onChange, type = "text", placeholder, icon, error, autoFocus, autoComplete,
@@ -89,7 +90,7 @@ function RegisterForm() {
   const inviteFromUrl = params.get("invite") || "";
   const isPaidPlan = planPrice > 0;
 
-  const meta = PLAN_META[planName] ?? PLAN_META.Free;
+  const meta = getPlanMeta(planPrice > 0 ? { name: planName, price: planPrice } : { name: "Free", price: 0 });
 
   const [name, setName]         = useState("");
   const [email, setEmail]       = useState("");

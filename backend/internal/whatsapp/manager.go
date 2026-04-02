@@ -121,10 +121,12 @@ func (m *Manager) IsRunning(instanceID string) bool {
 }
 
 // SaveMessage saves a message to the database for inbox display.
-func (m *Manager) SaveMessage(instanceID string, toJID string, content string, direction models.MessageDirection, msgType string) error {
+func (m *Manager) SaveMessage(instanceID string, toJID string, content string, direction models.MessageDirection, msgType string, pushName string, isGroup bool) error {
 	if m.db == nil {
 		return nil
 	}
+
+	log.Printf("DEBUG SaveMessage: instanceID=%s, toJID=%s, isGroup=%v", instanceID, toJID, isGroup)
 
 	instUUID, err := uuid.Parse(instanceID)
 	if err != nil {
@@ -133,36 +135,75 @@ func (m *Manager) SaveMessage(instanceID string, toJID string, content string, d
 
 	contentJSON, _ := json.Marshal(content)
 
-	// Extract phone from JID
+	// Extract phone from JID (for non-groups)
 	phone := extractPhoneFromJID(toJID)
 
-	// Try to get contact info from WhatsApp
+	// Try to get contact info
 	var contactName string
 	var contactAvatar string
 
-	client := m.GetInstance(instanceID)
-	if client != nil && client.IsConnected() {
-		// Get avatar from WhatsApp
+	if isGroup {
+		// For groups, get the group name from WhatsApp
+		log.Printf("DEBUG: Processing group message, JID: %s", toJID)
+		if client := m.GetInstance(instanceID); client != nil && client.IsConnected() {
+			log.Printf("DEBUG: Instance connected, fetching group info for: %s", toJID)
+			groupInfo, err := client.GetGroupInfo(toJID)
+			if err == nil {
+				log.Printf("DEBUG: Got group info: %+v", groupInfo)
+				if name, ok := groupInfo["name"].(string); ok && name != "" {
+					contactName = name
+					log.Printf("DEBUG: Set group name to: %s", name)
+				}
+			} else {
+				log.Printf("DEBUG: Error getting group info: %v", err)
+			}
+			// Fallback to group JID if name not found
+			if contactName == "" {
+				contactName = "Grupo " + phone
+			}
+		} else {
+			log.Printf("DEBUG: Instance not connected, using fallback")
+			contactName = "Grupo " + phone
+		}
+	} else {
+		// For individual chats
+		if direction == models.DirectionOut {
+			// For sent messages (direction OUT), get recipient info
+			// First try CRM
+			var contact models.Contact
+			if err := m.db.Where("phone LIKE ?", "%"+phone+"%").First(&contact).Error; err == nil {
+				contactName = contact.Name
+			}
+			// Fallback to phone number
+			if contactName == "" {
+				contactName = phone
+			}
+		} else {
+			// For received messages, use push name from event
+			if pushName != "" {
+				contactName = pushName
+			}
+
+			// If no push name, try CRM
+			if contactName == "" {
+				var contact models.Contact
+				if err := m.db.Where("phone LIKE ?", "%"+phone+"%").First(&contact).Error; err == nil {
+					contactName = contact.Name
+				}
+			}
+
+			// Fallback to phone number
+			if contactName == "" {
+				contactName = phone
+			}
+		}
+	}
+
+	// Try to get avatar from WhatsApp (async, non-blocking for speed)
+	if client := m.GetInstance(instanceID); client != nil && client.IsConnected() {
 		if picURL := client.GetContactProfilePicture(toJID); picURL != "" {
 			contactAvatar = picURL
 		}
-		// Get contact name from WhatsApp
-		if _, pushName := client.GetContactInfo(toJID); pushName != "" {
-			contactName = pushName
-		}
-	}
-
-	// If no name from WhatsApp, try CRM
-	if contactName == "" {
-		var contact models.Contact
-		if err := m.db.Where("phone LIKE ?", "%"+phone+"%").First(&contact).Error; err == nil {
-			contactName = contact.Name
-		}
-	}
-
-	// Fallback to phone number
-	if contactName == "" {
-		contactName = phone
 	}
 
 	logEntry := models.MessageLog{
@@ -175,6 +216,18 @@ func (m *Manager) SaveMessage(instanceID string, toJID string, content string, d
 		ContactAvatar: contactAvatar,
 		Content:       string(contentJSON),
 		Status:        models.MessageStatusSent,
+	}
+
+	// Check for duplicate - don't save if same message was saved in last 2 seconds
+	var count int64
+	m.db.Model(&models.MessageLog{}).Where(
+		"instance_id = ? AND to_j_id = ? AND content = ? AND direction = ? AND created_at > datetime('now', '-2 seconds')",
+		instUUID, toJID, string(contentJSON), direction,
+	).Count(&count)
+
+	if count > 0 {
+		log.Printf("DEBUG: Skipping duplicate message for %s", toJID)
+		return nil
 	}
 
 	return m.db.Create(&logEntry).Error
@@ -234,20 +287,51 @@ func (m *Manager) StartInstanceForPairing(instance *models.Instance) error {
 // LoadAll loads and starts all connected instances from the database.
 func (m *Manager) LoadAll() {
 	var instances []models.Instance
-	if err := m.db.Find(&instances, "status = ?", models.StatusConnected).Error; err != nil {
-		log.Error().Err(err).Msg("failed to load instances")
+
+	// Use raw SQL for SQLite compatibility
+	if err := m.db.Raw("SELECT * FROM instances WHERE status = 'connected'").Scan(&instances).Error; err != nil {
+		log.Error().Err(err).Msg("failed to load connected instances")
 		return
 	}
 
 	for i := range instances {
-		// Mark as connecting while we attempt to restore the session
 		m.db.Model(&instances[i]).Update("status", models.StatusConnecting)
 		if err := m.StartInstance(&instances[i]); err != nil {
 			log.Error().Err(err).Str("instance", instances[i].ID.String()).Msg("failed to start instance on boot")
 			m.db.Model(&instances[i]).Update("status", models.StatusDisconnected)
 		}
 	}
+
+	// Start background reconnection checker
+	go m.startReconnectionChecker()
+
 	log.Info().Int("count", len(instances)).Msg("loaded WhatsApp instances")
+}
+
+// startReconnectionChecker periodically checks disconnected instances and tries to reconnect them
+func (m *Manager) startReconnectionChecker() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		// Check all instances that should be connected
+		var instances []models.Instance
+		m.db.Find(&instances, "status = ?", models.StatusConnected)
+
+		for _, inst := range instances {
+			m.mu.RLock()
+			client, exists := m.clients[inst.ID.String()]
+			m.mu.RUnlock()
+
+			// If not in clients map or not connected, try to start
+			if !exists || (client != nil && !client.IsConnected()) {
+				log.Info().Str("instance", inst.ID.String()).Msg("attempting auto-reconnect")
+				if err := m.StartInstance(&inst); err != nil {
+					log.Error().Err(err).Str("instance", inst.ID.String()).Msg("auto-reconnect failed")
+				}
+			}
+		}
+	}
 }
 
 // ResetSession clears the WhatsApp session for an instance (logout + delete device store)
@@ -279,6 +363,20 @@ func (m *Manager) RefreshSettings(instanceID string, instance *models.Instance) 
 		return
 	}
 	client.UpdateSettings(instanceSettings(instance))
+}
+
+// ReconnectAll triggers reconnection for all instances belonging to a specific user
+func (m *Manager) ReconnectAll(userID string) {
+	var instances []models.Instance
+	m.db.Find(&instances, "user_id = ? AND status = ?", userID, models.StatusConnected)
+
+	for _, inst := range instances {
+		m.db.Model(&inst).Update("status", models.StatusConnecting)
+		if err := m.StartInstance(&inst); err != nil {
+			log.Error().Err(err).Str("instance", inst.ID.String()).Msg("failed to reconnect on login")
+			m.db.Model(&inst).Update("status", models.StatusDisconnected)
+		}
+	}
 }
 
 // RefreshWebhooks updates the webhooks for a running instance without reconnecting.
@@ -367,14 +465,32 @@ func (m *Manager) watchStatus(instanceID string, client *InstanceClient) {
 
 	for status := range client.GetStatusChan() {
 		connectTimer.Stop()
+
+		// Get phone number for the event
+		var inst models.Instance
+		var phone string
+		if err := m.db.First(&inst, "id = ?", instanceID).Error; err == nil {
+			phone = inst.PhoneNumber
+		}
+
 		if status == "connected" {
 			now := time.Now()
 			m.db.Model(&models.Instance{}).Where("id = ?", instanceID).Updates(map[string]interface{}{
 				"status":       models.StatusConnected,
 				"connected_at": now,
 			})
+
+			// Broadcast connection event
+			if hub := GetHub(); hub != nil {
+				hub.BroadcastInstanceStatus(instanceID, "connected", phone)
+			}
 		} else {
 			m.db.Model(&models.Instance{}).Where("id = ?", instanceID).Update("status", models.StatusDisconnected)
+
+			// Broadcast disconnection event
+			if hub := GetHub(); hub != nil {
+				hub.BroadcastInstanceStatus(instanceID, "disconnected", phone)
+			}
 		}
 	}
 }

@@ -80,7 +80,7 @@ func (h *OTPHandler) Send(c *fiber.Ctx) error {
 	userID, _ := c.Locals("user_id").(uuid.UUID)
 
 	var req struct {
-		Phone          string `json:"phone"`
+		Phone          any    `json:"phone"` // Accept both string and number
 		Template       string `json:"template"`
 		CodeLength     int    `json:"code_length"`
 		ExpiresMinutes int    `json:"expires_minutes"`
@@ -88,7 +88,19 @@ func (h *OTPHandler) Send(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
 	}
-	if strings.TrimSpace(req.Phone) == "" {
+
+	// Normalize phone to string
+	var phone string
+	switch v := req.Phone.(type) {
+	case string:
+		phone = strings.TrimSpace(v)
+	case float64:
+		phone = fmt.Sprintf("%.0f", v)
+	case nil:
+		phone = ""
+	}
+
+	if phone == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'phone' é obrigatório"})
 	}
 	if req.CodeLength <= 0 {
@@ -100,9 +112,6 @@ func (h *OTPHandler) Send(c *fiber.Ctx) error {
 	if strings.TrimSpace(req.Template) == "" {
 		req.Template = otpDefaultTemplate
 	}
-
-	// Normalize phone
-	phone := strings.TrimSpace(req.Phone)
 
 	// Generate code
 	code, err := generateCode(req.CodeLength)
@@ -151,10 +160,10 @@ func (h *OTPHandler) Send(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"session_id":  session.ID,
-		"phone":       phone,
-		"expires_at":  expiresAt,
-		"status":      status,
+		"session_id": session.ID,
+		"phone":      phone,
+		"expires_at": expiresAt,
+		"status":     status,
 	})
 }
 
@@ -213,10 +222,10 @@ func (h *OTPHandler) Verify(c *fiber.Ctx) error {
 		h.db.Model(&session).Update("attempts", session.Attempts)
 		remaining := otpDefaultMaxAttempts - session.Attempts
 		return c.JSON(fiber.Map{
-			"valid":      false,
-			"reason":     "código incorreto",
-			"attempts":   session.Attempts,
-			"remaining":  remaining,
+			"valid":     false,
+			"reason":    "código incorreto",
+			"attempts":  session.Attempts,
+			"remaining": remaining,
 		})
 	}
 

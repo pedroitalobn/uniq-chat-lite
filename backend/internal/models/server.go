@@ -21,6 +21,9 @@ type Server struct {
 	Slug        string     `gorm:"uniqueIndex;not null" json:"slug"` // subdomain-safe, e.g. "acme-corp"
 	Description string     `gorm:"type:text" json:"description,omitempty"`
 	IsActive    bool       `gorm:"default:true" json:"is_active"`
+	ProxyPoolID *uuid.UUID `gorm:"type:uuid" json:"proxy_pool_id,omitempty"`
+	ProxyPool   *ProxyPool `gorm:"foreignKey:ProxyPoolID" json:"proxy_pool,omitempty"`
+	WebhookURL  string     `gorm:"type:varchar(500)" json:"webhook_url,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 }

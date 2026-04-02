@@ -2,16 +2,101 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { serversApi } from "@/lib/api";
-import type { Server } from "@/types";
+import { serversApi, proxyPoolsApi } from "@/lib/api";
+import type { Server, ServerStats, ProxyPool } from "@/types";
 import {
   Server as ServerIcon, Plus, X, Trash2, Pencil, Globe,
   Smartphone, Loader2, Copy, Check, ExternalLink,
+  Play, Pause, RefreshCw, LogOut, Trash, Link2, RotateCw,
+  Activity, Wifi, WifiOff, AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { showConfirm } from "@/lib/confirm";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+
+// ─── Actions Dropdown ──────────────────────────────────────────────────────
+function ActionsMenu({ serverId, onAction }: { serverId: string; onAction: () => void }) {
+  const [open, setOpen] = useState(false);
+  
+  const handleAction = async (action: string) => {
+    setOpen(false);
+    try {
+      const res = await serversApi.action(serverId, action);
+      toast.success(res.data.message || "Ação executada");
+      onAction();
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao executar ação");
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(!open)} className="p-1.5 rounded-lg transition-colors"
+        style={{ color: "hsl(240 8% 38%)" }}
+        onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 15% 75%)")}
+        onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}>
+        <Activity className="w-3.5 h-3.5" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-xl py-1 animate-fade-in-up"
+            style={{ background: "hsl(240 18% 8%)", border: "1px solid hsl(240 12% 14%)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
+            <button onClick={() => handleAction("pause")} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
+              style={{ color: "hsl(240 8% 65%)" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "hsl(240 12% 12%)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+              <Pause className="w-3.5 h-3.5" /> Pausar todas
+            </button>
+            <button onClick={() => handleAction("resume")} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
+              style={{ color: "hsl(240 8% 65%)" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "hsl(240 12% 12%)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+              <Play className="w-3.5 h-3.5" /> Retomar todas
+            </button>
+            <button onClick={() => handleAction("reconnect")} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
+              style={{ color: "hsl(240 8% 65%)" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "hsl(240 12% 12%)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+              <RefreshCw className="w-3.5 h-3.5" /> Reconectar todas
+            </button>
+            <button onClick={() => handleAction("disconnect")} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
+              style={{ color: "hsl(240 8% 65%)" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "hsl(240 12% 12%)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+              <LogOut className="w-3.5 h-3.5" /> Desconectar todas
+            </button>
+            <div className="my-1" style={{ borderTop: "1px solid hsl(240 12% 12%)" }} />
+            <button onClick={() => handleAction("apply_proxy")} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
+              style={{ color: "hsl(240 8% 65%)" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "hsl(240 12% 12%)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+              <Link2 className="w-3.5 h-3.5" /> Aplicar proxy
+            </button>
+            <button onClick={() => handleAction("rotate_proxy")} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
+              style={{ color: "hsl(240 8% 65%)" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "hsl(240 12% 12%)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+              <RotateCw className="w-3.5 h-3.5" /> Rotacionar proxy
+            </button>
+            <div className="my-1" style={{ borderTop: "1px solid hsl(240 12% 12%)" }} />
+            <button onClick={async () => {
+              if (await showConfirm("Todas as instâncias deste server serão excluídas permanentemente.", { title: "Confirmar exclusão", confirmLabel: "Excluir", danger: true })) {
+                handleAction("delete");
+              }
+            }} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
+              style={{ color: "#f87171" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "rgba(239,68,68,0.1)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+              <Trash className="w-3.5 h-3.5" /> Excluir todas instâncias
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 // ─── Create / Edit Modal ──────────────────────────────────────────────────────
 function ServerModal({
@@ -23,9 +108,18 @@ function ServerModal({
   const [name, setName]         = useState(server?.name || "");
   const [slug, setSlug]         = useState(server?.slug || "");
   const [description, setDesc]  = useState(server?.description || "");
+  const [proxyPoolId, setProxyPoolId] = useState(server?.proxy_pool_id || "");
+  const [webhookUrl, setWebhookUrl] = useState(server?.webhook_url || "");
+  const [applyWebhook, setApplyWebhook] = useState(false);
   const [slugTouched, setSlugTouched] = useState(isEdit);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
+
+  const { data: proxyPools = [] } = useQuery<ProxyPool[]>({
+    queryKey: ["proxy-pools"],
+    queryFn: () => proxyPoolsApi.list().then(r => r.data),
+    enabled: isEdit,
+  });
 
   const autoSlug = (v: string) =>
     v.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/--+/g, "-").replace(/^-|-$/g, "");
@@ -42,7 +136,13 @@ function ServerModal({
     setError("");
     try {
       if (isEdit) {
-        await serversApi.update(server.id, { name: name.trim(), description });
+        await serversApi.update(server.id, { 
+          name: name.trim(), 
+          description,
+          proxy_pool_id: proxyPoolId || undefined,
+          webhook_url: webhookUrl || undefined,
+          apply_webhook: applyWebhook,
+        });
       } else {
         await serversApi.create({ name: name.trim(), slug: slug || undefined, description, workspace_id: workspaceId });
       }
@@ -57,7 +157,7 @@ function ServerModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-2xl p-6 animate-fade-in-up"
+      <div className="relative w-full max-w-md rounded-2xl p-6 animate-fade-in-up max-h-[90vh] overflow-y-auto"
         style={{ background: "hsl(240 18% 6%)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 32px 80px rgba(0,0,0,0.6)" }}>
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
@@ -123,6 +223,37 @@ function ServerModal({
               rows={2} className="input-field w-full resize-none" />
           </div>
 
+          {isEdit && (
+            <>
+              <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+                  Proxy Pool
+                </label>
+                <select value={proxyPoolId} onChange={e => setProxyPoolId(e.target.value)}
+                  className="input-field w-full">
+                  <option value="">Nenhum</option>
+                  {proxyPools.map(pool => (
+                    <option key={pool.id} value={pool.id}>{pool.name} ({pool.provider})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+                  Webhook Padrão
+                </label>
+                <input value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)}
+                  placeholder="https://seu-webhook.com.br/webhook" className="input-field w-full" />
+              </div>
+
+              <label className="flex items-center gap-2 text-xs" style={{ color: "hsl(240 8% 55%)" }}>
+                <input type="checkbox" checked={applyWebhook} onChange={e => setApplyWebhook(e.target.checked)}
+                  className="rounded" />
+                Aplicar webhook a todas as instâncias
+              </label>
+            </>
+          )}
+
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} className="btn-ghost flex-1 py-2.5 text-sm">Cancelar</button>
             <button type="submit" disabled={loading || !name.trim()}
@@ -137,8 +268,8 @@ function ServerModal({
 }
 
 // ─── Server Card ──────────────────────────────────────────────────────────────
-function ServerCard({ server, onEdit, onDelete }: {
-  server: Server; onEdit: () => void; onDelete: () => void;
+function ServerCard({ server, onEdit, onDelete, onAction }: {
+  server: Server; onEdit: () => void; onDelete: () => void; onAction: () => void;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -151,7 +282,18 @@ function ServerCard({ server, onEdit, onDelete }: {
   const { data: instances = [] } = useQuery({
     queryKey: ["server-instances", server.id],
     queryFn: () => serversApi.instances(server.id).then(r => r.data),
+    refetchInterval: 10000,
+    staleTime: 5000,
   });
+
+  const { data: stats } = useQuery<ServerStats>({
+    queryKey: ["server-stats", server.id],
+    queryFn: () => serversApi.stats(server.id).then(r => r.data),
+    refetchInterval: 30000,
+  });
+
+  const connectedCount = stats?.connected || 0;
+  const totalCount = stats?.total_instances || instances.length;
 
   return (
     <div className="rounded-2xl p-5 flex flex-col gap-4 transition-all group"
@@ -174,6 +316,7 @@ function ServerCard({ server, onEdit, onDelete }: {
           </div>
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+          <ActionsMenu serverId={server.id} onAction={onAction} />
           <button onClick={onEdit}
             className="p-1.5 rounded-lg transition-colors"
             style={{ color: "hsl(240 8% 38%)" }}
@@ -206,10 +349,30 @@ function ServerCard({ server, onEdit, onDelete }: {
         </button>
       </div>
 
+      {/* Status badges */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs" style={{ background: "hsl(240 12% 8%)" }}>
+          <Smartphone className="w-3 h-3" style={{ color: "hsl(240 8% 46%)" }} />
+          <span style={{ color: "hsl(240 8% 65%)" }}>{totalCount}</span>
+        </div>
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs" style={{ background: "hsl(240 12% 8%)" }}>
+          {connectedCount > 0 ? (
+            <><Wifi className="w-3 h-3" style={{ color: "var(--green)" }} /><span style={{ color: "var(--green)" }}>{connectedCount}</span></>
+          ) : (
+            <><WifiOff className="w-3 h-3" style={{ color: "hsl(240 8% 36%)" }} /><span style={{ color: "hsl(240 8% 36%)" }}>0</span></>
+          )}
+        </div>
+        {server.proxy_pool_id && (
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs" style={{ background: "rgba(167,139,250,0.08)" }}>
+            <Link2 className="w-3 h-3" style={{ color: "#a78bfa" }} />
+            <span style={{ color: "#a78bfa" }}>Proxy</span>
+          </div>
+        )}
+      </div>
+
       {/* Stats */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs" style={{ color: "hsl(240 8% 46%)" }}>
-          <Smartphone className="w-3.5 h-3.5" />
           <span>{instances.length} instância{instances.length !== 1 ? "s" : ""}</span>
         </div>
         <a href={`/instances?server=${server.id}`}
@@ -317,6 +480,10 @@ export default function ServersPage() {
               server={server}
               onEdit={() => setEditServer(server)}
               onDelete={() => handleDelete(server)}
+              onAction={() => {
+                queryClient.invalidateQueries({ queryKey: ["server-instances", server.id] });
+                queryClient.invalidateQueries({ queryKey: ["server-stats", server.id] });
+              }}
             />
           ))}
           {/* Add new card */}

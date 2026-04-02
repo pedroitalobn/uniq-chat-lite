@@ -81,9 +81,17 @@ func main() {
 		log.Warn().Msg("MINIO_ENDPOINT not set — media storage disabled")
 	}
 
+	// Start real-time event hub
+	whatsapp.StartHub()
+
 	// WhatsApp Manager
 	manager := whatsapp.NewManager(cfg.SessionDir, db)
 	manager.LoadAll()
+
+	// Connect hub to manager for bulk actions
+	if hub := whatsapp.GetHub(); hub != nil {
+		hub.SetManager(manager)
+	}
 
 	// Scheduled recovery snapshots (check every hour)
 	recoveryH := handlers.NewRecoveryHandler(db, manager)
@@ -139,6 +147,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.InstanceAgent{},
 		&models.PasswordResetToken{},
 		&models.ProxyPool{},
+		&models.ProxyProviderConfig{},
 		&models.InstanceProxyAssignment{},
 		&models.InstagramAccount{},
 		&models.TikTokAccount{},

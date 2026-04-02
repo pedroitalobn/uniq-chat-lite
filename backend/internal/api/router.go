@@ -49,6 +49,17 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 		AllowMethods:     "GET, POST, PUT, DELETE, PATCH, OPTIONS",
 	}))
 
+	// Force HTTPS in production
+	if config.AppConfig.AppURL != "" && strings.HasPrefix(config.AppConfig.AppURL, "https") {
+		app.Use(func(c *fiber.Ctx) error {
+			if c.Protocol() != "https" {
+				httpsURL := "https://" + c.Hostname() + c.OriginalURL()
+				return c.Redirect(httpsURL, fiber.StatusMovedPermanently)
+			}
+			return c.Next()
+		})
+	}
+
 	// Health check
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok", "service": "uniq-chat"})
@@ -85,21 +96,22 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	handlers.SetAuthHandlerAppURL(config.AppConfig.AppURL)
 
 	// Handlers
-	authH := handlers.NewAuthHandler(db, emailSvc)
+	authH := handlers.NewAuthHandler(db, emailSvc, manager)
 	stripeH := handlers.NewStripeHandler(db, emailSvc)
 	instanceH := handlers.NewInstanceHandler(db, manager)
 	proxyH := handlers.NewProxyHandler(db, manager)
 	msgH := handlers.NewMessageHandler(db, manager)
 	webhookH := handlers.NewWebhookHandler(db, manager)
+	globalWebhookH := handlers.NewGlobalWebhookHandler(db)
 	apiKeyH := handlers.NewAPIKeyHandler(db)
 	adminH := handlers.NewAdminHandler(db, emailSvc)
 	wsH := handlers.NewWSHandler(db, manager)
 	mcpH := handlers.NewMCPHandler(db, manager)
-	groupH := handlers.NewGroupHandler(db, manager)
 	contactH := handlers.NewContactHandler(db)
+	groupH := handlers.NewGroupHandler(db, manager)
 	campaignH := handlers.NewCampaignHandler(db, manager)
 	otpH := handlers.NewOTPHandler(db, manager)
-	serverH := handlers.NewServerHandler(db)
+	serverH := handlers.NewServerHandler(db, whatsapp.GetHub())
 	integrationH := handlers.NewIntegrationHandler(db)
 	recoveryH := handlers.NewRecoveryHandler(db, manager)
 
@@ -175,6 +187,14 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	roles.Put("/:role_id", roleH.Update)
 	roles.Delete("/:role_id", roleH.Delete)
 
+	// Global System Webhooks
+	systemWebhooks := api.Group("/webhooks/system")
+	systemWebhooks.Get("/events", globalWebhookH.ListEvents)
+	systemWebhooks.Get("/", globalWebhookH.List)
+	systemWebhooks.Post("/", globalWebhookH.Create)
+	systemWebhooks.Delete("/:id", globalWebhookH.Delete)
+	systemWebhooks.Post("/:id/test", globalWebhookH.Test)
+
 	// Permissions (global)
 	api.Get("/permissions", roleH.ListPermissions)
 	api.Post("/permissions/seed", middleware.RequireAdmin(), roleH.SeedPermissions)
@@ -202,7 +222,10 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	instance.Put("/settings", instanceH.UpdateSettings)
 	instance.Post("/regenerate-token", instanceH.RegenerateToken)
 
-	// WebSocket
+	// Global WebSocket for real-time events
+	app.Get("/ws/events", wsH.EventsWS)
+
+	// WebSocket per instance (legacy, for specific instance events)
 	instance.Get("/ws", wsH.InstanceWS)
 
 	// MCP (Model Context Protocol)
@@ -399,6 +422,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	inbox.Post("/chats/:jid/messages/media", inboxH.SendMedia)
 	inbox.Post("/chats/:jid/read", inboxH.MarkRead)
 	inbox.Post("/chats/:jid/typing", inboxH.Typing)
+	inbox.Put("/contacts/:id", inboxH.UpdateContact)
+	inbox.Patch("/messages/:id", inboxH.UpdateMessage)
 
 	// Legacy chats endpoint
 	instance.Get("/chats", msgH.GetChats)
@@ -413,6 +438,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	proxyPool := api.Group("/proxy")
 	proxyPool.Get("/pool", resProxyH.ListPool)
 	proxyPool.Get("/stats", resProxyH.GetPoolStats)
+	// Proxy provider configs (user-specific)
+	proxyPool.Get("/providers", resProxyH.ListProviderConfigs)
+	proxyPool.Post("/providers", resProxyH.CreateProviderConfig)
+	proxyPool.Put("/providers/:id", resProxyH.UpdateProviderConfig)
+	proxyPool.Delete("/providers/:id", resProxyH.DeleteProviderConfig)
 
 	// ─── Servers ──────────────────────────────────────────────────────────────
 	servers := api.Group("/servers")
@@ -422,6 +452,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	servers.Put("/:id", serverH.Update)
 	servers.Delete("/:id", serverH.Delete)
 	servers.Get("/:id/instances", serverH.Instances)
+	servers.Post("/:id/actions", serverH.BulkAction)
+	servers.Get("/:id/stats", serverH.Stats)
 
 	// ─── Public v1 API: /v1/:server_slug/:instance_slug/* ─────────────────────
 	// Auth: Authorization: Bearer <instance_token>  OR  X-Instance-Token: <token>

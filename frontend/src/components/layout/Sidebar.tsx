@@ -5,9 +5,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
-  LayoutDashboard, Smartphone, Key, LogOut,
-  Users, CreditCard, Shield, BookOpen, Contact, Megaphone, Server, Settings, Plug, Zap, Menu, X,
-  MessageSquare, Building2
+  LayoutDashboard, Smartphone, LogOut,
+  Users, CreditCard, Shield, Contact, Megaphone, Server, Settings, Plug, Zap, Menu, X,
+  MessageSquare, Building2, ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePreferences } from "@/lib/preferences";
@@ -20,7 +20,7 @@ export function Sidebar() {
   const { data: session } = useSession();
   const { t } = usePreferences();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { currentWorkspace } = useWorkspace();
+  const { currentWorkspace, setCurrentWorkspace, workspaces } = useWorkspace();
   const isAdmin = session?.user?.role === "super_admin";
   const planName = (session?.user?.plan as { name?: string } | undefined)?.name ?? session?.user?.role;
   const initials = session?.user?.name?.[0]?.toUpperCase() || "U";
@@ -34,8 +34,6 @@ export function Sidebar() {
     { href: "/crm",         label: t("nav_crm"),          icon: Contact,         exact: false },
     { href: "/campaigns",   label: t("nav_campaigns"),    icon: Megaphone,       exact: false },
     { href: "/integrations", label: t("nav_integrations"), icon: Plug,            exact: false },
-    { href: "/api-keys",     label: t("nav_api_keys"),     icon: Key,             exact: false },
-    { href: "/docs",         label: t("nav_api_docs"),     icon: BookOpen,        exact: false },
     { href: "/settings",     label: "Conta",               icon: Settings,        exact: false },
   ];
 
@@ -65,29 +63,53 @@ export function Sidebar() {
 
       {/* Workspace info */}
       <div className="px-3 py-3 border-b" style={{ borderColor: "var(--sidebar-border)" }}>
-        <button
-          onClick={() => router.push("/workspace")}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all"
-          style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.15)" }}
-          onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = "rgba(124,58,237,0.12)")}
-          onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = "rgba(124,58,237,0.08)")}
-        >
+        <div className="flex items-center gap-2 mb-2">
           <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(124,58,237,0.15)" }}>
             <Building2 className="w-4 h-4" style={{ color: "#a78bfa" }} />
           </div>
-          <div className="flex-1 min-w-0 text-left">
-            <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>
-              {currentWorkspace?.name || "Selecione workspace"}
-            </p>
+          <div className="flex-1 min-w-0">
+            {workspaces.length > 1 ? (
+              <div className="relative">
+                <select
+                  value={currentWorkspace?.id || ""}
+                  onChange={(e) => {
+                    const ws = workspaces.find(w => w.id === e.target.value);
+                    if (ws) setCurrentWorkspace(ws);
+                  }}
+                  className="w-full appearance-none bg-transparent text-xs font-medium truncate pr-5 cursor-pointer"
+                  style={{ color: "var(--text-1)" }}
+                >
+                  {workspaces.map(ws => (
+                    <option key={ws.id} value={ws.id} style={{ background: "var(--surface-2)", color: "var(--text-1)" }}>{ws.name}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: "var(--text-3)" }} />
+              </div>
+            ) : (
+              <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>
+                {currentWorkspace?.name || "Selecione workspace"}
+              </p>
+            )}
             {currentWorkspace?.is_owner ? (
               <p className="text-[10px]" style={{ color: "#fbbf24" }}>Proprietário</p>
             ) : currentWorkspace ? (
               <p className="text-[10px]" style={{ color: "hsl(240 8% 45%)" }}>Membro</p>
             ) : null}
           </div>
-          <span className="text-[10px] px-2 py-1 rounded-lg" style={{ background: "rgba(124,58,237,0.1)", color: "#a78bfa" }}>
-            Trocar
-          </span>
+        </div>
+        <button
+          onClick={() => {
+            if (workspaces.length <= 1) {
+              router.push("/workspace/new");
+            } else {
+              router.push("/workspace");
+            }
+          }}
+          className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-all"
+          style={{ background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.15)", color: "#a78bfa" }}
+        >
+          <Settings className="w-3 h-3" />
+          Gerenciar workspaces
         </button>
       </div>
 

@@ -31,6 +31,10 @@ type MessageLog struct {
 	ContactAvatar string           `gorm:"type:text" json:"contact_avatar,omitempty"`
 	Content       string           `gorm:"type:text" json:"content"` // JSON
 	Status        MessageStatus    `gorm:"type:varchar(20);default:'pending'" json:"status"`
+	IsPinned      bool             `gorm:"default:false" json:"is_pinned"`
+	IsFavorite    bool             `gorm:"default:false" json:"is_favorite"`
+	IsArchived    bool             `gorm:"default:false" json:"is_archived"`
+	IsDeleted     bool             `gorm:"default:false" json:"is_deleted"`
 	CreatedAt     time.Time        `json:"created_at"`
 }
 

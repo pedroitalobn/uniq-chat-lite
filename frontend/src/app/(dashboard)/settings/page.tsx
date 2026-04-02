@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { authApi, stripeApi } from "@/lib/api";
@@ -109,6 +109,7 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
   const { data: plans = [], isLoading: plansLoading } = useQuery<Plan[]>({
     queryKey: ["stripe-plans"],
     queryFn: () => stripeApi.plans().then((r) => r.data),
+    refetchInterval: 30000,
   });
 
   const { data: subscription } = useQuery<{ status?: string; cancel_at_period_end?: boolean }>({
@@ -505,7 +506,7 @@ function InviteSection() {
     }
   };
 
-  useState(() => { loadCodes(); });
+  useEffect(() => { loadCodes(); }, []);
 
   const generate = async () => {
     setGenerating(true);

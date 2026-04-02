@@ -65,22 +65,38 @@ func (j *Journey) ShouldTrigger(messageText, groupJID, messageType string, isGro
 	// Handle media type triggers
 	switch TriggerType(j.TriggerType) {
 	case TriggerContactVideo:
-		return messageType == "video"
+		if messageType != "video" {
+			return false
+		}
 	case TriggerContactAudio:
-		return messageType == "audio"
+		if messageType != "audio" {
+			return false
+		}
 	case TriggerContactDocument:
-		return messageType == "document"
+		if messageType != "document" {
+			return false
+		}
 	case TriggerContactImage:
-		return messageType == "image"
+		if messageType != "image" {
+			return false
+		}
 	case TriggerContactCall:
-		return messageType == "call"
+		if messageType != "call" {
+			return false
+		}
 	case TriggerGroupJoin:
-		return messageType == "group_join"
+		if messageType != "group_join" {
+			return false
+		}
 	case TriggerGroupLeave:
-		return messageType == "group_leave"
+		if messageType != "group_leave" {
+			return false
+		}
+	default:
+		// For other triggers, continue checking
 	}
 
-	// For message triggers, check keywords
+	// For message triggers, check keywords (including media triggers)
 	if j.Keywords == "" || j.Keywords == "[]" {
 		return true
 	}

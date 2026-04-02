@@ -431,6 +431,7 @@ export default function CRMPage() {
   const [filterOpen, setFilterOpen]       = useState(false);
   const [viewMode, setViewMode]           = useState<"list" | "kanban">("list");
   const [kanbanGroup, setKanbanGroup]     = useState<"stage" | "journey" | "funnel">("stage");
+  const [columnOrder, setColumnOrder]    = useState<string[]>([]);
 
   const updateContactMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Partial<Contact> }) => crmApi.updateContact(id, payload),
@@ -735,18 +736,50 @@ export default function CRMPage() {
           <div className="flex gap-4 overflow-x-auto pb-4 snap-x">
             {(() => {
               const columnsInfo = Array.from(new Set(contacts.map(c => c[kanbanGroup] || "Sem categoria"))).sort();
-              // Ensure 'Sem categoria' goes last
-              const sortedCols = columnsInfo.filter(c => c !== "Sem categoria").concat(columnsInfo.includes("Sem categoria") ? ["Sem categoria"] : []);
+              // Use saved order or default (Sem categoria last)
+              let sortedCols: string[];
+              if (columnOrder.length > 0) {
+                sortedCols = columnOrder.filter(c => columnsInfo.includes(c)).concat(columnsInfo.filter(c => !columnOrder.includes(c)));
+              } else {
+                sortedCols = columnsInfo.filter(c => c !== "Sem categoria").concat(columnsInfo.includes("Sem categoria") ? ["Sem categoria"] : []);
+              }
               
               return sortedCols.map((colName) => {
                 const colContacts = contacts.filter(c => (c[kanbanGroup] || "Sem categoria") === colName);
+                const colIdx = sortedCols.indexOf(colName);
                 return (
-                  <div key={colName} className="flex-shrink-0 w-80 flex flex-col snap-start rounded-2xl"
-                    style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                    <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
-                      <h3 className="text-sm font-semibold truncate" style={{ color: "hsl(240 15% 90%)" }}>
-                        {colName}
-                      </h3>
+                  <div 
+                    key={colName} 
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("colIdx", String(colIdx));
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      const fromIdx = parseInt(e.dataTransfer.getData("colIdx"));
+                      const toIdx = colIdx;
+                      if (fromIdx !== toIdx) {
+                        const newOrder = [...sortedCols];
+                        const [moved] = newOrder.splice(fromIdx, 1);
+                        newOrder.splice(toIdx, 0, moved);
+                        setColumnOrder(newOrder);
+                      }
+                    }}
+                    className="flex-shrink-0 w-80 flex flex-col snap-start rounded-2xl transition-opacity"
+                    style={{ 
+                      background: "rgba(255,255,255,0.02)", 
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      cursor: "grab"
+                    }}
+                  >
+                    <div className="px-4 py-3 border-b flex items-center justify-between select-none" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                      <div className="flex items-center gap-2">
+                        <GripVertical className="w-4 h-4 opacity-40" style={{ color: "hsl(240 8% 38%)" }} />
+                        <h3 className="text-sm font-semibold truncate" style={{ color: "hsl(240 15% 90%)" }}>
+                          {colName}
+                        </h3>
+                      </div>
                       <span className="text-xs font-medium px-2 py-0.5 rounded-full" 
                         style={{ background: "rgba(255,255,255,0.08)", color: "hsl(240 8% 62%)" }}>
                         {colContacts.length}
