@@ -243,12 +243,43 @@ function APIKeysSection() {
 }
 
 // ─── Webhooks Section ───────────────────────────────────────────────────────
+const WEBHOOK_EVENTS = [
+  { id: "message.received", name: "Mensagem Recebida", category: "Mensagem" },
+  { id: "message.sent", name: "Mensagem Enviada", category: "Mensagem" },
+  { id: "instance.created", name: "Instância Criada", category: "Instância" },
+  { id: "instance.connected", name: "Instância Conectada", category: "Instância" },
+  { id: "instance.disconnected", name: "Instância Desconectada", category: "Instância" },
+  { id: "crm.contact.created", name: "Contato Criado", category: "CRM" },
+  { id: "crm.contact.updated", name: "Contato Atualizado", category: "CRM" },
+  { id: "crm.tag.assigned", name: "Tag Atribuída", category: "CRM" },
+  { id: "crm.stage.assigned", name: "Stage Atribuído", category: "CRM" },
+  { id: "crm.funnel.assigned", name: "Funil Atribuído", category: "CRM" },
+  { id: "campaign.created", name: "Campanha Criada", category: "Campanha" },
+  { id: "campaign.started", name: "Campanha Iniciada", category: "Campanha" },
+  { id: "campaign.paused", name: "Campanha Pausada", category: "Campanha" },
+  { id: "campaign.completed", name: "Campanha Finalizada", category: "Campanha" },
+  { id: "user.registered", name: "Usuário Registrado", category: "Usuário" },
+  { id: "workspace.created", name: "Workspace Criado", category: "Workspace" },
+  { id: "workspace.member_added", name: "Membro Adicionado", category: "Workspace" },
+  { id: "payment.success", name: "Pagamento Succedido", category: "Pagamento" },
+  { id: "payment.failed", name: "Pagamento Falhou", category: "Pagamento" },
+];
+
 function WebhooksSection() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["global-webhooks"], queryFn: () => globalWebhooksApi.list().then(r => r.data) });
-  const create = useMutation({ mutationFn: (url: string) => globalWebhooksApi.create({ name: "Webhook", url, events: [] }), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["global-webhooks"] }); toast.success("Webhook criado"); } });
+  const create = useMutation({ mutationFn: (data: { name: string; url: string; events: string[] }) => globalWebhooksApi.create(data), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["global-webhooks"] }); toast.success("Webhook criado"); }, onError: (e: any) => toast.error(e?.response?.data?.error || "Erro ao criar") });
   const del = useMutation({ mutationFn: (id: string) => globalWebhooksApi.delete(id), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["global-webhooks"] }); toast.success("Webhook removido"); } });
+  const test = useMutation({ mutationFn: (id: string) => globalWebhooksApi.test(id), onSuccess: () => toast.success("Teste enviado!"), onError: () => toast.error("Erro ao enviar teste") });
+  const [name, setName] = useState("");
   const [url, setUrl] = useState("");
+  const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
+
+  const groupedEvents = WEBHOOK_EVENTS.reduce((acc, e) => {
+    if (!acc[e.category]) acc[e.category] = [];
+    acc[e.category].push(e);
+    return acc;
+  }, {} as Record<string, typeof WEBHOOK_EVENTS>);
 
   return (
     <div className="space-y-5">
@@ -260,12 +291,36 @@ function WebhooksSection() {
           </div>
           <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 88%)" }}>Criar webhook global</h2>
         </div>
-        <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>Receba eventos de todas as instâncias (mensagens recebidas/enviadas, status, etc.)</p>
-        <div className="flex gap-3">
-          <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === "Enter" && url && create.mutate(url)}
-            placeholder="https://seu-webhook.com.br/webhook" className="input-field flex-1" />
-          <button onClick={() => create.mutate(url)} disabled={!url || create.isPending} className="btn-primary flex items-center gap-2 text-sm px-4 py-2.5 disabled:opacity-40">
-            {create.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Criar
+        <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>Receba eventos de todas as instâncias (mensagens, CRM, campanhas, etc.)</p>
+        
+        <div className="space-y-3">
+          <div className="flex gap-3">
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome do webhook" className="input-field flex-1" />
+            <input type="text" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://seu-webhook.com.br/webhook" className="input-field flex-[2]" />
+          </div>
+          
+          {/* Event selection */}
+          <div>
+            <p className="text-xs font-medium mb-2" style={{ color: "hsl(240 8% 42%)" }}>Eventos (selecione ou deixe vazio para todos)</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto p-2 rounded-xl" style={{ background: "hsl(240 18% 4%)", border: "1px solid hsl(240 12% 11%)" }}>
+              {Object.entries(groupedEvents).map(([category, events]) => (
+                <div key={category} className="col-span-full">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 36%)" }}>{category}</p>
+                  <div className="flex flex-wrap gap-1">
+                    {events.map(e => (
+                      <label key={e.id} className="flex items-center gap-1 cursor-pointer">
+                        <input type="checkbox" checked={selectedEvents.includes(e.id)} onChange={(cb) => setSelectedEvents(cb.target.checked ? [...selectedEvents, e.id] : selectedEvents.filter(x => x !== e.id))} className="rounded w-3 h-3" />
+                        <span className="text-[10px]" style={{ color: "hsl(240 8% 55%)" }}>{e.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <button onClick={() => create.mutate({ name, url, events: selectedEvents })} disabled={!name || !url || create.isPending} className="btn-primary flex items-center gap-2 text-sm px-4 py-2.5 disabled:opacity-40">
+            {create.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Criar Webhook
           </button>
         </div>
       </div>
@@ -292,12 +347,17 @@ function WebhooksSection() {
                 <Webhook className="w-3.5 h-3.5" style={{ color: "#8b5cf6" }} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 80%)" }}>{w.url}</p>
-                <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>Eventos: {w.events?.join(", ") || "todos"}</p>
+                <p className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 80%)" }}>{w.name}</p>
+                <p className="text-xs mt-0.5 truncate" style={{ color: "hsl(240 8% 38%)" }}>{w.url}</p>
+                <p className="text-[10px] mt-0.5" style={{ color: "hsl(240 8% 32%)" }}>Eventos: {w.events?.length > 0 ? w.events.join(", ") : "todos"}</p>
               </div>
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${w.is_active ? "text-green-400 bg-green-500/10" : "text-gray-400 bg-gray-500/10"}`}>
                 {w.is_active ? "Ativo" : "Inativo"}
               </span>
+              <button onClick={() => test.mutate(w.id)} className="p-2 rounded-lg transition-colors flex-shrink-0" style={{ color: "hsl(240 8% 32%)" }}
+                onMouseEnter={e => (e.currentTarget.style.color = "#8b5cf6")} onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 32%)")}>
+                <Play className="w-4 h-4" />
+              </button>
               <button onClick={() => del.mutate(w.id)} className="p-2 rounded-lg transition-colors flex-shrink-0" style={{ color: "hsl(240 8% 32%)" }}
                 onMouseEnter={e => (e.currentTarget.style.color = "#ef4444")} onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 32%)")}>
                 <Trash2 className="w-4 h-4" />
@@ -310,14 +370,16 @@ function WebhooksSection() {
       {/* Webhook events info */}
       <div className="rounded-2xl p-5 space-y-3" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
         <h2 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 42)" }}>Eventos disponíveis</h2>
-        <div className="grid grid-cols-2 gap-2 text-xs" style={{ color: "hsl(240 8% 55%)" }}>
-          <div><code style={{ color: "var(--green)" }}>message.received</code> - Nova mensagem recebida</div>
-          <div><code style={{ color: "var(--green)" }}>message.sent</code> - Mensagem enviada</div>
-          <div><code style={{ color: "var(--green)" }}>status.changed</code> - Status da instância</div>
-          <div><code style={{ color: "var(--green)" }}>qr.updated</code> - QR Code atualizado</div>
-          <div><code style={{ color: "var(--green)" }}>call.received</code> - Chamada recebida</div>
-          <div><code style={{ color: "var(--green)" }}>group.joined</code> - Entrou em grupo</div>
-        </div>
+        {Object.entries(groupedEvents).map(([category, events]) => (
+          <div key={category}>
+            <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 36%)" }}>{category}</p>
+            <div className="grid grid-cols-2 gap-1 text-xs" style={{ color: "hsl(240 8% 55%)" }}>
+              {events.map(e => (
+                <div key={e.id}><code style={{ color: "var(--green)" }}>{e.id}</code> - {e.name}</div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

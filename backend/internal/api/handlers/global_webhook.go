@@ -25,17 +25,50 @@ var SystemEvents = []struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Category    string `json:"category"`
 }{
-	{ID: "user.registered", Name: "Usuário Registrado", Description: "Quando um novo usuário se registra"},
-	{ID: "user.login", Name: "Login", Description: "Quando um usuário faz login"},
-	{ID: "user.logout", Name: "Logout", Description: "Quando um usuário faz logout"},
-	{ID: "instance.created", Name: "Instância Criada", Description: "Quando uma nova instância é criada"},
-	{ID: "instance.connected", Name: "Instância Conectada", Description: "Quando uma instância conecta ao WhatsApp"},
-	{ID: "instance.disconnected", Name: "Instância Desconectada", Description: "Quando uma instância desconecta"},
-	{ID: "workspace.created", Name: "Workspace Criado", Description: "Quando um novo workspace é criado"},
-	{ID: "workspace.member_added", Name: "Membro Adicionado", Description: "Quando um membro é adicionado a um workspace"},
-	{ID: "payment.success", Name: "Pagamento Succedido", Description: "Quando um pagamento é confirmado"},
-	{ID: "payment.failed", Name: "Pagamento Falhou", Description: "Quando um pagamento falha"},
+	// User events
+	{ID: "user.registered", Name: "Usuário Registrado", Description: "Quando um novo usuário se registra", Category: "Usuário"},
+	{ID: "user.login", Name: "Login", Description: "Quando um usuário faz login", Category: "Usuário"},
+	{ID: "user.logout", Name: "Logout", Description: "Quando um usuário faz logout", Category: "Usuário"},
+
+	// Instance events
+	{ID: "instance.created", Name: "Instância Criada", Description: "Quando uma nova instância é criada", Category: "Instância"},
+	{ID: "instance.connected", Name: "Instância Conectada", Description: "Quando uma instância conecta ao WhatsApp", Category: "Instância"},
+	{ID: "instance.disconnected", Name: "Instância Desconectada", Description: "Quando uma instância desconecta", Category: "Instância"},
+
+	// Message events
+	{ID: "message.received", Name: "Mensagem Recebida", Description: "Quando uma mensagem é recebida", Category: "Mensagem"},
+	{ID: "message.sent", Name: "Mensagem Enviada", Description: "Quando uma mensagem é enviada", Category: "Mensagem"},
+
+	// Workspace events
+	{ID: "workspace.created", Name: "Workspace Criado", Description: "Quando um novo workspace é criado", Category: "Workspace"},
+	{ID: "workspace.member_added", Name: "Membro Adicionado", Description: "Quando um membro é adicionado a um workspace", Category: "Workspace"},
+	{ID: "workspace.member_removed", Name: "Membro Removido", Description: "Quando um membro é removido de um workspace", Category: "Workspace"},
+
+	// CRM events
+	{ID: "crm.contact.created", Name: "Contato Criado", Description: "Quando um novo contato é criado no CRM", Category: "CRM"},
+	{ID: "crm.contact.updated", Name: "Contato Atualizado", Description: "Quando um contato é atualizado no CRM", Category: "CRM"},
+	{ID: "crm.contact.deleted", Name: "Contato Deletado", Description: "Quando um contato é deletado do CRM", Category: "CRM"},
+	{ID: "crm.tag.created", Name: "Tag Criada", Description: "Quando uma nova tag é criada", Category: "CRM"},
+	{ID: "crm.tag.assigned", Name: "Tag Atribuída", Description: "Quando uma tag é atribuída a um contato", Category: "CRM"},
+	{ID: "crm.stage.assigned", Name: "Stage Atribuído", Description: "Quando um stage é atribuído a um contato", Category: "CRM"},
+	{ID: "crm.funnel.assigned", Name: "Funil Atribuído", Description: "Quando um funil é atribuído a um contato", Category: "CRM"},
+
+	// Campaign events
+	{ID: "campaign.created", Name: "Campanha Criada", Description: "Quando uma nova campanha é criada", Category: "Campanha"},
+	{ID: "campaign.started", Name: "Campanha Iniciada", Description: "Quando uma campanha é iniciada", Category: "Campanha"},
+	{ID: "campaign.paused", Name: "Campanha Pausada", Description: "Quando uma campanha é pausada", Category: "Campanha"},
+	{ID: "campaign.completed", Name: "Campanha Finalizada", Description: "Quando uma campanha é finalizada", Category: "Campanha"},
+	{ID: "campaign.failed", Name: "Campanha Falhou", Description: "Quando uma campanha falha", Category: "Campanha"},
+
+	// Payment events
+	{ID: "payment.success", Name: "Pagamento Succedido", Description: "Quando um pagamento é confirmado", Category: "Pagamento"},
+	{ID: "payment.failed", Name: "Pagamento Falhou", Description: "Quando um pagamento falha", Category: "Pagamento"},
+	{ID: "payment.refunded", Name: "Pagamento Estornado", Description: "Quando um pagamento é estornado", Category: "Pagamento"},
+
+	// Webhook events
+	{ID: "webhook.test", Name: "Teste de Webhook", Description: "Evento de teste disparado manualmente", Category: "Sistema"},
 }
 
 // List available system events
