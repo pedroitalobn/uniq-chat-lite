@@ -295,12 +295,11 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  "px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors",
-                  activeTab === tab.id
-                    ? "border-green-500 text-green-500"
-                    : "border-transparent text-zinc-500 hover:text-zinc-300"
-                )}
+                className="px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors"
+                style={{
+                  color: activeTab === tab.id ? "var(--green)" : "hsl(240 8% 46%)",
+                  borderColor: activeTab === tab.id ? "var(--green)" : "transparent"
+                }}
               >
                 {tab.label}
               </button>
@@ -313,7 +312,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
             {activeTab === "general" && (
               <div className="space-y-4 animate-fade-in-up">
                 <div>
-                  <label className="text-xs block mb-1.5 text-zinc-400">Nome do plano</label>
+                  <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Nome do plano</label>
                   <input
                     type="text"
                     value={form.name}
@@ -323,7 +322,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                   />
                 </div>
                 <div>
-                  <label className="text-xs block mb-1.5 text-zinc-400">Preço (R$)</label>
+                  <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Preço (R$)</label>
                   <input
                     type="number"
                     value={form.price}
@@ -332,7 +331,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                   />
                 </div>
                 <div>
-                  <label className="text-xs block mb-1.5 text-zinc-400">Descrição (Card)</label>
+                  <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Descrição (Card)</label>
                   <textarea
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -345,8 +344,8 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                   <label className="flex items-center gap-3 cursor-pointer">
                     <Toggle checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
                     <div>
-                      <span className="text-sm font-medium text-zinc-300 block">Status de Comercialização</span>
-                      <span className="text-[10px] text-zinc-500 block">Permitir assinaturas públicas deste plano</span>
+                      <span className="text-sm font-medium block" style={{ color: "hsl(240 15% 93%)" }}>Status de Comercialização</span>
+                      <span className="text-[10px] block" style={{ color: "hsl(240 8% 46%)" }}>Permitir assinaturas públicas deste plano</span>
                     </div>
                   </label>
                 </div>
@@ -355,24 +354,24 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
 
             {activeTab === "limits" && (
               <div className="space-y-4 animate-fade-in-up">
-                <div className="p-3 mb-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-[11px] text-yellow-500">
-                  Dica: Utilize <strong className="font-mono bg-yellow-500/20 px-1 py-0.5 rounded">-1</strong> para configurar limites infinitos (ilimitado).
+                <div className="p-3 mb-4 rounded-lg text-[11px]" style={{ background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.2)", color: "#fbbf24" }}>
+                  Dica: Utilize <strong className="font-mono px-1 py-0.5 rounded" style={{ background: "rgba(251,191,36,0.2)" }}>-1</strong> para configurar limites infinitos (ilimitado).
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs block mb-1.5 text-zinc-400">Max. Workspaces</label>
+                    <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Max. Workspaces</label>
                     <input type="number" value={form.max_workspaces} onChange={(e) => setForm({ ...form, max_workspaces: Number(e.target.value) })} className="input-field w-full font-mono" />
                   </div>
                   <div>
-                    <label className="text-xs block mb-1.5 text-zinc-400">Max. Usuários</label>
+                    <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Max. Usuários</label>
                     <input type="number" value={form.max_users} onChange={(e) => setForm({ ...form, max_users: Number(e.target.value) })} className="input-field w-full font-mono" />
                   </div>
                   <div>
-                    <label className="text-xs block mb-1.5 text-zinc-400">Max. Instâncias WPP</label>
+                    <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Max. Instâncias WPP</label>
                     <input type="number" value={form.max_instances} onChange={(e) => setForm({ ...form, max_instances: Number(e.target.value) })} className="input-field w-full font-mono" />
                   </div>
                   <div>
-                    <label className="text-xs block mb-1.5 text-zinc-400">Limite de Envios Diários</label>
+                    <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Limite de Envios Diários</label>
                     <input type="number" value={form.max_messages_per_day} onChange={(e) => setForm({ ...form, max_messages_per_day: Number(e.target.value) })} className="input-field w-full font-mono" />
                   </div>
                 </div>
@@ -383,12 +382,12 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
               <div className="space-y-6 animate-fade-in-up">
                 <FeatureGrid checkboxes={checkboxes} onChange={(key, val) => setCheckboxes({ ...checkboxes, [key]: val })} />
                 
-                <div className="pt-2 border-t border-white/5">
+                <div className="pt-4 border-t" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
                   <label className="flex items-center gap-3 cursor-pointer mt-4">
                     <Toggle checked={form.allow_proxy} onChange={(v) => setForm({ ...form, allow_proxy: v })} color="#60a5fa" />
                     <div>
-                      <span className="text-sm font-medium text-blue-400 block">Sessão via Proxy</span>
-                      <span className="text-[10px] text-zinc-500 block">Habilita menu de proxies na página da instância</span>
+                      <span className="text-sm font-medium block" style={{ color: "#60a5fa" }}>Sessão via Proxy</span>
+                      <span className="text-[10px] block" style={{ color: "hsl(240 8% 46%)" }}>Habilita menu de proxies na página da instância</span>
                     </div>
                   </label>
                 </div>
@@ -398,7 +397,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
             {activeTab === "gateway" && (
               <div className="space-y-4 animate-fade-in-up">
                 <div>
-                  <label className="text-xs block mb-1.5 text-zinc-400">Stripe Price ID</label>
+                  <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Stripe Price ID</label>
                   <input
                     type="text"
                     value={form.stripe_price_id}
@@ -406,10 +405,10 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                     placeholder="price_xxxxxxxxxxxxxxxxx"
                     className="input-field w-full font-mono text-xs"
                   />
-                  <p className="text-[10px] text-zinc-500 mt-1.5">Copie o ID da precificação do produto no painel do Stripe.</p>
+                  <p className="text-[10px] mt-1.5" style={{ color: "hsl(240 8% 38%)" }}>Copie o ID da precificação do produto no painel do Stripe.</p>
                 </div>
                 <div>
-                  <label className="text-xs block mb-1.5 text-zinc-400">Asaas Product ID (se aplicável)</label>
+                  <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Asaas Product ID (se aplicável)</label>
                   <input
                     type="text"
                     value={form.asaas_product_id}
@@ -417,7 +416,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                     placeholder="prod_xxxxxxxxxxxxxxxxx"
                     className="input-field w-full font-mono text-xs"
                   />
-                  <p className="text-[10px] text-zinc-500 mt-1.5">Mapeado apenas em integrações compatíveis no Asaas.</p>
+                  <p className="text-[10px] mt-1.5" style={{ color: "hsl(240 8% 38%)" }}>Mapeado apenas em integrações compatíveis no Asaas.</p>
                 </div>
               </div>
             )}
@@ -465,16 +464,14 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
 
   return (
     <div
-      className="rounded-2xl p-5 space-y-5 animate-fade-in-up relative group"
+      className="rounded-2xl p-5 animate-fade-in-up relative group transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] hover:-translate-y-0.5"
       style={{ background: style.bg, border: `1px solid ${style.border}` }}
     >
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: style.gradient, border: `1px solid ${style.border}` }}
-          >
+      <div className="flex flex-col xl:flex-row items-center gap-6">
+        
+        {/* Left: Identity */}
+        <div className="flex items-center gap-4 w-full xl:w-[280px] flex-shrink-0">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: style.gradient, border: `1px solid ${style.border}` }}>
             {plan.name === "Enterprise" || plan.name === "Business"
               ? <Zap className="w-5 h-5" style={{ color: style.icon }} />
               : plan.name === "Pro"
@@ -484,73 +481,62 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
               : <Shield className="w-5 h-5" style={{ color: style.icon }} />
             }
           </div>
-          <div>
-            <h3 className="font-bold text-sm" style={{ color: "hsl(240 15% 93%)" }}>{plan.name}</h3>
-            <p className="text-xs mt-0.5" style={{ color: style.accent }}>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <h3 className="font-bold text-base truncate" style={{ color: "hsl(240 15% 93%)" }}>{plan.name}</h3>
+              {plan.is_active ? 
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0" style={{ background: "rgba(0,212,106,0.08)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.15)" }}>Ativo</span> : 
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0" style={{ background: "rgba(239,68,68,0.08)", color: "#f87171", border: "1px solid rgba(239,68,68,0.15)" }}>Inativo</span>}
+            </div>
+            <p className="text-sm font-medium truncate" style={{ color: style.accent }}>
               {plan.price === 0 ? "Gratuito" : `R$ ${plan.price}/mês`}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {plan.is_active ? (
-            <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full" style={{ background: "rgba(0,212,106,0.08)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.15)" }}>
-              Ativo
+
+        {/* Middle: Limits Wrapper */}
+        <div className="flex-1 flex flex-wrap gap-2 w-full">
+           <div className="flex-1 min-w-[90px] rounded-xl p-3 flex flex-col justify-center" style={{ background: "rgba(0,0,0,0.2)" }}>
+              <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 38%)" }}>Workspaces</p>
+              <p className="text-lg font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_workspaces === -1 ? "∞" : plan.max_workspaces}</p>
+           </div>
+           <div className="flex-1 min-w-[90px] rounded-xl p-3 flex flex-col justify-center" style={{ background: "rgba(0,0,0,0.2)" }}>
+              <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 38%)" }}>Instâncias</p>
+              <p className="text-lg font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_instances === -1 ? "∞" : plan.max_instances}</p>
+           </div>
+           <div className="flex-1 min-w-[90px] rounded-xl p-3 flex flex-col justify-center" style={{ background: "rgba(0,0,0,0.2)" }}>
+              <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 38%)" }}>Usuários</p>
+              <p className="text-lg font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_users === -1 ? "∞" : plan.max_users}</p>
+           </div>
+           <div className="flex-1 min-w-[90px] rounded-xl p-3 flex flex-col justify-center" style={{ background: "rgba(0,0,0,0.2)" }}>
+              <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 38%)" }}>Msgs/dia</p>
+              <p className="text-lg font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_messages_per_day === -1 ? "∞" : plan.max_messages_per_day.toLocaleString("pt-BR")}</p>
+           </div>
+           
+           <div className="w-[110px] rounded-xl p-3 flex items-center justify-center gap-2" style={{ background: plan.allow_proxy ? "rgba(96,165,250,0.06)" : "rgba(0,0,0,0.15)", border: plan.allow_proxy ? "1px solid rgba(96,165,250,0.12)" : "1px solid transparent" }}>
+            <Globe className="w-4 h-4 hidden sm:block" style={{ color: plan.allow_proxy ? "#60a5fa" : "hsl(240 8% 28%)" }} />
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: plan.allow_proxy ? "#93c5fd" : "hsl(240 8% 36%)" }}>
+              Proxy {plan.allow_proxy ? "On" : "Off"}
             </span>
-          ) : (
-            <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full" style={{ background: "rgba(239,68,68,0.08)", color: "#f87171", border: "1px solid rgba(239,68,68,0.15)" }}>
-              Inativo
-            </span>
-          )}
+          </div>
+        </div>
+
+        {/* Right: Actions / Buttons */}
+        <div className="flex xl:flex-col items-center justify-center gap-2 w-full xl:w-32 flex-shrink-0 opacity-[0.98] xl:opacity-0 xl:group-hover:opacity-100 transition-opacity">
+           <button onClick={onEdit} className="btn-primary w-full py-2 shadow-lg">Editar</button>
         </div>
       </div>
-
-      <div className="space-y-3">
-        {description && <p className="text-xs leading-relaxed text-zinc-400">{description}</p>}
-
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
-            <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Instâncias</p>
-            <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_instances === -1 ? "∞" : plan.max_instances}</p>
-          </div>
-          <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
-            <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Msgs/dia</p>
-            <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_messages_per_day === -1 ? "∞" : plan.max_messages_per_day.toLocaleString("pt-BR")}</p>
-          </div>
-          <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
-            <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Usuários</p>
-            <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_users === -1 ? "∞" : plan.max_users}</p>
-          </div>
-          <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
-            <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Workspaces</p>
-            <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_workspaces === -1 ? "∞" : plan.max_workspaces}</p>
-          </div>
-          
-          <div className="col-span-2 rounded-xl p-3 flex items-center gap-2" style={{ background: plan.allow_proxy ? "rgba(96,165,250,0.06)" : "rgba(0,0,0,0.15)", border: plan.allow_proxy ? "1px solid rgba(96,165,250,0.12)" : "1px solid transparent" }}>
-            <Globe className="w-3.5 h-3.5" style={{ color: plan.allow_proxy ? "#60a5fa" : "hsl(240 8% 28%)" }} />
-            <span className="text-xs font-medium" style={{ color: plan.allow_proxy ? "#93c5fd" : "hsl(240 8% 36%)" }}>
-              Proxy {plan.allow_proxy ? "habilitado" : "desabilitado"}
-            </span>
-          </div>
-        </div>
-
-        {enabledFeatures.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
+      
+      {/* Features string at the bottom if any */}
+      {enabledFeatures.length > 0 && (
+         <div className="mt-5 pt-4 border-t flex flex-wrap gap-2" style={{ borderColor: "rgba(255,255,255,0.04)" }}>
             {enabledFeatures.map(({ key, label, icon }) => (
-              <span key={key} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 8% 62%)" }}>
+              <span key={key} className="flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full font-medium" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "hsl(240 8% 65%)" }}>
                 {icon} {label}
               </span>
             ))}
-          </div>
-        )}
-      </div>
-
-      {/* Edit Overlay Button */}
-      <div className="absolute inset-0 z-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl bg-black/60 backdrop-blur-[1px]">
-         <button onClick={onEdit} className="btn-primary shadow-2xl scale-95 group-hover:scale-100 transition-transform duration-200">
-           <Edit2 className="w-4 h-4 mr-2" />
-           Editar Configurações
-         </button>
-      </div>
+         </div>
+      )}
     </div>
   );
 }
@@ -584,7 +570,10 @@ export default function AdminPlansPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setActivePlanDrawer("new")}
-            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-all duration-150 active:scale-[0.97] bg-green-500/10 text-green-500 border border-green-500/20 hover:bg-green-500/20"
+            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-all duration-150 active:scale-[0.97]"
+            style={{ color: "var(--green)", background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.18)" }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.1)" }}
           >
             <Plus className="w-4 h-4" />
             Novo Plano
@@ -598,11 +587,11 @@ export default function AdminPlansPage() {
 
       {/* Plans grid */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-[420px] rounded-2xl" />)}
+        <div className="grid grid-cols-1 gap-4">
+          {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-32 rounded-2xl" />)}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {plans.map((plan) => (
             <PlanCard key={plan.id} plan={plan} onEdit={() => setActivePlanDrawer(plan)} />
           ))}
@@ -619,17 +608,17 @@ export default function AdminPlansPage() {
 
       {/* Notes */}
       <div className="rounded-2xl p-5 space-y-3" style={cardStyle}>
-        <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
+        <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 46%)" }}>
           Notas da Engenharia
         </h3>
         <ul className="space-y-2">
           {[
-            <>Use <code className="text-xs px-1.5 py-0.5 rounded-md bg-white/5 text-zinc-300">-1</code> em limites numéricos para definir como ilimitado.</>,
+            <>Use <code className="text-xs px-1.5 py-0.5 rounded-md" style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 15% 88%)" }}>-1</code> em limites numéricos para definir como ilimitado.</>,
             "Alterar o status de comercialização para 'Inativo' remove o plano da tela de aquisição, mas não interrompe subscrições em andamento.",
-            <>O campo <strong className="text-zinc-300">Stripe Price ID</strong> dita o produto faturado no checkout dinâmico da plataforma.</>,
+            <>O campo <strong style={{ color: "hsl(240 15% 88%)" }}>Stripe Price ID</strong> dita o produto faturado no checkout dinâmico da plataforma.</>,
           ].map((note, i) => (
-            <li key={i} className="flex items-start gap-2 text-sm text-zinc-400">
-              <span className="mt-1.5 w-1 h-1 rounded-full flex-shrink-0 bg-zinc-600" />
+            <li key={i} className="flex items-start gap-2 text-sm" style={{ color: "hsl(240 8% 46%)" }}>
+              <span className="mt-1.5 w-1 h-1 rounded-full flex-shrink-0" style={{ background: "hsl(240 8% 28%)" }} />
               {note}
             </li>
           ))}
