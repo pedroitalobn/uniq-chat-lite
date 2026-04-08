@@ -24,12 +24,28 @@ type StripeHandler struct {
 }
 
 func NewStripeHandler(db *gorm.DB, emailSvc *email.Service) *StripeHandler {
-	stripe.Key = config.AppConfig.StripeSecretKey
 	return &StripeHandler{
 		db:       db,
 		emailSvc: emailSvc,
 		proxyMgr: services.NewProxyManager(db),
 	}
+}
+
+func (h *StripeHandler) loadConfig() {
+	var settings models.PaymentSettings
+	if err := h.db.First(&settings).Error; err == nil && settings.StripeSecretKey != "" {
+		stripe.Key = settings.StripeSecretKey
+	} else {
+		stripe.Key = config.AppConfig.StripeSecretKey
+	}
+}
+
+func (h *StripeHandler) getWebhookSecret() string {
+	var settings models.PaymentSettings
+	if err := h.db.First(&settings).Error; err == nil && settings.StripeWebhookSecret != "" {
+		return settings.StripeWebhookSecret
+	}
+	return config.AppConfig.StripeWebhookSecret
 }
 
 // GET /stripe/plans — list plans with Stripe info (public)
@@ -43,6 +59,7 @@ func (h *StripeHandler) ListPlans(c *fiber.Ctx) error {
 
 // POST /stripe/checkout — create Stripe Checkout session (protected)
 func (h *StripeHandler) CreateCheckout(c *fiber.Ctx) error {
+	h.loadConfig()
 	user := middleware.GetCurrentUser(c)
 	if user == nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
@@ -131,6 +148,7 @@ func (h *StripeHandler) GetSubscription(c *fiber.Ctx) error {
 		"plan":                       user.Plan,
 		"stripe_subscription_id":     user.StripeSubscriptionID,
 		"stripe_subscription_status": user.StripeSubscriptionStatus,
+		"status":                     user.StripeSubscriptionStatus,
 	})
 }
 
@@ -138,7 +156,7 @@ func (h *StripeHandler) GetSubscription(c *fiber.Ctx) error {
 func (h *StripeHandler) Webhook(c *fiber.Ctx) error {
 	payload := c.Body()
 	sigHeader := c.Get("Stripe-Signature")
-	webhookSecret := config.AppConfig.StripeWebhookSecret
+	webhookSecret := h.getWebhookSecret()
 
 	if webhookSecret == "" {
 		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "webhook não configurado"})

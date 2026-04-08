@@ -98,6 +98,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Handlers
 	authH := handlers.NewAuthHandler(db, emailSvc, manager)
 	stripeH := handlers.NewStripeHandler(db, emailSvc)
+	asaasH := handlers.NewAsaasHandler(db, emailSvc)
+	paymentH := handlers.NewPaymentHandler(db, stripeH, asaasH)
 	instanceH := handlers.NewInstanceHandler(db, manager)
 	proxyH := handlers.NewProxyHandler(db, manager)
 	msgH := handlers.NewMessageHandler(db, manager)
@@ -137,7 +139,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	inviteH := handlers.NewInviteHandler(db)
 
 	// Plans (public — used by pricing/register page)
-	app.Get("/stripe/plans", stripeH.ListPlans)
+	app.Get("/stripe/plans", paymentH.ListPlans)
+	app.Get("/asaas/plans", paymentH.ListPlans)
+	app.Get("/payments/plans", paymentH.ListPlans)
 
 	// Invite system (public)
 	app.Get("/invites/status", inviteH.GetStatus)
@@ -145,6 +149,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 
 	// Stripe webhook (public — must receive raw body, Stripe signature verified internally)
 	app.Post("/stripe/webhook", stripeH.Webhook)
+
+	// Asaas webhook (public)
+	app.Post("/asaas/webhook", asaasH.Webhook)
 
 	// ─── Auth routes (public) ─────────────────────────────────────────────────
 	auth := app.Group("/auth")
@@ -372,8 +379,21 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 
 	// Stripe (protected)
 	stripeRoutes := api.Group("/stripe")
-	stripeRoutes.Post("/checkout", stripeH.CreateCheckout)
-	stripeRoutes.Get("/subscription", stripeH.GetSubscription)
+	stripeRoutes.Post("/checkout", paymentH.CreateCheckout)
+	stripeRoutes.Get("/subscription", paymentH.GetSubscription)
+
+	// Asaas (protected)
+	asaasRoutes := api.Group("/asaas")
+	asaasRoutes.Post("/checkout", paymentH.CreateCheckout)
+	asaasRoutes.Get("/subscription", paymentH.GetSubscription)
+
+	// Payments (protected)
+	paymentRoutes := api.Group("/payments")
+	paymentRoutes.Post("/checkout", paymentH.CreateCheckout)
+	paymentRoutes.Get("/subscription", paymentH.GetSubscription)
+
+	// Asaas plans (public)
+	app.Get("/asaas/plans", paymentH.ListPlans)
 
 	// Integrations (account-level LLM/tool connections)
 	integrations := api.Group("/integrations")
@@ -520,6 +540,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	admin.Get("/plans", adminH.ListPlans)
 	admin.Post("/plans", adminH.CreatePlan)
 	admin.Put("/plans/:id", adminH.UpdatePlan)
+	admin.Get("/payment-settings", adminH.GetPaymentSettings)
+	admin.Put("/payment-settings", adminH.UpdatePaymentSettings)
 	admin.Get("/stats", adminH.Stats)
 	admin.Post("/invites/toggle", inviteH.ToggleSystem)
 	admin.Get("/invites", inviteH.AdminList)

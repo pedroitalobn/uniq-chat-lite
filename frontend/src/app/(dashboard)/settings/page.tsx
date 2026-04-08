@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { authApi, stripeApi } from "@/lib/api";
+import { authApi, plansApi } from "@/lib/api";
 import { usePreferences, TIMEZONES, type Language, type ThemeMode } from "@/lib/preferences";
 import {
   User, Lock, Check, Loader2, Eye, EyeOff, Globe, Sun, Moon, Monitor,
@@ -108,18 +108,18 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
 
   const { data: plans = [], isLoading: plansLoading } = useQuery<Plan[]>({
     queryKey: ["stripe-plans"],
-    queryFn: () => stripeApi.plans().then((r) => r.data),
+    queryFn: () => plansApi.list().then((r) => r.data),
     refetchInterval: 30000,
   });
 
   const { data: subscription } = useQuery<{ status?: string; cancel_at_period_end?: boolean }>({
     queryKey: ["stripe-subscription"],
-    queryFn: () => stripeApi.subscription().then((r) => r.data),
+    queryFn: () => plansApi.subscription().then((r) => r.data),
     enabled: !isFreePlan,
   });
 
   const checkoutMutation = useMutation({
-    mutationFn: (planId: string) => stripeApi.createCheckout(planId),
+    mutationFn: (planId: string) => plansApi.checkout({ plan_id: planId }),
     onSuccess: (res) => {
       const url = res.data?.url || res.data?.checkout_url;
       if (url) { window.location.href = url; }

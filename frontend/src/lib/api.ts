@@ -451,9 +451,9 @@ export const aiApi = {
 };
 
 export const stripeApi = {
-  plans: () => api.get("/stripe/plans"),
-  createCheckout: (planId: string) => api.post("/stripe/checkout", { plan_id: planId }),
-  subscription: () => api.get("/stripe/subscription"),
+  plans: () => api.get("/payments/plans"),
+  createCheckout: (planId: string) => api.post("/payments/checkout", { plan_id: planId }),
+  subscription: () => api.get("/payments/subscription"),
 };
 
 export const adminApi = {
@@ -472,12 +472,15 @@ export const adminApi = {
   createPlan: (data: Record<string, unknown>) => api.post("/admin/plans", data),
   updatePlan: (id: string, data: Record<string, unknown>) =>
     api.put(`/admin/plans/${id}`, data),
+  getPaymentSettings: () => api.get("/admin/payment-settings"),
+  updatePaymentSettings: (data: Record<string, unknown>) =>
+    api.put("/admin/payment-settings", data),
 };
 
 export const plansApi = {
-  list: () => api.get("/stripe/plans"),
-  checkout: (data: { price_id: string }) => api.post("/stripe/checkout", data),
-  subscription: () => api.get("/stripe/subscription"),
+  list: () => api.get("/payments/plans"),
+  checkout: (data: { plan_id: string }) => api.post("/payments/checkout", data),
+  subscription: () => api.get("/payments/subscription"),
 };
 
 // ─── Instagram ───────────────────────────────────────────────────────────────
