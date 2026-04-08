@@ -467,10 +467,10 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
       className="rounded-2xl p-5 animate-fade-in-up relative group transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] hover:-translate-y-0.5"
       style={{ background: style.bg, border: `1px solid ${style.border}` }}
     >
-      <div className="flex flex-col xl:flex-row items-center gap-6">
+      <div className="flex flex-col md:flex-row md:items-center gap-6">
         
         {/* Left: Identity */}
-        <div className="flex items-center gap-4 w-full xl:w-[280px] flex-shrink-0">
+        <div className="flex items-center gap-4 w-full md:w-[280px] flex-shrink-0">
           <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: style.gradient, border: `1px solid ${style.border}` }}>
             {plan.name === "Enterprise" || plan.name === "Business"
               ? <Zap className="w-5 h-5" style={{ color: style.icon }} />
@@ -495,35 +495,35 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
         </div>
 
         {/* Middle: Limits Wrapper */}
-        <div className="flex-1 flex flex-wrap gap-2 w-full">
-           <div className="flex-1 min-w-[90px] rounded-xl p-3 flex flex-col justify-center" style={{ background: "rgba(0,0,0,0.2)" }}>
+        <div className="flex-1 grid grid-cols-2 lg:grid-cols-5 gap-2 w-full">
+           <div className="rounded-xl p-3 flex flex-col justify-center text-center sm:text-left" style={{ background: "rgba(0,0,0,0.2)" }}>
               <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 38%)" }}>Workspaces</p>
               <p className="text-lg font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_workspaces === -1 ? "∞" : plan.max_workspaces}</p>
            </div>
-           <div className="flex-1 min-w-[90px] rounded-xl p-3 flex flex-col justify-center" style={{ background: "rgba(0,0,0,0.2)" }}>
+           <div className="rounded-xl p-3 flex flex-col justify-center text-center sm:text-left" style={{ background: "rgba(0,0,0,0.2)" }}>
               <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 38%)" }}>Instâncias</p>
               <p className="text-lg font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_instances === -1 ? "∞" : plan.max_instances}</p>
            </div>
-           <div className="flex-1 min-w-[90px] rounded-xl p-3 flex flex-col justify-center" style={{ background: "rgba(0,0,0,0.2)" }}>
+           <div className="rounded-xl p-3 flex flex-col justify-center text-center sm:text-left" style={{ background: "rgba(0,0,0,0.2)" }}>
               <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 38%)" }}>Usuários</p>
               <p className="text-lg font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_users === -1 ? "∞" : plan.max_users}</p>
            </div>
-           <div className="flex-1 min-w-[90px] rounded-xl p-3 flex flex-col justify-center" style={{ background: "rgba(0,0,0,0.2)" }}>
+           <div className="rounded-xl p-3 flex flex-col justify-center text-center sm:text-left" style={{ background: "rgba(0,0,0,0.2)" }}>
               <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 38%)" }}>Msgs/dia</p>
               <p className="text-lg font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_messages_per_day === -1 ? "∞" : plan.max_messages_per_day.toLocaleString("pt-BR")}</p>
            </div>
            
-           <div className="w-[110px] rounded-xl p-3 flex items-center justify-center gap-2" style={{ background: plan.allow_proxy ? "rgba(96,165,250,0.06)" : "rgba(0,0,0,0.15)", border: plan.allow_proxy ? "1px solid rgba(96,165,250,0.12)" : "1px solid transparent" }}>
-            <Globe className="w-4 h-4 hidden sm:block" style={{ color: plan.allow_proxy ? "#60a5fa" : "hsl(240 8% 28%)" }} />
-            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: plan.allow_proxy ? "#93c5fd" : "hsl(240 8% 36%)" }}>
+           <div className="rounded-xl p-3 flex flex-col sm:flex-row items-center justify-center gap-2" style={{ background: plan.allow_proxy ? "rgba(96,165,250,0.06)" : "rgba(0,0,0,0.15)", border: plan.allow_proxy ? "1px solid rgba(96,165,250,0.12)" : "1px solid transparent" }}>
+            <Globe className="w-4 h-4" style={{ color: plan.allow_proxy ? "#60a5fa" : "hsl(240 8% 28%)" }} />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-center" style={{ color: plan.allow_proxy ? "#93c5fd" : "hsl(240 8% 36%)" }}>
               Proxy {plan.allow_proxy ? "On" : "Off"}
             </span>
           </div>
         </div>
 
         {/* Right: Actions / Buttons */}
-        <div className="flex xl:flex-col items-center justify-center gap-2 w-full xl:w-32 flex-shrink-0 opacity-[0.98] xl:opacity-0 xl:group-hover:opacity-100 transition-opacity">
-           <button onClick={onEdit} className="btn-primary w-full py-2 shadow-lg">Editar</button>
+        <div className="flex md:flex-col items-center justify-end md:w-32 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+           <button onClick={onEdit} className="btn-primary px-6 w-auto md:w-full py-2 shadow-lg">Editar</button>
         </div>
       </div>
       
