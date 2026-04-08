@@ -433,7 +433,7 @@ export default function InboxPage() {
             </div>
 
             {/* Chat Area */}
-            <div className="flex-1 min-w-[400px] flex flex-col min-w-0" style={{ background: "var(--surface-1)" }}>
+            <div className="flex-1 min-w-[380px] flex flex-col min-w-0" style={{ background: "var(--surface-1)" }}>
               {!chat ? (
                 <div className="flex-1 flex flex-col items-center justify-center">
                   <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: `${curChannel.color}12` }}>

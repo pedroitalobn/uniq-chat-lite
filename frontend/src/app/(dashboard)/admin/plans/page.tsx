@@ -527,74 +527,74 @@ function PlanCard({ plan }: { plan: Plan }) {
 
         {/* Edit Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowEditModal(false)} />
-          <div className="relative w-full max-w-md sm:max-w-lg md:max-w-xl max-h-[90dvh] sm:max-h-[85vh] rounded-xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowEditModal(false)} />
+          <div className="relative w-full max-w-3xl max-h-[90dvh] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
             style={{ background: "hsl(240 12% 8%)", border: `1px solid ${style.border}` }}>
-            <div className="flex items-center justify-between p-3 sm:p-4 border-b flex-shrink-0"
+            <div className="flex items-center justify-between p-5 border-b flex-shrink-0"
               style={{ borderColor: "hsl(240 12% 15%)", background: "hsl(240 12% 8%)" }}>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: style.gradient }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: style.gradient }}>
                   {plan.name === "Enterprise" || plan.name === "Business"
-                    ? <Zap className="w-4 h-4" style={{ color: style.icon }} />
+                    ? <Zap className="w-5 h-5" style={{ color: style.icon }} />
                     : plan.name === "Pro"
-                    ? <CreditCard className="w-4 h-4" style={{ color: style.icon }} />
+                    ? <CreditCard className="w-5 h-5" style={{ color: style.icon }} />
                     : plan.name === "Starter"
-                    ? <Flame className="w-4 h-4" style={{ color: style.icon }} />
-                    : <Shield className="w-4 h-4" style={{ color: style.icon }} />
+                    ? <Flame className="w-5 h-5" style={{ color: style.icon }} />
+                    : <Shield className="w-5 h-5" style={{ color: style.icon }} />
                   }
                 </div>
-                <h3 className="font-bold text-sm" style={{ color: "hsl(240 15% 93%)" }}>Editar {plan.name}</h3>
+                <h3 className="font-bold text-lg" style={{ color: "hsl(240 15% 93%)" }}>Editar {plan.name}</h3>
               </div>
-              <button onClick={() => setShowEditModal(false)} className="p-1.5 rounded-lg" style={{ color: "hsl(240 8% 40%)" }}>
+              <button onClick={() => setShowEditModal(false)} className="p-2 rounded-lg hover:bg-white/5 transition-colors" style={{ color: "hsl(240 8% 40%)" }}>
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-3 sm:p-4 space-y-3 sm:space-y-4 overflow-y-auto flex-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                <div>
-                  <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Nome do plano</label>
-                  <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field w-full" />
+            <div className="p-6 space-y-5 overflow-y-auto flex-1">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm block font-medium" style={{ color: "hsl(240 8% 46%)" }}>Nome do plano</label>
+                  <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field w-full text-sm" />
                 </div>
-                <div>
-                  <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Preço (R$)</label>
-                  <input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} className="input-field w-full" />
+                <div className="space-y-2">
+                  <label className="text-sm block font-medium" style={{ color: "hsl(240 8% 46%)" }}>Preço (R$)</label>
+                  <input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} className="input-field w-full text-sm" />
                 </div>
-                <div>
-                  <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Instâncias (-1 = ∞)</label>
-                  <input type="number" value={form.max_instances} onChange={(e) => setForm({ ...form, max_instances: Number(e.target.value) })} className="input-field w-full" />
+                <div className="space-y-2">
+                  <label className="text-sm block font-medium" style={{ color: "hsl(240 8% 46%)" }}>Instâncias (-1 = ∞)</label>
+                  <input type="number" value={form.max_instances} onChange={(e) => setForm({ ...form, max_instances: Number(e.target.value) })} className="input-field w-full text-sm" />
                 </div>
-                <div>
-                  <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Msgs/dia (-1 = ∞)</label>
-                  <input type="number" value={form.max_messages_per_day} onChange={(e) => setForm({ ...form, max_messages_per_day: Number(e.target.value) })} className="input-field w-full" />
+                <div className="space-y-2">
+                  <label className="text-sm block font-medium" style={{ color: "hsl(240 8% 46%)" }}>Msgs/dia (-1 = ∞)</label>
+                  <input type="number" value={form.max_messages_per_day} onChange={(e) => setForm({ ...form, max_messages_per_day: Number(e.target.value) })} className="input-field w-full text-sm" />
                 </div>
-                <div>
-                  <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Usuários (-1 = ∞)</label>
-                  <input type="number" value={form.max_users} onChange={(e) => setForm({ ...form, max_users: Number(e.target.value) })} className="input-field w-full" />
+                <div className="space-y-2">
+                  <label className="text-sm block font-medium" style={{ color: "hsl(240 8% 46%)" }}>Usuários (-1 = ∞)</label>
+                  <input type="number" value={form.max_users} onChange={(e) => setForm({ ...form, max_users: Number(e.target.value) })} className="input-field w-full text-sm" />
                 </div>
-                <div>
-                  <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Workspaces (-1 = ∞)</label>
-                  <input type="number" value={form.max_workspaces} onChange={(e) => setForm({ ...form, max_workspaces: Number(e.target.value) })} className="input-field w-full" />
+                <div className="space-y-2">
+                  <label className="text-sm block font-medium" style={{ color: "hsl(240 8% 46%)" }}>Workspaces (-1 = ∞)</label>
+                  <input type="number" value={form.max_workspaces} onChange={(e) => setForm({ ...form, max_workspaces: Number(e.target.value) })} className="input-field w-full text-sm" />
                 </div>
               </div>
-              <div>
-                <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Stripe Price ID</label>
-                <input type="text" value={form.stripe_price_id} onChange={(e) => setForm({ ...form, stripe_price_id: e.target.value })} placeholder="price_xxxxxxxx" className="input-field w-full font-mono text-xs" />
+              <div className="space-y-2">
+                <label className="text-sm block font-medium" style={{ color: "hsl(240 8% 46%)" }}>Stripe Price ID</label>
+                <input type="text" value={form.stripe_price_id} onChange={(e) => setForm({ ...form, stripe_price_id: e.target.value })} placeholder="price_xxxxxxxx" className="input-field w-full font-mono text-sm" />
               </div>
-              <div>
-                <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Descrição</label>
-                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} className="input-field w-full resize-none text-sm" />
+              <div className="space-y-2">
+                <label className="text-sm block font-medium" style={{ color: "hsl(240 8% 46%)" }}>Descrição</label>
+                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className="input-field w-full resize-none text-sm" />
               </div>
               <FeatureGrid checkboxes={checkboxes} onChange={(key, val) => setCheckboxes({ ...checkboxes, [key]: val })} />
               <HighlightsEditor highlights={form.highlights} onChange={(h) => setForm({ ...form, highlights: h })} />
-              <div className="flex items-center gap-5 flex-wrap">
+              <div className="flex items-center gap-6 flex-wrap">
                 <label className="flex items-center gap-2.5 cursor-pointer flex-shrink-0">
                   <Toggle checked={form.allow_proxy} onChange={(v) => setForm({ ...form, allow_proxy: v })} color="rgba(96,165,250,0.8)" />
-                  <span className="text-xs" style={{ color: "hsl(240 8% 60%)" }}>Proxy</span>
+                  <span className="text-sm" style={{ color: "hsl(240 8% 60%)" }}>Proxy</span>
                 </label>
                 <label className="flex items-center gap-2.5 cursor-pointer flex-shrink-0">
                   <Toggle checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
-                  <span className="text-xs" style={{ color: "hsl(240 8% 60%)" }}>Ativo</span>
+                  <span className="text-sm" style={{ color: "hsl(240 8% 60%)" }}>Ativo</span>
                 </label>
               </div>
               <div className="flex gap-2 pt-2">
