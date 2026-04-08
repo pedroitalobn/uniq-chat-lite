@@ -467,35 +467,35 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
       className="rounded-2xl p-4 sm:p-5 pb-5 sm:pb-6 pr-5 sm:pr-8 animate-fade-in-up relative group transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] hover:-translate-y-0.5"
       style={{ background: style.bg, border: `1px solid ${style.border}` }}
     >
-      <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-8">
+      <div className="flex flex-wrap lg:flex-nowrap items-center gap-4 sm:gap-6">
         
-        {/* Left: Identity */}
-        <div className="flex items-center gap-4 w-full lg:w-[260px] flex-shrink-0">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: style.gradient, border: `1px solid ${style.border}` }}>
-            {plan.name === "Enterprise" || plan.name === "Business"
-              ? <Zap className="w-5 h-5" style={{ color: style.icon }} />
-              : plan.name === "Pro"
-              ? <CreditCard className="w-5 h-5" style={{ color: style.icon }} />
-              : plan.name === "Starter"
-              ? <Flame className="w-5 h-5" style={{ color: style.icon }} />
-              : <Shield className="w-5 h-5" style={{ color: style.icon }} />
-            }
+        {/* Left: Icon */}
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: style.gradient, border: `1px solid ${style.border}` }}>
+          {plan.name === "Enterprise" || plan.name === "Business"
+            ? <Zap className="w-5 h-5" style={{ color: style.icon }} />
+            : plan.name === "Pro"
+            ? <CreditCard className="w-5 h-5" style={{ color: style.icon }} />
+            : plan.name === "Starter"
+            ? <Flame className="w-5 h-5" style={{ color: style.icon }} />
+            : <Shield className="w-5 h-5" style={{ color: style.icon }} />
+          }
+        </div>
+
+        {/* Identity Title */}
+        <div className="min-w-[140px] flex-shrink-0 sm:w-[180px]">
+          <div className="flex items-center gap-2 mb-0.5">
+            <h3 className="font-bold text-base truncate" style={{ color: "hsl(240 15% 93%)" }}>{plan.name}</h3>
+            {plan.is_active ? 
+              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0" style={{ background: "rgba(0,212,106,0.08)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.15)" }}>Ativo</span> : 
+              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0" style={{ background: "rgba(239,68,68,0.08)", color: "#f87171", border: "1px solid rgba(239,68,68,0.15)" }}>Inativo</span>}
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <h3 className="font-bold text-base truncate" style={{ color: "hsl(240 15% 93%)" }}>{plan.name}</h3>
-              {plan.is_active ? 
-                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0" style={{ background: "rgba(0,212,106,0.08)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.15)" }}>Ativo</span> : 
-                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0" style={{ background: "rgba(239,68,68,0.08)", color: "#f87171", border: "1px solid rgba(239,68,68,0.15)" }}>Inativo</span>}
-            </div>
-            <p className="text-sm font-medium truncate" style={{ color: style.accent }}>
-              {plan.price === 0 ? "Gratuito" : `R$ ${plan.price}/mês`}
-            </p>
-          </div>
+          <p className="text-sm font-medium truncate" style={{ color: style.accent }}>
+            {plan.price === 0 ? "Gratuito" : `R$ ${plan.price}/mês`}
+          </p>
         </div>
 
         {/* Middle: Limits Wrapper */}
-        <div className="flex-1 flex flex-wrap gap-2 w-full lg:pr-10">
+        <div className="flex-1 flex flex-wrap gap-2 w-full lg:pr-10 min-w-[200px]">
            <div className="flex-1 min-w-[90px] rounded-xl p-3 flex flex-col justify-center" style={{ background: "rgba(0,0,0,0.2)" }}>
               <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 38%)" }}>Workspaces</p>
               <p className="text-lg font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_workspaces === -1 ? "∞" : plan.max_workspaces}</p>
