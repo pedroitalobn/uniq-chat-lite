@@ -265,16 +265,15 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
         .animate-drawer-in { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       `}</style>
       
-      <div className="fixed inset-0 z-[100] flex justify-end">
-        {/* Backdrop */}
-        <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" 
-          onClick={onClose} 
-        />
-        
-        {/* Slide-over Drawer */}
-        <div className="relative w-full max-w-md h-full shadow-2xl flex flex-col animate-drawer-in"
-          style={{ background: "hsl(240 12% 8%)", borderLeft: "1px solid hsl(240 12% 15%)" }}>
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm transition-opacity" 
+        onClick={onClose} 
+      />
+      
+      {/* Slide-over Drawer */}
+      <div className="fixed top-0 right-0 bottom-0 z-[101] w-full max-w-md h-screen shadow-2xl flex flex-col animate-drawer-in"
+        style={{ background: "hsl(240 12% 8%)", borderLeft: "1px solid hsl(240 12% 15%)" }}>
           
           {/* Header */}
           <div className="flex items-center justify-between p-5 border-b flex-shrink-0" style={{ borderColor: "hsl(240 12% 15%)" }}>
@@ -443,9 +442,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
               {isEditing ? "Salvar Alterações" : "Criar Plano"}
             </button>
           </div>
-
         </div>
-      </div>
     </>
   );
 }
