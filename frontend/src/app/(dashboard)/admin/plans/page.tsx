@@ -524,7 +524,7 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
       
       {/* Features string at the bottom if any */}
       {enabledFeatures.length > 0 && (
-         <div className="mt-5 pt-4 border-t flex flex-wrap gap-2 lg:pr-10" style={{ borderColor: "rgba(255,255,255,0.04)" }}>
+         <div className="mt-4 pt-4 border-t flex flex-wrap gap-2 relative z-0" style={{ borderColor: "rgba(255,255,255,0.04)" }}>
             {enabledFeatures.map(({ key, label, icon }) => (
               <span key={key} className="flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full font-medium" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "hsl(240 8% 65%)" }}>
                 {icon} {label}
@@ -533,14 +533,21 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
          </div>
       )}
 
-      {/* Edit Button Float */}
-      <div className="absolute bottom-4 sm:bottom-5 right-4 sm:right-5 z-10 flex lg:opacity-0 group-hover:opacity-100 transition-opacity">
-         <button onClick={onEdit} className="btn-primary px-3 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-xs rounded-xl flex items-center gap-1.5" style={{ background: "rgba(0,212,106,0.15)", border: "1px solid rgba(0,212,106,0.25)", color: "var(--green)" }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.25)" }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.15)" }}>
-           <Edit2 className="w-3.5 h-3.5 md:hidden" />
-           <span className="hidden md:inline">Editar Configurações</span>
-           <span className="inline md:hidden">Editar</span>
+      {/* Edit Button - Anchored to card's relative space */}
+      <div className="flex justify-end mt-4">
+         <button 
+           onClick={onEdit} 
+           className="btn-primary px-4 py-2 text-xs rounded-xl flex items-center gap-2 transition-all active:scale-95 shadow-lg" 
+           style={{ 
+             background: "rgba(0,212,106,0.1)", 
+             border: "1px solid rgba(0,212,106,0.2)", 
+             color: "var(--green)" 
+           }}
+           onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.2)" }}
+           onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.1)" }}
+         >
+           <Edit2 className="w-3.5 h-3.5" />
+           <span>Editar Plano</span>
          </button>
       </div>
     </div>
