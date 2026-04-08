@@ -19,6 +19,7 @@ interface EditState {
   allow_proxy: boolean;
   is_active: boolean;
   stripe_price_id: string;
+  asaas_product_id: string;
   description: string;
   highlights: string[]; // custom feature texts shown on /plans
   features: string; // raw JSON string
@@ -71,7 +72,7 @@ function featuresObjToCheckboxes(featObj: Record<string, unknown>): Record<strin
 
 function checkboxesToFeaturesObj(
   checkboxes: Record<string, boolean>,
-  extra: { description: string; stripe_price_id: string; highlights: string[]; support?: string }
+  extra: { description: string; stripe_price_id: string; highlights: string[]; support?: string; asaas_product_id?: string }
 ): Record<string, unknown> {
   const obj: Record<string, unknown> = {};
   FEATURE_KEYS.forEach(({ key }) => {
@@ -81,6 +82,7 @@ function checkboxesToFeaturesObj(
   // Only store highlights if the admin has customized them
   if (extra.highlights.length > 0) obj["highlights"] = extra.highlights;
   if (extra.stripe_price_id) obj["stripe_price_id"] = extra.stripe_price_id;
+  if (extra.asaas_product_id) obj["asaas_product_id"] = extra.asaas_product_id;
   return obj;
 }
 
@@ -183,7 +185,7 @@ function FeatureGrid({
   return (
     <div>
       <p className="text-xs font-medium mb-2" style={{ color: "hsl(240 8% 46%)" }}>Recursos incluídos</p>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {FEATURE_KEYS.map(({ key, label, icon }) => (
           <label key={key} className="flex items-center gap-2 cursor-pointer p-2 rounded-xl transition-colors overflow-hidden min-w-0"
             style={{
@@ -219,9 +221,9 @@ function PlanEditForm({
   isPending: boolean;
 }) {
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        <div>
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="sm:col-span-2">
           <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Nome do plano</label>
           <input
             type="text"
@@ -277,16 +279,30 @@ function PlanEditForm({
         </div>
       </div>
 
-      {/* Stripe Price ID */}
-      <div>
-        <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Stripe Price ID</label>
-        <input
-          type="text"
-          value={form.stripe_price_id}
-          onChange={(e) => setForm({ ...form, stripe_price_id: e.target.value })}
-          placeholder="price_xxxxxxxx"
-          className="input-field w-full font-mono text-xs"
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Stripe Price ID */}
+        <div>
+          <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Stripe Price ID</label>
+          <input
+            type="text"
+            value={form.stripe_price_id}
+            onChange={(e) => setForm({ ...form, stripe_price_id: e.target.value })}
+            placeholder="price_xxxxxxxx"
+            className="input-field w-full font-mono text-xs"
+          />
+        </div>
+
+        {/* Asaas Product ID */}
+        <div>
+          <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Asaas Product ID</label>
+          <input
+            type="text"
+            value={form.asaas_product_id}
+            onChange={(e) => setForm({ ...form, asaas_product_id: e.target.value })}
+            placeholder="prod_xxxxxxxx"
+            className="input-field w-full font-mono text-xs"
+          />
+        </div>
       </div>
 
       {/* Description */}
@@ -360,6 +376,7 @@ function PlanCard({ plan }: { plan: Plan }) {
     allow_proxy: plan.allow_proxy,
     is_active: plan.is_active,
     stripe_price_id: plan.stripe_price_id ?? "",
+    asaas_product_id: (plan as any).asaas_product_id ?? "",
     description: (typeof featObj["description"] === "string" ? featObj["description"] : "") as string,
     highlights: Array.isArray(featObj["highlights"]) ? (featObj["highlights"] as string[]) : [],
     features: JSON.stringify(featObj, null, 2),
@@ -382,6 +399,7 @@ function PlanCard({ plan }: { plan: Plan }) {
         allow_proxy: form.allow_proxy,
         is_active: form.is_active,
         stripe_price_id: form.stripe_price_id || undefined,
+        asaas_product_id: form.asaas_product_id || undefined,
         // backend expects features as JSON string
         features: JSON.stringify(featuresPayload),
       });
@@ -527,83 +545,39 @@ function PlanCard({ plan }: { plan: Plan }) {
 
         {/* Edit Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowEditModal(false)} />
-          <div className="relative w-full max-w-3xl max-h-[90dvh] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-            style={{ background: "hsl(240 12% 8%)", border: `1px solid ${style.border}` }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowEditModal(false)} />
+          <div className="relative w-full max-w-4xl rounded-3xl shadow-2xl flex flex-col animate-fade-in-up"
+            style={{ background: "hsl(240 12% 8%)", border: `1px solid ${style.border}`, maxHeight: "85vh" }}>
             <div className="flex items-center justify-between p-5 border-b flex-shrink-0"
-              style={{ borderColor: "hsl(240 12% 15%)", background: "hsl(240 12% 8%)" }}>
+              style={{ borderColor: "rgba(255,255,255,0.05)" }}>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: style.gradient }}>
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: style.gradient }}>
                   {plan.name === "Enterprise" || plan.name === "Business"
-                    ? <Zap className="w-5 h-5" style={{ color: style.icon }} />
+                    ? <Zap className="w-4 h-4" style={{ color: style.icon }} />
                     : plan.name === "Pro"
-                    ? <CreditCard className="w-5 h-5" style={{ color: style.icon }} />
+                    ? <CreditCard className="w-4 h-4" style={{ color: style.icon }} />
                     : plan.name === "Starter"
-                    ? <Flame className="w-5 h-5" style={{ color: style.icon }} />
-                    : <Shield className="w-5 h-5" style={{ color: style.icon }} />
+                    ? <Flame className="w-4 h-4" style={{ color: style.icon }} />
+                    : <Shield className="w-4 h-4" style={{ color: style.icon }} />
                   }
                 </div>
-                <h3 className="font-bold text-lg" style={{ color: "hsl(240 15% 93%)" }}>Editar {plan.name}</h3>
+                <h3 className="font-semibold text-sm" style={{ color: "hsl(240 15% 93%)" }}>Editar {plan.name}</h3>
               </div>
-              <button onClick={() => setShowEditModal(false)} className="p-2 rounded-lg hover:bg-white/5 transition-colors" style={{ color: "hsl(240 8% 40%)" }}>
-                <X className="w-5 h-5" />
+              <button onClick={() => setShowEditModal(false)} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors" style={{ color: "hsl(240 8% 40%)" }}>
+                <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-6 space-y-5 overflow-y-auto flex-1">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm block font-medium" style={{ color: "hsl(240 8% 46%)" }}>Nome do plano</label>
-                  <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field w-full text-sm" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm block font-medium" style={{ color: "hsl(240 8% 46%)" }}>Preço (R$)</label>
-                  <input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} className="input-field w-full text-sm" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm block font-medium" style={{ color: "hsl(240 8% 46%)" }}>Instâncias (-1 = ∞)</label>
-                  <input type="number" value={form.max_instances} onChange={(e) => setForm({ ...form, max_instances: Number(e.target.value) })} className="input-field w-full text-sm" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm block font-medium" style={{ color: "hsl(240 8% 46%)" }}>Msgs/dia (-1 = ∞)</label>
-                  <input type="number" value={form.max_messages_per_day} onChange={(e) => setForm({ ...form, max_messages_per_day: Number(e.target.value) })} className="input-field w-full text-sm" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm block font-medium" style={{ color: "hsl(240 8% 46%)" }}>Usuários (-1 = ∞)</label>
-                  <input type="number" value={form.max_users} onChange={(e) => setForm({ ...form, max_users: Number(e.target.value) })} className="input-field w-full text-sm" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm block font-medium" style={{ color: "hsl(240 8% 46%)" }}>Workspaces (-1 = ∞)</label>
-                  <input type="number" value={form.max_workspaces} onChange={(e) => setForm({ ...form, max_workspaces: Number(e.target.value) })} className="input-field w-full text-sm" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm block font-medium" style={{ color: "hsl(240 8% 46%)" }}>Stripe Price ID</label>
-                <input type="text" value={form.stripe_price_id} onChange={(e) => setForm({ ...form, stripe_price_id: e.target.value })} placeholder="price_xxxxxxxx" className="input-field w-full font-mono text-sm" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm block font-medium" style={{ color: "hsl(240 8% 46%)" }}>Descrição</label>
-                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className="input-field w-full resize-none text-sm" />
-              </div>
-              <FeatureGrid checkboxes={checkboxes} onChange={(key, val) => setCheckboxes({ ...checkboxes, [key]: val })} />
-              <HighlightsEditor highlights={form.highlights} onChange={(h) => setForm({ ...form, highlights: h })} />
-              <div className="flex items-center gap-6 flex-wrap">
-                <label className="flex items-center gap-2.5 cursor-pointer flex-shrink-0">
-                  <Toggle checked={form.allow_proxy} onChange={(v) => setForm({ ...form, allow_proxy: v })} color="rgba(96,165,250,0.8)" />
-                  <span className="text-sm" style={{ color: "hsl(240 8% 60%)" }}>Proxy</span>
-                </label>
-                <label className="flex items-center gap-2.5 cursor-pointer flex-shrink-0">
-                  <Toggle checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
-                  <span className="text-sm" style={{ color: "hsl(240 8% 60%)" }}>Ativo</span>
-                </label>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button onClick={() => setShowEditModal(false)} className="btn-ghost flex-1 py-2 text-sm">Cancelar</button>
-                <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending} className="btn-primary flex-1 flex items-center justify-center gap-2 py-2 text-sm disabled:opacity-40">
-                  {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                  Salvar
-                </button>
-              </div>
+            <div className="p-5 overflow-y-auto flex-1 custom-scrollbar">
+              <PlanEditForm
+                form={form}
+                setForm={setForm}
+                checkboxes={checkboxes}
+                setCheckboxes={setCheckboxes}
+                onCancel={() => setShowEditModal(false)}
+                onSave={() => updateMutation.mutate()}
+                isPending={updateMutation.isPending}
+              />
             </div>
           </div>
         </div>
@@ -627,6 +601,7 @@ function NewPlanForm({ onDone }: { onDone: () => void }) {
     allow_proxy: false,
     is_active: true,
     stripe_price_id: "",
+    asaas_product_id: "",
     description: "",
     highlights: [],
     features: "{}",
@@ -639,6 +614,7 @@ function NewPlanForm({ onDone }: { onDone: () => void }) {
         description: form.description,
         stripe_price_id: form.stripe_price_id,
         highlights: form.highlights,
+        asaas_product_id: form.asaas_product_id,
       });
       return adminApi.createPlan({
         name: form.name,
@@ -650,6 +626,7 @@ function NewPlanForm({ onDone }: { onDone: () => void }) {
         allow_proxy: form.allow_proxy,
         is_active: form.is_active,
         stripe_price_id: form.stripe_price_id || undefined,
+        asaas_product_id: form.asaas_product_id || undefined,
         // backend expects features as JSON string
         features: JSON.stringify(featuresPayload),
       });
