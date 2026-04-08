@@ -273,7 +273,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
         />
         
         {/* Slide-over Drawer */}
-        <div className="relative w-full max-w-md h-screen shadow-2xl flex flex-col animate-drawer-in"
+        <div className="relative w-full max-w-md h-full shadow-2xl flex flex-col animate-drawer-in"
           style={{ background: "hsl(240 12% 8%)", borderLeft: "1px solid hsl(240 12% 15%)" }}>
           
           {/* Header */}
