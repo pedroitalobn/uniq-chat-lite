@@ -265,15 +265,15 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
         .animate-drawer-in { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       `}</style>
       
-      <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="fixed inset-0 z-[100] flex justify-end">
         {/* Backdrop */}
         <div 
-          className="absolute inset-0 bg-black/70 backdrop-blur-[2px] transition-opacity" 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity" 
           onClick={onClose} 
         />
         
         {/* Slide-over Drawer */}
-        <div className="relative w-full max-w-lg h-full shadow-2xl flex flex-col animate-drawer-in"
+        <div className="relative w-full max-w-xl h-screen shadow-2xl flex flex-col animate-drawer-in"
           style={{ background: "hsl(240 12% 8%)", borderLeft: "1px solid hsl(240 12% 15%)" }}>
           
           {/* Header */}
@@ -522,33 +522,33 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
         </div>
       </div>
       
-      {/* Features string at the bottom if any */}
-      {enabledFeatures.length > 0 && (
-         <div className="mt-4 pt-4 border-t flex flex-wrap gap-2 relative z-0" style={{ borderColor: "rgba(255,255,255,0.04)" }}>
-            {enabledFeatures.map(({ key, label, icon }) => (
-              <span key={key} className="flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full font-medium" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "hsl(240 8% 65%)" }}>
-                {icon} {label}
-              </span>
-            ))}
-         </div>
-      )}
+      {/* Bottom Footer Area: Tags + Edit Button */}
+      <div className="mt-4 pt-4 border-t flex items-center justify-between gap-4" style={{ borderColor: "rgba(255,255,255,0.04)" }}>
+        {/* Tags */}
+        <div className="flex flex-wrap gap-2 flex-1">
+          {enabledFeatures.map(({ key, label, icon }) => (
+            <span key={key} className="flex items-center gap-1.5 text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "hsl(240 8% 65%)" }}>
+              {icon} {label}
+            </span>
+          ))}
+          {enabledFeatures.length === 0 && <span className="text-[10px]" style={{ color: "hsl(240 8% 28%)" }}>Nenhum recurso extra</span>}
+        </div>
 
-      {/* Edit Button - Anchored to card's relative space */}
-      <div className="flex justify-end mt-4">
-         <button 
-           onClick={onEdit} 
-           className="btn-primary px-4 py-2 text-xs rounded-xl flex items-center gap-2 transition-all active:scale-95 shadow-lg" 
-           style={{ 
-             background: "rgba(0,212,106,0.1)", 
-             border: "1px solid rgba(0,212,106,0.2)", 
-             color: "var(--green)" 
-           }}
-           onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.2)" }}
-           onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.1)" }}
-         >
-           <Edit2 className="w-3.5 h-3.5" />
-           <span>Editar Plano</span>
-         </button>
+        {/* Edit Action */}
+        <button 
+          onClick={onEdit} 
+          className="btn-primary px-3 py-1.5 text-[10px] rounded-lg flex items-center gap-1.5 flex-shrink-0 transition-all active:scale-95 shadow-lg group-hover:shadow-green-500/10" 
+          style={{ 
+            background: "rgba(0,212,106,0.08)", 
+            border: "1px solid rgba(0,212,106,0.18)", 
+            color: "var(--green)" 
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.15)" }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.08)" }}
+        >
+          <Edit2 className="w-3 h-3" />
+          <span>Editar</span>
+        </button>
       </div>
     </div>
   );
