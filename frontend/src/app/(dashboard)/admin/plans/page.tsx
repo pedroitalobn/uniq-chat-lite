@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Plan } from "@/types";
+import { cn } from "@/lib/utils";
 
 interface EditState {
   name: string;
@@ -21,8 +22,8 @@ interface EditState {
   stripe_price_id: string;
   asaas_product_id: string;
   description: string;
-  highlights: string[]; // custom feature texts shown on /plans
-  features: string; // raw JSON string
+  highlights: string[]; 
+  features: string; 
 }
 
 const FEATURE_KEYS = [
@@ -56,7 +57,6 @@ function parseFeaturesObj(plan: Plan): Record<string, unknown> {
 
 function featuresObjToCheckboxes(featObj: Record<string, unknown>): Record<string, boolean> {
   const result: Record<string, boolean> = {};
-  // channels array support: {"channels":["whatsapp","instagram"]}
   const channels = Array.isArray(featObj.channels) ? (featObj.channels as string[]) : [];
   FEATURE_KEYS.forEach(({ key }) => {
     if (typeof featObj[key] === "boolean") {
@@ -79,7 +79,6 @@ function checkboxesToFeaturesObj(
     obj[key] = checkboxes[key] ?? false;
   });
   obj["description"] = extra.description;
-  // Only store highlights if the admin has customized them
   if (extra.highlights.length > 0) obj["highlights"] = extra.highlights;
   if (extra.stripe_price_id) obj["stripe_price_id"] = extra.stripe_price_id;
   if (extra.asaas_product_id) obj["asaas_product_id"] = extra.asaas_product_id;
@@ -87,13 +86,7 @@ function checkboxesToFeaturesObj(
 }
 
 // ─── Highlights editor ────────────────────────────────────────────────────────
-function HighlightsEditor({
-  highlights,
-  onChange,
-}: {
-  highlights: string[];
-  onChange: (h: string[]) => void;
-}) {
+function HighlightsEditor({ highlights, onChange }: { highlights: string[]; onChange: (h: string[]) => void; }) {
   const update = (i: number, val: string) => {
     const next = [...highlights];
     next[i] = val;
@@ -107,9 +100,6 @@ function HighlightsEditor({
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs font-medium" style={{ color: "hsl(240 8% 46%)" }}>
           Textos das funcionalidades
-          <span className="ml-1.5 text-[10px]" style={{ color: "hsl(240 8% 32%)" }}>
-            (exibidos em /plans · vazio = gerado automaticamente)
-          </span>
         </p>
         <button
           type="button"
@@ -145,7 +135,7 @@ function HighlightsEditor({
         ))}
         {highlights.length === 0 && (
           <p className="text-[11px] text-center py-2" style={{ color: "hsl(240 8% 28%)" }}>
-            Nenhum texto personalizado · clique em Adicionar para customizar
+            Nenhum texto personalizado
           </p>
         )}
       </div>
@@ -154,9 +144,7 @@ function HighlightsEditor({
 }
 
 // ─── Toggle component ─────────────────────────────────────────────────────────
-function Toggle({ checked, onChange, color = "var(--green)" }: {
-  checked: boolean; onChange: (v: boolean) => void; color?: string;
-}) {
+function Toggle({ checked, onChange, color = "var(--green)" }: { checked: boolean; onChange: (v: boolean) => void; color?: string; }) {
   return (
     <button
       type="button"
@@ -175,17 +163,10 @@ function Toggle({ checked, onChange, color = "var(--green)" }: {
 }
 
 // ─── Feature checkboxes grid ──────────────────────────────────────────────────
-function FeatureGrid({
-  checkboxes,
-  onChange,
-}: {
-  checkboxes: Record<string, boolean>;
-  onChange: (key: string, val: boolean) => void;
-}) {
+function FeatureGrid({ checkboxes, onChange }: { checkboxes: Record<string, boolean>; onChange: (key: string, val: boolean) => void; }) {
   return (
     <div>
-      <p className="text-xs font-medium mb-2" style={{ color: "hsl(240 8% 46%)" }}>Recursos incluídos</p>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {FEATURE_KEYS.map(({ key, label, icon }) => (
           <label key={key} className="flex items-center gap-2 cursor-pointer p-2 rounded-xl transition-colors overflow-hidden min-w-0"
             style={{
@@ -202,194 +183,40 @@ function FeatureGrid({
   );
 }
 
-// ─── Plan Edit Form ───────────────────────────────────────────────────────────
-function PlanEditForm({
-  form,
-  setForm,
-  checkboxes,
-  setCheckboxes,
-  onCancel,
-  onSave,
-  isPending,
-}: {
-  form: EditState;
-  setForm: (f: EditState) => void;
-  checkboxes: Record<string, boolean>;
-  setCheckboxes: (c: Record<string, boolean>) => void;
-  onCancel: () => void;
-  onSave: () => void;
-  isPending: boolean;
-}) {
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="sm:col-span-2">
-          <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Nome do plano</label>
-          <input
-            type="text"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="input-field w-full"
-          />
-        </div>
-        <div>
-          <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Preço (R$)</label>
-          <input
-            type="number"
-            value={form.price}
-            onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
-            className="input-field w-full"
-          />
-        </div>
-        <div>
-          <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Instâncias (-1 = ∞)</label>
-          <input
-            type="number"
-            value={form.max_instances}
-            onChange={(e) => setForm({ ...form, max_instances: Number(e.target.value) })}
-            className="input-field w-full"
-          />
-        </div>
-        <div>
-          <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Msgs/dia (-1 = ∞)</label>
-          <input
-            type="number"
-            value={form.max_messages_per_day}
-            onChange={(e) => setForm({ ...form, max_messages_per_day: Number(e.target.value) })}
-            className="input-field w-full"
-          />
-        </div>
-        <div>
-          <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Usuários (-1 = ∞)</label>
-          <input
-            type="number"
-            value={form.max_users}
-            onChange={(e) => setForm({ ...form, max_users: Number(e.target.value) })}
-            className="input-field w-full"
-          />
-        </div>
-        <div>
-          <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Workspaces (-1 = ∞)</label>
-          <input
-            type="number"
-            value={form.max_workspaces}
-            onChange={(e) => setForm({ ...form, max_workspaces: Number(e.target.value) })}
-            className="input-field w-full"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Stripe Price ID */}
-        <div>
-          <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Stripe Price ID</label>
-          <input
-            type="text"
-            value={form.stripe_price_id}
-            onChange={(e) => setForm({ ...form, stripe_price_id: e.target.value })}
-            placeholder="price_xxxxxxxx"
-            className="input-field w-full font-mono text-xs"
-          />
-        </div>
-
-        {/* Asaas Product ID */}
-        <div>
-          <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Asaas Product ID</label>
-          <input
-            type="text"
-            value={form.asaas_product_id}
-            onChange={(e) => setForm({ ...form, asaas_product_id: e.target.value })}
-            placeholder="prod_xxxxxxxx"
-            className="input-field w-full font-mono text-xs"
-          />
-        </div>
-      </div>
-
-      {/* Description */}
-      <div>
-        <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 46%)" }}>Descrição (exibida na página de planos)</label>
-        <textarea
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-          placeholder="Ideal para pequenos negócios..."
-          rows={2}
-          className="input-field w-full resize-none text-sm"
-        />
-      </div>
-
-      {/* Feature checkboxes */}
-      <FeatureGrid
-        checkboxes={checkboxes}
-        onChange={(key, val) => setCheckboxes({ ...checkboxes, [key]: val })}
-      />
-
-      {/* Highlights editor */}
-      <HighlightsEditor
-        highlights={form.highlights}
-        onChange={(h) => setForm({ ...form, highlights: h })}
-      />
-
-      {/* Toggles */}
-      <div className="flex items-center gap-5 flex-wrap">
-        <label className="flex items-center gap-2.5 cursor-pointer flex-shrink-0">
-          <Toggle checked={form.allow_proxy} onChange={(v) => setForm({ ...form, allow_proxy: v })} color="rgba(96,165,250,0.8)" />
-          <span className="text-xs" style={{ color: "hsl(240 8% 60%)" }}>Proxy</span>
-        </label>
-        <label className="flex items-center gap-2.5 cursor-pointer flex-shrink-0">
-          <Toggle checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
-          <span className="text-xs" style={{ color: "hsl(240 8% 60%)" }}>Ativo</span>
-        </label>
-      </div>
-
-      <div className="flex gap-2 pt-1">
-        <button onClick={onCancel} className="btn-ghost flex-1 py-2 text-sm">
-          Cancelar
-        </button>
-        <button
-          onClick={onSave}
-          disabled={isPending}
-          className="btn-primary flex-1 flex items-center justify-center gap-2 py-2 text-sm disabled:opacity-40"
-        >
-          {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-          Salvar
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Plan Card ────────────────────────────────────────────────────────────────
-function PlanCard({ plan }: { plan: Plan }) {
+// ─── Plan Drawer ────────────────────────────────────────────────────────────
+function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void }) {
   const queryClient = useQueryClient();
-  const [showEditModal, setShowEditModal] = useState(false);
+  const isEditing = plan !== "new";
+  const p = isEditing ? (plan as Plan) : null;
 
-  const featObj = parseFeaturesObj(plan);
-  const [checkboxes, setCheckboxes] = useState<Record<string, boolean>>(() => featuresObjToCheckboxes(featObj));
+  const featObj = p ? parseFeaturesObj(p) : {};
+  const defaultCheckboxes = Object.fromEntries(FEATURE_KEYS.map(({ key }) => [key, false]));
 
   const [form, setForm] = useState<EditState>({
-    name: plan.name,
-    price: plan.price,
-    max_instances: plan.max_instances,
-    max_messages_per_day: plan.max_messages_per_day,
-    max_users: plan.max_users,
-    max_workspaces: plan.max_workspaces,
-    allow_proxy: plan.allow_proxy,
-    is_active: plan.is_active,
-    stripe_price_id: plan.stripe_price_id ?? "",
-    asaas_product_id: (plan as any).asaas_product_id ?? "",
-    description: (typeof featObj["description"] === "string" ? featObj["description"] : "") as string,
+    name: p?.name || "",
+    price: p?.price || 0,
+    max_instances: p?.max_instances ?? 1,
+    max_messages_per_day: p?.max_messages_per_day ?? 100,
+    max_users: p?.max_users ?? 1,
+    max_workspaces: p?.max_workspaces ?? 1,
+    allow_proxy: p?.allow_proxy ?? false,
+    is_active: p?.is_active ?? true,
+    stripe_price_id: p?.stripe_price_id ?? "",
+    asaas_product_id: (p as any)?.asaas_product_id ?? "",
+    description: typeof featObj["description"] === "string" ? featObj["description"] : "",
     highlights: Array.isArray(featObj["highlights"]) ? (featObj["highlights"] as string[]) : [],
     features: JSON.stringify(featObj, null, 2),
   });
 
-  const updateMutation = useMutation({
+  const [checkboxes, setCheckboxes] = useState<Record<string, boolean>>(() =>
+    isEditing ? featuresObjToCheckboxes(featObj) : defaultCheckboxes
+  );
+
+  const [activeTab, setActiveTab] = useState<"general" | "limits" | "features" | "gateway" | "visuals">("general");
+
+  const saveMutation = useMutation({
     mutationFn: () => {
-      const featuresPayload = checkboxesToFeaturesObj(checkboxes, {
-        description: form.description,
-        stripe_price_id: form.stripe_price_id,
-        highlights: form.highlights,
-      });
-      return adminApi.updatePlan(plan.id, {
+      const payload = {
         name: form.name,
         price: form.price,
         max_instances: form.max_instances,
@@ -400,20 +227,233 @@ function PlanCard({ plan }: { plan: Plan }) {
         is_active: form.is_active,
         stripe_price_id: form.stripe_price_id || undefined,
         asaas_product_id: form.asaas_product_id || undefined,
-        // backend expects features as JSON string
-        features: JSON.stringify(featuresPayload),
-      });
+        features: JSON.stringify(checkboxesToFeaturesObj(checkboxes, {
+          description: form.description,
+          stripe_price_id: form.stripe_price_id,
+          highlights: form.highlights,
+          asaas_product_id: form.asaas_product_id,
+        })),
+      };
+
+      if (isEditing) {
+        return adminApi.updatePlan(p!.id, payload);
+      }
+      return adminApi.createPlan(payload);
     },
     onSuccess: () => {
-      toast.success("Plano atualizado!");
+      toast.success(isEditing ? "Plano atualizado!" : "Plano criado!");
       queryClient.invalidateQueries({ queryKey: ["admin-plans"] });
       queryClient.invalidateQueries({ queryKey: ["plans-public"] });
       queryClient.invalidateQueries({ queryKey: ["stripe-plans"] });
-      setShowEditModal(false);
+      onClose();
     },
-    onError: () => toast.error("Erro ao atualizar plano"),
+    onError: () => toast.error(isEditing ? "Erro ao atualizar plano" : "Erro ao criar plano"),
   });
 
+  const TABS = [
+    { id: "general", label: "Geral" },
+    { id: "limits", label: "Limites" },
+    { id: "features", label: "Recursos" },
+    { id: "gateway", label: "Cobranças" },
+    { id: "visuals", label: "Aparência" },
+  ] as const;
+
+  return (
+    <>
+      <style>{`
+        @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .animate-drawer-in { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      `}</style>
+      
+      <div className="fixed inset-0 z-50 flex justify-end">
+        {/* Backdrop */}
+        <div 
+          className="absolute inset-0 bg-black/70 backdrop-blur-[2px] transition-opacity" 
+          onClick={onClose} 
+        />
+        
+        {/* Slide-over Drawer */}
+        <div className="relative w-full max-w-lg h-full shadow-2xl flex flex-col animate-drawer-in"
+          style={{ background: "hsl(240 12% 8%)", borderLeft: "1px solid hsl(240 12% 15%)" }}>
+          
+          {/* Header */}
+          <div className="flex items-center justify-between p-5 border-b flex-shrink-0" style={{ borderColor: "hsl(240 12% 15%)" }}>
+            <div>
+              <h2 className="text-lg font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
+                {isEditing ? "Editar Plano" : "Novo Plano"}
+              </h2>
+              {isEditing && <p className="text-[10px] text-zinc-500 font-mono mt-0.5">{p!.id}</p>}
+            </div>
+            <button onClick={onClose} className="p-2 rounded-xl transition-colors hover:bg-white/5 text-zinc-400">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Tab Navigation */}
+          <div className="flex px-2 pt-2 border-b overflow-x-auto flex-shrink-0 custom-scrollbar" style={{ borderColor: "hsl(240 12% 12%)" }}>
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors",
+                  activeTab === tab.id
+                    ? "border-green-500 text-green-500"
+                    : "border-transparent text-zinc-500 hover:text-zinc-300"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Form Content */}
+          <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+            
+            {activeTab === "general" && (
+              <div className="space-y-4 animate-fade-in-up">
+                <div>
+                  <label className="text-xs block mb-1.5 text-zinc-400">Nome do plano</label>
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    className="input-field w-full"
+                    placeholder="Ex: Profissional"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs block mb-1.5 text-zinc-400">Preço (R$)</label>
+                  <input
+                    type="number"
+                    value={form.price}
+                    onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+                    className="input-field w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs block mb-1.5 text-zinc-400">Descrição (Card)</label>
+                  <textarea
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    rows={3}
+                    className="input-field w-full resize-none"
+                    placeholder="Descrição breve para exibição aos clientes."
+                  />
+                </div>
+                <div className="pt-2">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <Toggle checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} />
+                    <div>
+                      <span className="text-sm font-medium text-zinc-300 block">Status de Comercialização</span>
+                      <span className="text-[10px] text-zinc-500 block">Permitir assinaturas públicas deste plano</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "limits" && (
+              <div className="space-y-4 animate-fade-in-up">
+                <div className="p-3 mb-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-[11px] text-yellow-500">
+                  Dica: Utilize <strong className="font-mono bg-yellow-500/20 px-1 py-0.5 rounded">-1</strong> para configurar limites infinitos (ilimitado).
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs block mb-1.5 text-zinc-400">Max. Workspaces</label>
+                    <input type="number" value={form.max_workspaces} onChange={(e) => setForm({ ...form, max_workspaces: Number(e.target.value) })} className="input-field w-full font-mono" />
+                  </div>
+                  <div>
+                    <label className="text-xs block mb-1.5 text-zinc-400">Max. Usuários</label>
+                    <input type="number" value={form.max_users} onChange={(e) => setForm({ ...form, max_users: Number(e.target.value) })} className="input-field w-full font-mono" />
+                  </div>
+                  <div>
+                    <label className="text-xs block mb-1.5 text-zinc-400">Max. Instâncias WPP</label>
+                    <input type="number" value={form.max_instances} onChange={(e) => setForm({ ...form, max_instances: Number(e.target.value) })} className="input-field w-full font-mono" />
+                  </div>
+                  <div>
+                    <label className="text-xs block mb-1.5 text-zinc-400">Limite de Envios Diários</label>
+                    <input type="number" value={form.max_messages_per_day} onChange={(e) => setForm({ ...form, max_messages_per_day: Number(e.target.value) })} className="input-field w-full font-mono" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "features" && (
+              <div className="space-y-6 animate-fade-in-up">
+                <FeatureGrid checkboxes={checkboxes} onChange={(key, val) => setCheckboxes({ ...checkboxes, [key]: val })} />
+                
+                <div className="pt-2 border-t border-white/5">
+                  <label className="flex items-center gap-3 cursor-pointer mt-4">
+                    <Toggle checked={form.allow_proxy} onChange={(v) => setForm({ ...form, allow_proxy: v })} color="#60a5fa" />
+                    <div>
+                      <span className="text-sm font-medium text-blue-400 block">Sessão via Proxy</span>
+                      <span className="text-[10px] text-zinc-500 block">Habilita menu de proxies na página da instância</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "gateway" && (
+              <div className="space-y-4 animate-fade-in-up">
+                <div>
+                  <label className="text-xs block mb-1.5 text-zinc-400">Stripe Price ID</label>
+                  <input
+                    type="text"
+                    value={form.stripe_price_id}
+                    onChange={(e) => setForm({ ...form, stripe_price_id: e.target.value })}
+                    placeholder="price_xxxxxxxxxxxxxxxxx"
+                    className="input-field w-full font-mono text-xs"
+                  />
+                  <p className="text-[10px] text-zinc-500 mt-1.5">Copie o ID da precificação do produto no painel do Stripe.</p>
+                </div>
+                <div>
+                  <label className="text-xs block mb-1.5 text-zinc-400">Asaas Product ID (se aplicável)</label>
+                  <input
+                    type="text"
+                    value={form.asaas_product_id}
+                    onChange={(e) => setForm({ ...form, asaas_product_id: e.target.value })}
+                    placeholder="prod_xxxxxxxxxxxxxxxxx"
+                    className="input-field w-full font-mono text-xs"
+                  />
+                  <p className="text-[10px] text-zinc-500 mt-1.5">Mapeado apenas em integrações compatíveis no Asaas.</p>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "visuals" && (
+              <div className="animate-fade-in-up">
+                <HighlightsEditor highlights={form.highlights} onChange={(h) => setForm({ ...form, highlights: h })} />
+              </div>
+            )}
+
+          </div>
+
+          {/* Footer Actions */}
+          <div className="p-5 border-t flex gap-3 flex-shrink-0" style={{ borderColor: "hsl(240 12% 15%)", background: "hsl(240 12% 7%)" }}>
+            <button onClick={onClose} className="btn-ghost flex-1 py-2.5 text-sm">
+              Cancelar
+            </button>
+            <button
+              onClick={() => saveMutation.mutate()}
+              disabled={saveMutation.isPending}
+              className="btn-primary flex-1 flex items-center justify-center gap-2 py-2.5 text-sm disabled:opacity-40"
+            >
+              {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              {isEditing ? "Salvar Alterações" : "Criar Plano"}
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Plan Card ────────────────────────────────────────────────────────────────
+function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
+  const featObj = parseFeaturesObj(plan);
   const style = getPlanStyle(plan.name);
   const description = typeof featObj["description"] === "string" ? featObj["description"] : "";
   const enabledFeatures = FEATURE_KEYS.filter(({ key }) => {
@@ -425,7 +465,7 @@ function PlanCard({ plan }: { plan: Plan }) {
 
   return (
     <div
-      className="rounded-2xl p-5 space-y-5 animate-fade-in-up"
+      className="rounded-2xl p-5 space-y-5 animate-fade-in-up relative group"
       style={{ background: style.bg, border: `1px solid ${style.border}` }}
     >
       {/* Header */}
@@ -452,78 +492,40 @@ function PlanCard({ plan }: { plan: Plan }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span
-            className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-            style={plan.is_active ? {
-              background: "rgba(0,212,106,0.08)",
-              color: "#00d46a",
-              border: "1px solid rgba(0,212,106,0.15)",
-            } : {
-              background: "rgba(239,68,68,0.08)",
-              color: "#f87171",
-              border: "1px solid rgba(239,68,68,0.15)",
-            }}
-          >
-            {plan.is_active ? "Ativo" : "Inativo"}
-          </span>
-          <button
-            onClick={() => setShowEditModal(true)}
-            className="p-1.5 rounded-lg transition-colors"
-            style={{ color: "hsl(240 8% 38%)" }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)";
-              (e.currentTarget as HTMLElement).style.color = "hsl(240 15% 80%)";
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.background = "transparent";
-              (e.currentTarget as HTMLElement).style.color = "hsl(240 8% 38%)";
-            }}
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
+          {plan.is_active ? (
+            <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full" style={{ background: "rgba(0,212,106,0.08)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.15)" }}>
+              Ativo
+            </span>
+          ) : (
+            <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full" style={{ background: "rgba(239,68,68,0.08)", color: "#f87171", border: "1px solid rgba(239,68,68,0.15)" }}>
+              Inativo
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Display only - click edit to modify */}
       <div className="space-y-3">
-        {description && (
-          <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 55%)" }}>{description}</p>
-        )}
+        {description && <p className="text-xs leading-relaxed text-zinc-400">{description}</p>}
 
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
             <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Instâncias</p>
-            <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>
-              {plan.max_instances === -1 ? "∞" : plan.max_instances}
-            </p>
+            <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_instances === -1 ? "∞" : plan.max_instances}</p>
           </div>
           <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
             <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Msgs/dia</p>
-            <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>
-              {plan.max_messages_per_day === -1 ? "∞" : plan.max_messages_per_day.toLocaleString("pt-BR")}
-            </p>
+            <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_messages_per_day === -1 ? "∞" : plan.max_messages_per_day.toLocaleString("pt-BR")}</p>
           </div>
           <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
             <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Usuários</p>
-            <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>
-              {plan.max_users === -1 ? "∞" : plan.max_users}
-            </p>
+            <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_users === -1 ? "∞" : plan.max_users}</p>
           </div>
           <div className="rounded-xl p-3" style={{ background: "rgba(0,0,0,0.2)" }}>
             <p className="text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Workspaces</p>
-            <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>
-              {plan.max_workspaces === -1 ? "∞" : plan.max_workspaces}
-            </p>
+            <p className="text-xl font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_workspaces === -1 ? "∞" : plan.max_workspaces}</p>
           </div>
-          <div
-            className="col-span-2 rounded-xl p-3 flex items-center gap-2"
-            style={plan.allow_proxy ? {
-              background: "rgba(96,165,250,0.06)",
-              border: "1px solid rgba(96,165,250,0.12)",
-            } : {
-              background: "rgba(0,0,0,0.15)",
-            }}
-          >
+          
+          <div className="col-span-2 rounded-xl p-3 flex items-center gap-2" style={{ background: plan.allow_proxy ? "rgba(96,165,250,0.06)" : "rgba(0,0,0,0.15)", border: plan.allow_proxy ? "1px solid rgba(96,165,250,0.12)" : "1px solid transparent" }}>
             <Globe className="w-3.5 h-3.5" style={{ color: plan.allow_proxy ? "#60a5fa" : "hsl(240 8% 28%)" }} />
             <span className="text-xs font-medium" style={{ color: plan.allow_proxy ? "#93c5fd" : "hsl(240 8% 36%)" }}>
               Proxy {plan.allow_proxy ? "habilitado" : "desabilitado"}
@@ -534,8 +536,7 @@ function PlanCard({ plan }: { plan: Plan }) {
         {enabledFeatures.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-1">
             {enabledFeatures.map(({ key, label, icon }) => (
-              <span key={key} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 8% 62%)" }}>
+              <span key={key} className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 8% 62%)" }}>
                 {icon} {label}
               </span>
             ))}
@@ -543,131 +544,20 @@ function PlanCard({ plan }: { plan: Plan }) {
         )}
       </div>
 
-        {/* Edit Modal */}
-      {showEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowEditModal(false)} />
-          <div className="relative w-full max-w-4xl rounded-3xl shadow-2xl flex flex-col animate-fade-in-up"
-            style={{ background: "hsl(240 12% 8%)", border: `1px solid ${style.border}`, maxHeight: "85vh" }}>
-            <div className="flex items-center justify-between p-5 border-b flex-shrink-0"
-              style={{ borderColor: "rgba(255,255,255,0.05)" }}>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: style.gradient }}>
-                  {plan.name === "Enterprise" || plan.name === "Business"
-                    ? <Zap className="w-4 h-4" style={{ color: style.icon }} />
-                    : plan.name === "Pro"
-                    ? <CreditCard className="w-4 h-4" style={{ color: style.icon }} />
-                    : plan.name === "Starter"
-                    ? <Flame className="w-4 h-4" style={{ color: style.icon }} />
-                    : <Shield className="w-4 h-4" style={{ color: style.icon }} />
-                  }
-                </div>
-                <h3 className="font-semibold text-sm" style={{ color: "hsl(240 15% 93%)" }}>Editar {plan.name}</h3>
-              </div>
-              <button onClick={() => setShowEditModal(false)} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors" style={{ color: "hsl(240 8% 40%)" }}>
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-5 overflow-y-auto flex-1 custom-scrollbar">
-              <PlanEditForm
-                form={form}
-                setForm={setForm}
-                checkboxes={checkboxes}
-                setCheckboxes={setCheckboxes}
-                onCancel={() => setShowEditModal(false)}
-                onSave={() => updateMutation.mutate()}
-                isPending={updateMutation.isPending}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── New Plan Form ────────────────────────────────────────────────────────────
-function NewPlanForm({ onDone }: { onDone: () => void }) {
-  const queryClient = useQueryClient();
-  const defaultCheckboxes = Object.fromEntries(FEATURE_KEYS.map(({ key }) => [key, false])) as Record<string, boolean>;
-
-  const [form, setForm] = useState<EditState>({
-    name: "",
-    price: 0,
-    max_instances: 1,
-    max_messages_per_day: 100,
-    max_users: 1,
-    max_workspaces: 1,
-    allow_proxy: false,
-    is_active: true,
-    stripe_price_id: "",
-    asaas_product_id: "",
-    description: "",
-    highlights: [],
-    features: "{}",
-  });
-  const [checkboxes, setCheckboxes] = useState<Record<string, boolean>>(defaultCheckboxes);
-
-  const createMutation = useMutation({
-    mutationFn: () => {
-      const featuresPayload = checkboxesToFeaturesObj(checkboxes, {
-        description: form.description,
-        stripe_price_id: form.stripe_price_id,
-        highlights: form.highlights,
-        asaas_product_id: form.asaas_product_id,
-      });
-      return adminApi.createPlan({
-        name: form.name,
-        price: form.price,
-        max_instances: form.max_instances,
-        max_messages_per_day: form.max_messages_per_day,
-        max_users: form.max_users,
-        max_workspaces: form.max_workspaces,
-        allow_proxy: form.allow_proxy,
-        is_active: form.is_active,
-        stripe_price_id: form.stripe_price_id || undefined,
-        asaas_product_id: form.asaas_product_id || undefined,
-        // backend expects features as JSON string
-        features: JSON.stringify(featuresPayload),
-      });
-    },
-    onSuccess: () => {
-      toast.success("Plano criado!");
-      queryClient.invalidateQueries({ queryKey: ["admin-plans"] });
-      queryClient.invalidateQueries({ queryKey: ["plans-public"] });
-      onDone();
-    },
-    onError: () => toast.error("Erro ao criar plano"),
-  });
-
-  return (
-    <div
-      className="rounded-2xl p-5 animate-fade-in-up"
-      style={{ background: "rgba(0,212,106,0.04)", border: "1px solid rgba(0,212,106,0.15)" }}
-    >
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-          style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}>
-          <Plus className="w-4 h-4" style={{ color: "var(--green)" }} />
-        </div>
-        <h3 className="font-bold text-sm" style={{ color: "hsl(240 15% 93%)" }}>Novo Plano</h3>
+      {/* Edit Overlay Button */}
+      <div className="absolute inset-0 z-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl bg-black/60 backdrop-blur-[1px]">
+         <button onClick={onEdit} className="btn-primary shadow-2xl scale-95 group-hover:scale-100 transition-transform duration-200">
+           <Edit2 className="w-4 h-4 mr-2" />
+           Editar Configurações
+         </button>
       </div>
-      <PlanEditForm
-        form={form}
-        setForm={setForm}
-        checkboxes={checkboxes}
-        setCheckboxes={setCheckboxes}
-        onCancel={onDone}
-        onSave={() => createMutation.mutate()}
-        isPending={createMutation.isPending}
-      />
     </div>
   );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function AdminPlansPage() {
-  const [creatingNew, setCreatingNew] = useState(false);
+  const [activePlanDrawer, setActivePlanDrawer] = useState<Plan | "new" | null>(null);
 
   const { data: plans = [], isLoading } = useQuery<Plan[]>({
     queryKey: ["admin-plans"],
@@ -680,7 +570,7 @@ export default function AdminPlansPage() {
   };
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-7 relative">
       {/* Header */}
       <div className="flex items-end justify-between">
         <div>
@@ -693,59 +583,53 @@ export default function AdminPlansPage() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setCreatingNew((v) => !v)}
-            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-all duration-150 active:scale-[0.97]"
-            style={{
-              background: creatingNew ? "rgba(0,212,106,0.18)" : "rgba(0,212,106,0.1)",
-              border: "1px solid rgba(0,212,106,0.25)",
-              color: "var(--green)",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = "rgba(0,212,106,0.18)"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = creatingNew ? "rgba(0,212,106,0.18)" : "rgba(0,212,106,0.1)"; }}
+            onClick={() => setActivePlanDrawer("new")}
+            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-all duration-150 active:scale-[0.97] bg-green-500/10 text-green-500 border border-green-500/20 hover:bg-green-500/20"
           >
-            {creatingNew ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-            {creatingNew ? "Cancelar" : "Novo Plano"}
+            <Plus className="w-4 h-4" />
+            Novo Plano
           </button>
-          <div
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
-            style={{ background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.15)" }}
-          >
-            <Shield className="w-3.5 h-3.5" style={{ color: "#fbbf24" }} />
-            <span className="text-xs font-semibold" style={{ color: "#fbbf24" }}>Admin</span>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+            <Shield className="w-3.5 h-3.5 text-amber-500" />
+            <span className="text-xs font-semibold text-amber-500">Admin</span>
           </div>
         </div>
       </div>
 
-      {/* New plan form */}
-      {creatingNew && (
-        <NewPlanForm onDone={() => setCreatingNew(false)} />
-      )}
-
       {/* Plans grid */}
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-52 rounded-2xl" />)}
+          {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-[420px] rounded-2xl" />)}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {plans.map((plan) => <PlanCard key={plan.id} plan={plan} />)}
+          {plans.map((plan) => (
+            <PlanCard key={plan.id} plan={plan} onEdit={() => setActivePlanDrawer(plan)} />
+          ))}
         </div>
+      )}
+
+      {/* Global Drawer */}
+      {activePlanDrawer !== null && (
+        <PlanDrawer 
+          plan={activePlanDrawer} 
+          onClose={() => setActivePlanDrawer(null)} 
+        />
       )}
 
       {/* Notes */}
       <div className="rounded-2xl p-5 space-y-3" style={cardStyle}>
-        <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
-          Notas
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
+          Notas da Engenharia
         </h3>
         <ul className="space-y-2">
           {[
-            <>Use <code className="text-xs px-1.5 py-0.5 rounded-md" style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 15% 80%)" }}>-1</code> em limites numéricos para definir como ilimitado.</>,
-            "Alterar o plano Free não afeta usuários pagantes ativos.",
-            <>A flag <strong style={{ color: "hsl(240 15% 80%)" }}>Proxy</strong> controla o acesso à aba de configuração de proxy nas instâncias.</>,
-            <>O campo <strong style={{ color: "hsl(240 15% 80%)" }}>Stripe Price ID</strong> é usado para criar checkouts automáticos de assinatura.</>,
+            <>Use <code className="text-xs px-1.5 py-0.5 rounded-md bg-white/5 text-zinc-300">-1</code> em limites numéricos para definir como ilimitado.</>,
+            "Alterar o status de comercialização para 'Inativo' remove o plano da tela de aquisição, mas não interrompe subscrições em andamento.",
+            <>O campo <strong className="text-zinc-300">Stripe Price ID</strong> dita o produto faturado no checkout dinâmico da plataforma.</>,
           ].map((note, i) => (
-            <li key={i} className="flex items-start gap-2 text-sm" style={{ color: "hsl(240 8% 46%)" }}>
-              <span className="mt-1.5 w-1 h-1 rounded-full flex-shrink-0" style={{ background: "hsl(240 8% 28%)" }} />
+            <li key={i} className="flex items-start gap-2 text-sm text-zinc-400">
+              <span className="mt-1.5 w-1 h-1 rounded-full flex-shrink-0 bg-zinc-600" />
               {note}
             </li>
           ))}
