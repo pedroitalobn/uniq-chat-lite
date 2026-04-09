@@ -61,14 +61,25 @@ func (h *InstanceHandler) List(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar instâncias"})
 	}
 
-	// Enrich with live status — only override DB status when truly connected.
-	// If the client is running but not yet connected, trust the DB (it may be
-	// "connecting" while attempting reconnect, or "disconnected" after a timeout).
+	// Enrich with live status from the WhatsApp manager.
 	for i := range instances {
-		if h.manager.IsRunning(instances[i].ID.String()) {
-			client := h.manager.GetInstance(instances[i].ID.String())
+		id := instances[i].ID.String()
+		if h.manager.IsRunning(id) {
+			client := h.manager.GetInstance(id)
 			if client != nil && client.IsConnected() {
 				instances[i].Status = models.StatusConnected
+			} else if client != nil {
+				// Running but not yet connected → keep as connecting
+				instances[i].Status = models.StatusConnecting
+			}
+		} else {
+			// Manager is NOT running for this instance.
+			// If DB says "connecting", it's a stale state from a previous
+			// failed reconnect — reset to disconnected so the frontend
+			// can trigger a fresh reconnect.
+			if instances[i].Status == models.StatusConnecting {
+				instances[i].Status = models.StatusDisconnected
+				h.db.Model(&instances[i]).Update("status", models.StatusDisconnected)
 			}
 		}
 	}

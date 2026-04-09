@@ -362,10 +362,10 @@ function InstancesContent() {
 
     hasAutoReconnected.current = true;
 
-    const toReconnect = instances.filter((i) => i.status === "disconnected");
+    const toReconnect = instances.filter((i) => i.status === "disconnected" || i.status === "connecting");
     if (toReconnect.length === 0) return;
 
-    console.log("[Instances] Auto-reconnecting", toReconnect.length, "disconnected instances");
+    console.log("[Instances] Auto-reconnecting", toReconnect.length, "instances");
 
     // Fire reconnects with a small stagger to avoid hammering the backend
     toReconnect.forEach((inst, idx) => {
