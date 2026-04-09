@@ -42,9 +42,20 @@ function InstanceCard({
   index: number; serverName?: string;
 }) {
   const { instanceStatuses } = useInstanceStatus();
-  // Use real-time status from WebSocket, fall back to instance.status
-  const realTimeStatus = instanceStatuses[instance.id];
-  const currentStatus = realTimeStatus || instance.status;
+  // Merge real-time WS status with API status.
+  // API status is authoritative (backend checks live manager state).
+  // WS status is used to upgrade (e.g. disconnected→connected in real-time)
+  // but should NOT downgrade a "connected" API status to "connecting".
+  const wsStatus = instanceStatuses[instance.id];
+  let currentStatus = instance.status;
+  if (wsStatus) {
+    if (wsStatus === "connected") {
+      currentStatus = "connected";
+    } else if (instance.status !== "connected") {
+      // Only apply non-connected WS status if API also doesn't say connected
+      currentStatus = wsStatus as typeof currentStatus;
+    }
+  }
   const s = STATUS_MAP[currentStatus] ?? STATUS_MAP.disconnected;
   const isConnected = currentStatus === "connected";
 
