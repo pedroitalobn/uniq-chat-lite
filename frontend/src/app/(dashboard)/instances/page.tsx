@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { instancesApi, serversApi } from "@/lib/api";
 import { Plus, Globe, AlertTriangle, Smartphone, Trash2, QrCode, RefreshCw, Server as ServerIcon, X, MessageSquare, Hash, Shield, Wifi, Copy, Check } from "lucide-react";
@@ -179,7 +179,7 @@ function InstanceCard({
             );
           })()}
           <span className={cn("status-badge", s.cls)}>
-            {instance.status === "connecting"
+            {currentStatus === "connecting"
               ? <RefreshCw className="w-3 h-3 animate-spin" />
               : <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.dotColor }} />
             }
@@ -340,6 +340,46 @@ function InstancesContent() {
     queryKey: ["servers", currentWorkspace?.id],
     queryFn: () => serversApi.list(currentWorkspace?.id).then((r) => r.data),
   });
+
+  const reconnectMutation = useMutation({
+    mutationFn: async (instanceId: string) => {
+      await instancesApi.reconnect(instanceId);
+      return instanceId;
+    },
+    onSuccess: () => {
+      // Refresh list after a delay to let WhatsApp connection settle
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["instances"] });
+      }, 3000);
+    },
+  });
+
+  // Auto-reconnect disconnected instances ONCE on page load
+  const hasAutoReconnected = useRef(false);
+  useEffect(() => {
+    if (hasAutoReconnected.current) return;
+    if (isLoading || instances.length === 0) return;
+
+    hasAutoReconnected.current = true;
+
+    const toReconnect = instances.filter((i) => i.status === "disconnected");
+    if (toReconnect.length === 0) return;
+
+    console.log("[Instances] Auto-reconnecting", toReconnect.length, "disconnected instances");
+
+    // Fire reconnects with a small stagger to avoid hammering the backend
+    toReconnect.forEach((inst, idx) => {
+      setTimeout(() => {
+        reconnectMutation.mutate(inst.id);
+      }, idx * 500);
+    });
+
+    // Final refresh after all reconnects had time to settle
+    setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ["instances"] });
+    }, toReconnect.length * 500 + 5000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, instances]);
 
   const serverMap = Object.fromEntries(servers.map((s) => [s.id, s]));
   const activeServer = serverFilter ? serverMap[serverFilter] : null;
