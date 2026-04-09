@@ -1,6 +1,6 @@
-# Uniq Chat — WhatsApp API SaaS
+# Uniq.chat — Multi-Channel Messaging Platform
 
-Multi-tenant WhatsApp API platform powered by [whatsmeow](https://github.com/tulir/whatsmeow). Connect multiple WhatsApp numbers, send/receive messages via REST API, configure per-instance proxies, and manage everything through a modern dashboard.
+Multi-tenant messaging platform that integrates with WhatsApp, Instagram, Facebook, Telegram, LinkedIn, TikTok, and Kwai. Connect multiple messaging numbers, send/receive messages via REST API, configure per-instance proxies, and manage everything through a modern dashboard.
 
 ---
 
@@ -10,10 +10,11 @@ Multi-tenant WhatsApp API platform powered by [whatsmeow](https://github.com/tul
 |---|---|
 | Backend | Go 1.22 · Fiber v2 · GORM · whatsmeow |
 | Database | PostgreSQL 16 (SQLite fallback for dev) |
-| Auth | Anthropic API Key → JWT (access 15m + refresh 7d) |
-| Frontend | Next.js 15 · App Router · TanStack Query · Tailwind CSS |
+| Auth | Email/Password + JWT (access 15m + refresh 7d) |
+| Frontend | Next.js 16 · App Router · TanStack Query · Tailwind CSS |
 | Real-time | WebSocket (gorilla/websocket) |
 | Proxy | SOCKS5 / HTTP / HTTPS per instance · AES-256-GCM encrypted passwords |
+| Payments | Stripe, Asaas (transparent + redirect checkout) |
 
 ---
 
@@ -24,16 +25,17 @@ Multi-tenant WhatsApp API platform powered by [whatsmeow](https://github.com/tul
 ```bash
 git clone https://github.com/your-org/uniq-chat
 cd uniq-chat
-cp .env.example .env
+cp backend/.env.example backend/.env
 ```
 
-Edit `.env` — the only required values are:
+Edit `backend/.env`:
 
 ```env
 DATABASE_URL=postgres://uniqchat:uniqchat@localhost:5432/uniqchat?sslmode=disable
 JWT_SECRET=change-me-32-chars-minimum-secret
-PROXY_ENCRYPTION_KEY=exactly-32-bytes-key-here-padded!   # must be exactly 32 bytes
-ANTHROPIC_VALIDATE_KEYS=true
+PROXY_ENCRYPTION_KEY=exactly-32-bytes-key-here-padded!
+PORT=8080
+FRONTEND_URL=http://localhost:3011
 ```
 
 ### 2. Start with Docker Compose
@@ -44,26 +46,108 @@ docker compose up -d
 
 Services:
 - **Backend** → `http://localhost:8080`
-- **Frontend** → `http://localhost:3000`
+- **Frontend** → `http://localhost:3011`
 - **PostgreSQL** → `localhost:5432`
 
-### 3. Login
+### 3. Access the dashboard
 
-Open `http://localhost:3000` and enter your Anthropic API key (`sk-ant-...`).
-The platform validates the key against Anthropic's API — no passwords stored.
+Open `http://localhost:3011` and:
+- Register with email/password for Free plan
+- Select a paid plan to go through checkout
 
 ---
 
 ## Authentication
 
-Uniq Chat uses **Anthropic API Keys** as the authentication credential.
+Uniq.chat supports **email/password** authentication:
 
-1. User submits their `sk-ant-...` key
-2. Backend calls `GET https://api.anthropic.com/v1/models` to validate
-3. On success, the key hash is stored and a JWT is issued
-4. User account is created automatically on first login
+1. User registers with name, email, password
+2. Password is hashed with bcrypt (cost 12)
+3. JWT access token (15min) + refresh token (7 days) issued
 
-The plaintext API key is **never stored** — only a SHA-256 hash is kept for identity.
+### Registration Flow
+
+- **Free plans**: User created immediately as `customer`, active, receives JWT
+- **Paid plans**: User created as `lead` (inactive), redirected to checkout, activated after payment confirmed
+
+### Auth Endpoints
+
+```bash
+# Register (free plan)
+curl -X POST http://localhost:8080/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name": "João Silva", "email": "joao@exemplo.com", "password": "senha123"}'
+
+# Register (paid plan - creates lead)
+curl -X POST http://localhost:8080/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name": "João Silva", "email": "joao@exemplo.com", "password": "senha123", "plan_id": "uuid"}'
+
+# Login
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"identifier": "joao@exemplo.com", "password": "senha123"}'
+
+# Refresh token
+curl -X POST http://localhost:8080/auth/refresh \
+  -H "Authorization: Bearer <access_token>"
+
+# Forgot password
+curl -X POST http://localhost:8080/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"email": "joao@exemplo.com"}'
+
+# Reset password
+curl -X POST http://localhost:8080/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"token": "xxx", "password": "novasenha123"}'
+```
+
+---
+
+## Plans & Payments
+
+### Subscription Plans
+
+| Plan | Price | Instances | Msgs/day | Proxy |
+|---|---|---|---|---|
+| Free | R$0 | 1 | 100 | — |
+| Starter | R$29 | 1 | 100 | — |
+| Pro | R$99 | 150 | Unlimited | ✓ |
+| Business | R$149 | 300 | Unlimited | ✓ (Residential) |
+
+### Payment Providers
+
+- **Stripe**: International cards, transparent/redirect checkout
+- **Asaas**: Brazilian Pix, Boleto, Cartão, transparent checkout
+
+### Admin Payment Settings
+
+```bash
+# Get payment settings
+curl http://localhost:8080/admin/payment-settings \
+  -H "Authorization: Bearer <admin_token>"
+
+# Update payment settings
+curl -X PUT http://localhost:8080/admin/payment-settings \
+  -H "Authorization: Bearer <admin_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "active_provider": "stripe",
+    "stripe_secret_key": "sk_live_...",
+    "stripe_checkout_type": "transparent"
+  }'
+```
+
+### Lead Activation
+
+After successful payment, leads are activated via webhook or direct API:
+
+```bash
+curl -X POST http://localhost:8080/stripe/activate-lead \
+  -H "Content-Type: application/json" \
+  -d '{"lead_id": "uuid"}'
+```
 
 ---
 
@@ -76,112 +160,59 @@ All authenticated endpoints require:
 Authorization: Bearer <access_token>
 ```
 
----
-
-### Auth
-
-#### Validate an Anthropic key
-```bash
-curl -X POST http://localhost:8080/auth/validate-key \
-  -H "Content-Type: application/json" \
-  -d '{"anthropic_api_key": "sk-ant-..."}'
-```
-
-#### Login (get JWT)
-```bash
-curl -X POST http://localhost:8080/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"anthropic_api_key": "sk-ant-..."}'
-# Returns: { "access_token": "...", "refresh_token": "...", "user": {...} }
-```
-
-#### Refresh token
-```bash
-curl -X POST http://localhost:8080/auth/refresh \
-  -H "Authorization: Bearer <access_token>"
-```
-
-#### Current user
-```bash
-curl http://localhost:8080/auth/me \
-  -H "Authorization: Bearer <access_token>"
-```
+Protected routes are prefixed with `/api`.
 
 ---
 
 ### Instances
 
-#### List instances
 ```bash
-curl http://localhost:8080/instances \
+# List instances
+curl http://localhost:8080/api/instances \
   -H "Authorization: Bearer <token>"
-```
 
-#### Create instance
-```bash
-curl -X POST http://localhost:8080/instances \
+# Create instance
+curl -X POST http://localhost:8080/api/instances \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"name": "Suporte Principal"}'
-```
 
-#### Get QR Code (to connect WhatsApp)
-```bash
-curl http://localhost:8080/instances/<id>/qr \
+# Get QR Code (to connect WhatsApp)
+curl http://localhost:8080/api/instances/<id>/qr \
   -H "Authorization: Bearer <token>"
-# Returns: { "qr": "<base64-encoded-qr-data>" }
-# Or: { "message": "instância já conectada" }
-```
 
-#### Get instance status
-```bash
-curl http://localhost:8080/instances/<id>/status \
+# Disconnect
+curl -X POST http://localhost:8080/api/instances/<id>/disconnect \
+  -H "Authorization: Bearer <token>"
+
+# Delete instance
+curl -X DELETE http://localhost:8080/api/instances/<id> \
   -H "Authorization: Bearer <token>"
 ```
-
-#### Disconnect
-```bash
-curl -X POST http://localhost:8080/instances/<id>/disconnect \
-  -H "Authorization: Bearer <token>"
-```
-
-#### Delete instance
-```bash
-curl -X DELETE http://localhost:8080/instances/<id> \
-  -H "Authorization: Bearer <token>"
-```
-
----
 
 ### Messages
 
-#### Send a text message
 ```bash
-curl -X POST http://localhost:8080/instances/<id>/messages/text \
+# Send text message
+curl -X POST http://localhost:8080/api/instances/<id>/messages/text \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"to": "5511999999999", "text": "Olá! Tudo bem?"}'
-```
 
-#### List received/sent messages
-```bash
-curl "http://localhost:8080/instances/<id>/messages?limit=50&offset=0" \
+# List messages
+curl "http://localhost:8080/api/instances/<id>/messages?limit=50" \
   -H "Authorization: Bearer <token>"
 ```
 
----
+### Proxy
 
-### Proxy (Pro/Enterprise plans)
-
-#### Get proxy config
 ```bash
-curl http://localhost:8080/instances/<id>/proxy \
+# Get proxy config
+curl http://localhost:8080/api/instances/<id>/proxy \
   -H "Authorization: Bearer <token>"
-```
 
-#### Set/update proxy
-```bash
-curl -X PUT http://localhost:8080/instances/<id>/proxy \
+# Set/update proxy
+curl -X PUT http://localhost:8080/api/instances/<id>/proxy \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -192,154 +223,99 @@ curl -X PUT http://localhost:8080/instances/<id>/proxy \
     "username": "user",
     "password": "pass"
   }'
-```
 
-Supported types: `socks5`, `http`, `https`
+# Test proxy
+curl -X POST http://localhost:8080/api/instances/<id>/proxy/test \
+  -H "Authorization: Bearer <token>"
 
-#### Test proxy connectivity
-```bash
-# Test the saved proxy
-curl -X POST http://localhost:8080/instances/<id>/proxy/test \
-  -H "Authorization: Bearer <token>" \
-  -d '{}'
-
-# Test an unsaved config
-curl -X POST http://localhost:8080/instances/<id>/proxy/test \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "enabled": true,
-    "type": "socks5",
-    "host": "proxy.example.com",
-    "port": 1080
-  }'
-# Returns: { "success": true, "external_ip": "1.2.3.4", "latency_ms": 142 }
-```
-
-#### Remove proxy
-```bash
-curl -X DELETE http://localhost:8080/instances/<id>/proxy \
+# Remove proxy
+curl -X DELETE http://localhost:8080/api/instances/<id>/proxy \
   -H "Authorization: Bearer <token>"
 ```
-
----
 
 ### Webhooks
 
-#### List webhooks for an instance
 ```bash
-curl http://localhost:8080/instances/<id>/webhooks \
+# List webhooks
+curl http://localhost:8080/api/instances/<id>/webhooks \
+  -H "Authorization: Bearer <token>"
+
+# Create webhook
+curl -X POST http://localhost:8080/api/instances/<id>/webhooks \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://your-server.com/webhook", "events": ["message.received"]}'
+
+# Delete webhook
+curl -X DELETE http://localhost:8080/api/instances/<id>/webhooks/<webhook_id> \
   -H "Authorization: Bearer <token>"
 ```
 
-#### Create webhook
-```bash
-curl -X POST http://localhost:8080/instances/<id>/webhooks \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://your-server.com/webhook",
-    "events": ["message.received", "status.changed"]
-  }'
-```
+### Workspaces
 
-Available events: `message.received`, `message.sent`, `status.changed`, `qr.updated`
-
-#### Update webhook
 ```bash
-curl -X PUT http://localhost:8080/instances/<id>/webhooks/<webhook_id> \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"is_active": false}'
-```
-
-#### Delete webhook
-```bash
-curl -X DELETE http://localhost:8080/instances/<id>/webhooks/<webhook_id> \
+# List workspaces
+curl http://localhost:8080/api/workspaces \
   -H "Authorization: Bearer <token>"
-```
 
----
+# Create workspace
+curl -X POST http://localhost:8080/api/workspaces \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Minha Empresa"}'
+
+# Invite member
+curl -X POST http://localhost:8080/api/workspaces/<id>/invites \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type": "application/json" \
+  -d '{"email": "colaborador@exemplo.com", "role_id": "uuid"}'
+```
 
 ### API Keys
 
-#### List API keys
 ```bash
-curl http://localhost:8080/api-keys \
+# List API keys
+curl http://localhost:8080/api/api-keys \
   -H "Authorization: Bearer <token>"
-```
 
-#### Create API key
-```bash
-curl -X POST http://localhost:8080/api-keys \
+# Create API key
+curl -X POST http://localhost:8080/api/api-keys \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"name": "Produção"}'
-# Returns: { "id": "...", "key": "sc_...", "name": "Produção" }
-# The plaintext key is only returned once — store it securely
 ```
 
-#### Delete API key
+### Admin
+
 ```bash
-curl -X DELETE http://localhost:8080/api-keys/<id> \
-  -H "Authorization: Bearer <token>"
-```
-
----
-
-### Admin (role: admin only)
-
-#### Stats
-```bash
-curl http://localhost:8080/admin/stats \
+# Stats
+curl http://localhost:8080/api/admin/stats \
   -H "Authorization: Bearer <admin_token>"
-```
 
-#### List all users
-```bash
-curl http://localhost:8080/admin/users \
+# List users
+curl http://localhost:8080/api/admin/users \
   -H "Authorization: Bearer <admin_token>"
-```
 
-#### Update user (block, change plan, etc.)
-```bash
-curl -X PUT http://localhost:8080/admin/users/<user_id> \
+# List plans
+curl http://localhost:8080/api/admin/plans \
+  -H "Authorization: Bearer <admin_token>"
+
+# Update plan
+curl -X PUT http://localhost:8080/api/admin/plans/<plan_id> \
   -H "Authorization: Bearer <admin_token>" \
   -H "Content-Type: application/json" \
-  -d '{"is_active": false}'
-```
-
-#### List plans
-```bash
-curl http://localhost:8080/admin/plans \
-  -H "Authorization: Bearer <admin_token>"
-```
-
-#### Update plan
-```bash
-curl -X PUT http://localhost:8080/admin/plans/<plan_id> \
-  -H "Authorization: Bearer <admin_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "price": 49,
-    "max_instances": 5,
-    "max_messages_per_day": 10000,
-    "allow_proxy": true,
-    "is_active": true
-  }'
+  -d '{"price": 49, "max_instances": 5}'
 ```
 
 ---
 
 ## WebSocket
 
-Connect to receive real-time events per instance:
+Connect to receive real-time events:
 
 ```
-ws://localhost:8080/instances/<id>/ws
+ws://localhost:8080/api/instances/<id>/ws?token=<access_token>
 ```
-
-Requires `Authorization: Bearer <token>` as a query param or header.
 
 ### Event types
 
@@ -352,8 +328,6 @@ Requires `Authorization: Bearer <token>` as a query param or header.
 ---
 
 ## Webhook Payload
-
-When a webhook fires, the POST body is:
 
 ```json
 {
@@ -370,41 +344,16 @@ When a webhook fires, the POST body is:
 
 ---
 
-## Plans
-
-| Plan | Price | Instances | Msgs/day | Proxy |
-|---|---|---|---|---|
-| Free | R$0 | 1 | 1,000 | — |
-| Pro | R$49/mês | 5 | 10,000 | SOCKS5/HTTP/HTTPS |
-| Enterprise | R$149/mês | Unlimited | Unlimited | SOCKS5/HTTP/HTTPS |
-
-Plans can be edited by an admin via the dashboard or API.
-
----
-
-## Default Admin
-
-The first deploy seeds an admin account:
-- **Email**: `admin@uniqchat.app`
-- **Password**: The admin logs in using an Anthropic API key like any user, then their role is promoted to `admin` via direct DB update or via `/admin/users`.
-
-To promote a user to admin via SQL:
-```sql
-UPDATE users SET role = 'admin' WHERE email = 'user@example.com';
-```
-
----
-
 ## Development
 
-### Backend only
+### Backend
 
 ```bash
 cd backend
 go run ./cmd/server
 ```
 
-### Frontend only
+### Frontend
 
 ```bash
 cd frontend
@@ -412,7 +361,7 @@ npm install
 npm run dev
 ```
 
-### Environment variables
+### Environment Variables
 
 | Variable | Description | Required |
 |---|---|---|
@@ -420,8 +369,9 @@ npm run dev
 | `JWT_SECRET` | Secret for signing JWTs (min 32 chars) | Yes |
 | `PROXY_ENCRYPTION_KEY` | AES-256-GCM key for proxy passwords (exactly 32 bytes) | Yes |
 | `PORT` | Backend port (default: `8080`) | No |
-| `ANTHROPIC_VALIDATE_KEYS` | Whether to validate keys against Anthropic API (default: `true`) | No |
-| `NEXT_PUBLIC_API_URL` | Backend URL for the frontend (default: `http://localhost:8080`) | No |
+| `FRONTEND_URL` | Frontend URL for redirects (default: `http://localhost:3011`) | No |
+| `RABBITMQ_URI` | RabbitMQ connection string (optional) | No |
+| `MINIO_ENDPOINT` | MinIO endpoint for media storage (optional) | No |
 
 ---
 
@@ -430,33 +380,32 @@ npm run dev
 ```
 uniq-chat/
 ├── backend/
-│   ├── cmd/server/main.go          # Entry point
-│   ├── internal/
-│   │   ├── api/
-│   │   │   ├── handlers/           # HTTP handlers (auth, instances, proxy, ...)
-│   │   │   ├── middleware/         # JWT auth, OwnsInstance, RequireAdmin
-│   │   │   └── router.go
-│   │   ├── config/                 # Env config
-│   │   ├── models/                 # GORM models
-│   │   └── whatsapp/
-│   │       ├── instance.go         # InstanceClient (wraps whatsmeow)
-│   │       ├── manager.go          # Singleton managing all instances
-│   │       └── proxy.go            # Proxy builder, tester, encryption
-│   └── migrations/                 # SQL migrations
+│   ├── cmd/server/main.go          # Entry point, migrations, seeding
+│   └── internal/
+│       ├── api/
+│       │   ├── handlers/           # HTTP handlers
+│       │   ├── middleware/         # JWT auth, role checks
+│       │   └── router.go           # Route definitions
+│       ├── config/                 # Env config
+│       ├── models/                 # GORM models
+│       ├── whatsapp/               # WhatsApp client (whatsmeow)
+│       ├── services/               # Business logic
+│       └── email/                  # Email templates & sending
 └── frontend/
     └── src/
         ├── app/
-        │   ├── (auth)/login/       # Login page (Anthropic key input)
-        │   └── (dashboard)/
-        │       ├── dashboard/      # Stats + chart
-        │       ├── instances/      # List + detail (tabs: Geral/Proxy/Webhooks/Logs)
-        │       ├── api-keys/       # API key management
-        │       └── admin/          # users + plans (admin only)
-        ├── components/
-        │   ├── instances/          # ProxyConfigForm, QRCodeModal, CreateInstanceModal
-        │   └── layout/             # Sidebar
-        ├── lib/api.ts              # Typed Axios helpers
-        └── types/index.ts          # Shared TypeScript types
+        │   ├── (auth)/             # Login, register, checkout, plans
+        │   └── (dashboard)/        # Main app pages
+        │       ├── dashboard/      # Stats
+        │       ├── instances/      # Instance management
+        │       ├── inbox/          # Messaging inbox
+        │       ├── crm/             # Contacts & funnels
+        │       ├── campaigns/      # Bulk messaging
+        │       ├── admin/           # User & plan management
+        │       └── settings/       # User settings
+        ├── components/             # Reusable UI components
+        ├── lib/api.ts              # API client
+        └── types/                  # TypeScript definitions
 ```
 
 ---

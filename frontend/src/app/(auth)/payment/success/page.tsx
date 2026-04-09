@@ -9,7 +9,19 @@ function SuccessContent() {
   const router = useRouter();
   const params = useSearchParams();
   const sessionId = params.get("session_id");
+  const leadId = params.get("lead_id");
   const [countdown, setCountdown] = useState(5);
+
+  useEffect(() => {
+    // If lead_id present, call backend to activate lead
+    if (leadId) {
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/stripe/activate-lead`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lead_id: leadId }),
+      }).catch(console.error);
+    }
+  }, [leadId]);
 
   useEffect(() => {
     const timer = setInterval(() => {

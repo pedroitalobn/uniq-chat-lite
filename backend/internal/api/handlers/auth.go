@@ -10,16 +10,44 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	stripe "github.com/stripe/stripe-go/v76"
+	"github.com/stripe/stripe-go/v76/checkout/session"
+	stripecustomer "github.com/stripe/stripe-go/v76/customer"
+	"github.com/stripe/stripe-go/v76/paymentintent"
 	"github.com/uniq-chat/backend/internal/api/middleware"
+	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/email"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
 )
 
+var (
+	stripeKey          string
+	stripeCheckoutType string
+)
+
+func loadStripeConfigFromDB(db *gorm.DB) {
+	var settings models.PaymentSettings
+	if db.Where("id = ?", "default").First(&settings).Error == nil {
+		stripeKey = settings.StripeSecretKey
+		stripeCheckoutType = settings.StripeCheckoutType
+		if stripeCheckoutType == "" {
+			stripeCheckoutType = "redirect"
+		}
+	}
+}
+
+func getStripeCheckoutType(db *gorm.DB) string {
+	if stripeCheckoutType == "" {
+		loadStripeConfigFromDB(db)
+	}
+	return stripeCheckoutType
+}
+
 // Register godoc
 // POST /auth/register
-// Body: { "name": "...", "email": "...", "username": "...", "password": "...", "workspace_name": "...", "invite_code": "..." }
+// Body: { "name": "...", "email": "...", "username": "...", "password": "...", "workspace_name": "...", "invite_code": "...", "plan_id": "..." }
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	var req struct {
 		Name          string `json:"name"`
@@ -28,6 +56,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		Password      string `json:"password"`
 		WorkspaceName string `json:"workspace_name"`
 		InviteCode    string `json:"invite_code"`
+		PlanID        string `json:"plan_id"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
@@ -38,6 +67,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	req.Password = strings.TrimSpace(req.Password)
 	req.WorkspaceName = strings.TrimSpace(req.WorkspaceName)
 	req.InviteCode = strings.TrimSpace(req.InviteCode)
+	req.PlanID = strings.TrimSpace(req.PlanID)
 
 	if req.Name == "" || req.Email == "" || req.Password == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name, email e password são obrigatórios"})
@@ -76,22 +106,56 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		}
 	}
 
-	// Assign free plan
-	var freePlan models.Plan
-	h.db.First(&freePlan, "name = 'Free'")
+	// Determine plan - check if it's a paid plan
+	var plan *models.Plan
+	var isPaidPlan bool
+	if req.PlanID != "" {
+		planID, err := uuid.Parse(req.PlanID)
+		if err == nil {
+			var p models.Plan
+			if h.db.First(&p, "id = ?", planID).Error == nil && p.Price > 0 {
+				plan = &p
+				isPaidPlan = true
+			}
+		}
+	}
 
-	user := models.User{
-		Name:     req.Name,
-		Email:    req.Email,
-		Role:     models.RoleCustomer,
-		IsActive: true,
+	// If paid plan, create as "lead" (not active, no login yet)
+	// If free plan or no plan, create as "customer" (active)
+	var user models.User
+	if isPaidPlan {
+		// Lead - inactive, no login until payment confirmed
+		user = models.User{
+			Name:     req.Name,
+			Email:    req.Email,
+			Role:     models.RoleLead,
+			IsActive: false, // Inactive until payment confirmed
+		}
+		if req.Username != "" {
+			user.Username = &req.Username
+		}
+		if plan != nil {
+			user.PlanID = &plan.ID
+		}
+	} else {
+		// Customer - active immediately (free plan)
+		var freePlan models.Plan
+		h.db.First(&freePlan, "name = 'Free'")
+
+		user = models.User{
+			Name:     req.Name,
+			Email:    req.Email,
+			Role:     models.RoleCustomer,
+			IsActive: true,
+		}
+		if req.Username != "" {
+			user.Username = &req.Username
+		}
+		if freePlan.ID != uuid.Nil {
+			user.PlanID = &freePlan.ID
+		}
 	}
-	if req.Username != "" {
-		user.Username = &req.Username
-	}
-	if freePlan.ID != uuid.Nil {
-		user.PlanID = &freePlan.ID
-	}
+
 	if err := user.SetPassword(req.Password); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao processar senha"})
 	}
@@ -104,11 +168,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		MarkInviteCodeUsed(h.db, req.InviteCode, user.ID)
 	}
 
-	h.emailSvc.SendWelcome(user.Email, user.Name)
-
-	h.db.Preload("Plan").First(&user, "id = ?", user.ID)
-
-	// Create workspace if workspace_name is provided
+	// For paid plans, create workspace here (but user won't have access until activated)
 	var workspace *models.Workspace
 	if req.WorkspaceName != "" {
 		workspace = &models.Workspace{
@@ -138,7 +198,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 			})
 		}
 
-		// Add user as owner
+		// Add user as owner (but won't have access until activated)
 		h.db.Create(&models.UserWorkspace{
 			UserID:      user.ID,
 			WorkspaceID: workspace.ID,
@@ -148,6 +208,107 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 
 		h.db.Preload("Role").First(workspace, workspace.ID)
 	}
+
+	// If paid plan, create payment session and return payment URL
+	if isPaidPlan && plan != nil {
+		// Create Stripe customer
+		loadStripeConfigFromDB(h.db)
+		if stripeKey == "" {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Stripe não configurado"})
+		}
+
+		stripe.Key = stripeKey
+
+		cp := &stripe.CustomerParams{
+			Email: stripe.String(user.Email),
+			Name:  stripe.String(user.Name),
+			Metadata: map[string]string{
+				"user_id": user.ID.String(),
+				"lead_id": user.ID.String(),
+				"is_lead": "true",
+			},
+		}
+		sc, err := stripecustomer.New(cp)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar cliente Stripe"})
+		}
+		h.db.Model(&user).Update("stripe_customer_id", sc.ID)
+
+		frontendURL := config.AppConfig.FrontendURL
+		checkoutType := getStripeCheckoutType(h.db)
+
+		if checkoutType == "transparent" {
+			// Transparent checkout - create PaymentIntent
+			params := &stripe.PaymentIntentParams{
+				Amount:      stripe.Int64(int64(plan.Price * 100)),
+				Currency:    stripe.String("brl"),
+				Customer:    stripe.String(sc.ID),
+				Description: stripe.String("Assinatura " + plan.Name),
+				Metadata: map[string]string{
+					"user_id": user.ID.String(),
+					"plan_id": plan.ID.String(),
+					"is_lead": "true",
+					"lead_id": user.ID.String(),
+				},
+				AutomaticPaymentMethods: &stripe.PaymentIntentAutomaticPaymentMethodsParams{
+					Enabled: stripe.Bool(true),
+				},
+			}
+
+			pi, err := paymentintent.New(params)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar pagamento"})
+			}
+
+			return c.JSON(fiber.Map{
+				"checkout_type":     "transparent",
+				"client_secret":     pi.ClientSecret,
+				"payment_intent_id": pi.ID,
+				"plan_name":         plan.Name,
+				"plan_price":        plan.Price,
+				"amount":            pi.Amount,
+				"lead_id":           user.ID.String(),
+			})
+		}
+
+		// Redirect checkout
+		params := &stripe.CheckoutSessionParams{
+			Customer: stripe.String(sc.ID),
+			Mode:     stripe.String(string(stripe.CheckoutSessionModeSubscription)),
+			LineItems: []*stripe.CheckoutSessionLineItemParams{
+				{
+					Price:    stripe.String(plan.StripePriceID),
+					Quantity: stripe.Int64(1),
+				},
+			},
+			SuccessURL:        stripe.String(frontendURL + "/payment/success?session_id={CHECKOUT_SESSION_ID}&lead_id=" + user.ID.String()),
+			CancelURL:         stripe.String(frontendURL + "/plans"),
+			ClientReferenceID: stripe.String(user.ID.String()),
+			SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
+				Metadata: map[string]string{
+					"user_id": user.ID.String(),
+					"plan_id": plan.ID.String(),
+					"is_lead": "true",
+					"lead_id": user.ID.String(),
+				},
+			},
+		}
+
+		session, err := session.New(params)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar sessão de pagamento"})
+		}
+
+		return c.JSON(fiber.Map{
+			"checkout_type": "redirect",
+			"url":           session.URL,
+			"lead_id":       user.ID.String(),
+		})
+	}
+
+	// Free plan - create account normally and return token
+	h.emailSvc.SendWelcome(user.Email, user.Name)
+	h.db.Preload("Plan").First(&user, "id = ?", user.ID)
 
 	accessToken, err := middleware.GenerateAccessToken(&user)
 	if err != nil {

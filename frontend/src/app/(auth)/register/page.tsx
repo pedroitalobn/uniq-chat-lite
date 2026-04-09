@@ -145,7 +145,7 @@ function RegisterForm() {
     setLoading(true);
 
     try {
-      // 1. Create account
+      // 1. Create account (or lead for paid plans)
       const res = await fetch(`${API_BASE}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -156,6 +156,7 @@ function RegisterForm() {
           password,
           workspace_name: workspaceName.trim() || undefined,
           invite_code: inviteCode.trim() || undefined,
+          plan_id: planId || undefined,
         }),
       });
       const data = await res.json();
@@ -164,7 +165,20 @@ function RegisterForm() {
         return;
       }
 
-      // 2. Auto sign-in
+      // 2. If paid plan, redirect to payment
+      if (isPaidPlan && planId) {
+        if (data.checkout_type === "transparent" && data.client_secret) {
+          // Transparent checkout - redirect to checkout page with client secret
+          router.push(`/checkout?client_secret=${encodeURIComponent(data.client_secret)}&lead_id=${data.lead_id}&plan_name=${encodeURIComponent(data.plan_name || "")}&plan_price=${data.plan_price}`);
+          return;
+        } else if (data.url) {
+          // Redirect checkout
+          window.location.href = data.url;
+          return;
+        }
+      }
+
+      // 3. Free plan - Auto sign-in
       const result = await signIn("credentials", {
         identifier: email.trim(),
         password,
@@ -173,21 +187,6 @@ function RegisterForm() {
       if (result?.error) {
         setErrors({ global: result.error });
         return;
-      }
-
-      // 3. If paid plan, create Stripe Checkout session
-      if (isPaidPlan && planId) {
-        try {
-          const checkoutRes = await api.post("/stripe/checkout", { plan_id: planId });
-          const { url } = checkoutRes.data;
-          if (url) {
-            window.location.href = url;
-            return;
-          }
-        } catch {
-          // If Stripe fails, still go to dashboard on free plan
-          toast.error("Erro ao iniciar pagamento. Você foi criado no plano Free. Atualize seu plano nas configurações.");
-        }
       }
 
       toast.success("Conta criada! Bem-vindo à Uniq.chat!");

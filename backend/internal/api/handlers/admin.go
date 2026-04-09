@@ -19,6 +19,134 @@ func NewAdminHandler(db *gorm.DB, emailSvc *email.Service) *AdminHandler {
 	return &AdminHandler{db: db, emailSvc: emailSvc}
 }
 
+// --- Payment Settings ---
+
+// GetPaymentSettings godoc
+// GET /admin/payment-settings
+func (h *AdminHandler) GetPaymentSettings(c *fiber.Ctx) error {
+	var settings models.PaymentSettings
+
+	// Usar Where em vez de First para evitar problemas de tipo
+	err := h.db.Where("id = ?", "default").First(&settings).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// Criar configuração padrão se não existir
+			settings = models.PaymentSettings{
+				ID:                 "default",
+				ActiveProvider:     models.PaymentProviderStripe,
+				AsaasEnvironment:   "sandbox",
+				AsaasCheckoutType:  "transparent",
+				StripeCheckoutType: "redirect",
+			}
+			if createErr := h.db.Create(&settings).Error; createErr != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar configurações: " + createErr.Error()})
+			}
+		} else {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar configurações: " + err.Error()})
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"id":                     settings.ID,
+		"active_provider":        string(settings.ActiveProvider),
+		"stripe_secret_key":      settings.StripeSecretKey,
+		"stripe_webhook_secret":  settings.StripeWebhookSecret,
+		"stripe_checkout_type":   settings.StripeCheckoutType,
+		"asaas_api_key":          settings.AsaasAPIKey,
+		"asaas_environment":      settings.AsaasEnvironment,
+		"asaas_webhook_secret":   settings.AsaasWebhookSecret,
+		"asaas_checkout_type":    settings.AsaasCheckoutType,
+		"hotmart_api_key":        settings.HotmartAPIKey,
+		"hotmart_webhook_secret": settings.HotmartWebhookSecret,
+	})
+}
+
+// UpdatePaymentSettings godoc
+// PUT /admin/payment-settings
+func (h *AdminHandler) UpdatePaymentSettings(c *fiber.Ctx) error {
+	var req struct {
+		ActiveProvider       string `json:"active_provider"`
+		StripeSecretKey      string `json:"stripe_secret_key"`
+		StripeWebhookSecret  string `json:"stripe_webhook_secret"`
+		StripeCheckoutType   string `json:"stripe_checkout_type"`
+		AsaasAPIKey          string `json:"asaas_api_key"`
+		AsaasEnvironment     string `json:"asaas_environment"`
+		AsaasWebhookSecret   string `json:"asaas_webhook_secret"`
+		AsaasCheckoutType    string `json:"asaas_checkout_type"`
+		HotmartAPIKey        string `json:"hotmart_api_key"`
+		HotmartWebhookSecret string `json:"hotmart_webhook_secret"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
+	}
+
+	var settings models.PaymentSettings
+	err := h.db.Where("id = ?", "default").First(&settings).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			settings = models.PaymentSettings{ID: "default"}
+			if err := h.db.Create(&settings).Error; err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar configurações: " + err.Error()})
+			}
+		} else {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar configurações: " + err.Error()})
+		}
+	}
+
+	updates := map[string]interface{}{}
+	if req.ActiveProvider != "" {
+		updates["active_provider"] = req.ActiveProvider
+	}
+	if req.StripeSecretKey != "" {
+		updates["stripe_secret_key"] = req.StripeSecretKey
+	}
+	if req.StripeWebhookSecret != "" {
+		updates["stripe_webhook_secret"] = req.StripeWebhookSecret
+	}
+	if req.StripeCheckoutType != "" {
+		updates["stripe_checkout_type"] = req.StripeCheckoutType
+	}
+	if req.AsaasAPIKey != "" {
+		updates["asaas_api_key"] = req.AsaasAPIKey
+	}
+	if req.AsaasEnvironment != "" {
+		updates["asaas_environment"] = req.AsaasEnvironment
+	}
+	if req.AsaasWebhookSecret != "" {
+		updates["asaas_webhook_secret"] = req.AsaasWebhookSecret
+	}
+	if req.AsaasCheckoutType != "" {
+		updates["asaas_checkout_type"] = req.AsaasCheckoutType
+	}
+	if req.HotmartAPIKey != "" {
+		updates["hotmart_api_key"] = req.HotmartAPIKey
+	}
+	if req.HotmartWebhookSecret != "" {
+		updates["hotmart_webhook_secret"] = req.HotmartWebhookSecret
+	}
+
+	if len(updates) > 0 {
+		if err := h.db.Model(&settings).Updates(updates).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao atualizar configurações"})
+		}
+	}
+
+	h.db.First(&settings, "id = ?", "default")
+	return c.JSON(fiber.Map{
+		"id":                     settings.ID,
+		"active_provider":        string(settings.ActiveProvider),
+		"stripe_secret_key":      settings.StripeSecretKey,
+		"stripe_webhook_secret":  settings.StripeWebhookSecret,
+		"stripe_checkout_type":   settings.StripeCheckoutType,
+		"asaas_api_key":          settings.AsaasAPIKey,
+		"asaas_environment":      settings.AsaasEnvironment,
+		"asaas_webhook_secret":   settings.AsaasWebhookSecret,
+		"asaas_checkout_type":    settings.AsaasCheckoutType,
+		"hotmart_api_key":        settings.HotmartAPIKey,
+		"hotmart_webhook_secret": settings.HotmartWebhookSecret,
+	})
+}
+
 // --- Users ---
 
 // ListUsers godoc
@@ -222,6 +350,7 @@ func (h *AdminHandler) CreatePlan(c *fiber.Ctx) error {
 		Features          string  `json:"features"`
 		AllowProxy        bool    `json:"allow_proxy"`
 		StripePriceID     string  `json:"stripe_price_id"`
+		AsaasProductID    string  `json:"asaas_product_id"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.Name == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'name' é obrigatório"})
@@ -242,6 +371,7 @@ func (h *AdminHandler) CreatePlan(c *fiber.Ctx) error {
 		Features:          features,
 		AllowProxy:        req.AllowProxy,
 		StripePriceID:     req.StripePriceID,
+		AsaasProductID:    req.AsaasProductID,
 		IsActive:          true,
 	}
 
@@ -276,6 +406,7 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 		AllowProxy        *bool    `json:"allow_proxy"`
 		IsActive          *bool    `json:"is_active"`
 		StripePriceID     string   `json:"stripe_price_id"`
+		AsaasProductID    string   `json:"asaas_product_id"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -311,6 +442,9 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 	}
 	if req.StripePriceID != "" {
 		updates["stripe_price_id"] = req.StripePriceID
+	}
+	if req.AsaasProductID != "" {
+		updates["asaas_product_id"] = req.AsaasProductID
 	}
 
 	if err := h.db.Model(&plan).Updates(updates).Error; err != nil {

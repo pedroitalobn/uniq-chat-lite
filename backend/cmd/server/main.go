@@ -165,6 +165,8 @@ func autoMigrate(db *gorm.DB) error {
 		&models.Invite{},
 		&models.InviteCode{},
 		&models.SystemSetting{},
+		// Payment
+		&models.PaymentSettings{},
 	)
 }
 

@@ -150,6 +150,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Stripe webhook (public — must receive raw body, Stripe signature verified internally)
 	app.Post("/stripe/webhook", stripeH.Webhook)
 
+	// Activate lead after payment (public)
+	app.Post("/stripe/activate-lead", stripeH.ActivateLead)
+
 	// Asaas webhook (public)
 	app.Post("/asaas/webhook", asaasH.Webhook)
 
@@ -167,7 +170,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	auth.Post("/change-password", middleware.RequireAuth(db), authH.ChangePassword)
 
 	// ─── Protected routes ─────────────────────────────────────────────────────
-	api := app.Group("/", middleware.RequireAuth(db), middleware.RateLimit(300))
+	api := app.Group("/api", middleware.RequireAuth(db), middleware.RateLimit(300))
 
 	// Workspaces
 	workspaces := api.Group("/workspaces")
@@ -532,17 +535,19 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 
 	// ─── Admin routes ─────────────────────────────────────────────────────────
 	admin := api.Group("/admin", middleware.RequireAdmin())
+	// Rotas específicas primeiro (sem parâmetros)
+	admin.Get("/stats", adminH.Stats)
 	admin.Get("/users", adminH.ListUsers)
 	admin.Post("/users", adminH.CreateUser)
+	admin.Get("/plans", adminH.ListPlans)
+	admin.Post("/plans", adminH.CreatePlan)
+	admin.Get("/payment-settings", adminH.GetPaymentSettings)
+	admin.Put("/payment-settings", adminH.UpdatePaymentSettings)
+	// Rotas com parâmetros por último
 	admin.Put("/users/:id", adminH.UpdateUser)
 	admin.Post("/users/:id/reset-password", adminH.ResetPassword)
 	admin.Delete("/users/:id", adminH.DeleteUser)
-	admin.Get("/plans", adminH.ListPlans)
-	admin.Post("/plans", adminH.CreatePlan)
 	admin.Put("/plans/:id", adminH.UpdatePlan)
-	admin.Get("/payment-settings", adminH.GetPaymentSettings)
-	admin.Put("/payment-settings", adminH.UpdatePaymentSettings)
-	admin.Get("/stats", adminH.Stats)
 	admin.Post("/invites/toggle", inviteH.ToggleSystem)
 	admin.Get("/invites", inviteH.AdminList)
 
