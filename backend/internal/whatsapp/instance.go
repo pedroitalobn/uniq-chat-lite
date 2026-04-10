@@ -15,7 +15,9 @@ import (
 	"github.com/uniq-chat/backend/internal/queue"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waCommon"
+	"go.mau.fi/whatsmeow/proto/waCompanionReg"
 	"go.mau.fi/whatsmeow/proto/waE2E"
+	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
@@ -99,6 +101,20 @@ func NewInstanceClient(instanceID, sessionDir string, proxyCfg *ProxyConfig, web
 		shortID = shortID[:8]
 	}
 	logger := waLog.Stdout("Client-"+shortID, "WARN", true)
+
+	// Configure full history sync - modify global DeviceProps before creating client
+	// This requests up to 365 days of history from WhatsApp servers
+	store.DeviceProps = &waCompanionReg.DeviceProps{
+		Os:              proto.String("uniq-chat"),
+		PlatformType:    waCompanionReg.DeviceProps_DESKTOP.Enum(),
+		RequireFullSync: proto.Bool(true),
+		HistorySyncConfig: &waCompanionReg.DeviceProps_HistorySyncConfig{
+			FullSyncDaysLimit:   proto.Uint32(365),
+			FullSyncSizeMbLimit: proto.Uint32(10240),
+			StorageQuotaMb:      proto.Uint32(10240),
+		},
+	}
+
 	waClient := whatsmeow.NewClient(deviceStore, logger)
 
 	ic := &InstanceClient{
