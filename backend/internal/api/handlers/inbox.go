@@ -215,6 +215,28 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 		}
 
 		name := rc.ContactName
+		if name == "" || name == phone {
+			// Try to get updated name from WhatsApp
+			client := h.manager.GetInstance(instance.ID.String())
+			if client != nil && client.IsConnected() {
+				if strings.Contains(rc.ToJID, "@g.us") {
+					// Get group info
+					groupInfo, err := client.GetGroupInfo(rc.ToJID)
+					if err == nil {
+						if gName, ok := groupInfo["name"].(string); ok && gName != "" {
+							name = gName
+						}
+					}
+				} else {
+					// Get contact info
+					queryJID := phone + "@s.whatsapp.net"
+					_, pushName := client.GetContactInfo(queryJID)
+					if pushName != "" {
+						name = pushName
+					}
+				}
+			}
+		}
 		if name == "" {
 			name = phone
 		}
