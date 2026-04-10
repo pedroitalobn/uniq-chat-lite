@@ -114,6 +114,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           user.id = backendUser.id;
           (user as unknown as Record<string, unknown>).accessToken = access_token;
           (user as unknown as Record<string, unknown>).role = backendUser.role;
+          (user as unknown as Record<string, unknown>).is_beta = backendUser.is_beta;
           (user as unknown as Record<string, unknown>).plan = backendUser.plan;
         } catch {
           // Allow sign-in even if backend sync fails — token won't have role/plan
@@ -127,6 +128,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const u = user as unknown as Record<string, unknown>;
         token.accessToken = u.accessToken as string;
         token.role = u.role as string;
+        token.is_beta = u.is_beta as boolean;
         token.plan = u.plan;
         token.userId = user.id;
         token.username = u.username as string;
@@ -137,6 +139,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       session.accessToken = token.accessToken as string;
       session.user.role = token.role as "super_admin" | "customer";
+      session.user.is_beta = token.is_beta as boolean;
       session.user.plan = token.plan as Record<string, unknown>;
       session.user.id = token.userId as string;
       (session.user as unknown as Record<string, unknown>).username = token.username;

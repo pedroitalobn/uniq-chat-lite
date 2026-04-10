@@ -16,6 +16,7 @@ type Claims struct {
 	UserID uuid.UUID       `json:"user_id"`
 	Email  string          `json:"email"`
 	Role   models.UserRole `json:"role"`
+	IsBeta bool            `json:"is_beta"`
 	jwt.RegisteredClaims
 }
 
@@ -29,6 +30,7 @@ func GenerateAccessToken(user *models.User) (string, error) {
 		UserID: user.ID,
 		Email:  user.Email,
 		Role:   user.Role,
+		IsBeta: user.IsBeta,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

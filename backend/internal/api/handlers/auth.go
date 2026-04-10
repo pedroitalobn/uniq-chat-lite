@@ -335,6 +335,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 			"email":    user.Email,
 			"username": user.Username,
 			"role":     user.Role,
+			"is_beta":  user.IsBeta,
 			"plan":     user.Plan,
 		},
 	}
@@ -469,6 +470,7 @@ func (h *AuthHandler) loginWithCredentials(c *fiber.Ctx, identifier, password st
 			"email":    user.Email,
 			"username": user.Username,
 			"role":     user.Role,
+			"is_beta":  user.IsBeta,
 			"plan":     user.Plan,
 		},
 	})
@@ -602,11 +604,12 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		"token_type":   "Bearer",
 		"expires_in":   900,
 		"user": fiber.Map{
-			"id":    user.ID,
-			"name":  user.Name,
-			"email": user.Email,
-			"role":  user.Role,
-			"plan":  user.Plan,
+			"id":      user.ID,
+			"name":    user.Name,
+			"email":   user.Email,
+			"role":    user.Role,
+			"is_beta": user.IsBeta,
+			"plan":    user.Plan,
 		},
 	})
 }
@@ -693,6 +696,7 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 		"name":       user.Name,
 		"email":      user.Email,
 		"role":       user.Role,
+		"is_beta":    user.IsBeta,
 		"plan":       user.Plan,
 		"is_active":  user.IsActive,
 		"created_at": user.CreatedAt,
@@ -751,6 +755,7 @@ func (h *AuthHandler) UpdateMe(c *fiber.Ctx) error {
 		"email":    user.Email,
 		"username": user.Username,
 		"role":     user.Role,
+		"is_beta":  user.IsBeta,
 		"plan":     user.Plan,
 	})
 }

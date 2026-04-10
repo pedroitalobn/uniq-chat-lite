@@ -267,6 +267,7 @@ func (h *AdminHandler) UpdateUser(c *fiber.Ctx) error {
 	var req struct {
 		Name         string  `json:"name"`
 		Role         string  `json:"role"`
+		IsBeta       *bool   `json:"is_beta"`
 		PlanID       string  `json:"plan_id"`
 		IsActive     *bool   `json:"is_active"`
 		BlockedUntil *string `json:"blocked_until"` // ISO 8601 or null to unblock
@@ -281,6 +282,9 @@ func (h *AdminHandler) UpdateUser(c *fiber.Ctx) error {
 	}
 	if req.Role == "admin" || req.Role == "user" {
 		updates["role"] = req.Role
+	}
+	if req.IsBeta != nil {
+		updates["is_beta"] = *req.IsBeta
 	}
 	if req.IsActive != nil {
 		updates["is_active"] = *req.IsActive

@@ -3,12 +3,15 @@ export interface User {
   name: string;
   email: string;
   username?: string;
-  role: "super_admin" | "customer" | "lead";
+  role: UserRole;
+  is_beta?: boolean;
   plan?: Plan;
   is_active: boolean;
   blocked_until?: string;
   created_at: string;
 }
+
+export type UserRole = "super_admin" | "customer" | "lead";
 
 export interface Server {
   id: string;
@@ -68,7 +71,7 @@ export interface Plan {
   stripe_price_id?: string;
 }
 
-export type ChannelType = "whatsapp" | "instagram" | "facebook" | "telegram" | "linkedin" | "tiktok" | "kwai";
+export type ChannelType = "whatsapp" | "instagram" | "facebook" | "telegram" | "linkedin" | "tiktok" | "kwai" | "waba";
 
 export interface ChannelInfo {
   id: ChannelType;
@@ -327,4 +330,20 @@ export interface Invite {
   status: "pending" | "accepted" | "expired" | "revoked";
   expires_at: string;
   created_at: string;
+}
+
+// ─── WABA (WhatsApp Business API) ─────────────────────────────────────────────
+
+export interface WABAInstance {
+  id: string;
+  instance_id: string;
+  waba_id: string;
+  phone_number_id: string;
+  phone_number: string;
+  business_name: string;
+  created_at: string;
+}
+
+export interface WABAAuthURL {
+  url: string;
 }

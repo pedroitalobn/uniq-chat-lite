@@ -40,6 +40,7 @@ export function Sidebar() {
   const adminItems = [
     { href: "/admin/users", label: t("nav_users"), icon: Users },
     { href: "/admin/plans", label: t("nav_plans"), icon: CreditCard },
+    { href: "/admin/payment-settings", label: "Pagamento", icon: Shield },
   ];
 
   const closeMobile = () => setMobileOpen(false);
@@ -222,6 +223,11 @@ export function Sidebar() {
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold truncate leading-tight" style={{ color: "var(--text-1)" }}>
               {session?.user?.name || "Usuário"}
+              {session?.user?.is_beta && (
+                <span className="ml-2 inline-flex items-center px-1 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                  BETA
+                </span>
+              )}
             </p>
             <p className="text-[10px] truncate capitalize leading-tight mt-0.5" style={{ color: "var(--text-3)" }}>
               {planName}

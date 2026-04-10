@@ -10,12 +10,14 @@ declare module "next-auth" {
       email?: string | null;
       image?: string | null;
       role: "super_admin" | "customer" | "lead";
+      is_beta?: boolean;
       plan?: Record<string, unknown>;
     };
   }
 
   interface User {
     role: "super_admin" | "customer" | "lead";
+    is_beta?: boolean;
     plan?: Record<string, unknown>;
     accessToken?: string;
   }
@@ -25,7 +27,9 @@ declare module "next-auth/jwt" {
   interface JWT {
     accessToken?: string;
     role?: string;
+    is_beta?: boolean;
     plan?: unknown;
     userId?: string;
+    username?: string;
   }
 }

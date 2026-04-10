@@ -45,6 +45,37 @@ func main() {
 	// Seed default permissions
 	seedPermissions(db)
 
+	// Seed super admin if configured via env vars
+	if os.Getenv("SUPER_ADMIN_EMAIL") != "" && os.Getenv("SUPER_ADMIN_PASSWORD") != "" {
+		var existing models.User
+		if err := db.First(&existing, "email = ?", os.Getenv("SUPER_ADMIN_EMAIL")).Error; err == gorm.ErrRecordNotFound {
+			user := models.User{
+				Name:     os.Getenv("SUPER_ADMIN_NAME"),
+				Email:    os.Getenv("SUPER_ADMIN_EMAIL"),
+				Role:     models.RoleSuperAdmin,
+				IsBeta:   true,
+				IsActive: true,
+			}
+			if name := os.Getenv("SUPER_ADMIN_NAME"); name != "" {
+				user.Name = name
+			} else {
+				user.Name = "Super Admin"
+			}
+			if err := user.SetPassword(os.Getenv("SUPER_ADMIN_PASSWORD")); err != nil {
+				log.Fatal().Err(err).Msg("failed to hash super admin password")
+			}
+			if err := db.Create(&user).Error; err != nil {
+				log.Fatal().Err(err).Msg("failed to create super admin user")
+			}
+			log.Info().Str("email", user.Email).Msg("super admin user created")
+		} else if existing.Role != models.RoleSuperAdmin {
+			existing.Role = models.RoleSuperAdmin
+			existing.IsBeta = true
+			db.Save(&existing)
+			log.Info().Str("email", existing.Email).Msg("existing user promoted to super admin")
+		}
+	}
+
 	// Backfill slug and token for existing instances that predate these fields
 	backfillInstances(db)
 
@@ -167,6 +198,8 @@ func autoMigrate(db *gorm.DB) error {
 		&models.SystemSetting{},
 		// Payment
 		&models.PaymentSettings{},
+		// WABA
+		&models.WABAInstance{},
 	)
 }
 

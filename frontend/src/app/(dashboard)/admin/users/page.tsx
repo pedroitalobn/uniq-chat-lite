@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { adminApi } from "@/lib/api";
 import {
   Users, Shield, User as UserIcon, Trash2, Ban, CheckCircle2,
@@ -358,6 +359,8 @@ function InviteSystemToggle() {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AdminUsersPage() {
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
+  const isSuperAdmin = session?.user?.role === "super_admin";
   const [search, setSearch]       = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [resetUser, setResetUser]   = useState<User | null>(null);
@@ -426,6 +429,13 @@ export default function AdminUsersPage() {
     const newRole = user.role === "super_admin" ? "customer" : "super_admin";
     if (!await showConfirm(`Alterar o role de "${user.email}" para ${newRole}?`, { title: "Alterar permissão", confirmLabel: "Confirmar", danger: false })) return;
     updateMutation.mutate({ id: user.id, data: { role: newRole } });
+  };
+
+  const handleBetaToggle = async (user: User) => {
+    if (!isSuperAdmin) return;
+    const newBeta = !user.is_beta;
+    if (!await showConfirm(`${newBeta ? "Liberar" : "Remover"} acesso beta de "${user.email}"?`, { title: "Acesso Beta", confirmLabel: "Confirmar", danger: false })) return;
+    updateMutation.mutate({ id: user.id, data: { is_beta: newBeta } });
   };
 
   const filtered = users.filter(u =>
@@ -530,6 +540,20 @@ export default function AdminUsersPage() {
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 80%)" }}>
                           {user.name}
+                          {user.is_beta && (
+                            <span className="ml-2 text-xs font-medium px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 border border-purple-500/20">
+                              BETA
+                            </span>
+                          )}
+                          {isSuperAdmin && user.role !== "super_admin" && !user.is_beta && (
+                            <button
+                              onClick={() => handleBetaToggle(user)}
+                              className="ml-2 text-xs font-medium px-1.5 py-0.5 rounded bg-white/5 text-white/40 border border-white/10 hover:bg-white/10 hover:text-white/60 transition-colors"
+                              title="Clique para dar acesso beta"
+                            >
+                              +BETA
+                            </button>
+                          )}
                         </p>
                         <p className="text-xs mt-0.5 truncate" style={{ color: "hsl(240 8% 40%)" }}>
                           {user.email}

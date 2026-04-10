@@ -23,6 +23,7 @@ type User struct {
 	Username                 *string    `gorm:"uniqueIndex" json:"username,omitempty"`
 	PasswordHash             string     `gorm:"not null" json:"-"`
 	Role                     UserRole   `gorm:"type:varchar(15);default:'customer'" json:"role"`
+	IsBeta                   bool       `gorm:"default:false" json:"is_beta"`
 	PlanID                   *uuid.UUID `gorm:"type:uuid" json:"plan_id"`
 	Plan                     *Plan      `gorm:"foreignKey:PlanID" json:"plan,omitempty"`
 	IsActive                 bool       `gorm:"default:true" json:"is_active"`
