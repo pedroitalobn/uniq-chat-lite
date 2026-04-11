@@ -238,12 +238,40 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 	var instances []models.Instance
 	var journeys []models.Journey
 	var integrations []models.UserIntegration
+	var contacts []models.Contact
+	var tags []models.Tag
+	var userWorkspaces []models.UserWorkspace
 
 	h.db.Where("user_id = ?", userID).Find(&instances)
 	h.db.Where("user_id = ?", userID).Find(&journeys)
 	h.db.Where("user_id = ? AND is_active = true", userID).Find(&integrations)
+	h.db.Where("user_id = ?", userID).Order("created_at DESC").Limit(20).Find(&contacts)
+	h.db.Where("user_id = ?", userID).Find(&tags)
 
-	systemPrompt := buildContextPrompt(instances, journeys, integrations)
+	// Get user's workspaces to find their funnels and stages
+	h.db.Where("user_id = ?", userID).Find(&userWorkspaces)
+	var workspaceIDs []string
+	for _, uw := range userWorkspaces {
+		workspaceIDs = append(workspaceIDs, uw.WorkspaceID.String())
+	}
+
+	// Get unique funnels and stages from contacts
+	var funnels, stages []string
+	if len(workspaceIDs) > 0 {
+		h.db.Model(&models.Contact{}).Where("workspace_id IN (?)", workspaceIDs).Distinct("funnel").Pluck("funnel", &funnels)
+		h.db.Model(&models.Contact{}).Where("workspace_id IN (?) AND funnel IS NOT NULL AND funnel != ''", workspaceIDs).Distinct("stage").Pluck("stage", &stages)
+	}
+
+	// Get workspace members for assign_user action
+	var workspaceUsers []models.User
+	if len(workspaceIDs) > 0 {
+		h.db.Joins("JOIN user_workspaces ON user_workspaces.user_id = users.id").
+			Where("user_workspaces.workspace_id IN (?)", workspaceIDs).
+			Limit(10).
+			Find(&workspaceUsers)
+	}
+
+	systemPrompt := buildContextPrompt(instances, journeys, integrations, contacts, tags, funnels, stages, workspaceUsers)
 
 	response, err := h.llm.CallChatWithSystem(ctx, integration, systemPrompt, req.Message, false)
 	if err != nil {
@@ -253,15 +281,15 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"response": response})
 }
 
-func buildContextPrompt(instances []models.Instance, journeys []models.Journey, integrations []models.UserIntegration) string {
-	prompt := "Você é um assistente especializado em configurar automações de WhatsApp.\n\n"
+func buildContextPrompt(instances []models.Instance, journeys []models.Journey, integrations []models.UserIntegration, contacts []models.Contact, tags []models.Tag, funnels []string, stages []string, users []models.User) string {
+	prompt := "Você é um assistente especializado em configurar automações de WhatsApp para marketing e vendas.\n\n"
 
 	prompt += "=== SEU CONTEXTO ===\n\n"
 
 	if len(instances) > 0 {
 		prompt += "INSTÂNCIAS WHATSAPP:\n"
 		for _, inst := range instances {
-			prompt += "- " + inst.Name + " ("
+			prompt += "- ID: " + inst.ID.String() + ", Nome: " + inst.Name + " ("
 			if inst.Status == models.StatusConnected {
 				prompt += "conectada"
 			} else {
@@ -271,6 +299,47 @@ func buildContextPrompt(instances []models.Instance, journeys []models.Journey, 
 				prompt += ", " + inst.PhoneNumber
 			}
 			prompt += ")\n"
+		}
+		prompt += "\n"
+	}
+
+	if len(users) > 0 {
+		prompt += "USUÁRIOS DO WORKSPACE:\n"
+		for _, u := range users {
+			if u.Name != "" {
+				prompt += "- " + u.Name + " (" + u.Email + ")\n"
+			}
+		}
+		prompt += "\n"
+	}
+
+	if len(funnels) > 0 || len(stages) > 0 {
+		prompt += "FUNIS E ETAPAS (CRM):\n"
+		for _, f := range funnels {
+			prompt += "- Funil: " + f + "\n"
+		}
+		for _, s := range stages {
+			prompt += "  - Etapa: " + s + "\n"
+		}
+		prompt += "\n"
+	}
+
+	if len(tags) > 0 {
+		prompt += "TAGS DISPONÍVEIS:\n"
+		for _, t := range tags {
+			prompt += "- " + t.Name + " (cor: " + t.Color + ")\n"
+		}
+		prompt += "\n"
+	}
+
+	if len(contacts) > 0 {
+		prompt += "CONTATOS RECENTES:\n"
+		for i, c := range contacts {
+			if i >= 5 {
+				prompt += fmt.Sprintf("- ... e mais %d contatos\n", len(contacts)-5)
+				break
+			}
+			prompt += "- " + c.Name + " (" + c.Phone + ")\n"
 		}
 		prompt += "\n"
 	}
@@ -302,17 +371,44 @@ func buildContextPrompt(instances []models.Instance, journeys []models.Journey, 
 			if len(desc) > 60 {
 				desc = desc[:60] + "..."
 			}
-			prompt += fmt.Sprintf("- %s (%s, %d execuções)\n", desc, status, j.Invocations)
+			prompt += fmt.Sprintf("- %s (ID: %s, %s, %d execuções)\n", desc, j.ID, status, j.Invocations)
 		}
 		prompt += "\n"
 	}
 
-	prompt += `=== INSTRUÇÕES ===
+	prompt += `=== AÇÕES POSSÍVEIS EM JORNADAS ===
+TRIGGERES (gatilhos):
+- group_keyword: quando alguém enviar uma palavra-chave no grupo
+- group_message: qualquer mensagem no grupo
+- private_message: mensagem privada para a instância
+- contact_tag: quando uma tag for adicionada/removida
+- first_message: primeira mensagem de um contato novo
+- group_join: quando alguém entra no grupo
+- scheduled: em horário agendado
+
+ACÇÕES (respostas/automções):
+- send_message: enviar mensagem no grupo
+- send_private: enviar mensagem privada para o contato
+- create_contact: criar/atuauzair contato no CRM como lead
+- update_stage: atualizar a etapa do funil do contato
+- add_tag: adicionar uma tag ao contato
+- remove_tag: remover tag do contato
+- add_to_inbox: adicionar ao inbox para atendimento humano
+- assign_user: atribuir a um usuário do workspace
+- ai_response: usar IA para gerar resposta
+- wait: aguardar X segundos antes do próximo passo
+
+EXEMPLOS DE FLUXOS:
+1. "Quando alguém dizer 'bom dia' no grupo, criar contato como lead, enviar mensaje privada de boas-vindas e adicionar à etapa 'Novos Leads'"
+2. "Quando alguém entrar no grupo, verificar se já é contato no CRM, se não, criar como lead"
+3. "Após 5 minutos sem resposta, adicionar ao inbox para revisão humana"
+
+=== INSTRUÇÕES ===
 - Seja direto e objetivo nas respostas
 - Se o usuário quiser criar uma jornada, pergunte os detalhes ou extraia do contexto
-- Para enviar mensagens, use a tool send_message
-- Para listar grupos, use list_groups
+- Para criar jornadas complexas, sugira um passo a passo se necessário
 - Mantenha respostas concisas
+- Sempre que possível, use dados reais do contexto acima
 `
 
 	return prompt

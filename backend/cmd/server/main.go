@@ -187,6 +187,8 @@ func autoMigrate(db *gorm.DB) error {
 		&models.TaktikDevice{},
 		&models.Journey{},
 		&models.JourneyExecution{},
+		&models.Funnel{},
+		&models.FunnelStage{},
 		// Workspace / RBAC
 		&models.Workspace{},
 		&models.UserWorkspace{},

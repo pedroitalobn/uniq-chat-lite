@@ -27,6 +27,7 @@ const (
 	ChannelLinkedIn  ChannelType = "linkedin"
 	ChannelTikTok    ChannelType = "tiktok"
 	ChannelKwai      ChannelType = "kwai"
+	ChannelWABA      ChannelType = "waba"
 )
 
 // ChannelMeta holds display info for each channel.
@@ -41,6 +42,7 @@ var ChannelMeta = map[ChannelType]struct {
 	ChannelLinkedIn:  {Label: "LinkedIn", Color: "#0a66c2", Description: "Automatize mensagens e InMails via LinkedIn API"},
 	ChannelTikTok:    {Label: "TikTok", Color: "#ff0050", Description: "Mensagens diretas e comentários via TikTok"},
 	ChannelKwai:      {Label: "Kwai", Color: "#ff6600", Description: "Mensagens e interações via Kwai"},
+	ChannelWABA:      {Label: "WhatsApp Business", Color: "#25d366", Description: "Conecte números via WhatsApp Business API (WABA) com Embedded Signup"},
 }
 
 type InstanceStatus string
@@ -113,6 +115,8 @@ type Instance struct {
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+
+	WABA *WABAInstance `gorm:"foreignKey:InstanceID" json:"waba,omitempty"`
 }
 
 func (i *Instance) BeforeCreate(tx *gorm.DB) error {

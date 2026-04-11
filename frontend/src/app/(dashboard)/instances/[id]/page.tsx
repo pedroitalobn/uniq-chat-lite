@@ -348,20 +348,25 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
       <div>
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 85%)" }}>Webhooks HTTP</h3>
+            <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 85%)" }}>Webhooks da Instância</h3>
             <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 40%)" }}>
-              Cada webhook pode replicar eventos para RabbitMQ, NATS e WebSocket
+              Receba eventos específicos desta instância (mensagens, status, conexões)
             </p>
           </div>
-          <button
-            onClick={() => setCreating(true)}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all"
-            style={{ background: "var(--green)", color: "#03170a" }}
-            onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.1)")}
-            onMouseLeave={e => (e.currentTarget.style.filter = "none")}
-          >
-            <Plus className="w-3.5 h-3.5" /> Novo
-          </button>
+          <div className="flex items-center gap-2">
+            <a href="/settings/webhooks" className="text-[10px] px-2 py-1.5 rounded-lg" style={{ background: "hsl(240 12% 10%)", color: "hsl(240 8% 48)" }}>
+              Ver globais
+            </a>
+            <button
+              onClick={() => setCreating(true)}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all"
+              style={{ background: "var(--green)", color: "#03170a" }}
+              onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.1)")}
+              onMouseLeave={e => (e.currentTarget.style.filter = "none")}
+            >
+              <Plus className="w-3.5 h-3.5" /> Novo
+            </button>
+          </div>
         </div>
 
         {creating && (
@@ -384,33 +389,45 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
             </div>
             {/* Events */}
             <div>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-3">
                 <label className="text-xs font-medium" style={labelStyle}>Eventos</label>
                 <div className="flex gap-2">
-                  <button className="text-[10px]" style={{ color: "hsl(240 8% 42%)" }} onClick={() => setSelectedEvents(ALL_EVENTS)}>todos</button>
-                  <button className="text-[10px]" style={{ color: "hsl(240 8% 42%)" }} onClick={() => setSelectedEvents([])}>nenhum</button>
+                  <button className="text-[10px] px-2.5 py-1.5 rounded-lg font-medium transition-colors" style={{ background: "var(--green)", color: "#03170a" }} onClick={() => setSelectedEvents(ALL_EVENTS)}>Todos</button>
+                  <button className="text-[10px] px-2.5 py-1.5 rounded-lg font-medium transition-colors" style={{ background: "rgba(239,68,68,0.15)", color: "#ef4444" }} onClick={() => setSelectedEvents([])}>Limpar</button>
                 </div>
               </div>
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {EVENT_GROUPS.map(group => {
                   const allSel = group.events.every(e => selectedEvents.includes(e));
+                  const noneSel = group.events.every(e => !selectedEvents.includes(e));
                   return (
                     <div key={group.label}>
-                      <button onClick={() => toggleGroup(group.events)}
-                        className="text-[10px] font-semibold uppercase tracking-wider mb-1"
-                        style={{ color: allSel ? "var(--green)" : "hsl(240 8% 36%)" }}>
-                        {group.label}
-                      </button>
+                      <div className="flex items-center justify-between mb-2">
+                        <button onClick={() => toggleGroup(group.events)}
+                          className="text-[11px] font-semibold uppercase tracking-wider px-2 py-1 rounded-lg transition-all"
+                          style={{ 
+                            background: allSel ? "var(--green)" : noneSel ? "hsl(240 12% 12%)" : "rgba(251,191,36,0.15)", 
+                            color: allSel ? "#03170a" : noneSel ? "hsl(240 8% 48)" : "#fbbf24" 
+                          }}>
+                          {allSel ? "✓ Todos" : noneSel ? "Nenhum" : "Parcial"}
+                        </button>
+                        <span className="text-[10px]" style={{ color: "hsl(240 8% 38)" }}>
+                          {group.events.filter(e => selectedEvents.includes(e)).length}/{group.events.length}
+                        </span>
+                      </div>
                       <div className="flex flex-wrap gap-1.5">
-                        {group.events.map(ev => (
-                          <button key={ev} type="button" onClick={() => toggleEvent(ev)}
-                            className="text-[10px] px-2 py-1 rounded-lg border transition-all font-mono"
-                            style={selectedEvents.includes(ev)
-                              ? { background: "rgba(96,165,250,0.08)", borderColor: "rgba(96,165,250,0.2)", color: "#60a5fa" }
-                              : { background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.05)", color: "hsl(240 8% 36%)" }}>
-                            {ev}
-                          </button>
-                        ))}
+                        {group.events.map(ev => {
+                          const isSelected = selectedEvents.includes(ev);
+                          return (
+                            <button key={ev} type="button" onClick={() => toggleEvent(ev)}
+                              className="text-[11px] py-1.5 rounded-lg font-mono transition-all"
+                              style={isSelected
+                                ? { background: "var(--green)", border: "1px solid var(--green)", color: "#03170a" }
+                                : { background: "hsl(240 12% 10%)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 8% 48)" }}>
+                              {ev}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -1488,7 +1505,7 @@ export default function InstanceDetailPage() {
     ...(isWhatsApp ? [
       { id: "geral" as Tab, label: "Geral", icon: <Settings className="w-3.5 h-3.5" /> },
       { id: "proxy" as Tab, label: "Proxy", icon: <Globe className="w-3.5 h-3.5" /> },
-      { id: "webhooks" as Tab, label: "Integrações", icon: <WebhookIcon className="w-3.5 h-3.5" /> },
+      { id: "webhooks" as Tab, label: "Webhooks", icon: <WebhookIcon className="w-3.5 h-3.5" /> },
       { id: "logs" as Tab, label: "Logs", icon: <Activity className="w-3.5 h-3.5" /> },
       { id: "recovery" as Tab, label: "Recovery", icon: <ShieldAlert className="w-3.5 h-3.5" />, alert: instance?.status === "banned" },
     ] : []),
@@ -1499,7 +1516,7 @@ export default function InstanceDetailPage() {
       { id: "actions" as Tab, label: "Ações", icon: <Users className="w-3.5 h-3.5" /> },
       { id: "scraping" as Tab, label: "Scraping", icon: <Download className="w-3.5 h-3.5" /> },
       { id: "proxy" as Tab, label: "Proxy", icon: <Globe className="w-3.5 h-3.5" /> },
-      { id: "webhooks" as Tab, label: "Integrações", icon: <WebhookIcon className="w-3.5 h-3.5" /> },
+      { id: "webhooks" as Tab, label: "Webhooks", icon: <WebhookIcon className="w-3.5 h-3.5" /> },
       { id: "logs" as Tab, label: "Logs", icon: <Activity className="w-3.5 h-3.5" /> },
     ] : []),
     // TikTok-specific tabs
@@ -1509,7 +1526,7 @@ export default function InstanceDetailPage() {
       { id: "actions" as Tab, label: "Ações", icon: <Users className="w-3.5 h-3.5" /> },
       { id: "scraping" as Tab, label: "Scraping", icon: <Download className="w-3.5 h-3.5" /> },
       { id: "proxy" as Tab, label: "Proxy", icon: <Globe className="w-3.5 h-3.5" /> },
-      { id: "webhooks" as Tab, label: "Integrações", icon: <WebhookIcon className="w-3.5 h-3.5" /> },
+      { id: "webhooks" as Tab, label: "Webhooks", icon: <WebhookIcon className="w-3.5 h-3.5" /> },
       { id: "logs" as Tab, label: "Logs", icon: <Activity className="w-3.5 h-3.5" /> },
     ] : []),
   ];

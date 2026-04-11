@@ -235,8 +235,15 @@ func (h *InstanceHandler) Delete(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
 	}
 
+	// Clear session data BEFORE stopping (while client still exists)
+	if client := h.manager.GetInstance(instance.ID.String()); client != nil {
+		client.ClearSession()
+	}
+
+	// Stop the WhatsApp connection
 	h.manager.StopInstance(instance.ID.String())
 
+	// Delete from database
 	if err := h.db.Delete(instance).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao deletar instância"})
 	}
@@ -252,23 +259,29 @@ func (h *InstanceHandler) GetQR(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
 	}
 
-	// Start instance if not running
-	if !h.manager.IsRunning(instance.ID.String()) {
+	client := h.manager.GetInstance(instance.ID.String())
+
+	// If not running, start it now
+	if client == nil {
 		if err := h.manager.StartInstance(instance); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao iniciar instância: " + err.Error()})
 		}
-		// Update status in DB
-		h.db.Model(instance).Update("status", models.StatusConnecting)
+		// Give it a moment to connect
+		time.Sleep(500 * time.Millisecond)
+		client = h.manager.GetInstance(instance.ID.String())
 	}
 
-	client := h.manager.GetInstance(instance.ID.String())
 	if client == nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "cliente não encontrado"})
 	}
 
+	// Already logged in - don't generate new QR
 	if client.IsLoggedIn() {
 		return c.JSON(fiber.Map{"message": "instância já está conectada"})
 	}
+
+	// Make sure it's in connecting state in DB
+	h.db.Model(instance).Update("status", models.StatusConnecting)
 
 	// Wait for QR with timeout
 	select {
@@ -288,6 +301,11 @@ func (h *InstanceHandler) Disconnect(c *fiber.Ctx) error {
 	instance, ok := c.Locals("instance").(*models.Instance)
 	if !ok {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	// Logout from WhatsApp and clear session so user needs to re-scan QR on reconnect
+	if client := h.manager.GetInstance(instance.ID.String()); client != nil {
+		client.ClearSession()
 	}
 
 	h.manager.StopInstance(instance.ID.String())

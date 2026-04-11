@@ -19,6 +19,7 @@ const CHANNEL_META: Record<ChannelType, { label: string; color: string }> = {
   linkedin:  { label: "LinkedIn",  color: "#0a66c2" },
   tiktok:    { label: "TikTok",    color: "#ff0050" },
   kwai:      { label: "Kwai",      color: "#ff6600" },
+  waba:      { label: "WABA",      color: "#0088ff" },
 };
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";

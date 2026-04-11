@@ -1349,7 +1349,6 @@ func (ic *InstanceClient) broadcastWS(msgType string, data interface{}) {
 	for _, conn := range ic.wsConns {
 		select {
 		case <-conn.done:
-			// closed — skip
 		default:
 			select {
 			case conn.send <- msg:
@@ -1359,6 +1358,14 @@ func (ic *InstanceClient) broadcastWS(msgType string, data interface{}) {
 		}
 	}
 	ic.wsConns = active
+
+	if hub := GetHub(); hub != nil {
+		hub.Broadcast(&Event{
+			Type:     msgType,
+			Instance: ic.ID,
+			Payload:  data,
+		})
+	}
 }
 
 func (ic *InstanceClient) dispatchEvent(event string, data interface{}, ctx eventContext) {
@@ -1451,8 +1458,24 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		case v.Message.GetContactMessage() != nil:
 			msgType = "contact"
 			text = v.Message.GetContactMessage().GetDisplayName()
+		case v.Message.GetInteractiveMessage() != nil:
+			msgType = "interactive"
+			text = "Mensagem interativa"
+		case v.Message.GetListMessage() != nil:
+			msgType = "list"
+			text = "Lista de opções"
+		case v.Message.GetButtonsMessage() != nil:
+			msgType = "buttons"
+			text = "Mensagem com botões"
+		case v.Message.GetEphemeralMessage() != nil:
+			msgType = "ephemeral"
+			text = "Mensagem efêmera"
+		case v.Message.GetProtocolMessage() != nil:
+			msgType = "protocol"
+			text = "Mensagem removida"
 		default:
-			msgType = "unknown"
+			log.Printf("DEBUG: Unknown message type: %T", v.Message)
+			msgType = "text"
 		}
 
 		data := map[string]interface{}{
@@ -1515,9 +1538,10 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		pushName := v.Info.PushName
 		isGroupMsg := v.Info.Chat.Server == "g.us"
 		log.Printf("DEBUG: Saving message - chatJID=%s, pushName=%s, isGroup=%v", chatJID, pushName, isGroupMsg)
+		senderJID := v.Info.Sender.String()
 		go func() {
 			if GlobalManager != nil {
-				_ = GlobalManager.SaveMessage(ic.ID, chatJID, msgText, direction, msgType, pushName, isGroupMsg)
+				_ = GlobalManager.SaveMessage(ic.ID, chatJID, msgText, direction, msgType, pushName, isGroupMsg, senderJID)
 			}
 		}()
 

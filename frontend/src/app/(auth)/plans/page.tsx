@@ -123,7 +123,7 @@ function PlanCard({ plan, onSelect, loading, disabled }: {
   return (
     <div
       className={cn(
-        "relative flex flex-col rounded-2xl p-6 transition-all duration-200",
+        "relative flex flex-col rounded-2xl p-5 sm:p-6 transition-all duration-200 h-full",
         disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
         isPopular ? "ring-2" : !disabled ? "hover:ring-1" : ""
       )}
@@ -174,11 +174,11 @@ function PlanCard({ plan, onSelect, loading, disabled }: {
       </div>
 
       {/* Features */}
-      <ul className="space-y-2 flex-1 mb-6">
-        {highlights.map((item) => (
-          <li key={item} className="flex items-center gap-2.5 text-xs" style={{ color: "hsl(240 8% 65%)" }}>
-            <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: meta.color }} />
-            {item}
+      <ul className="space-y-1.5 flex-1 mb-5">
+        {highlights.slice(0, 8).map((item) => (
+          <li key={item} className="flex items-center gap-2 text-[11px] truncate" style={{ color: "hsl(240 8% 65%)" }}>
+            <Check className="w-3 h-3 flex-shrink-0" style={{ color: meta.color }} />
+            <span className="truncate">{item}</span>
           </li>
         ))}
       </ul>
@@ -343,9 +343,9 @@ function PlansContent() {
             <Loader2 className="w-6 h-6 animate-spin" style={{ color: "hsl(240 8% 40%)" }} />
           </div>
         ) : (
-          <div className="flex flex-wrap justify-center gap-5 mb-10 pb-6 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10 pb-6 pt-2 w-full max-w-6xl mx-auto items-stretch">
             {plans.map((plan) => (
-              <div key={plan.id} className="w-[300px] flex-shrink-0">
+              <div key={plan.id} className="w-full h-full">
                 <PlanCard plan={plan} onSelect={handleSelect} loading={selecting === plan.id} disabled={!canSelect} />
               </div>
             ))}

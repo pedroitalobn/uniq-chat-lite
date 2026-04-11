@@ -29,9 +29,14 @@ type Config struct {
 	MinIOPublicURL string // public base URL, e.g. http://localhost:9000
 	MinIOUseSSL    bool
 
-	// Stripe — payments
+	// Stripe — payments (loaded from DB with env fallback)
 	StripeSecretKey     string
 	StripeWebhookSecret string
+
+	// Asaas — payments (https://docs.asaas.com/) (loaded from DB with env fallback)
+	AsaasAPIKey        string
+	AsaasWebhookSecret string
+	AsaasEnvironment   string // "sandbox" ou "production"
 
 	// Resend — transactional email
 	ResendAPIKey string
@@ -48,6 +53,13 @@ type Config struct {
 
 	// Taktik — Instagram/TikTok automation
 	TaktikBaseURL string
+
+	// Meta — WhatsApp Business API (WABA)
+	MetaAppID              string
+	MetaAppSecret          string
+	MetaSystemUserToken    string
+	MetaWhatsAppConfigID   string
+	MetaWebhookVerifyToken string
 }
 
 var AppConfig *Config
@@ -84,6 +96,11 @@ func Load() *Config {
 		StripeSecretKey:     getEnv("STRIPE_SECRET_KEY", ""),
 		StripeWebhookSecret: getEnv("STRIPE_WEBHOOK_SECRET", ""),
 
+		// Asaas
+		AsaasAPIKey:        getEnv("ASAAS_API_KEY", ""),
+		AsaasWebhookSecret: getEnv("ASAAS_WEBHOOK_SECRET", ""),
+		AsaasEnvironment:   getEnv("ASAAS_ENVIRONMENT", "sandbox"),
+
 		// Resend
 		ResendAPIKey: getEnv("RESEND_API_KEY", ""),
 		FromEmail:    getEnv("FROM_EMAIL", "mail@mrstpry.org"),
@@ -99,6 +116,13 @@ func Load() *Config {
 
 		// Taktik — Instagram/TikTok automation
 		TaktikBaseURL: getEnv("TAKTIK_BASE_URL", "http://localhost:8090"),
+
+		// Meta — WhatsApp Business API (WABA)
+		MetaAppID:              getEnv("META_APP_ID", ""),
+		MetaAppSecret:          getEnv("META_APP_SECRET", ""),
+		MetaSystemUserToken:    getEnv("META_SYSTEM_USER_TOKEN", ""),
+		MetaWhatsAppConfigID:   getEnv("META_WHATSAPP_CONFIG_ID", ""),
+		MetaWebhookVerifyToken: getEnv("META_WEBHOOK_VERIFY_TOKEN", "uniqchat_verify_token"),
 	}
 
 	// Validate critical secrets in production

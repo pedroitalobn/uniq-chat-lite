@@ -66,8 +66,25 @@ export default function PaymentSettingsPage() {
 
   const [activeProvider, setActiveProvider] = useState("stripe");
   const [pendingProvider, setPendingProvider] = useState<string | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
 
   const displayProvider = pendingProvider ?? activeProvider;
+
+  // Check if form has changes from saved settings
+  const checkChanges = (newForm: PaymentConfig, newProvider: string) => {
+    if (!settings) return false;
+    const currentProvider = newProvider;
+    return (
+      currentProvider !== settings.active_provider ||
+      newForm.stripe_secret_key !== "" ||
+      newForm.stripe_webhook_secret !== (settings.stripe_webhook_secret || "") ||
+      newForm.stripe_checkout_type !== (settings.stripe_checkout_type || "redirect") ||
+      newForm.asaas_api_key !== "" ||
+      newForm.asaas_webhook_secret !== (settings.asaas_webhook_secret || "") ||
+      newForm.asaas_environment !== (settings.asaas_environment || "sandbox") ||
+      newForm.asaas_checkout_type !== (settings.asaas_checkout_type || "transparent")
+    );
+  };
 
   useEffect(() => {
     if (settings) {
@@ -84,8 +101,30 @@ export default function PaymentSettingsPage() {
         hotmart_api_key: settings.hotmart_api_key || "",
         hotmart_webhook_secret: settings.hotmart_webhook_secret || "",
       }));
+      setHasChanges(false);
     }
   }, [settings]);
+
+  // Track changes
+  useEffect(() => {
+    if (settings) {
+      setHasChanges(checkChanges(form, pendingProvider ?? activeProvider));
+    }
+  }, [form, pendingProvider, activeProvider, settings]);
+
+  // Update form handler
+  const updateForm = (updates: Partial<PaymentConfig>) => {
+    setForm((prev) => ({ ...prev, ...updates }));
+  };
+
+  // Helper to mask API keys
+  const maskKey = (key: string, showLast: number = 4) => {
+    if (!key) return null;
+    if (key.length <= showLast) return key;
+    return "••••••••" + key.slice(-showLast);
+  };
+
+  const isKeyFilled = (key: string | undefined) => key && key.length > 0;
 
   const updateMutation = useMutation({
     mutationFn: () => adminApi.updatePaymentSettings({
@@ -145,13 +184,20 @@ export default function PaymentSettingsPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: "rgba(0,212,106,0.15)" }}>
-          <span style={{ color: "var(--green)" }}>
-            {PROVIDERS.find((p) => p.id === activeProvider)?.icon}
-          </span>
-          <span className="text-sm font-medium" style={{ color: "var(--green)" }}>
-            {PROVIDERS.find((p) => p.id === activeProvider)?.label}
-          </span>
+        <div className="flex items-center gap-2">
+          {hasChanges && (
+            <span className="text-[10px] px-2 py-1 rounded" style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24" }}>
+              Alterações pendentes
+            </span>
+          )}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: "rgba(0,212,106,0.15)" }}>
+            <span style={{ color: "var(--green)" }}>
+              {PROVIDERS.find((p) => p.id === activeProvider)?.icon}
+            </span>
+            <span className="text-sm font-medium" style={{ color: "var(--green)" }}>
+              {PROVIDERS.find((p) => p.id === activeProvider)?.label}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -223,25 +269,33 @@ export default function PaymentSettingsPage() {
                 <input
                   type={showKeys.stripe_secret ? "text" : "password"}
                   value={form.stripe_secret_key}
-                  onChange={(e) => setForm({ ...form, stripe_secret_key: e.target.value })}
-                  placeholder="sk_live_..."
+                  onChange={(e) => updateForm({ stripe_secret_key: e.target.value })}
+                  placeholder={settings?.stripe_secret_key ? maskKey(settings.stripe_secret_key) : "sk_live_..."}
                   className="input-field w-full pr-8 font-mono text-xs"
                 />
                 <button type="button" onClick={() => toggleKey("stripe_secret")} className="absolute right-2 top-1/2 -translate-y-1/2">
                   {showKeys.stripe_secret ? <X className="w-3.5 h-3.5" /> : <Key className="w-3.5 h-3.5" />}
                 </button>
               </div>
-              <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 38%)" }}>Deixe vazio para manter a atual</p>
+              {isKeyFilled(settings?.stripe_secret_key) && (
+                <p className="text-[10px] mt-1" style={{ color: "var(--green)" }}>
+                  ✓ Configurado ({maskKey(settings?.stripe_secret_key || "")})
+                </p>
+              )}
+              <p className="text-[10px] mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>Deixe vazio para manter o atual</p>
             </div>
             <div>
               <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Webhook Secret</label>
               <input
                 type="text"
                 value={form.stripe_webhook_secret}
-                onChange={(e) => setForm({ ...form, stripe_webhook_secret: e.target.value })}
-                placeholder="whsec_..."
+                onChange={(e) => updateForm({ stripe_webhook_secret: e.target.value })}
+                placeholder={settings?.stripe_webhook_secret ? maskKey(settings.stripe_webhook_secret) : "whsec_..."}
                 className="input-field w-full font-mono text-xs"
               />
+              {isKeyFilled(settings?.stripe_webhook_secret) && (
+                <p className="text-[10px] mt-1" style={{ color: "var(--green)" }}>✓ Configurado</p>
+              )}
             </div>
           </div>
 
@@ -249,12 +303,12 @@ export default function PaymentSettingsPage() {
             <div className="pt-4">
               <label className="text-xs block mb-2" style={{ color: "hsl(240 8% 46%)" }}>Tipo de Checkout</label>
               <div className="flex gap-3">
-                <label className="flex items-center gap-2 cursor-pointer flex-1">
+                  <label className="flex items-center gap-2 cursor-pointer flex-1">
                   <input
                     type="radio"
                     name="stripe_checkout"
                     checked={form.stripe_checkout_type === "redirect"}
-                    onChange={() => setForm({ ...form, stripe_checkout_type: "redirect" })}
+                    onChange={() => updateForm({ stripe_checkout_type: "redirect" })}
                     className="accent-[#635bff]"
                   />
                   <div className="text-xs" style={{ color: "hsl(240 15% 80%)" }}>
@@ -267,7 +321,7 @@ export default function PaymentSettingsPage() {
                     type="radio"
                     name="stripe_checkout"
                     checked={form.stripe_checkout_type === "transparent"}
-                    onChange={() => setForm({ ...form, stripe_checkout_type: "transparent" })}
+                    onChange={() => updateForm({ stripe_checkout_type: "transparent" })}
                     className="accent-[#635bff]"
                   />
                   <div className="text-xs" style={{ color: "hsl(240 15% 80%)" }}>
@@ -305,7 +359,7 @@ export default function PaymentSettingsPage() {
               <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Ambiente</label>
               <select
                 value={form.asaas_environment}
-                onChange={(e) => setForm({ ...form, asaas_environment: e.target.value })}
+                onChange={(e) => updateForm({ asaas_environment: e.target.value })}
                 className="input-field w-full text-xs"
               >
                 {ASAAS_ENVIRONMENTS.map((env) => (
@@ -318,10 +372,13 @@ export default function PaymentSettingsPage() {
               <input
                 type="text"
                 value={form.asaas_webhook_secret}
-                onChange={(e) => setForm({ ...form, asaas_webhook_secret: e.target.value })}
-                placeholder="whsec_..."
+                onChange={(e) => updateForm({ asaas_webhook_secret: e.target.value })}
+                placeholder={settings?.asaas_webhook_secret ? maskKey(settings.asaas_webhook_secret) : "whsec_..."}
                 className="input-field w-full font-mono text-xs"
               />
+              {isKeyFilled(settings?.asaas_webhook_secret) && (
+                <p className="text-[10px] mt-1" style={{ color: "var(--green)" }}>✓ Configurado</p>
+              )}
             </div>
             <div className="col-span-2">
               <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Asaas API Key</label>
@@ -329,14 +386,20 @@ export default function PaymentSettingsPage() {
                 <input
                   type={showKeys.asaas_api_key ? "text" : "password"}
                   value={form.asaas_api_key}
-                  onChange={(e) => setForm({ ...form, asaas_api_key: e.target.value })}
-                  placeholder="$aas_..."
+                  onChange={(e) => updateForm({ asaas_api_key: e.target.value })}
+                  placeholder={settings?.asaas_api_key ? maskKey(settings.asaas_api_key) : "$aas_..."}
                   className="input-field w-full pr-8 font-mono text-xs"
                 />
                 <button type="button" onClick={() => toggleKey("asaas_api_key")} className="absolute right-2 top-1/2 -translate-y-1/2">
                   {showKeys.asaas_api_key ? <X className="w-3.5 h-3.5" /> : <Key className="w-3.5 h-3.5" />}
                 </button>
               </div>
+              {isKeyFilled(settings?.asaas_api_key) && (
+                <p className="text-[10px] mt-1" style={{ color: "var(--green)" }}>
+                  ✓ Configurado ({maskKey(settings?.asaas_api_key || "")})
+                </p>
+              )}
+              <p className="text-[10px] mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>Deixe vazio para manter o atual</p>
             </div>
           </div>
 
@@ -349,7 +412,7 @@ export default function PaymentSettingsPage() {
                     type="radio"
                     name="asaas_checkout"
                     checked={form.asaas_checkout_type === "transparent"}
-                    onChange={() => setForm({ ...form, asaas_checkout_type: "transparent" })}
+                    onChange={() => updateForm({ asaas_checkout_type: "transparent" })}
                     className="accent-[#22c55e]"
                   />
                   <div className="text-xs" style={{ color: "hsl(240 15% 80%)" }}>
@@ -362,7 +425,7 @@ export default function PaymentSettingsPage() {
                     type="radio"
                     name="asaas_checkout"
                     checked={form.asaas_checkout_type === "redirect"}
-                    onChange={() => setForm({ ...form, asaas_checkout_type: "redirect" })}
+                    onChange={() => updateForm({ asaas_checkout_type: "redirect" })}
                     className="accent-[#22c55e]"
                   />
                   <div className="text-xs" style={{ color: "hsl(240 15% 80%)" }}>

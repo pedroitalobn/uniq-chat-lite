@@ -175,7 +175,7 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="space-y-1">
-            {instances.slice(0, 5).map((inst) => {
+            {instances.slice(0, 10).map((inst) => {
               const s = instanceStatusStyles[inst.status] ?? instanceStatusStyles.disconnected;
               return (
                 <div key={inst.id} className="flex items-center justify-between py-2.5 px-3 rounded-xl transition-colors"
@@ -192,6 +192,11 @@ export default function DashboardPage() {
                 </div>
               );
             })}
+            {instances.length > 10 && (
+              <Link href="/instances" className="block text-center text-xs py-2" style={{ color: "var(--green)" }}>
+                Ver todas as {instances.length} instâncias →
+              </Link>
+            )}
           </div>
         )}
       </div>

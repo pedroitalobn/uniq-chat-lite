@@ -135,7 +135,8 @@ func (h *AsaasHandler) CreateCheckout(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
 	}
 
-	if h.getAPIKey() == "" {
+	apiKey := h.getAPIKey()
+	if apiKey == "" {
 		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "Asaas não configurado"})
 	}
 
@@ -143,6 +144,7 @@ func (h *AsaasHandler) CreateCheckout(c *fiber.Ctx) error {
 		PlanID        string `json:"plan_id"`
 		PaymentMethod string `json:"payment_method"` // CREDIT_CARD, BOLETO, PIX
 		Cpf           string `json:"cpf"`
+		Name          string `json:"name"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -152,7 +154,7 @@ func (h *AsaasHandler) CreateCheckout(c *fiber.Ctx) error {
 	if err := h.db.First(&plan, "id = ?", req.PlanID).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "plano não encontrado"})
 	}
-	if plan.AsaasProductID == "" {
+	if plan.AsaasProductID == "" && plan.Price > 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "plano sem produto Asaas configurado"})
 	}
 	if plan.Price == 0 {
@@ -162,6 +164,14 @@ func (h *AsaasHandler) CreateCheckout(c *fiber.Ctx) error {
 	paymentMethod := "PIX"
 	if req.PaymentMethod != "" {
 		paymentMethod = req.PaymentMethod
+	}
+
+	// Buscar configurações de checkout
+	var paySettings models.PaymentSettings
+	checkoutType := "transparent"
+	h.db.First(&paySettings)
+	if paySettings.AsaasCheckoutType != "" {
+		checkoutType = paySettings.AsaasCheckoutType
 	}
 
 	customerID := user.AsaasCustomerID
@@ -190,37 +200,53 @@ func (h *AsaasHandler) CreateCheckout(c *fiber.Ctx) error {
 		h.db.Model(user).Update("asaas_customer_id", customerID)
 	}
 
-	nextDueDate := time.Now().AddDate(0, 1, 1).Format("2006-01-02")
-
-	subReq := AsaasSubscriptionRequest{
-		Customer:          customerID,
-		Plan:              plan.AsaasProductID,
-		Price:             plan.Price,
-		Cycle:             "MONTHLY",
-		PaymentMethod:     paymentMethod,
-		NextDueDate:       nextDueDate,
-		Description:       "Assinatura " + plan.Name,
-		ExternalReference: user.ID.String() + "|" + plan.ID.String(),
+	// Gerar payment token para checkout transparente
+	tokenReq := map[string]interface{}{
+		"customer": customerID,
+		"billingType": map[string]string{
+			"creditCard": "CREDIT_CARD",
+			"boleto":     "BOLETO",
+			"pix":        "PIX",
+		}[paymentMethod],
+		"value":             plan.Price,
+		"dueDate":           time.Now().AddDate(0, 0, 3).Format("2006-01-02"),
+		"description":       "Assinatura " + plan.Name,
+		"externalReference": user.ID.String() + "|" + plan.ID.String(),
 	}
-
-	subBody, _ := json.Marshal(subReq)
-	subResp, err := h.apiRequest("POST", "/api/v3/subscriptions", subBody)
+	tokenBody, _ := json.Marshal(tokenReq)
+	tokenResp, err := h.apiRequest("POST", "/api/v3/payments", tokenBody)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar assinatura Asaas"})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar pagamento"})
 	}
 
-	var sub AsaasSubscriptionResponse
-	if err := json.Unmarshal(subResp, &sub); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao processar assinatura"})
+	var paymentResult map[string]interface{}
+	json.Unmarshal(tokenResp, &paymentResult)
+
+	if checkoutType == "transparent" {
+		// Checkout transparente - retorna dados para o frontend criar o formulario
+		return c.JSON(fiber.Map{
+			"checkout_type": "transparent",
+			"payment_id":    paymentResult["id"],
+			"customer_id":   customerID,
+			"plan_name":     plan.Name,
+			"plan_price":    plan.Price,
+			"qr_code":       paymentResult["encodedImage"],
+			"qr_code_text":  paymentResult["payload"],
+			"boleto_url":    paymentResult["bankSlipUrl"],
+			"status":        paymentResult["status"],
+		})
 	}
+
+	// Redirect - retorna URL de pagamento
+	invoiceURL, _ := paymentResult["invoiceUrl"].(string)
+	bankSlipLink, _ := paymentResult["bankSlipUrl"].(string)
 
 	return c.JSON(fiber.Map{
-		"subscription_id": sub.ID,
-		"status":          sub.Status,
-		"invoice_url":     sub.InvoiceURL,
-		"boleto_link":     sub.BankSlipLink,
-		"invoice_id":      sub.InvoiceID,
-		"url":             sub.InvoiceURL,
+		"checkout_type": "redirect",
+		"payment_id":    paymentResult["id"],
+		"url":           invoiceURL,
+		"boleto_link":   bankSlipLink,
+		"status":        paymentResult["status"],
 	})
 }
 

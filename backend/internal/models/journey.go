@@ -179,6 +179,12 @@ const (
 	ActionSendGroup    ActionType = "send_group"
 	ActionAIResponse   ActionType = "ai_response"
 	ActionWait         ActionType = "wait"
+	// Novas actions para CRM
+	ActionCreateContact ActionType = "create_contact" // Criar/lead no CRM
+	ActionUpdateStage   ActionType = "update_stage"   // Atualizar estágio do funil
+	ActionAddToInbox    ActionType = "add_to_inbox"   // Adicionar ao inbox
+	ActionAssignUser    ActionType = "assign_user"    // Atribuir a um usuário
+	ActionCreateLead    ActionType = "create_lead"    // Criar lead no funil
 )
 
 type StepType string

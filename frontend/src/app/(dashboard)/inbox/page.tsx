@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
+import api from "@/lib/api";
 import {
   Search, Send, Check, CheckCheck, Image, Mic, FileText, MapPin,
   Users, Phone, Video, MessageSquare, User, Archive, Trash2, Star,
   MoreHorizontal, ChevronRight, Filter, EyeOff, Pin, Tag, BellOff,
-  Smile, Paperclip, ArrowDown, RefreshCw
+  Smile, Paperclip, ArrowDown, RefreshCw, Copy
 } from "lucide-react";
 import { instancesApi, inboxApi, crmApi, workspacesApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -35,13 +37,15 @@ interface ChatContact {
 interface ChatMessage {
   id: string; content: string; from_me: boolean;
   timestamp: number; status: string; type: string;
+  sender_jid?: string; sender_name?: string;
   is_pinned?: boolean; is_favorite?: boolean; is_archived?: boolean; is_deleted?: boolean;
 }
 
 interface ContactInfo {
   jid: string; name: string; phone: string; avatar?: string;
-  email?: string; tags: string[]; funnel?: string; stage?: string;
+  email?: string; tags: string[]; funnel?: string; stage?: string; journey?: string;
   contact_id?: string; owner?: string; owner_name?: string; notes?: string;
+  is_group?: boolean;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -76,70 +80,123 @@ function MsgBody({ msg }: { msg: ChatMessage }) {
   return <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{t}</span>;
 }
 
-// ─── WebSocket Hook for Real-Time Messages ──────────────────────────────────
+// ─── WebSocket Hook for Real-Time Messages (Global) ──────────────────────────
 
-function useInboxWebSocket(instanceId: string, activeChat: string | null, qc: ReturnType<typeof useQueryClient>, onStatusChange: (s: "connected" | "disconnected" | "connecting") => void, onSync: () => void) {
+const API_WS_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/^http/, "ws") || "ws://localhost:8080";
+
+function useInboxWebSocket(instanceId: string, activeChat: string | null, qc: ReturnType<typeof useQueryClient>, onStatusChange: (s: "connected" | "disconnected" | "connecting") => void, onSync: () => void, session: { accessToken?: string } | null) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onStatusChangeRef = useRef(onStatusChange);
   const onSyncRef = useRef(onSync);
   const instanceIdRef = useRef(instanceId);
   const activeChatRef = useRef(activeChat);
-  const prevInstanceIdRef = useRef(instanceId);
+  const connectedRef = useRef(false);
+  const tokenRef = useRef("");
+  const shouldReconnectRef = useRef(true);
 
   onStatusChangeRef.current = onStatusChange;
   onSyncRef.current = onSync;
   instanceIdRef.current = instanceId;
   activeChatRef.current = activeChat;
+  tokenRef.current = (session?.accessToken as string) || "";
 
   const disconnect = useCallback(() => {
+    shouldReconnectRef.current = false;
     clearTimeout(reconnectTimer.current);
     if (wsRef.current) {
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
       wsRef.current.close();
       wsRef.current = null;
     }
+    connectedRef.current = false;
   }, []);
 
   const connect = useCallback(() => {
-    if (!instanceIdRef.current) return;
-    
-    disconnect();
+    if (connectedRef.current || wsRef.current) return;
+
+    shouldReconnectRef.current = true;
     onStatusChangeRef.current("connecting");
-    console.log("[InboxWS] Connecting to ws://localhost:8080/api/instances/" + instanceIdRef.current + "/ws");
     try {
-      const ws = new WebSocket(`ws://localhost:8080/api/instances/${instanceIdRef.current}/ws`);
+      const token = tokenRef.current;
+      if (!token) {
+        onStatusChangeRef.current("disconnected");
+        if (shouldReconnectRef.current) {
+          reconnectTimer.current = setTimeout(connect, 3000);
+        }
+        return;
+      }
+      const wsUrl = `${API_WS_URL}/ws/events?token=${encodeURIComponent(token)}`;
+      const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log("[InboxWS] Connected!");
+        connectedRef.current = true;
         onStatusChangeRef.current("connected");
       };
-      ws.onclose = (e) => { 
-        console.log("[InboxWS] Closed:", e.code, e.reason);
-        onStatusChangeRef.current("disconnected"); 
-        wsRef.current = null; 
-        reconnectTimer.current = setTimeout(connect, 3000); 
+      ws.onclose = () => {
+        connectedRef.current = false;
+        wsRef.current = null;
+        onStatusChangeRef.current("disconnected");
+        if (shouldReconnectRef.current) {
+          reconnectTimer.current = setTimeout(connect, 3000);
+        }
       };
-      ws.onerror = (e) => { 
-        console.log("[InboxWS] Error:", e); 
-        ws.close(); 
+      ws.onerror = () => {
+        if (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) {
+          ws.close();
+        }
       };
 
       ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
-          if (data.type === "history.sync") {
-            onSyncRef.current();
-          }
-          if (data.type === "message" || data.type === "message_received" || data.type === "message.received") {
-            qc.invalidateQueries({ queryKey: ["chats", instanceIdRef.current] });
-            if (activeChatRef.current) {
-              qc.invalidateQueries({ queryKey: ["msgs", instanceIdRef.current, activeChatRef.current] });
+          const msg = JSON.parse(event.data);
+          if (msg.type === "ping") return;
+
+          const eventInstance = msg.instance || "";
+          const currentInstance = instanceIdRef.current;
+
+          if (msg.type === "history.sync") {
+            if (!currentInstance || !eventInstance || eventInstance === currentInstance) {
+              onSyncRef.current();
             }
           }
-          if (data.type === "message_status" || data.type === "message.status") {
-            if (activeChatRef.current) {
-              qc.invalidateQueries({ queryKey: ["msgs", instanceIdRef.current, activeChatRef.current] });
+
+          if (msg.type === "message" || msg.type === "message_received" || msg.type === "message.received" || msg.type === "message.sent") {
+            if (eventInstance) {
+              qc.invalidateQueries({ queryKey: ["chats", eventInstance] });
+              const chat = activeChatRef.current;
+              if (chat && currentInstance === eventInstance) {
+                qc.invalidateQueries({ queryKey: ["msgs", eventInstance, chat] });
+              }
+            } else if (currentInstance) {
+              qc.invalidateQueries({ queryKey: ["chats", currentInstance] });
+              const chat = activeChatRef.current;
+              if (chat) {
+                qc.invalidateQueries({ queryKey: ["msgs", currentInstance, chat] });
+              }
+            }
+          }
+
+          if (msg.type === "message_status" || msg.type === "message.status") {
+            if (eventInstance) {
+              const chat = activeChatRef.current;
+              if (chat && currentInstance === eventInstance) {
+                qc.invalidateQueries({ queryKey: ["msgs", eventInstance, chat] });
+              }
+            } else if (currentInstance) {
+              const chat = activeChatRef.current;
+              if (chat) {
+                qc.invalidateQueries({ queryKey: ["msgs", currentInstance, chat] });
+              }
+            }
+          }
+
+          if (msg.type === "instance_status") {
+            qc.invalidateQueries({ queryKey: ["instances"] });
+            if (eventInstance) {
+              qc.invalidateQueries({ queryKey: ["chats", eventInstance] });
             }
           }
         } catch {}
@@ -148,14 +205,18 @@ function useInboxWebSocket(instanceId: string, activeChat: string | null, qc: Re
   }, [qc, disconnect]);
 
   useEffect(() => {
-    if (instanceId && instanceId !== prevInstanceIdRef.current) {
-      prevInstanceIdRef.current = instanceId;
-      connect();
-    } else if (instanceId) {
-      connect();
+    if (!session?.accessToken) {
+      disconnect();
+      return;
     }
-    return () => disconnect();
-  }, [instanceId, connect, disconnect]);
+
+    shouldReconnectRef.current = true;
+    connect();
+
+    return () => {
+      disconnect();
+    };
+  }, [session?.accessToken, connect, disconnect]);
 
   return wsRef;
 }
@@ -231,35 +292,41 @@ function ContactItem({
 // ─── Message Bubble ─────────────────────────────────────────────────────────
 
 function MessageBubble({
-  msg, channelColor, contactAvatar, contactName, onContextMenu,
+  msg, channelColor, contactAvatar, contactName, isGroupChat, onContextMenu,
 }: {
-  msg: ChatMessage; channelColor: string; contactAvatar?: string; contactName: string;
+  msg: ChatMessage; channelColor: string; contactAvatar?: string; contactName: string; isGroupChat?: boolean;
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
   const sent = msg.from_me;
+  const senderDisplay = msg.sender_name?.trim() || (msg.sender_jid ? msg.sender_jid.split("@")[0] : "Contato");
 
   return (
     <div className={cn("flex gap-2 group", sent ? "justify-end" : "items-end")}
       onContextMenu={onContextMenu}>
       {/* Received avatar */}
       {!sent && (
-        contactAvatar
+        (!isGroupChat && contactAvatar)
           ? <img src={contactAvatar} className="w-7 h-7 rounded-full object-cover flex-shrink-0 mb-5" alt="" />
           : <div className="w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-semibold flex-shrink-0 mb-5"
               style={{ background: `${channelColor}18`, color: channelColor }}>
-              {contactName.slice(0, 2).toUpperCase()}
+              {senderDisplay.slice(0, 2).toUpperCase()}
             </div>
       )}
 
       {/* Bubble */}
       <div className="max-w-[70%] min-w-[80px]">
+        {!sent && isGroupChat && (
+          <div className="text-[11px] mb-1 px-1" style={{ color: "var(--text-3)" }}>
+            {senderDisplay}
+          </div>
+        )}
         <div
           className={cn(
             "px-3 py-2 text-[13px] leading-[1.5] relative",
             sent ? "rounded-2xl rounded-br-md" : "rounded-2xl rounded-bl-md"
           )}
           style={sent
-            ? { background: channelColor, color: "#fff" }
+            ? { background: "rgb(37 211 102 / 17%)", color: "rgb(255, 255, 255)" }
             : { background: "var(--surface-3)", color: "var(--text-1)" }
           }
         >
@@ -287,6 +354,7 @@ function MessageBubble({
 
 export default function InboxPage() {
   const { currentWorkspace } = useWorkspace();
+  const { data: session } = useSession();
   const qc = useQueryClient();
 
   const [channels, setChannels] = useState<ChannelType[]>(["whatsapp"]);
@@ -301,12 +369,19 @@ export default function InboxPage() {
   const [contactNotes, setContactNotes] = useState("");
   const [contactOwner, setContactOwner] = useState("");
   const [contactStage, setContactStage] = useState("");
+  const [contactFunnel, setContactFunnel] = useState("");
+  const [contactJourney, setContactJourney] = useState("");
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [showContactPanel, setShowContactPanel] = useState(true);
   const [msgOffset, setMsgOffset] = useState(0);
   const [hasMoreMsgs, setHasMoreMsgs] = useState(true);
+  const [olderMsgs, setOlderMsgs] = useState<ChatMessage[]>([]);
   const [wsStatus, setWsStatus] = useState<"connected" | "disconnected" | "connecting">("disconnected");
   const [isSyncing, setIsSyncing] = useState<boolean | undefined>(undefined);
+  const [showNewFunnel, setShowNewFunnel] = useState(false);
+  const [showNewStage, setShowNewStage] = useState(false);
+  const [newFunnelName, setNewFunnelName] = useState("");
+  const [newStageName, setNewStageName] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const inpRef = useRef<HTMLInputElement>(null);
   const msgsContainerRef = useRef<HTMLDivElement>(null);
@@ -369,17 +444,58 @@ export default function InboxPage() {
     }
   });
 
-  const { data: tagsD } = useQuery({
+  const { data: tagsD = [] } = useQuery<any[]>({
     queryKey: ["crmTags", currentWorkspace?.id],
     enabled: !!currentWorkspace?.id,
     queryFn: async () => {
-      try { return (await crmApi.listTags(currentWorkspace!.id)).data; }
-      catch { return { tags: [] }; }
+      try { return (await crmApi.listTags(currentWorkspace!.id)).data || []; }
+      catch { return []; }
+    }
+  });
+
+  const { data: funnelsD } = useQuery({
+    queryKey: ["crmFunnels", currentWorkspace?.id],
+    enabled: !!currentWorkspace?.id,
+    queryFn: async () => {
+      try { return (await crmApi.listFunnels(currentWorkspace!.id)).data || []; }
+      catch { return []; }
+    }
+  });
+
+  const { data: funnelOptionsD } = useQuery({
+    queryKey: ["crmFunnelOptions"],
+    queryFn: async () => {
+      try { return (await crmApi.listFunnelOptions()).data || []; }
+      catch { return []; }
+    }
+  });
+
+  const { data: stageOptionsD } = useQuery({
+    queryKey: ["crmStageOptions"],
+    queryFn: async () => {
+      try { return (await crmApi.listStageOptions()).data || []; }
+      catch { return []; }
+    }
+  });
+
+  const { data: journeyOptionsD } = useQuery({
+    queryKey: ["crmJourneyOptions"],
+    queryFn: async () => {
+      try { return (await crmApi.listJourneyOptions()).data || []; }
+      catch { return []; }
     }
   });
 
   // ── WebSocket for real-time ──
-  useInboxWebSocket(instance, chat, qc, setWsStatus, () => { setIsSyncing(true); qc.invalidateQueries({ queryKey: ["chats", instance] }); if (chat) qc.invalidateQueries({ queryKey: ["msgs", instance, chat] }); setTimeout(() => setIsSyncing(false), 2000); });
+  useInboxWebSocket(instance, chat, qc, setWsStatus, () => {
+    setIsSyncing(true);
+    qc.invalidateQueries({ queryKey: ["chats", instance] });
+    if (chat) {
+      qc.invalidateQueries({ queryKey: ["msgs", instance, chat] });
+      qc.invalidateQueries({ queryKey: ["contact", instance, chat] });
+    }
+    setTimeout(() => setIsSyncing(false), 2000);
+  }, session);
 
   // ── Mutations ──
 
@@ -411,12 +527,41 @@ export default function InboxPage() {
   });
 
   const list: ChatContact[] = chatsD?.chats || [];
-  const msgs: ChatMessage[] = msgsD?.messages || [];
+  const currentMsgs: ChatMessage[] = msgsD?.messages || [];
+  const msgs: ChatMessage[] = useMemo(() => {
+    const merged = [...olderMsgs, ...currentMsgs];
+    const seen = new Set<string>();
+    return merged.filter((m) => {
+      const key = `${m.id}-${m.timestamp}-${m.from_me ? "out" : "in"}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [olderMsgs, currentMsgs]);
   const hasMore = msgsD?.has_more ?? false;
-  const ct: ContactInfo = contactD?.contact || { jid: chat || "", name: chat?.split("@")[0] || "", phone: chat || "", tags: [], notes: "" };
+  const liveChat = list.find(c => c.jid === chat);
+  const ct: ContactInfo = {
+    ...(contactD?.contact || { jid: chat || "", name: chat?.split("@")[0] || "", phone: chat || "", tags: [], notes: "" }),
+    name: liveChat?.name || contactD?.contact?.name || chat?.split("@")[0] || "",
+    phone: liveChat?.phone || contactD?.contact?.phone || chat?.split("@")[0] || "",
+    funnel: contactD?.contact?.funnel || "",
+    stage: contactD?.contact?.stage || "",
+    journey: contactD?.contact?.journey || "",
+  };
 
   // Reset pagination when chat changes
-  useEffect(() => { setMsgOffset(0); setHasMoreMsgs(true); }, [chat]);
+  useEffect(() => {
+    setMsgOffset(0);
+    setHasMoreMsgs(true);
+    setOlderMsgs([]);
+  }, [chat]);
+
+  // Keep local has-more in sync with server response for first page
+  useEffect(() => {
+    if (msgOffset === 0) {
+      setHasMoreMsgs(msgsD?.has_more ?? false);
+    }
+  }, [msgsD?.has_more, msgOffset]);
 
   const loadMoreMut = useMutation({
     mutationFn: async (currentOffset: number) => {
@@ -425,17 +570,44 @@ export default function InboxPage() {
       return { ...res.data, newOffset };
     },
     onSuccess: (data) => {
-      if (data.messages && data.messages.length > 0) {
+      const newBatch: ChatMessage[] = data.messages || [];
+      if (newBatch.length > 0) {
+        setOlderMsgs(prev => {
+          const seen = new Set(prev.map(m => m.id));
+          const filtered = newBatch.filter(m => !seen.has(m.id));
+          return [...filtered, ...prev];
+        });
         setMsgOffset(data.newOffset);
-        setHasMoreMsgs(data.has_more);
       }
+      setHasMoreMsgs(data.has_more ?? false);
+      if (newBatch.length === 0) {
+        toast.info("Não há mensagens mais antigas");
+      }
+    },
+    onError: () => {
+      toast.error("Falha ao carregar mensagens antigas");
     },
   });
 
   // CRM mutations
-  const updateContactMut = useMutation({
-    mutationFn: (data: { name?: string; email?: string; notes?: string; funnel?: string; stage?: string; journey?: string; owner?: string }) =>
-      crmApi.updateContact(ct.contact_id!, data),
+  const ensureContactAndUpdate = useMutation({
+    mutationFn: async (data: { name?: string; email?: string; notes?: string; funnel?: string; stage?: string; journey?: string; owner?: string }) => {
+      if (ct.contact_id) {
+        return crmApi.updateContact(ct.contact_id, data);
+      }
+      // No contact yet - create one first
+      const phone = ct.phone || chat?.split("@")[0] || "";
+      const name = ct.name || phone;
+      const created = await crmApi.createContact({
+        name,
+        phone,
+        workspace_id: currentWorkspace?.id,
+      });
+      // Then update with the desired data
+      const contactId = created.data?.contact?.id || created.data?.id;
+      if (!contactId) throw new Error("Falha ao criar contato");
+      return crmApi.updateContact(contactId, data);
+    },
     onSuccess: () => {
       toast.success("Contato atualizado!");
       qc.invalidateQueries({ queryKey: ["contact", instance, chat] });
@@ -443,13 +615,54 @@ export default function InboxPage() {
     onError: (e: any) => toast.error(e.response?.data?.error || "Erro ao atualizar"),
   });
 
-  const assignTagsMut = useMutation({
-    mutationFn: (tagIds: string[]) => crmApi.assignTags(ct.contact_id!, tagIds),
+  const ensureContactAndAssignTags = useMutation({
+    mutationFn: async (tagIds: string[]) => {
+      let contactId = ct.contact_id;
+      if (!contactId) {
+        const phone = ct.phone || chat?.split("@")[0] || "";
+        const name = ct.name || phone;
+        const created = await crmApi.createContact({
+          name,
+          phone,
+          workspace_id: currentWorkspace?.id,
+        });
+        contactId = created.data?.contact?.id || created.data?.id;
+        if (!contactId) throw new Error("Falha ao criar contato");
+        // Invalidate to get new contact_id
+        qc.invalidateQueries({ queryKey: ["contact", instance, chat] });
+      }
+      return crmApi.assignTags(contactId, tagIds);
+    },
     onSuccess: () => {
       toast.success("Tags atualizadas!");
       qc.invalidateQueries({ queryKey: ["contact", instance, chat] });
     },
     onError: (e: any) => toast.error(e.response?.data?.error || "Erro ao atualizar tags"),
+  });
+
+  const updateContactMut = ensureContactAndUpdate;
+
+  const assignTagsMut = ensureContactAndAssignTags;
+
+  const createFunnelMut = useMutation({
+    mutationFn: (data: { name: string; color?: string }) => crmApi.createFunnel({ ...data, workspace_id: currentWorkspace?.id }),
+    onSuccess: () => {
+      toast.success("Funil criado!");
+      qc.invalidateQueries({ queryKey: ["crmFunnels", currentWorkspace?.id] });
+      qc.invalidateQueries({ queryKey: ["crmFunnelOptions"] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.error || "Erro ao criar funil"),
+  });
+
+  const createStageMut = useMutation({
+    mutationFn: ({ funnelId, data }: { funnelId: string; data: { name: string; color?: string } }) => 
+      crmApi.createFunnelStage(funnelId, data),
+    onSuccess: () => {
+      toast.success("Etapa criada!");
+      qc.invalidateQueries({ queryKey: ["crmFunnelStages"] });
+      qc.invalidateQueries({ queryKey: ["crmStageOptions"] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.error || "Erro ao criar etapa"),
   });
 
   // ── Effects ──
@@ -462,6 +675,8 @@ export default function InboxPage() {
       setContactNotes(contactD.contact.notes || "");
       setContactOwner(contactD.contact.owner || "");
       setContactStage(contactD.contact.stage || "");
+      setContactFunnel(contactD.contact.funnel || "");
+      setContactJourney(contactD.contact.journey || "");
     }
   }, [contactD]);
 
@@ -528,32 +743,48 @@ export default function InboxPage() {
               <MessageSquare className="w-6 h-6" style={{ color: curChannel.color }} />
               Inbox
             </h1>
-            {/* Instance selector dropdown */}
-            {chInst.length > 0 && (
-              <select
-                value={instance}
-                onChange={e => { setInstance(e.target.value); setChat(null); }}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium outline-none cursor-pointer"
-                style={{ background: `${curChannel.color}15`, color: curChannel.color, border: `1px solid ${curChannel.color}30` }}
-              >
-                {chInst.map(i => (
-                  <option key={i.id} value={i.id} style={{ background: "var(--surface-2)", color: "var(--text-1)" }}>
-                    {i.name}
-                  </option>
-                ))}
-              </select>
-            )}
-            {/* Refresh button */}
-            {instance && (
-              <button
-                onClick={() => { qc.invalidateQueries({ queryKey: ["chats", instance] }); if (chat) qc.invalidateQueries({ queryKey: ["msgs", instance, chat] }); }}
-                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/5 transition-all"
-                style={{ color: wsStatus === "connected" ? "#22c55e" : "var(--text-3)" }}
-                title="Atualizar conversas"
-              >
-                <RefreshCw className="w-4 h-4" />
-              </button>
-            )}
+{/* Instance selector dropdown */}
+              {chInst.length > 0 && (
+                <select
+                  value={instance}
+                  onChange={e => { setInstance(e.target.value); setChat(null); }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium outline-none cursor-pointer w-[105%] min-w-[120px]"
+                  style={{ background: `${curChannel.color}15`, color: curChannel.color, border: `1px solid ${curChannel.color}30` }}
+                >
+                  {chInst.map(i => (
+                    <option key={i.id} value={i.id} style={{ background: "var(--surface-2)", color: "var(--text-1)" }}>
+                      {i.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {/* Refresh button */}
+              {instance && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await instancesApi.reconnect(instance);
+                      toast.success("Instância reconectada");
+                    } catch {
+                      toast.error("Falha ao reconectar instância");
+                    } finally {
+                      qc.invalidateQueries({ queryKey: ["instances"] });
+                      qc.invalidateQueries({ queryKey: ["chats", instance] });
+                      if (chat) {
+                        setOlderMsgs([]);
+                        setMsgOffset(0);
+                        qc.invalidateQueries({ queryKey: ["msgs", instance, chat] });
+                        qc.invalidateQueries({ queryKey: ["contact", instance, chat] });
+                      }
+                    }
+                  }}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-white/10 active:scale-95"
+                  style={{ color: wsStatus === "connected" ? curChannel.color : "var(--text-3)" }}
+                  title="Reconectar e atualizar instância"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              )}
             {/* Sync indicator */}
             {(isSyncing === true || wsStatus === "connecting") && (
               <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium animate-pulse"
@@ -562,16 +793,16 @@ export default function InboxPage() {
                 {isSyncing ? "Sincronizando..." : "Conectando..."}
               </span>
             )}
-            {/* WS status */}
+            {/* WS status - centered badge */}
             {wsStatus === "connected" && instance && (
-              <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium"
+              <span className="flex items-center justify-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium"
                 style={{ background: "#22c55e15", color: "#22c55e" }}>
                 <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
                 Online
               </span>
             )}
             {wsStatus === "disconnected" && instance && (
-              <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium"
+              <span className="flex items-center justify-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium"
                 style={{ background: "#ef444415", color: "#ef4444" }}>
                 <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444]" />
                 Offline
@@ -712,7 +943,21 @@ export default function InboxPage() {
                   )}
                   <div>
                     <div className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>{ct.name}</div>
-                    <div className="text-xs" style={{ color: "var(--text-3)" }}>{ct.phone}</div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const value = ct.jid || "";
+                        if (!value) return;
+                        navigator.clipboard.writeText(value);
+                        toast.success("JID copiado");
+                      }}
+                      className="text-xs inline-flex items-center gap-1 hover:underline"
+                      style={{ color: "var(--text-3)" }}
+                      title="Clique para copiar JID"
+                    >
+                      <span>{ct.jid}</span>
+                      <Copy className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -777,11 +1022,12 @@ export default function InboxPage() {
                 ) : (
                   msgs.map(m => (
                     <MessageBubble
-                      key={m.id}
+                      key={`${m.id}-${m.timestamp}-${m.from_me ? "out" : "in"}`}
                       msg={m}
                       channelColor={curChannel.color}
                       contactAvatar={ct.avatar}
                       contactName={ct.name}
+                      isGroupChat={ct.is_group}
                       onContextMenu={(e) => {
                         if (!m.from_me) {
                           e.preventDefault();
@@ -860,16 +1106,16 @@ export default function InboxPage() {
             </div>
 
             {/* Info sections */}
-            <div className="p-3 space-y-3">
+              <div className="p-3 space-y-3">
               {/* Responsible */}
-              {ct.contact_id && membersD?.members && (
+              {membersD?.members && (
                 <div className="p-3 rounded-xl" style={{ background: "var(--surface-1)" }}>
                   <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-3)" }}>Responsável</p>
                   <select value={contactOwner} onChange={(e) => {
                     setContactOwner(e.target.value);
-                    if (ct.contact_id) updateContactMut.mutate({ owner: e.target.value });
+                    ensureContactAndUpdate.mutate({ owner: e.target.value });
                   }}
-                    disabled={!ct.contact_id || updateContactMut.isPending}
+                    disabled={ensureContactAndUpdate.isPending}
                     className="w-full p-2 rounded-lg text-xs outline-none"
                     style={{ background: "var(--surface-3)", color: "var(--text-1)", border: "1px solid var(--surface-border)" }}>
                     <option value="">Selecionar...</option>
@@ -880,22 +1126,66 @@ export default function InboxPage() {
                 </div>
               )}
 
-              {/* Pipeline */}
+              {/* Funnel */}
               <div className="p-3 rounded-xl" style={{ background: "var(--surface-1)" }}>
-                <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-3)" }}>Pipeline</p>
-                <div className="space-y-1.5">
-                  {["Novo Lead", "Contatado", "Qualificado", "Fechado"].map((stage, i) => (
-                    <button key={i} onClick={() => {
-                      setContactStage(stage);
-                      if (ct.contact_id) updateContactMut.mutate({ stage });
-                    }}
-                      disabled={!ct.contact_id || updateContactMut.isPending}
-                      className="w-full p-2 rounded-lg text-xs text-left transition-all"
-                      style={{ background: contactStage === stage ? curChannel.color : "var(--surface-3)", color: contactStage === stage ? "#fff" : "var(--text-2)" }}>
-                      {stage}
-                    </button>
-                  ))}
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>Funil</p>
+                  <button onClick={() => setShowNewFunnel(true)}
+                    className="text-[10px] hover:opacity-70" style={{ color: curChannel.color }}>+ Novo</button>
                 </div>
+                <select value={contactFunnel} onChange={(e) => {
+                  setContactFunnel(e.target.value);
+                  ensureContactAndUpdate.mutate({ funnel: e.target.value });
+                }}
+                  disabled={ensureContactAndUpdate.isPending}
+                  className="w-full p-2 rounded-lg text-xs outline-none"
+                  style={{ background: "var(--surface-3)", color: "var(--text-1)", border: "1px solid var(--surface-border)" }}>
+                  <option value="">Todos</option>
+                  {(funnelsD || []).map((f: any) => (
+                    <option key={f.id} value={f.name}>{f.name}</option>
+                  ))}
+                  {(funnelOptionsD || []).filter((n: string) => !(funnelsD || []).find((f: any) => f.name === n)).map((name: string) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Stage */}
+              <div className="p-3 rounded-xl" style={{ background: "var(--surface-1)" }}>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>Etapa</p>
+                  <button onClick={() => setShowNewStage(true)}
+                    className="text-[10px] hover:opacity-70" style={{ color: curChannel.color }}>+ Nova</button>
+                </div>
+                <select value={contactStage} onChange={(e) => {
+                  setContactStage(e.target.value);
+                  ensureContactAndUpdate.mutate({ stage: e.target.value });
+                }}
+                  disabled={ensureContactAndUpdate.isPending}
+                  className="w-full p-2 rounded-lg text-xs outline-none"
+                  style={{ background: "var(--surface-3)", color: "var(--text-1)", border: "1px solid var(--surface-border)" }}>
+                  <option value="">Todas</option>
+                  {(stageOptionsD || []).map((s: string) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Journey */}
+              <div className="p-3 rounded-xl" style={{ background: "var(--surface-1)" }}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-3)" }}>Jornada</p>
+                <select value={contactJourney} onChange={(e) => {
+                  setContactJourney(e.target.value);
+                  ensureContactAndUpdate.mutate({ journey: e.target.value });
+                }}
+                  disabled={ensureContactAndUpdate.isPending}
+                  className="w-full p-2 rounded-lg text-xs outline-none"
+                  style={{ background: "var(--surface-3)", color: "var(--text-1)", border: "1px solid var(--surface-border)" }}>
+                  <option value="">Todas</option>
+                  {(journeyOptionsD || []).map((j: string) => (
+                    <option key={j} value={j}>{j}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Tags */}
@@ -909,23 +1199,25 @@ export default function InboxPage() {
                     </span>
                   )) : <span className="text-xs" style={{ color: "var(--text-3)" }}>Nenhuma tag</span>}
                 </div>
-                {ct.contact_id && tagsD?.tags && (
+                {tagsD && tagsD.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
-                    {tagsD.tags.map((tag: any) => (
-                      <button key={tag.id} onClick={() => {
-                        const currentTags = ct.tags || [];
-                        const currentTagObjs = tagsD.tags.filter((t: any) => currentTags.includes(t.name));
-                        const hasTag = currentTags.includes(tag.name);
-                        const newTagIds = hasTag
-                          ? currentTagObjs.filter((t: any) => t.id !== tag.id).map((t: any) => t.id)
-                          : [...currentTagObjs.map((t: any) => t.id), tag.id];
-                        assignTagsMut.mutate(newTagIds);
-                      }}
-                        className="text-[10px] px-2 py-0.5 rounded-full border transition-colors hover:opacity-80"
-                        style={{ borderColor: curChannel.color, color: curChannel.color }}>
-                        + {tag.name}
-                      </button>
-                    ))}
+                    {tagsD.map((tag: any) => {
+                      const currentTags = ct.tags || [];
+                      const hasTag = currentTags.includes(tag.name);
+                      return (
+                        <button key={tag.id} onClick={() => {
+                          const currentTagObjs = (tagsD || []).filter((t: any) => currentTags.includes(t.name));
+                          const newTagIds = hasTag
+                            ? currentTagObjs.filter((t: any) => t.id !== tag.id).map((t: any) => t.id)
+                            : [...currentTagObjs.map((t: any) => t.id), tag.id];
+                          ensureContactAndAssignTags.mutate(newTagIds);
+                        }}
+                          className="text-[10px] px-2 py-0.5 rounded-full border transition-colors hover:opacity-80"
+                          style={{ borderColor: curChannel.color, color: curChannel.color }}>
+                          {hasTag ? "✓" : "+"} {tag.name}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -936,17 +1228,22 @@ export default function InboxPage() {
                 <textarea
                   value={contactNotes}
                   onChange={(e) => setContactNotes(e.target.value)}
-                  onBlur={() => {
-                    if (ct.contact_id && contactNotes !== (contactD?.contact?.notes || "")) {
-                      updateContactMut.mutate({ notes: contactNotes });
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      const noteToSave = contactNotes.trim();
+                      if (noteToSave) {
+                        ensureContactAndUpdate.mutate({ notes: noteToSave });
+                        setContactNotes("");
+                      }
                     }
                   }}
-                  placeholder="Adicionar nota..."
+                  placeholder="Escreva uma nota e pressione Enter para salvar..."
                   rows={3}
-                  disabled={!ct.contact_id}
                   className="w-full p-2 rounded-lg text-xs outline-none resize-none"
                   style={{ background: "var(--surface-3)", color: "var(--text-1)", border: "1px solid var(--surface-border)" }}
                 />
+                <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>Pressione Enter para adicionar nota</p>
               </div>
             </div>
           </div>
@@ -1006,6 +1303,80 @@ export default function InboxPage() {
             style={{ color: "var(--text-3)" }}>
             Cancelar
           </button>
+        </div>
+      )}
+
+      {/* New Funnel Modal */}
+      {showNewFunnel && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNewFunnel(false)}>
+          <div className="rounded-xl p-5 w-72" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
+            onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-1)" }}>Novo Funil</h3>
+            <input
+              type="text"
+              value={newFunnelName}
+              onChange={(e) => setNewFunnelName(e.target.value)}
+              placeholder="Nome do funil"
+              className="w-full p-2 rounded-lg text-xs mb-3 outline-none"
+              style={{ background: "var(--surface-3)", color: "var(--text-1)", border: "1px solid var(--surface-border)" }}
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button onClick={() => setShowNewFunnel(false)}
+                className="flex-1 p-2 rounded-lg text-xs"
+                style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
+                Cancelar
+              </button>
+              <button onClick={() => { if (newFunnelName.trim()) { createFunnelMut.mutate({ name: newFunnelName.trim() }); setShowNewFunnel(false); setNewFunnelName(""); } }}
+                className="flex-1 p-2 rounded-lg text-xs font-medium"
+                style={{ background: curChannel.color, color: "#fff" }}>
+                Criar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Stage Modal */}
+      {showNewStage && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNewStage(false)}>
+          <div className="rounded-xl p-5 w-72" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
+            onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-1)" }}>Nova Etapa</h3>
+            <input
+              type="text"
+              value={newStageName}
+              onChange={(e) => setNewStageName(e.target.value)}
+              placeholder="Nome da etapa"
+              className="w-full p-2 rounded-lg text-xs mb-3 outline-none"
+              style={{ background: "var(--surface-3)", color: "var(--text-1)", border: "1px solid var(--surface-border)" }}
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button onClick={() => setShowNewStage(false)}
+                className="flex-1 p-2 rounded-lg text-xs"
+                style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
+                Cancelar
+              </button>
+              <button onClick={() => {
+                if (newStageName.trim()) {
+                  const firstFunnel = funnelsD?.[0];
+                  if (firstFunnel) {
+                    createStageMut.mutate({ funnelId: firstFunnel.id, data: { name: newStageName.trim() } });
+                  } else {
+                    createFunnelMut.mutate({ name: "Meu Funil" });
+                    toast.info("Funil criado! Agora adicione a etapa manualmente.");
+                  }
+                  setShowNewStage(false);
+                  setNewStageName("");
+                }
+              }}
+                className="flex-1 p-2 rounded-lg text-xs font-medium"
+                style={{ background: curChannel.color, color: "#fff" }}>
+                Criar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

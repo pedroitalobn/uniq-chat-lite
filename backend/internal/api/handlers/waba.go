@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -472,7 +471,5 @@ func (h *WABAHandler) SendMessage(c *fiber.Ctx) error {
 }
 
 func init() {
-	if config.AppConfig.MetaAppID != "" {
-		os.Setenv("FACEBOOK_APP_ID", config.AppConfig.MetaAppID)
-	}
+	// Note: Cannot access config.AppConfig here as it's not initialized yet
 }

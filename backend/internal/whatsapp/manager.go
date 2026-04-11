@@ -121,7 +121,7 @@ func (m *Manager) IsRunning(instanceID string) bool {
 }
 
 // SaveMessage saves a message to the database for inbox display.
-func (m *Manager) SaveMessage(instanceID string, toJID string, content string, direction models.MessageDirection, msgType string, pushName string, isGroup bool) error {
+func (m *Manager) SaveMessage(instanceID string, toJID string, content string, direction models.MessageDirection, msgType string, pushName string, isGroup bool, senderJID string) error {
 	if m.db == nil {
 		return nil
 	}
@@ -206,6 +206,11 @@ func (m *Manager) SaveMessage(instanceID string, toJID string, content string, d
 		}
 	}
 
+	senderName := pushName
+	if senderName == "" && senderJID != "" {
+		senderName = extractPhoneFromJID(senderJID)
+	}
+
 	logEntry := models.MessageLog{
 		ID:            uuid.New(),
 		InstanceID:    instUUID,
@@ -214,6 +219,8 @@ func (m *Manager) SaveMessage(instanceID string, toJID string, content string, d
 		ToJID:         toJID,
 		ContactName:   contactName,
 		ContactAvatar: contactAvatar,
+		SenderJID:     senderJID,
+		SenderName:    senderName,
 		Content:       string(contentJSON),
 		Status:        models.MessageStatusSent,
 	}
@@ -288,9 +295,16 @@ func (m *Manager) StartInstanceForPairing(instance *models.Instance) error {
 func (m *Manager) LoadAll() {
 	var instances []models.Instance
 
-	// Use raw SQL for SQLite compatibility
+	// Only auto-start instances that were actually connected before restart.
+	// Don't auto-start instances that are "connecting" (waiting for QR) or "disconnected".
 	if err := m.db.Raw("SELECT * FROM instances WHERE status = 'connected'").Scan(&instances).Error; err != nil {
 		log.Error().Err(err).Msg("failed to load connected instances")
+		return
+	}
+
+	// Skip if nothing to load
+	if len(instances) == 0 {
+		log.Info().Msg("no instances to load")
 		return
 	}
 
@@ -821,6 +835,162 @@ func (m *Manager) executeJourney(journey *models.Journey, fromJID, fromName, gro
 	})
 
 	log.Info().Str("journey", journey.ID).Str("to", recipientJID).Str("message", responseMsg).Msg("journey executed successfully")
+	return nil
+}
+
+// executeCRMAction executes CRM-related actions for a journey
+func (m *Manager) executeCRMAction(actionType models.ActionType, contactPhone, contactName, instanceID string, actionConfig map[string]interface{}) error {
+	log.Info().Str("action", string(actionType)).Str("phone", contactPhone).Msg("executing CRM action")
+
+	// Get phone without @s.whatsapp.net
+	phone := contactPhone
+	if idx := strings.Index(phone, "@"); idx > 0 {
+		phone = phone[:idx]
+	}
+
+	switch actionType {
+	case models.ActionCreateContact, models.ActionCreateLead:
+		// Create or update contact in CRM
+		instanceUUID, _ := uuid.Parse(instanceID)
+		funnel := "Default"
+		stage := "Novo"
+		if f, ok := actionConfig["funnel"].(string); ok && f != "" {
+			funnel = f
+		}
+		if s, ok := actionConfig["stage"].(string); ok && s != "" {
+			stage = s
+		}
+		if fs, ok := actionConfig["funnel_stage"].(string); ok && fs != "" {
+			parts := strings.Split(fs, "/")
+			if len(parts) >= 1 && parts[0] != "" {
+				funnel = parts[0]
+			}
+			if len(parts) >= 2 && parts[1] != "" {
+				stage = parts[1]
+			}
+		}
+
+		contactNameToSave := contactName
+		if contactNameToSave == "" {
+			contactNameToSave = "Cliente " + phone
+		}
+
+		// Check if contact exists
+		var existing models.Contact
+		if err := m.db.Where("phone LIKE ?", "%"+phone+"%").First(&existing).Error; err == nil {
+			// Update existing contact
+			existing.Funnel = funnel
+			existing.Stage = stage
+			m.db.Save(&existing)
+			log.Info().Str("phone", phone).Str("funnel", funnel).Str("stage", stage).Msg("journey updated contact in CRM")
+		} else {
+			// Create new contact
+			userID := uuid.Nil
+			// Try to get user from instance
+			var inst models.Instance
+			if err := m.db.First(&inst, "id = ?", instanceUUID).Error; err == nil {
+				userID = inst.UserID
+			}
+			contact := models.Contact{
+				ID:     uuid.New(),
+				UserID: userID,
+				Phone:  phone,
+				Name:   contactNameToSave,
+				Funnel: funnel,
+				Stage:  stage,
+			}
+			// Try to associate with workspace
+			if inst.WorkspaceID != nil {
+				contact.WorkspaceID = inst.WorkspaceID
+			}
+			if err := m.db.Create(&contact).Error; err != nil {
+				log.Error().Err(err).Str("phone", phone).Msg("journey failed to create contact in CRM")
+				return fmt.Errorf("failed to create contact: %w", err)
+			}
+			log.Info().Str("phone", phone).Str("funnel", funnel).Str("stage", stage).Msg("journey created contact in CRM")
+		}
+
+	case models.ActionAddTag:
+		// Add tag to contact
+		tagName := "Lead"
+		if t, ok := actionConfig["tag"].(string); ok && t != "" {
+			tagName = t
+		}
+		// Find or create tag
+		var tag models.Tag
+		if err := m.db.Where("name = ?", tagName).First(&tag).Error; err != nil {
+			tag = models.Tag{Name: tagName, Color: "#00d46a"}
+			m.db.Create(&tag)
+		}
+		// Add tag to contact
+		var contact models.Contact
+		if err := m.db.Where("phone LIKE ?", "%"+phone+"%").First(&contact).Error; err == nil {
+			var contactTags []models.Tag
+			m.db.Model(&contact).Association("Tags").Find(&contactTags)
+			hasTag := false
+			for _, t := range contactTags {
+				if t.ID == tag.ID {
+					hasTag = true
+					break
+				}
+			}
+			if !hasTag {
+				m.db.Model(&contact).Association("Tags").Append(&tag)
+				log.Info().Str("phone", phone).Str("tag", tagName).Msg("journey added tag to contact")
+			}
+		}
+
+	case models.ActionUpdateStage:
+		// Update contact stage
+		funnel := "Default"
+		stage := "Novo"
+		if f, ok := actionConfig["funnel"].(string); ok && f != "" {
+			funnel = f
+		}
+		if s, ok := actionConfig["stage"].(string); ok && s != "" {
+			stage = s
+		}
+		var contact models.Contact
+		if err := m.db.Where("phone LIKE ?", "%"+phone+"%").First(&contact).Error; err == nil {
+			contact.Funnel = funnel
+			contact.Stage = stage
+			m.db.Save(&contact)
+			log.Info().Str("phone", phone).Str("funnel", funnel).Str("stage", stage).Msg("journey updated contact stage")
+		}
+
+	case models.ActionAddToInbox:
+		// Mark contact for inbox review by adding to journey field
+		var contact models.Contact
+		if err := m.db.Where("phone LIKE ?", "%"+phone+"%").First(&contact).Error; err == nil {
+			contact.Journey = "Aguardando atendimento - " + time.Now().Format("02/01/2006 15:04")
+			m.db.Save(&contact)
+			log.Info().Str("phone", phone).Msg("journey marked contact for inbox review")
+		}
+
+	case models.ActionAssignUser:
+		// Assign contact to a user
+		userID := ""
+		if u, ok := actionConfig["user_id"].(string); ok && u != "" {
+			userID = u
+		} else if email, ok := actionConfig["user_email"].(string); ok && email != "" {
+			var user models.User
+			if err := m.db.Where("email = ?", email).First(&user).Error; err == nil {
+				userID = user.ID.String()
+			}
+		}
+		if userID != "" {
+			var contact models.Contact
+			if err := m.db.Where("phone LIKE ?", "%"+phone+"%").First(&contact).Error; err == nil {
+				contact.Owner = userID
+				m.db.Save(&contact)
+				log.Info().Str("phone", phone).Str("user_id", userID).Msg("journey assigned contact to user")
+			}
+		}
+
+	default:
+		log.Debug().Str("action", string(actionType)).Msg("action not implemented in journey")
+	}
+
 	return nil
 }
 

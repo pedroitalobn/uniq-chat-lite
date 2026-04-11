@@ -12,6 +12,13 @@ import (
 // of the workspace that contains the instance.
 func OwnsInstance(db *gorm.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		// First validate auth if not already set
+		if GetCurrentUser(c) == nil {
+			if err := RequireAuth(db)(c); err != nil {
+				return err
+			}
+		}
+
 		user := GetCurrentUser(c)
 		if user == nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})

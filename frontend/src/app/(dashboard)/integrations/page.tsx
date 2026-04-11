@@ -289,9 +289,9 @@ function WebhooksSection() {
           <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.15)" }}>
             <Webhook className="w-3.5 h-3.5" style={{ color: "#8b5cf6" }} />
           </div>
-          <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 88%)" }}>Criar webhook global</h2>
+          <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 88%)" }}>Webhooks Globais</h2>
         </div>
-        <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>Receba eventos de todas as instâncias (mensagens, CRM, campanhas, etc.)</p>
+        <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>Eventos da plataforma (usuários, pagamentos, workspaces)</p>
         
         <div className="space-y-3">
           <div className="flex gap-3">

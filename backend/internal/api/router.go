@@ -45,8 +45,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 				strings.HasPrefix(origin, "http://127.0.0.1:")
 		},
 		AllowCredentials: true,
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-API-Key",
-		AllowMethods:     "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-API-Key, Upgrade, Sec-WebSocket-Key, Sec-WebSocket-Version, Sec-WebSocket-Extensions",
+		AllowMethods:     "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD",
 	}))
 
 	// Force HTTPS in production
@@ -82,6 +82,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 			{ID: "telegram", Label: "Telegram", Color: "#229ed9", Description: "Crie bots e gerencie mensagens via Telegram Bot API", Available: false},
 			{ID: "linkedin", Label: "LinkedIn", Color: "#0a66c2", Description: "Automatize mensagens e InMails via LinkedIn API", Available: false},
 			{ID: "kwai", Label: "Kwai", Color: "#ff6600", Description: "Gerencie mensagens e interações via Kwai", Available: false},
+			{ID: "waba", Label: "WhatsApp Business", Color: "#25d366", Description: "Conecte números via WhatsApp Business API (WABA)", Available: true},
 		}
 		return c.JSON(channels)
 	})
@@ -137,6 +138,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	workspaceH := handlers.NewWorkspaceHandler(db)
 	roleH := handlers.NewRoleHandler(db)
 	inviteH := handlers.NewInviteHandler(db)
+
+	// WABA
+	wabaH := handlers.NewWABAHandler(db)
 
 	// Plans (public — used by pricing/register page)
 	app.Get("/stripe/plans", paymentH.ListPlans)
@@ -215,8 +219,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 
 	// Instances
 	instances := api.Group("/instances")
-	instances.Get("/", instanceH.List)
-	instances.Post("/", instanceH.Create)
+	instances.Get("/", middleware.RequireAuth(db), instanceH.List)
+	instances.Post("/", middleware.RequireAuth(db), instanceH.Create)
 
 	// Instance-specific routes (with ownership check)
 	instance := instances.Group("/:id", middleware.OwnsInstance(db))
@@ -231,6 +235,22 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	instance.Get("/settings", instanceH.GetSettings)
 	instance.Put("/settings", instanceH.UpdateSettings)
 	instance.Post("/regenerate-token", instanceH.RegenerateToken)
+
+	// WABA routes
+	waba := api.Group("/waba")
+	waba.Get("/auth-url", wabaH.GetAuthURL)
+	waba.Post("/callback", wabaH.Callback)
+
+	// Public webhook (no auth required)
+	wabaPost := app.Group("/waba/webhook")
+	wabaPost.Post("/", wabaH.Webhook)
+
+	// Instance-specific WABA routes
+	instanceWaba := instance.Group("/waba")
+	instanceWaba.Get("/", wabaH.GetWABA)
+	instanceWaba.Delete("/", wabaH.DeleteWABA)
+	instanceWaba.Get("/phone-numbers", wabaH.ListPhoneNumbers)
+	instanceWaba.Post("/messages", wabaH.SendMessage)
 
 	// Global WebSocket for real-time events
 	app.Get("/ws/events", wsH.EventsWS)
@@ -367,6 +387,18 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	tags.Get("/", contactH.ListTags)
 	tags.Post("/", contactH.CreateTag)
 	tags.Delete("/:id", contactH.DeleteTag)
+
+	funnels := crm.Group("/funnels")
+	funnels.Get("/", contactH.ListFunnels)
+	funnels.Post("/", contactH.CreateFunnel)
+	funnels.Delete("/:id", contactH.DeleteFunnel)
+	funnels.Get("/:id/stages", contactH.ListFunnelStages)
+	funnels.Post("/:id/stages", contactH.CreateFunnelStage)
+	funnels.Delete("/:id/stages/:stageId", contactH.DeleteFunnelStage)
+
+	crm.Get("/journey-options", contactH.ListJourneyOptions)
+	crm.Get("/stage-options", contactH.ListStageOptions)
+	crm.Get("/funnel-options", contactH.ListFunnelOptions)
 
 	// ─── Campaign routes ───────────────────────────────────────────────────────
 	campaigns := api.Group("/campaigns")

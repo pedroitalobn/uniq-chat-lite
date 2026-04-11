@@ -84,14 +84,19 @@ export default function WebhooksPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-3" style={{ color: "var(--text-1)" }}>
-            <Webhook className="w-6 h-6" style={{ color: "#8b5cf6" }} />
-            Webhooks do Sistema
-          </h1>
-          <p className="text-sm mt-1" style={{ color: "var(--text-3)" }}>
-            Receba notificações de eventos da plataforma (não relacionados a instâncias)
-          </p>
+        <div className="flex items-center gap-4">
+          <a href="/instances" className="text-xs px-2 py-1.5 rounded-lg" style={{ background: "hsl(240 12% 10%)", color: "hsl(240 8% 48)" }}>
+            ← Voltar
+          </a>
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-3" style={{ color: "var(--text-1)" }}>
+              <Webhook className="w-6 h-6" style={{ color: "#8b5cf6" }} />
+              Webhooks Globais
+            </h1>
+            <p className="text-sm mt-1" style={{ color: "var(--text-3)" }}>
+              Receba eventos da plataforma (usuários, pagamentos, workspaces)
+            </p>
+          </div>
         </div>
         <button onClick={() => setShowCreate(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"

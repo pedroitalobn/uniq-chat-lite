@@ -301,3 +301,160 @@ func (h *ContactHandler) DeleteTag(c *fiber.Ctx) error {
 	}
 	return c.SendStatus(fiber.StatusNoContent)
 }
+
+// ─── Funnels ─────────────────────────────────────────────────────────────────
+
+// ListFunnels GET /crm/funnels
+func (h *ContactHandler) ListFunnels(c *fiber.Ctx) error {
+	userID, err := h.currentUserID(c)
+	if err != nil {
+		return err
+	}
+	workspaceID := c.Query("workspace_id")
+	query := h.db.Where("user_id = ?", userID)
+	if workspaceID != "" {
+		if wid, err := uuid.Parse(workspaceID); err == nil {
+			query = query.Where("workspace_id = ?", wid)
+		}
+	}
+	var funnels []models.Funnel
+	if err := query.Order("name ASC").Find(&funnels).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar funis"})
+	}
+	return c.JSON(funnels)
+}
+
+// CreateFunnel POST /crm/funnels
+func (h *ContactHandler) CreateFunnel(c *fiber.Ctx) error {
+	userID, err := h.currentUserID(c)
+	if err != nil {
+		return err
+	}
+	var req struct {
+		WorkspaceID string `json:"workspace_id"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Color       string `json:"color"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.Name == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nome é obrigatório"})
+	}
+	funnel := models.Funnel{
+		UserID: userID,
+		Name:   req.Name,
+	}
+	if req.WorkspaceID != "" {
+		if wid, err := uuid.Parse(req.WorkspaceID); err == nil {
+			funnel.WorkspaceID = &wid
+		}
+	}
+	if err := h.db.Create(&funnel).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar funil"})
+	}
+	return c.Status(fiber.StatusCreated).JSON(funnel)
+}
+
+// DeleteFunnel DELETE /crm/funnels/:id
+func (h *ContactHandler) DeleteFunnel(c *fiber.Ctx) error {
+	userID, err := h.currentUserID(c)
+	if err != nil {
+		return err
+	}
+	funnelID := c.Params("id")
+	if err := h.db.Where("id = ? AND user_id = ?", funnelID, userID).Delete(&models.Funnel{}).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao deletar funil"})
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// ─── Funnel Stages ─────────────────────────────────────────────────────────────
+
+// ListFunnelStages GET /crm/funnels/:id/stages
+func (h *ContactHandler) ListFunnelStages(c *fiber.Ctx) error {
+	funnelID := c.Params("id")
+	var stages []models.FunnelStage
+	if err := h.db.Where("funnel_id = ?", funnelID).Order("\"order\" ASC").Find(&stages).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar etapas"})
+	}
+	return c.JSON(stages)
+}
+
+// CreateFunnelStage POST /crm/funnels/:id/stages
+func (h *ContactHandler) CreateFunnelStage(c *fiber.Ctx) error {
+	userID, err := h.currentUserID(c)
+	if err != nil {
+		return err
+	}
+	funnelID := c.Params("id")
+	var funnel models.Funnel
+	if err := h.db.Where("id = ? AND user_id = ?", funnelID, userID).First(&funnel).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "funil não encontrado"})
+	}
+	var req struct {
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.Name == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nome é obrigatório"})
+	}
+	var maxOrder int
+	h.db.Model(&models.FunnelStage{}).Where("funnel_id = ?", funnelID).Select("COALESCE(MAX(\"order\"), 0)").Scan(&maxOrder)
+	stage := models.FunnelStage{
+		FunnelID: funnel.ID,
+		Name:     req.Name,
+		Order:    maxOrder + 1,
+		Color:    req.Color,
+	}
+	if err := h.db.Create(&stage).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar etapa"})
+	}
+	return c.Status(fiber.StatusCreated).JSON(stage)
+}
+
+// DeleteFunnelStage DELETE /crm/funnels/:id/stages/:stageId
+func (h *ContactHandler) DeleteFunnelStage(c *fiber.Ctx) error {
+	stageID := c.Params("stageId")
+	if err := h.db.Delete(&models.FunnelStage{}, "id = ?", stageID).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao deletar etapa"})
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// ─── Journey Options ───────────────────────────────────────────────────────────
+
+// ListJourneyOptions GET /crm/journey-options
+func (h *ContactHandler) ListJourneyOptions(c *fiber.Ctx) error {
+	userID, err := h.currentUserID(c)
+	if err != nil {
+		return err
+	}
+	var journeys []models.Journey
+	h.db.Where("user_id = ? AND status = 'active'", userID).Order("name ASC").Find(&journeys)
+	names := make([]string, len(journeys))
+	for i, j := range journeys {
+		names[i] = j.Name
+	}
+	return c.JSON(names)
+}
+
+// ListStageOptions GET /crm/stage-options
+func (h *ContactHandler) ListStageOptions(c *fiber.Ctx) error {
+	userID, err := h.currentUserID(c)
+	if err != nil {
+		return err
+	}
+	var stages []string
+	h.db.Model(&models.Contact{}).Where("user_id = ? AND stage IS NOT NULL AND stage != ''", userID).Distinct("stage").Pluck("stage", &stages)
+	return c.JSON(stages)
+}
+
+// ListFunnelOptions GET /crm/funnel-options
+func (h *ContactHandler) ListFunnelOptions(c *fiber.Ctx) error {
+	userID, err := h.currentUserID(c)
+	if err != nil {
+		return err
+	}
+	var funnels []string
+	h.db.Model(&models.Contact{}).Where("user_id = ? AND funnel IS NOT NULL AND funnel != ''", userID).Distinct("funnel").Pluck("funnel", &funnels)
+	return c.JSON(funnels)
+}

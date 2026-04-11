@@ -350,24 +350,24 @@ function FilterPanel({
     icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   }) => (
     <div>
-      <label className="flex items-center gap-1 text-xs font-medium mb-1" style={{ color: "hsl(240 8% 48%)" }}>
+      <label className="flex items-center gap-1 text-xs font-medium mb-1.5" style={{ color: "hsl(240 8% 48)" }}>
         <Icon className="w-3 h-3" /> {label}
       </label>
       <div className="relative">
         <select
           value={filters[field] ?? ""}
           onChange={(e) => onChange(field, e.target.value)}
-          className="w-full appearance-none text-sm rounded-xl px-3 py-2 pr-8 outline-none"
+          className="w-full appearance-none text-sm rounded-xl px-3 py-2.5 pr-8 outline-none cursor-pointer transition-all"
           style={{
-            background: "rgba(255,255,255,0.04)",
+            background: "hsl(240 12% 10%)",
             border: "1px solid hsl(240 12% 16%)",
-            color: filters[field] ? "hsl(240 15% 90%)" : "hsl(240 8% 42%)",
+            color: filters[field] ? "hsl(240 15% 93%)" : "hsl(240 8% 46%)",
           }}
         >
-          <option value="">Todos</option>
-          {options.map((o) => <option key={o} value={o}>{o}</option>)}
+          <option value="" style={{ background: "hsl(240 12% 10%)" }}>Todos</option>
+          {options.map((o) => <option key={o} value={o} style={{ background: "hsl(240 12% 10%)" }}>{o}</option>)}
         </select>
-        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "hsl(240 8% 38%)" }} />
+        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "hsl(240 8% 38)" }} />
       </div>
     </div>
   );

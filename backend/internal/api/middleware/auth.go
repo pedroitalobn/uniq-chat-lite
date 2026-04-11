@@ -32,7 +32,7 @@ func GenerateAccessToken(user *models.User) (string, error) {
 		Role:   user.Role,
 		IsBeta: user.IsBeta,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
@@ -137,9 +137,6 @@ func extractToken(c *fiber.Ctx) string {
 	if cookie := c.Cookies("access_token"); cookie != "" {
 		return cookie
 	}
-	// Support ?token= for WebSocket/SSE clients that can't set headers.
-	// Only treat it as a JWT if it has the two-dot structure; otherwise
-	// tryAPIKey will pick it up as an API key.
 	if t := c.Query("token"); strings.Count(t, ".") == 2 {
 		return t
 	}

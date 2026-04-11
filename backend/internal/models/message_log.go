@@ -29,6 +29,8 @@ type MessageLog struct {
 	ToJID         string           `gorm:"column:to_j_id;type:varchar(100)" json:"to_jid,omitempty"`
 	ContactName   string           `gorm:"type:varchar(255)" json:"contact_name,omitempty"`
 	ContactAvatar string           `gorm:"type:text" json:"contact_avatar,omitempty"`
+	SenderJID     string           `gorm:"type:varchar(100)" json:"sender_jid,omitempty"`
+	SenderName    string           `gorm:"type:varchar(255)" json:"sender_name,omitempty"`
 	Content       string           `gorm:"type:text" json:"content"` // JSON
 	Status        MessageStatus    `gorm:"type:varchar(20);default:'pending'" json:"status"`
 	IsPinned      bool             `gorm:"default:false" json:"is_pinned"`

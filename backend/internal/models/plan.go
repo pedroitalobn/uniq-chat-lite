@@ -16,7 +16,12 @@ type Plan struct {
 	Features          string    `gorm:"type:text;default:'{}'" json:"features"`
 	AllowProxy        bool      `gorm:"default:false" json:"allow_proxy"`
 	IsActive          bool      `gorm:"default:true" json:"is_active"`
-	StripePriceID     string    `gorm:"type:varchar(255)" json:"stripe_price_id,omitempty"`
+
+	// Payment providers - Stripe
+	StripePriceID string `gorm:"type:varchar(255)" json:"stripe_price_id,omitempty"`
+
+	// Payment providers - Asaas
+	AsaasProductID string `gorm:"type:varchar(255)" json:"asaas_product_id,omitempty"`
 
 	// Users & Workspaces
 	MaxUsers      int `gorm:"not null;default:1" json:"max_users"`      // max users per workspace (-1 = unlimited)
