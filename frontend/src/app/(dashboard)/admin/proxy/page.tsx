@@ -1,0 +1,181 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { adminApi } from "@/lib/api";
+import { Activity, Globe, Loader2, Save, Server, Shield, Users } from "lucide-react";
+import { toast } from "sonner";
+
+type ProxyConfig = {
+  id: string;
+  enabled: boolean;
+  provider: string;
+  proxy_type: string;
+  host: string;
+  port: number;
+  username: string;
+  use_env: boolean;
+  is_active: boolean;
+  has_password: boolean;
+};
+
+type ProxyStats = {
+  summary: {
+    total_users: number;
+    total_instances: number;
+    global_proxy_instances: number;
+    eligible_users_by_plan: number;
+    connected_proxy_samples: number;
+  };
+  users: Array<{
+    user_id: string;
+    name: string;
+    email: string;
+    plan_name: string;
+    instances: number;
+    connected: number;
+    last_updated_at: string;
+  }>;
+};
+
+export default function AdminProxyPage() {
+  const qc = useQueryClient();
+  const [password, setPassword] = useState("");
+  const [form, setForm] = useState({
+    enabled: false,
+    provider: "manual",
+    proxy_type: "http",
+    host: "",
+    port: 33335,
+    username: "",
+    use_env: true,
+    is_active: true,
+  });
+
+  const { data: config, isLoading } = useQuery<ProxyConfig>({
+    queryKey: ["admin-proxy-config"],
+    queryFn: () => adminApi.getProxyConfig().then((r) => r.data),
+  });
+
+  const { data: stats } = useQuery<ProxyStats>({
+    queryKey: ["admin-proxy-stats"],
+    queryFn: () => adminApi.getProxyStats().then((r) => r.data),
+    refetchInterval: 15000,
+  });
+
+  useEffect(() => {
+    if (!config) return;
+    setForm({
+      enabled: config.enabled,
+      provider: config.provider || "manual",
+      proxy_type: config.proxy_type || "http",
+      host: config.host || "",
+      port: config.port || 33335,
+      username: config.username || "",
+      use_env: config.use_env,
+      is_active: config.is_active,
+    });
+  }, [config]);
+
+  const updateMutation = useMutation({
+    mutationFn: () => adminApi.updateProxyConfig({ ...form, password: password || undefined }),
+    onSuccess: () => {
+      toast.success("Configuração de proxy global salva");
+      setPassword("");
+      qc.invalidateQueries({ queryKey: ["admin-proxy-config"] });
+      qc.invalidateQueries({ queryKey: ["admin-proxy-stats"] });
+    },
+    onError: () => toast.error("Erro ao salvar configuração de proxy"),
+  });
+
+  const cards = useMemo(() => {
+    const s = stats?.summary;
+    if (!s) return [];
+    return [
+      { label: "Usuários totais", value: s.total_users, icon: Users },
+      { label: "Instâncias totais", value: s.total_instances, icon: Server },
+      { label: "Instâncias no proxy global", value: s.global_proxy_instances, icon: Globe },
+      { label: "Usuários elegíveis por plano", value: s.eligible_users_by_plan, icon: Shield },
+      { label: "Conexões OK", value: s.connected_proxy_samples, icon: Activity },
+    ];
+  }, [stats]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--green)" }} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 max-w-5xl">
+      <div>
+        <h1 className="text-2xl font-bold" style={{ color: "hsl(240 15% 93%)" }}>Proxy Global</h1>
+        <p className="text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
+          Configuração global opcional de proxy para contas elegíveis por plano.
+        </p>
+      </div>
+
+      <div className="rounded-2xl p-6" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label className="flex items-center justify-between text-sm" style={{ color: "hsl(240 15% 88%)" }}>
+            Proxy global habilitado
+            <input type="checkbox" checked={form.enabled} onChange={(e) => setForm((p) => ({ ...p, enabled: e.target.checked }))} />
+          </label>
+          <label className="flex items-center justify-between text-sm" style={{ color: "hsl(240 15% 88%)" }}>
+            Usar credenciais do ambiente
+            <input type="checkbox" checked={form.use_env} onChange={(e) => setForm((p) => ({ ...p, use_env: e.target.checked }))} />
+          </label>
+          <input value={form.provider} onChange={(e) => setForm((p) => ({ ...p, provider: e.target.value }))}
+            className="px-3 py-2 rounded-lg text-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} placeholder="Provider (manual/brightdata)" />
+          <input value={form.proxy_type} onChange={(e) => setForm((p) => ({ ...p, proxy_type: e.target.value }))}
+            className="px-3 py-2 rounded-lg text-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} placeholder="Tipo (http/https/socks5)" />
+          <input value={form.host} onChange={(e) => setForm((p) => ({ ...p, host: e.target.value }))}
+            className="px-3 py-2 rounded-lg text-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} placeholder="Host" />
+          <input type="number" value={form.port} onChange={(e) => setForm((p) => ({ ...p, port: Number(e.target.value || 0) }))}
+            className="px-3 py-2 rounded-lg text-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} placeholder="Porta" />
+          <input value={form.username} onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))}
+            className="px-3 py-2 rounded-lg text-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} placeholder="Username" />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+            className="px-3 py-2 rounded-lg text-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} placeholder={config?.has_password ? "Nova senha (opcional)" : "Senha"} />
+        </div>
+        <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}
+          className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold"
+          style={{ background: "var(--green)", color: "#04200f", opacity: updateMutation.isPending ? 0.7 : 1 }}>
+          {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          Salvar configuração
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {cards.map((c) => (
+          <div key={c.label} className="rounded-xl p-4" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+            <div className="flex items-center gap-2 mb-2"><c.icon className="w-4 h-4" style={{ color: "hsl(240 8% 60%)" }} /><span className="text-[11px]" style={{ color: "hsl(240 8% 48%)" }}>{c.label}</span></div>
+            <div className="text-xl font-bold" style={{ color: "hsl(240 15% 92%)" }}>{c.value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-2xl p-6" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+        <h2 className="text-base font-semibold mb-3" style={{ color: "hsl(240 15% 92%)" }}>Usuários usando proxy global</h2>
+        <div className="space-y-2">
+          {(stats?.users || []).map((u) => (
+            <div key={u.user_id} className="rounded-lg p-3 flex items-center justify-between" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+              <div>
+                <p className="text-sm font-medium" style={{ color: "hsl(240 15% 90%)" }}>{u.name} <span style={{ color: "hsl(240 8% 46%)" }}>({u.plan_name})</span></p>
+                <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>{u.email}</p>
+              </div>
+              <div className="text-xs" style={{ color: "hsl(240 8% 62%)" }}>
+                Instâncias: {u.instances} | Conectadas: {u.connected}
+              </div>
+            </div>
+          ))}
+          {(stats?.users || []).length === 0 && (
+            <p className="text-sm" style={{ color: "hsl(240 8% 46%)" }}>Nenhum usuário usando proxy global no momento.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

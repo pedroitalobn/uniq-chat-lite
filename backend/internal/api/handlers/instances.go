@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -192,6 +194,63 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 
 	if err := h.db.Create(&instance).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar instância"})
+	}
+
+	// Optional global proxy assignment (plan-gated)
+	if user.Plan != nil && user.Plan.AllowProxy {
+		var gcfg models.GlobalProxyConfig
+		if err := h.db.Where("id = ? AND enabled = ? AND is_active = ?", "default", true, true).First(&gcfg).Error; err == nil {
+			proxyType := gcfg.ProxyType
+			host := gcfg.Host
+			port := gcfg.Port
+			username := gcfg.Username
+			passwordEncrypted := gcfg.Password
+
+			if gcfg.UseEnv {
+				if envHost := os.Getenv("BRIGHTDATA_HOST"); envHost != "" {
+					host = envHost
+				}
+				if envPort := os.Getenv("BRIGHTDATA_PORT"); envPort != "" {
+					if p, convErr := strconv.Atoi(envPort); convErr == nil && p > 0 {
+						port = p
+					}
+				}
+				if envUser := os.Getenv("BRIGHTDATA_USER"); envUser != "" {
+					username = envUser
+				}
+				if envPass := os.Getenv("BRIGHTDATA_PASS"); envPass != "" {
+					if enc, encErr := whatsapp.EncryptProxyPassword(envPass); encErr == nil {
+						passwordEncrypted = enc
+					}
+				}
+				if proxyType == "" {
+					proxyType = "http"
+				}
+			}
+
+			if host != "" && port > 0 {
+				h.db.Model(&instance).Updates(map[string]interface{}{
+					"use_global_proxy": true,
+					"proxy_mode":       models.ProxyModeManual,
+					"proxy_enabled":    true,
+					"proxy_type":       proxyType,
+					"proxy_host":       host,
+					"proxy_port":       port,
+					"proxy_username":   username,
+					"proxy_password":   passwordEncrypted,
+					"proxy_status":     models.ProxyStatusUntested,
+				})
+				instance.UseGlobalProxy = true
+				instance.ProxyMode = models.ProxyModeManual
+				instance.ProxyEnabled = true
+				instance.ProxyType = models.ProxyType(proxyType)
+				instance.ProxyHost = host
+				instance.ProxyPort = port
+				instance.ProxyUsername = username
+				instance.ProxyPassword = passwordEncrypted
+				instance.ProxyStatus = models.ProxyStatusUntested
+			}
+		}
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(instance)

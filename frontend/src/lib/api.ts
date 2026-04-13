@@ -516,6 +516,9 @@ export const stripeApi = {
 export const adminApi = {
   getStats: () => api.get("/api/admin/stats"),
   listUsers: () => api.get("/api/admin/users"),
+  getProxyConfig: () => api.get("/api/admin/proxy-config"),
+  updateProxyConfig: (data: Record<string, unknown>) => api.put("/api/admin/proxy-config", data),
+  getProxyStats: () => api.get("/api/admin/proxy-stats"),
   createUser: (data: {
     name: string; email: string; username?: string;
     password: string; role?: string; plan_id?: string;

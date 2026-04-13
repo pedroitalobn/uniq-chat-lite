@@ -98,6 +98,7 @@ type Instance struct {
 	ProxyError      string      `gorm:"type:text" json:"proxy_error,omitempty"`
 	ProxyExternalIP string      `gorm:"type:varchar(64)" json:"proxy_external_ip,omitempty"`
 	ProxyPoolID     *uuid.UUID  `gorm:"type:uuid" json:"proxy_pool_id,omitempty"` // for residencial mode
+	UseGlobalProxy  bool        `gorm:"default:false" json:"use_global_proxy"`
 
 	WebhookURL  string     `gorm:"type:text" json:"webhook_url,omitempty"`
 	SessionData string     `gorm:"type:text" json:"-"`

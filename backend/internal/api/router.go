@@ -569,6 +569,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	admin.Post("/plans", adminH.CreatePlan)
 	admin.Get("/payment-settings", adminH.GetPaymentSettings)
 	admin.Put("/payment-settings", adminH.UpdatePaymentSettings)
+	admin.Get("/proxy-config", adminH.GetGlobalProxyConfig)
+	admin.Put("/proxy-config", adminH.UpdateGlobalProxyConfig)
+	admin.Get("/proxy-stats", adminH.GetGlobalProxyStats)
 	// Rotas com parâmetros por último
 	admin.Put("/users/:id", adminH.UpdateUser)
 	admin.Post("/users/:id/reset-password", adminH.ResetPassword)

@@ -7,7 +7,7 @@ import { signOut, useSession } from "next-auth/react";
 import {
   LayoutDashboard, Smartphone, LogOut,
   Users, CreditCard, Shield, Contact, Megaphone, Server, Settings, Plug, Zap, Menu, X,
-  MessageSquare, Building2, ChevronDown
+  MessageSquare, Building2, ChevronDown, Globe
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePreferences } from "@/lib/preferences";
@@ -41,6 +41,7 @@ export function Sidebar() {
     { href: "/admin/users", label: t("nav_users"), icon: Users },
     { href: "/admin/plans", label: t("nav_plans"), icon: CreditCard },
     { href: "/admin/payment-settings", label: "Pagamento", icon: Shield },
+    { href: "/admin/proxy", label: "Proxy Global", icon: Globe },
   ];
 
   const closeMobile = () => setMobileOpen(false);

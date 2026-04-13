@@ -200,6 +200,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.SystemSetting{},
 		// Payment
 		&models.PaymentSettings{},
+		&models.GlobalProxyConfig{},
 		// WABA
 		&models.WABAInstance{},
 	)
