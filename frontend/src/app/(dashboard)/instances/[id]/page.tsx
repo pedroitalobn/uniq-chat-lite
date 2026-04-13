@@ -1331,6 +1331,18 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                 </div>
               </div>
 
+              {!igChallenge && (
+                <button
+                  onClick={() => instagramLoginMutation.mutate({ username: igUsername.trim(), password: igPassword })}
+                  disabled={!igUsername.trim() || !igPassword.trim() || instagramLoginMutation.isPending}
+                  className="w-full text-sm font-semibold py-2.5 rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                  style={{ background: "#e1306c", color: "white" }}
+                >
+                  {instagramLoginMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {instagramLoginMutation.isPending ? "Conectando..." : "Conectar"}
+                </button>
+              )}
+
               {/* Challenge code input */}
               {igChallenge && (
                 <div className="space-y-3 pt-3" style={{ borderTop: "1px solid hsl(240 12% 16%)" }}>
