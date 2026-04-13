@@ -46,7 +46,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
     if (!instances || instances.length === 0) return;
     
     const disconnected = instances.filter(
-      (i: any) => i.status === "disconnected" || i.status === "connecting"
+      (i: any) => (i.channel === "whatsapp" || !i.channel) && (i.status === "disconnected" || i.status === "connecting")
     );
     
     if (disconnected.length > 0) {

@@ -732,6 +732,8 @@ export default function InboxPage() {
   };
 
   const curChannel = CHANNELS.find(c => c.id === channels[0]) || CHANNELS[0];
+  const currentInstData = instData.find(i => i.id === instance);
+  const isInstagramInbox = currentInstData?.channel === "instagram";
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -743,6 +745,11 @@ export default function InboxPage() {
               <MessageSquare className="w-6 h-6" style={{ color: curChannel.color }} />
               Inbox
             </h1>
+            {isInstagramInbox && (
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: `${curChannel.color}20`, color: curChannel.color }}>
+                Instagram
+              </span>
+            )}
 {/* Instance selector dropdown */}
               {chInst.length > 0 && (
                 <select
@@ -759,32 +766,33 @@ export default function InboxPage() {
                 </select>
               )}
               {/* Refresh button */}
-              {instance && (
-                <button
-                  onClick={async () => {
-                    try {
-                      await instancesApi.reconnect(instance);
-                      toast.success("Instância reconectada");
-                    } catch {
-                      toast.error("Falha ao reconectar instância");
-                    } finally {
-                      qc.invalidateQueries({ queryKey: ["instances"] });
-                      qc.invalidateQueries({ queryKey: ["chats", instance] });
-                      if (chat) {
-                        setOlderMsgs([]);
-                        setMsgOffset(0);
-                        qc.invalidateQueries({ queryKey: ["msgs", instance, chat] });
-                        qc.invalidateQueries({ queryKey: ["contact", instance, chat] });
-                      }
-                    }
-                  }}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-white/10 active:scale-95"
-                  style={{ color: wsStatus === "connected" ? curChannel.color : "var(--text-3)" }}
-                  title="Reconectar e atualizar instância"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-              )}
+               {instance && currentInstData?.channel === "whatsapp" && (
+                 <button
+                   onClick={async () => {
+                     try {
+                       await instancesApi.reconnect(instance);
+                       toast.success("Instância reconectada");
+                     } catch {
+                       toast.error("Falha ao reconectar instância");
+                     } finally {
+                       qc.invalidateQueries({ queryKey: ["instances"] });
+                       qc.invalidateQueries({ queryKey: ["chats", instance] });
+                       if (chat) {
+                         setOlderMsgs([]);
+                         setMsgOffset(0);
+                         qc.invalidateQueries({ queryKey: ["msgs", instance, chat] });
+                         qc.invalidateQueries({ queryKey: ["contact", instance, chat] });
+                       }
+                     }
+                   }}
+                   className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-white/10 active:scale-95"
+                   style={{ color: wsStatus === "connected" ? curChannel.color : "var(--text-3)" }}
+                   title="Reconectar e atualizar instância"
+                 >
+                   <RefreshCw className="w-4 h-4" />
+                 </button>
+               )}
+
             {/* Sync indicator */}
             {(isSyncing === true || wsStatus === "connecting") && (
               <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium animate-pulse"

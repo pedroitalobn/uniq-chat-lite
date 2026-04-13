@@ -76,7 +76,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 		}
 		channels := []channelInfo{
 			{ID: "whatsapp", Label: "WhatsApp", Color: "#25d366", Description: "Conecte números WhatsApp via QR ou código de pareamento", Available: true},
-			{ID: "instagram", Label: "Instagram", Color: "#e1306c", Description: "DMs, scraping, follow/unfollow, publicação de conteúdo", Available: false},
+			{ID: "instagram", Label: "Instagram", Color: "#e1306c", Description: "DMs, follow/unfollow, publicação de conteúdo", Available: true},
 			{ID: "tiktok", Label: "TikTok", Color: "#ff0050", Description: "DMs, scraping, follow/unfollow, interação com conteúdo", Available: false},
 			{ID: "facebook", Label: "Facebook", Color: "#1877f2", Description: "Gerencie mensagens do Facebook Messenger via Meta API", Available: false},
 			{ID: "telegram", Label: "Telegram", Color: "#229ed9", Description: "Crie bots e gerencie mensagens via Telegram Bot API", Available: false},
@@ -118,9 +118,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	integrationH := handlers.NewIntegrationHandler(db)
 	recoveryH := handlers.NewRecoveryHandler(db, manager)
 
-	// Taktik — Instagram/TikTok automation
+	// TikTok automation (legacy taktik bridge)
 	taktikSvc := services.NewTaktikService(db)
-	instagramH := handlers.NewInstagramHandler(db, taktikSvc)
 	tiktokH := handlers.NewTikTokHandler(db, taktikSvc)
 
 	// Proxy Manager (residential proxy pool)
@@ -231,6 +230,22 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	instance.Post("/disconnect", instanceH.Disconnect)
 	instance.Post("/reconnect", instanceH.Reconnect)
 	instance.Get("/status", instanceH.Status)
+
+	// Instagram routes
+	instance.Post("/instagram/login", instanceH.InstagramLogin)
+	instance.Post("/instagram/logout", instanceH.InstagramLogout)
+	instance.Post("/instagram/dm", instanceH.InstagramSendDM)
+	instance.Get("/instagram/dm", instanceH.InstagramGetInbox)
+	instance.Post("/instagram/follow", instanceH.InstagramFollow)
+	instance.Post("/instagram/unfollow", instanceH.InstagramUnfollow)
+	instance.Post("/instagram/pause", instanceH.InstagramPause)
+	instance.Post("/instagram/resume", instanceH.InstagramResume)
+	instance.Post("/instagram/post", instanceH.InstagramPublishPost)
+	instance.Post("/instagram/story", instanceH.InstagramUploadStory)
+	instance.Get("/instagram/media", instanceH.InstagramGetUserMedia)
+	instance.Post("/instagram/like", instanceH.InstagramLikeMedia)
+	instance.Post("/instagram/challenge", instanceH.InstagramChallenge)
+	instance.Post("/instagram/challenge/resend", instanceH.InstagramChallengeResend)
 	instance.Get("/profile", instanceH.Profile)
 	instance.Get("/settings", instanceH.GetSettings)
 	instance.Put("/settings", instanceH.UpdateSettings)
@@ -332,27 +347,6 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	webhooks.Post("/", webhookH.Create)
 	webhooks.Put("/:webhookId", webhookH.Update)
 	webhooks.Delete("/:webhookId", webhookH.Delete)
-
-	// ─── Instagram routes ────────────────────────────────────────────────────
-	ig := api.Group("/instagram")
-	ig.Get("/health", instagramH.Health)
-	ig.Get("/accounts", instagramH.List)
-	ig.Post("/accounts", instagramH.Create)
-	ig.Get("/accounts/:id", instagramH.Get)
-	ig.Delete("/accounts/:id", instagramH.Delete)
-	ig.Put("/accounts/:id/settings", instagramH.UpdateSettings)
-	ig.Post("/accounts/:id/connect", instagramH.Connect)
-	ig.Post("/accounts/:id/disconnect", instagramH.Disconnect)
-	ig.Post("/accounts/:id/dm", instagramH.SendDM)
-	ig.Get("/accounts/:id/dm", instagramH.ReadDMs)
-	ig.Post("/accounts/:id/follow", instagramH.Follow)
-	ig.Post("/accounts/:id/unfollow", instagramH.Unfollow)
-	ig.Post("/accounts/:id/scrape/followers", instagramH.ScrapeFollowers)
-	ig.Post("/accounts/:id/scrape/hashtag", instagramH.ScrapeHashtag)
-	ig.Post("/accounts/:id/scrape/post", instagramH.ScrapePostLikers)
-	ig.Post("/accounts/:id/post", instagramH.PublishPost)
-	ig.Get("/targets", instagramH.ListTargets)
-	ig.Get("/dms", instagramH.ListDMs)
 
 	// ─── TikTok routes ──────────────────────────────────────────────────────
 	tk := api.Group("/tiktok")

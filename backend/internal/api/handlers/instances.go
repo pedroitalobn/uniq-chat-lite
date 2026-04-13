@@ -8,17 +8,21 @@ import (
 	"github.com/google/uuid"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/models"
+	"github.com/uniq-chat/backend/internal/services"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
 )
 
 type InstanceHandler struct {
-	db      *gorm.DB
-	manager *whatsapp.Manager
+	db        *gorm.DB
+	manager   *whatsapp.Manager
+	instagram *services.InstagramService
 }
 
 func NewInstanceHandler(db *gorm.DB, manager *whatsapp.Manager) *InstanceHandler {
-	return &InstanceHandler{db: db, manager: manager}
+	h := &InstanceHandler{db: db, manager: manager}
+	h.instagram = services.NewInstagramService(db)
+	return h
 }
 
 // List godoc
@@ -258,6 +262,9 @@ func (h *InstanceHandler) GetQR(c *fiber.Ctx) error {
 	if !ok {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
 	}
+	if instance.Channel != models.ChannelWhatsApp {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "QR disponível apenas para instâncias WhatsApp"})
+	}
 
 	client := h.manager.GetInstance(instance.ID.String())
 
@@ -302,6 +309,9 @@ func (h *InstanceHandler) Disconnect(c *fiber.Ctx) error {
 	if !ok {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
 	}
+	if instance.Channel != models.ChannelWhatsApp {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "disconnect disponível apenas para instâncias WhatsApp"})
+	}
 
 	// Logout from WhatsApp and clear session so user needs to re-scan QR on reconnect
 	if client := h.manager.GetInstance(instance.ID.String()); client != nil {
@@ -329,6 +339,10 @@ func (h *InstanceHandler) Reconnect(c *fiber.Ctx) error {
 	var fresh models.Instance
 	if err := h.db.First(&fresh, "id = ?", instance.ID).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	if fresh.Channel != models.ChannelWhatsApp {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "reconexão disponível apenas para instâncias WhatsApp"})
 	}
 
 	if err := h.manager.StartInstance(&fresh); err != nil {
@@ -528,6 +542,338 @@ func (h *InstanceHandler) GetPairingCode(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"code": code})
+}
+
+// ─── Instagram Handlers ─────────────────────────────────────────────────────
+
+// InstagramLogin POST /instances/:id/instagram/login
+func (h *InstanceHandler) InstagramLogin(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	if instance.Channel != models.ChannelInstagram {
+		return c.Status(400).JSON(fiber.Map{"error": "instância não é do Instagram"})
+	}
+
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	if req.Username == "" || req.Password == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "username e password são obrigatórios"})
+	}
+
+	resp, err := h.instagram.Login(c.Context(), instance.ID.String(), req.Username, req.Password)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	if resp.Status == "challenge_required" {
+		return c.JSON(fiber.Map{
+			"status":         "challenge_required",
+			"challenge_type": resp.ChallengeType,
+			"options":        resp.Options,
+			"api_path":       resp.APIPath,
+			"message":        resp.Message,
+		})
+	}
+
+	h.db.Model(instance).Updates(map[string]interface{}{
+		"instagram_username":  req.Username,
+		"status":              models.StatusConnected,
+		"instagram_device_id": generateDeviceID(req.Username),
+	})
+
+	return c.JSON(fiber.Map{
+		"username": resp.Username,
+		"pk":       resp.PK,
+		"status":   "connected",
+	})
+}
+
+// InstagramLogout POST /instances/:id/instagram/logout
+func (h *InstanceHandler) InstagramLogout(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	if err := h.instagram.Logout(c.Context(), instance.ID.String()); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	h.db.Model(instance).Update("status", models.StatusDisconnected)
+
+	return c.JSON(fiber.Map{"message": "logged out", "status": "disconnected"})
+}
+
+// InstagramSendDM POST /instances/:id/instagram/dm
+func (h *InstanceHandler) InstagramSendDM(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	var req struct {
+		Recipient string `json:"recipient"`
+		Message   string `json:"message"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	resp, err := h.instagram.SendDM(c.Context(), instance.ID.String(), req.Recipient, req.Message)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	h.db.Model(instance).Update("last_message_at", time.Now())
+
+	return c.JSON(resp)
+}
+
+// InstagramGetInbox GET /instances/:id/instagram/dm
+func (h *InstanceHandler) InstagramGetInbox(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	inbox, err := h.instagram.GetInbox(c.Context(), instance.ID.String())
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(inbox)
+}
+
+// InstagramFollow POST /instances/:id/instagram/follow
+func (h *InstanceHandler) InstagramFollow(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	var req struct {
+		Target string `json:"target"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	if err := h.instagram.Follow(c.Context(), instance.ID.String(), req.Target); err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"status": "ok", "target": req.Target})
+}
+
+// InstagramUnfollow POST /instances/:id/instagram/unfollow
+func (h *InstanceHandler) InstagramUnfollow(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	var req struct {
+		Target string `json:"target"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	if err := h.instagram.Unfollow(c.Context(), instance.ID.String(), req.Target); err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"status": "ok", "target": req.Target})
+}
+
+// InstagramPause POST /instances/:id/instagram/pause
+func (h *InstanceHandler) InstagramPause(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	h.db.Model(instance).Update("is_paused", true)
+	return c.JSON(fiber.Map{"status": "paused"})
+}
+
+// InstagramResume POST /instances/:id/instagram/resume
+func (h *InstanceHandler) InstagramResume(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	h.db.Model(instance).Update("is_paused", false)
+	return c.JSON(fiber.Map{"status": "active"})
+}
+
+// InstagramPublishPost POST /instances/:id/instagram/post
+func (h *InstanceHandler) InstagramPublishPost(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	var req struct {
+		ImageURL string `json:"image_url"`
+		VideoURL string `json:"video_url"`
+		Caption  string `json:"caption"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	if req.ImageURL == "" && req.VideoURL == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "image_url ou video_url é obrigatório"})
+	}
+
+	resp, err := h.instagram.PublishPost(c.Context(), instance.ID.String(), req.ImageURL, req.VideoURL, req.Caption)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(resp)
+}
+
+// InstagramUploadStory POST /instances/:id/instagram/story
+func (h *InstanceHandler) InstagramUploadStory(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	var req struct {
+		ImageURL string `json:"image_url"`
+		VideoURL string `json:"video_url"`
+		Caption  string `json:"caption"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	if req.ImageURL == "" && req.VideoURL == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "image_url ou video_url é obrigatório"})
+	}
+
+	resp, err := h.instagram.UploadStory(c.Context(), instance.ID.String(), req.ImageURL, req.VideoURL, req.Caption)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(resp)
+}
+
+// InstagramGetUserMedia GET /instances/:id/instagram/media
+func (h *InstanceHandler) InstagramGetUserMedia(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	username := c.Query("username")
+	if username == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "username é obrigatório"})
+	}
+
+	resp, err := h.instagram.GetUserMedia(c.Context(), instance.ID.String(), username)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(resp)
+}
+
+// InstagramLikeMedia POST /instances/:id/instagram/like
+func (h *InstanceHandler) InstagramLikeMedia(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	var req struct {
+		MediaID string `json:"media_id"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	if req.MediaID == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "media_id é obrigatório"})
+	}
+
+	if err := h.instagram.LikeMedia(c.Context(), instance.ID.String(), req.MediaID); err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"status": "ok"})
+}
+
+// InstagramChallenge POST /instances/:id/instagram/challenge
+func (h *InstanceHandler) InstagramChallenge(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	var req struct {
+		APIPath string `json:"api_path"`
+		Code    string `json:"code"`
+		Method  string `json:"method"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	if req.APIPath == "" || req.Code == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "api_path e code são obrigatórios"})
+	}
+
+	resp, err := h.instagram.ChallengeVerify(c.Context(), instance.ID.String(), req.APIPath, req.Code, req.Method)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(resp)
+}
+
+// InstagramChallengeResend POST /instances/:id/instagram/challenge/resend
+func (h *InstanceHandler) InstagramChallengeResend(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	var req struct {
+		APIPath string `json:"api_path"`
+		Method  string `json:"method"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	if req.APIPath == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "api_path é obrigatório"})
+	}
+
+	if err := h.instagram.ChallengeResend(c.Context(), instance.ID.String(), req.APIPath, req.Method); err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"message": "código reenviado"})
+}
+
+func generateDeviceID(username string) string {
+	return fmt.Sprintf("android-%s", uuid.New().String()[:8])
 }
 
 // suppress unused import

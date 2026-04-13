@@ -126,6 +126,11 @@ export interface Instance {
   read_messages: boolean;
   ignore_groups: boolean;
   ignore_status: boolean;
+  // Instagram-specific
+  instagram_username?: string;
+  instagram_device_id?: string;
+  is_paused?: boolean;
+  last_message_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -202,22 +207,49 @@ export interface Tag {
   created_at: string;
 }
 
+export type ContactSource = "whatsapp" | "waba" | "instagram" | "telegram" | "linkedin" | "tiktok" | "kwai" | "manual";
+
 export interface Contact {
   id: string;
   user_id: string;
+  owner_id?: string;
+  workspace_id?: string;
   name: string;
   phone: string;
   email?: string;
   notes?: string;
   avatar_url?: string;
+  source?: ContactSource;
+  instance_id?: string;
   funnel?: string;
   stage?: string;
   journey?: string;
   external_id?: string;
-  owner?: string;
   tags: Tag[];
   created_at: string;
   updated_at: string;
+}
+
+export interface PipelineStage {
+  id: string;
+  workspace_id: string;
+  name: string;
+  order: number;
+  color: string;
+  is_default: boolean;
+  funnel?: string;
+}
+
+export type ActivityType = "created" | "stage_changed" | "note_added" | "assigned" | "messaged";
+
+export interface ContactActivity {
+  id: string;
+  contact_id: string;
+  user_id: string;
+  type: ActivityType;
+  description: string;
+  metadata?: string;
+  created_at: string;
 }
 
 // ─── Campaigns ────────────────────────────────────────────────────────────────

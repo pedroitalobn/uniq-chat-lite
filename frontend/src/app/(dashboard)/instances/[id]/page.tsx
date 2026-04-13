@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { instancesApi, webhooksApi, messagesApi, settingsApi, mcpApi, recoveryApi, instagramApi, tiktokApi, type WebhookPayload } from "@/lib/api";
+import { instancesApi, webhooksApi, messagesApi, settingsApi, mcpApi, recoveryApi, tiktokApi, type WebhookPayload } from "@/lib/api";
 import {
   Smartphone, ArrowLeft, Globe, AlertTriangle,
   QrCode, Power, Trash2, Plus, X, Send, ChevronRight,
@@ -11,6 +11,7 @@ import {
   RefreshCw, Bot, ChevronDown, ChevronUp, Image, FileText, Music,
   Video, MapPin, User, Smile, BarChart2, Sticker, MessageSquareText,
   MousePointerClick, ShieldAlert, Camera, Users, Phone, RotateCcw, Download,
+  Eye, EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -20,7 +21,7 @@ import Link from "next/link";
 import { QRCodeModal } from "@/components/instances/QRCodeModal";
 import { ProxyConfigForm } from "@/components/instances/ProxyConfigForm";
 
-type Tab = "geral" | "proxy" | "webhooks" | "logs" | "recovery" | "dm" | "actions" | "scraping";
+type Tab = "geral" | "proxy" | "webhooks" | "logs" | "recovery" | "dm" | "actions" | "scraping" | "posts" | "stories" | "media";
 
 const STATUS_MAP: Record<string, { label: string; dot: string; bg: string; color: string }> = {
   connected:    { label: "Conectado",    dot: "#00d46a", bg: "rgba(0,212,106,0.08)",   color: "#00d46a" },
@@ -608,6 +609,14 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
   const [copiedToken, setCopiedToken] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [tokenVisible, setTokenVisible] = useState(false);
+  const [igUsername, setIgUsername] = useState("");
+  const [igPassword, setIgPassword] = useState("");
+  const [igPasswordVisible, setIgPasswordVisible] = useState(false);
+  const [showIgLogin, setShowIgLogin] = useState(false);
+  // Challenge states
+  const [igChallenge, setIgChallenge] = useState<{ api_path: string; options: string[]; challenge_type: string } | null>(null);
+  const [igChallengeCode, setIgChallengeCode] = useState("");
+  const [igChallengeLoading, setIgChallengeLoading] = useState(false);
   const [msgType, setMsgType] = useState<"text"|"image"|"document"|"audio"|"video"|"location"|"contact"|"reaction"|"poll"|"sticker"|"buttons">("text");
   const [recipient, setRecipient] = useState("");
   const [sending, setSending] = useState(false);
@@ -679,6 +688,65 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
       queryClient.invalidateQueries({ queryKey: ["instance", instanceId] });
     },
     onError: () => toast.error("Erro ao reconectar"),
+  });
+
+  const instagramLoginMutation = useMutation({
+    mutationFn: (creds: { username: string; password: string }) =>
+      instancesApi.instagramLogin(instanceId, creds),
+    onSuccess: (res) => {
+      // Check if it's a challenge response
+      const data = res as unknown as { data?: { challenge_type?: string; api_path?: string; options?: string[] } };
+      if (data?.data?.challenge_type) {
+        setIgChallenge({
+          challenge_type: data.data.challenge_type,
+          api_path: data.data.api_path || "",
+          options: data.data.options || ["email", "phone"],
+        });
+        toast.info("Verificação necessária - inserir código");
+      } else {
+        toast.success("Conectado ao Instagram!");
+        queryClient.invalidateQueries({ queryKey: ["instance", instanceId] });
+        setShowIgLogin(false);
+        setIgUsername("");
+        setIgPassword("");
+        setIgChallenge(null);
+      }
+    },
+    onError: (err: unknown) => {
+      const errData = err as { response?: { data?: { error?: string; data?: Record<string, unknown> } } };
+      const errMsg = errData?.response?.data?.error;
+      const challengeData = errData?.response?.data?.data;
+      // Check if it's a challenge error
+      if (errMsg === "challenge_required" && challengeData) {
+        setIgChallenge({
+          challenge_type: (challengeData.challenge_type as string) || "code",
+          api_path: (challengeData.api_path as string) || "",
+          options: (challengeData.options as string[]) || ["email", "phone"],
+        });
+        toast.info("Verificação necessária - inserir código");
+      } else {
+        const msg = errMsg || "Erro ao conectar";
+        toast.error(msg);
+      }
+    },
+  });
+
+  const instagramChallengeMutation = useMutation({
+    mutationFn: (data: { api_path: string; code: string; method?: string }) =>
+      instancesApi.instagramChallenge(instanceId, data),
+    onSuccess: () => {
+      toast.success("Verificado com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["instance", instanceId] });
+      setShowIgLogin(false);
+      setIgChallenge(null);
+      setIgChallengeCode("");
+      setIgUsername("");
+      setIgPassword("");
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Código incorreto";
+      toast.error(msg);
+    },
   });
 
   const canSend = (): boolean => {
@@ -845,7 +913,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
             <div>
               <p className="text-xs mb-1.5" style={labelStyle}>Canal</p>
               <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "rgba(225,48,108,0.1)", color: "#e1306c", border: "1px solid rgba(225,48,108,0.2)" }}>
-                Instagram Beta
+                Instagram
               </span>
             </div>
           )}
@@ -994,7 +1062,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
           )}
           {isSocial && instance.status !== "connected" && (
             <button
-              onClick={() => reconnectMutation.mutate()}
+              onClick={() => isInstagram ? setShowIgLogin(true) : reconnectMutation.mutate()}
               disabled={reconnectMutation.isPending}
               className="flex items-center justify-center gap-2 text-sm font-medium py-2.5 px-4 rounded-xl transition-all disabled:opacity-50"
               style={{ background: `${channelColor}15`, border: `1px solid ${channelColor}25`, color: channelColor }}
@@ -1006,7 +1074,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
               Conectar
             </button>
           )}
-          {instance.status === "connected" ? (
+          {isWhatsApp && (instance.status === "connected" ? (
             <button
               onClick={() => disconnectMutation.mutate()}
               disabled={disconnectMutation.isPending}
@@ -1036,7 +1104,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
               }
               Reconectar
             </button>
-          )}
+          ))}
         </div>
       </div>
 
@@ -1216,6 +1284,96 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
           }}
           onConnected={() => queryClient.invalidateQueries({ queryKey: ["instance", instanceId] })}
         />
+      )}
+
+      {showIgLogin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setShowIgLogin(false)} />
+          <div className="relative w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-fade-in-up"
+            style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Login no Instagram</h2>
+              <button onClick={() => setShowIgLogin(false)} style={{ color: "hsl(240 8% 38%)" }}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 48%)" }}>Usuário</label>
+                <input
+                  type="text"
+                  value={igUsername}
+                  onChange={(e) => setIgUsername(e.target.value)}
+                  placeholder="seu_usuario"
+                  className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 48)" }}>Senha</label>
+                <div className="relative">
+                  <input
+                    type={igPasswordVisible ? "text" : "password"}
+                    value={igPassword}
+                    onChange={(e) => setIgPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full text-sm rounded-xl px-3 py-2.5 pr-10 outline-none"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIgPasswordVisible(!igPasswordVisible)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2"
+                    style={{ color: "hsl(240 8% 40%)" }}
+                  >
+                    {igPasswordVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Challenge code input */}
+              {igChallenge && (
+                <div className="space-y-3 pt-3" style={{ borderTop: "1px solid hsl(240 12% 16%)" }}>
+                  <div className="text-xs font-medium" style={{ color: "#e1306c" }}>
+                    Verificação de segurança
+                  </div>
+                  <p className="text-xs" style={{ color: "hsl(240 8% 48%)" }}>
+                    O Instagram enviou um código para seu {igChallenge.challenge_type === "email" ? "email" : "número de telefone"}.
+                  </p>
+                  <div>
+                    <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 48%)" }}>Código de verificação</label>
+                    <input
+                      type="text"
+                      value={igChallengeCode}
+                      onChange={(e) => setIgChallengeCode(e.target.value.replace(/\D/g, ""))}
+                      placeholder="000000"
+                      className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
+                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)", letterSpacing: "0.2em", textAlign: "center" as React.CSSProperties["textAlign"] }}
+                      maxLength={6}
+                    />
+                  </div>
+                  <button
+                    onClick={() => instagramChallengeMutation.mutate({ api_path: igChallenge.api_path, code: igChallengeCode })}
+                    disabled={igChallengeCode.length < 6 || instagramChallengeMutation.isPending || igChallengeLoading}
+                    className="w-full text-sm font-semibold py-2.5 rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                    style={{ background: "#e1306c", color: "white" }}
+                  >
+                    {instagramChallengeMutation.isPending || igChallengeLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    {instagramChallengeMutation.isPending || igChallengeLoading ? "Verificando..." : "Verificar código"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIgChallenge(null); setIgChallengeCode(""); }}
+                    className="w-full text-xs py-2"
+                    style={{ color: "hsl(240 8% 48%)" }}
+                  >
+                    ← Voltar ao login
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -1473,11 +1631,15 @@ export default function InstanceDetailPage() {
   const { data: instance, isLoading } = useQuery<Instance>({
     queryKey: ["instance", instanceId],
     queryFn: () => instancesApi.get(instanceId).then((r) => r.data),
-    // Stop polling while deleting to avoid 404 race; poll faster while connecting
+    // Stop polling while deleting to avoid 404 race
     enabled: !deleting,
+    // Poll while connecting only for WhatsApp; Instagram connection lifecycle is manual/login-driven
     refetchInterval: (query) => {
-      const status = (query.state.data as Instance | undefined)?.status;
-      return status === "connecting" ? 2_000 : 10_000;
+      const data = query.state.data as Instance | undefined;
+      const status = data?.status;
+      const channel = data?.channel;
+      if (status === "connecting" && (!channel || channel === "whatsapp")) return 2_000;
+      return 10_000;
     },
   });
 
@@ -1500,6 +1662,8 @@ export default function InstanceDetailPage() {
   const isTikTok = instance?.channel === "tiktok";
   const isSocial = isInstagram || isTikTok;
 
+  const needsIgLogin = isInstagram && !instance.instagram_username && instance.status !== "connected";
+
   const tabs: { id: Tab; label: string; icon: React.ReactNode; alert?: boolean }[] = [
     // WhatsApp-specific tabs
     ...(isWhatsApp ? [
@@ -1514,7 +1678,9 @@ export default function InstanceDetailPage() {
       { id: "geral" as Tab, label: "Geral", icon: <Settings className="w-3.5 h-3.5" /> },
       { id: "dm" as Tab, label: "Mensagens", icon: <MessageSquareText className="w-3.5 h-3.5" /> },
       { id: "actions" as Tab, label: "Ações", icon: <Users className="w-3.5 h-3.5" /> },
-      { id: "scraping" as Tab, label: "Scraping", icon: <Download className="w-3.5 h-3.5" /> },
+      { id: "posts" as Tab, label: "Publicar", icon: <Camera className="w-3.5 h-3.5" /> },
+      { id: "stories" as Tab, label: "Stories", icon: <Video className="w-3.5 h-3.5" /> },
+      { id: "media" as Tab, label: "Mídia", icon: <Image className="w-3.5 h-3.5" /> },
       { id: "proxy" as Tab, label: "Proxy", icon: <Globe className="w-3.5 h-3.5" /> },
       { id: "webhooks" as Tab, label: "Webhooks", icon: <WebhookIcon className="w-3.5 h-3.5" /> },
       { id: "logs" as Tab, label: "Logs", icon: <Activity className="w-3.5 h-3.5" /> },
@@ -1672,6 +1838,9 @@ export default function InstanceDetailPage() {
         {activeTab === "dm"       && <DMTab instance={instance} />}
         {activeTab === "actions"  && <ActionsTab instance={instance} />}
         {activeTab === "scraping" && <ScrapingTab instance={instance} />}
+        {activeTab === "posts"    && <PostsTab instance={instance} />}
+        {activeTab === "stories"  && <StoriesTab instance={instance} />}
+        {activeTab === "media"    && <MediaTab instance={instance} />}
       </div>
     </div>
   );
@@ -1680,7 +1849,6 @@ export default function InstanceDetailPage() {
 // ─── Instagram/TikTok: DM Tab ───────────────────────────────────────────
 function DMTab({ instance }: { instance: Instance }) {
   const channel = instance.channel || "whatsapp";
-  const api = channel === "instagram" ? instagramApi : tiktokApi;
   const [target, setTarget] = useState("");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -1689,7 +1857,11 @@ function DMTab({ instance }: { instance: Instance }) {
     if (!target.trim() || !message.trim()) return;
     setSending(true);
     try {
-      await api.sendDM(instance.id, target.trim(), message.trim());
+      if (channel === "instagram") {
+        await instancesApi.instagramSendDM(instance.id, { recipient: target.trim(), message: message.trim() });
+      } else {
+        await tiktokApi.sendDM(instance.id, target.trim(), message.trim());
+      }
       toast.success("DM enviado com sucesso!");
       setMessage("");
     } catch (err: any) {
@@ -1727,7 +1899,6 @@ function DMTab({ instance }: { instance: Instance }) {
 // ─── Instagram/TikTok: Actions Tab (Follow/Unfollow) ─────────────────────
 function ActionsTab({ instance }: { instance: Instance }) {
   const channel = instance.channel || "whatsapp";
-  const api = channel === "instagram" ? instagramApi : tiktokApi;
   const [target, setTarget] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -1736,10 +1907,18 @@ function ActionsTab({ instance }: { instance: Instance }) {
     setLoading(true);
     try {
       if (action === "follow") {
-        await api.follow(instance.id, target.trim());
+        if (channel === "instagram") {
+          await instancesApi.instagramFollow(instance.id, target.trim());
+        } else {
+          await tiktokApi.follow(instance.id, target.trim());
+        }
         toast.success(`Seguiu @${target.trim()} com sucesso!`);
       } else {
-        await api.unfollow(instance.id, target.trim());
+        if (channel === "instagram") {
+          await instancesApi.instagramUnfollow(instance.id, target.trim());
+        } else {
+          await tiktokApi.unfollow(instance.id, target.trim());
+        }
         toast.success(`Deixou de seguir @${target.trim()} com sucesso!`);
       }
       setTarget("");
@@ -1791,7 +1970,6 @@ function ActionsTab({ instance }: { instance: Instance }) {
 // ─── Instagram/TikTok: Scraping Tab ─────────────────────────────────────
 function ScrapingTab({ instance }: { instance: Instance }) {
   const channel = instance.channel || "whatsapp";
-  const api = channel === "instagram" ? instagramApi : tiktokApi;
   const [source, setSource] = useState<"followers" | "hashtag" | "post">("followers");
   const [target, setTarget] = useState("");
   const [limit, setLimit] = useState(100);
@@ -1800,15 +1978,19 @@ function ScrapingTab({ instance }: { instance: Instance }) {
 
   const handleScrape = async () => {
     if (!target.trim()) return;
+    if (channel === "instagram") {
+      toast.error("Scraping Instagram foi removido desta integração.");
+      return;
+    }
     setLoading(true);
     try {
       let res;
       if (source === "followers") {
-        res = await api.scrapeFollowers(instance.id, target.trim(), limit);
+        res = await tiktokApi.scrapeFollowers(instance.id, target.trim(), limit);
       } else if (source === "hashtag") {
-        res = await api.scrapeHashtag(instance.id, target.trim(), limit);
+        res = await tiktokApi.scrapeHashtag(instance.id, target.trim(), limit);
       } else {
-        res = await (api as any).scrapePostLikers(instance.id, target.trim(), limit);
+        res = await (tiktokApi as any).scrapePostLikers(instance.id, target.trim(), limit);
       }
       setResults(res.data?.users || []);
       toast.success(`Scraped ${res.data?.scraped || 0} perfis (${res.data?.saved || 0} salvos)`);
@@ -1881,6 +2063,185 @@ function ScrapingTab({ instance }: { instance: Instance }) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+// ─── Instagram: Posts Tab ────────────────────────────────────────────────────
+function PostsTab({ instance }: { instance: Instance }) {
+  const [mediaUrl, setMediaUrl] = useState("");
+  const [caption, setCaption] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ success?: boolean; message?: string } | null>(null);
+
+  const handlePublish = async () => {
+    if (!mediaUrl.trim()) return;
+    setSending(true);
+    setResult(null);
+    try {
+      await instancesApi.instagramPublishPost(instance.id, { image_url: mediaUrl.trim(), caption: caption.trim() });
+      setResult({ success: true, message: "Post publicado com sucesso!" });
+      setMediaUrl("");
+      setCaption("");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao publicar";
+      setResult({ success: false, message: msg });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs" style={{ color: "hsl(240 8% 42%)" }}>
+        Publique fotos/vídeos no Instagram da conta conectada.
+      </p>
+      <div>
+        <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>URL da imagem/vídeo</label>
+        <input type="text" value={mediaUrl} onChange={e => setMediaUrl(e.target.value)}
+          placeholder="https://exemplo.com/imagem.jpg"
+          className="input-field w-full" />
+      </div>
+      <div>
+        <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>Legenda</label>
+        <textarea value={caption} onChange={e => setCaption(e.target.value)}
+          placeholder="Sua legenda..."
+          rows={3}
+          className="input-field w-full" />
+      </div>
+      <button onClick={handlePublish} disabled={sending || !mediaUrl.trim()}
+        className="btn-primary w-full flex items-center justify-center gap-2 py-2.5 text-sm disabled:opacity-40"
+        style={{ background: "#e1306c", color: "white" }}>
+        {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+        Publicar
+      </button>
+      {result && (
+        <div className={`p-3 rounded-xl text-sm ${result.success ? "bg-green-900/20 text-green-400" : "bg-red-900/20 text-red-400"}`}>
+          {result.message}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Instagram: Stories Tab ───────────────────────────────────────────────────
+function StoriesTab({ instance }: { instance: Instance }) {
+  const [mediaUrl, setMediaUrl] = useState("");
+  const [caption, setCaption] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ success?: boolean; message?: string } | null>(null);
+
+  const handlePublish = async () => {
+    if (!mediaUrl.trim()) return;
+    setSending(true);
+    setResult(null);
+    try {
+      await instancesApi.instagramUploadStory(instance.id, { image_url: mediaUrl.trim(), caption: caption.trim() });
+      setResult({ success: true, message: "Story publicado com sucesso!" });
+      setMediaUrl("");
+      setCaption("");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao publicar story";
+      setResult({ success: false, message: msg });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs" style={{ color: "hsl(240 8% 42%)" }}>
+        Publique stories (foto/vídeo) que desaparecem em 24h.
+      </p>
+      <div>
+        <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>URL da mídia</label>
+        <input type="text" value={mediaUrl} onChange={e => setMediaUrl(e.target.value)}
+          placeholder="https://exemplo.com/video.mp4"
+          className="input-field w-full" />
+      </div>
+      <div>
+        <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>Texto (opcional)</label>
+        <input type="text" value={caption} onChange={e => setCaption(e.target.value)}
+          placeholder="Texto sobre a imagem..."
+          className="input-field w-full" />
+      </div>
+      <button onClick={handlePublish} disabled={sending || !mediaUrl.trim()}
+        className="btn-primary w-full flex items-center justify-center gap-2 py-2.5 text-sm disabled:opacity-40"
+        style={{ background: "#e1306c", color: "white" }}>
+        {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Video className="w-4 h-4" />}
+        Publicar Story
+      </button>
+      {result && (
+        <div className={`p-3 rounded-xl text-sm ${result.success ? "bg-green-900/20 text-green-400" : "bg-red-900/20 text-red-400"}`}>
+          {result.message}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Instagram: Media Tab ───────────────────────────────────────────────────
+function MediaTab({ instance }: { instance: Instance }) {
+  const [targetUser, setTargetUser] = useState("");
+  const [media, setMedia] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchMedia = async () => {
+    if (!targetUser.trim()) return;
+    setLoading(true);
+    try {
+      const res = await instancesApi.instagramGetUserMedia(instance.id, targetUser.trim());
+      setMedia(res.data?.users?.[0]?.media || []);
+    } catch (err: unknown) {
+      toast.error("Erro ao buscar mídia");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLike = async (mediaId: string) => {
+    try {
+      await instancesApi.instagramLikeMedia(instance.id, mediaId);
+      toast.success("Post liked!");
+    } catch (err: unknown) {
+      toast.error("Erro ao dar like");
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs" style={{ color: "hsl(240 8% 42%)" }}>
+        Veja mídia de usuários e interaja com posts.
+      </p>
+      <div className="flex gap-2">
+        <input type="text" value={targetUser} onChange={e => setTargetUser(e.target.value)}
+          placeholder="@username"
+          className="input-field flex-1" />
+        <button onClick={fetchMedia} disabled={loading || !targetUser.trim()}
+          className="btn-primary px-4 py-2 text-sm disabled:opacity-40">
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Buscar"}
+        </button>
+      </div>
+
+      {media.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 mt-4">
+          {media.slice(0, 9).map((m: any, i: number) => (
+            <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-gray-800 group">
+              {m.media_type === "VIDEO" ? (
+                <Video className="w-6 h-6 absolute center" />
+              ) : (
+                <img src={m.image_versions2?.candidates?.[0]?.url || ""} alt="" className="w-full h-full object-cover" />
+              )}
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                <button onClick={() => handleLike(m.id)} className="p-2 bg-white/20 rounded-full">
+                  <Smile className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

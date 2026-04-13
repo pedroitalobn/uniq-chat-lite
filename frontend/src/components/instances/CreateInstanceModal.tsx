@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { instancesApi, serversApi, channelsApi, instagramApi, tiktokApi } from "@/lib/api";
+import { instancesApi, serversApi, channelsApi, tiktokApi } from "@/lib/api";
 import { X, Server, Key, ChevronRight, Check, Eye, EyeOff, User, Lock, Loader2, ExternalLink } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
@@ -78,6 +78,9 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
   const [igUsername, setIgUsername] = useState("");
   const [igPassword, setIgPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [challenge, setChallenge] = useState<{ api_path: string; challenge_type?: string; options?: string[] } | null>(null);
+  const [challengeCode, setChallengeCode] = useState("");
+  const [pendingInstagramInstanceId, setPendingInstagramInstanceId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   const isSocial = selectedChannel === "instagram" || selectedChannel === "tiktok";
@@ -117,7 +120,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
     setCreating(true);
     try {
       // First create the instance
-      await instancesApi.create(
+      const createResp = await instancesApi.create(
         name.trim(),
         selectedChannel,
         serverId || undefined,
@@ -125,13 +128,33 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
         workspaceId
       );
 
-      // Then, for social channels, register the account
-      if (isSocial) {
+      // Then, for social channels, register/connect account where required
+      if (selectedChannel === "tiktok") {
         const accountData = { username: igUsername.trim().toLowerCase(), password: igPassword.trim() };
-        if (selectedChannel === "instagram") {
-          await instagramApi.createAccount(accountData);
-        } else if (selectedChannel === "tiktok") {
-          await tiktokApi.createAccount(accountData);
+        await tiktokApi.createAccount(accountData);
+      }
+
+      if (selectedChannel === "instagram") {
+        const createdId = createResp?.data?.id as string | undefined;
+        if (!createdId) {
+          throw new Error("falha ao criar instância Instagram");
+        }
+
+        const loginResp = await instancesApi.instagramLogin(createdId, {
+          username: igUsername.trim().toLowerCase(),
+          password: igPassword,
+        });
+
+        const loginData = loginResp?.data as { status?: string; api_path?: string; challenge_type?: string; options?: string[] };
+        if (loginData?.status === "challenge_required") {
+          setPendingInstagramInstanceId(createdId);
+          setChallenge({
+            api_path: loginData.api_path || "",
+            challenge_type: loginData.challenge_type,
+            options: loginData.options,
+          });
+          toast.info(loginData.api_path ? "Código de verificação necessário para concluir criação" : "Instagram exigiu verificação no app/email antes de concluir");
+          return;
         }
       }
 
@@ -158,6 +181,9 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
     setIgUsername("");
     setIgPassword("");
     setShowPassword(false);
+    setChallenge(null);
+    setChallengeCode("");
+    setPendingInstagramInstanceId(null);
   };
 
   const handleClose = () => { reset(); onClose(); };
@@ -294,8 +320,72 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
               />
             </div>
 
+            {/* Instagram challenge verification */}
+            {selectedChannel === "instagram" && challenge && (
+              <>
+                <div className="border-t pt-3" style={{ borderColor: "hsl(240 12% 13%)" }}>
+                  <p className="text-xs font-medium mb-2" style={{ color: "#e1306c" }}>
+                    Verificação do Instagram ({challenge.challenge_type || "código"})
+                  </p>
+                  <p className="text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
+                    Digite o código recebido para concluir a criação da instância.
+                  </p>
+                </div>
+                {challenge.api_path ? (
+                  <>
+                    <div>
+                      <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+                        Código de verificação
+                      </label>
+                      <input
+                        type="text"
+                        value={challengeCode}
+                        onChange={(e) => setChallengeCode(e.target.value.replace(/\D/g, ""))}
+                        placeholder="000000"
+                        className="input-field w-full text-center tracking-[0.3em]"
+                        maxLength={6}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={creating || challengeCode.length < 6}
+                      className="btn-primary w-full py-2.5 text-sm disabled:opacity-40"
+                      style={{ background: ch?.color || "#e1306c", color: "white" }}
+                      onClick={async () => {
+                        try {
+                          setCreating(true);
+                          if (!pendingInstagramInstanceId) throw new Error("instância pendente não encontrada");
+                          await instancesApi.instagramChallenge(pendingInstagramInstanceId, { api_path: challenge.api_path, code: challengeCode });
+                          toast.success("Instância Instagram criada e conectada!");
+                          reset();
+                          onCreated();
+                          onClose();
+                        } catch (err: unknown) {
+                          const msg =
+                            (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+                            "Erro ao validar código";
+                          toast.error(msg);
+                        } finally {
+                          setCreating(false);
+                        }
+                      }}
+                    >
+                      {creating ? "Validando..." : "Validar código e concluir"}
+                    </button>
+                  </>
+                ) : (
+                  <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <p className="text-xs" style={{ color: "hsl(240 8% 58%)" }}>
+                      O Instagram pediu confirmação de segurança fora da API. Acesse o app/site do Instagram dessa conta,
+                      conclua a verificação e tente novamente.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+
             {/* Instagram/TikTok credentials */}
-            {isSocial && (
+            {isSocial && !challenge && (
               <>
                 <div className="border-t pt-3" style={{ borderColor: "hsl(240 12% 13%)" }}>
                   <p className="text-xs font-medium mb-2 flex items-center gap-1.5" style={{ color: ch.color }}>
@@ -377,15 +467,17 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
               <button type="button" onClick={() => setStep("channel")} className="btn-ghost flex-1 py-2.5 text-sm">
                 Voltar
               </button>
-              <button
-                type="submit"
-                disabled={!name.trim() || creating || (isSocial && (!igUsername.trim() || !igPassword.trim()))}
-                className="btn-primary flex-1 py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                style={{ background: ch.color, color: ch.id === "whatsapp" ? "#03170a" : "white" }}
-              >
-                {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                <span>{creating ? "Criando..." : "Criar instância"}</span>
-              </button>
+              {!challenge && (
+                <button
+                  type="submit"
+                  disabled={!name.trim() || creating || (isSocial && (!igUsername.trim() || !igPassword.trim()))}
+                  className="btn-primary flex-1 py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  style={{ background: ch.color, color: ch.id === "whatsapp" ? "#03170a" : "white" }}
+                >
+                  {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  <span>{creating ? "Criando..." : "Criar instância"}</span>
+                </button>
+              )}
             </div>
           </form>
         )}

@@ -177,6 +177,30 @@ export const instancesApi = {
   status: (id: string) => api.get(`/api/instances/${id}/status`),
   profile: (id: string) => api.get(`/api/instances/${id}/profile`),
   regenerateToken: (id: string) => api.post(`/api/instances/${id}/regenerate-token`),
+  instagramLogin: (id: string, creds: { username: string; password: string }) =>
+    api.post(`/api/instances/${id}/instagram/login`, creds),
+  instagramLogout: (id: string) => api.post(`/api/instances/${id}/instagram/logout`),
+  instagramSendDM: (id: string, data: { recipient: string; message: string }) =>
+    api.post(`/api/instances/${id}/instagram/dm`, data),
+  instagramGetInbox: (id: string) => api.get(`/api/instances/${id}/instagram/dm`),
+  instagramFollow: (id: string, target: string) =>
+    api.post(`/api/instances/${id}/instagram/follow`, { target }),
+  instagramUnfollow: (id: string, target: string) =>
+    api.post(`/api/instances/${id}/instagram/unfollow`, { target }),
+  instagramPause: (id: string) => api.post(`/api/instances/${id}/instagram/pause`),
+  instagramResume: (id: string) => api.post(`/api/instances/${id}/instagram/resume`),
+  instagramPublishPost: (id: string, data: { image_url?: string; video_url?: string; caption?: string }) =>
+    api.post(`/api/instances/${id}/instagram/post`, data),
+  instagramUploadStory: (id: string, data: { image_url?: string; video_url?: string; caption?: string }) =>
+    api.post(`/api/instances/${id}/instagram/story`, data),
+  instagramGetUserMedia: (id: string, username: string) =>
+    api.get(`/api/instances/${id}/instagram/media`, { params: { username } }),
+  instagramLikeMedia: (id: string, mediaId: string) =>
+    api.post(`/api/instances/${id}/instagram/like`, { media_id: mediaId }),
+  instagramChallenge: (id: string, data: { api_path: string; code: string; method?: string }) =>
+    api.post(`/api/instances/${id}/instagram/challenge`, data),
+  instagramChallengeResend: (id: string, data: { api_path: string; method?: string }) =>
+    api.post(`/api/instances/${id}/instagram/challenge/resend`, data),
 };
 
 export const settingsApi = {
@@ -518,38 +542,6 @@ export const plansApi = {
 
 // ─── Instagram ───────────────────────────────────────────────────────────────
 
-export const instagramApi = {
-  health: () => api.get("/api/instagram/health"),
-  listAccounts: () => api.get("/api/instagram/accounts"),
-  createAccount: (data: { username: string; password: string }) =>
-    api.post("/api/instagram/accounts", data),
-  getAccount: (id: string) => api.get(`/api/instagram/accounts/${id}`),
-  deleteAccount: (id: string) => api.delete(`/api/instagram/accounts/${id}`),
-  connect: (id: string) => api.post(`/api/instagram/accounts/${id}/connect`),
-  disconnect: (id: string) => api.post(`/api/instagram/accounts/${id}/disconnect`),
-  updateSettings: (id: string, data: {
-    auto_reply?: boolean; ai_enabled?: boolean; integration_id?: string | null;
-  }) => api.put(`/api/instagram/accounts/${id}/settings`, data),
-  sendDM: (id: string, target: string, message: string) =>
-    api.post(`/api/instagram/accounts/${id}/dm`, { target, message }),
-  readDMs: (id: string) => api.get(`/api/instagram/accounts/${id}/dm`),
-  follow: (id: string, target: string) =>
-    api.post(`/api/instagram/accounts/${id}/follow`, { target }),
-  unfollow: (id: string, target: string) =>
-    api.post(`/api/instagram/accounts/${id}/unfollow`, { target }),
-  scrapeFollowers: (id: string, target: string, limit?: number) =>
-    api.post(`/api/instagram/accounts/${id}/scrape/followers`, { target, limit: limit || 100 }),
-  scrapeHashtag: (id: string, hashtag: string, limit?: number) =>
-    api.post(`/api/instagram/accounts/${id}/scrape/hashtag`, { hashtag, limit: limit || 100 }),
-  scrapePostLikers: (id: string, post_url: string, limit?: number) =>
-    api.post(`/api/instagram/accounts/${id}/scrape/post`, { post_url, limit: limit || 100 }),
-  publishPost: (id: string, image_url: string, caption: string) =>
-    api.post(`/api/instagram/accounts/${id}/post`, { image_url, caption }),
-  listTargets: (params?: { platform?: string; source?: string; search?: string }) =>
-    api.get("/api/instagram/targets", { params }),
-  listDMs: (accountId?: string) =>
-    api.get("/api/instagram/dms", { params: accountId ? { account_id: accountId } : {} }),
-};
 
 // ─── TikTok ─────────────────────────────────────────────────────────────────
 

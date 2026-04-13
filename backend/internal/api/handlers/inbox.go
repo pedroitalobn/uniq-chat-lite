@@ -41,8 +41,6 @@ type InboxMessage struct {
 	Timestamp  int64  `json:"timestamp"`
 	Status     string `json:"status"`
 	Type       string `json:"type"`
-	SenderJID  string `json:"sender_jid,omitempty"`
-	SenderName string `json:"sender_name,omitempty"`
 	IsPinned   *bool  `json:"is_pinned,omitempty"`
 	IsFavorite *bool  `json:"is_favorite,omitempty"`
 	IsArchived *bool  `json:"is_archived,omitempty"`
@@ -87,7 +85,7 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 		isArchivedVal := true
 		isArchived = &isArchivedVal
 	case "unread":
-		// Filter handled via WHERE clause added below
+		// Unread filter handled separately
 	}
 
 	type rawChat struct {
@@ -95,7 +93,6 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 		Content       string `gorm:"column:content"`
 		MaxTime       string `gorm:"column:max_time"`
 		MsgCount      int64  `gorm:"column:cnt"`
-		UnreadCount   int64  `gorm:"column:unread_cnt"`
 		ContactName   string `gorm:"column:contact_name"`
 		ContactAvatar string `gorm:"column:contact_avatar"`
 		Direction     string `gorm:"column:direction"`
@@ -120,8 +117,8 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 		excludeSelf = "AND SUBSTR(to_j_id, 1, INSTR(to_j_id, '@') - 1) != '" + instancePhoneNormalized + "'"
 	}
 
-	// Base filter conditions - include LID contacts too (WhatsApp may change JID format)
-	baseWhere := "instance_id = ? AND to_j_id != '' " + excludeSelf + " AND to_j_id NOT LIKE '%@newsletter%' AND to_j_id != 'status@broadcast' AND is_deleted = 0"
+	// Base filter conditions
+	baseWhere := "instance_id = ? AND to_j_id != '' " + excludeSelf + " AND to_j_id NOT LIKE '%@newsletter%' AND to_j_id NOT LIKE '%@lid%' AND to_j_id != 'status@broadcast' AND is_deleted = 0"
 
 	// Add filter conditions
 	if isFavorite != nil {
@@ -130,73 +127,61 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 	if isArchived != nil {
 		baseWhere += " AND is_archived = 1"
 	}
-	if filter == "unread" {
-		// Filter handled in post-processing - show chats with unread_cnt > 0
-	}
 
-	// Simplified query: get latest message per chat using subquery
+	// Simple query: get latest message per phone number using window function
 	// Include groups (@g.us) but filter out newsletter
 	query := `
-		SELECT 
-			ml.to_j_id,
-			ml.content,
-			ml.created_at as max_time,
-			(
-				SELECT COUNT(*) FROM message_logs ml2 
-				WHERE ml2.instance_id = ml.instance_id 
-				AND ml2.to_j_id = ml.to_j_id 
-				AND ml2.is_deleted = 0
-			) as cnt,
-			(
-				SELECT COUNT(*) FROM message_logs ml2 
-				WHERE ml2.instance_id = ml.instance_id 
-				AND ml2.to_j_id = ml.to_j_id 
-				AND ml2.direction = 'in' 
-				AND ml2.status != 'read'
-				AND ml2.is_deleted = 0
-			) as unread_cnt,
-			ml.contact_name,
-			ml.contact_avatar,
-			ml.direction
-		FROM message_logs ml
-		WHERE ` + baseWhere + `
-		AND ml.created_at = (
-			SELECT MAX(ml3.created_at) FROM message_logs ml3 
-			WHERE ml3.instance_id = ml.instance_id 
-			AND ml3.to_j_id = ml.to_j_id 
-			AND ml3.is_deleted = 0
+		SELECT to_j_id, content, created_at as max_time, cnt, contact_name, contact_avatar, direction
+		FROM (
+			SELECT *,
+				ROW_NUMBER() OVER (PARTITION BY 
+					CASE 
+						WHEN to_j_id LIKE '%@g.us' THEN to_j_id  -- groups kept as-is
+						ELSE SUBSTR(to_j_id, 1, CASE WHEN INSTR(to_j_id, '@') > 0 THEN INSTR(to_j_id, '@') - 1 ELSE LENGTH(to_j_id) END)  -- normalize phones
+					END
+				ORDER BY created_at DESC) as rn,
+				COUNT(*) OVER (PARTITION BY 
+					CASE 
+						WHEN to_j_id LIKE '%@g.us' THEN to_j_id
+						ELSE SUBSTR(to_j_id, 1, CASE WHEN INSTR(to_j_id, '@') > 0 THEN INSTR(to_j_id, '@') - 1 ELSE LENGTH(to_j_id) END)
+					END
+				) as cnt
+			FROM message_logs
+			WHERE ` + baseWhere + `
 		)
-		ORDER BY ml.created_at DESC
+		WHERE rn = 1
+		ORDER BY created_at DESC
 		LIMIT 50
 	`
 
 	params := []interface{}{instance.ID}
 
 	if search != "" {
-		searchWhere := baseWhere + " AND (to_j_id LIKE ? OR contact_name LIKE ?)"
-		searchTerm := "%" + search + "%"
+		searchWhere := baseWhere + " AND to_j_id LIKE ?"
 		query = `
-			SELECT 
-				ml.to_j_id,
-				ml.content,
-				ml.created_at as max_time,
-				(SELECT COUNT(*) FROM message_logs ml2 WHERE ml2.instance_id = ml.instance_id AND ml2.to_j_id = ml.to_j_id AND ml2.is_deleted = 0) as cnt,
-				(SELECT COUNT(*) FROM message_logs ml2 WHERE ml2.instance_id = ml.instance_id AND ml2.to_j_id = ml.to_j_id AND ml2.direction = 'in' AND ml2.status != 'read' AND ml2.is_deleted = 0) as unread_cnt,
-				ml.contact_name,
-				ml.contact_avatar,
-				ml.direction
-			FROM message_logs ml
-			WHERE ` + searchWhere + `
-			AND ml.created_at = (
-				SELECT MAX(ml3.created_at) FROM message_logs ml3 
-				WHERE ml3.instance_id = ml.instance_id 
-				AND ml3.to_j_id = ml.to_j_id 
-				AND ml3.is_deleted = 0
+			SELECT to_j_id, content, created_at as max_time, cnt, contact_name, contact_avatar, direction
+			FROM (
+				SELECT *,
+					ROW_NUMBER() OVER (PARTITION BY 
+						CASE 
+							WHEN to_j_id LIKE '%@g.us' THEN to_j_id
+							ELSE SUBSTR(to_j_id, 1, CASE WHEN INSTR(to_j_id, '@') > 0 THEN INSTR(to_j_id, '@') - 1 ELSE LENGTH(to_j_id) END)
+						END
+					ORDER BY created_at DESC) as rn,
+					COUNT(*) OVER (PARTITION BY 
+						CASE 
+							WHEN to_j_id LIKE '%@g.us' THEN to_j_id
+							ELSE SUBSTR(to_j_id, 1, CASE WHEN INSTR(to_j_id, '@') > 0 THEN INSTR(to_j_id, '@') - 1 ELSE LENGTH(to_j_id) END)
+						END
+					) as cnt
+				FROM message_logs
+				WHERE ` + searchWhere + `
 			)
-			ORDER BY ml.created_at DESC
+			WHERE rn = 1
+			ORDER BY created_at DESC
 			LIMIT 50
 		`
-		params = []interface{}{instance.ID, searchTerm, searchTerm}
+		params = append(params, "%"+search+"%")
 	}
 
 	h.db.Raw(query, params...).Scan(&rawChatsResult)
@@ -266,20 +251,9 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 			Avatar:      rc.ContactAvatar,
 			LastMessage: truncateMessage(lastMsg, 60),
 			LastTime:    rc.MaxTime,
-			UnreadCount: int(rc.UnreadCount),
+			UnreadCount: int(rc.MsgCount),
 			IsGroup:     isGroup,
 		})
-	}
-
-	// Post-process filter: remove non-unread chats when filter="unread"
-	if filter == "unread" {
-		filtered := make([]InboxChat, 0)
-		for _, chat := range chats {
-			if chat.UnreadCount > 0 {
-				filtered = append(filtered, chat)
-			}
-		}
-		chats = filtered
 	}
 
 	return c.JSON(fiber.Map{
@@ -446,13 +420,9 @@ func (h *InboxHandler) GetMessages(c *fiber.Ctx) error {
 	offset := c.QueryInt("offset", 0)
 	before := c.Query("before", "")
 
-	// Normalize JID: extract phone number from any JID format
-	phone := strings.Split(jid, "@")[0]
-
 	var logs []models.MessageLog
-	// Filter by to_j_id - try exact match first, then normalized for LID
-	// This handles cases where WhatsApp changes JID to LID format
-	query := h.db.Where("instance_id = ? AND (to_j_id = ? OR to_j_id LIKE ?) AND is_deleted = ?", instance.ID, jid, phone+"@%", false).
+	// Filter by to_j_id and exclude deleted messages
+	query := h.db.Where("instance_id = ? AND to_j_id = ? AND is_deleted = ?", instance.ID, jid, false).
 		Order("created_at DESC")
 
 	if before != "" {
@@ -486,8 +456,6 @@ func (h *InboxHandler) GetMessages(c *fiber.Ctx) error {
 			Timestamp:  timestamp,
 			Status:     string(log.Status),
 			Type:       log.Type,
-			SenderJID:  log.SenderJID,
-			SenderName: log.SenderName,
 			IsPinned:   boolPtr(log.IsPinned),
 			IsFavorite: boolPtr(log.IsFavorite),
 			IsArchived: boolPtr(log.IsArchived),
@@ -730,18 +698,8 @@ func (h *InboxHandler) Typing(c *fiber.Ctx) error {
 
 // UpdateContact updates a contact's CRM info from inbox
 func (h *InboxHandler) UpdateContact(c *fiber.Ctx) error {
-	rawUserID := c.Locals("user_id")
-	var userID uuid.UUID
-	switch v := rawUserID.(type) {
-	case uuid.UUID:
-		userID = v
-	case string:
-		parsed, err := uuid.Parse(v)
-		if err != nil {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autorizado"})
-		}
-		userID = parsed
-	default:
+	userID, ok := c.Locals("user_id").(string)
+	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autorizado"})
 	}
 
@@ -756,14 +714,14 @@ func (h *InboxHandler) UpdateContact(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		Name    *string  `json:"name"`
-		Phone   *string  `json:"phone"`
-		Email   *string  `json:"email"`
-		Notes   *string  `json:"notes"`
-		Funnel  *string  `json:"funnel"`
-		Stage   *string  `json:"stage"`
-		Journey *string  `json:"journey"`
-		Owner   *string  `json:"owner"`
+		Name    string   `json:"name"`
+		Phone   string   `json:"phone"`
+		Email   string   `json:"email"`
+		Notes   string   `json:"notes"`
+		Funnel  string   `json:"funnel"`
+		Stage   string   `json:"stage"`
+		Journey string   `json:"journey"`
+		Owner   string   `json:"owner"`
 		TagIDs  []string `json:"tag_ids"`
 	}
 	if err := c.BodyParser(&req); err != nil {
@@ -771,40 +729,38 @@ func (h *InboxHandler) UpdateContact(c *fiber.Ctx) error {
 	}
 
 	updates := map[string]interface{}{}
-	if req.Name != nil {
-		updates["name"] = strings.TrimSpace(*req.Name)
+	if req.Name != "" {
+		updates["name"] = req.Name
 	}
-	if req.Phone != nil {
-		updates["phone"] = strings.TrimSpace(*req.Phone)
+	if req.Phone != "" {
+		updates["phone"] = req.Phone
 	}
-	if req.Email != nil {
-		updates["email"] = strings.TrimSpace(*req.Email)
+	if req.Email != "" {
+		updates["email"] = req.Email
 	}
-	if req.Notes != nil {
-		updates["notes"] = *req.Notes
+	if req.Notes != "" {
+		updates["notes"] = req.Notes
 	}
-	if req.Funnel != nil {
-		updates["funnel"] = strings.TrimSpace(*req.Funnel)
+	if req.Funnel != "" {
+		updates["funnel"] = req.Funnel
 	}
-	if req.Stage != nil {
-		updates["stage"] = strings.TrimSpace(*req.Stage)
+	if req.Stage != "" {
+		updates["stage"] = req.Stage
 	}
-	if req.Journey != nil {
-		updates["journey"] = strings.TrimSpace(*req.Journey)
+	if req.Journey != "" {
+		updates["journey"] = req.Journey
 	}
-	if req.Owner != nil {
-		updates["owner"] = strings.TrimSpace(*req.Owner)
+	if req.Owner != "" {
+		updates["owner"] = req.Owner
 	}
 
 	if len(updates) > 0 {
 		h.db.Model(&contact).Updates(updates)
 	}
 
-	if req.TagIDs != nil {
+	if len(req.TagIDs) > 0 {
 		var tags []models.Tag
-		if len(req.TagIDs) > 0 {
-			h.db.Where("id IN ? AND user_id = ?", req.TagIDs, userID).Find(&tags)
-		}
+		h.db.Where("id IN ? AND user_id = ?", req.TagIDs, userID).Find(&tags)
 		h.db.Model(&contact).Association("Tags").Replace(tags)
 	}
 

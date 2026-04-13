@@ -37,7 +37,7 @@ var ChannelMeta = map[ChannelType]struct {
 	Description string
 }{
 	ChannelWhatsApp:  {Label: "WhatsApp", Color: "#25d366", Description: "Conecte números WhatsApp via QR ou código de pareamento"},
-	ChannelInstagram: {Label: "Instagram", Color: "#e1306c", Description: "Conecte Instagram e gerencie DMs via instagram-cli"},
+	ChannelInstagram: {Label: "Instagram", Color: "#e1306c", Description: "Conecte Instagram e gerencie DMs via instagram-private-api"},
 	ChannelTelegram:  {Label: "Telegram", Color: "#229ed9", Description: "Crie bots e gerencie mensagens via Telegram Bot API"},
 	ChannelLinkedIn:  {Label: "LinkedIn", Color: "#0a66c2", Description: "Automatize mensagens e InMails via LinkedIn API"},
 	ChannelTikTok:    {Label: "TikTok", Color: "#ff0050", Description: "Mensagens diretas e comentários via TikTok"},
@@ -117,6 +117,12 @@ type Instance struct {
 	UpdatedAt time.Time `json:"updated_at"`
 
 	WABA *WABAInstance `gorm:"foreignKey:InstanceID" json:"waba,omitempty"`
+
+	InstagramUsername string     `gorm:"type:varchar(100)" json:"instagram_username,omitempty"`
+	InstagramSession  string     `gorm:"type:text" json:"-"`
+	InstagramDeviceID string     `gorm:"type:varchar(100)" json:"instagram_device_id,omitempty"`
+	IsPaused          bool       `gorm:"default:false" json:"is_paused"`
+	LastMessageAt     *time.Time `json:"last_message_at,omitempty"`
 }
 
 func (i *Instance) BeforeCreate(tx *gorm.DB) error {

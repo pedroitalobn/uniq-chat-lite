@@ -51,8 +51,9 @@ type Config struct {
 	BrightDataHost       string
 	BrightDataPort       int
 
-	// Taktik — Instagram/TikTok automation
-	TaktikBaseURL string
+	// Bridges — social channel automation
+	TaktikBaseURL    string
+	InstagramBaseURL string
 
 	// Meta — WhatsApp Business API (WABA)
 	MetaAppID              string
@@ -114,8 +115,9 @@ func Load() *Config {
 		BrightDataHost:       getEnv("BRIGHTDATA_HOST", "brd.superproxy.io"),
 		BrightDataPort:       getEnvInt("BRIGHTDATA_PORT", 33335),
 
-		// Taktik — Instagram/TikTok automation
-		TaktikBaseURL: getEnv("TAKTIK_BASE_URL", "http://localhost:8090"),
+		// Bridges — social channel automation
+		TaktikBaseURL:    getEnv("TAKTIK_BASE_URL", "http://localhost:8090"),
+		InstagramBaseURL: getEnv("INSTAGRAM_BRIDGE_URL", "http://localhost:8091"),
 
 		// Meta — WhatsApp Business API (WABA)
 		MetaAppID:              getEnv("META_APP_ID", ""),
