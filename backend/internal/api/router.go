@@ -91,6 +91,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	emailSvc := email.New(
 		config.AppConfig.ResendAPIKey,
 		config.AppConfig.FromEmail,
+		config.AppConfig.MailerooSenderName,
 		config.AppConfig.AppName,
 		config.AppConfig.AppURL,
 	)

@@ -40,6 +40,7 @@ func (h *ContactHandler) ListContacts(c *fiber.Ctx) error {
 	stage := c.Query("stage")
 	journey := c.Query("journey")
 	owner := c.Query("owner")
+	ownerID := c.Query("owner_id")
 	externalID := c.Query("external_id")
 	workspaceID := c.Query("workspace_id")
 	limit := c.QueryInt("limit", 50)
@@ -70,7 +71,12 @@ func (h *ContactHandler) ListContacts(c *fiber.Ctx) error {
 		query = query.Where("journey = ?", journey)
 	}
 	if owner != "" {
-		query = query.Where("owner = ?", owner)
+		query = query.Joins("LEFT JOIN users owner_users ON owner_users.id = contacts.owner_id").Where("owner_users.name ILIKE ?", "%"+owner+"%")
+	}
+	if ownerID != "" {
+		if oid, err := uuid.Parse(ownerID); err == nil {
+			query = query.Where("owner_id = ?", oid)
+		}
 	}
 	if externalID != "" {
 		query = query.Where("external_id = ?", externalID)
@@ -104,7 +110,7 @@ func (h *ContactHandler) CreateContact(c *fiber.Ctx) error {
 		Stage       string `json:"stage"`
 		Journey     string `json:"journey"`
 		ExternalID  string `json:"external_id"`
-		Owner       string `json:"owner"`
+		OwnerID     string `json:"owner_id"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.Name == "" || req.Phone == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campos 'name' e 'phone' são obrigatórios"})
@@ -120,11 +126,15 @@ func (h *ContactHandler) CreateContact(c *fiber.Ctx) error {
 		Stage:      req.Stage,
 		Journey:    req.Journey,
 		ExternalID: req.ExternalID,
-		Owner:      req.Owner,
 	}
 	if req.WorkspaceID != "" {
 		if wid, err := uuid.Parse(req.WorkspaceID); err == nil {
 			contact.WorkspaceID = &wid
+		}
+	}
+	if req.OwnerID != "" {
+		if oid, err := uuid.Parse(req.OwnerID); err == nil {
+			contact.OwnerID = &oid
 		}
 	}
 	if err := h.db.Create(&contact).Error; err != nil {
@@ -170,7 +180,7 @@ func (h *ContactHandler) UpdateContact(c *fiber.Ctx) error {
 		Stage      string `json:"stage"`
 		Journey    string `json:"journey"`
 		ExternalID string `json:"external_id"`
-		Owner      string `json:"owner"`
+		OwnerID    string `json:"owner_id"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -183,13 +193,17 @@ func (h *ContactHandler) UpdateContact(c *fiber.Ctx) error {
 		"stage":       req.Stage,
 		"journey":     req.Journey,
 		"external_id": req.ExternalID,
-		"owner":       req.Owner,
 	}
 	if req.Name != "" {
 		updates["name"] = req.Name
 	}
 	if req.Phone != "" {
 		updates["phone"] = req.Phone
+	}
+	if req.OwnerID != "" {
+		if oid, err := uuid.Parse(req.OwnerID); err == nil {
+			updates["owner_id"] = oid
+		}
 	}
 	h.db.Model(&contact).Updates(updates)
 	h.db.Preload("Tags").First(&contact)
