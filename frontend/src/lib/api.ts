@@ -2,8 +2,9 @@ import axios from "axios";
 import { getSession } from "next-auth/react";
 
 const api = axios.create({
-  baseURL: "http://localhost:8080",
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080",
   withCredentials: true,
+  timeout: 20000,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -23,41 +24,79 @@ async function getCachedSession() {
   if (cachedSession?.accessToken) {
     return cachedSession;
   }
-  
-  // If there's already a pending request, wait for it
+
   if (sessionFetchPromise) {
     return sessionFetchPromise;
   }
-  
-  // Start a new request
+
+  const sessionStart = performance.now();
   sessionFetchPromise = getSession().then((session) => {
     cachedSession = session;
+    if (session?.accessToken) {
+      memoryToken = session.accessToken;
+    }
     return session;
   }).finally(() => {
+    const elapsed = Math.round(performance.now() - sessionStart);
+    if (elapsed > 500) {
+      console.warn(`[api] getSession slow: ${elapsed}ms`);
+    }
     sessionFetchPromise = null;
   });
-  
+
   return sessionFetchPromise;
+}
+
+async function getSessionWithTimeout(timeoutMs = 1200) {
+  const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs));
+  const session = await Promise.race([getCachedSession(), timeout]);
+  return session as { accessToken?: string } | null;
 }
 
 // Attach JWT token from session or memory
 api.interceptors.request.use(async (config) => {
+  const startedAt = performance.now();
+  (config as any).metadata = { startedAt };
+
   if (memoryToken) {
     config.headers.Authorization = `Bearer ${memoryToken}`;
     return config;
   }
-  const session = await getCachedSession();
+
+  // Do not block requests too long waiting for /api/auth/session
+  const session = await getSessionWithTimeout(1200);
   if (session?.accessToken) {
     config.headers.Authorization = `Bearer ${session.accessToken}`;
   }
+
   return config;
 });
 
 // Auto-refresh on 401 with concurrency lock
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    const startedAt = (res.config as any)?.metadata?.startedAt;
+    if (startedAt) {
+      const elapsed = Math.round(performance.now() - startedAt);
+      if (elapsed > 1200) {
+        console.warn(`[api] slow request ${res.config.method?.toUpperCase()} ${res.config.url}: ${elapsed}ms`);
+      }
+    }
+    return res;
+  },
   async (error) => {
     const originalRequest = error.config;
+
+    if (originalRequest?.metadata?.startedAt) {
+      const elapsed = Math.round(performance.now() - originalRequest.metadata.startedAt);
+      if (elapsed > 1200) {
+        const code = error?.code || "UNKNOWN";
+        const message = error?.message || "unknown error";
+        const baseURL = originalRequest?.baseURL || "";
+        console.warn(`[api] failed/slow request ${originalRequest.method?.toUpperCase()} ${originalRequest.url}: ${elapsed}ms status=${error.response?.status || "ERR"} code=${code} msg=${message} base=${baseURL}`);
+      }
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
@@ -72,15 +111,21 @@ api.interceptors.response.use(
       }
 
       isRefreshing = true;
+      const refreshStart = performance.now();
       try {
         const refresh = await axios.post(
           `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/auth/refresh`,
           {},
           { withCredentials: true }
         );
+        const refreshElapsed = Math.round(performance.now() - refreshStart);
+        if (refreshElapsed > 500) {
+          console.warn(`[api] refresh token slow: ${refreshElapsed}ms`);
+        }
+
         const newToken = refresh.data.access_token;
         memoryToken = newToken;
-        
+
         isRefreshing = false;
         onRefreshed(newToken);
 
@@ -89,6 +134,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         isRefreshing = false;
         memoryToken = null;
+        cachedSession = null;
         refreshSubscribers = [];
         window.location.href = "/login";
         return Promise.reject(refreshError);
@@ -145,6 +191,7 @@ export const channelsApi = {
 export const proxyPoolsApi = {
   list: () => api.get("/api/proxy/pool"),
   listProviders: () => api.get("/api/proxy/providers"),
+  getGlobalProxies: () => api.get("/api/proxy/global"),
   createProvider: (data: { provider: string; name: string; api_key: string; country?: string }) =>
     api.post("/api/proxy/providers", data),
   updateProvider: (id: string, data: { name?: string; api_key?: string; country?: string; is_active?: boolean }) =>
@@ -221,6 +268,8 @@ export const proxyApi = {
   test: (id: string, data?: Partial<ProxyConfig>) =>
     api.post(`/api/instances/${id}/proxy/test`, data || {}),
   delete: (id: string) => api.delete(`/api/instances/${id}/proxy`),
+  setMode: (id: string, data: { mode: string; global_proxy_id?: string; provider_id?: string }) => 
+    api.put(`/api/instances/${id}/proxy/mode`, data),
 };
 
 export const messagesApi = {
@@ -250,6 +299,8 @@ export const messagesApi = {
     api.post(`/api/instances/${id}/messages/buttons`, data),
   sendList: (id: string, data: { to: string; title?: string; description?: string; button_text: string; footer?: string; sections: { title: string; rows: { id: string; title: string; description?: string }[] }[] }) =>
     api.post(`/api/instances/${id}/messages/list`, data),
+  sendMenu: (id: string, data: { number: string; type: "button"|"list"|"poll"|"carousel"; text: string; choices: string[]; footerText?: string; listButton?: string; selectableCount?: number; imageButton?: string }) =>
+    api.post(`/api/instances/${id}/messages/menu`, data),
 };
 
 export const inboxApi = {
@@ -518,6 +569,7 @@ export const adminApi = {
   listUsers: () => api.get("/api/admin/users"),
   getProxyConfig: () => api.get("/api/admin/proxy-config"),
   updateProxyConfig: (data: Record<string, unknown>) => api.put("/api/admin/proxy-config", data),
+  deleteProxyConfig: (id: string) => api.delete(`/api/admin/proxy-config/${id}`),
   getProxyStats: () => api.get("/api/admin/proxy-stats"),
   createUser: (data: {
     name: string; email: string; username?: string;
@@ -535,6 +587,26 @@ export const adminApi = {
   getPaymentSettings: () => api.get("/api/admin/payment-settings"),
   updatePaymentSettings: (data: Record<string, unknown>) =>
     api.put("/api/admin/payment-settings", data),
+  // Email settings
+  getEmailSettings: () => api.get("/api/admin/email-settings"),
+  updateEmailSettings: (data: {
+    api_key?: string;
+    sender_email?: string;
+    sender_name?: string;
+    is_enabled?: boolean;
+  }) => api.put("/api/admin/email-settings", data),
+  testEmail: (to: string) => api.post("/api/admin/email-settings/test", { to }),
+  listEmailTemplates: () => api.get("/api/admin/email-templates"),
+  getEmailTemplate: (slug: string) => api.get(`/api/admin/email-templates/${slug}`),
+  updateEmailTemplate: (slug: string, data: {
+    subject?: string;
+    html_content?: string;
+    is_active?: boolean;
+  }) => api.put(`/api/admin/email-templates/${slug}`, data),
+  testEmailTemplate: (slug: string, to: string) =>
+    api.post(`/api/admin/email-templates/${slug}/test`, { to }),
+  getEmailLogs: (limit?: number, offset?: number) => 
+    api.get("/api/admin/email-logs", { params: { limit, offset } }),
 };
 
 export const plansApi = {
