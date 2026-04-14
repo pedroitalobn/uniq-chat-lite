@@ -207,6 +207,16 @@ function InstanceCard({
               {serverName}
             </span>
           )}
+          {instance.use_global_proxy && instance.proxy_status === "ok" && (
+            <span className="status-badge" style={{
+              background: "rgba(0,212,106,0.08)",
+              color: "#00d46a",
+              borderColor: "rgba(0,212,106,0.18)",
+            }}>
+              <Globe className="w-3 h-3" />
+              Global {instance.global_proxy?.name || ""}
+            </span>
+          )}
           {instance.proxy_enabled && instance.proxy_status === "ok" && (
             instance.proxy_mode === "residencial" ? (
               <span className="status-badge" style={{

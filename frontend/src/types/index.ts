@@ -36,6 +36,21 @@ export interface ProxyPool {
   max_instances?: number;
 }
 
+export interface GlobalProxyConfig {
+  id: string;
+  name: string;
+  enabled: boolean;
+  is_default?: boolean;
+  provider: string;
+  proxy_type: string;
+  host: string;
+  port: number;
+  username: string;
+  use_env: boolean;
+  is_active: boolean;
+  country: string;
+}
+
 export interface ProxyProviderConfig {
   id: string;
   user_id: string;
@@ -123,6 +138,7 @@ export interface Instance {
   proxy_pool_id?: string;
   use_global_proxy?: boolean;
   global_proxy_id?: string;
+  global_proxy?: GlobalProxyConfig;
   connected_at?: string;
   // MCP
   mcp_enabled: boolean;

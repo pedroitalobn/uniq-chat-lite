@@ -11,7 +11,7 @@ import {
   RefreshCw, Bot, ChevronDown, ChevronUp, Image, FileText, Music,
   Video, MapPin, User, Smile, BarChart2, Sticker, MessageSquareText,
   MousePointerClick, ShieldAlert, Camera, Users, Phone, RotateCcw, Download,
-  Eye, EyeOff,
+  Eye, EyeOff, Lock, LogIn, List, LayoutGrid,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -614,10 +614,11 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
   const [igPasswordVisible, setIgPasswordVisible] = useState(false);
   const [showIgLogin, setShowIgLogin] = useState(false);
   // Challenge states
-  const [igChallenge, setIgChallenge] = useState<{ api_path: string; options: string[]; challenge_type: string } | null>(null);
+  const [igChallenge, setIgChallenge] = useState<{ api_path: string; options: string[]; challenge_type: string; phone_mask?: string; email_mask?: string; can_resend?: boolean; external_verification?: boolean; message?: string } | null>(null);
   const [igChallengeCode, setIgChallengeCode] = useState("");
+  const [igChallengeMethod, setIgChallengeMethod] = useState<"email" | "phone">("phone");
   const [igChallengeLoading, setIgChallengeLoading] = useState(false);
-  const [msgType, setMsgType] = useState<"text"|"image"|"document"|"audio"|"video"|"location"|"contact"|"reaction"|"poll"|"sticker"|"buttons">("text");
+  const [msgType, setMsgType] = useState<"text"|"image"|"document"|"audio"|"video"|"location"|"contact"|"reaction"|"poll"|"sticker"|"buttons"|"list"|"carousel">("text");
   const [recipient, setRecipient] = useState("");
   const [sending, setSending] = useState(false);
   // per-type fields
@@ -637,8 +638,16 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
   // buttons
   const [btnBody, setBtnBody] = useState("");
   const [btnFooter, setBtnFooter] = useState("");
-  const [btnItems, setBtnItems] = useState("Sim\nNão\nTalvez");
+  const [btnItems, setBtnItems] = useState("Sim|sim\nNão|não\nTalvez|talvez");
   // list
+  const [listText, setListText] = useState("");
+  const [listButton, setListButton] = useState("Ver opções");
+  const [listFooter, setListFooter] = useState("");
+  const [listChoices, setListChoices] = useState("[Seção 1]\nItem 1|id1|Descrição 1\nItem 2|id2|Descrição 2\n[Seção 2]\nItem 3|id3");
+  // carousel
+  const [carouselText, setCarouselText] = useState("");
+  const [carouselFooter, setCarouselFooter] = useState("");
+  const [carouselChoices, setCarouselChoices] = useState("[Cartão 1]\n{https://exemplo.com/imagem1.jpg}\nVer mais|https://exemplo.com\n[Cartão 2]\n{https://exemplo.com/imagem2.jpg}\nComprar|https://loja.exemplo.com");
 
   const isWhatsApp = !instance?.channel || instance.channel === "whatsapp";
   const isInstagram = instance?.channel === "instagram";
@@ -695,14 +704,21 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
       instancesApi.instagramLogin(instanceId, creds),
     onSuccess: (res) => {
       // Check if it's a challenge response
-      const data = res as unknown as { data?: { challenge_type?: string; api_path?: string; options?: string[] } };
+      const data = res as unknown as { data?: { challenge_type?: string; api_path?: string; options?: string[]; phone_mask?: string; email_mask?: string; can_resend?: boolean; external_verification?: boolean; message?: string } };
       if (data?.data?.challenge_type) {
+        const options = data.data.options || ["phone"];
+        setIgChallengeMethod(options.includes("phone") ? "phone" : "email");
         setIgChallenge({
           challenge_type: data.data.challenge_type,
           api_path: data.data.api_path || "",
-          options: data.data.options || ["email", "phone"],
+          options,
+          phone_mask: data.data.phone_mask,
+          email_mask: data.data.email_mask,
+          can_resend: data.data.can_resend,
+          external_verification: data.data.external_verification,
+          message: data.data.message,
         });
-        toast.info("Verificação necessária - inserir código");
+        toast.info(data.data.external_verification ? "Verificação externa necessária" : "Verificação necessária - inserir código");
       } else {
         toast.success("Conectado ao Instagram!");
         queryClient.invalidateQueries({ queryKey: ["instance", instanceId] });
@@ -718,12 +734,21 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
       const challengeData = errData?.response?.data?.data;
       // Check if it's a challenge error
       if (errMsg === "challenge_required" && challengeData) {
+        const options = (challengeData.options as string[]) || ["phone"];
+        const isExternal = (challengeData.external_verification as boolean) || 
+                          (challengeData.challenge_type === "external" || challengeData.challenge_type === "email_recovery");
+        setIgChallengeMethod(options.includes("phone") ? "phone" : "email");
         setIgChallenge({
           challenge_type: (challengeData.challenge_type as string) || "code",
           api_path: (challengeData.api_path as string) || "",
-          options: (challengeData.options as string[]) || ["email", "phone"],
+          options,
+          phone_mask: challengeData.phone_mask as string | undefined,
+          email_mask: challengeData.email_mask as string | undefined,
+          can_resend: challengeData.can_resend as boolean | undefined,
+          external_verification: isExternal,
+          message: challengeData.message as string | undefined,
         });
-        toast.info("Verificação necessária - inserir código");
+        toast.info(isExternal ? "Verificação externa necessária" : "Verificação necessária - inserir código");
       } else {
         const msg = errMsg || "Erro ao conectar";
         toast.error(msg);
@@ -749,6 +774,18 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
     },
   });
 
+  const instagramChallengeResendMutation = useMutation({
+    mutationFn: (data: { api_path: string; method?: string }) =>
+      instancesApi.instagramChallengeResend(instanceId, data),
+    onSuccess: () => {
+      toast.success("Código reenviado");
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao reenviar código";
+      toast.error(msg);
+    },
+  });
+
   const canSend = (): boolean => {
     if (!recipient.trim()) return false;
     switch (msgType) {
@@ -760,7 +797,8 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
       case "reaction": return !!reactionMsgId.trim() && !!emoji.trim();
       case "poll":     return !!pollQuestion.trim() && pollOptions.split("\n").filter(Boolean).length >= 2;
       case "buttons":  return !!btnBody.trim() && btnItems.split("\n").filter(Boolean).length >= 1;
-
+      case "list":     return !!listText.trim() && listChoices.split("\n").filter(Boolean).length >= 1;
+      case "carousel": return !!carouselText.trim() && carouselChoices.split("\n").filter(Boolean).length >= 1;
       default:         return true;
     }
   };
@@ -803,6 +841,29 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
         case "buttons": {
           const buttons = btnItems.split("\n").filter(Boolean).slice(0, 3).map((t, i) => ({ id: `btn_${i}`, text: t.trim() }));
           await messagesApi.sendButtons(instanceId, { to: recipient, body: btnBody, footer: btnFooter || undefined, buttons });
+          break;
+        }
+        case "list": {
+          const choices = listChoices.split("\n").filter(Boolean);
+          await messagesApi.sendMenu(instanceId, {
+            number: recipient,
+            type: "list",
+            text: listText,
+            choices,
+            listButton: listButton || "Ver opções",
+            footerText: listFooter || undefined,
+          });
+          break;
+        }
+        case "carousel": {
+          const choices = carouselChoices.split("\n").filter(Boolean);
+          await messagesApi.sendMenu(instanceId, {
+            number: recipient,
+            type: "carousel",
+            text: carouselText,
+            choices,
+            footerText: carouselFooter || undefined,
+          });
           break;
         }
       }
@@ -1031,7 +1092,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
             <Globe className="w-4 h-4 flex-shrink-0" style={{ color: instance.proxy_status === "ok" ? "#60a5fa" : "#fb923c" }} />
             <div>
               <p className="text-xs font-medium" style={{ color: "hsl(240 15% 80%)" }}>
-                Proxy {instance.proxy_status === "ok" ? "ativo" : "com erro"}
+                {instance.use_global_proxy ? `Proxy Global (${instance.global_proxy?.name || "global"})` : `Proxy ${instance.proxy_status === "ok" ? "ativo" : "com erro"}`}
               </p>
               {instance.proxy_status === "ok" && instance.proxy_external_ip && (
                 <p className="text-xs font-mono" style={{ color: "hsl(240 8% 46%)" }}>IP: {instance.proxy_external_ip}</p>
@@ -1060,7 +1121,8 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
               QR Code
             </button>
           )}
-          {isSocial && instance.status !== "connected" && (
+          {/* Instagram/TikTok - Connect button */}
+          {isSocial && instance.status !== "connected" && !isWhatsApp && (
             <button
               onClick={() => isInstagram ? setShowIgLogin(true) : reconnectMutation.mutate()}
               disabled={reconnectMutation.isPending}
@@ -1138,6 +1200,8 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                 { id: "poll",     label: "Enquete",    icon: BarChart2 },
                 { id: "sticker",  label: "Sticker",    icon: Sticker },
                 { id: "buttons",  label: "Botões",     icon: MousePointerClick },
+                { id: "list",     label: "Lista",      icon: List },
+                { id: "carousel", label: "Carrossel",  icon: LayoutGrid },
               ] as { id: typeof msgType; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
                 <button key={id} onClick={() => setMsgType(id)}
                   className="flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg transition-all"
@@ -1219,8 +1283,42 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
               <input value={btnFooter} onChange={e => setBtnFooter(e.target.value)}
                 placeholder="Rodapé (opcional)" className="input-field w-full" />
               <textarea value={btnItems} onChange={e => setBtnItems(e.target.value)}
-                rows={3} placeholder={"Sim\nNão\nTalvez"} className="input-field w-full resize-none" />
-              <p className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>Um botão por linha · máximo 3</p>
+                rows={3} placeholder={"Sim|sim\nNão|não\nTalvez|talvez"} className="input-field w-full resize-none" />
+              <p className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>Um botão por linha · formato: texto|id · máximo 3</p>
+            </div>
+          )}
+          {msgType === "list" && (
+            <div className="space-y-3">
+              <textarea value={listText} onChange={e => setListText(e.target.value)}
+                rows={2} placeholder="Texto principal da mensagem" className="input-field w-full resize-none" />
+              <div className="flex gap-2">
+                <input value={listButton} onChange={e => setListButton(e.target.value)}
+                  placeholder="Texto do botão" className="input-field flex-1" />
+                <input value={listFooter} onChange={e => setListFooter(e.target.value)}
+                  placeholder="Rodapé (opcional)" className="input-field flex-1" />
+              </div>
+              <textarea value={listChoices} onChange={e => setListChoices(e.target.value)}
+                rows={6} placeholder={"[Seção 1]\nItem 1|id1|Descrição 1\nItem 2|id2\n[Seção 2]\nItem 3|id3|Descrição 3"} className="input-field w-full resize-none font-mono text-xs" />
+              <div className="rounded-lg p-2.5" style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.2)" }}>
+                <p className="text-[10px]" style={{ color: "hsl(217, 91%, 75%)" }}>
+                  📋 Formato: <span className="font-mono">[Título da Seção]</span> para seções, <span className="font-mono">titulo|id|descricao</span> para itens
+                </p>
+              </div>
+            </div>
+          )}
+          {msgType === "carousel" && (
+            <div className="space-y-3">
+              <textarea value={carouselText} onChange={e => setCarouselText(e.target.value)}
+                rows={2} placeholder="Texto principal do carrossel" className="input-field w-full resize-none" />
+              <input value={carouselFooter} onChange={e => setCarouselFooter(e.target.value)}
+                placeholder="Rodapé (opcional)" className="input-field w-full" />
+              <textarea value={carouselChoices} onChange={e => setCarouselChoices(e.target.value)}
+                rows={8} placeholder={"[Cartão 1 - Título]\n{https://exemplo.com/imagem.jpg}\nVer mais|https://exemplo.com\nComprar|call:+5511999999999\n[Cartão 2]\n{https://exemplo.com/img2.jpg}\nInfo|https://loja.exemplo.com"} className="input-field w-full resize-none font-mono text-xs" />
+              <div className="rounded-lg p-2.5" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.2)" }}>
+                <p className="text-[10px]" style={{ color: "hsl(271, 91%, 75%)" }}>
+                  🎠 Formato: <span className="font-mono">[Título]</span> cartão, <span className="font-mono">{"{url}"}</span> imagem, <span className="font-mono">texto|url</span> ou <span className="font-mono">texto|call:numero</span> para botões
+                </p>
+              </div>
             </div>
           )}
 
@@ -1288,42 +1386,62 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
 
       {showIgLogin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setShowIgLogin(false)} />
-          <div className="relative w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-fade-in-up"
+          <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.7)" }} onClick={() => setShowIgLogin(false)} />
+          <div className="relative w-full max-w-sm rounded-2xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto"
             style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Login no Instagram</h2>
-              <button onClick={() => setShowIgLogin(false)} style={{ color: "hsl(240 8% 38%)" }}>
+            {/* Header com ícone Instagram */}
+            <div className="flex flex-col items-center mb-5">
+              <button 
+                onClick={() => setShowIgLogin(false)} 
+                className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                style={{ color: "hsl(240 8% 40%)" }}
+              >
                 <X className="w-5 h-5" />
               </button>
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3" style={{ background: "rgba(225,48,108,0.15)" }}>
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="#e1306c">
+                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+                </svg>
+              </div>
+              <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Login no Instagram</h2>
+              <p className="text-xs mt-1 text-center" style={{ color: "hsl(240 8% 48%)" }}>
+                Digite as credenciais da conta que deseja conectar
+              </p>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* Credentials inputs */}
               <div>
-                <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 48%)" }}>Usuário</label>
-                <input
-                  type="text"
-                  value={igUsername}
-                  onChange={(e) => setIgUsername(e.target.value)}
-                  placeholder="seu_usuario"
-                  className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
-                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
-                />
+                <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>Usuário</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={igUsername}
+                    onChange={(e) => setIgUsername(e.target.value)}
+                    placeholder="seu_usuario"
+                    autoComplete="username"
+                    className="w-full text-sm rounded-xl px-3 py-2.5 pl-10 outline-none"
+                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
+                  />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "hsl(240 8% 40%)" }} />
+                </div>
               </div>
               <div>
-                <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 48)" }}>Senha</label>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>Senha</label>
                 <div className="relative">
                   <input
                     type={igPasswordVisible ? "text" : "password"}
                     value={igPassword}
                     onChange={(e) => setIgPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full text-sm rounded-xl px-3 py-2.5 pr-10 outline-none"
-                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
+                    autoComplete="current-password"
+                    className="w-full text-sm rounded-xl px-3 py-2.5 pl-10 pr-10 outline-none"
+                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
                   />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "hsl(240 8% 40%)" }} />
                   <button
                     type="button"
                     onClick={() => setIgPasswordVisible(!igPasswordVisible)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1"
                     style={{ color: "hsl(240 8% 40%)" }}
                   >
                     {igPasswordVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -1335,52 +1453,200 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                 <button
                   onClick={() => instagramLoginMutation.mutate({ username: igUsername.trim(), password: igPassword })}
                   disabled={!igUsername.trim() || !igPassword.trim() || instagramLoginMutation.isPending}
-                  className="w-full text-sm font-semibold py-2.5 rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                  className="w-full text-sm font-semibold py-3 rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2 mt-2"
                   style={{ background: "#e1306c", color: "white" }}
                 >
-                  {instagramLoginMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {instagramLoginMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
                   {instagramLoginMutation.isPending ? "Conectando..." : "Conectar"}
                 </button>
               )}
 
               {/* Challenge code input */}
               {igChallenge && (
-                <div className="space-y-3 pt-3" style={{ borderTop: "1px solid hsl(240 12% 16%)" }}>
-                  <div className="text-xs font-medium" style={{ color: "#e1306c" }}>
-                    Verificação de segurança
+                <div className="space-y-3 pt-4 mt-4" style={{ borderTop: "1px solid hsl(240 12% 16%)" }}>
+                  {/* Challenge Header */}
+                  <div className="flex items-start gap-3 p-3 rounded-xl" style={{ background: "rgba(225,48,108,0.08)", border: "1px solid rgba(225,48,108,0.2)" }}>
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "rgba(225,48,108,0.15)" }}>
+                      {igChallenge.external_verification ? (
+                        <ShieldAlert className="w-4 h-4" style={{ color: "#e1306c" }} />
+                      ) : igChallenge.challenge_type === "email" ? (
+                        <svg className="w-4 h-4" style={{ color: "#e1306c" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                      ) : igChallenge.challenge_type === "phone" || igChallenge.challenge_type === "sms" ? (
+                        <Phone className="w-4 h-4" style={{ color: "#e1306c" }} />
+                      ) : (
+                        <Lock className="w-4 h-4" style={{ color: "#e1306c" }} />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold mb-0.5" style={{ color: "#e1306c" }}>
+                        {igChallenge.external_verification ? "Verificação externa necessária" : "Código de verificação necessário"}
+                      </p>
+                      <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 62%)" }}>
+                        {igChallenge.external_verification
+                          ? "O Instagram exige que você verifique sua identidade diretamente no app ou site do Instagram."
+                          : igChallenge.challenge_type === "email"
+                          ? `Enviamos um código de 6 dígitos para o email ${igChallenge.email_mask || "cadastrado"}.`
+                          : igChallenge.challenge_type === "phone" || igChallenge.challenge_type === "sms"
+                          ? `Enviamos um código de 6 dígitos para o telefone ${igChallenge.phone_mask || "cadastrado"}.`
+                          : igChallenge.message || "O Instagram pediu confirmação de segurança."}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-xs" style={{ color: "hsl(240 8% 48%)" }}>
-                    O Instagram enviou um código para seu {igChallenge.challenge_type === "email" ? "email" : "número de telefone"}.
-                  </p>
-                  <div>
-                    <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 48%)" }}>Código de verificação</label>
-                    <input
-                      type="text"
-                      value={igChallengeCode}
-                      onChange={(e) => setIgChallengeCode(e.target.value.replace(/\D/g, ""))}
-                      placeholder="000000"
-                      className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
-                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)", letterSpacing: "0.2em", textAlign: "center" as React.CSSProperties["textAlign"] }}
-                      maxLength={6}
-                    />
-                  </div>
-                  <button
-                    onClick={() => instagramChallengeMutation.mutate({ api_path: igChallenge.api_path, code: igChallengeCode })}
-                    disabled={igChallengeCode.length < 6 || instagramChallengeMutation.isPending || igChallengeLoading}
-                    className="w-full text-sm font-semibold py-2.5 rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2"
-                    style={{ background: "#e1306c", color: "white" }}
-                  >
-                    {instagramChallengeMutation.isPending || igChallengeLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                    {instagramChallengeMutation.isPending || igChallengeLoading ? "Verificando..." : "Verificar código"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setIgChallenge(null); setIgChallengeCode(""); }}
-                    className="w-full text-xs py-2"
-                    style={{ color: "hsl(240 8% 48%)" }}
-                  >
-                    ← Voltar ao login
-                  </button>
+
+                  {/* External verification - no code input, just instructions */}
+                  {igChallenge.external_verification ? (
+                    <>
+                      <div className="rounded-xl p-3 space-y-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 16%)" }}>
+                        <p className="text-xs font-medium" style={{ color: "hsl(240 15% 85%)" }}>
+                          📱 Como verificar sua conta:
+                        </p>
+                        <ol className="text-xs space-y-1.5 list-decimal list-inside" style={{ color: "hsl(240 8% 58%)" }}>
+                          <li>Abra o app do Instagram ou acesse <span className="font-mono" style={{ color: "#e1306c" }}>instagram.com</span></li>
+                          <li>Faça login com suas credenciais</li>
+                          <li>Siga as instruções de verificação na tela</li>
+                          <li>Após concluir, volte aqui e clique em "Tentar novamente"</li>
+                        </ol>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setIgChallenge(null); setIgChallengeCode(""); }}
+                        className="w-full text-sm font-semibold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2"
+                        style={{ background: "rgba(255,255,255,0.08)", color: "hsl(240 15% 90%)" }}
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Tentar novamente
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {/* Regular challenge - code input */}
+                      {/* Method selector if multiple options */}
+                      {igChallenge.options && igChallenge.options.length > 1 && (
+                        <div>
+                          <label className="text-xs font-medium block mb-2" style={{ color: "hsl(240 8% 55%)" }}>
+                            Enviar código por:
+                          </label>
+                          <div className="flex gap-2">
+                            {igChallenge.options.includes("phone") && (
+                              <button
+                                type="button"
+                                onClick={() => setIgChallengeMethod("phone")}
+                                className="flex-1 text-xs py-2 px-3 rounded-lg transition-all font-medium"
+                                style={{
+                                  background: igChallengeMethod === "phone" ? "rgba(225,48,108,0.15)" : "rgba(255,255,255,0.04)",
+                                  color: igChallengeMethod === "phone" ? "#e1306c" : "hsl(240 8% 58%)",
+                                  border: igChallengeMethod === "phone" ? "1px solid rgba(225,48,108,0.3)" : "1px solid transparent",
+                                }}
+                              >
+                                📱 SMS
+                              </button>
+                            )}
+                            {igChallenge.options.includes("email") && (
+                              <button
+                                type="button"
+                                onClick={() => setIgChallengeMethod("email")}
+                                className="flex-1 text-xs py-2 px-3 rounded-lg transition-all font-medium"
+                                style={{
+                                  background: igChallengeMethod === "email" ? "rgba(225,48,108,0.15)" : "rgba(255,255,255,0.04)",
+                                  color: igChallengeMethod === "email" ? "#e1306c" : "hsl(240 8% 58%)",
+                                  border: igChallengeMethod === "email" ? "1px solid rgba(225,48,108,0.3)" : "1px solid transparent",
+                                }}
+                              >
+                                ✉️ Email
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Single option info */}
+                      {igChallenge.options && igChallenge.options.length === 1 && (
+                        <p className="text-xs px-3 py-2 rounded-lg" style={{ color: "hsl(240 8% 52%)", background: "rgba(255,255,255,0.03)" }}>
+                          {igChallenge.options[0] === "email"
+                            ? `ℹ️ O Instagram só permitiu verificação por email para ${igChallenge.email_mask || "este email"}.`
+                            : `ℹ️ O Instagram só permitiu verificação por SMS para ${igChallenge.phone_mask || "este telefone"}.`}
+                        </p>
+                      )}
+
+                      {/* Code input field */}
+                      <div>
+                        <label className="text-xs font-medium block mb-2" style={{ color: "hsl(240 8% 55%)" }}>
+                          Código de verificação
+                        </label>
+                        <input
+                          type="text"
+                          value={igChallengeCode}
+                          onChange={(e) => setIgChallengeCode(e.target.value.replace(/\D/g, ""))}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && igChallengeCode.length === 6 && !instagramChallengeMutation.isPending) {
+                              e.preventDefault();
+                              instagramChallengeMutation.mutate({ api_path: igChallenge.api_path, code: igChallengeCode, method: igChallengeMethod });
+                            }
+                          }}
+                          placeholder="000000"
+                          className="w-full text-sm rounded-xl px-3 py-3 outline-none"
+                          style={{
+                            background: "rgba(255,255,255,0.04)",
+                            border: "1px solid hsl(240 12% 16%)",
+                            color: "hsl(240 15% 90%)",
+                            letterSpacing: "0.4em",
+                            textAlign: "center" as React.CSSProperties["textAlign"],
+                            fontSize: "1.25rem",
+                          }}
+                          maxLength={6}
+                        />
+                        <p className="text-xs mt-1.5 text-center" style={{ color: "hsl(240 8% 45%)" }}>
+                          Digite os 6 dígitos recebidos
+                        </p>
+                      </div>
+
+                      {/* Verify button */}
+                      <button
+                        onClick={() => instagramChallengeMutation.mutate({ api_path: igChallenge.api_path, code: igChallengeCode, method: igChallengeMethod })}
+                        disabled={igChallengeCode.length < 6 || instagramChallengeMutation.isPending || igChallengeLoading}
+                        className="w-full text-sm font-semibold py-3 rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                        style={{ background: "#e1306c", color: "white" }}
+                      >
+                        {instagramChallengeMutation.isPending || igChallengeLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Check className="w-4 h-4" />
+                        )}
+                        {instagramChallengeMutation.isPending || igChallengeLoading ? "Verificando..." : "Verificar código"}
+                      </button>
+
+                      {/* Resend button */}
+                      {igChallenge.can_resend && !!igChallenge.api_path && igChallenge.options && igChallenge.options.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => instagramChallengeResendMutation.mutate({ api_path: igChallenge.api_path, method: igChallengeMethod })}
+                          disabled={instagramChallengeResendMutation.isPending}
+                          className="w-full text-xs py-2.5 rounded-lg transition-all flex items-center justify-center gap-2"
+                          style={{ color: "hsl(240 8% 58%)", background: "rgba(255,255,255,0.04)" }}
+                        >
+                          {instagramChallengeResendMutation.isPending ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <RotateCcw className="w-3 h-3" />
+                          )}
+                          {instagramChallengeResendMutation.isPending ? "Reenviando..." : `Reenviar código via ${igChallengeMethod === "email" ? "email" : "SMS"}`}
+                        </button>
+                      )}
+
+                      {/* Back to login button */}
+                      <button
+                        type="button"
+                        onClick={() => { setIgChallenge(null); setIgChallengeCode(""); }}
+                        className="w-full text-xs py-2.5 rounded-lg transition-all flex items-center justify-center gap-2"
+                        style={{ color: "hsl(240 8% 48%)", background: "transparent" }}
+                      >
+                        <ArrowLeft className="w-3 h-3" />
+                        Voltar ao login
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>

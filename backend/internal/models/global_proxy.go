@@ -10,6 +10,7 @@ import (
 type GlobalProxyConfig struct {
 	ID        string `gorm:"type:varchar(32);primaryKey" json:"id"`
 	Enabled   bool   `gorm:"default:false" json:"enabled"`
+	IsDefault bool   `gorm:"default:false" json:"is_default"` // padrão para auto-assign
 	Provider  string `gorm:"type:varchar(30);default:'manual'" json:"provider"`
 	ProxyType string `gorm:"type:varchar(10);default:'http'" json:"proxy_type"`
 	Host      string `gorm:"type:varchar(255)" json:"host"`
@@ -18,6 +19,8 @@ type GlobalProxyConfig struct {
 	Password  string `gorm:"type:varchar(512)" json:"-"`
 	UseEnv    bool   `gorm:"default:true" json:"use_env"`
 	IsActive  bool   `gorm:"default:true" json:"is_active"`
+	Country   string `gorm:"type:varchar(10);default:'br'" json:"country"`
+	Name      string `gorm:"type:varchar(100)" json:"name"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

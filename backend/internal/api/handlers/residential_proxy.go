@@ -1,12 +1,82 @@
 package handlers
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/services"
+	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
 )
+
+type parsedProxy struct {
+	Type     string
+	Host     string
+	Port     int
+	Username string
+	Password string
+}
+
+func parseProxyURL(url string) (*parsedProxy, error) {
+	url = strings.TrimSpace(url)
+
+	proxyType := "http"
+	if strings.HasPrefix(url, "socks5://") {
+		proxyType = "socks5"
+		url = strings.TrimPrefix(url, "socks5://")
+	} else if strings.HasPrefix(url, "socks4://") {
+		proxyType = "socks4"
+		url = strings.TrimPrefix(url, "socks4://")
+	} else if strings.HasPrefix(url, "https://") {
+		proxyType = "https"
+		url = strings.TrimPrefix(url, "https://")
+	} else if strings.HasPrefix(url, "http://") {
+		url = strings.TrimPrefix(url, "http://")
+	}
+
+	var auth, hostPort string
+	if strings.Contains(url, "@") {
+		atIdx := strings.LastIndex(url, "@")
+		auth = url[:atIdx]
+		hostPort = url[atIdx+1:]
+	} else {
+		hostPort = url
+	}
+
+	var username, password string
+	if auth != "" {
+		if strings.Contains(auth, ":") {
+			colonIdx := strings.Index(auth, ":")
+			username = auth[:colonIdx]
+			password = auth[colonIdx+1:]
+		} else {
+			username = auth
+		}
+	}
+
+	host := hostPort
+	port := 33335
+	if strings.Contains(hostPort, ":") {
+		colonIdx := strings.LastIndex(hostPort, ":")
+		host = hostPort[:colonIdx]
+		var err error
+		port, err = strconv.Atoi(hostPort[colonIdx+1:])
+		if err != nil {
+			port = 33335
+		}
+	}
+
+	return &parsedProxy{
+		Type:     proxyType,
+		Host:     host,
+		Port:     port,
+		Username: username,
+		Password: password,
+	}, nil
+}
 
 // ResidencialProxyHandler manages residential proxy pool endpoints.
 type ResidencialProxyHandler struct {
@@ -145,7 +215,7 @@ func (h *ResidencialProxyHandler) GetPoolStats(c *fiber.Ctx) error {
 	return c.JSON(stats)
 }
 
-// PUT /proxy/mode/:id — change instance proxy mode (none | manual | residencial)
+// PUT /proxy/mode/:id — change instance proxy mode (none | manual | global | residencial)
 func (h *ResidencialProxyHandler) SetProxyMode(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 	instance, ok := c.Locals("instance").(*models.Instance)
@@ -158,7 +228,9 @@ func (h *ResidencialProxyHandler) SetProxyMode(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		Mode string `json:"mode"` // none | manual | residencial
+		Mode          string `json:"mode"` // none | manual | global | residencial
+		GlobalProxyID string `json:"global_proxy_id,omitempty"`
+		ProviderID    string `json:"provider_id,omitempty"` // for manual/custom proxy
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -170,6 +242,50 @@ func (h *ResidencialProxyHandler) SetProxyMode(c *fiber.Ctx) error {
 	// If switching away from residencial, release the proxy
 	if oldMode == models.ProxyModeResidencial && newMode != models.ProxyModeResidencial {
 		h.pm.ReleaseProxy(instance.ID)
+	}
+
+	// If switching to global proxy
+	if newMode == "global" {
+		if req.GlobalProxyID == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "global_proxy_id é obrigatório"})
+		}
+		// Get the global proxy config
+		var gProxy models.GlobalProxyConfig
+		if err := h.db.Where("id = ? AND enabled = ? AND is_active = ?", req.GlobalProxyID, true, true).First(&gProxy).Error; err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "proxy global não encontrado ou inativo"})
+		}
+		// Update instance to use global proxy
+		h.db.Model(instance).Updates(map[string]interface{}{
+			"proxy_mode":       models.ProxyModeNone,
+			"proxy_enabled":    true,
+			"use_global_proxy": true,
+			"global_proxy_id":  gProxy.ID,
+		})
+		return c.JSON(fiber.Map{
+			"mode":         "global",
+			"global_proxy": gProxy.Name,
+			"country":      gProxy.Country,
+		})
+	}
+
+	// If switching to custom proxy (manual provider)
+	if req.Mode == "manual" && req.ProviderID != "" {
+		var provider models.ProxyProviderConfig
+		if err := h.db.Where("id = ? AND user_id = ?", req.ProviderID, user.ID).First(&provider).Error; err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "proxy provider não encontrado"})
+		}
+		h.db.Model(instance).Updates(map[string]interface{}{
+			"proxy_mode":       models.ProxyModeManual,
+			"proxy_enabled":    true,
+			"use_global_proxy": false,
+			"global_proxy_id":  nil,
+			"proxy_type":       provider.ProxyType,
+			"proxy_host":       provider.ProxyHost,
+			"proxy_port":       provider.ProxyPort,
+			"proxy_username":   provider.ProxyUsername,
+			"proxy_status":     models.ProxyStatusUntested,
+		})
+		return c.JSON(fiber.Map{"mode": "manual", "provider": provider.Name})
 	}
 
 	// If switching to residencial, assign a proxy
@@ -204,6 +320,8 @@ func (h *ResidencialProxyHandler) SetProxyMode(c *fiber.Ctx) error {
 			"proxy_last_tested": nil,
 			"proxy_error":       "",
 			"proxy_external_ip": "",
+			"use_global_proxy":  false,
+			"global_proxy_id":   nil,
 		})
 	}
 
@@ -227,26 +345,88 @@ func (h *ResidencialProxyHandler) CreateProviderConfig(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 
 	var req struct {
-		Provider string `json:"provider"`
-		Name     string `json:"name"`
-		APIKey   string `json:"api_key"`
-		Country  string `json:"country"`
+		Provider      string `json:"provider"`
+		Name          string `json:"name"`
+		APIKey        string `json:"api_key"`
+		Country       string `json:"country"`
+		ProxyURL      string `json:"proxy_url"`
+		ProxyType     string `json:"proxy_type"`
+		ProxyHost     string `json:"proxy_host"`
+		ProxyPort     int    `json:"proxy_port"`
+		ProxyUsername string `json:"proxy_username"`
+		ProxyPassword string `json:"proxy_password"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
 	}
 
+	// Handle manual proxy configuration
+	if req.Provider == "manual" {
+		if req.ProxyURL == "" && (req.ProxyHost == "" || req.ProxyPort == 0) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "forneça proxy_url ou proxy_host:proxy_port"})
+		}
+		// Parse URL if provided
+		if req.ProxyURL != "" && req.ProxyHost == "" {
+			// Parse proxy_url to extract host/port/username/password
+			parsed, err := parseProxyURL(req.ProxyURL)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "URL de proxy inválida"})
+			}
+			req.ProxyType = parsed.Type
+			req.ProxyHost = parsed.Host
+			req.ProxyPort = parsed.Port
+			if parsed.Username != "" {
+				req.ProxyUsername = parsed.Username
+				req.ProxyPassword = parsed.Password
+			}
+		}
+		if req.ProxyPort == 0 {
+			req.ProxyPort = 33335
+		}
+		if req.ProxyType == "" {
+			req.ProxyType = "http"
+		}
+
+		encryptedProxyPassword := ""
+		if req.ProxyPassword != "" {
+			encrypted, err := whatsapp.EncryptProxyPassword(req.ProxyPassword)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criptografar senha do proxy"})
+			}
+			encryptedProxyPassword = encrypted
+		}
+
+		config := models.ProxyProviderConfig{
+			UserID:        user.ID,
+			Provider:      models.ProxyProvider("manual"),
+			Name:          req.Name,
+			Country:       req.Country,
+			ProxyType:     req.ProxyType,
+			ProxyHost:     req.ProxyHost,
+			ProxyPort:     req.ProxyPort,
+			ProxyUsername: req.ProxyUsername,
+			ProxyPassword: encryptedProxyPassword,
+			IsActive:      true,
+		}
+
+		if err := h.db.Create(&config).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar configuração"})
+		}
+		return c.Status(fiber.StatusCreated).JSON(config)
+	}
+
+	// Validate provider for API-based providers
 	if req.Provider == "" || req.Name == "" || req.APIKey == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "provider, name e api_key são obrigatórios"})
 	}
 
-	// Validate provider
 	provider := models.ProxyProvider(req.Provider)
 	validProviders := []models.ProxyProvider{
 		models.ProxyProviderBrightData,
 		models.ProxyProviderOxylabs,
 		models.ProxyProviderProxyCheap,
 		models.ProxyProviderSmartProxy,
+		models.ProxyProviderWebshare,
 	}
 	valid := false
 	for _, p := range validProviders {
@@ -265,11 +445,16 @@ func (h *ResidencialProxyHandler) CreateProviderConfig(c *fiber.Ctx) error {
 		masked = req.APIKey[:8] + "..." + req.APIKey[len(req.APIKey)-4:]
 	}
 
+	encryptedAPIKey, err := whatsapp.EncryptProxyPassword(req.APIKey)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criptografar api_key"})
+	}
+
 	config := models.ProxyProviderConfig{
 		UserID:       user.ID,
 		Provider:     provider,
 		Name:         req.Name,
-		APIKey:       req.APIKey, // TODO: encrypt this
+		APIKey:       encryptedAPIKey,
 		APIKeyMasked: masked,
 		Country:      req.Country,
 		IsActive:     true,

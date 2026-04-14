@@ -32,11 +32,12 @@ func NewInstanceHandler(db *gorm.DB, manager *whatsapp.Manager) *InstanceHandler
 // GET /instances
 // Query params: workspace_id (optional)
 func (h *InstanceHandler) List(c *fiber.Ctx) error {
+	startedAt := time.Now()
 	user := middleware.GetCurrentUser(c)
 	workspaceID := c.Query("workspace_id")
 
 	var instances []models.Instance
-	q := h.db.Preload("Server").Order("created_at DESC")
+	q := h.db.Preload("Server").Preload("GlobalProxy").Order("created_at DESC")
 
 	// SuperAdmins can see all or filter by workspace
 	if user.Role == models.RoleSuperAdmin {
@@ -89,6 +90,16 @@ func (h *InstanceHandler) List(c *fiber.Ctx) error {
 				h.db.Model(&instances[i]).Update("status", models.StatusDisconnected)
 			}
 		}
+	}
+
+	elapsed := time.Since(startedAt).Milliseconds()
+	if elapsed > 600 {
+		log.Warn().
+			Str("user_id", user.ID.String()).
+			Str("workspace_id", workspaceID).
+			Int64("instances_count", int64(len(instances))).
+			Int64("duration_ms", elapsed).
+			Msg("slow instances list request")
 	}
 
 	return c.JSON(instances)
@@ -204,10 +215,22 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 
 	// Optional global proxy assignment (plan-gated)
 	// Auto-assigns if user has plan allowing proxy AND any global proxy is configured and active
+	// Prioritizes is_default=true, then falls back to any enabled active proxy
 	if user.Plan != nil && user.Plan.AllowProxy {
-		// Find any enabled global proxy (not just "default")
 		var gcfg models.GlobalProxyConfig
-		if err := h.db.Where("enabled = ? AND is_active = ?", true, true).First(&gcfg).Error; err == nil {
+		found := false
+
+		// First try to find the default proxy
+		if err := h.db.Where("is_default = ? AND enabled = ? AND is_active = ?", true, true, true).First(&gcfg).Error; err == nil {
+			found = true
+		} else {
+			// Fall back to any enabled active proxy
+			if err := h.db.Where("enabled = ? AND is_active = ?", true, true).First(&gcfg).Error; err == nil {
+				found = true
+			}
+		}
+
+		if found {
 			proxyType := gcfg.ProxyType
 			host := gcfg.Host
 			port := gcfg.Port
