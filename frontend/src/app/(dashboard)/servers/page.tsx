@@ -397,6 +397,7 @@ export default function ServersPage() {
   const { data: servers = [], isLoading } = useQuery<Server[]>({
     queryKey: ["servers", currentWorkspace?.id],
     queryFn: () => serversApi.list(currentWorkspace?.id).then(r => r.data),
+    staleTime: 30 * 1000, // 30 seconds
   });
 
   const deleteMutation = useMutation({

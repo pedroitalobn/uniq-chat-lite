@@ -25,6 +25,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { data: workspaces = [], isLoading } = useQuery<Workspace[]>({
     queryKey: ["workspaces"],
     queryFn: () => workspacesApi.list().then((r) => r.data.workspaces || r.data),
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Auto-select first workspace if none selected

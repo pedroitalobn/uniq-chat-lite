@@ -437,6 +437,7 @@ export default function InboxPage() {
     queryKey: ["instances", currentWorkspace?.id],
     queryFn: () => instancesApi.list(undefined, currentWorkspace?.id).then(r => r.data),
     enabled: !!currentWorkspace,
+    staleTime: 30 * 1000, // 30 seconds
   });
 
   const chInst = instData.filter(i => i.status === "connected" || i.status === "connecting" || i.status === "disconnected");
