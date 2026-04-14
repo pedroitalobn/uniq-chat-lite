@@ -10,97 +10,199 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const (
+	MailerooBaseURL = "https://smtp.maileroo.com/api/v2"
+)
+
 type Service struct {
-	apiKey  string
-	from    string
-	appName string
-	appURL  string
+	apiKey   string
+	from     string
+	fromName string
+	appName  string
+	appURL   string
 }
 
-func New(apiKey, from, appName, appURL string) *Service {
-	return &Service{apiKey: apiKey, from: from, appName: appName, appURL: appURL}
+func New(apiKey, from, fromName, appName, appURL string) *Service {
+	return &Service{apiKey: apiKey, from: from, fromName: fromName, appName: appName, appURL: appURL}
 }
 
-type EmailPayload struct {
-	From    string   `json:"from"`
-	To      []string `json:"to"`
-	Subject string   `json:"subject"`
-	HTML    string   `json:"html"`
+func (s *Service) SetConfig(apiKey, from, fromName string) {
+	s.apiKey = apiKey
+	s.from = from
+	s.fromName = fromName
 }
 
-func (s *Service) send(to, subject, html string) {
+func (s *Service) GetConfig() (apiKey, from, fromName string) {
+	return s.apiKey, s.from, s.fromName
+}
+
+// Maileroo request/response types
+type mailerooFrom struct {
+	Address     string `json:"address"`
+	DisplayName string `json:"display_name,omitempty"`
+}
+
+type mailerooTo struct {
+	Address     string `json:"address"`
+	DisplayName string `json:"display_name,omitempty"`
+}
+
+type mailerooRequest struct {
+	From     mailerooFrom      `json:"from"`
+	To       []mailerooTo      `json:"to"`
+	Subject  string            `json:"subject"`
+	HTML     string            `json:"html"`
+	Plain    string            `json:"plain,omitempty"`
+	Tracking bool              `json:"tracking"`
+	Tags     map[string]string `json:"tags,omitempty"`
+}
+
+type mailerooResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Data    struct {
+		ReferenceID string `json:"reference_id"`
+	} `json:"data"`
+}
+
+// EmailLog for tracking sent emails
+type EmailLog struct {
+	ID          uint      `json:"id" gorm:"primaryKey"`
+	To          string    `json:"to"`
+	Subject     string    `json:"subject"`
+	Status      string    `json:"status"` // "sent", "failed", "pending"
+	ReferenceID string    `json:"reference_id"`
+	Error       string    `json:"error,omitempty"`
+	EmailType   string    `json:"email_type"` // "welcome", "password_reset", etc.
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+func (s *Service) send(to, subject, html, emailType string) error {
 	if s.apiKey == "" || to == "" {
-		return
+		return fmt.Errorf("email service not configured")
 	}
-	go func() {
-		payload := EmailPayload{
-			From:    fmt.Sprintf("%s <%s>", s.appName, s.from),
-			To:      []string{to},
-			Subject: subject,
-			HTML:    html,
-		}
-		body, _ := json.Marshal(payload)
-		req, err := http.NewRequest(http.MethodPost, "https://api.resend.com/emails", bytes.NewReader(body))
-		if err != nil {
-			log.Error().Err(err).Msg("email: failed to build request")
-			return
-		}
-		req.Header.Set("Authorization", "Bearer "+s.apiKey)
-		req.Header.Set("Content-Type", "application/json")
 
-		client := &http.Client{Timeout: 15 * time.Second}
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Error().Err(err).Str("to", to).Msg("email: send failed")
-			return
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode >= 400 {
-			log.Error().Int("status", resp.StatusCode).Str("to", to).Msg("email: resend returned error")
-		} else {
-			log.Debug().Str("to", to).Str("subject", subject).Msg("email: sent")
-		}
-	}()
+	fromName := s.fromName
+	if fromName == "" {
+		fromName = s.appName
+	}
+
+	reqBody := mailerooRequest{
+		From: mailerooFrom{
+			Address:     s.from,
+			DisplayName: fromName,
+		},
+		To: []mailerooTo{
+			{Address: to},
+		},
+		Subject:  subject,
+		HTML:     html,
+		Tracking: true,
+		Tags: map[string]string{
+			"type": emailType,
+		},
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		log.Error().Err(err).Msg("email: failed to marshal request")
+		return err
+	}
+
+	httpReq, err := http.NewRequest(http.MethodPost, MailerooBaseURL+"/emails", bytes.NewReader(body))
+	if err != nil {
+		log.Error().Err(err).Msg("email: failed to build request")
+		return err
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+s.apiKey)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		log.Error().Err(err).Str("to", to).Msg("email: send failed")
+		return err
+	}
+	defer resp.Body.Close()
+
+	var result mailerooResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		log.Error().Err(err).Str("to", to).Msg("email: failed to decode response")
+		return err
+	}
+
+	if resp.StatusCode >= 400 {
+		log.Error().Int("status", resp.StatusCode).Str("to", to).Str("message", result.Message).Msg("email: maileroo returned error")
+		return fmt.Errorf("maileroo error: %s", result.Message)
+	}
+
+	log.Debug().Str("to", to).Str("subject", subject).Str("ref", result.Data.ReferenceID).Msg("email: sent")
+	return nil
+}
+
+// SyncSend sends email synchronously and returns error
+func (s *Service) SyncSend(to, subject, html, emailType string) error {
+	return s.send(to, subject, html, emailType)
 }
 
 func (s *Service) SendWelcome(to, name string) {
-	s.send(to, "Bem-vindo ao "+s.appName+"!", welcomeHTML(s.appName, name, s.appURL))
+	if err := s.send(to, "Bem-vindo ao "+s.appName+"!", welcomeHTML(s.appName, name, s.appURL), "welcome"); err != nil {
+		log.Error().Err(err).Str("to", to).Msg("email: failed to send welcome")
+	}
 }
 
 func (s *Service) SendPasswordChanged(to, name string) {
-	s.send(to, "Sua senha foi alterada", passwordChangedHTML(s.appName, name))
+	if err := s.send(to, "Sua senha foi alterada", passwordChangedHTML(s.appName, s.appURL, name), "password_changed"); err != nil {
+		log.Error().Err(err).Str("to", to).Msg("email: failed to send password changed")
+	}
 }
 
 func (s *Service) SendForgotPassword(to, name, resetLink string) {
-	s.send(to, "Redefinição de senha", forgotPasswordHTML(s.appName, name, resetLink))
+	if err := s.send(to, "Redefinição de senha", forgotPasswordHTML(s.appName, s.appURL, name, resetLink), "forgot_password"); err != nil {
+		log.Error().Err(err).Str("to", to).Msg("email: failed to send forgot password")
+	}
 }
 
 func (s *Service) SendPaymentConfirmed(to, name, planName string, amount float64) {
-	s.send(to, "Pagamento confirmado!", paymentConfirmedHTML(s.appName, name, planName, amount))
+	if err := s.send(to, "Pagamento confirmado!", paymentConfirmedHTML(s.appName, s.appURL, name, planName, amount), "payment_confirmed"); err != nil {
+		log.Error().Err(err).Str("to", to).Msg("email: failed to send payment confirmed")
+	}
 }
 
 func (s *Service) SendPlanChanged(to, name, oldPlan, newPlan string) {
-	s.send(to, "Seu plano foi atualizado", planChangedHTML(s.appName, name, oldPlan, newPlan))
+	if err := s.send(to, "Seu plano foi atualizado", planChangedHTML(s.appName, s.appURL, name, oldPlan, newPlan), "plan_changed"); err != nil {
+		log.Error().Err(err).Str("to", to).Msg("email: failed to send plan changed")
+	}
 }
 
 func (s *Service) SendPaymentFailed(to, name string) {
 	billingURL := s.appURL + "/billing"
-	s.send(to, "Falha no pagamento", paymentFailedHTML(s.appName, name, billingURL))
+	if err := s.send(to, "Falha no pagamento", paymentFailedHTML(s.appName, s.appURL, name, billingURL), "payment_failed"); err != nil {
+		log.Error().Err(err).Str("to", to).Msg("email: failed to send payment failed")
+	}
 }
 
 func (s *Service) SendSubscriptionCanceled(to, name string) {
 	plansURL := s.appURL + "/plans"
-	s.send(to, "Assinatura cancelada", subscriptionCanceledHTML(s.appName, name, plansURL))
+	if err := s.send(to, "Assinatura cancelada", subscriptionCanceledHTML(s.appName, s.appURL, name, plansURL), "subscription_canceled"); err != nil {
+		log.Error().Err(err).Str("to", to).Msg("email: failed to send subscription canceled")
+	}
 }
 
 func (s *Service) SendInstanceBanned(to, name, instanceName, phone string) {
-	s.send(to, "Instância banida", instanceBannedHTML(s.appName, name, instanceName, phone))
+	if err := s.send(to, "Instância banida", instanceBannedHTML(s.appName, s.appURL, name, instanceName, phone), "instance_banned"); err != nil {
+		log.Error().Err(err).Str("to", to).Msg("email: failed to send instance banned")
+	}
 }
 
 func (s *Service) SendAdminCreatedAccount(to, name, email, tempPassword string) {
-	s.send(to, "Sua conta foi criada no "+s.appName, adminCreatedAccountHTML(s.appName, name, email, tempPassword, s.appURL))
+	if err := s.send(to, "Sua conta foi criada no "+s.appName, adminCreatedAccountHTML(s.appName, name, email, tempPassword, s.appURL), "admin_created_account"); err != nil {
+		log.Error().Err(err).Str("to", to).Msg("email: failed to send admin created account")
+	}
 }
 
 func (s *Service) SendAdminResetPassword(to, name, newPassword string) {
-	s.send(to, "Sua senha foi redefinida pelo administrador", adminResetPasswordHTML(s.appName, name, newPassword))
+	if err := s.send(to, "Sua senha foi redefinida pelo administrador", adminResetPasswordHTML(s.appName, s.appURL, name, newPassword), "admin_reset_password"); err != nil {
+		log.Error().Err(err).Str("to", to).Msg("email: failed to send admin reset password")
+	}
 }
