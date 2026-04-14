@@ -2,12 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { proxyApi } from "@/lib/api";
-import { Globe, Eye, EyeOff, Loader2, CheckCircle2, XCircle, Trash2, TriangleAlert } from "lucide-react";
+import { proxyApi, proxyPoolsApi, adminApi } from "@/lib/api";
+import { Globe, Eye, EyeOff, Loader2, CheckCircle2, XCircle, Trash2, TriangleAlert, Save, ChevronDown, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { showConfirm } from "@/lib/confirm";
+
+const COUNTRY_FLAGS: Record<string, string> = {
+  br: "🇧🇷", us: "🇺🇸", gb: "🇬🇧", ar: "🇦🇷", co: "🇨🇴", mx: "🇲🇽", 
+  es: "🇪🇸", de: "🇩🇪", fr: "🇫🇷", it: "🇮🇹", jp: "🇯🇵", cn: "🇨🇳",
+  global: "🌍"
+};
 
 interface Props {
   instanceId: string;
@@ -17,7 +23,30 @@ interface TestResult {
   success: boolean;
   external_ip?: string;
   latency_ms?: number;
+  country?: string;
   error?: string;
+}
+
+interface ProxyProviderConfig {
+  id: string;
+  name: string;
+  provider: string;
+  proxy_type?: string;
+  proxy_host?: string;
+  proxy_port?: number;
+  proxy_username?: string;
+  country?: string;
+}
+
+interface GlobalProxyConfig {
+  id: string;
+  name: string;
+  enabled: boolean;
+  host: string;
+  port: number;
+  proxy_type: string;
+  username: string;
+  country: string;
 }
 
 export function ProxyConfigForm({ instanceId }: Props) {
@@ -31,6 +60,20 @@ export function ProxyConfigForm({ instanceId }: Props) {
     enabled: !!allowProxy,
   });
 
+  const { data: proxyProviders } = useQuery<ProxyProviderConfig[]>({
+    queryKey: ["proxy-providers"],
+    queryFn: () => proxyPoolsApi.listProviders().then((r) => r.data),
+    enabled: !!allowProxy,
+  });
+
+  const { data: globalProxy } = useQuery<GlobalProxyConfig[]>({
+    queryKey: ["global-proxies"],
+    queryFn: () => proxyPoolsApi.getGlobalProxies().then((r) => r.data),
+    enabled: !!allowProxy,
+  });
+
+  const [selectedProvider, setSelectedProvider] = useState<string>("");
+  const [showProviderDropdown, setShowProviderDropdown] = useState(false);
   const [form, setForm] = useState({
     enabled: false,
     type: "socks5" as "http" | "https" | "socks5",
@@ -43,6 +86,7 @@ export function ProxyConfigForm({ instanceId }: Props) {
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [testing, setTesting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (proxy) {
@@ -57,10 +101,73 @@ export function ProxyConfigForm({ instanceId }: Props) {
     }
   }, [proxy]);
 
+const handleSelectProvider = (providerId: string) => {
+    setShowProviderDropdown(false);
+
+    if (providerId.startsWith("global:")) {
+      const proxyId = providerId.replace("global:", "");
+      const gp = globalProxy?.find(p => p.id === proxyId);
+      if (gp && gp.enabled && gp.host) {
+        setSelectedProvider(providerId);
+        setForm({
+          enabled: true,
+          type: "http",
+          host: "",
+          port: 0,
+          username: "",
+          password: "",
+        });
+        toast.info(`Usando ${gp.name || "Proxy Global"} (${gp.country ? COUNTRY_FLAGS[gp.country.toLowerCase()] || "" : ""})`);
+      } else {
+        toast.error("Proxy global não configurado");
+        setSelectedProvider("");
+      }
+    } else if (providerId === "none") {
+      setSelectedProvider(providerId);
+      setForm({
+        enabled: false,
+        type: "socks5",
+        host: "",
+        port: 1080,
+        username: "",
+        password: "",
+      });
+    } else {
+      const provider = proxyProviders?.find(p => p.id === providerId);
+      if (provider && provider.proxy_host) {
+        setSelectedProvider(providerId);
+        setForm({
+          enabled: true,
+          type: (provider.proxy_type as "http" | "https" | "socks5") || "socks5",
+          host: provider.proxy_host,
+          port: provider.proxy_port || 1080,
+          username: provider.proxy_username || "",
+          password: "",
+        });
+      }
+    }
+  };
+
   const saveMutation = useMutation({
-    mutationFn: () => proxyApi.set(instanceId, { ...form }),
+    mutationFn: async () => {
+      // If selecting global proxy
+      if (selectedProvider.startsWith("global:")) {
+        const proxyId = selectedProvider.replace("global:", "");
+        return proxyApi.setMode(instanceId, { mode: "global", global_proxy_id: proxyId });
+      }
+      // If selecting custom provider
+      if (selectedProvider && !selectedProvider.startsWith("global:") && selectedProvider !== "none") {
+        return proxyApi.setMode(instanceId, { mode: "manual", provider_id: selectedProvider });
+      }
+      // If none selected
+      if (selectedProvider === "none") {
+        return proxyApi.setMode(instanceId, { mode: "none" });
+      }
+      // Otherwise use manual form
+      return proxyApi.set(instanceId, { ...form });
+    },
     onSuccess: () => {
-      toast.success("Proxy salvo! Testando conectividade...");
+      toast.success("Proxy salvo!");
       setTimeout(() => refetch(), 2000);
     },
     onError: (err: unknown) => {
@@ -164,6 +271,75 @@ export function ProxyConfigForm({ instanceId }: Props) {
 
         {form.enabled && (
           <div className="space-y-4 pt-1">
+            {/* Proxy Selector Dropdown */}
+            <div>
+              <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 52%)" }}>Selecionar Proxy</label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowProviderDropdown(!showProviderDropdown)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
+                >
+                  <span>
+                    {selectedProvider.startsWith("global:") 
+                      ? "🌐 Proxy Global Uniq" 
+                      : selectedProvider === "none"
+                      ? "❌ Sem proxy"
+                      : proxyProviders?.find(p => p.id === selectedProvider)?.name || "Selecione um proxy..."}
+                  </span>
+                  <ChevronDown className="w-4 h-4" style={{ color: "hsl(240 8% 48%)" }} />
+                </button>
+                
+                {showProviderDropdown && (
+                  <div className="absolute top-full left-0 right-0 mt-1 rounded-xl border overflow-hidden z-10" style={{ background: "hsl(240 18% 8%)", borderColor: "hsl(240 12% 16%)" }}>
+                    {globalProxy?.filter(p => p.enabled && p.host).map(gp => (
+                      <button
+                        key={gp.id}
+                        type="button"
+                        onClick={() => handleSelectProvider(`global:${gp.id}`)}
+                        className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-white/5"
+                        style={{ color: "hsl(240 15% 90%)" }}
+                      >
+                        🌐 {gp.name || "Proxy Global"} {gp.country ? `(${COUNTRY_FLAGS[gp.country.toLowerCase()] || gp.country})` : ""}
+                      </button>
+                    ))}
+                    {proxyProviders?.map(p => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleSelectProvider(p.id)}
+                        className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-white/5"
+                        style={{ color: "hsl(240 15% 90%)" }}
+                      >
+                        📌 {p.name} ({p.provider === "manual" ? p.proxy_host : p.provider})
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowProviderDropdown(false);
+                        window.location.href = "/integrations?section=proxy";
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-white/5 border-t"
+                      style={{ color: "var(--green)" }}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      + Adicionar novo proxy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectProvider("none")}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-white/5"
+                      style={{ color: "hsl(240 8% 58%)" }}
+                    >
+                      ❌ Remover proxy
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Type selector */}
             <div>
               <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 52%)" }}>Tipo</label>
@@ -273,7 +449,9 @@ export function ProxyConfigForm({ instanceId }: Props) {
               <>
                 <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "var(--green)" }} />
                 <span style={{ color: "#86efac" }}>
-                  IP externo: <strong>{testResult.external_ip}</strong> — Latência: {testResult.latency_ms}ms
+                  IP: <strong>{testResult.external_ip}</strong> 
+                  {testResult.country && ` (${testResult.country})`}
+                  {" "}— Latência: {testResult.latency_ms}ms
                 </span>
               </>
             ) : (

@@ -44,6 +44,10 @@ export interface ProxyProviderConfig {
   api_key_masked?: string;
   country: string;
   is_active: boolean;
+  proxy_type?: string;
+  proxy_host?: string;
+  proxy_port?: number;
+  proxy_username?: string;
   created_at: string;
   updated_at: string;
 }
@@ -117,6 +121,8 @@ export interface Instance {
   proxy_external_ip?: string;
   proxy_error?: string;
   proxy_pool_id?: string;
+  use_global_proxy?: boolean;
+  global_proxy_id?: string;
   connected_at?: string;
   // MCP
   mcp_enabled: boolean;

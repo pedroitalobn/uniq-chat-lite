@@ -252,16 +252,6 @@ function InstanceCard({
               Proxy erro
             </span>
           )}
-          {instance.proxy_enabled && instance.proxy_status === "untested" && (
-            <span className="status-badge" style={{
-              background: "rgba(234,179,8,0.08)",
-              color: "#fbbf24",
-              borderColor: "rgba(234,179,8,0.18)",
-            }}>
-              <Wifi className="w-3 h-3" />
-              Proxy teste
-            </span>
-          )}
         </div>
 
         {/* Actions */}
@@ -286,7 +276,7 @@ function InstanceCard({
             Gerenciar
           </Link>
 
-          {!isConnected && (
+          {instance.status !== "connected" && instance.channel === "whatsapp" && (
             <button
               onClick={() => onQR(instance.id)}
               className="flex items-center gap-1.5 text-xs font-medium py-2 px-3 rounded-xl transition-all duration-150"

@@ -8,6 +8,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/services"
@@ -110,6 +111,11 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nome é obrigatório"})
 	}
 
+	// Server is required
+	if req.ServerID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "server é obrigatório"})
+	}
+
 	// Validate workspace if provided
 	var wsUUID *uuid.UUID
 	if req.WorkspaceID != nil && *req.WorkspaceID != "" {
@@ -197,9 +203,11 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 	}
 
 	// Optional global proxy assignment (plan-gated)
+	// Auto-assigns if user has plan allowing proxy AND any global proxy is configured and active
 	if user.Plan != nil && user.Plan.AllowProxy {
+		// Find any enabled global proxy (not just "default")
 		var gcfg models.GlobalProxyConfig
-		if err := h.db.Where("id = ? AND enabled = ? AND is_active = ?", "default", true, true).First(&gcfg).Error; err == nil {
+		if err := h.db.Where("enabled = ? AND is_active = ?", true, true).First(&gcfg).Error; err == nil {
 			proxyType := gcfg.ProxyType
 			host := gcfg.Host
 			port := gcfg.Port
@@ -229,27 +237,34 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 			}
 
 			if host != "" && port > 0 {
+				gProxyIDStr := gcfg.ID
+				gProxyID, _ := uuid.Parse(gProxyIDStr)
 				h.db.Model(&instance).Updates(map[string]interface{}{
 					"use_global_proxy": true,
-					"proxy_mode":       models.ProxyModeManual,
+					"global_proxy_id":  gProxyID,
+					"proxy_mode":       models.ProxyModeNone,
 					"proxy_enabled":    true,
 					"proxy_type":       proxyType,
 					"proxy_host":       host,
 					"proxy_port":       port,
 					"proxy_username":   username,
 					"proxy_password":   passwordEncrypted,
-					"proxy_status":     models.ProxyStatusUntested,
+					"proxy_status":     models.ProxyStatusOK, // Auto-mark as OK since it's from global proxy
 				})
 				instance.UseGlobalProxy = true
-				instance.ProxyMode = models.ProxyModeManual
+				instance.GlobalProxyID = &gProxyID
+				instance.ProxyMode = models.ProxyModeNone
 				instance.ProxyEnabled = true
 				instance.ProxyType = models.ProxyType(proxyType)
 				instance.ProxyHost = host
 				instance.ProxyPort = port
 				instance.ProxyUsername = username
 				instance.ProxyPassword = passwordEncrypted
-				instance.ProxyStatus = models.ProxyStatusUntested
+				instance.ProxyStatus = models.ProxyStatusOK
+				log.Info().Str("instance", instance.ID.String()).Str("global_proxy_id", gProxyIDStr).Msg("global proxy auto-assigned on instance creation")
 			}
+		} else {
+			log.Debug().Str("user_id", user.ID.String()).Msg("no global proxy available for auto-assign")
 		}
 	}
 
@@ -635,11 +650,15 @@ func (h *InstanceHandler) InstagramLogin(c *fiber.Ctx) error {
 
 	if resp.Status == "challenge_required" {
 		return c.JSON(fiber.Map{
-			"status":         "challenge_required",
-			"challenge_type": resp.ChallengeType,
-			"options":        resp.Options,
-			"api_path":       resp.APIPath,
-			"message":        resp.Message,
+			"status":                "challenge_required",
+			"challenge_type":        resp.ChallengeType,
+			"options":               resp.Options,
+			"api_path":              resp.APIPath,
+			"message":               resp.Message,
+			"phone_mask":            resp.PhoneMask,
+			"email_mask":            resp.EmailMask,
+			"can_resend":            resp.CanResend,
+			"external_verification": resp.ExternalVerification,
 		})
 	}
 
