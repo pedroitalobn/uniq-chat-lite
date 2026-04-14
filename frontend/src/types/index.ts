@@ -235,6 +235,7 @@ export interface Contact {
   id: string;
   user_id: string;
   owner_id?: string;
+  owner?: string;
   workspace_id?: string;
   name: string;
   phone: string;
