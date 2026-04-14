@@ -139,6 +139,44 @@ func TestProxy(cfg *ProxyConfig) (externalIP string, latencyMs int64, err error)
 	return ipResp.Origin, latencyMs, nil
 }
 
+// DetectCountryByIP detects the country of an IP address using ipinfo.io (free tier).
+// Returns the 2-letter country code (e.g., "BR", "US") or empty string on error.
+func DetectCountryByIP(ip string) (string, error) {
+	if ip == "" {
+		return "", nil
+	}
+
+	// Don't detect for private IPs
+	if net.ParseIP(ip) != nil && (net.ParseIP(ip).IsPrivate() || net.ParseIP(ip).IsLoopback()) {
+		return "", nil
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(fmt.Sprintf("https://ipinfo.io/%s/json", ip))
+	if err != nil {
+		return "", fmt.Errorf("failed to detect country: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("ipinfo returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var ipInfoResp struct {
+		Country string `json:"country"`
+	}
+	if err := json.Unmarshal(body, &ipInfoResp); err != nil {
+		return "", fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return ipInfoResp.Country, nil
+}
+
 // EncryptProxyPassword encrypts the password using AES-256-GCM.
 // Key is read from PROXY_ENCRYPTION_KEY env variable (must be 32 bytes).
 func EncryptProxyPassword(password string) (string, error) {

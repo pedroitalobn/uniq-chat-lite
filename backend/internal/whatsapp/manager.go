@@ -126,7 +126,9 @@ func (m *Manager) SaveMessage(instanceID string, toJID string, content string, d
 		return nil
 	}
 
-	log.Printf("DEBUG SaveMessage: instanceID=%s, toJID=%s, isGroup=%v", instanceID, toJID, isGroup)
+	rawJID := toJID
+	toJID = canonicalJID(toJID)
+	log.Printf("DEBUG SaveMessage: instanceID=%s, rawJID=%s, canonicalJID=%s, isGroup=%v", instanceID, rawJID, toJID, isGroup)
 
 	instUUID, err := uuid.Parse(instanceID)
 	if err != nil {
@@ -245,6 +247,21 @@ func extractPhoneFromJID(jid string) string {
 		return jid[:idx]
 	}
 	return jid
+}
+
+// canonicalJID normalizes personal chats to @s.whatsapp.net to avoid split conversations
+func canonicalJID(jid string) string {
+	if jid == "" {
+		return jid
+	}
+	if strings.HasSuffix(jid, "@g.us") || strings.HasSuffix(jid, "@newsletter") || jid == "status@broadcast" {
+		return jid
+	}
+	phone := extractPhoneFromJID(jid)
+	if phone == "" {
+		return jid
+	}
+	return phone + "@s.whatsapp.net"
 }
 
 // RestartWithProxy stops the instance and restarts it with updated proxy configuration.
@@ -408,6 +425,34 @@ func (m *Manager) RefreshWebhooks(instanceID string) {
 func (m *Manager) buildProxyCfg(instance *models.Instance) *ProxyConfig {
 	if !instance.ProxyEnabled {
 		return nil
+	}
+
+	// Handle global proxy - fetch from GlobalProxyConfig
+	if instance.UseGlobalProxy && instance.GlobalProxyID != nil {
+		var gProxy models.GlobalProxyConfig
+		if err := m.db.First(&gProxy, "id = ? AND enabled = ? AND is_active = ?", instance.GlobalProxyID.String(), true, true).Error; err != nil {
+			log.Warn().Err(err).Str("instance", instance.ID.String()).Str("global_proxy_id", instance.GlobalProxyID.String()).Msg("global proxy config not found")
+			return nil
+		}
+
+		password := ""
+		if gProxy.Password != "" {
+			dec, err := DecryptProxyPassword(gProxy.Password)
+			if err != nil {
+				log.Warn().Err(err).Str("instance", instance.ID.String()).Msg("failed to decrypt global proxy password")
+			} else {
+				password = dec
+			}
+		}
+
+		return &ProxyConfig{
+			Enabled:  true,
+			Type:     gProxy.ProxyType,
+			Host:     gProxy.Host,
+			Port:     gProxy.Port,
+			Username: gProxy.Username,
+			Password: password,
+		}
 	}
 
 	password := ""
@@ -981,7 +1026,8 @@ func (m *Manager) executeCRMAction(actionType models.ActionType, contactPhone, c
 		if userID != "" {
 			var contact models.Contact
 			if err := m.db.Where("phone LIKE ?", "%"+phone+"%").First(&contact).Error; err == nil {
-				contact.Owner = userID
+				ownerUUID := uuid.MustParse(userID)
+				contact.OwnerID = &ownerUUID
 				m.db.Save(&contact)
 				log.Info().Str("phone", phone).Str("user_id", userID).Msg("journey assigned contact to user")
 			}
