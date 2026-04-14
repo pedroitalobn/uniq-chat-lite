@@ -436,6 +436,7 @@ export default function InboxPage() {
   const { data: instData = [] } = useQuery<Instance[]>({
     queryKey: ["instances", currentWorkspace?.id],
     queryFn: () => instancesApi.list(undefined, currentWorkspace?.id).then(r => r.data),
+    enabled: !!currentWorkspace,
   });
 
   const chInst = instData.filter(i => i.status === "connected" || i.status === "connecting" || i.status === "disconnected");
