@@ -71,15 +71,19 @@ type SendDMResponse struct {
 }
 
 type LoginResponse struct {
-	Username      string   `json:"username"`
-	PK            int64    `json:"pk"`
-	ProfilePic    string   `json:"profile_pic_url"`
-	Session       []byte   `json:"session"`
-	Status        string   `json:"status"`
-	ChallengeType string   `json:"challenge_type"`
-	Options       []string `json:"options"`
-	APIPath       string   `json:"api_path"`
-	Message       string   `json:"message"`
+	Username             string   `json:"username"`
+	PK                   int64    `json:"pk"`
+	ProfilePic           string   `json:"profile_pic_url"`
+	Session              []byte   `json:"session"`
+	Status               string   `json:"status"`
+	ChallengeType        string   `json:"challenge_type"`
+	Options              []string `json:"options"`
+	APIPath              string   `json:"api_path"`
+	Message              string   `json:"message"`
+	PhoneMask            string   `json:"phone_mask"`
+	EmailMask            string   `json:"email_mask"`
+	CanResend            bool     `json:"can_resend"`
+	ExternalVerification bool     `json:"external_verification"`
 }
 
 type bridgeResponse struct {
