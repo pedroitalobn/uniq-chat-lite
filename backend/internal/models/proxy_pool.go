@@ -24,7 +24,9 @@ const (
 	ProxyProviderOxylabs    ProxyProvider = "oxylabs"
 	ProxyProviderProxyCheap ProxyProvider = "proxy_cheap"
 	ProxyProviderSmartProxy ProxyProvider = "smartproxy"
-	ProxyProviderUniq       ProxyProvider = "uniq" // Uniq's native proxy
+	ProxyProviderUniq       ProxyProvider = "uniq"
+	ProxyProviderWebshare   ProxyProvider = "webshare"
+	ProxyProviderManual     ProxyProvider = "manual"
 )
 
 // ProxyPoolStatus tracks whether a pool entry is usable.
@@ -38,16 +40,21 @@ const (
 
 // ProxyProviderConfig stores API credentials for third-party proxy providers
 type ProxyProviderConfig struct {
-	ID           uuid.UUID     `gorm:"type:uuid;primaryKey" json:"id"`
-	UserID       uuid.UUID     `gorm:"type:uuid;not null;index" json:"user_id"`
-	Provider     ProxyProvider `gorm:"type:varchar(30);not null" json:"provider"`
-	Name         string        `gorm:"not null" json:"name"`                         // e.g., "Meu Proxy Brasil"
-	APIKey       string        `gorm:"type:varchar(512)" json:"-"`                   // encrypted, never expose
-	APIKeyMasked string        `gorm:"type:varchar(50)" json:"api_key_masked"`       // e.g., "bd_xxxx...xxxx"
-	Country      string        `gorm:"type:varchar(10);default:'br'" json:"country"` // default country
-	IsActive     bool          `gorm:"default:true" json:"is_active"`
-	CreatedAt    time.Time     `json:"created_at"`
-	UpdatedAt    time.Time     `json:"updated_at"`
+	ID            uuid.UUID     `gorm:"type:uuid;primaryKey" json:"id"`
+	UserID        uuid.UUID     `gorm:"type:uuid;not null;index" json:"user_id"`
+	Provider      ProxyProvider `gorm:"type:varchar(30);not null" json:"provider"`
+	Name          string        `gorm:"not null" json:"name"`
+	APIKey        string        `gorm:"type:varchar(512)" json:"-"`
+	APIKeyMasked  string        `gorm:"type:varchar(50)" json:"api_key_masked"`
+	Country       string        `gorm:"type:varchar(10);default:'br'" json:"country"`
+	IsActive      bool          `gorm:"default:true" json:"is_active"`
+	ProxyType     string        `gorm:"type:varchar(10)" json:"proxy_type"`
+	ProxyHost     string        `gorm:"type:varchar(255)" json:"proxy_host"`
+	ProxyPort     int           `json:"proxy_port"`
+	ProxyUsername string        `gorm:"type:varchar(255)" json:"proxy_username"`
+	ProxyPassword string        `gorm:"type:varchar(512)" json:"-"`
+	CreatedAt     time.Time     `json:"created_at"`
+	UpdatedAt     time.Time     `json:"updated_at"`
 }
 
 func (p *ProxyProviderConfig) BeforeCreate(tx *gorm.DB) error {
