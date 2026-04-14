@@ -22,6 +22,7 @@ func NewInboxHandler(db *gorm.DB, manager *whatsapp.Manager) *InboxHandler {
 }
 
 type InboxChat struct {
+	InstanceID  string `json:"instance_id,omitempty"`
 	JID         string `json:"jid"`
 	Name        string `json:"name"`
 	Phone       string `json:"phone"`
@@ -45,6 +46,8 @@ type InboxMessage struct {
 	IsFavorite *bool  `json:"is_favorite,omitempty"`
 	IsArchived *bool  `json:"is_archived,omitempty"`
 	IsDeleted  *bool  `json:"is_deleted,omitempty"`
+	SenderJID  string `json:"sender_jid,omitempty"`
+	SenderName string `json:"sender_name,omitempty"`
 }
 
 type InboxContact struct {
@@ -60,7 +63,7 @@ type InboxContact struct {
 	Funnel      string   `json:"funnel,omitempty"`
 	Stage       string   `json:"stage,omitempty"`
 	Journey     string   `json:"journey,omitempty"`
-	Owner       string   `json:"owner,omitempty"`
+	Source      string   `json:"source,omitempty"`
 	OwnerName   string   `json:"owner_name,omitempty"`
 	Notes       string   `json:"notes,omitempty"`
 }
@@ -96,6 +99,7 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 		ContactName   string `gorm:"column:contact_name"`
 		ContactAvatar string `gorm:"column:contact_avatar"`
 		Direction     string `gorm:"column:direction"`
+		InstanceID    string `gorm:"column:instance_id"`
 	}
 
 	var rawChatsResult []rawChat
@@ -215,29 +219,8 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 		}
 
 		name := rc.ContactName
+		avatar := rc.ContactAvatar
 		if name == "" || name == phone {
-			// Try to get updated name from WhatsApp
-			client := h.manager.GetInstance(instance.ID.String())
-			if client != nil && client.IsConnected() {
-				if strings.Contains(rc.ToJID, "@g.us") {
-					// Get group info
-					groupInfo, err := client.GetGroupInfo(rc.ToJID)
-					if err == nil {
-						if gName, ok := groupInfo["name"].(string); ok && gName != "" {
-							name = gName
-						}
-					}
-				} else {
-					// Get contact info
-					queryJID := phone + "@s.whatsapp.net"
-					_, pushName := client.GetContactInfo(queryJID)
-					if pushName != "" {
-						name = pushName
-					}
-				}
-			}
-		}
-		if name == "" {
 			name = phone
 		}
 
@@ -245,10 +228,11 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 		isGroup := strings.Contains(rc.ToJID, "@g.us")
 
 		chats = append(chats, InboxChat{
+			InstanceID:  instance.ID.String(),
 			JID:         rc.ToJID,
 			Name:        name,
 			Phone:       phone,
-			Avatar:      rc.ContactAvatar,
+			Avatar:      avatar,
 			LastMessage: truncateMessage(lastMsg, 60),
 			LastTime:    rc.MaxTime,
 			UnreadCount: int(rc.MsgCount),
@@ -362,7 +346,7 @@ func (h *InboxHandler) GetChat(c *fiber.Ctx) error {
 		contactInfo.Funnel = contact.Funnel
 		contactInfo.Stage = contact.Stage
 		contactInfo.Journey = contact.Journey
-		contactInfo.Owner = contact.Owner
+		contactInfo.Source = string(contact.Source)
 		contactInfo.Notes = contact.Notes
 		tags := make([]string, len(contact.Tags))
 		for i, t := range contact.Tags {
@@ -370,10 +354,10 @@ func (h *InboxHandler) GetChat(c *fiber.Ctx) error {
 		}
 		contactInfo.Tags = tags
 
-		// Get owner name if owner is set
-		if contact.Owner != "" {
+		// Get owner name if owner_id is set
+		if contact.OwnerID != nil {
 			var ownerUser models.User
-			if err := h.db.Where("id = ?", contact.Owner).First(&ownerUser).Error; err == nil {
+			if err := h.db.Where("id = ?", *contact.OwnerID).First(&ownerUser).Error; err == nil {
 				contactInfo.OwnerName = ownerUser.Name
 			}
 		}
@@ -416,13 +400,18 @@ func (h *InboxHandler) GetMessages(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "jid é obrigatório"})
 	}
 
+	canonicalJID := jid
+	if !strings.HasSuffix(jid, "@g.us") && !strings.HasSuffix(jid, "@newsletter") && jid != "status@broadcast" {
+		canonicalJID = extractPhoneFromJID(jid) + "@s.whatsapp.net"
+	}
+
 	limit := c.QueryInt("limit", 50)
 	offset := c.QueryInt("offset", 0)
 	before := c.Query("before", "")
 
 	var logs []models.MessageLog
-	// Filter by to_j_id and exclude deleted messages
-	query := h.db.Where("instance_id = ? AND to_j_id = ? AND is_deleted = ?", instance.ID, jid, false).
+	// Filter by canonical to_j_id and exclude deleted messages
+	query := h.db.Where("instance_id = ? AND (to_j_id = ? OR to_j_id = ?) AND is_deleted = ?", instance.ID, jid, canonicalJID, false).
 		Order("created_at DESC")
 
 	if before != "" {
@@ -460,13 +449,15 @@ func (h *InboxHandler) GetMessages(c *fiber.Ctx) error {
 			IsFavorite: boolPtr(log.IsFavorite),
 			IsArchived: boolPtr(log.IsArchived),
 			IsDeleted:  boolPtr(log.IsDeleted),
+			SenderJID:  log.SenderJID,
+			SenderName: log.SenderName,
 		})
 	}
 
 	reverseMessages(messages)
 
 	var total int64
-	h.db.Model(&models.MessageLog{}).Where("instance_id = ? AND to_j_id = ?", instance.ID, jid).Count(&total)
+	h.db.Model(&models.MessageLog{}).Where("instance_id = ? AND (to_j_id = ? OR to_j_id = ?)", instance.ID, jid, canonicalJID).Count(&total)
 
 	return c.JSON(fiber.Map{
 		"messages": messages,
@@ -535,6 +526,9 @@ func (h *InboxHandler) SendMessage(c *fiber.Ctx) error {
 	jid := c.Params("jid")
 	if jid == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "jid é obrigatório"})
+	}
+	if !strings.HasSuffix(jid, "@g.us") && !strings.HasSuffix(jid, "@newsletter") && jid != "status@broadcast" {
+		jid = extractPhoneFromJID(jid) + "@s.whatsapp.net"
 	}
 
 	var req struct {

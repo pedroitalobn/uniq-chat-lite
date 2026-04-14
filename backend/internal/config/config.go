@@ -38,11 +38,17 @@ type Config struct {
 	AsaasWebhookSecret string
 	AsaasEnvironment   string // "sandbox" ou "production"
 
-	// Resend — transactional email
+	// Resend — transactional email (legacy)
 	ResendAPIKey string
 	FromEmail    string
-	AppName      string
-	AppURL       string
+
+	// Maileroo — transactional email (new)
+	MailerooAPIKey      string
+	MailerooSenderEmail string
+	MailerooSenderName  string
+
+	AppName string
+	AppURL  string
 
 	// Bright Data — residential proxy
 	BrightDataCustomerID string
@@ -102,11 +108,17 @@ func Load() *Config {
 		AsaasWebhookSecret: getEnv("ASAAS_WEBHOOK_SECRET", ""),
 		AsaasEnvironment:   getEnv("ASAAS_ENVIRONMENT", "sandbox"),
 
-		// Resend
+		// Resend (legacy)
 		ResendAPIKey: getEnv("RESEND_API_KEY", ""),
 		FromEmail:    getEnv("FROM_EMAIL", "mail@mrstpry.org"),
-		AppName:      getEnv("APP_NAME", "Uniq.chat"),
-		AppURL:       getEnv("APP_URL", getEnv("FRONTEND_URL", "http://localhost:3000")),
+
+		// Maileroo - transactional email
+		MailerooAPIKey:      getEnv("MAILEROO_API_KEY", "f7afa02bf8b442e9369d83d3315e20013876b97146f31cac65e8fe2b1d398eb8"),
+		MailerooSenderEmail: getEnv("MAILEROO_SENDER_EMAIL", "mail@uniq.chat"),
+		MailerooSenderName:  getEnv("MAILEROO_SENDER_NAME", "Uniq.chat"),
+
+		AppName: getEnv("APP_NAME", "Uniq.chat"),
+		AppURL:  getEnv("APP_URL", getEnv("FRONTEND_URL", "http://localhost:3000")),
 
 		// Bright Data
 		BrightDataCustomerID: getEnv("BRIGHTDATA_CUSTOMER_ID", ""),

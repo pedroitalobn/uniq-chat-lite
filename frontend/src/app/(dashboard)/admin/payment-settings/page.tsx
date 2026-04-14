@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api";
-import { CreditCard, Shield, Check, X, Loader2, Save, Key, Globe, ExternalLink, Lock } from "lucide-react";
+import { CreditCard, Shield, Check, X, Loader2, Save, Key, Globe, ExternalLink, Lock, Copy } from "lucide-react";
+import { LoadingScreen } from "@/components/Loading";
 import { toast } from "sonner";
 
 interface PaymentSettings {
@@ -18,12 +19,40 @@ interface PaymentSettings {
   asaas_checkout_type?: string;
   hotmart_api_key?: string;
   hotmart_webhook_secret?: string;
+  // Configuration status
+  stripe_configured?: boolean;
+  asaas_configured?: boolean;
+  hotmart_configured?: boolean;
+  // Webhook URLs
+  stripe_webhook_url?: string;
+  asaas_webhook_url?: string;
 }
 
 const PROVIDERS = [
-  { id: "stripe", label: "Stripe", icon: "💳", color: "#635bff", desc: "Cartão Internacional" },
-  { id: "asaas", label: "Asaas", icon: "🇧🇷", color: "#22c55e", desc: "Pix, Boleto, Cartão (BR)" },
-  { id: "hotmart", label: "Hotmart", icon: "🎯", color: "#fbbf24", desc: "Em breve" },
+  { 
+    id: "stripe", 
+    label: "Stripe", 
+    icon: "💳", 
+    color: "#635bff", 
+    desc: "Cartão Internacional",
+    descConfigured: "Cartão Internacional (Configurado)"
+  },
+  { 
+    id: "asaas", 
+    label: "Asaas", 
+    icon: "🇧🇷", 
+    color: "#22c55e", 
+    desc: "Pix, Boleto, Cartão (BR) - Configure no painel",
+    descConfigured: "Pix, Boleto, Cartão (BR) (Configurado)"
+  },
+  { 
+    id: "hotmart", 
+    label: "Hotmart", 
+    icon: "🎯", 
+    color: "#fbbf24", 
+    desc: "Em breve",
+    descConfigured: "Em breve"
+  },
 ];
 
 const ASAAS_ENVIRONMENTS = [
@@ -146,8 +175,12 @@ export default function PaymentSettingsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--green)" }} />
+      <div className="space-y-6 max-w-4xl">
+        <div>
+          <div className="skeleton h-8 w-64 rounded-xl mb-2" />
+          <div className="skeleton h-4 w-80 rounded-xl" />
+        </div>
+        <LoadingScreen />
       </div>
     );
   }
@@ -166,21 +199,48 @@ export default function PaymentSettingsPage() {
       {/* Status do Provedor Ativo */}
       <div
         className="rounded-2xl p-4 flex items-center justify-between"
-        style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.2)" }}
+        style={{ 
+          background: settings?.active_provider && 
+            ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
+             (settings.active_provider === 'asaas' && settings.asaas_configured)) 
+            ? "rgba(0,212,106,0.08)" 
+            : "rgba(251,191,36,0.08)", 
+          border: `1px solid ${
+            settings?.active_provider && 
+            ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
+             (settings.active_provider === 'asaas' && settings.asaas_configured))
+            ? "rgba(0,212,106,0.2)" 
+            : "rgba(251,191,36,0.2)"
+          }` 
+        }}
       >
         <div className="flex items-center gap-3">
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ background: "rgba(0,212,106,0.15)" }}
+            style={{ 
+              background: settings?.active_provider && 
+                ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
+                 (settings.active_provider === 'asaas' && settings.asaas_configured))
+                ? "rgba(0,212,106,0.15)" 
+                : "rgba(251,191,36,0.15)"
+            }}
           >
-            <Check className="w-4 h-4" style={{ color: "var(--green)" }} />
+            {settings?.active_provider && 
+              ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
+               (settings.active_provider === 'asaas' && settings.asaas_configured)) ? (
+              <Check className="w-4 h-4" style={{ color: "var(--green)" }} />
+            ) : (
+              <Shield className="w-4 h-4" style={{ color: "#fbbf24" }} />
+            )}
           </div>
           <div>
             <p className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>
               Provedor Ativo
             </p>
             <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>
-              {PROVIDERS.find((p) => p.id === activeProvider)?.desc}
+              {PROVIDERS.find((p) => p.id === settings?.active_provider)?.descConfigured || 
+               PROVIDERS.find((p) => p.id === settings?.active_provider)?.desc ||
+               "Não configurado"}
             </p>
           </div>
         </div>
@@ -190,12 +250,32 @@ export default function PaymentSettingsPage() {
               Alterações pendentes
             </span>
           )}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: "rgba(0,212,106,0.15)" }}>
-            <span style={{ color: "var(--green)" }}>
-              {PROVIDERS.find((p) => p.id === activeProvider)?.icon}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ 
+            background: settings?.active_provider && 
+              ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
+               (settings.active_provider === 'asaas' && settings.asaas_configured))
+              ? "rgba(0,212,106,0.15)" 
+              : "rgba(251,191,36,0.15)"
+          }}>
+            <span style={{ 
+              color: settings?.active_provider && 
+                ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
+                 (settings.active_provider === 'asaas' && settings.asaas_configured))
+                ? "var(--green)" 
+                : "#fbbf24"
+            }}>
+              {PROVIDERS.find((p) => p.id === settings?.active_provider)?.icon}
             </span>
-            <span className="text-sm font-medium" style={{ color: "var(--green)" }}>
-              {PROVIDERS.find((p) => p.id === activeProvider)?.label}
+            <span className="text-sm font-medium" style={{ 
+              color: settings?.active_provider && 
+                ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
+                 (settings.active_provider === 'asaas' && settings.asaas_configured))
+                ? "var(--green)" 
+                : "#fbbf24"
+            }}>
+              {settings?.active_provider === 'stripe' && settings?.stripe_configured ? 'Stripe' :
+               settings?.active_provider === 'asaas' && settings?.asaas_configured ? 'Asaas' :
+               settings?.active_provider || 'Stripe'}
             </span>
           </div>
         </div>
@@ -214,32 +294,51 @@ export default function PaymentSettingsPage() {
         </div>
 
         <div className="grid grid-cols-3 gap-3">
-          {PROVIDERS.map((provider) => (
-            <button
-              key={provider.id}
-              onClick={() => setPendingProvider(provider.id)}
-              className="p-3 rounded-xl border-2 transition-all text-center relative"
-              style={{
-                borderColor: displayProvider === provider.id ? provider.color : "hsl(240 12% 15%)",
-                background: displayProvider === provider.id ? `${provider.color}10` : "transparent",
-                opacity: provider.id === "hotmart" ? 0.5 : 1,
-              }}
-              disabled={provider.id === "hotmart"}
-            >
-              <div className="text-2xl mb-1">{provider.icon}</div>
-              <div className="font-medium text-sm" style={{ color: displayProvider === provider.id ? provider.color : "hsl(240 15% 93%)" }}>
-                {provider.label}
-              </div>
-              <div className="text-[10px]" style={{ color: "hsl(240 8% 46%)" }}>
-                {provider.desc}
-              </div>
-              {displayProvider === provider.id && (
-                <div className="absolute top-2 right-2">
-                  <Check className="w-4 h-4" style={{ color: provider.color }} />
+          {PROVIDERS.map((provider) => {
+            const isConfigured = 
+              (provider.id === 'stripe' && settings?.stripe_configured) ||
+              (provider.id === 'asaas' && settings?.asaas_configured) ||
+              (provider.id === 'hotmart' && settings?.hotmart_configured);
+            
+            return (
+              <button
+                key={provider.id}
+                onClick={() => {
+                  if (provider.id !== 'hotmart') {
+                    setPendingProvider(provider.id);
+                  }
+                }}
+                className="p-3 rounded-xl border-2 transition-all text-center relative"
+                style={{
+                  borderColor: displayProvider === provider.id ? provider.color : isConfigured ? "hsl(240 12% 15%)" : "hsl(240 12% 10%)",
+                  background: displayProvider === provider.id ? `${provider.color}10` : "transparent",
+                  opacity: provider.id === "hotmart" ? 0.5 : (isConfigured ? 1 : 0.6),
+                }}
+                disabled={provider.id === "hotmart"}
+              >
+                <div className="text-2xl mb-1">{provider.icon}</div>
+                <div className="font-medium text-sm" style={{ color: displayProvider === provider.id ? provider.color : isConfigured ? "hsl(240 15% 93%)" : "hsl(240 8% 46%)" }}>
+                  {provider.label}
+                  {isConfigured && (
+                    <Check className="w-3 h-3 inline ml-1" style={{ color: "var(--green)" }} />
+                  )}
                 </div>
-              )}
-            </button>
-          ))}
+                <div className="text-[10px]" style={{ color: isConfigured ? "var(--green)" : "hsl(240 8% 46%)" }}>
+                  {isConfigured ? provider.descConfigured : provider.desc}
+                </div>
+                {displayProvider === provider.id && (
+                  <div className="absolute top-2 right-2">
+                    <Check className="w-4 h-4" style={{ color: provider.color }} />
+                  </div>
+                )}
+                {!isConfigured && provider.id !== 'hotmart' && (
+                  <div className="absolute top-2 left-2">
+                    <Shield className="w-3 h-3" style={{ color: "#fbbf24" }} />
+                  </div>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -251,15 +350,24 @@ export default function PaymentSettingsPage() {
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(99,91,255,0.15)" }}>
-                <Shield className="w-4 h-4" style={{ color: "#635bff" }} />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: settings?.stripe_configured ? "rgba(99,91,255,0.15)" : "rgba(251,191,36,0.15)" }}>
+                {settings?.stripe_configured ? (
+                  <Shield className="w-4 h-4" style={{ color: "#635bff" }} />
+                ) : (
+                  <Shield className="w-4 h-4" style={{ color: "#fbbf24" }} />
+                )}
               </div>
               <div>
                 <h3 className="font-medium" style={{ color: "hsl(240 15% 93%)" }}>Stripe</h3>
-                <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>Configurações do Stripe</p>
+                <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>Configurações do Stripe {settings?.stripe_configured ? "(via painel)" : "(via .env)"}</p>
               </div>
             </div>
-            <span className="text-xs px-2 py-1 rounded" style={{ background: "rgba(99,91,255,0.15)", color: "#635bff" }}>Ativo</span>
+            <span className="text-xs px-2 py-1 rounded" style={{ 
+              background: settings?.stripe_configured ? "rgba(0,212,106,0.15)" : "rgba(251,191,36,0.15)", 
+              color: settings?.stripe_configured ? "var(--green)" : "#fbbf24" 
+            }}>
+              {settings?.stripe_configured ? "Configurado" : "Fallback .env"}
+            </span>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -332,6 +440,30 @@ export default function PaymentSettingsPage() {
               </div>
             </div>
           </div>
+
+          {/* Webhook URL */}
+          <div className="border-t pt-4" style={{ borderColor: "hsl(240 12% 15%)" }}>
+            <label className="text-xs block mb-2" style={{ color: "hsl(240 8% 46%)" }}>URL do Webhook (para configurar no Stripe)</label>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 12% 10%)", color: "hsl(240 8% 60%)" }}>
+                {settings?.stripe_webhook_url || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/webhook`}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  const url = settings?.stripe_webhook_url || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/webhook`;
+                  navigator.clipboard.writeText(url);
+                  toast.success("URL copiada!");
+                }}
+                className="p-2 rounded hover:bg-white/5"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 38%)" }}>
+              Configure esta URL no painel do Stripe em: webhook settings → Add endpoint
+            </p>
+          </div>
         </div>
       )}
 
@@ -343,15 +475,24 @@ export default function PaymentSettingsPage() {
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(34,197,94,0.15)" }}>
-                <Globe className="w-4 h-4" style={{ color: "#22c55e" }} />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: settings?.asaas_configured ? "rgba(34,197,94,0.15)" : "rgba(251,191,36,0.15)" }}>
+                {settings?.asaas_configured ? (
+                  <Globe className="w-4 h-4" style={{ color: "#22c55e" }} />
+                ) : (
+                  <Globe className="w-4 h-4" style={{ color: "#fbbf24" }} />
+                )}
               </div>
               <div>
                 <h3 className="font-medium" style={{ color: "hsl(240 15% 93%)" }}>Asaas</h3>
-                <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>Gateway de pagamento brasileiro</p>
+                <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>Gateway de pagamento brasileiro {settings?.asaas_configured ? "(configurado)" : "(não configurado)"}</p>
               </div>
             </div>
-            <span className="text-xs px-2 py-1 rounded" style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e" }}>Ativo</span>
+            <span className="text-xs px-2 py-1 rounded" style={{ 
+              background: settings?.asaas_configured ? "rgba(0,212,106,0.15)" : "rgba(251,191,36,0.15)", 
+              color: settings?.asaas_configured ? "var(--green)" : "#fbbf24" 
+            }}>
+              {settings?.asaas_configured ? "Configurado" : "Não configurado"}
+            </span>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -435,6 +576,30 @@ export default function PaymentSettingsPage() {
                 </label>
               </div>
             </div>
+          </div>
+
+          {/* Webhook URL */}
+          <div className="border-t pt-4" style={{ borderColor: "hsl(240 12% 15%)" }}>
+            <label className="text-xs block mb-2" style={{ color: "hsl(240 8% 46%)" }}>URL do Webhook (para configurar no Asaas)</label>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 12% 10%)", color: "hsl(240 8% 60%)" }}>
+                {settings?.asaas_webhook_url || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/asaas/webhook`}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  const url = settings?.asaas_webhook_url || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/asaas/webhook`;
+                  navigator.clipboard.writeText(url);
+                  toast.success("URL copiada!");
+                }}
+                className="p-2 rounded hover:bg-white/5"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 38%)" }}>
+              Configure esta URL no painel do Asaas em: Configurações → Webhooks
+            </p>
           </div>
         </div>
       )}

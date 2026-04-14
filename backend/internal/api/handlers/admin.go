@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/email"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/whatsapp"
@@ -48,9 +50,36 @@ func (h *AdminHandler) GetPaymentSettings(c *fiber.Ctx) error {
 		}
 	}
 
+	// Check if keys are configured (DB or env fallback)
+	stripeConfigured := settings.StripeSecretKey != "" || config.AppConfig.StripeSecretKey != ""
+	asaasConfigured := settings.AsaasAPIKey != "" || config.AppConfig.AsaasAPIKey != ""
+	hotmartConfigured := settings.HotmartAPIKey != ""
+
+	// Determine active provider based on what's configured
+	activeProvider := string(settings.ActiveProvider)
+	if activeProvider == "stripe" && !stripeConfigured {
+		// Stripe selected but not configured, check others
+		if asaasConfigured {
+			activeProvider = "asaas"
+		} else if hotmartConfigured {
+			activeProvider = "hotmart"
+		}
+	} else if activeProvider == "asaas" && !asaasConfigured {
+		if stripeConfigured {
+			activeProvider = "stripe"
+		} else if hotmartConfigured {
+			activeProvider = "hotmart"
+		}
+	}
+
+	// Build webhook URLs
+	appURL := strings.TrimRight(config.AppConfig.AppURL, "/")
+	stripeWebhookURL := appURL + "/api/stripe/webhook"
+	asaasWebhookURL := appURL + "/api/asaas/webhook"
+
 	return c.JSON(fiber.Map{
 		"id":                     settings.ID,
-		"active_provider":        string(settings.ActiveProvider),
+		"active_provider":        activeProvider,
 		"stripe_secret_key":      settings.StripeSecretKey,
 		"stripe_webhook_secret":  settings.StripeWebhookSecret,
 		"stripe_checkout_type":   settings.StripeCheckoutType,
@@ -60,6 +89,13 @@ func (h *AdminHandler) GetPaymentSettings(c *fiber.Ctx) error {
 		"asaas_checkout_type":    settings.AsaasCheckoutType,
 		"hotmart_api_key":        settings.HotmartAPIKey,
 		"hotmart_webhook_secret": settings.HotmartWebhookSecret,
+		// Status de configuração
+		"stripe_configured":  stripeConfigured,
+		"asaas_configured":   asaasConfigured,
+		"hotmart_configured": hotmartConfigured,
+		// Webhook URLs
+		"stripe_webhook_url": stripeWebhookURL,
+		"asaas_webhook_url":  asaasWebhookURL,
 	})
 }
 
@@ -728,4 +764,355 @@ func (h *AdminHandler) Stats(c *fiber.Ctx) error {
 			"today": todayMessages,
 		},
 	})
+}
+
+// --- Email Settings ---
+
+// GetEmailSettings godoc
+// GET /admin/email-settings
+func (h *AdminHandler) GetEmailSettings(c *fiber.Ctx) error {
+	var settings models.EmailSettings
+
+	// Try to get existing settings, or return defaults
+	result := h.db.First(&settings)
+	if result.Error == gorm.ErrRecordNotFound {
+		// Return default settings
+		return c.JSON(fiber.Map{
+			"api_key":      "",
+			"sender_email": "mail@uniq.chat",
+			"sender_name":  "Uniq.chat",
+			"is_enabled":   true,
+		})
+	}
+	if result.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar configurações"})
+	}
+
+	// Don't return the actual API key for security
+	return c.JSON(fiber.Map{
+		"api_key":      "",
+		"sender_email": settings.SenderEmail,
+		"sender_name":  settings.SenderName,
+		"is_enabled":   settings.IsEnabled,
+		"has_api_key":  settings.APIKey != "",
+	})
+}
+
+// UpdateEmailSettings godoc
+// PUT /admin/email-settings
+func (h *AdminHandler) UpdateEmailSettings(c *fiber.Ctx) error {
+	var req struct {
+		APIKey      string `json:"api_key"`
+		SenderEmail string `json:"sender_email"`
+		SenderName  string `json:"sender_name"`
+		IsEnabled   bool   `json:"is_enabled"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	if req.SenderEmail == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "sender_email é obrigatório"})
+	}
+
+	var settings models.EmailSettings
+	result := h.db.First(&settings)
+
+	if result.Error == gorm.ErrRecordNotFound {
+		// Create new settings
+		settings = models.EmailSettings{
+			APIKey:      req.APIKey,
+			SenderEmail: req.SenderEmail,
+			SenderName:  req.SenderName,
+			IsEnabled:   req.IsEnabled,
+		}
+		h.db.Create(&settings)
+	} else if result.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar configurações"})
+	} else {
+		// Update existing - only update APIKey if provided
+		if req.APIKey != "" {
+			settings.APIKey = req.APIKey
+		}
+		settings.SenderEmail = req.SenderEmail
+		settings.SenderName = req.SenderName
+		settings.IsEnabled = req.IsEnabled
+		h.db.Save(&settings)
+	}
+
+	// Update the email service config
+	if h.emailSvc != nil {
+		apiKey := settings.APIKey
+		if apiKey == "" {
+			apiKey = req.APIKey // Use new API key if just set
+		}
+		h.emailSvc.SetConfig(apiKey, settings.SenderEmail, settings.SenderName)
+	}
+
+	return c.JSON(fiber.Map{"message": "configurações atualizadas"})
+}
+
+// TestEmail godoc
+// POST /admin/email-settings/test
+func (h *AdminHandler) TestEmail(c *fiber.Ctx) error {
+	var req struct {
+		To string `json:"to"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	if req.To == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "e-mail de destino é obrigatório"})
+	}
+
+	// Get current settings
+	var settings models.EmailSettings
+	if err := h.db.First(&settings).Error; err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "configure o e-mail primeiro"})
+	}
+
+	if !settings.IsEnabled {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "e-mail está desabilitado"})
+	}
+
+	// Send test email
+	htmlContent := email.TestHTML("Uniq.chat")
+	err := h.emailSvc.SyncSend(req.To, "Teste do Uniq.chat", htmlContent, "test")
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao enviar: " + err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"message": "e-mail de teste enviado com sucesso"})
+}
+
+// ListEmailTemplates godoc
+// GET /admin/email-templates
+func (h *AdminHandler) ListEmailTemplates(c *fiber.Ctx) error {
+	var templates []models.EmailTemplate
+	h.db.Order("slug ASC").Find(&templates)
+
+	// If no templates exist, return defaults
+	if len(templates) == 0 {
+		templates = getDefaultTemplates()
+	}
+
+	return c.JSON(fiber.Map{"data": templates})
+}
+
+// GetEmailTemplate godoc
+// GET /admin/email-templates/:slug
+func (h *AdminHandler) GetEmailTemplate(c *fiber.Ctx) error {
+	slug := c.Params("slug")
+
+	var template models.EmailTemplate
+	result := h.db.Where("slug = ?", slug).First(&template)
+	if result.Error == gorm.ErrRecordNotFound {
+		// Return default template
+		defaults := getDefaultTemplates()
+		for _, t := range defaults {
+			if t.Slug == slug {
+				return c.JSON(t)
+			}
+		}
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "template não encontrado"})
+	}
+	if result.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar template"})
+	}
+
+	return c.JSON(template)
+}
+
+// UpdateEmailTemplate godoc
+// PUT /admin/email-templates/:slug
+func (h *AdminHandler) UpdateEmailTemplate(c *fiber.Ctx) error {
+	slug := c.Params("slug")
+
+	var req struct {
+		Subject     string `json:"subject"`
+		HTMLContent string `json:"html_content"`
+		IsActive    bool   `json:"is_active"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	var template models.EmailTemplate
+	result := h.db.Where("slug = ?", slug).First(&template)
+
+	if result.Error == gorm.ErrRecordNotFound {
+		// Create new template
+		template = models.EmailTemplate{
+			Slug:        slug,
+			Name:        getTemplateName(slug),
+			Subject:     req.Subject,
+			HTMLContent: req.HTMLContent,
+			IsActive:    req.IsActive,
+		}
+		h.db.Create(&template)
+	} else if result.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar template"})
+	} else {
+		template.Subject = req.Subject
+		template.HTMLContent = req.HTMLContent
+		template.IsActive = req.IsActive
+		h.db.Save(&template)
+	}
+
+	return c.JSON(fiber.Map{"message": "template atualizado"})
+}
+
+// TestEmailTemplate godoc
+// POST /admin/email-templates/:slug/test
+func (h *AdminHandler) TestEmailTemplate(c *fiber.Ctx) error {
+	slug := c.Params("slug")
+	var req struct {
+		To string `json:"to"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+	if req.To == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "e-mail de destino é obrigatório"})
+	}
+
+	var settings models.EmailSettings
+	if err := h.db.First(&settings).Error; err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "configure o e-mail primeiro"})
+	}
+	if !settings.IsEnabled {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "e-mail está desabilitado"})
+	}
+
+	var subject, html string
+
+	// Prefer custom template from DB
+	var custom models.EmailTemplate
+	if err := h.db.Where("slug = ?", slug).First(&custom).Error; err == nil {
+		subject = strings.TrimSpace(custom.Subject)
+		html = strings.TrimSpace(custom.HTMLContent)
+	}
+
+	if subject == "" || html == "" {
+		// fallback to default template
+		defaults := getDefaultTemplates()
+		found := false
+		for _, t := range defaults {
+			if t.Slug == slug {
+				subject = t.Subject
+				html = t.HTMLContent
+				found = true
+				break
+			}
+		}
+		if !found {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "template não encontrado"})
+		}
+	}
+
+	// placeholder replacements for test payload
+	replacer := strings.NewReplacer(
+		"{{app_name}}", "Uniq.chat",
+		"{{name}}", "Usuário Teste",
+		"{{app_url}}", "https://uniq.chat",
+		"{{reset_link}}", "https://uniq.chat/reset-password?token=test",
+		"{{plan_name}}", "Pro",
+		"{{amount}}", "99.90",
+		"{{old_plan}}", "Starter",
+		"{{new_plan}}", "Pro",
+		"{{billing_url}}", "https://uniq.chat/billing",
+		"{{plans_url}}", "https://uniq.chat/plans",
+		"{{instance_name}}", "Vendas",
+		"{{phone}}", "+55 11 99999-0000",
+		"{{email}}", req.To,
+		"{{temp_password}}", "Temp#1234",
+		"{{new_password}}", "New#1234",
+	)
+	subject = replacer.Replace(subject)
+	html = replacer.Replace(html)
+
+	if err := h.emailSvc.SyncSend(req.To, subject, html, "test_"+slug); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao enviar: " + err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"message": "e-mail de teste do template enviado com sucesso"})
+}
+
+// GetEmailLogs godoc
+// GET /admin/email-logs
+func (h *AdminHandler) GetEmailLogs(c *fiber.Ctx) error {
+	var logs []models.EmailLog
+	limit := c.QueryInt("limit", 50)
+	offset := c.QueryInt("offset", 0)
+
+	h.db.Order("created_at DESC").Limit(limit).Offset(offset).Find(&logs)
+
+	var total int64
+	h.db.Model(&models.EmailLog{}).Count(&total)
+
+	return c.JSON(fiber.Map{
+		"data":   logs,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
+}
+
+// Helper functions
+func getTemplateName(slug string) string {
+	names := map[string]string{
+		"welcome":               "Bem-vindo",
+		"password_reset":        "Redefinição de Senha",
+		"password_changed":      "Senha Alterada",
+		"payment_confirmed":     "Pagamento Confirmado",
+		"payment_failed":        "Pagamento Falhou",
+		"plan_changed":          "Plano Atualizado",
+		"subscription_canceled": "Assinatura Cancelada",
+		"instance_banned":       "Instância Banida",
+		"admin_created_account": "Conta Criada por Admin",
+		"admin_reset_password":  "Senha Resetada por Admin",
+	}
+	if name, ok := names[slug]; ok {
+		return name
+	}
+	return slug
+}
+
+func getDefaultTemplates() []models.EmailTemplate {
+	base := func(title, body string) string {
+		return `<div style="margin:0;padding:0;background:#f1f5f9;font-family:Inter,Arial,sans-serif;">` +
+			`<table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 0;">` +
+			`<tr><td align="center">` +
+			`<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;">` +
+			`<tr><td style="background:linear-gradient(135deg,#6366f1,#818cf8);padding:26px 28px;text-align:center;">` +
+			`<h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;">{{app_name}}</h1>` +
+			`</td></tr>` +
+			`<tr><td style="padding:28px;">` +
+			`<h2 style="margin:0 0 12px;color:#1e293b;font-size:24px;">` + title + `</h2>` +
+			`<p style="margin:0 0 12px;color:#475569;font-size:14px;line-height:1.6;">Olá, <strong>{{name}}</strong>!</p>` +
+			body +
+			`</td></tr>` +
+			`<tr><td style="background:#f8fafc;padding:18px 28px;border-top:1px solid #e2e8f0;text-align:center;">` +
+			`<p style="margin:0;color:#64748b;font-size:12px;">© 2026 {{app_name}} • Todos os direitos reservados</p>` +
+			`<p style="margin:6px 0 0;"><a href="{{app_url}}/unsubscribe" style="color:#6366f1;font-size:12px;">Cancelar inscrição</a></p>` +
+			`</td></tr>` +
+			`</table></td></tr></table></div>`
+	}
+
+	return []models.EmailTemplate{
+		{Slug: "welcome", Name: "Bem-vindo", Subject: "Bem-vindo ao {{app_name}}!", HTMLContent: base("Bem-vindo ao {{app_name}}", `<p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">Sua conta foi criada com sucesso. Estamos felizes em ter você conosco.</p>`), IsActive: true},
+		{Slug: "password_reset", Name: "Redefinição de Senha", Subject: "Redefinir sua senha", HTMLContent: base("Redefinir senha", `<p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">Recebemos uma solicitação de redefinição. Use este link: <a href="{{reset_link}}" style="color:#6366f1;">{{reset_link}}</a></p>`), IsActive: true},
+		{Slug: "password_changed", Name: "Senha Alterada", Subject: "Sua senha foi alterada", HTMLContent: base("Senha alterada", `<p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">Sua senha foi alterada com sucesso. Se não foi você, contate o suporte imediatamente.</p>`), IsActive: true},
+		{Slug: "payment_confirmed", Name: "Pagamento Confirmado", Subject: "Pagamento confirmado!", HTMLContent: base("Pagamento confirmado", `<p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">Seu pagamento foi processado com sucesso para o plano <strong>{{plan_name}}</strong> no valor de <strong>R$ {{amount}}</strong>.</p>`), IsActive: true},
+		{Slug: "payment_failed", Name: "Pagamento Falhou", Subject: "Falha no pagamento", HTMLContent: base("Falha no pagamento", `<p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">Não foi possível processar seu pagamento. Atualize seus dados em <a href="{{billing_url}}" style="color:#6366f1;">{{billing_url}}</a>.</p>`), IsActive: true},
+		{Slug: "plan_changed", Name: "Plano Atualizado", Subject: "Seu plano foi atualizado", HTMLContent: base("Plano atualizado", `<p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">Seu plano foi alterado de <strong>{{old_plan}}</strong> para <strong>{{new_plan}}</strong>.</p>`), IsActive: true},
+		{Slug: "subscription_canceled", Name: "Assinatura Cancelada", Subject: "Assinatura cancelada", HTMLContent: base("Assinatura cancelada", `<p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">Sua assinatura foi cancelada. Você pode reativar quando quiser em <a href="{{plans_url}}" style="color:#6366f1;">{{plans_url}}</a>.</p>`), IsActive: true},
+		{Slug: "instance_banned", Name: "Instância Banida", Subject: "Instância banida", HTMLContent: base("Instância banida", `<p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">A instância <strong>{{instance_name}}</strong> ({{phone}}) foi banida. Entre em contato com o suporte.</p>`), IsActive: true},
+		{Slug: "admin_created_account", Name: "Conta Criada por Admin", Subject: "Sua conta foi criada", HTMLContent: base("Conta criada", `<p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">Sua conta foi criada. E-mail: <strong>{{email}}</strong> • Senha temporária: <strong>{{temp_password}}</strong>.</p>`), IsActive: true},
+		{Slug: "admin_reset_password", Name: "Senha Resetada por Admin", Subject: "Sua senha foi redefinida", HTMLContent: base("Senha redefinida", `<p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">Sua nova senha temporária é: <strong>{{new_password}}</strong>.</p>`), IsActive: true},
+	}
 }
