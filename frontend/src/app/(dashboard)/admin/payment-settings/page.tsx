@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api";
 import { CreditCard, Shield, Check, X, Loader2, Save, Key, Globe, ExternalLink, Lock, Copy } from "lucide-react";
-import { LoadingScreen } from "@/components/Loading";
 import { toast } from "sonner";
 
 interface PaymentSettings {
