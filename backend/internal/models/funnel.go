@@ -8,15 +8,16 @@ import (
 )
 
 type Funnel struct {
-	ID          uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
-	UserID      uuid.UUID  `gorm:"type:uuid;not null;index" json:"user_id"`
-	WorkspaceID *uuid.UUID `gorm:"type:uuid;index" json:"workspace_id,omitempty"`
-	Name        string     `gorm:"type:varchar(120);not null" json:"name"`
-	Description string     `gorm:"type:text" json:"description,omitempty"`
-	Color       string     `gorm:"type:varchar(20)" json:"color,omitempty"`
-	IsDefault   bool       `gorm:"default:false" json:"is_default"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID          uuid.UUID     `gorm:"type:uuid;primaryKey" json:"id"`
+	UserID      uuid.UUID     `gorm:"type:uuid;not null;index" json:"user_id"`
+	WorkspaceID *uuid.UUID    `gorm:"type:uuid;index" json:"workspace_id,omitempty"`
+	Name        string        `gorm:"type:varchar(120);not null" json:"name"`
+	Description string        `gorm:"type:text" json:"description,omitempty"`
+	Color       string        `gorm:"type:varchar(20)" json:"color,omitempty"`
+	IsDefault   bool          `gorm:"default:false" json:"is_default"`
+	Stages      []FunnelStage `gorm:"foreignKey:FunnelID" json:"stages,omitempty"`
+	CreatedAt   time.Time     `json:"created_at"`
+	UpdatedAt   time.Time     `json:"updated_at"`
 }
 
 func (f *Funnel) BeforeCreate(tx *gorm.DB) error {

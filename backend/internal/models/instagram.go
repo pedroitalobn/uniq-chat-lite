@@ -17,6 +17,14 @@ const (
 	AccountPending      AccountStatus = "pending"
 )
 
+// InstagramIntegrationType represents the type of Instagram integration
+type InstagramIntegrationType string
+
+const (
+	InstagramPrivate  InstagramIntegrationType = "private"  // Non-official API via instagram-private-api
+	InstagramGraphAPI InstagramIntegrationType = "graph_api" // Official Meta Graph API
+)
+
 // InstagramAccount stores credentials and metadata for an Instagram account.
 type InstagramAccount struct {
 	ID            uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
@@ -26,9 +34,21 @@ type InstagramAccount struct {
 	ProfilePicURL string    `gorm:"type:text" json:"profile_pic_url,omitempty"`
 	Bio           string    `gorm:"type:text" json:"bio,omitempty"`
 
-	// Instagram credentials (encrypted)
+	// Integration type
+	IntegrationType InstagramIntegrationType `gorm:"type:varchar(20);default:'private'" json:"integration_type"` // private | graph_api
+
+	// Instagram Private credentials (encrypted)
 	SessionJSON string `gorm:"type:text" json:"-"`         // IG session cookies (encrypted)
 	PasswordEnc string `gorm:"type:varchar(512)" json:"-"` // encrypted password
+
+	// Instagram Graph API credentials
+	FacebookPageID     string `gorm:"type:varchar(100)" json:"facebook_page_id,omitempty"`
+	FacebookPageName   string `gorm:"type:varchar(255)" json:"facebook_page_name,omitempty"`
+	PageAccessToken    string `gorm:"type:text" json:"-"` // encrypted page access token
+	InstagramBusinessID string `gorm:"type:varchar(100)" json:"instagram_business_id,omitempty"`
+	AppID              string `gorm:"type:varchar(100)" json:"app_id,omitempty"`
+	AppSecret          string `gorm:"type:varchar(255)" json:"-"` // encrypted app secret
+	WebhookVerifyToken string `gorm:"type:varchar(255)" json:"-"` // encrypted webhook verify token
 
 	// Status
 	Status     AccountStatus `gorm:"type:varchar(20);default:'pending'" json:"status"`
@@ -42,7 +62,7 @@ type InstagramAccount struct {
 	AIEnabled     bool       `gorm:"default:false" json:"ai_enabled"`
 	IntegrationID *uuid.UUID `gorm:"type:uuid" json:"integration_id,omitempty"` // LLM integration
 
-	// Taktik device assignment
+	// Taktik device assignment (for private only)
 	TaktikDeviceID string `gorm:"type:varchar(100)" json:"taktik_device_id,omitempty"`
 
 	// API proxy for instagram-cli
