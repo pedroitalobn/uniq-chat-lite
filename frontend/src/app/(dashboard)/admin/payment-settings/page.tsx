@@ -179,7 +179,13 @@ export default function PaymentSettingsPage() {
           <div className="skeleton h-8 w-64 rounded-xl mb-2" />
           <div className="skeleton h-4 w-80 rounded-xl" />
         </div>
-        <LoadingScreen />
+        <div className="flex flex-col items-center justify-center h-64 gap-3">
+          <div className="relative w-10 h-10">
+            <div className="absolute inset-0 rounded-full border-2 opacity-20" style={{ borderColor: "var(--green)" }} />
+            <div className="absolute inset-0 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--green)" }} />
+          </div>
+          <span className="text-sm" style={{ color: "var(--text-3)" }}>Carregando...</span>
+        </div>
       </div>
     );
   }
