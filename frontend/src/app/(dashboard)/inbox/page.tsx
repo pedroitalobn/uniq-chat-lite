@@ -7,7 +7,7 @@ import api from "@/lib/api";
 import {
   Search, Send, Check, CheckCheck, Image, Mic, FileText, MapPin,
   Users, Phone, Video, MessageSquare, User, Archive, Trash2, Star,
-  MoreHorizontal, ChevronRight, Filter, EyeOff, Pin, Tag, BellOff,
+  MoreHorizontal, ChevronRight, ChevronDown, Filter, EyeOff, Pin, Tag, BellOff,
   Smile, Paperclip, ArrowDown, RefreshCw, Copy
 } from "lucide-react";
 import { instancesApi, inboxApi, crmApi, workspacesApi } from "@/lib/api";
@@ -224,11 +224,19 @@ function useInboxWebSocket(instanceId: string, activeChat: string | null, qc: Re
 // ─── Contact List Item ──────────────────────────────────────────────────────
 
 function ContactItem({
-  contact, isActive, channelColor, onClick, onContextMenu,
+  contact, isActive, channelColor, onClick, onContextMenu, selectedInstances, instData,
 }: {
   contact: ChatContact; isActive: boolean; channelColor: string;
   onClick: () => void; onContextMenu: (e: React.MouseEvent) => void;
+  selectedInstances?: string[]; instData?: Instance[];
 }) {
+  // Get channels for this contact's instance
+  const contactChannels = useMemo(() => {
+    if (!selectedInstances || selectedInstances.length <= 1 || !instData) return [];
+    const contactInst = instData.filter(i => selectedInstances.includes(i.id) && i.status === "connected");
+    return contactInst;
+  }, [selectedInstances, instData]);
+
   return (
     <button
       onClick={onClick}
@@ -257,6 +265,27 @@ function ContactItem({
         {contact.is_online && !contact.is_group && (
           <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2"
             style={{ background: "#22c55e", borderColor: "var(--surface-2)" }} />
+        )}
+        {/* Channel badges for multi-instance */}
+        {contactChannels.length > 0 && (
+          <div className="absolute -bottom-1 -right-1 flex -space-x-1">
+            {contactChannels.slice(0, 3).map(inst => {
+              const ch = CHANNELS.find(c => c.id === inst.channel);
+              return (
+                <span key={inst.id} className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold border"
+                  style={{ background: ch?.color || "#888", color: "#fff", borderColor: "var(--surface-2)" }}
+                  title={inst.name}>
+                  {ch?.label.slice(0, 2).toUpperCase()}
+                </span>
+              );
+            })}
+            {contactChannels.length > 3 && (
+              <span className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold bg-gray-500"
+                style={{ color: "#fff", borderColor: "var(--surface-2)" }}>
+                +{contactChannels.length - 3}
+              </span>
+            )}
+          </div>
         )}
       </div>
 
@@ -359,6 +388,8 @@ export default function InboxPage() {
 
   const [channels, setChannels] = useState<ChannelType[]>(["whatsapp"]);
   const [instance, setInstance] = useState("");
+  const [selectedInstances, setSelectedInstances] = useState<string[]>([]);
+  const [showInstanceDropdown, setShowInstanceDropdown] = useState(false);
   const [chat, setChat] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [input, setInput] = useState("");
@@ -385,6 +416,20 @@ export default function InboxPage() {
   const endRef = useRef<HTMLDivElement>(null);
   const inpRef = useRef<HTMLInputElement>(null);
   const msgsContainerRef = useRef<HTMLDivElement>(null);
+  const instanceDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (instanceDropdownRef.current && !instanceDropdownRef.current.contains(e.target as Node)) {
+        setShowInstanceDropdown(false);
+      }
+    };
+    if (showInstanceDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showInstanceDropdown]);
 
   // ── Data queries ──
 
@@ -393,44 +438,98 @@ export default function InboxPage() {
     queryFn: () => instancesApi.list(undefined, currentWorkspace?.id).then(r => r.data),
   });
 
-  const chInst = instData.filter(i => i.status === "connected");
-  const chAvail = CHANNELS.filter(c => instData.some(i => i.channel === c.id && i.status === "connected"));
+  const chInst = instData.filter(i => i.status === "connected" || i.status === "connecting" || i.status === "disconnected");
+  const chAvail = CHANNELS.filter(c => instData.some(i => i.channel === c.id && (i.status === "connected" || i.status === "connecting" || i.status === "disconnected")));
 
+  // Auto-select most recent instance if none selected
   useEffect(() => {
-    if (chInst.length > 0 && !chInst.find(i => i.id === instance)) { setInstance(chInst[0].id); setChat(null); }
-  }, [channels, chInst.length]);
+    if (chInst.length > 0) {
+      if (selectedInstances.length === 0 && instance === "") {
+        // Select most recent connected instance by default
+        setSelectedInstances([chInst[0].id]);
+        setChat(null);
+      }
+    }
+  }, [chInst.length]);
+
+  // Sync selectedInstances with legacy instance state
+  useEffect(() => {
+    if (selectedInstances.length > 0 && !selectedInstances.includes(instance)) {
+      // Update legacy instance when multi-select changes
+    } else if (selectedInstances.length === 0 && instance) {
+      setSelectedInstances([instance]);
+    }
+  }, [selectedInstances, instance]);
 
   useEffect(() => {
     if (chAvail.length > 0 && !chAvail.find(c => channels.includes(c.id))) setChannels([chAvail[0].id]);
   }, [chAvail.length]);
 
-  // Chat list — still poll every 5s as fallback, WS handles instant updates
-  const { data: chatsD } = useQuery({
-    queryKey: ["chats", instance, search, filter],
-    enabled: !!instance,
+  const activeInstance = selectedInstances[0] || instance;
+
+  // Chat list — aggregate from all selected instances
+  const chatInstanceId = selectedInstances[0] || instance;
+  const { data: chatsD, refetch: refetchChats } = useQuery({
+    queryKey: ["chats", chatInstanceId, search, filter],
+    enabled: !!chatInstanceId,
     refetchInterval: 5000,
     queryFn: async () => {
-      try { return (await inboxApi.getChats(instance, search, filter)).data; }
-      catch { return { chats: [] }; }
+      const instId = selectedInstances[0] || instance;
+      if (!instId) return { chats: [] };
+      const instIds = [instId];
+      
+      const allChats: any[] = [];
+      for (const instId of instIds) {
+        try {
+          const res = await inboxApi.getChats(instId, search, filter);
+          const chats = res.data?.chats || [];
+          chats.forEach((c: any) => c.instance_id = instId);
+          allChats.push(...chats);
+        } catch {}
+      }
+      
+      // Deduplicate by jid, keeping most recent
+      const seen = new Map<string, any>();
+      for (const chat of allChats) {
+        const existing = seen.get(chat.jid);
+        if (!existing || new Date(chat.last_time) > new Date(existing.last_time)) {
+          seen.set(chat.jid, chat);
+        }
+      }
+      
+      return { chats: Array.from(seen.values()).sort((a, b) => 
+        new Date(b.last_time).getTime() - new Date(a.last_time).getTime()
+      )};
     }
   });
 
+  // Track which instance each chat belongs to
+  const chatInstanceMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (chatsD?.chats) {
+      (chatsD.chats as any[]).forEach(c => {
+        if (c.instance_id) map.set(c.jid, c.instance_id);
+      });
+    }
+    return map;
+  }, [chatsD?.chats]);
+
   // Messages — poll every 4s as fallback, WS gives instant
   const { data: msgsD } = useQuery({
-    queryKey: ["msgs", instance, chat, msgOffset],
-    enabled: !!instance && !!chat,
+    queryKey: ["msgs", activeInstance, chat, msgOffset],
+    enabled: !!activeInstance && !!chat,
     refetchInterval: 4000,
     queryFn: async () => {
-      try { return (await inboxApi.getMessages(instance, chat, { offset: msgOffset })).data; }
+      try { return (await inboxApi.getMessages(activeInstance, chat, { offset: msgOffset })).data; }
       catch { return { messages: [], has_more: false }; }
     }
   });
 
   const { data: contactD } = useQuery({
-    queryKey: ["contact", instance, chat],
-    enabled: !!instance && !!chat,
+    queryKey: ["contact", activeInstance, chat],
+    enabled: !!activeInstance && !!chat,
     queryFn: async () => {
-      try { return (await inboxApi.getChat(instance, chat)).data; }
+      try { return (await inboxApi.getChat(activeInstance, chat)).data; }
       catch { return null; }
     }
   });
@@ -500,33 +599,42 @@ export default function InboxPage() {
   // ── Mutations ──
 
   const sendMut = useMutation({
-    mutationFn: (content: string) => inboxApi.sendMessage(instance, chat!, { content, type: "text" }),
+    mutationFn: (content: string) => inboxApi.sendMessage(activeInstance, chat!, { content, type: "text" }),
     onSuccess: () => {
       setInput("");
-      qc.invalidateQueries({ queryKey: ["msgs", instance, chat] });
-      qc.invalidateQueries({ queryKey: ["chats", instance] });
+      qc.invalidateQueries({ queryKey: ["msgs", activeInstance, chat] });
+      qc.invalidateQueries({ queryKey: ["chats", selectedInstances.join(",") || instance] });
       inpRef.current?.focus();
     },
     onError: (e: any) => toast.error(e.response?.data?.error || "Erro ao enviar"),
   });
 
   const readMut = useMutation({
-    mutationFn: () => inboxApi.markRead(instance, chat!),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["chats", instance] }),
+    mutationFn: () => inboxApi.markRead(activeInstance, chat!),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chats", selectedInstances.join(",") || instance] }),
   });
 
   const updateMessageMut = useMutation({
     mutationFn: (data: { is_pinned?: boolean; is_favorite?: boolean; is_archived?: boolean; is_deleted?: boolean }) =>
-      inboxApi.updateMessage(instance, selectedMsgId || "", data),
+      inboxApi.updateMessage(activeInstance, selectedMsgId || "", data),
     onSuccess: () => {
       toast.success("Mensagem atualizada!");
-      qc.invalidateQueries({ queryKey: ["msgs", instance, chat] });
+      qc.invalidateQueries({ queryKey: ["msgs", activeInstance, chat] });
       setSelectedMsgId(null);
     },
     onError: (e: any) => toast.error(e.response?.data?.error || "Erro"),
   });
 
-  const list: ChatContact[] = chatsD?.chats || [];
+  const list: ChatContact[] = useMemo(() => {
+    const chats = chatsD?.chats || [];
+    const seen = new Set<string>();
+    return chats.filter(c => {
+      const key = c.jid;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [chatsD?.chats]);
   const currentMsgs: ChatMessage[] = msgsD?.messages || [];
   const msgs: ChatMessage[] = useMemo(() => {
     const merged = [...olderMsgs, ...currentMsgs];
@@ -717,7 +825,7 @@ export default function InboxPage() {
       })
     }).then(() => {
       toast.success(action === "star" ? "Conversa favoritada!" : action === "archive" ? "Conversa arquivada!" : action === "mute" ? "Conversa silenciada!" : "Conversa excluída!");
-      qc.invalidateQueries({ queryKey: ["chats", instance] });
+      qc.invalidateQueries({ queryKey: ["chats", selectedInstances.join(",") || instance] });
     }).catch(() => toast.error("Erro ao realizar ação"));
   };
 
@@ -732,8 +840,10 @@ export default function InboxPage() {
   };
 
   const curChannel = CHANNELS.find(c => c.id === channels[0]) || CHANNELS[0];
-  const currentInstData = instData.find(i => i.id === instance);
+  const currentInstData = instData.find(i => i.id === activeInstance);
   const isInstagramInbox = currentInstData?.channel === "instagram";
+
+  const chatActiveInstance = chat ? (chatInstanceMap.get(chat) || activeInstance) : activeInstance;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -752,46 +862,77 @@ export default function InboxPage() {
             )}
 {/* Instance selector dropdown */}
               {chInst.length > 0 && (
-                <select
-                  value={instance}
-                  onChange={e => { setInstance(e.target.value); setChat(null); }}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium outline-none cursor-pointer w-[105%] min-w-[120px]"
-                  style={{ background: `${curChannel.color}15`, color: curChannel.color, border: `1px solid ${curChannel.color}30` }}
-                >
-                  {chInst.map(i => (
-                    <option key={i.id} value={i.id} style={{ background: "var(--surface-2)", color: "var(--text-1)" }}>
-                      {i.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowInstanceDropdown(!showInstanceDropdown)}
+                    className="px-4 py-2 rounded-lg text-sm font-medium outline-none cursor-pointer min-w-[200px] flex items-center justify-between gap-2"
+                    style={{ background: `${curChannel.color}15`, color: curChannel.color, border: `1px solid ${curChannel.color}30` }}
+                  >
+                    <span>{selectedInstances.length > 0 ? `${selectedInstances.length} instância(s)` : "Selecionar instâncias"}</span>
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                  {showInstanceDropdown && (
+                    <div className="absolute top-full left-0 mt-1 w-80 rounded-xl shadow-xl z-50 py-1 max-h-72 overflow-y-auto"
+                      style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+                      {chInst.map(i => {
+                        const isSelected = selectedInstances.includes(i.id);
+                        const ch = CHANNELS.find(c => c.id === i.channel);
+                        return (
+                          <button
+                            key={i.id}
+                            onClick={() => {
+                              if (isSelected) {
+                                setSelectedInstances(selectedInstances.filter(id => id !== i.id));
+                              } else {
+                                setSelectedInstances([...selectedInstances, i.id]);
+                              }
+                              setChat(null);
+                            }}
+                            className="w-full px-3 py-2 flex items-center gap-2 text-left hover:bg-white/5 transition-colors"
+                            style={{ color: "var(--text-1)" }}
+                          >
+                            <span className={`w-4 h-4 rounded flex items-center justify-center ${isSelected ? '' : 'border'}`}
+                              style={{ background: isSelected ? curChannel.color : 'transparent', borderColor: curChannel.color }}>
+                              {isSelected && <Check className="w-3 h-3" style={{ color: "#000" }} />}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate">{i.name}</div>
+                              <div className="text-[10px]" style={{ color: ch?.color || "var(--text-3)" }}>{ch?.label}</div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
               {/* Refresh button */}
-               {instance && currentInstData?.channel === "whatsapp" && (
-                 <button
-                   onClick={async () => {
-                     try {
-                       await instancesApi.reconnect(instance);
-                       toast.success("Instância reconectada");
-                     } catch {
-                       toast.error("Falha ao reconectar instância");
-                     } finally {
-                       qc.invalidateQueries({ queryKey: ["instances"] });
-                       qc.invalidateQueries({ queryKey: ["chats", instance] });
-                       if (chat) {
-                         setOlderMsgs([]);
-                         setMsgOffset(0);
-                         qc.invalidateQueries({ queryKey: ["msgs", instance, chat] });
-                         qc.invalidateQueries({ queryKey: ["contact", instance, chat] });
-                       }
-                     }
-                   }}
-                   className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-white/10 active:scale-95"
-                   style={{ color: wsStatus === "connected" ? curChannel.color : "var(--text-3)" }}
-                   title="Reconectar e atualizar instância"
-                 >
-                   <RefreshCw className="w-4 h-4" />
-                 </button>
-               )}
+              {activeInstance && currentInstData?.channel === "whatsapp" && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await instancesApi.reconnect(activeInstance);
+                      toast.success("Instância reconectada");
+                    } catch {
+                      toast.error("Falha ao reconectar instância");
+                    } finally {
+                      qc.invalidateQueries({ queryKey: ["instances"] });
+                      qc.invalidateQueries({ queryKey: ["chats", selectedInstances.join(",") || instance] });
+                      if (chat) {
+                        setOlderMsgs([]);
+                        setMsgOffset(0);
+                        qc.invalidateQueries({ queryKey: ["msgs", activeInstance, chat] });
+                        qc.invalidateQueries({ queryKey: ["contact", activeInstance, chat] });
+                      }
+                    }
+                  }}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-white/10 active:scale-95"
+                  style={{ color: wsStatus === "connected" ? curChannel.color : "var(--text-3)" }}
+                  title="Reconectar e atualizar instância"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+                )}
 
             {/* Sync indicator */}
             {(isSyncing === true || wsStatus === "connecting") && (
@@ -799,21 +940,6 @@ export default function InboxPage() {
                 style={{ background: `${curChannel.color}15`, color: curChannel.color }}>
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: curChannel.color }} />
                 {isSyncing ? "Sincronizando..." : "Conectando..."}
-              </span>
-            )}
-            {/* WS status - centered badge */}
-            {wsStatus === "connected" && instance && (
-              <span className="flex items-center justify-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium"
-                style={{ background: "#22c55e15", color: "#22c55e" }}>
-                <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
-                Online
-              </span>
-            )}
-            {wsStatus === "disconnected" && instance && (
-              <span className="flex items-center justify-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium"
-                style={{ background: "#ef444415", color: "#ef4444" }}>
-                <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444]" />
-                Offline
               </span>
             )}
           </div>
@@ -919,6 +1045,8 @@ export default function InboxPage() {
                   setChat(c.jid);
                   setChatContextMenu({ x: e.clientX, y: e.clientY, jid: c.jid });
                 }}
+                selectedInstances={selectedInstances}
+                instData={instData}
               />
             ))}
           </div>
