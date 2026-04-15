@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -46,6 +47,7 @@ func main() {
 	seedPermissions(db)
 
 	// Seed super admin if configured via env vars
+	log.Debug().Str("email", os.Getenv("SUPER_ADMIN_EMAIL")).Str("password_set", fmt.Sprintf("%v", os.Getenv("SUPER_ADMIN_PASSWORD") != "")).Msg("checking super admin env vars")
 	if os.Getenv("SUPER_ADMIN_EMAIL") != "" && os.Getenv("SUPER_ADMIN_PASSWORD") != "" {
 		var existing models.User
 		if err := db.First(&existing, "email = ?", os.Getenv("SUPER_ADMIN_EMAIL")).Error; err == gorm.ErrRecordNotFound {
