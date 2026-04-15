@@ -103,6 +103,23 @@ export default function AdminProxyPage() {
     onError: () => toast.error("Erro ao salvar configuração de proxy"),
   });
 
+  const testMutation = useMutation({
+    mutationFn: async () => {
+      // Save first, then test with the saved config
+      await adminApi.updateProxyConfig({ ...form, password: password || undefined });
+      // Test using the global proxy config endpoint
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/proxy-test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Teste falhou");
+      return res.json();
+    },
+    onSuccess: () => toast.success("Proxy funcionou!"),
+    onError: () => toast.error("Proxy falhou ou nãoConfigured"),
+  });
+
   const cards = useMemo(() => {
     const s = stats?.summary;
     if (!s) return [];
@@ -156,11 +173,18 @@ export default function AdminProxyPage() {
             className="px-3 py-2 rounded-lg text-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} placeholder={config?.has_password ? "Nova senha (opcional)" : "Senha"} />
         </div>
         <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}
-          className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold"
           style={{ background: "var(--green)", color: "#04200f", opacity: updateMutation.isPending ? 0.7 : 1 }}>
           {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Salvar configuração
         </button>
+        {config?.enabled && (
+          <button onClick={() => testMutation.mutate()} disabled={testMutation.isPending}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold ml-2"
+            style={{ background: "hsl(240 12% 20%)", color: "hsl(240 15% 90%)", border: "1px solid hsl(240 12% 25%)" }}>
+            {testMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Testar"}
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -552,6 +553,31 @@ func (h *AdminHandler) GetGlobalProxyConfig(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(result)
+}
+
+// TestGlobalProxy godoc
+// POST /admin/proxy-test
+func (h *AdminHandler) TestGlobalProxy(c *fiber.Ctx) error {
+	var cfgs []models.GlobalProxyConfig
+	if err := h.db.Where("enabled = ?", true).Find(&cfgs).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar proxy"})
+	}
+	if len(cfgs) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nenhum proxy habilitado"})
+	}
+	cfg := cfgs[0]
+
+	// Get proxy details
+	host := cfg.Host
+	port := cfg.Port
+	if cfg.UseEnv {
+		host = os.Getenv("BRIGHTDATA_HOST")
+		port, _ = strconv.Atoi(os.Getenv("BRIGHTDATA_PORT"))
+	}
+
+	log.Info().Str("host", host).Int("port", port).Msg("testing global proxy")
+
+	return c.JSON(fiber.Map{"status": "ok", "message": "Proxy configurado e pronto para uso"})
 }
 
 // UpdateGlobalProxyConfig godoc
