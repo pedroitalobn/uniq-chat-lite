@@ -582,7 +582,8 @@ func (h *AdminHandler) UpdateGlobalProxyConfig(c *fiber.Ctx) error {
 
 	// Create new proxy if no id provided
 	if req.ID == "" {
-		req.ID = uuid.New().String()
+		// Truncate UUID to 32 chars (max varchar(32) in DB)
+		req.ID = uuid.New().String()[:32]
 
 		// If setting as default, clear other defaults first
 		if req.IsDefault != nil && *req.IsDefault {
