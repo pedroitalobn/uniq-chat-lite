@@ -76,6 +76,13 @@ func main() {
 		} else if err != nil {
 			log.Error().Err(err).Msg("failed to query for existing super admin")
 		} else {
+			// Update username if not set
+			if existing.Username == nil || *existing.Username == "" {
+				username := strings.ToLower(strings.ReplaceAll(os.Getenv("SUPER_ADMIN_NAME"), " ", ""))
+				existing.Username = &username
+				db.Save(&existing)
+				log.Info().Str("email", existing.Email).Str("username", username).Msg("super admin username updated")
+			}
 			log.Info().Str("email", existing.Email).Str("role", string(existing.Role)).Msg("super admin user already exists")
 		}
 	}
