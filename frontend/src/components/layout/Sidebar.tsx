@@ -101,11 +101,7 @@ export function Sidebar() {
         </div>
         <button
           onClick={() => {
-            if (workspaces.length <= 1) {
-              router.push("/workspace/new");
-            } else {
-              router.push("/workspace");
-            }
+            router.push("/workspace");
           }}
           className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-all"
           style={{ background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.15)", color: "#a78bfa" }}
