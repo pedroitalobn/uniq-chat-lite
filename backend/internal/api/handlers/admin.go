@@ -7,6 +7,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/email"
 	"github.com/uniq-chat/backend/internal/models"
@@ -573,8 +574,11 @@ func (h *AdminHandler) UpdateGlobalProxyConfig(c *fiber.Ctx) error {
 		Country   string `json:"country"`
 	}
 	if err := c.BodyParser(&req); err != nil {
+		log.Error().Err(err).Msg("proxy-config: failed to parse body")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
 	}
+
+	log.Info().Str("id", req.ID).Str("name", req.Name).Msg("proxy-config update request")
 
 	// Create new proxy if no id provided
 	if req.ID == "" {
@@ -602,6 +606,7 @@ func (h *AdminHandler) UpdateGlobalProxyConfig(c *fiber.Ctx) error {
 		if req.Password != "" {
 			encrypted, err := whatsapp.EncryptProxyPassword(req.Password)
 			if err != nil {
+				log.Error().Err(err).Msg("proxy-config: failed to encrypt password")
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criptografar senha"})
 			}
 			cfg.Password = encrypted
@@ -612,6 +617,7 @@ func (h *AdminHandler) UpdateGlobalProxyConfig(c *fiber.Ctx) error {
 		if cfg.Country == "" {
 			cfg.Country = "br"
 		}
+		log.Info().Msg("proxy-config: creating new config")
 		if err := h.db.Create(&cfg).Error; err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar configuração"})
 		}
@@ -649,6 +655,7 @@ func (h *AdminHandler) UpdateGlobalProxyConfig(c *fiber.Ctx) error {
 	if req.Password != "" {
 		encrypted, err := whatsapp.EncryptProxyPassword(req.Password)
 		if err != nil {
+			log.Error().Err(err).Msg("proxy-config: failed to encrypt password on update")
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criptografar senha"})
 		}
 		updates["password"] = encrypted
