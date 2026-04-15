@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api";
 import { Activity, Globe, Loader2, Save, Server, Shield, Users } from "lucide-react";
@@ -39,8 +41,21 @@ type ProxyStats = {
 };
 
 export default function AdminProxyPage() {
+  const { data: session } = useSession();
+  const router = useRouter();
   const qc = useQueryClient();
   const [password, setPassword] = useState("");
+  const isSuperAdmin = session?.user?.role === "super_admin";
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <Shield className="w-10 h-10" style={{ color: "hsl(240 8% 46%)" }} />
+        <p className="text-sm" style={{ color: "hsl(240 8% 46%)" }}>Acesso restrito a super administradores</p>
+      </div>
+    );
+  }
+
   const [form, setForm] = useState({
     enabled: false,
     provider: "manual",
