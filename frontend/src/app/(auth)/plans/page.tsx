@@ -11,7 +11,7 @@ import {
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080") + "/v1";
 
 interface Plan {
   id: string;

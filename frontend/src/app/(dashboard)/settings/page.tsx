@@ -481,7 +481,7 @@ function InviteSection() {
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [inviteEnabled, setInviteEnabled] = useState(false);
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.uniq.chat";
+  const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://api.uniq.chat") + "/v1";
 
   const getToken = async () => {
     const { getSession } = await import("next-auth/react");

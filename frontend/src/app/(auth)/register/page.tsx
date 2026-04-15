@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { Logo } from "@/components/Logo";
 import api from "@/lib/api";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080") + "/v1";
 
 function getPlanMeta(plan: { name: string; price: number } | null) {
   if (!plan) return { icon: <MessageSquare className="w-3.5 h-3.5" />, color: "#60a5fa", label: "Grátis" };
