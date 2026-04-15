@@ -500,6 +500,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	proxyPool := api.Group("/proxy")
 	proxyPool.Get("/pool", resProxyH.ListPool)
 	proxyPool.Get("/stats", resProxyH.GetPoolStats)
+	// Global proxy configs (admin only alias for frontend compatibility)
+	api.Get("/proxy/global", middleware.RequireAdmin(), adminH.GetGlobalProxyConfig)
 	// Proxy provider configs (user-specific)
 	proxyPool.Get("/providers", resProxyH.ListProviderConfigs)
 	proxyPool.Post("/providers", resProxyH.CreateProviderConfig)

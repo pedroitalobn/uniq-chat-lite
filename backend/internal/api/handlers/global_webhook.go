@@ -3,11 +3,13 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -80,12 +82,30 @@ func (h *GlobalWebhookHandler) ListEvents(c *fiber.Ctx) error {
 // List global webhooks
 // GET /webhooks/system
 func (h *GlobalWebhookHandler) List(c *fiber.Ctx) error {
-	user := c.Locals("user").(*models.User)
+	localUser := c.Locals("user")
+	var userID uuid.UUID
+
+	switch u := localUser.(type) {
+	case *models.User:
+		if u == nil {
+			log.Error().Msg("webhooks/system list: user pointer is nil")
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+		}
+		userID = u.ID
+	case models.User:
+		userID = u.ID
+	default:
+		log.Error().Str("user_type", fmt.Sprintf("%T", localUser)).Msg("webhooks/system list: unexpected user locals type")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+	}
 
 	var webhooks []models.GlobalWebhook
-	if err := h.db.Where("user_id = ?", user.ID).Order("created_at DESC").Find(&webhooks).Error; err != nil {
+	if err := h.db.Where("user_id = ?", userID).Order("created_at DESC").Find(&webhooks).Error; err != nil {
+		log.Error().Err(err).Str("user_id", userID.String()).Msg("webhooks/system list: db query failed")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar webhooks"})
 	}
+
+	log.Debug().Str("user_id", userID.String()).Int("count", len(webhooks)).Msg("webhooks/system list: loaded webhooks")
 
 	// Parse events JSON
 	type webhookResponse struct {
@@ -100,7 +120,10 @@ func (h *GlobalWebhookHandler) List(c *fiber.Ctx) error {
 	result := make([]webhookResponse, len(webhooks))
 	for i, wh := range webhooks {
 		var events []string
-		json.Unmarshal([]byte(wh.Events), &events)
+		if err := json.Unmarshal([]byte(wh.Events), &events); err != nil {
+			log.Warn().Err(err).Str("webhook_id", wh.ID.String()).Msg("webhooks/system list: invalid events json, using empty list")
+			events = []string{}
+		}
 		result[i] = webhookResponse{
 			ID:        wh.ID,
 			Name:      wh.Name,
