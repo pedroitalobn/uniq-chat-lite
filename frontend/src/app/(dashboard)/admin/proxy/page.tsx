@@ -66,14 +66,14 @@ export default function AdminProxyPage() {
   useEffect(() => {
     if (!config) return;
     setForm({
-      enabled: config.enabled,
+      enabled: config.enabled ?? false,
       provider: config.provider || "manual",
       proxy_type: config.proxy_type || "http",
       host: config.host || "",
       port: config.port || 33335,
       username: config.username || "",
-      use_env: config.use_env,
-      is_active: config.is_active,
+      use_env: config.use_env ?? false,
+      is_active: config.is_active ?? true,
     });
   }, [config]);
 
