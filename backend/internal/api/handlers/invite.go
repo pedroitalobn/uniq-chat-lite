@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/models"
@@ -26,6 +27,7 @@ func (h *InviteHandler) GetStatus(c *fiber.Ctx) error {
 	if err := h.db.First(&setting, "key = ?", "invite_system_enabled").Error; err == nil {
 		enabled = setting.Value == "true"
 	}
+	log.Info().Bool("enabled", enabled).Msg("invites/status: returning status")
 	return c.JSON(fiber.Map{"enabled": enabled})
 }
 
@@ -111,10 +113,14 @@ func (h *InviteHandler) ListMine(c *fiber.Ctx) error {
 
 // POST /admin/invites/toggle — admin: enable/disable invite system
 func (h *InviteHandler) ToggleSystem(c *fiber.Ctx) error {
+	user, ok := c.Locals("user").(*models.User)
+	log.Info().Bool("user_found", ok).Str("user_role", string(user.Role)).Msg("invites/toggle: called")
+
 	var req struct {
 		Enabled bool `json:"enabled"`
 	}
 	if err := c.BodyParser(&req); err != nil {
+		log.Error().Err(err).Msg("invites/toggle: failed to parse body")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
 	}
 
@@ -122,6 +128,8 @@ func (h *InviteHandler) ToggleSystem(c *fiber.Ctx) error {
 	if req.Enabled {
 		val = "true"
 	}
+
+	log.Info().Bool("enabled", req.Enabled).Msg("invites/toggle: updating system setting")
 
 	h.db.Where(models.SystemSetting{Key: "invite_system_enabled"}).
 		Assign(models.SystemSetting{Key: "invite_system_enabled", Value: val}).
