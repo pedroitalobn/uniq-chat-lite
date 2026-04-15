@@ -19,6 +19,9 @@ type ProxyConfig = {
   use_env: boolean;
   is_active: boolean;
   has_password: boolean;
+  name?: string;
+  country?: string;
+  is_default?: boolean;
 };
 
 type ProxyStats = {
@@ -56,7 +59,9 @@ export default function AdminProxyPage() {
     );
   }
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<any>({
+    id: "",
+    name: "",
     enabled: false,
     provider: "manual",
     proxy_type: "http",
@@ -65,9 +70,10 @@ export default function AdminProxyPage() {
     username: "",
     use_env: true,
     is_active: true,
+    country: "br",
   });
 
-  const { data: config, isLoading } = useQuery<ProxyConfig>({
+  const { data: config, isLoading } = useQuery<ProxyConfig[] | ProxyConfig>({
     queryKey: ["admin-proxy-config"],
     queryFn: () => adminApi.getProxyConfig().then((r) => r.data),
   });
@@ -80,15 +86,20 @@ export default function AdminProxyPage() {
 
   useEffect(() => {
     if (!config) return;
+    // Handle array - get first item
+    const cfg = Array.isArray(config) ? config[0] : config;
     setForm({
-      enabled: config.enabled ?? false,
-      provider: config.provider || "manual",
-      proxy_type: config.proxy_type || "http",
-      host: config.host || "",
-      port: config.port || 33335,
-      username: config.username || "",
-      use_env: config.use_env ?? false,
-      is_active: config.is_active ?? true,
+      id: cfg.id || "",
+      name: cfg.name || "",
+      enabled: cfg.enabled ?? false,
+      provider: cfg.provider || "manual",
+      proxy_type: cfg.proxy_type || "http",
+      host: cfg.host || "",
+      port: cfg.port || 33335,
+      username: cfg.username || "",
+      use_env: cfg.use_env ?? false,
+      is_active: cfg.is_active ?? true,
+      country: cfg.country || "br",
     });
   }, [config]);
 
@@ -140,16 +151,53 @@ export default function AdminProxyPage() {
     );
   }
 
+  // Handle array response (multiple proxies)
+  const configs: ProxyConfig[] = Array.isArray(config) ? config : config ? [config] : [];
+  const currentConfig: ProxyConfig = configs.find((c) => c.id === form?.id) || configs[0] || { id: "", enabled: false, provider: "manual", proxy_type: "http", host: "", port: 33335, username: "", use_env: false, is_active: true, has_password: false };
+
   return (
     <div className="space-y-6 max-w-5xl">
       <div>
         <h1 className="text-2xl font-bold" style={{ color: "hsl(240 15% 93%)" }}>Proxy Global</h1>
         <p className="text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
-          Configuração global opcional de proxy para contas elegíveis por plano.
+          Configure proxies residenciais para reduzir banimento de contas.
         </p>
       </div>
 
+      {/* Proxy List */}
       <div className="rounded-2xl p-6" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Proxies Configurados</h2>
+          <button onClick={() => { setForm({}); setPassword(""); }}
+            className="text-xs px-3 py-1.5 rounded-lg" style={{ background: "var(--green)", color: "#000" }}>
+            + Novo Proxy
+          </button>
+        </div>
+        <div className="space-y-2">
+          {configs.map((c: any) => (
+            <div key={c.id} className="rounded-lg p-3 flex items-center justify-between cursor-pointer"
+              style={{ background: c.id === form?.id ? "rgba(0,212,106,0.1)" : "rgba(255,255,255,0.03)", border: "1px solid" + (c.id === form?.id ? "var(--green)" : "rgba(255,255,255,0.06)") }}
+              onClick={() => setForm(c)}>
+              <div>
+                <p className="text-sm font-medium" style={{ color: "hsl(240 15% 90%)" }}>{c.name || "Proxy"} <span style={{ color: c.enabled ? "var(--green)" : "hsl(240 8% 46%)" }}>{c.enabled ? " (ativo)" : " (inativo)"}</span></p>
+                <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>{c.host}:{c.port} • {c.country}</p>
+              </div>
+              <div className="text-xs" style={{ color: "hsl(240 8% 62%)" }}>
+                {c.provider}
+              </div>
+            </div>
+          ))}
+          {configs.length === 0 && (
+            <p className="text-sm" style={{ color: "hsl(240 8% 46%)" }}>Nenhum proxy configurado. Clique em "+ Novo Proxy" para adicionar.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Proxy Form */}
+      <div className="rounded-2xl p-6" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+        <h2 className="text-base font-semibold mb-4" style={{ color: "hsl(240 15% 92%)" }}>
+          {form?.id ? "Editar Proxy" : "Novo Proxy"}
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="flex items-center justify-between text-sm" style={{ color: "hsl(240 15% 88%)" }}>
             Proxy global habilitado
@@ -170,7 +218,7 @@ export default function AdminProxyPage() {
           <input value={form.username} onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))}
             className="px-3 py-2 rounded-lg text-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} placeholder="Username" />
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-            className="px-3 py-2 rounded-lg text-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} placeholder={config?.has_password ? "Nova senha (opcional)" : "Senha"} />
+            className="px-3 py-2 rounded-lg text-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} placeholder={currentConfig?.has_password ? "Nova senha (opcional)" : "Senha"} />
         </div>
         <button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold"
@@ -178,7 +226,7 @@ export default function AdminProxyPage() {
           {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Salvar configuração
         </button>
-        {config?.enabled && (
+        {form?.enabled && (
           <button onClick={() => testMutation.mutate()} disabled={testMutation.isPending}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold ml-2"
             style={{ background: "hsl(240 12% 20%)", color: "hsl(240 15% 90%)", border: "1px solid hsl(240 12% 25%)" }}>
