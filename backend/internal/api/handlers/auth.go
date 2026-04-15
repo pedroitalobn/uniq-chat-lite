@@ -497,8 +497,11 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		AnthropicAPIKey string `json:"anthropic_api_key"`
 	}
 	if err := c.BodyParser(&req); err != nil {
+		log.Error().Err(err).Msg("login: failed to parse body")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
 	}
+
+	log.Info().Str("identifier", req.Identifier).Str("has_password", fmt.Sprintf("%v", req.Password != "")).Msg("login request")
 
 	// ── Credential login path ──────────────────────────────────────────────
 	if strings.TrimSpace(req.Identifier) != "" && strings.TrimSpace(req.Password) != "" {
