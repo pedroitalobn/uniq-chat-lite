@@ -49,6 +49,16 @@ type InstanceClient struct {
 	settings InstanceSettings
 }
 
+type ContactLookup struct {
+	Query     string `json:"query"`
+	Exists    bool   `json:"exists"`
+	JID       string `json:"jid,omitempty"`
+	Phone     string `json:"phone,omitempty"`
+	Name      string `json:"name,omitempty"`
+	PushName  string `json:"push_name,omitempty"`
+	AvatarURL string `json:"avatar_url,omitempty"`
+}
+
 type wsConn struct {
 	send chan []byte
 	done chan struct{}
@@ -812,8 +822,19 @@ func (ic *InstanceClient) SendPollMessage(to, question string, options []string,
 
 // ButtonItem represents a quick-reply button.
 type ButtonItem struct {
-	ID   string `json:"id"`
-	Text string `json:"text"`
+	ID    string `json:"id"`
+	Text  string `json:"text"`
+	Type  string `json:"type"`
+	URL   string `json:"url"`
+	Phone string `json:"phone"`
+}
+
+type TemplateButtonItem struct {
+	DisplayText string `json:"display_text"`
+	Type        string `json:"type"`
+	ID          string `json:"id"`
+	URL         string `json:"url"`
+	PhoneNumber string `json:"phone_number"`
 }
 
 // buttonEmojis maps index 0-9 to emoji number indicators.
@@ -839,67 +860,249 @@ func buildButtonsTextFallback(body, footer string, buttons []ButtonItem) string 
 	return sb.String()
 }
 
+func buildListTextFallback(title, description, buttonText, footer string, sections []ListSection) string {
+	var sb strings.Builder
+
+	appendLine := func(line string) {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			return
+		}
+		if sb.Len() > 0 {
+			sb.WriteString("\n")
+		}
+		sb.WriteString(line)
+	}
+
+	if title != "" {
+		appendLine(title)
+	}
+	if description != "" {
+		appendLine(description)
+	}
+	if buttonText != "" {
+		appendLine("")
+		appendLine("[" + buttonText + "]")
+	}
+
+	for _, section := range sections {
+		if len(section.Rows) == 0 {
+			continue
+		}
+		appendLine("")
+		if section.Title != "" {
+			appendLine("*" + section.Title + "*")
+		}
+		for idx, row := range section.Rows {
+			label := row.Title
+			if row.Description != "" {
+				label += " - " + row.Description
+			}
+			appendLine(fmt.Sprintf("%d. %s", idx+1, label))
+		}
+	}
+
+	if footer != "" {
+		appendLine("")
+		appendLine("_" + footer + "_")
+	}
+
+	return strings.TrimSpace(sb.String())
+}
+
+func (ic *InstanceClient) SendButtonsFallbackMessage(to, body, footer string, buttons []ButtonItem) (string, error) {
+	return ic.SendTextMessage(to, buildButtonsTextFallback(body, footer, buttons))
+}
+
+func (ic *InstanceClient) SendListFallbackMessage(to, title, description, buttonText, footer string, sections []ListSection) (string, error) {
+	return ic.SendTextMessage(to, buildListTextFallback(title, description, buttonText, footer, sections))
+}
+
 // SendButtonsMessage sends a button message.
-// First attempts ButtonsMessage wrapped in ViewOnceMessage (wuzapi/wuzapi approach).
+// First attempts hydrated template buttons.
 // If WhatsApp returns 405 (deprecated on some accounts), falls back to a
 // formatted text message with emoji-numbered options.
 func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []ButtonItem) (string, error) {
-	ctx := context.Background()
-	recipient, err := types.ParseJID(normalizeJID(to))
-	if err != nil {
-		return "", fmt.Errorf("invalid JID: %w", err)
-	}
-	recipient = ic.resolveRecipient(ctx, recipient)
-
 	if len(buttons) > 3 {
 		buttons = buttons[:3]
 	}
 
-	// Build ButtonsMessage proto
-	waButtons := make([]*waE2E.ButtonsMessage_Button, len(buttons))
-	for i, b := range buttons {
-		id := b.ID
-		if id == "" {
-			id = fmt.Sprintf("btn_%d", i)
+	recipient, err := types.ParseJID(normalizeJID(to))
+	if err != nil {
+		return "", fmt.Errorf("invalid JID: %w", err)
+	}
+
+	hydratedButtons := make([]*waE2E.HydratedTemplateButton, 0, len(buttons))
+	for i, button := range buttons {
+		text := strings.TrimSpace(button.Text)
+		if text == "" {
+			continue
 		}
-		waButtons[i] = &waE2E.ButtonsMessage_Button{
-			ButtonID: proto.String(id),
-			ButtonText: &waE2E.ButtonsMessage_Button_ButtonText{
-				DisplayText: proto.String(b.Text),
-			},
-			Type:           waE2E.ButtonsMessage_Button_RESPONSE.Enum(),
-			NativeFlowInfo: &waE2E.ButtonsMessage_Button_NativeFlowInfo{},
+
+		index := uint32(i)
+		switch {
+		case strings.EqualFold(button.Type, "url") || strings.TrimSpace(button.URL) != "":
+			url := strings.TrimSpace(button.URL)
+			if url == "" {
+				continue
+			}
+			hydratedButtons = append(hydratedButtons, &waE2E.HydratedTemplateButton{
+				Index: &index,
+				HydratedButton: &waE2E.HydratedTemplateButton_UrlButton{
+					UrlButton: &waE2E.HydratedTemplateButton_HydratedURLButton{
+						DisplayText: proto.String(text),
+						URL:         proto.String(url),
+					},
+				},
+			})
+		case strings.EqualFold(button.Type, "call") || strings.TrimSpace(button.Phone) != "":
+			phone := strings.TrimSpace(button.Phone)
+			if phone == "" {
+				continue
+			}
+			hydratedButtons = append(hydratedButtons, &waE2E.HydratedTemplateButton{
+				Index: &index,
+				HydratedButton: &waE2E.HydratedTemplateButton_CallButton{
+					CallButton: &waE2E.HydratedTemplateButton_HydratedCallButton{
+						DisplayText: proto.String(text),
+						PhoneNumber: proto.String(phone),
+					},
+				},
+			})
+		default:
+			id := strings.TrimSpace(button.ID)
+			if id == "" {
+				id = fmt.Sprintf("btn_%d", i)
+			}
+			hydratedButtons = append(hydratedButtons, &waE2E.HydratedTemplateButton{
+				Index: &index,
+				HydratedButton: &waE2E.HydratedTemplateButton_QuickReplyButton{
+					QuickReplyButton: &waE2E.HydratedTemplateButton_HydratedQuickReplyButton{
+						DisplayText: proto.String(text),
+						ID:          proto.String(id),
+					},
+				},
+			})
 		}
 	}
-	headerType := waE2E.ButtonsMessage_EMPTY
+
+	if len(hydratedButtons) == 0 {
+		return "", fmt.Errorf("no valid buttons provided")
+	}
+
 	msg := &waE2E.Message{
-		ViewOnceMessage: &waE2E.FutureProofMessage{
-			Message: &waE2E.Message{
-				ButtonsMessage: &waE2E.ButtonsMessage{
-					ContentText: proto.String(body),
-					FooterText:  proto.String(footer),
-					HeaderType:  &headerType,
-					Buttons:     waButtons,
-				},
-				MessageContextInfo: &waE2E.MessageContextInfo{
-					DeviceListMetadata:        &waE2E.DeviceListMetadata{},
-					DeviceListMetadataVersion: proto.Int32(2),
+		TemplateMessage: &waE2E.TemplateMessage{
+			Format: &waE2E.TemplateMessage_HydratedFourRowTemplate_{
+				HydratedFourRowTemplate: &waE2E.TemplateMessage_HydratedFourRowTemplate{
+					HydratedContentText: proto.String(body),
+					HydratedFooterText:  proto.String(footer),
+					HydratedButtons:     hydratedButtons,
 				},
 			},
 		},
 	}
 
-	res, err := ic.client.SendMessage(ctx, recipient, msg)
+	res, err := ic.sendMessage(context.Background(), recipient, msg)
 	if err != nil {
-		// Fall back to text simulation when ButtonsMessage is rejected (405/deprecated)
-		log.Warn().Str("instance", ic.ID).Err(err).Msg("ButtonsMessage failed, falling back to text")
-		fallback := &waE2E.Message{
-			Conversation: proto.String(buildButtonsTextFallback(body, footer, buttons)),
+		log.Warn().Str("instance", ic.ID).Err(err).Msg("hydrated template button failed, using text fallback")
+		return ic.SendButtonsFallbackMessage(to, body, footer, buttons)
+	}
+	return res.ID, nil
+}
+
+func (ic *InstanceClient) SendTemplateMessage(to, content, footer string, buttons []TemplateButtonItem) (string, error) {
+	recipient, err := types.ParseJID(normalizeJID(to))
+	if err != nil {
+		return "", fmt.Errorf("invalid JID: %w", err)
+	}
+
+	hydratedButtons := make([]*waE2E.HydratedTemplateButton, 0, len(buttons))
+	for i, button := range buttons {
+		text := strings.TrimSpace(button.DisplayText)
+		if text == "" {
+			continue
 		}
-		res, err = ic.client.SendMessage(ctx, recipient, fallback)
-		if err != nil {
-			return "", fmt.Errorf("send buttons failed: %w", err)
+
+		index := uint32(i)
+		switch strings.ToLower(strings.TrimSpace(button.Type)) {
+		case "url":
+			url := strings.TrimSpace(button.URL)
+			if url == "" {
+				continue
+			}
+			hydratedButtons = append(hydratedButtons, &waE2E.HydratedTemplateButton{
+				Index: &index,
+				HydratedButton: &waE2E.HydratedTemplateButton_UrlButton{
+					UrlButton: &waE2E.HydratedTemplateButton_HydratedURLButton{
+						DisplayText: proto.String(text),
+						URL:         proto.String(url),
+					},
+				},
+			})
+		case "call":
+			phone := strings.TrimSpace(button.PhoneNumber)
+			if phone == "" {
+				continue
+			}
+			hydratedButtons = append(hydratedButtons, &waE2E.HydratedTemplateButton{
+				Index: &index,
+				HydratedButton: &waE2E.HydratedTemplateButton_CallButton{
+					CallButton: &waE2E.HydratedTemplateButton_HydratedCallButton{
+						DisplayText: proto.String(text),
+						PhoneNumber: proto.String(phone),
+					},
+				},
+			})
+		default:
+			id := strings.TrimSpace(button.ID)
+			if id == "" {
+				id = fmt.Sprintf("template_btn_%d", i)
+			}
+			hydratedButtons = append(hydratedButtons, &waE2E.HydratedTemplateButton{
+				Index: &index,
+				HydratedButton: &waE2E.HydratedTemplateButton_QuickReplyButton{
+					QuickReplyButton: &waE2E.HydratedTemplateButton_HydratedQuickReplyButton{
+						DisplayText: proto.String(text),
+						ID:          proto.String(id),
+					},
+				},
+			})
 		}
+	}
+
+	if len(hydratedButtons) == 0 {
+		return "", fmt.Errorf("no valid template buttons provided")
+	}
+
+	msg := &waE2E.Message{
+		TemplateMessage: &waE2E.TemplateMessage{
+			Format: &waE2E.TemplateMessage_HydratedFourRowTemplate_{
+				HydratedFourRowTemplate: &waE2E.TemplateMessage_HydratedFourRowTemplate{
+					HydratedContentText: proto.String(content),
+					HydratedFooterText:  proto.String(footer),
+					HydratedButtons:     hydratedButtons,
+				},
+			},
+		},
+	}
+
+	res, err := ic.sendMessage(context.Background(), recipient, msg)
+	if err != nil {
+		log.Warn().Str("instance", ic.ID).Err(err).Msg("template message failed, using text fallback")
+		fallbackButtons := make([]ButtonItem, 0, len(buttons))
+		for i, button := range buttons {
+			fallbackButtons = append(fallbackButtons, ButtonItem{
+				ID:    button.ID,
+				Text:  button.DisplayText,
+				Type:  button.Type,
+				URL:   button.URL,
+				Phone: button.PhoneNumber,
+			})
+			if fallbackButtons[i].ID == "" {
+				fallbackButtons[i].ID = fmt.Sprintf("template_btn_%d", i)
+			}
+		}
+		return ic.SendButtonsFallbackMessage(to, content, footer, fallbackButtons)
 	}
 	return res.ID, nil
 }
@@ -921,59 +1124,8 @@ type ListSection struct {
 // Wraps ListMessage inside ViewOnceMessage > FutureProofMessage — the pattern
 // confirmed to deliver to the recipient on personal accounts (whatsmeow #305).
 func (ic *InstanceClient) SendListMessage(to, title, description, buttonText, footer string, sections []ListSection) (string, error) {
-	ctx := context.Background()
-	recipient, err := types.ParseJID(normalizeJID(to))
-	if err != nil {
-		return "", fmt.Errorf("invalid JID: %w", err)
-	}
-	// Resolve canonical JID once; send directly to avoid double-resolution issues.
-	recipient = ic.resolveRecipient(ctx, recipient)
-
-	sects := make([]*waE2E.ListMessage_Section, len(sections))
-	for i, s := range sections {
-		rows := make([]*waE2E.ListMessage_Row, len(s.Rows))
-		for j, r := range s.Rows {
-			id := r.ID
-			if id == "" {
-				id = fmt.Sprintf("row_%d_%d", i, j)
-			}
-			rows[j] = &waE2E.ListMessage_Row{
-				RowID:       proto.String(id),
-				Title:       proto.String(r.Title),
-				Description: proto.String(r.Description),
-			}
-		}
-		sects[i] = &waE2E.ListMessage_Section{
-			Title: proto.String(s.Title),
-			Rows:  rows,
-		}
-	}
-
-	listType := waE2E.ListMessage_SINGLE_SELECT
-	inner := &waE2E.ListMessage{
-		Title:       proto.String(title),
-		Description: proto.String(description),
-		ButtonText:  proto.String(buttonText),
-		FooterText:  proto.String(footer),
-		ListType:    &listType,
-		Sections:    sects,
-	}
-
-	// ViewOnceMessage > FutureProofMessage wrapping required — without it the
-	// message is only echoed back to the sender, never delivered to recipient.
-	msg := &waE2E.Message{
-		ViewOnceMessage: &waE2E.FutureProofMessage{
-			Message: &waE2E.Message{
-				ListMessage: inner,
-			},
-		},
-	}
-
-	res, err := ic.client.SendMessage(ctx, recipient, msg)
-	if err != nil {
-		return "", fmt.Errorf("send list failed: %w", err)
-	}
-	return res.ID, nil
+	log.Warn().Str("instance", ic.ID).Msg("list interactive disabled for regular instance, using text fallback")
+	return ic.SendListFallbackMessage(to, title, description, buttonText, footer, sections)
 }
 
 // SendStickerMessage sends a WebP sticker.
@@ -1270,6 +1422,52 @@ func (ic *InstanceClient) CheckNumber(phone string) (bool, string, error) {
 		jid = r.JID.String()
 	}
 	return r.IsIn, jid, nil
+}
+
+// LookupContact resolves a number or JID, returning canonical contact info when available.
+func (ic *InstanceClient) LookupContact(input string) (*ContactLookup, error) {
+	raw := strings.TrimSpace(input)
+	if raw == "" {
+		return nil, fmt.Errorf("phone ou jid é obrigatório")
+	}
+
+	lookupPhone := raw
+	if strings.Contains(raw, "@") {
+		jid, err := types.ParseJID(raw)
+		if err != nil {
+			return nil, fmt.Errorf("jid inválido: %w", err)
+		}
+		lookupPhone = "+" + jid.User
+	} else if !strings.HasPrefix(lookupPhone, "+") {
+		lookupPhone = "+" + strings.TrimLeft(lookupPhone, "+")
+	}
+
+	resp, err := ic.client.IsOnWhatsApp(context.Background(), []string{lookupPhone})
+	if err != nil {
+		return nil, fmt.Errorf("lookup contact failed: %w", err)
+	}
+
+	result := &ContactLookup{Query: raw}
+	if len(resp) == 0 || !resp[0].IsIn {
+		return result, nil
+	}
+
+	canonical := resp[0].JID
+	if canonical.IsEmpty() {
+		return result, nil
+	}
+
+	result.Exists = true
+	result.JID = canonical.String()
+	result.Phone = canonical.User
+
+	_, _ = ic.client.GetUserInfo(context.Background(), []types.JID{canonical})
+	name, pushName := ic.GetContactInfo(canonical.String())
+	result.Name = name
+	result.PushName = pushName
+	result.AvatarURL = ic.GetContactProfilePicture(canonical.String())
+
+	return result, nil
 }
 
 // downloadURL fetches raw bytes from an HTTP/HTTPS URL (used for media_url resolution).

@@ -223,6 +223,10 @@ export const instancesApi = {
   reconnect: (id: string) => api.post(`/api/instances/${id}/reconnect`),
   status: (id: string) => api.get(`/api/instances/${id}/status`),
   profile: (id: string) => api.get(`/api/instances/${id}/profile`),
+  contactInfo: (id: string, data: { phone?: string; jid?: string }) =>
+    api.post(`/api/instances/${id}/contact/info`, data),
+  contactAvatar: (id: string, data: { phone?: string; jid?: string }) =>
+    api.post(`/api/instances/${id}/contact/avatar`, data),
   regenerateToken: (id: string) => api.post(`/api/instances/${id}/regenerate-token`),
   instagramLogin: (id: string, creds: { username: string; password: string }) =>
     api.post(`/api/instances/${id}/instagram/login`, creds),
@@ -295,8 +299,10 @@ export const messagesApi = {
     api.post(`/api/instances/${id}/messages/poll`, data),
   sendSticker: (id: string, data: { to: string; url?: string; base64?: string }) =>
     api.post(`/api/instances/${id}/messages/sticker`, data),
-  sendButtons: (id: string, data: { to: string; body: string; footer?: string; buttons: { id: string; text: string }[] }) =>
+  sendButtons: (id: string, data: { to: string; body: string; footer?: string; buttons: { id?: string; text: string; type?: "reply" | "url" | "call"; url?: string; phone?: string }[] }) =>
     api.post(`/api/instances/${id}/messages/buttons`, data),
+  sendTemplate: (id: string, data: { to: string; content: string; footer?: string; buttons: { display_text: string; type: "quickreply" | "url" | "call"; id?: string; url?: string; phone_number?: string }[] }) =>
+    api.post(`/api/instances/${id}/messages/template`, data),
   sendList: (id: string, data: { to: string; title?: string; description?: string; button_text: string; footer?: string; sections: { title: string; rows: { id: string; title: string; description?: string }[] }[] }) =>
     api.post(`/api/instances/${id}/messages/list`, data),
   sendMenu: (id: string, data: { number: string; type: "button"|"list"|"poll"|"carousel"; text: string; choices: string[]; footerText?: string; listButton?: string; selectableCount?: number; imageButton?: string }) =>

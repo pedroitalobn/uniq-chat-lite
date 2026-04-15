@@ -122,8 +122,8 @@ func (h *MessageHandler) SendText(c *fiber.Ctx) error {
 	instance := c.Locals("instance").(*models.Instance)
 
 	var req struct {
-		To      string            `json:"to"`
-		Text    string            `json:"text"`
+		To      string             `json:"to"`
+		Text    string             `json:"text"`
 		Options *queue.SendOptions `json:"options"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.To == "" || req.Text == "" {
@@ -371,9 +371,9 @@ func (h *MessageHandler) SendContact(c *fiber.Ctx) error {
 		To          string `json:"to"`
 		DisplayName string `json:"display_name"`
 		// Provide either a full vcard string OR individual fields
-		Vcard       string `json:"vcard"`
-		Phone       string `json:"phone"`
-		Email       string `json:"email"`
+		Vcard        string `json:"vcard"`
+		Phone        string `json:"phone"`
+		Email        string `json:"email"`
 		Organization string `json:"organization"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.To == "" || req.DisplayName == "" {
@@ -481,10 +481,10 @@ func (h *MessageHandler) SendButtons(c *fiber.Ctx) error {
 	instance := c.Locals("instance").(*models.Instance)
 
 	var req struct {
-		To      string                    `json:"to"`
-		Body    string                    `json:"body"`
-		Footer  string                    `json:"footer"`
-		Buttons []whatsapp.ButtonItem     `json:"buttons"`
+		To      string                `json:"to"`
+		Body    string                `json:"body"`
+		Footer  string                `json:"footer"`
+		Buttons []whatsapp.ButtonItem `json:"buttons"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.To == "" || req.Body == "" || len(req.Buttons) == 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campos 'to', 'body' e 'buttons' são obrigatórios"})
@@ -502,6 +502,38 @@ func (h *MessageHandler) SendButtons(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message_id": msgID, "status": "sent"})
 }
 
+// SendTemplate godoc
+// POST /instances/:id/messages/template
+func (h *MessageHandler) SendTemplate(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	instance := c.Locals("instance").(*models.Instance)
+
+	var req struct {
+		To      string                        `json:"to"`
+		Content string                        `json:"content"`
+		Footer  string                        `json:"footer"`
+		Buttons []whatsapp.TemplateButtonItem `json:"buttons"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.To == "" || req.Content == "" || len(req.Buttons) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campos 'to', 'content' e 'buttons' sao obrigatorios"})
+	}
+
+	msgID, err := client.SendTemplateMessage(req.To, req.Content, req.Footer, req.Buttons)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	go h.logMessage(instance.ID.String(), "out", "template", req.To, msgID, map[string]interface{}{
+		"content": req.Content,
+		"footer":  req.Footer,
+		"buttons": req.Buttons,
+	})
+	return c.JSON(fiber.Map{"message_id": msgID, "status": "sent"})
+}
+
 // SendList godoc
 // POST /instances/:id/messages/list
 func (h *MessageHandler) SendList(c *fiber.Ctx) error {
@@ -512,12 +544,12 @@ func (h *MessageHandler) SendList(c *fiber.Ctx) error {
 	instance := c.Locals("instance").(*models.Instance)
 
 	var req struct {
-		To          string                     `json:"to"`
-		Title       string                     `json:"title"`
-		Description string                     `json:"description"`
-		ButtonText  string                     `json:"button_text"`
-		Footer      string                     `json:"footer"`
-		Sections    []whatsapp.ListSection     `json:"sections"`
+		To          string                 `json:"to"`
+		Title       string                 `json:"title"`
+		Description string                 `json:"description"`
+		ButtonText  string                 `json:"button_text"`
+		Footer      string                 `json:"footer"`
+		Sections    []whatsapp.ListSection `json:"sections"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.To == "" || req.ButtonText == "" || len(req.Sections) == 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campos 'to', 'button_text' e 'sections' são obrigatórios"})
@@ -529,6 +561,206 @@ func (h *MessageHandler) SendList(c *fiber.Ctx) error {
 	}
 
 	go h.logMessage(instance.ID.String(), "out", "list", req.To, msgID, map[string]interface{}{"title": req.Title})
+	return c.JSON(fiber.Map{"message_id": msgID, "status": "sent"})
+}
+
+func parseMenuButtons(choices []string) []whatsapp.ButtonItem {
+	buttons := make([]whatsapp.ButtonItem, 0, len(choices))
+	for i, raw := range choices {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, "|", 2)
+		text := strings.TrimSpace(parts[0])
+		id := fmt.Sprintf("btn_%d", i)
+		if len(parts) == 2 && strings.TrimSpace(parts[1]) != "" {
+			id = strings.TrimSpace(parts[1])
+		}
+		if text == "" {
+			continue
+		}
+
+		buttons = append(buttons, whatsapp.ButtonItem{ID: id, Text: text})
+	}
+	return buttons
+}
+
+func parseMenuSections(choices []string) []whatsapp.ListSection {
+	sections := make([]whatsapp.ListSection, 0)
+	current := whatsapp.ListSection{Title: "Opcoes"}
+
+	flush := func() {
+		if len(current.Rows) == 0 {
+			return
+		}
+		sections = append(sections, current)
+		current = whatsapp.ListSection{Title: "Opcoes"}
+	}
+
+	for _, raw := range choices {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			flush()
+			title := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(line, "["), "]"))
+			if title == "" {
+				title = "Opcoes"
+			}
+			current.Title = title
+			continue
+		}
+
+		parts := strings.SplitN(line, "|", 3)
+		title := strings.TrimSpace(parts[0])
+		if title == "" {
+			continue
+		}
+
+		row := whatsapp.ListRow{
+			ID:    fmt.Sprintf("row_%d_%d", len(sections), len(current.Rows)),
+			Title: title,
+		}
+		if len(parts) >= 2 && strings.TrimSpace(parts[1]) != "" {
+			row.ID = strings.TrimSpace(parts[1])
+		}
+		if len(parts) == 3 {
+			row.Description = strings.TrimSpace(parts[2])
+		}
+		current.Rows = append(current.Rows, row)
+	}
+
+	flush()
+	return sections
+}
+
+func buildCarouselFallback(text, footer string, choices []string) string {
+	var sb strings.Builder
+	if strings.TrimSpace(text) != "" {
+		sb.WriteString(strings.TrimSpace(text))
+	}
+
+	appendLine := func(line string) {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			return
+		}
+		if sb.Len() > 0 {
+			sb.WriteString("\n")
+		}
+		sb.WriteString(line)
+	}
+
+	for _, raw := range choices {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+
+		switch {
+		case strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]"):
+			appendLine("")
+			appendLine("*" + strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(line, "["), "]")) + "*")
+		case strings.HasPrefix(line, "{") && strings.HasSuffix(line, "}"):
+			appendLine(strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(line, "{"), "}")))
+		default:
+			parts := strings.SplitN(line, "|", 2)
+			label := strings.TrimSpace(parts[0])
+			target := ""
+			if len(parts) == 2 {
+				target = strings.TrimSpace(parts[1])
+			}
+			if target != "" {
+				appendLine(fmt.Sprintf("- %s: %s", label, target))
+			} else {
+				appendLine("- " + label)
+			}
+		}
+	}
+
+	if strings.TrimSpace(footer) != "" {
+		appendLine("")
+		appendLine("_" + strings.TrimSpace(footer) + "_")
+	}
+
+	return strings.TrimSpace(sb.String())
+}
+
+// SendMenu godoc
+// POST /instances/:id/messages/menu
+func (h *MessageHandler) SendMenu(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	instance := c.Locals("instance").(*models.Instance)
+
+	var req struct {
+		Number          string   `json:"number"`
+		Type            string   `json:"type"`
+		Text            string   `json:"text"`
+		Choices         []string `json:"choices"`
+		FooterText      string   `json:"footerText"`
+		ListButton      string   `json:"listButton"`
+		SelectableCount int      `json:"selectableCount"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.Number == "" || req.Type == "" || req.Text == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campos 'number', 'type' e 'text' sao obrigatorios"})
+	}
+
+	var msgID string
+	switch strings.ToLower(strings.TrimSpace(req.Type)) {
+	case "button", "buttons":
+		buttons := parseMenuButtons(req.Choices)
+		if len(buttons) == 0 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "envie pelo menos um botao valido em 'choices'"})
+		}
+		if len(buttons) > 3 {
+			buttons = buttons[:3]
+		}
+		msgID, err = client.SendButtonsMessage(req.Number, req.Text, req.FooterText, buttons)
+	case "list":
+		sections := parseMenuSections(req.Choices)
+		if len(sections) == 0 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "envie pelo menos uma secao ou item valido em 'choices'"})
+		}
+		buttonText := strings.TrimSpace(req.ListButton)
+		if buttonText == "" {
+			buttonText = "Ver opcoes"
+		}
+		msgID, err = client.SendListMessage(req.Number, "", req.Text, buttonText, req.FooterText, sections)
+	case "poll":
+		options := make([]string, 0, len(req.Choices))
+		for _, raw := range req.Choices {
+			line := strings.TrimSpace(raw)
+			if line != "" {
+				options = append(options, line)
+			}
+		}
+		if len(options) < 2 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "enquete precisa de pelo menos 2 opcoes"})
+		}
+		msgID, err = client.SendPollMessage(req.Number, req.Text, options, req.SelectableCount)
+	case "carousel":
+		fallbackText := buildCarouselFallback(req.Text, req.FooterText, req.Choices)
+		msgID, err = client.SendTextMessage(req.Number, fallbackText)
+	default:
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "tipo de menu nao suportado"})
+	}
+
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	go h.logMessage(instance.ID.String(), "out", "menu", req.Number, msgID, map[string]interface{}{
+		"type":    req.Type,
+		"text":    req.Text,
+		"choices": req.Choices,
+	})
 	return c.JSON(fiber.Map{"message_id": msgID, "status": "sent"})
 }
 
@@ -757,8 +989,8 @@ func (h *MessageHandler) SendTyping(c *fiber.Ctx) error {
 		return err
 	}
 	var req struct {
-		To      string `json:"to"`
-		Typing  bool   `json:"typing"`
+		To     string `json:"to"`
+		Typing bool   `json:"typing"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.To == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'to' é obrigatório"})

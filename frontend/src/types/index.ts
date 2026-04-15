@@ -202,6 +202,16 @@ export interface InstanceProfile {
   connected_at?: string;
 }
 
+export interface InstanceContactLookup {
+  query: string;
+  exists: boolean;
+  jid?: string;
+  phone?: string;
+  name?: string;
+  push_name?: string;
+  avatar_url?: string;
+}
+
 export interface MessageLog {
   id: string;
   instance_id: string;

@@ -231,6 +231,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	instance.Post("/disconnect", instanceH.Disconnect)
 	instance.Post("/reconnect", instanceH.Reconnect)
 	instance.Get("/status", instanceH.Status)
+	instance.Post("/contact/info", instanceH.ContactInfo)
+	instance.Post("/contact/avatar", instanceH.ContactAvatar)
 
 	// Instagram routes
 	instance.Post("/instagram/login", instanceH.InstagramLogin)
@@ -304,7 +306,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	msgs.Post("/reaction", msgH.SendReaction)
 	msgs.Post("/poll", msgH.SendPoll)
 	msgs.Post("/buttons", msgH.SendButtons)
+	msgs.Post("/template", msgH.SendTemplate)
 	msgs.Post("/list", msgH.SendList)
+	msgs.Post("/menu", msgH.SendMenu)
 	msgs.Post("/sticker", msgH.SendSticker)
 	msgs.Post("/status", msgH.SendStatus)
 	msgs.Post("/presence", msgH.SendPresence)
@@ -522,7 +526,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	v1msgs.Post("/reaction", msgH.SendReaction)
 	v1msgs.Post("/poll", msgH.SendPoll)
 	v1msgs.Post("/buttons", msgH.SendButtons)
+	v1msgs.Post("/template", msgH.SendTemplate)
 	v1msgs.Post("/list", msgH.SendList)
+	v1msgs.Post("/menu", msgH.SendMenu)
 	v1msgs.Post("/sticker", msgH.SendSticker)
 	v1msgs.Post("/status", msgH.SendStatus)
 	v1msgs.Post("/presence", msgH.SendPresence)
@@ -542,6 +548,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	v1inst.Get("/profile", instanceH.Profile)
 	v1inst.Get("/qr", instanceH.GetQR)
 	v1inst.Post("/pairing-code", instanceH.GetPairingCode)
+	v1inst.Post("/contact/info", instanceH.ContactInfo)
+	v1inst.Post("/contact/avatar", instanceH.ContactAvatar)
 
 	// OTP
 	v1otp := v1inst.Group("/otp")

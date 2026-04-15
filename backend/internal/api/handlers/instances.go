@@ -28,6 +28,26 @@ func NewInstanceHandler(db *gorm.DB, manager *whatsapp.Manager) *InstanceHandler
 	return h
 }
 
+func (h *InstanceHandler) getConnectedWhatsAppClient(c *fiber.Ctx) (*models.Instance, *whatsapp.InstanceClient, error) {
+	instance, ok := c.Locals("instance").(*models.Instance)
+	if !ok {
+		return nil, nil, fiber.NewError(fiber.StatusNotFound, "instância não encontrada")
+	}
+	if instance.Channel != models.ChannelWhatsApp {
+		return nil, nil, fiber.NewError(fiber.StatusBadRequest, "endpoint disponível apenas para instâncias WhatsApp")
+	}
+
+	client := h.manager.GetInstance(instance.ID.String())
+	if client == nil {
+		return nil, nil, fiber.NewError(fiber.StatusConflict, "instância não está em execução. Conecte primeiro.")
+	}
+	if !client.IsConnected() {
+		return nil, nil, fiber.NewError(fiber.StatusConflict, "instância não está conectada ao WhatsApp")
+	}
+
+	return instance, client, nil
+}
+
 // List godoc
 // GET /instances
 // Query params: workspace_id (optional)
@@ -516,6 +536,75 @@ func (h *InstanceHandler) Profile(c *fiber.Ctx) error {
 		"conversations":   convCount,
 		"status":          instance.Status,
 		"connected_at":    instance.ConnectedAt,
+	})
+}
+
+// ContactInfo godoc
+// POST /instances/:id/contact/info
+func (h *InstanceHandler) ContactInfo(c *fiber.Ctx) error {
+	_, client, err := h.getConnectedWhatsAppClient(c)
+	if err != nil {
+		return err
+	}
+
+	var req struct {
+		Phone string `json:"phone"`
+		JID   string `json:"jid"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
+	}
+
+	target := req.Phone
+	if target == "" {
+		target = req.JID
+	}
+	if target == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "envie 'phone' ou 'jid'"})
+	}
+
+	info, err := client.LookupContact(target)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(info)
+}
+
+// ContactAvatar godoc
+// POST /instances/:id/contact/avatar
+func (h *InstanceHandler) ContactAvatar(c *fiber.Ctx) error {
+	_, client, err := h.getConnectedWhatsAppClient(c)
+	if err != nil {
+		return err
+	}
+
+	var req struct {
+		Phone string `json:"phone"`
+		JID   string `json:"jid"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
+	}
+
+	target := req.Phone
+	if target == "" {
+		target = req.JID
+	}
+	if target == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "envie 'phone' ou 'jid'"})
+	}
+
+	info, err := client.LookupContact(target)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{
+		"query":      info.Query,
+		"exists":     info.Exists,
+		"jid":        info.JID,
+		"avatar_url": info.AvatarURL,
 	})
 }
 

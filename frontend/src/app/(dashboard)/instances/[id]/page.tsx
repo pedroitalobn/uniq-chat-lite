@@ -16,7 +16,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { showConfirm } from "@/lib/confirm";
-import type { Instance, InstanceSettings, MessageLog, InstanceProfile, Webhook } from "@/types";
+import type { Instance, InstanceSettings, MessageLog, InstanceProfile, InstanceContactLookup, Webhook } from "@/types";
 import Link from "next/link";
 import { QRCodeModal } from "@/components/instances/QRCodeModal";
 import { ProxyConfigForm } from "@/components/instances/ProxyConfigForm";
@@ -370,6 +370,12 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
           </div>
         </div>
 
+        <div className="rounded-xl p-3 mb-3" style={{ background: "rgba(96,165,250,0.06)", border: "1px solid rgba(96,165,250,0.14)" }}>
+          <p className="text-[11px]" style={{ color: "hsl(217, 91%, 78%)" }}>
+            Na criação do webhook, a API retorna o <span className="font-mono">secret</span> uma única vez. As entregas HTTP saem assinadas com o header <span className="font-mono">X-Webhook-Signature: sha256=...</span>.
+          </p>
+        </div>
+
         {creating && (
           <div className="rounded-2xl p-5 space-y-4 mb-3 animate-fade-in-up" style={cardStyle}>
             <div className="flex items-center justify-between">
@@ -618,7 +624,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
   const [igChallengeCode, setIgChallengeCode] = useState("");
   const [igChallengeMethod, setIgChallengeMethod] = useState<"email" | "phone">("phone");
   const [igChallengeLoading, setIgChallengeLoading] = useState(false);
-  const [msgType, setMsgType] = useState<"text"|"image"|"document"|"audio"|"video"|"location"|"contact"|"reaction"|"poll"|"sticker"|"buttons"|"list"|"carousel">("text");
+  const [msgType, setMsgType] = useState<"text"|"image"|"document"|"audio"|"video"|"location"|"contact"|"reaction"|"poll"|"sticker"|"buttons"|"template"|"list"|"carousel">("text");
   const [recipient, setRecipient] = useState("");
   const [sending, setSending] = useState(false);
   // per-type fields
@@ -639,6 +645,10 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
   const [btnBody, setBtnBody] = useState("");
   const [btnFooter, setBtnFooter] = useState("");
   const [btnItems, setBtnItems] = useState("Sim|sim\nNão|não\nTalvez|talvez");
+  // template
+  const [templateContent, setTemplateContent] = useState("");
+  const [templateFooter, setTemplateFooter] = useState("");
+  const [templateButtons, setTemplateButtons] = useState("Yes|quickreply|yes\nNo|quickreply|no\nVisit Site|url|https://www.fop2.com\nLlamame|call|1155554444");
   // list
   const [listText, setListText] = useState("");
   const [listButton, setListButton] = useState("Ver opções");
@@ -648,6 +658,8 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
   const [carouselText, setCarouselText] = useState("");
   const [carouselFooter, setCarouselFooter] = useState("");
   const [carouselChoices, setCarouselChoices] = useState("[Cartão 1]\n{https://exemplo.com/imagem1.jpg}\nVer mais|https://exemplo.com\n[Cartão 2]\n{https://exemplo.com/imagem2.jpg}\nComprar|https://loja.exemplo.com");
+  const [lookupTarget, setLookupTarget] = useState("");
+  const [contactLookup, setContactLookup] = useState<InstanceContactLookup | null>(null);
 
   const isWhatsApp = !instance?.channel || instance.channel === "whatsapp";
   const isInstagram = instance?.channel === "instagram";
@@ -679,6 +691,11 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
   const toggleSetting = (key: keyof InstanceSettings) => {
     if (!settings) return;
     settingsMutation.mutate({ [key]: !settings[key] });
+  };
+
+  const buildLookupPayload = (value: string) => {
+    const target = value.trim();
+    return target.includes("@") ? { jid: target } : { phone: target };
   };
 
   const disconnectMutation = useMutation({
@@ -797,6 +814,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
       case "reaction": return !!reactionMsgId.trim() && !!emoji.trim();
       case "poll":     return !!pollQuestion.trim() && pollOptions.split("\n").filter(Boolean).length >= 2;
       case "buttons":  return !!btnBody.trim() && btnItems.split("\n").filter(Boolean).length >= 1;
+      case "template": return !!templateContent.trim() && templateButtons.split("\n").filter(Boolean).length >= 1;
       case "list":     return !!listText.trim() && listChoices.split("\n").filter(Boolean).length >= 1;
       case "carousel": return !!carouselText.trim() && carouselChoices.split("\n").filter(Boolean).length >= 1;
       default:         return true;
@@ -839,8 +857,54 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
           await messagesApi.sendSticker(instanceId, { to: recipient, url: mediaUrl });
           break;
         case "buttons": {
-          const buttons = btnItems.split("\n").filter(Boolean).slice(0, 3).map((t, i) => ({ id: `btn_${i}`, text: t.trim() }));
+          const buttons = btnItems
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .slice(0, 3)
+            .map((line, i) => {
+              const [textPart, actionPart] = line.split("|");
+              const textValue = (textPart || "").trim();
+              const actionValue = (actionPart || "").trim();
+              if (!textValue) return null;
+              if (actionValue.startsWith("url:")) {
+                return { text: textValue, type: "url" as const, url: actionValue.slice(4).trim() };
+              }
+              if (actionValue.startsWith("call:")) {
+                return { text: textValue, type: "call" as const, phone: actionValue.slice(5).trim() };
+              }
+              return { id: actionValue || `btn_${i}`, text: textValue, type: "reply" as const };
+            })
+            .filter((button): button is NonNullable<typeof button> => Boolean(button?.text));
           await messagesApi.sendButtons(instanceId, { to: recipient, body: btnBody, footer: btnFooter || undefined, buttons });
+          break;
+        }
+        case "template": {
+          const buttons = templateButtons
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .map((line, i) => {
+              const [displayTextPart, typePart, valuePart] = line.split("|");
+              const displayText = (displayTextPart || "").trim();
+              const typeValue = ((typePart || "").trim().toLowerCase() || "quickreply") as "quickreply" | "url" | "call";
+              const value = (valuePart || "").trim();
+              if (!displayText) return null;
+              if (typeValue === "url") {
+                return { display_text: displayText, type: "url" as const, url: value };
+              }
+              if (typeValue === "call") {
+                return { display_text: displayText, type: "call" as const, phone_number: value };
+              }
+              return { display_text: displayText, type: "quickreply" as const, id: value || `template_btn_${i}` };
+            })
+            .filter((button): button is NonNullable<typeof button> => Boolean(button?.display_text));
+          await messagesApi.sendTemplate(instanceId, {
+            to: recipient,
+            content: templateContent,
+            footer: templateFooter || undefined,
+            buttons,
+          });
           break;
         }
         case "list": {
@@ -909,6 +973,35 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
       queryClient.invalidateQueries({ queryKey: ["instance", instanceId] });
     },
     onError: () => toast.error("Erro ao regenerar token"),
+  });
+
+  const contactInfoMutation = useMutation({
+    mutationFn: (target: string) => instancesApi.contactInfo(instanceId, buildLookupPayload(target)),
+    onSuccess: (res) => setContactLookup(res.data),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao consultar contato";
+      toast.error(msg);
+    },
+  });
+
+  const contactAvatarMutation = useMutation({
+    mutationFn: (target: string) => instancesApi.contactAvatar(instanceId, buildLookupPayload(target)),
+    onSuccess: (res) => {
+      const data = res.data as InstanceContactLookup;
+      setContactLookup((prev) => ({
+        query: data.query || prev?.query || lookupTarget.trim(),
+        exists: data.exists,
+        jid: data.jid || prev?.jid,
+        phone: prev?.phone,
+        name: prev?.name,
+        push_name: prev?.push_name,
+        avatar_url: data.avatar_url || prev?.avatar_url,
+      }));
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao buscar avatar";
+      toast.error(msg);
+    },
   });
 
   const cardStyle = {
@@ -1103,6 +1196,88 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
             </div>
           </div>
         )}
+
+        {isWhatsApp && instance.status === "connected" && (
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
+              Consulta rápida
+            </h3>
+            <div className="rounded-2xl p-4 space-y-3" style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={lookupTarget}
+                  onChange={(e) => setLookupTarget(e.target.value)}
+                  placeholder="5511999999999 ou 5511999999999@s.whatsapp.net"
+                  className="input-field flex-1"
+                />
+                <button
+                  onClick={() => contactInfoMutation.mutate(lookupTarget)}
+                  disabled={!lookupTarget.trim() || contactInfoMutation.isPending}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-40"
+                  style={{ background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.25)", color: "#60a5fa" }}
+                >
+                  {contactInfoMutation.isPending ? "Consultando..." : "Consultar info"}
+                </button>
+                <button
+                  onClick={() => contactAvatarMutation.mutate(lookupTarget)}
+                  disabled={!lookupTarget.trim() || contactAvatarMutation.isPending}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-40"
+                  style={{ background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.22)", color: "#34d399" }}
+                >
+                  {contactAvatarMutation.isPending ? "Buscando..." : "Buscar avatar"}
+                </button>
+              </div>
+              <p className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>
+                Valide número ou JID canônico, nome exibido e avatar vistos pela instância conectada.
+              </p>
+
+              {contactLookup && (
+                <div className="rounded-xl p-3 flex gap-3 items-start" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  {contactLookup.avatar_url ? (
+                    <img src={contactLookup.avatar_url} alt="Avatar do contato" className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(255,255,255,0.05)" }}>
+                      <User className="w-5 h-5" style={{ color: "hsl(240 8% 45%)" }} />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-semibold" style={{ color: "hsl(240 15% 88%)" }}>
+                        {contactLookup.push_name || contactLookup.name || "Contato sem nome disponível"}
+                      </span>
+                      <span
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                        style={contactLookup.exists
+                          ? { background: "rgba(0,212,106,0.1)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.2)" }
+                          : { background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.2)" }}
+                      >
+                        {contactLookup.exists ? "Existe no WhatsApp" : "Não encontrado"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-mono break-all" style={{ color: "hsl(240 8% 46%)" }}>
+                      Consulta: {contactLookup.query}
+                    </p>
+                    {contactLookup.jid && (
+                      <p className="text-[11px] font-mono break-all" style={{ color: "hsl(240 8% 46%)" }}>
+                        JID: {contactLookup.jid}
+                      </p>
+                    )}
+                    {contactLookup.phone && (
+                      <p className="text-[11px] font-mono" style={{ color: "hsl(240 8% 46%)" }}>
+                        Número: {contactLookup.phone}
+                      </p>
+                    )}
+                    {!contactLookup.avatar_url && contactLookup.exists && (
+                      <p className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>
+                        Nenhum avatar disponível para este contato no momento.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Actions */}
@@ -1200,6 +1375,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                 { id: "poll",     label: "Enquete",    icon: BarChart2 },
                 { id: "sticker",  label: "Sticker",    icon: Sticker },
                 { id: "buttons",  label: "Botões",     icon: MousePointerClick },
+                { id: "template", label: "Template",   icon: MousePointerClick },
                 { id: "list",     label: "Lista",      icon: List },
                 { id: "carousel", label: "Carrossel",  icon: LayoutGrid },
               ] as { id: typeof msgType; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
@@ -1283,8 +1459,27 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
               <input value={btnFooter} onChange={e => setBtnFooter(e.target.value)}
                 placeholder="Rodapé (opcional)" className="input-field w-full" />
               <textarea value={btnItems} onChange={e => setBtnItems(e.target.value)}
-                rows={3} placeholder={"Sim|sim\nNão|não\nTalvez|talvez"} className="input-field w-full resize-none" />
-              <p className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>Um botão por linha · formato: texto|id · máximo 3</p>
+                rows={4} placeholder={"Sim|sim\nVisitar site|url:https://uniq.chat\nLigar agora|call:+5511999999999"} className="input-field w-full resize-none font-mono text-xs" />
+              <div className="rounded-lg p-2.5" style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)" }}>
+                <p className="text-[10px]" style={{ color: "rgb(110 231 183)" }}>
+                  Formatos: <span className="font-mono">texto|id</span> para resposta rápida, <span className="font-mono">texto|url:https://...</span> para link, <span className="font-mono">texto|call:+5511...</span> para ligação. Máximo 3 botões.
+                </p>
+              </div>
+            </div>
+          )}
+          {msgType === "template" && (
+            <div className="space-y-3">
+              <textarea value={templateContent} onChange={e => setTemplateContent(e.target.value)}
+                rows={2} placeholder="Template content" className="input-field w-full resize-none" />
+              <input value={templateFooter} onChange={e => setTemplateFooter(e.target.value)}
+                placeholder="Some footer text" className="input-field w-full" />
+              <textarea value={templateButtons} onChange={e => setTemplateButtons(e.target.value)}
+                rows={5} placeholder={"Yes|quickreply|yes\nNo|quickreply|no\nVisit Site|url|https://www.fop2.com\nLlamame|call|1155554444"} className="input-field w-full resize-none font-mono text-xs" />
+              <div className="rounded-lg p-2.5" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)" }}>
+                <p className="text-[10px]" style={{ color: "rgb(253 186 116)" }}>
+                  Formato: <span className="font-mono">DisplayText|quickreply|id</span>, <span className="font-mono">DisplayText|url|https://...</span> ou <span className="font-mono">DisplayText|call|5511...</span>.
+                </p>
+              </div>
             </div>
           )}
           {msgType === "list" && (
@@ -1301,7 +1496,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                 rows={6} placeholder={"[Seção 1]\nItem 1|id1|Descrição 1\nItem 2|id2\n[Seção 2]\nItem 3|id3|Descrição 3"} className="input-field w-full resize-none font-mono text-xs" />
               <div className="rounded-lg p-2.5" style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.2)" }}>
                 <p className="text-[10px]" style={{ color: "hsl(217, 91%, 75%)" }}>
-                  📋 Formato: <span className="font-mono">[Título da Seção]</span> para seções, <span className="font-mono">titulo|id|descricao</span> para itens
+                  Formato via <span className="font-mono">/messages/menu</span>: <span className="font-mono">[Título da Seção]</span> para seções e <span className="font-mono">titulo|id|descricao</span> para itens.
                 </p>
               </div>
             </div>
@@ -1316,7 +1511,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                 rows={8} placeholder={"[Cartão 1 - Título]\n{https://exemplo.com/imagem.jpg}\nVer mais|https://exemplo.com\nComprar|call:+5511999999999\n[Cartão 2]\n{https://exemplo.com/img2.jpg}\nInfo|https://loja.exemplo.com"} className="input-field w-full resize-none font-mono text-xs" />
               <div className="rounded-lg p-2.5" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.2)" }}>
                 <p className="text-[10px]" style={{ color: "hsl(271, 91%, 75%)" }}>
-                  🎠 Formato: <span className="font-mono">[Título]</span> cartão, <span className="font-mono">{"{url}"}</span> imagem, <span className="font-mono">texto|url</span> ou <span className="font-mono">texto|call:numero</span> para botões
+                  Formato via <span className="font-mono">/messages/menu</span>: <span className="font-mono">[Título]</span> para cartão, <span className="font-mono">{"{url}"}</span> para imagem e <span className="font-mono">texto|url</span> ou <span className="font-mono">texto|call:numero</span> para ações.
                 </p>
               </div>
             </div>
