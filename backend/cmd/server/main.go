@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -51,8 +52,10 @@ func main() {
 	if os.Getenv("SUPER_ADMIN_EMAIL") != "" && os.Getenv("SUPER_ADMIN_PASSWORD") != "" {
 		var existing models.User
 		if err := db.First(&existing, "email = ?", os.Getenv("SUPER_ADMIN_EMAIL")).Error; err == gorm.ErrRecordNotFound {
+			username := strings.ToLower(strings.ReplaceAll(os.Getenv("SUPER_ADMIN_NAME"), " ", ""))
 			user := models.User{
 				Name:     os.Getenv("SUPER_ADMIN_NAME"),
+				Username: &username,
 				Email:    os.Getenv("SUPER_ADMIN_EMAIL"),
 				Role:     models.RoleSuperAdmin,
 				IsBeta:   true,
