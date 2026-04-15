@@ -101,6 +101,9 @@ services:
       MINIO_BUCKET: ${MINIO_BUCKET:-uniqchat-media}
       MINIO_PUBLIC_URL: https://media.uniq.chat
       MINIO_USE_SSL: "false"
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD}
+      SUPER_ADMIN_NAME: ${SUPER_ADMIN_NAME:-Admin}
     volumes:
       - sessions_data:/app/sessions
     ports:
