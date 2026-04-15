@@ -15,21 +15,13 @@ import api from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
-// Plan colors matching admin panel
-const PLAN_COLORS: Record<string, { icon: React.ReactNode; color: string }> = {
-  Free:       { icon: <MessageSquare className="w-3.5 h-3.5" />, color: "#64748b" },
-  Starter:    { icon: <Flame className="w-3.5 h-3.5" />, color: "#fb923c" },
-  Pro:        { icon: <Zap className="w-3.5 h-3.5" />, color: "#60a5fa" },
-  Business:   { icon: <Building2 className="w-3.5 h-3.5" />, color: "#a78bfa" },
-  Enterprise: { icon: <Building2 className="w-3.5 h-3.5" />, color: "#a78bfa" },
-};
-
 function getPlanMeta(plan: { name: string; price: number } | null) {
-  if (!plan) return { icon: <MessageSquare className="w-3.5 h-3.5" />, color: "#64748b", label: "Grátis" };
-  const name = plan.name || "Free";
-  const style = PLAN_COLORS[name] ?? PLAN_COLORS["Free"];
-  const label = name === "Free" ? "Grátis" : `R$${plan.price}/mês`;
-  return { icon: style.icon, color: style.color, label };
+  if (!plan) return { icon: <MessageSquare className="w-3.5 h-3.5" />, color: "#60a5fa", label: "Grátis" };
+  const price = plan.price;
+  if (price === 0) return { icon: <MessageSquare className="w-3.5 h-3.5" />, color: "#60a5fa", label: "Grátis" };
+  if (price < 50) return { icon: <Flame className="w-3.5 h-3.5" />, color: "#fb923c", label: `R$${price}/mês` };
+  if (price < 120) return { icon: <Zap className="w-3.5 h-3.5" />, color: "#00d46a", label: `R$${price}/mês` };
+  return { icon: <Building2 className="w-3.5 h-3.5" />, color: "#a78bfa", label: `R$${price}/mês` };
 }
 
 function Field({
