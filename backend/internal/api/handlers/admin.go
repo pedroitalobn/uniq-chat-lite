@@ -618,7 +618,9 @@ func (h *AdminHandler) UpdateGlobalProxyConfig(c *fiber.Ctx) error {
 			cfg.Country = "br"
 		}
 		log.Info().Msg("proxy-config: creating new config")
+		log.Info().Any("config", cfg).Msg("proxy-config: config struct")
 		if err := h.db.Create(&cfg).Error; err != nil {
+			log.Error().Err(err).Msg("proxy-config: failed to create config")
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar configuração"})
 		}
 		return h.GetGlobalProxyConfig(c)
