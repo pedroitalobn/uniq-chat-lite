@@ -63,7 +63,7 @@ api.interceptors.request.use(async (config) => {
     return config;
   }
 
-  // Do not block requests too long waiting for /api/auth/session
+  // Do not block requests too long waiting for /v1/auth/session
   const session = await getSessionWithTimeout(1200);
   if (session?.accessToken) {
     config.headers.Authorization = `Bearer ${session.accessToken}`;
@@ -166,10 +166,10 @@ export const authApi = {
 };
 
 export const serversApi = {
-  list: (workspaceId?: string) => api.get("/api/servers", { params: workspaceId ? { workspace_id: workspaceId } : undefined }),
-  get: (id: string) => api.get(`/api/servers/${id}`),
+  list: (workspaceId?: string) => api.get("/v1/servers", { params: workspaceId ? { workspace_id: workspaceId } : undefined }),
+  get: (id: string) => api.get(`/v1/servers/${id}`),
   create: (data: { name: string; slug?: string; description?: string; workspace_id?: string }) =>
-    api.post("/api/servers", data),
+    api.post("/v1/servers", data),
   update: (id: string, data: { 
     name?: string; 
     description?: string; 
@@ -177,26 +177,26 @@ export const serversApi = {
     proxy_pool_id?: string;
     webhook_url?: string;
     apply_webhook?: boolean;
-  }) => api.put(`/api/servers/${id}`, data),
-  delete: (id: string) => api.delete(`/api/servers/${id}`),
-  instances: (id: string) => api.get(`/api/servers/${id}/instances`),
-  stats: (id: string) => api.get(`/api/servers/${id}/stats`),
-  action: (id: string, action: string) => api.post(`/api/servers/${id}/actions`, { action }),
+  }) => api.put(`/v1/servers/${id}`, data),
+  delete: (id: string) => api.delete(`/v1/servers/${id}`),
+  instances: (id: string) => api.get(`/v1/servers/${id}/instances`),
+  stats: (id: string) => api.get(`/v1/servers/${id}/stats`),
+  action: (id: string, action: string) => api.post(`/v1/servers/${id}/actions`, { action }),
 };
 
 export const channelsApi = {
-  list: () => api.get("/api/channels"),
+  list: () => api.get("/v1/channels"),
 };
 
 export const proxyPoolsApi = {
-  list: () => api.get("/api/proxy/pool"),
-  listProviders: () => api.get("/api/proxy/providers"),
-  getGlobalProxies: () => api.get("/api/proxy/global"),
+  list: () => api.get("/v1/proxy/pool"),
+  listProviders: () => api.get("/v1/proxy/providers"),
+  getGlobalProxies: () => api.get("/v1/proxy/global"),
   createProvider: (data: { provider: string; name: string; api_key: string; country?: string }) =>
-    api.post("/api/proxy/providers", data),
+    api.post("/v1/proxy/providers", data),
   updateProvider: (id: string, data: { name?: string; api_key?: string; country?: string; is_active?: boolean }) =>
-    api.put(`/api/proxy/providers/${id}`, data),
-  deleteProvider: (id: string) => api.delete(`/api/proxy/providers/${id}`),
+    api.put(`/v1/proxy/providers/${id}`, data),
+  deleteProvider: (id: string) => api.delete(`/v1/proxy/providers/${id}`),
 };
 
 export const instancesApi = {
@@ -204,58 +204,58 @@ export const instancesApi = {
     const params: Record<string, string> = {};
     if (channel) params.channel = channel;
     if (workspaceId) params.workspace_id = workspaceId;
-    return api.get("/api/instances", { params: Object.keys(params).length ? params : undefined });
+    return api.get("/v1/instances", { params: Object.keys(params).length ? params : undefined });
   },
-  get: (id: string) => api.get(`/api/instances/${id}`),
+  get: (id: string) => api.get(`/v1/instances/${id}`),
   create: (name: string, channel?: string, serverId?: string, token?: string, workspaceId?: string) =>
-    api.post("/api/instances", {
+    api.post("/v1/instances", {
       name,
       channel: channel || "whatsapp",
       server_id: serverId || undefined,
       token: token || undefined,
       workspace_id: workspaceId || undefined,
     }),
-  delete: (id: string) => api.delete(`/api/instances/${id}`),
-  getQR: (id: string) => api.get(`/api/instances/${id}/qr`),
+  delete: (id: string) => api.delete(`/v1/instances/${id}`),
+  getQR: (id: string) => api.get(`/v1/instances/${id}/qr`),
   getPairingCode: (id: string, phoneNumber: string) =>
-    api.post(`/api/instances/${id}/pairing-code`, { phone_number: phoneNumber }),
-  disconnect: (id: string) => api.post(`/api/instances/${id}/disconnect`),
-  reconnect: (id: string) => api.post(`/api/instances/${id}/reconnect`),
-  status: (id: string) => api.get(`/api/instances/${id}/status`),
-  profile: (id: string) => api.get(`/api/instances/${id}/profile`),
+    api.post(`/v1/instances/${id}/pairing-code`, { phone_number: phoneNumber }),
+  disconnect: (id: string) => api.post(`/v1/instances/${id}/disconnect`),
+  reconnect: (id: string) => api.post(`/v1/instances/${id}/reconnect`),
+  status: (id: string) => api.get(`/v1/instances/${id}/status`),
+  profile: (id: string) => api.get(`/v1/instances/${id}/profile`),
   contactInfo: (id: string, data: { phone?: string; jid?: string }) =>
-    api.post(`/api/instances/${id}/contact/info`, data),
+    api.post(`/v1/instances/${id}/contact/info`, data),
   contactAvatar: (id: string, data: { phone?: string; jid?: string }) =>
-    api.post(`/api/instances/${id}/contact/avatar`, data),
-  regenerateToken: (id: string) => api.post(`/api/instances/${id}/regenerate-token`),
+    api.post(`/v1/instances/${id}/contact/avatar`, data),
+  regenerateToken: (id: string) => api.post(`/v1/instances/${id}/regenerate-token`),
   instagramLogin: (id: string, creds: { username: string; password: string }) =>
-    api.post(`/api/instances/${id}/instagram/login`, creds),
-  instagramLogout: (id: string) => api.post(`/api/instances/${id}/instagram/logout`),
+    api.post(`/v1/instances/${id}/instagram/login`, creds),
+  instagramLogout: (id: string) => api.post(`/v1/instances/${id}/instagram/logout`),
   instagramSendDM: (id: string, data: { recipient: string; message: string }) =>
-    api.post(`/api/instances/${id}/instagram/dm`, data),
-  instagramGetInbox: (id: string) => api.get(`/api/instances/${id}/instagram/dm`),
+    api.post(`/v1/instances/${id}/instagram/dm`, data),
+  instagramGetInbox: (id: string) => api.get(`/v1/instances/${id}/instagram/dm`),
   instagramFollow: (id: string, target: string) =>
-    api.post(`/api/instances/${id}/instagram/follow`, { target }),
+    api.post(`/v1/instances/${id}/instagram/follow`, { target }),
   instagramUnfollow: (id: string, target: string) =>
-    api.post(`/api/instances/${id}/instagram/unfollow`, { target }),
-  instagramPause: (id: string) => api.post(`/api/instances/${id}/instagram/pause`),
-  instagramResume: (id: string) => api.post(`/api/instances/${id}/instagram/resume`),
+    api.post(`/v1/instances/${id}/instagram/unfollow`, { target }),
+  instagramPause: (id: string) => api.post(`/v1/instances/${id}/instagram/pause`),
+  instagramResume: (id: string) => api.post(`/v1/instances/${id}/instagram/resume`),
   instagramPublishPost: (id: string, data: { image_url?: string; video_url?: string; caption?: string }) =>
-    api.post(`/api/instances/${id}/instagram/post`, data),
+    api.post(`/v1/instances/${id}/instagram/post`, data),
   instagramUploadStory: (id: string, data: { image_url?: string; video_url?: string; caption?: string }) =>
-    api.post(`/api/instances/${id}/instagram/story`, data),
+    api.post(`/v1/instances/${id}/instagram/story`, data),
   instagramGetUserMedia: (id: string, username: string) =>
-    api.get(`/api/instances/${id}/instagram/media`, { params: { username } }),
+    api.get(`/v1/instances/${id}/instagram/media`, { params: { username } }),
   instagramLikeMedia: (id: string, mediaId: string) =>
-    api.post(`/api/instances/${id}/instagram/like`, { media_id: mediaId }),
+    api.post(`/v1/instances/${id}/instagram/like`, { media_id: mediaId }),
   instagramChallenge: (id: string, data: { api_path: string; code: string; method?: string }) =>
-    api.post(`/api/instances/${id}/instagram/challenge`, data),
+    api.post(`/v1/instances/${id}/instagram/challenge`, data),
   instagramChallengeResend: (id: string, data: { api_path: string; method?: string }) =>
-    api.post(`/api/instances/${id}/instagram/challenge/resend`, data),
+    api.post(`/v1/instances/${id}/instagram/challenge/resend`, data),
 };
 
 export const settingsApi = {
-  get: (id: string) => api.get(`/api/instances/${id}/settings`),
+  get: (id: string) => api.get(`/v1/instances/${id}/settings`),
   update: (id: string, data: Partial<{
     always_online: boolean;
     reject_calls: boolean;
@@ -263,71 +263,71 @@ export const settingsApi = {
     ignore_groups: boolean;
     ignore_status: boolean;
     mcp_enabled: boolean;
-  }>) => api.put(`/api/instances/${id}/settings`, data),
+  }>) => api.put(`/v1/instances/${id}/settings`, data),
 };
 
 export const proxyApi = {
-  get: (id: string) => api.get(`/api/instances/${id}/proxy`),
-  set: (id: string, data: ProxyConfig) => api.put(`/api/instances/${id}/proxy`, data),
+  get: (id: string) => api.get(`/v1/instances/${id}/proxy`),
+  set: (id: string, data: ProxyConfig) => api.put(`/v1/instances/${id}/proxy`, data),
   test: (id: string, data?: Partial<ProxyConfig>) =>
-    api.post(`/api/instances/${id}/proxy/test`, data || {}),
-  delete: (id: string) => api.delete(`/api/instances/${id}/proxy`),
+    api.post(`/v1/instances/${id}/proxy/test`, data || {}),
+  delete: (id: string) => api.delete(`/v1/instances/${id}/proxy`),
   setMode: (id: string, data: { mode: string; global_proxy_id?: string; provider_id?: string }) => 
-    api.put(`/api/instances/${id}/proxy/mode`, data),
+    api.put(`/v1/instances/${id}/proxy/mode`, data),
 };
 
 export const messagesApi = {
   list: (id: string, params?: { limit?: number; offset?: number }) =>
-    api.get(`/api/instances/${id}/messages`, { params }),
+    api.get(`/v1/instances/${id}/messages`, { params }),
   sendText: (id: string, to: string, text: string) =>
-    api.post(`/api/instances/${id}/messages/text`, { to, text }),
+    api.post(`/v1/instances/${id}/messages/text`, { to, text }),
   sendImage: (id: string, data: { to: string; url?: string; base64?: string; caption?: string }) =>
-    api.post(`/api/instances/${id}/messages/image`, data),
+    api.post(`/v1/instances/${id}/messages/image`, data),
   sendDocument: (id: string, data: { to: string; url?: string; base64?: string; filename?: string; caption?: string }) =>
-    api.post(`/api/instances/${id}/messages/document`, data),
+    api.post(`/v1/instances/${id}/messages/document`, data),
   sendAudio: (id: string, data: { to: string; url?: string; base64?: string }) =>
-    api.post(`/api/instances/${id}/messages/audio`, data),
+    api.post(`/v1/instances/${id}/messages/audio`, data),
   sendVideo: (id: string, data: { to: string; url?: string; base64?: string; caption?: string }) =>
-    api.post(`/api/instances/${id}/messages/video`, data),
+    api.post(`/v1/instances/${id}/messages/video`, data),
   sendLocation: (id: string, data: { to: string; latitude: number; longitude: number; name?: string; address?: string }) =>
-    api.post(`/api/instances/${id}/messages/location`, data),
+    api.post(`/v1/instances/${id}/messages/location`, data),
   sendContact: (id: string, data: { to: string; display_name: string; phone: string }) =>
-    api.post(`/api/instances/${id}/messages/contact`, data),
+    api.post(`/v1/instances/${id}/messages/contact`, data),
   sendReaction: (id: string, data: { to: string; message_id: string; emoji: string }) =>
-    api.post(`/api/instances/${id}/messages/reaction`, data),
+    api.post(`/v1/instances/${id}/messages/reaction`, data),
   sendPoll: (id: string, data: { to: string; question: string; options: string[]; multiple_answers?: boolean }) =>
-    api.post(`/api/instances/${id}/messages/poll`, data),
+    api.post(`/v1/instances/${id}/messages/poll`, data),
   sendSticker: (id: string, data: { to: string; url?: string; base64?: string }) =>
-    api.post(`/api/instances/${id}/messages/sticker`, data),
+    api.post(`/v1/instances/${id}/messages/sticker`, data),
   sendButtons: (id: string, data: { to: string; body: string; footer?: string; buttons: { id?: string; text: string; type?: "reply" | "url" | "call"; url?: string; phone?: string }[] }) =>
-    api.post(`/api/instances/${id}/messages/buttons`, data),
+    api.post(`/v1/instances/${id}/messages/buttons`, data),
   sendTemplate: (id: string, data: { to: string; content: string; footer?: string; buttons: { display_text: string; type: "quickreply" | "url" | "call"; id?: string; url?: string; phone_number?: string }[] }) =>
-    api.post(`/api/instances/${id}/messages/template`, data),
+    api.post(`/v1/instances/${id}/messages/template`, data),
   sendList: (id: string, data: { to: string; title?: string; description?: string; button_text: string; footer?: string; sections: { title: string; rows: { id: string; title: string; description?: string }[] }[] }) =>
-    api.post(`/api/instances/${id}/messages/list`, data),
+    api.post(`/v1/instances/${id}/messages/list`, data),
   sendMenu: (id: string, data: { number: string; type: "button"|"list"|"poll"|"carousel"; text: string; choices: string[]; footerText?: string; listButton?: string; selectableCount?: number; imageButton?: string }) =>
-    api.post(`/api/instances/${id}/messages/menu`, data),
+    api.post(`/v1/instances/${id}/messages/menu`, data),
 };
 
 export const inboxApi = {
   getChats: (instanceId: string, search?: string, filter?: string) =>
-    api.get(`/api/instances/${instanceId}/inbox/chats`, { params: { search, filter } }),
+    api.get(`/v1/instances/${instanceId}/inbox/chats`, { params: { search, filter } }),
   getChat: (instanceId: string, jid: string) =>
-    api.get(`/api/instances/${instanceId}/inbox/chats/${jid}`),
+    api.get(`/v1/instances/${instanceId}/inbox/chats/${jid}`),
   getMessages: (instanceId: string, jid: string, params?: { limit?: number; offset?: number; before?: string }) =>
-    api.get(`/api/instances/${instanceId}/inbox/chats/${jid}/messages`, { params }),
+    api.get(`/v1/instances/${instanceId}/inbox/chats/${jid}/messages`, { params }),
   sendMessage: (instanceId: string, jid: string, data: { content: string; type?: string }) =>
-    api.post(`/api/instances/${instanceId}/inbox/chats/${jid}/messages`, data),
+    api.post(`/v1/instances/${instanceId}/inbox/chats/${jid}/messages`, data),
   sendMedia: (instanceId: string, jid: string, data: { url: string; caption?: string; mime_type?: string }) =>
-    api.post(`/api/instances/${instanceId}/inbox/chats/${jid}/messages/media`, data),
+    api.post(`/v1/instances/${instanceId}/inbox/chats/${jid}/messages/media`, data),
   markRead: (instanceId: string, jid: string) =>
-    api.post(`/api/instances/${instanceId}/inbox/chats/${jid}/read`),
+    api.post(`/v1/instances/${instanceId}/inbox/chats/${jid}/read`),
   sendTyping: (instanceId: string, jid: string, typing: boolean) =>
-    api.post(`/api/instances/${instanceId}/inbox/chats/${jid}/typing`, { typing }),
+    api.post(`/v1/instances/${instanceId}/inbox/chats/${jid}/typing`, { typing }),
   updateContact: (instanceId: string, contactId: string, data: { name?: string; phone?: string; email?: string; notes?: string; funnel?: string; stage?: string; journey?: string; owner?: string; tag_ids?: string[] }) =>
-    api.put(`/api/instances/${instanceId}/inbox/contacts/${contactId}`, data),
+    api.put(`/v1/instances/${instanceId}/inbox/contacts/${contactId}`, data),
   updateMessage: (instanceId: string, messageId: string, data: { is_pinned?: boolean; is_favorite?: boolean; is_archived?: boolean; is_deleted?: boolean }) =>
-    api.patch(`/api/instances/${instanceId}/inbox/messages/${messageId}`, data),
+    api.patch(`/v1/instances/${instanceId}/inbox/messages/${messageId}`, data),
 };
 
 export interface WebhookPayload {
@@ -355,123 +355,123 @@ export interface WebhookPayload {
 }
 
 export const webhooksApi = {
-  list: (id: string) => api.get(`/api/instances/${id}/webhooks`),
+  list: (id: string) => api.get(`/v1/instances/${id}/webhooks`),
   create: (id: string, data: WebhookPayload) =>
-    api.post(`/api/instances/${id}/webhooks`, data),
+    api.post(`/v1/instances/${id}/webhooks`, data),
   update: (id: string, webhookId: string, data: WebhookPayload) =>
-    api.put(`/api/instances/${id}/webhooks/${webhookId}`, data),
+    api.put(`/v1/instances/${id}/webhooks/${webhookId}`, data),
   delete: (id: string, webhookId: string) =>
-    api.delete(`/api/instances/${id}/webhooks/${webhookId}`),
+    api.delete(`/v1/instances/${id}/webhooks/${webhookId}`),
 };
 
 export const globalWebhooksApi = {
-  listEvents: () => api.get("/api/webhooks/system/events"),
-  list: () => api.get("/api/webhooks/system"),
+  listEvents: () => api.get("/v1/webhooks/system/events"),
+  list: () => api.get("/v1/webhooks/system"),
   create: (data: { name: string; url: string; events: string[] }) =>
-    api.post("/api/webhooks/system", data),
-  delete: (id: string) => api.delete(`/api/webhooks/system/${id}`),
-  test: (id: string) => api.post(`/api/webhooks/system/${id}/test`, {}),
+    api.post("/v1/webhooks/system", data),
+  delete: (id: string) => api.delete(`/v1/webhooks/system/${id}`),
+  test: (id: string) => api.post(`/v1/webhooks/system/${id}/test`, {}),
 };
 
 export const recoveryApi = {
-  get: (id: string) => api.get(`/api/instances/${id}/recovery`),
-  snapshot: (id: string) => api.post(`/api/instances/${id}/recovery/snapshot`),
-  reset: (id: string) => api.post(`/api/instances/${id}/recovery/reset`),
+  get: (id: string) => api.get(`/v1/instances/${id}/recovery`),
+  snapshot: (id: string) => api.post(`/v1/instances/${id}/recovery/snapshot`),
+  reset: (id: string) => api.post(`/v1/instances/${id}/recovery/reset`),
   setSchedule: (id: string, schedule: "" | "daily" | "weekly") =>
-    api.put(`/api/instances/${id}/recovery/schedule`, { schedule }),
+    api.put(`/v1/instances/${id}/recovery/schedule`, { schedule }),
 };
 
 export const mcpApi = {
-  tools: (id: string) => api.get(`/api/instances/${id}/mcp/tools`),
+  tools: (id: string) => api.get(`/v1/instances/${id}/mcp/tools`),
 };
 
 // ─── Workspace API ────────────────────────────────────────────────────────────
 
 export const workspacesApi = {
-  list: () => api.get("/api/workspaces"),
-  create: (data: { name: string }) => api.post("/api/workspaces", data),
-  get: (id: string) => api.get(`/api/workspaces/${id}`),
-  update: (id: string, data: { name: string }) => api.put(`/api/workspaces/${id}`, data),
-  delete: (id: string) => api.delete(`/api/workspaces/${id}`),
+  list: () => api.get("/v1/workspaces"),
+  create: (data: { name: string }) => api.post("/v1/workspaces", data),
+  get: (id: string) => api.get(`/v1/workspaces/${id}`),
+  update: (id: string, data: { name: string }) => api.put(`/v1/workspaces/${id}`, data),
+  delete: (id: string) => api.delete(`/v1/workspaces/${id}`),
   // Members
-  listMembers: (id: string) => api.get(`/api/workspaces/${id}/members`),
-  removeMember: (id: string, memberId: string) => api.delete(`/api/workspaces/${id}/members/${memberId}`),
+  listMembers: (id: string) => api.get(`/v1/workspaces/${id}/members`),
+  removeMember: (id: string, memberId: string) => api.delete(`/v1/workspaces/${id}/members/${memberId}`),
   // Invites
-  createInvite: (id: string, data: { email: string; role_id: string }) => api.post(`/api/workspaces/${id}/invites`, data),
-  listInvites: (id: string) => api.get(`/api/workspaces/${id}/invites`),
-  revokeInvite: (id: string, inviteId: string) => api.delete(`/api/workspaces/${id}/invites/${inviteId}`),
-  acceptInvite: (token: string) => api.post(`/api/workspaces/accept-invite/${token}`),
+  createInvite: (id: string, data: { email: string; role_id: string }) => api.post(`/v1/workspaces/${id}/invites`, data),
+  listInvites: (id: string) => api.get(`/v1/workspaces/${id}/invites`),
+  revokeInvite: (id: string, inviteId: string) => api.delete(`/v1/workspaces/${id}/invites/${inviteId}`),
+  acceptInvite: (token: string) => api.post(`/v1/workspaces/accept-invite/${token}`),
 };
 
 // ─── Roles API ────────────────────────────────────────────────────────────────
 
 export const rolesApi = {
-  list: (workspaceId: string) => api.get(`/api/workspaces/${workspaceId}/roles`),
-  get: (workspaceId: string, roleId: string) => api.get(`/api/workspaces/${workspaceId}/roles/${roleId}`),
+  list: (workspaceId: string) => api.get(`/v1/workspaces/${workspaceId}/roles`),
+  get: (workspaceId: string, roleId: string) => api.get(`/v1/workspaces/${workspaceId}/roles/${roleId}`),
   create: (workspaceId: string, data: { name: string; description?: string; permission_ids: string[] }) =>
-    api.post(`/api/workspaces/${workspaceId}/roles`, data),
+    api.post(`/v1/workspaces/${workspaceId}/roles`, data),
   update: (workspaceId: string, roleId: string, data: { name?: string; description?: string; permission_ids?: string[] }) =>
-    api.put(`/api/workspaces/${workspaceId}/roles/${roleId}`, data),
-  delete: (workspaceId: string, roleId: string) => api.delete(`/api/workspaces/${workspaceId}/roles/${roleId}`),
+    api.put(`/v1/workspaces/${workspaceId}/roles/${roleId}`, data),
+  delete: (workspaceId: string, roleId: string) => api.delete(`/v1/workspaces/${workspaceId}/roles/${roleId}`),
 };
 
 export const permissionsApi = {
-  list: () => api.get("/api/permissions"),
-  seed: () => api.post("/api/permissions/seed"),
+  list: () => api.get("/v1/permissions"),
+  seed: () => api.post("/v1/permissions/seed"),
 };
 
 export const apiKeysApi = {
-  list: () => api.get("/api/api-keys"),
-  create: (name: string) => api.post("/api/api-keys", { name }),
-  delete: (id: string) => api.delete(`/api/api-keys/${id}`),
+  list: () => api.get("/v1/api-keys"),
+  create: (name: string) => api.post("/v1/api-keys", { name }),
+  delete: (id: string) => api.delete(`/v1/api-keys/${id}`),
 };
 
 export const groupsApi = {
-  list: (instanceId: string) => api.get(`/api/instances/${instanceId}/groups`),
+  list: (instanceId: string) => api.get(`/v1/instances/${instanceId}/groups`),
   create: (instanceId: string, name: string, participants: string[]) =>
-    api.post(`/api/instances/${instanceId}/groups`, { name, participants }),
-  get: (instanceId: string, jid: string) => api.get(`/api/instances/${instanceId}/groups/${jid}`),
+    api.post(`/v1/instances/${instanceId}/groups`, { name, participants }),
+  get: (instanceId: string, jid: string) => api.get(`/v1/instances/${instanceId}/groups/${jid}`),
   update: (instanceId: string, jid: string, data: { name?: string; description?: string }) =>
-    api.put(`/api/instances/${instanceId}/groups/${jid}`, data),
+    api.put(`/v1/instances/${instanceId}/groups/${jid}`, data),
   updateParticipants: (instanceId: string, jid: string, action: string, participants: string[]) =>
-    api.post(`/api/instances/${instanceId}/groups/${jid}/participants`, { action, participants }),
+    api.post(`/v1/instances/${instanceId}/groups/${jid}/participants`, { action, participants }),
   inviteLink: (instanceId: string, jid: string, reset = false) =>
-    api.get(`/api/instances/${instanceId}/groups/${jid}/invite`, { params: { reset } }),
+    api.get(`/v1/instances/${instanceId}/groups/${jid}/invite`, { params: { reset } }),
   leave: (instanceId: string, jid: string) =>
-    api.post(`/api/instances/${instanceId}/groups/${jid}/leave`),
+    api.post(`/v1/instances/${instanceId}/groups/${jid}/leave`),
 };
 
 export const crmApi = {
   listContacts: (params?: { search?: string; tag_id?: string; limit?: number; offset?: number; workspace_id?: string }) =>
-    api.get("/api/crm/contacts", { params }),
+    api.get("/v1/crm/contacts", { params }),
   createContact: (data: { name: string; phone: string; email?: string; notes?: string; avatar_url?: string; workspace_id?: string }) =>
-    api.post("/api/crm/contacts", data),
-  getContact: (id: string) => api.get(`/api/crm/contacts/${id}`),
+    api.post("/v1/crm/contacts", data),
+  getContact: (id: string) => api.get(`/v1/crm/contacts/${id}`),
   updateContact: (id: string, data: Partial<{ name: string; phone: string; email: string; notes: string; avatar_url: string }>) =>
-    api.put(`/api/crm/contacts/${id}`, data),
-  deleteContact: (id: string) => api.delete(`/api/crm/contacts/${id}`),
-  assignTags: (id: string, tagIds: string[]) => api.put(`/api/crm/contacts/${id}/tags`, { tag_ids: tagIds }),
-  listTags: (workspaceId?: string) => api.get("/api/crm/tags", { params: workspaceId ? { workspace_id: workspaceId } : undefined }),
-  createTag: (name: string, color: string, workspaceId?: string) => api.post("/api/crm/tags", { name, color, workspace_id: workspaceId }),
-  deleteTag: (id: string) => api.delete(`/api/crm/tags/${id}`),
-  listFunnels: (workspaceId?: string) => api.get("/api/crm/funnels", { params: workspaceId ? { workspace_id: workspaceId } : undefined }),
-  createFunnel: (data: { name: string; description?: string; color?: string; workspace_id?: string }) => api.post("/api/crm/funnels", data),
-  deleteFunnel: (id: string) => api.delete(`/api/crm/funnels/${id}`),
-  listFunnelStages: (funnelId: string) => api.get(`/api/crm/funnels/${funnelId}/stages`),
-  createFunnelStage: (funnelId: string, data: { name: string; color?: string }) => api.post(`/api/crm/funnels/${funnelId}/stages`, data),
-  deleteFunnelStage: (funnelId: string, stageId: string) => api.delete(`/api/crm/funnels/${funnelId}/stages/${stageId}`),
-  listJourneyOptions: () => api.get("/api/crm/journey-options"),
-  listStageOptions: () => api.get("/api/crm/stage-options"),
-  listFunnelOptions: () => api.get("/api/crm/funnel-options"),
+    api.put(`/v1/crm/contacts/${id}`, data),
+  deleteContact: (id: string) => api.delete(`/v1/crm/contacts/${id}`),
+  assignTags: (id: string, tagIds: string[]) => api.put(`/v1/crm/contacts/${id}/tags`, { tag_ids: tagIds }),
+  listTags: (workspaceId?: string) => api.get("/v1/crm/tags", { params: workspaceId ? { workspace_id: workspaceId } : undefined }),
+  createTag: (name: string, color: string, workspaceId?: string) => api.post("/v1/crm/tags", { name, color, workspace_id: workspaceId }),
+  deleteTag: (id: string) => api.delete(`/v1/crm/tags/${id}`),
+  listFunnels: (workspaceId?: string) => api.get("/v1/crm/funnels", { params: workspaceId ? { workspace_id: workspaceId } : undefined }),
+  createFunnel: (data: { name: string; description?: string; color?: string; workspace_id?: string }) => api.post("/v1/crm/funnels", data),
+  deleteFunnel: (id: string) => api.delete(`/v1/crm/funnels/${id}`),
+  listFunnelStages: (funnelId: string) => api.get(`/v1/crm/funnels/${funnelId}/stages`),
+  createFunnelStage: (funnelId: string, data: { name: string; color?: string }) => api.post(`/v1/crm/funnels/${funnelId}/stages`, data),
+  deleteFunnelStage: (funnelId: string, stageId: string) => api.delete(`/v1/crm/funnels/${funnelId}/stages/${stageId}`),
+  listJourneyOptions: () => api.get("/v1/crm/journey-options"),
+  listStageOptions: () => api.get("/v1/crm/stage-options"),
+  listFunnelOptions: () => api.get("/v1/crm/funnel-options"),
 };
 
 export const campaignsApi = {
-  list: (workspaceId?: string) => api.get("/api/campaigns", { params: workspaceId ? { workspace_id: workspaceId } : undefined }),
-  segmentOptions: () => api.get("/api/campaigns/segment-options"),
+  list: (workspaceId?: string) => api.get("/v1/campaigns", { params: workspaceId ? { workspace_id: workspaceId } : undefined }),
+  segmentOptions: () => api.get("/v1/campaigns/segment-options"),
   segmentPreview: (data: {
     funnel?: string; stage?: string; journey?: string;
     tags?: string[]; owner?: string; external_id?: string;
-  }) => api.post("/api/campaigns/segment-preview", data),
+  }) => api.post("/v1/campaigns/segment-preview", data),
   create: (data: {
     workspace_id?: string;
     instance_id: string;
@@ -494,16 +494,16 @@ export const campaignsApi = {
       funnel?: string; stage?: string; journey?: string;
       tags?: string[]; owner?: string; external_id?: string;
     };
-  }) => api.post("/api/campaigns", data),
-  get: (id: string) => api.get(`/api/campaigns/${id}`),
-  start: (id: string) => api.post(`/api/campaigns/${id}/start`),
-  pause: (id: string) => api.post(`/api/campaigns/${id}/pause`),
-  cancel: (id: string) => api.post(`/api/campaigns/${id}/cancel`),
-  delete: (id: string) => api.delete(`/api/campaigns/${id}`),
+  }) => api.post("/v1/campaigns", data),
+  get: (id: string) => api.get(`/v1/campaigns/${id}`),
+  start: (id: string) => api.post(`/v1/campaigns/${id}/start`),
+  pause: (id: string) => api.post(`/v1/campaigns/${id}/pause`),
+  cancel: (id: string) => api.post(`/v1/campaigns/${id}/cancel`),
+  delete: (id: string) => api.delete(`/v1/campaigns/${id}`),
 };
 
 export const integrationsApi = {
-  list: () => api.get("/api/integrations"),
+  list: () => api.get("/v1/integrations"),
   create: (data: {
     provider: string;
     name: string;
@@ -511,7 +511,7 @@ export const integrationsApi = {
     base_url?: string;
     models?: string[];
     config?: string;
-  }) => api.post("/api/integrations", data),
+  }) => api.post("/v1/integrations", data),
   update: (id: string, data: {
     name?: string;
     api_key?: string;
@@ -519,10 +519,10 @@ export const integrationsApi = {
     models?: string[];
     config?: string;
     is_active?: boolean;
-  }) => api.put(`/api/integrations/${id}`, data),
-  delete: (id: string) => api.delete(`/api/integrations/${id}`),
-  test: (id: string) => api.post(`/api/integrations/${id}/test`),
-  getAgent: (instanceId: string) => api.get(`/api/instances/${instanceId}/agent`),
+  }) => api.put(`/v1/integrations/${id}`, data),
+  delete: (id: string) => api.delete(`/v1/integrations/${id}`),
+  test: (id: string) => api.post(`/v1/integrations/${id}/test`),
+  getAgent: (instanceId: string) => api.get(`/v1/instances/${instanceId}/agent`),
   updateAgent: (instanceId: string, data: {
     integration_id?: string | null;
     system_prompt?: string;
@@ -530,28 +530,28 @@ export const integrationsApi = {
     webhook_url?: string;
     webhook_secret?: string;
     mcp_server_url?: string;
-  }) => api.put(`/api/instances/${instanceId}/agent`, data),
+  }) => api.put(`/v1/instances/${instanceId}/agent`, data),
 };
 
 export const agentsApi = {
   chat: (message: string, integrationId?: string, model?: string) =>
-    api.post("/api/ai/chat", { message, integration_id: integrationId, model }),
-  stats: () => api.get("/api/agent/stats"),
-  activity: (limit?: number) => api.get("/api/agent/activity", { params: limit ? { limit } : undefined }),
-  instances: () => api.get("/api/agent/instances"),
-  stopExecution: (executionId: string) => api.post(`/api/agent/executions/${executionId}/stop`),
+    api.post("/v1/ai/chat", { message, integration_id: integrationId, model }),
+  stats: () => api.get("/v1/agent/stats"),
+  activity: (limit?: number) => api.get("/v1/agent/activity", { params: limit ? { limit } : undefined }),
+  instances: () => api.get("/v1/agent/instances"),
+  stopExecution: (executionId: string) => api.post(`/v1/agent/executions/${executionId}/stop`),
 };
 
 export const journeysApi = {
-  list: () => api.get("/api/journeys"),
+  list: () => api.get("/v1/journeys"),
   create: (prompt: string, integrationId?: string, instanceId?: string) =>
-    api.post("/api/journeys", { prompt, integration_id: integrationId, instance_id: instanceId }),
-  get: (id: string) => api.get(`/api/journeys/${id}`),
+    api.post("/v1/journeys", { prompt, integration_id: integrationId, instance_id: instanceId }),
+  get: (id: string) => api.get(`/v1/journeys/${id}`),
   updateStatus: (id: string, status: "active" | "paused") =>
-    api.patch(`/api/journeys/${id}/status`, { status }),
-  delete: (id: string) => api.delete(`/api/journeys/${id}`),
+    api.patch(`/v1/journeys/${id}/status`, { status }),
+  delete: (id: string) => api.delete(`/v1/journeys/${id}`),
   executions: (id: string, limit?: number, offset?: number) =>
-    api.get(`/api/journeys/${id}/executions`, { params: { limit: limit || 20, offset: offset || 0 } }),
+    api.get(`/v1/journeys/${id}/executions`, { params: { limit: limit || 20, offset: offset || 0 } }),
 };
 
 export const aiApi = {
@@ -561,64 +561,64 @@ export const aiApi = {
     count?: number;
     tone?: string;
     context?: string;
-  }) => api.post("/api/ai/generate", data),
+  }) => api.post("/v1/ai/generate", data),
 };
 
 export const stripeApi = {
-  plans: () => api.get("/api/payments/plans"),
-  createCheckout: (planId: string) => api.post("/api/payments/checkout", { plan_id: planId }),
-  subscription: () => api.get("/api/payments/subscription"),
+  plans: () => api.get("/v1/payments/plans"),
+  createCheckout: (planId: string) => api.post("/v1/payments/checkout", { plan_id: planId }),
+  subscription: () => api.get("/v1/payments/subscription"),
 };
 
 export const adminApi = {
-  getStats: () => api.get("/api/admin/stats"),
-  listUsers: () => api.get("/api/admin/users"),
-  getProxyConfig: () => api.get("/api/admin/proxy-config"),
-  updateProxyConfig: (data: Record<string, unknown>) => api.put("/api/admin/proxy-config", data),
-  deleteProxyConfig: (id: string) => api.delete(`/api/admin/proxy-config/${id}`),
-  getProxyStats: () => api.get("/api/admin/proxy-stats"),
+  getStats: () => api.get("/v1/admin/stats"),
+  listUsers: () => api.get("/v1/admin/users"),
+  getProxyConfig: () => api.get("/v1/admin/proxy-config"),
+  updateProxyConfig: (data: Record<string, unknown>) => api.put("/v1/admin/proxy-config", data),
+  deleteProxyConfig: (id: string) => api.delete(`/v1/admin/proxy-config/${id}`),
+  getProxyStats: () => api.get("/v1/admin/proxy-stats"),
   createUser: (data: {
     name: string; email: string; username?: string;
     password: string; role?: string; plan_id?: string;
-  }) => api.post("/api/admin/users", data),
+  }) => api.post("/v1/admin/users", data),
   updateUser: (id: string, data: Record<string, unknown>) =>
-    api.put(`/api/admin/users/${id}`, data),
+    api.put(`/v1/admin/users/${id}`, data),
   resetPassword: (id: string, password: string) =>
-    api.post(`/api/admin/users/${id}/reset-password`, { password }),
-  deleteUser: (id: string) => api.delete(`/api/admin/users/${id}`),
-  listPlans: () => api.get("/api/admin/plans"),
-  createPlan: (data: Record<string, unknown>) => api.post("/api/admin/plans", data),
+    api.post(`/v1/admin/users/${id}/reset-password`, { password }),
+  deleteUser: (id: string) => api.delete(`/v1/admin/users/${id}`),
+  listPlans: () => api.get("/v1/admin/plans"),
+  createPlan: (data: Record<string, unknown>) => api.post("/v1/admin/plans", data),
   updatePlan: (id: string, data: Record<string, unknown>) =>
-    api.put(`/api/admin/plans/${id}`, data),
-  getPaymentSettings: () => api.get("/api/admin/payment-settings"),
+    api.put(`/v1/admin/plans/${id}`, data),
+  getPaymentSettings: () => api.get("/v1/admin/payment-settings"),
   updatePaymentSettings: (data: Record<string, unknown>) =>
-    api.put("/api/admin/payment-settings", data),
+    api.put("/v1/admin/payment-settings", data),
   // Email settings
-  getEmailSettings: () => api.get("/api/admin/email-settings"),
+  getEmailSettings: () => api.get("/v1/admin/email-settings"),
   updateEmailSettings: (data: {
     api_key?: string;
     sender_email?: string;
     sender_name?: string;
     is_enabled?: boolean;
-  }) => api.put("/api/admin/email-settings", data),
-  testEmail: (to: string) => api.post("/api/admin/email-settings/test", { to }),
-  listEmailTemplates: () => api.get("/api/admin/email-templates"),
-  getEmailTemplate: (slug: string) => api.get(`/api/admin/email-templates/${slug}`),
+  }) => api.put("/v1/admin/email-settings", data),
+  testEmail: (to: string) => api.post("/v1/admin/email-settings/test", { to }),
+  listEmailTemplates: () => api.get("/v1/admin/email-templates"),
+  getEmailTemplate: (slug: string) => api.get(`/v1/admin/email-templates/${slug}`),
   updateEmailTemplate: (slug: string, data: {
     subject?: string;
     html_content?: string;
     is_active?: boolean;
-  }) => api.put(`/api/admin/email-templates/${slug}`, data),
+  }) => api.put(`/v1/admin/email-templates/${slug}`, data),
   testEmailTemplate: (slug: string, to: string) =>
-    api.post(`/api/admin/email-templates/${slug}/test`, { to }),
+    api.post(`/v1/admin/email-templates/${slug}/test`, { to }),
   getEmailLogs: (limit?: number, offset?: number) => 
-    api.get("/api/admin/email-logs", { params: { limit, offset } }),
+    api.get("/v1/admin/email-logs", { params: { limit, offset } }),
 };
 
 export const plansApi = {
-  list: () => api.get("/api/payments/plans"),
-  checkout: (data: { plan_id: string }) => api.post("/api/payments/checkout", data),
-  subscription: () => api.get("/api/payments/subscription"),
+  list: () => api.get("/v1/payments/plans"),
+  checkout: (data: { plan_id: string }) => api.post("/v1/payments/checkout", data),
+  subscription: () => api.get("/v1/payments/subscription"),
 };
 
 // ─── Instagram ───────────────────────────────────────────────────────────────
@@ -627,31 +627,31 @@ export const plansApi = {
 // ─── TikTok ─────────────────────────────────────────────────────────────────
 
 export const tiktokApi = {
-  health: () => api.get("/api/tiktok/health"),
-  listAccounts: () => api.get("/api/tiktok/accounts"),
+  health: () => api.get("/v1/tiktok/health"),
+  listAccounts: () => api.get("/v1/tiktok/accounts"),
   createAccount: (data: { username: string; password: string }) =>
-    api.post("/api/tiktok/accounts", data),
-  getAccount: (id: string) => api.get(`/api/tiktok/accounts/${id}`),
-  deleteAccount: (id: string) => api.delete(`/api/tiktok/accounts/${id}`),
-  connect: (id: string) => api.post(`/api/tiktok/accounts/${id}/connect`),
-  disconnect: (id: string) => api.post(`/api/tiktok/accounts/${id}/disconnect`),
+    api.post("/v1/tiktok/accounts", data),
+  getAccount: (id: string) => api.get(`/v1/tiktok/accounts/${id}`),
+  deleteAccount: (id: string) => api.delete(`/v1/tiktok/accounts/${id}`),
+  connect: (id: string) => api.post(`/v1/tiktok/accounts/${id}/connect`),
+  disconnect: (id: string) => api.post(`/v1/tiktok/accounts/${id}/disconnect`),
   updateSettings: (id: string, data: {
     auto_reply?: boolean; ai_enabled?: boolean; integration_id?: string | null;
-  }) => api.put(`/api/tiktok/accounts/${id}/settings`, data),
+  }) => api.put(`/v1/tiktok/accounts/${id}/settings`, data),
   sendDM: (id: string, target: string, message: string) =>
-    api.post(`/api/tiktok/accounts/${id}/dm`, { target, message }),
-  readDMs: (id: string) => api.get(`/api/tiktok/accounts/${id}/dm`),
+    api.post(`/v1/tiktok/accounts/${id}/dm`, { target, message }),
+  readDMs: (id: string) => api.get(`/v1/tiktok/accounts/${id}/dm`),
   follow: (id: string, target: string) =>
-    api.post(`/api/tiktok/accounts/${id}/follow`, { target }),
+    api.post(`/v1/tiktok/accounts/${id}/follow`, { target }),
   unfollow: (id: string, target: string) =>
-    api.post(`/api/tiktok/accounts/${id}/unfollow`, { target }),
+    api.post(`/v1/tiktok/accounts/${id}/unfollow`, { target }),
   scrapeFollowers: (id: string, target: string, limit?: number) =>
-    api.post(`/api/tiktok/accounts/${id}/scrape/followers`, { target, limit: limit || 100 }),
+    api.post(`/v1/tiktok/accounts/${id}/scrape/followers`, { target, limit: limit || 100 }),
   scrapeHashtag: (id: string, hashtag: string, limit?: number) =>
-    api.post(`/api/tiktok/accounts/${id}/scrape/hashtag`, { hashtag, limit: limit || 100 }),
-  listTargets: () => api.get("/api/tiktok/targets"),
+    api.post(`/v1/tiktok/accounts/${id}/scrape/hashtag`, { hashtag, limit: limit || 100 }),
+  listTargets: () => api.get("/v1/tiktok/targets"),
   listDMs: (accountId?: string) =>
-    api.get("/api/tiktok/dms", { params: accountId ? { account_id: accountId } : {} }),
+    api.get("/v1/tiktok/dms", { params: accountId ? { account_id: accountId } : {} }),
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────

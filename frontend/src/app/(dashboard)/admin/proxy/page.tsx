@@ -121,7 +121,7 @@ export default function AdminProxyPage() {
       // Save first, then test with the saved config
       await adminApi.updateProxyConfig({ ...form, password: password || undefined });
       // Test using the global proxy config endpoint
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/proxy-test`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/v1/admin/proxy-test`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

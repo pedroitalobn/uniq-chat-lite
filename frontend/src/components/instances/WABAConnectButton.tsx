@@ -98,7 +98,7 @@ export function WABAConnectButton({ className }: Props) {
         },
         {
           config_id: authUrl.match(/config_id=(\d+)/)?.[1] || "",
-          redirect_uri: window.location.origin + "/api/waba/callback",
+          redirect_uri: window.location.origin + "/v1/waba/callback",
         }
       );
     } catch (error) {

@@ -451,12 +451,12 @@ export default function PaymentSettingsPage() {
             <label className="text-xs block mb-2" style={{ color: "hsl(240 8% 46%)" }}>URL do Webhook (para configurar no Stripe)</label>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 12% 10%)", color: "hsl(240 8% 60%)" }}>
-                {settings?.stripe_webhook_url || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/webhook`}
+                {settings?.stripe_webhook_url || `${process.env.NEXT_PUBLIC_API_URL?.replace('/v1', '') || 'https://api.uniq.chat'}/stripe/webhook`}
               </code>
               <button
                 type="button"
                 onClick={() => {
-                  const url = settings?.stripe_webhook_url || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/webhook`;
+                  const url = settings?.stripe_webhook_url || `${process.env.NEXT_PUBLIC_API_URL?.replace('/v1', '') || 'https://api.uniq.chat'}/stripe/webhook`;
                   navigator.clipboard.writeText(url);
                   toast.success("URL copiada!");
                 }}
@@ -588,12 +588,12 @@ export default function PaymentSettingsPage() {
             <label className="text-xs block mb-2" style={{ color: "hsl(240 8% 46%)" }}>URL do Webhook (para configurar no Asaas)</label>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 12% 10%)", color: "hsl(240 8% 60%)" }}>
-                {settings?.asaas_webhook_url || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/asaas/webhook`}
+                {settings?.asaas_webhook_url || `${process.env.NEXT_PUBLIC_API_URL?.replace('/v1', '') || 'https://api.uniq.chat'}/asaas/webhook`}
               </code>
               <button
                 type="button"
                 onClick={() => {
-                  const url = settings?.asaas_webhook_url || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/asaas/webhook`;
+                  const url = settings?.asaas_webhook_url || `${process.env.NEXT_PUBLIC_API_URL?.replace('/v1', '') || 'https://api.uniq.chat'}/asaas/webhook`;
                   navigator.clipboard.writeText(url);
                   toast.success("URL copiada!");
                 }}
