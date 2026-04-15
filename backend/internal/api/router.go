@@ -174,7 +174,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	auth.Post("/change-password", middleware.RequireAuth(db), authH.ChangePassword)
 
 	// ─── Protected routes ─────────────────────────────────────────────────────
-	api := app.Group("/api", middleware.RequireAuth(db), middleware.RateLimit(300))
+	api := app.Group("/v1", middleware.RequireAuth(db), middleware.RateLimit(300))
 
 	// Workspaces
 	workspaces := api.Group("/workspaces")
