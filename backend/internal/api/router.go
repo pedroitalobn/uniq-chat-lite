@@ -519,6 +519,28 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	servers.Post("/:id/actions", serverH.BulkAction)
 	servers.Get("/:id/stats", serverH.Stats)
 
+	// ─── Admin routes ─────────────────────────────────────────────────────────
+	admin := api.Group("/admin", middleware.RequireAdmin())
+	// Rotas específicas primeiro (sem parâmetros)
+	admin.Get("/stats", adminH.Stats)
+	admin.Get("/users", adminH.ListUsers)
+	admin.Post("/users", adminH.CreateUser)
+	admin.Get("/plans", adminH.ListPlans)
+	admin.Post("/plans", adminH.CreatePlan)
+	admin.Get("/payment-settings", adminH.GetPaymentSettings)
+	admin.Put("/payment-settings", adminH.UpdatePaymentSettings)
+	admin.Get("/proxy-config", adminH.GetGlobalProxyConfig)
+	admin.Put("/proxy-config", adminH.UpdateGlobalProxyConfig)
+	admin.Post("/proxy-test", adminH.TestGlobalProxy)
+	admin.Get("/proxy-stats", adminH.GetGlobalProxyStats)
+	// Rotas com parâmetros por último
+	admin.Put("/users/:id", adminH.UpdateUser)
+	admin.Post("/users/:id/reset-password", adminH.ResetPassword)
+	admin.Delete("/users/:id", adminH.DeleteUser)
+	admin.Put("/plans/:id", adminH.UpdatePlan)
+	admin.Post("/invites/toggle", inviteH.ToggleSystem)
+	admin.Get("/invites", inviteH.AdminList)
+
 	// ─── Public v1 API: /v1/:server_slug/:instance_slug/* ─────────────────────
 	// Auth: Authorization: Bearer <instance_token>  OR  X-Instance-Token: <token>
 	v1inst := app.Group("/v1/:server_slug/:instance_slug", middleware.ResolveV1Instance(db), middleware.RateLimit(300))
@@ -577,28 +599,6 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	v1groups.Post("/:jid/participants", groupH.UpdateParticipants)
 	v1groups.Get("/:jid/invite", groupH.InviteLink)
 	v1groups.Post("/:jid/leave", groupH.Leave)
-
-	// ─── Admin routes ─────────────────────────────────────────────────────────
-	admin := api.Group("/admin", middleware.RequireAdmin())
-	// Rotas específicas primeiro (sem parâmetros)
-	admin.Get("/stats", adminH.Stats)
-	admin.Get("/users", adminH.ListUsers)
-	admin.Post("/users", adminH.CreateUser)
-	admin.Get("/plans", adminH.ListPlans)
-	admin.Post("/plans", adminH.CreatePlan)
-	admin.Get("/payment-settings", adminH.GetPaymentSettings)
-	admin.Put("/payment-settings", adminH.UpdatePaymentSettings)
-	admin.Get("/proxy-config", adminH.GetGlobalProxyConfig)
-	admin.Put("/proxy-config", adminH.UpdateGlobalProxyConfig)
-	admin.Post("/proxy-test", adminH.TestGlobalProxy)
-	admin.Get("/proxy-stats", adminH.GetGlobalProxyStats)
-	// Rotas com parâmetros por último
-	admin.Put("/users/:id", adminH.UpdateUser)
-	admin.Post("/users/:id/reset-password", adminH.ResetPassword)
-	admin.Delete("/users/:id", adminH.DeleteUser)
-	admin.Put("/plans/:id", adminH.UpdatePlan)
-	admin.Post("/invites/toggle", inviteH.ToggleSystem)
-	admin.Get("/invites", inviteH.AdminList)
 
 	return app
 }
