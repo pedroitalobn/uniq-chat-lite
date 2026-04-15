@@ -295,7 +295,7 @@ function planBadge(plan?: Plan) {
 function InviteSystemToggle() {
   const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(false);
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.uniq.chat";
 
   useEffect(() => {
     fetch(`${API_BASE}/invites/status`)
