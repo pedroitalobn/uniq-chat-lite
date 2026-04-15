@@ -127,9 +127,8 @@ services:
     environment:
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       NEXTAUTH_URL: https://app.uniq.chat
-      # URL interna do backend — usada pelo auth.ts (server-side) para
-      # evitar hairpin NAT via domínio externo dentro do container.
       API_URL: http://uniqchat-backend:8080
+      NEXT_PUBLIC_API_URL: https://api.uniq.chat
     expose:
       - "3000"
     networks:
