@@ -529,7 +529,7 @@ function ChatSection() {
     }
     const allIntegrations = Object.values(groupedIntegrations).flat();
     const integration = allIntegrations.find((i: any) => i.id === selectedIntegration);
-    if (integration?.models && integration.models.length > 0) {
+    if (integration && Array.isArray(integration?.models) && integration.models.length > 0) {
       setSelectedModel(integration.models[0]);
     } else {
       setSelectedModel("");
@@ -726,9 +726,9 @@ Responda de forma clara e pergunte se o usuário confirma.`);
             {selectedIntegration && (() => {
               const allIntegrations = Object.values(groupedIntegrations).flat();
               const currentIntegration = allIntegrations.find((i: any) => i.id === selectedIntegration);
-              const hasModels = currentIntegration?.models && currentIntegration.models.length > 1;
+              const hasModels = currentIntegration && Array.isArray(currentIntegration?.models) && currentIntegration.models.length > 1;
               
-              if (!hasModels) return null;
+              if (!hasModels || !currentIntegration?.models) return null;
               
               return (
                 <div className="relative">
@@ -738,7 +738,7 @@ Responda de forma clara e pergunte se o usuário confirma.`);
                     className="appearance-none outline-none text-xs font-medium rounded-lg px-3 py-2 pr-8 cursor-pointer min-w-[120px]"
                     style={{ background: "var(--green)", color: "#000", border: "none" }}
                   >
-                    {currentIntegration.models.map((m: string) => (
+                    {(currentIntegration.models as string[]).map((m: string) => (
                       <option key={m} value={m}>{m}</option>
                     ))}
                   </select>
