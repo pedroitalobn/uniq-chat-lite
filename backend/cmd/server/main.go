@@ -70,11 +70,10 @@ func main() {
 				log.Fatal().Err(err).Msg("failed to create super admin user")
 			}
 			log.Info().Str("email", user.Email).Msg("super admin user created")
-		} else if existing.Role != models.RoleSuperAdmin {
-			existing.Role = models.RoleSuperAdmin
-			existing.IsBeta = true
-			db.Save(&existing)
-			log.Info().Str("email", existing.Email).Msg("existing user promoted to super admin")
+		} else if err != nil {
+			log.Error().Err(err).Msg("failed to query for existing super admin")
+		} else {
+			log.Info().Str("email", existing.Email).Str("role", string(existing.Role)).Msg("super admin user already exists")
 		}
 	}
 
