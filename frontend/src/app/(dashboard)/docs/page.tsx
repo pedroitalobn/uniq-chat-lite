@@ -12,8 +12,20 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const API_BASE = "https://api.uniq.chat/v1";
+const API_ROOT = "https://api.uniq.chat";
+const API_BASE = `${API_ROOT}/v1`;
 const API_BASE_PLAYGROUND = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+
+function isRootLevelPath(path: string) {
+  return path.startsWith("/auth/") ||
+    path.startsWith("/stripe/") ||
+    path.startsWith("/asaas/") ||
+    path.startsWith("/waba/webhook") ||
+    path.startsWith("/ws/") ||
+    path === "/payments/plans" ||
+    path === "/stripe/plans" ||
+    path === "/asaas/plans";
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Endpoint {
@@ -41,6 +53,40 @@ const METHOD_STYLE: Record<string, { bg: string; color: string }> = {
 
 // ─── API Sections ─────────────────────────────────────────────────────────────
 const SECTIONS: Section[] = [
+  // ── Public/Open API ───────────────────────────────────────────────────────
+  {
+    id: "public-open-api",
+    label: "API Pública (Open)",
+    icon: <Globe className="w-3.5 h-3.5" />,
+    endpoints: [
+      { method: "GET",  path: "/stripe/plans",          summary: "Listar planos (público)" },
+      { method: "GET",  path: "/asaas/plans",           summary: "Listar planos Asaas (público)" },
+      { method: "GET",  path: "/payments/plans",        summary: "Listar planos (alias público)" },
+      { method: "GET",  path: "/v1/stripe/plans",       summary: "Listar planos v1 (público)" },
+      { method: "GET",  path: "/v1/asaas/plans",        summary: "Listar planos Asaas v1 (público)" },
+      { method: "GET",  path: "/v1/payments/plans",     summary: "Listar planos v1 (compat)" },
+      { method: "GET",  path: "/v1/invites/status",     summary: "Status do sistema de convites" },
+      { method: "POST", path: "/v1/invites/validate",   summary: "Validar código de convite",
+        body: {
+          code: { type: "string", required: true, description: "Código de convite", example: "ABC123" },
+        },
+      },
+      { method: "POST", path: "/auth/register",         summary: "Registrar conta (público)" },
+      { method: "POST", path: "/auth/login",            summary: "Login (público)" },
+      { method: "POST", path: "/auth/validate-key",     summary: "Validar chave Anthropic (público)" },
+      { method: "POST", path: "/auth/refresh",          summary: "Renovar token" },
+      { method: "POST", path: "/auth/logout",           summary: "Logout" },
+      { method: "POST", path: "/auth/forgot-password",  summary: "Solicitar recuperação de senha" },
+      { method: "POST", path: "/auth/reset-password",   summary: "Resetar senha com token" },
+      { method: "POST", path: "/stripe/activate-lead",  summary: "Ativar lead após checkout transparente" },
+      { method: "POST", path: "/stripe/webhook",        summary: "Webhook Stripe (público)" },
+      { method: "POST", path: "/asaas/webhook",         summary: "Webhook Asaas (público)" },
+      { method: "POST", path: "/waba/webhook",          summary: "Webhook WABA (público)" },
+      { method: "GET",  path: "/ws/events",             summary: "WebSocket global de eventos" },
+      { method: "GET",  path: "/ws/agent-activity",     summary: "WebSocket de atividade de agentes" },
+    ],
+  },
+
   // ── Instances ──────────────────────────────────────────────────────────────
   {
     id: "instances",
@@ -749,7 +795,8 @@ function Playground({ endpoint, apiKey, instanceId }: {
   const buildUrl = () => {
     let path = endpoint.path;
     endpoint.pathParams?.forEach((p) => { path = path.replace(`:${p}`, pathValues[p] || `:${p}`); });
-    return `${API_BASE_PLAYGROUND}${path}`;
+    const base = isRootLevelPath(path) ? API_BASE_PLAYGROUND.replace(/\/v1$/, "") : API_BASE_PLAYGROUND;
+    return `${base}${path}`;
   };
 
   const run = async () => {
@@ -879,7 +926,8 @@ function EndpointRow({ endpoint, apiKey, instanceId }: {
     } else {
       endpoint.pathParams?.forEach((p) => { path = path.replace(`:${p}`, p === "id" ? "{instance_id}" : `{${p}}`); });
     }
-    const url = `${API_BASE}${path}`;
+    const base = isRootLevelPath(path) ? API_ROOT : API_BASE;
+    const url = `${base}${path}`;
     const hasBody = endpoint.body && endpoint.method !== "GET" && endpoint.method !== "DELETE";
     const bodyStr = hasBody
       ? ` \\\n  -d '${JSON.stringify(Object.fromEntries(Object.entries(endpoint.body!).map(([k, v]) => [k, v.example || `<${k}>`])), null, 2)}'`
@@ -1053,7 +1101,7 @@ export default function DocsPage() {
           <p className="text-xs font-semibold" style={{ color: "#a78bfa" }}>Estrutura da URL — API Pública v1</p>
           <div className="rounded-xl px-3 py-2.5" style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}>
             <code className="text-xs font-mono" style={{ color: "hsl(240 15% 75%)" }}>
-              <span style={{ color: "hsl(240 8% 46%)" }}>{API_BASE}</span>
+              <span style={{ color: "hsl(240 8% 46%)" }}>{API_ROOT}</span>
               <span style={{ color: "#a78bfa" }}>/v1/</span>
               <span style={{ color: "#fbbf24" }}>{"{server-slug}"}</span>
               <span style={{ color: "#a78bfa" }}>/</span>
