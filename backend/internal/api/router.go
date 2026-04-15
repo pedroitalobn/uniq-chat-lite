@@ -147,10 +147,6 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	app.Get("/asaas/plans", paymentH.ListPlans)
 	app.Get("/payments/plans", paymentH.ListPlans)
 
-	// Invite system (public)
-	app.Get("/invites/status", inviteH.GetStatus)
-	app.Post("/invites/validate", inviteH.Validate)
-
 	// Stripe webhook (public — must receive raw body, Stripe signature verified internally)
 	app.Post("/stripe/webhook", stripeH.Webhook)
 
@@ -172,6 +168,13 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	auth.Get("/me", middleware.RequireAuth(db), authH.Me)
 	auth.Put("/me", middleware.RequireAuth(db), authH.UpdateMe)
 	auth.Post("/change-password", middleware.RequireAuth(db), authH.ChangePassword)
+
+	// ─── Public v1 routes (no auth required) ─────────────────────────────────
+	v1Public := app.Group("/v1")
+
+	// Invite system (public)
+	v1Public.Get("/invites/status", inviteH.GetStatus)
+	v1Public.Post("/invites/validate", inviteH.Validate)
 
 	// ─── Protected routes ─────────────────────────────────────────────────────
 	api := app.Group("/v1", middleware.RequireAuth(db), middleware.RateLimit(300))
