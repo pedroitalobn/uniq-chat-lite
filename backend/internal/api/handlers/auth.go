@@ -10,6 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	stripe "github.com/stripe/stripe-go/v76"
 	"github.com/stripe/stripe-go/v76/checkout/session"
 	stripecustomer "github.com/stripe/stripe-go/v76/customer"
@@ -419,6 +420,8 @@ func deriveEmailFromKey(key string) string {
 
 // loginWithCredentials handles email/username + password authentication.
 func (h *AuthHandler) loginWithCredentials(c *fiber.Ctx, identifier, password string) error {
+	log.Debug().Str("identifier", identifier).Msg("login attempt")
+
 	var user models.User
 	q := h.db.Preload("Plan")
 
@@ -430,10 +433,14 @@ func (h *AuthHandler) loginWithCredentials(c *fiber.Ctx, identifier, password st
 	}
 
 	if err := q.First(&user).Error; err != nil {
+		log.Debug().Str("identifier", identifier).Err(err).Msg("user not found")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "credenciais inválidas"})
 	}
 
+	log.Debug().Str("email", user.Email).Str("role", string(user.Role)).Msg("user found, checking password")
+
 	if !user.CheckPassword(password) {
+		log.Debug().Str("email", user.Email).Msg("password mismatch")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "credenciais inválidas"})
 	}
 
