@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const API_BASE = "https://api.uniq.chat";
+const API_BASE = "https://api.uniq.chat/v1";
 const API_BASE_PLAYGROUND = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 interface Endpoint {
