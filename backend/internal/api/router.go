@@ -147,6 +147,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	app.Get("/asaas/plans", paymentH.ListPlans)
 	app.Get("/payments/plans", paymentH.ListPlans)
 
+	// v1 aliases for plans (public, release 1.1 compatibility)
+	app.Get("/v1/stripe/plans", paymentH.ListPlans)
+	app.Get("/v1/asaas/plans", paymentH.ListPlans)
+	app.Get("/v1/payments/plans", paymentH.ListPlans)
+
 	// Stripe webhook (public — must receive raw body, Stripe signature verified internally)
 	app.Post("/stripe/webhook", stripeH.Webhook)
 
