@@ -63,6 +63,7 @@ export default function AdminProxyPage() {
     id: "",
     name: "",
     enabled: false,
+    is_default: false,
     provider: "manual",
     proxy_type: "http",
     host: "",
@@ -92,6 +93,7 @@ export default function AdminProxyPage() {
       id: cfg.id || "",
       name: cfg.name || "",
       enabled: cfg.enabled ?? false,
+      is_default: cfg.is_default ?? false,
       provider: cfg.provider || "manual",
       proxy_type: cfg.proxy_type || "http",
       host: cfg.host || "",
@@ -204,9 +206,26 @@ export default function AdminProxyPage() {
             <input type="checkbox" checked={form.enabled} onChange={(e) => setForm((p) => ({ ...p, enabled: e.target.checked }))} />
           </label>
           <label className="flex items-center justify-between text-sm" style={{ color: "hsl(240 15% 88%)" }}>
+            Proxy padrão do país
+            <input type="checkbox" checked={form.is_default || false} onChange={(e) => setForm((p) => ({ ...p, is_default: e.target.checked }))} />
+          </label>
+          <label className="flex items-center justify-between text-sm" style={{ color: "hsl(240 15% 88%)" }}>
             Usar credenciais do ambiente
             <input type="checkbox" checked={form.use_env} onChange={(e) => setForm((p) => ({ ...p, use_env: e.target.checked }))} />
           </label>
+          <select value={form.country || "br"} onChange={(e) => setForm((p) => ({ ...p, country: e.target.value }))}
+            className="px-3 py-2 rounded-lg text-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}>
+            <option value="br">🇧🇷 Brasil</option>
+            <option value="us">🇺🇸 Estados Unidos</option>
+            <option value="uk">🇬🇧 Reino Unido</option>
+            <option value="es">🇪🇸 Espanha</option>
+            <option value="pt">🇵🇹 Portugal</option>
+            <option value="ar">🇦🇷 Argentina</option>
+            <option value="co">🇨🇴 Colombia</option>
+            <option value="mx">🇲🇽 México</option>
+            <option value="cl">🇨🇱 Chile</option>
+            <option value="pe">🇵🇪 Peru</option>
+          </select>
           <input value={form.provider} onChange={(e) => setForm((p) => ({ ...p, provider: e.target.value }))}
             className="px-3 py-2 rounded-lg text-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} placeholder="Provider (manual/brightdata)" />
           <input value={form.proxy_type} onChange={(e) => setForm((p) => ({ ...p, proxy_type: e.target.value }))}
