@@ -319,10 +319,9 @@ func seedPlans(db *gorm.DB) {
 		if db.Where("name = ?", plans[i].Name).First(&existing).Error != nil {
 			db.Create(&plans[i])
 		} else {
-			// Update numeric limits only — do NOT overwrite features or allow_proxy
+			// Update numeric limits only — do NOT overwrite price, features or allow_proxy
 			// so that admin edits made via the panel are preserved across restarts.
 			db.Model(&existing).Updates(map[string]interface{}{
-				"price":                plans[i].Price,
 				"max_instances":        plans[i].MaxInstances,
 				"max_messages_per_day": plans[i].MaxMessagesPerDay,
 				"max_users":            plans[i].MaxUsers,
