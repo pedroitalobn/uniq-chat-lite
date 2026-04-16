@@ -73,9 +73,9 @@ export default function IntegrationsPage() {
   const sections = [
     { id: "llm" as const, label: "LLMs", icon: Bot, color: "var(--green)" },
     { id: "agents" as const, label: "Agents", icon: Zap, color: "#8b5cf6" },
-    { id: "api" as const, label: "API Keys", icon: Key, color: "#f59e0b" },
+    { id: "mcp" as const, label: "MCPs", icon: Link2, color: "#f59e0b" },
     { id: "webhook" as const, label: "Webhooks", icon: Webhook, color: "#10b981" },
-    { id: "mcp" as const, label: "MCP", icon: Link2, color: "#f59e0b" },
+    { id: "api" as const, label: "API Keys", icon: Key, color: "#f59e0b" },
     { id: "docs" as const, label: "API Docs", icon: FileJson, color: "#64748b" },
   ];
 
@@ -103,9 +103,9 @@ export default function IntegrationsPage() {
 
         {section === "llm" && <LLMSection onConnect={setConnecting} />}
         {section === "agents" && <AgentsSection />}
-        {section === "api" && <APIKeysSection />}
-        {section === "webhook" && <WebhooksSection />}
         {section === "mcp" && <MCPSection />}
+        {section === "webhook" && <WebhooksSection />}
+        {section === "api" && <APIKeysSection />}
         {section === "docs" && <DocsSection />}
       </div>
 
