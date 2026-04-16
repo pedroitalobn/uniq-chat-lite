@@ -593,6 +593,10 @@ export const adminApi = {
   getPaymentSettings: () => api.get("/v1/admin/payment-settings"),
   updatePaymentSettings: (data: Record<string, unknown>) =>
     api.put("/v1/admin/payment-settings", data),
+  // Inspect/Support - list all servers and instances for super admin
+  listAllServers: () => api.get("/v1/admin/inspect/servers"),
+  listAllInstances: () => api.get("/v1/admin/inspect/instances"),
+  getInstance: (id: string) => api.get(`/v1/admin/inspect/instances/${id}`),
   // Email settings
   getEmailSettings: () => api.get("/v1/admin/email-settings"),
   updateEmailSettings: (data: {

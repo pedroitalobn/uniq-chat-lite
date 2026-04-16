@@ -535,6 +535,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	admin.Delete("/proxy-config/:id", adminH.DeleteGlobalProxyConfig)
 	admin.Post("/proxy-test", adminH.TestGlobalProxy)
 	admin.Get("/proxy-stats", adminH.GetGlobalProxyStats)
+	// Inspect/Support routes - list all servers and instances for super admin support
+	inspect := admin.Group("/inspect")
+	inspect.Get("/servers", adminH.ListAllServers)
+	inspect.Get("/instances", adminH.ListAllInstances)
+	inspect.Get("/instances/:id", adminH.GetInstance)
 	// Rotas com parâmetros por último
 	admin.Put("/users/:id", adminH.UpdateUser)
 	admin.Post("/users/:id/reset-password", adminH.ResetPassword)

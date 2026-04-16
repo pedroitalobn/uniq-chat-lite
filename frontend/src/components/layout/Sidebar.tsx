@@ -5,9 +5,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
-  LayoutDashboard, Smartphone, LogOut,
-  Users, CreditCard, Shield, Contact, Megaphone, Server, Settings, Plug, Zap, Menu, X,
-  MessageSquare, Building2, ChevronDown, Globe
+  Building2, Calendar, ChevronDown, Contact, CreditCard, Globe, Hash, HelpCircle, Home,
+  Info, KanbanSquare, Layers, LayoutDashboard, Link2, List, Loader2, LogOut,
+  Mail, MapPin, Megaphone, Menu, MessageSquare, Minus, MoreHorizontal,
+  MoreVertical, Phone, Plug, Plus, Search, Send, Settings, Shield, Smartphone,
+  Smile, Sparkles, Star, Tag, Trash2, Users, X, Zap, StickyNote,
+  Wrench, ExternalLink, Server
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePreferences } from "@/lib/preferences";
@@ -38,6 +41,7 @@ export function Sidebar() {
   ];
 
   const adminItems = [
+    { href: "/admin/inspect", label: "Inspect", icon: Server },
     { href: "/admin/users", label: t("nav_users"), icon: Users },
     { href: "/admin/plans", label: t("nav_plans"), icon: CreditCard },
     { href: "/admin/payment-settings", label: "Pagamento", icon: Shield },

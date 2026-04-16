@@ -199,6 +199,41 @@ func (h *AdminHandler) ListUsers(c *fiber.Ctx) error {
 	return c.JSON(users)
 }
 
+// ListAllServers godoc
+// GET /admin/inspect/servers - List all servers for super admin support
+func (h *AdminHandler) ListAllServers(c *fiber.Ctx) error {
+	var servers []models.Server
+	if err := h.db.Preload("User").Order("created_at DESC").Find(&servers).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar servidores"})
+	}
+	return c.JSON(servers)
+}
+
+// ListAllInstances godoc
+// GET /admin/inspect/instances - List all instances for super admin support
+func (h *AdminHandler) ListAllInstances(c *fiber.Ctx) error {
+	var instances []models.Instance
+	if err := h.db.Preload("User").Preload("Workspace").Order("created_at DESC").Find(&instances).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar instâncias"})
+	}
+	return c.JSON(instances)
+}
+
+// GetInstance godoc
+// GET /admin/inspect/instances/:id - Get instance details for support
+func (h *AdminHandler) GetInstance(c *fiber.Ctx) error {
+	instID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID inválido"})
+	}
+
+	var instance models.Instance
+	if err := h.db.Preload("User").Preload("Workspace").First(&instance, "id = ?", instID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	return c.JSON(instance)
+}
+
 // CreateUser godoc
 // POST /admin/users
 func (h *AdminHandler) CreateUser(c *fiber.Ctx) error {
