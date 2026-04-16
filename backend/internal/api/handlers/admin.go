@@ -611,9 +611,11 @@ func (h *AdminHandler) UpdateGlobalProxyConfig(c *fiber.Ctx) error {
 		// Truncate UUID to 32 chars (max varchar(32) in DB)
 		req.ID = uuid.New().String()[:32]
 
-		// If setting as default, clear other defaults first
+		// If setting as default, clear other defaults only for the same country
 		if req.IsDefault != nil && *req.IsDefault {
-			h.db.Model(&models.GlobalProxyConfig{}).Where("is_default = ?", true).Update("is_default", false)
+			h.db.Model(&models.GlobalProxyConfig{}).
+				Where("is_default = ? AND country = ?", true, req.Country).
+				Update("is_default", false)
 		}
 
 		cfg := models.GlobalProxyConfig{
@@ -694,7 +696,10 @@ func (h *AdminHandler) UpdateGlobalProxyConfig(c *fiber.Ctx) error {
 	}
 	if req.IsDefault != nil {
 		if *req.IsDefault {
-			h.db.Model(&models.GlobalProxyConfig{}).Where("is_default = ? AND id != ?", true, cfg.ID).Update("is_default", false)
+			// Clear other defaults ONLY for the same country (not global)
+			h.db.Model(&models.GlobalProxyConfig{}).
+				Where("is_default = ? AND country = ? AND id != ?", true, req.Country, cfg.ID).
+				Update("is_default", false)
 		}
 		updates["is_default"] = *req.IsDefault
 	}
