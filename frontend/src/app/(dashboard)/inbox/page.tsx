@@ -974,7 +974,7 @@ export default function InboxPage() {
 
       <div className="flex gap-0 flex-1 min-h-0 rounded-2xl overflow-hidden" style={{ border: "1px solid var(--surface-border)" }}>
         {/* ═══ CHANNEL SIDEBAR (icons) ═══ */}
-        <aside className="w-[56px] flex-shrink-0 flex flex-col items-center py-3 gap-1"
+        <aside className="w-14 sm:w-[56px] flex-shrink-0 flex flex-col items-center py-3 gap-1 hidden sm:flex"
           style={{ background: "var(--surface-2)", borderRight: "1px solid var(--surface-border)" }}>
           {CHANNELS.map(ch => {
             const isActive = channels.includes(ch.id);
@@ -1004,7 +1004,7 @@ export default function InboxPage() {
         </aside>
 
         {/* ═══ CONTACTS LIST ═══ */}
-        <div className="w-[340px] flex-shrink-0 flex flex-col"
+        <div className="w-60 sm:w-72 md:w-[340px] flex-shrink-0 flex flex-col hidden md:flex"
           style={{ background: "var(--surface-2)", borderRight: "1px solid var(--surface-border)" }}>
 
           {/* Search */}
@@ -1217,11 +1217,11 @@ export default function InboxPage() {
           )}
         </div>
 
-        {/* ═══ CONTACT SIDEBAR ═══ */}
+{/* ═══ CONTACT SIDEBAR ═══ */}
         {chat && showContactPanel && (
-          <div className="w-[300px] flex-shrink-0 flex flex-col overflow-y-auto"
+          <div className="w-64 sm:w-[300px] flex-shrink-0 flex flex-col overflow-y-auto hidden lg:flex"
             style={{ background: "var(--surface-2)", borderLeft: "1px solid var(--surface-border)" }}>
-            {/* Profile header */}
+          {/* Profile header */}
             <div className="p-5 border-b text-center" style={{ borderColor: "var(--surface-border)" }}>
               {ct.avatar ? (
                 <img src={ct.avatar} className="w-16 h-16 rounded-full mx-auto object-cover" alt="" />
