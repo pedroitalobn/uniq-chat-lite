@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { proxyApi, proxyPoolsApi, adminApi } from "@/lib/api";
 import { Globe, Eye, EyeOff, Loader2, CheckCircle2, XCircle, Trash2, TriangleAlert, Save, ChevronDown, Plus } from "lucide-react";
@@ -210,23 +211,28 @@ const handleSelectProvider = (providerId: string) => {
   };
 
   if (!allowProxy) {
-    return (
-      <div className="rounded-2xl p-10 text-center animate-fade-in-up" style={cardStyle}>
-        <div
-          className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
-          style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.18)" }}
-        >
-          <TriangleAlert className="w-5 h-5" style={{ color: "#fbbf24" }} />
-        </div>
-        <p className="font-semibold text-sm mb-2" style={{ color: "hsl(240 15% 88%)" }}>
-          Proxy disponível nos planos Pro e Enterprise
-        </p>
-        <p className="text-sm mb-6 leading-relaxed" style={{ color: "hsl(240 8% 46%)" }}>
-          Configure proxies SOCKS5/HTTP por instância para rotacionar IPs e evitar bloqueios.
-        </p>
-        <button className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
-          Fazer upgrade
-        </button>
+  const router = useRouter();
+  return (
+    <div className="rounded-2xl p-10 text-center animate-fade-in-up" style={cardStyle}>
+      <div
+        className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
+        style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.18)" }}
+      >
+        <TriangleAlert className="w-5 h-5" style={{ color: "#fbbf24" }} />
+      </div>
+      <p className="font-semibold text-sm mb-2" style={{ color: "hsl(240 15% 88%)" }}>
+        Proxy indisponível no seu plano
+      </p>
+      <p className="text-sm mb-6 leading-relaxed" style={{ color: "hsl(240 8% 46%)" }}>
+        Proxy dedicado está disponível nos planos Pro e Business.<br />
+        Faça upgrade para desbloquear.
+      </p>
+      <button 
+        onClick={() => router.push("/plans")}
+        className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm"
+      >
+        Fazer upgrade
+      </button>
       </div>
     );
   }
