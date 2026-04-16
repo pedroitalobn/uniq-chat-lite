@@ -30,31 +30,22 @@ func (h *ServerHandler) List(c *fiber.Ctx) error {
 	var servers []models.Server
 	q := h.db.Order("created_at DESC")
 
-	// SuperAdmins can see all or filter by workspace
-	if user.Role == models.RoleSuperAdmin {
-		if workspaceID != "" {
-			wsUUID, err := uuid.Parse(workspaceID)
-			if err == nil {
-				q = q.Where("workspace_id = ?", wsUUID)
+	// Regular users and super admins both need workspace membership
+	// (Super admins should use /admin/inspect to see all servers)
+	if workspaceID != "" {
+		wsUUID, err := uuid.Parse(workspaceID)
+		if err == nil {
+			// Verify user is member of workspace
+			var uw models.UserWorkspace
+			if err := h.db.Where("user_id = ? AND workspace_id = ?", user.ID, wsUUID).First(&uw).Error; err != nil {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado ao workspace"})
 			}
+			q = q.Where("workspace_id = ?", wsUUID)
 		}
 	} else {
-		// For regular users, filter by workspace membership
-		if workspaceID != "" {
-			wsUUID, err := uuid.Parse(workspaceID)
-			if err == nil {
-				// Verify user is member of workspace
-				var uw models.UserWorkspace
-				if err := h.db.Where("user_id = ? AND workspace_id = ?", user.ID, wsUUID).First(&uw).Error; err != nil {
-					return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado ao workspace"})
-				}
-				q = q.Where("workspace_id = ?", wsUUID)
-			}
-		} else {
-			// No workspace filter: show servers in workspaces they belong to OR owned directly
-			// Include servers with NULL workspace_id that user owns directly
-			q = q.Where("(workspace_id IN (SELECT workspace_id FROM user_workspaces WHERE user_id = ?) OR (workspace_id IS NULL AND user_id = ?))", user.ID, user.ID)
-		}
+		// No workspace filter: show servers in workspaces they belong to OR owned directly
+		// Include servers with NULL workspace_id that user owns directly
+		q = q.Where("(workspace_id IN (SELECT workspace_id FROM user_workspaces WHERE user_id = ?) OR (workspace_id IS NULL AND user_id = ?))", user.ID, user.ID)
 	}
 
 	if err := q.Find(&servers).Error; err != nil {

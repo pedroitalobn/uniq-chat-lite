@@ -59,30 +59,21 @@ func (h *InstanceHandler) List(c *fiber.Ctx) error {
 	var instances []models.Instance
 	q := h.db.Preload("Server").Preload("GlobalProxy").Order("created_at DESC")
 
-	// SuperAdmins can see all or filter by workspace
-	if user.Role == models.RoleSuperAdmin {
-		if workspaceID != "" {
-			wsUUID, err := uuid.Parse(workspaceID)
-			if err == nil {
-				q = q.Where("workspace_id = ?", wsUUID)
+	// Regular users and super admins both need workspace membership
+	// (Super admins should use /admin/inspect to see all instances)
+	if workspaceID != "" {
+		wsUUID, err := uuid.Parse(workspaceID)
+		if err == nil {
+			// Verify user is member of workspace
+			var uw models.UserWorkspace
+			if err := h.db.Where("user_id = ? AND workspace_id = ?", user.ID, wsUUID).First(&uw).Error; err != nil {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado ao workspace"})
 			}
+			q = q.Where("workspace_id = ?", wsUUID)
 		}
 	} else {
-		// For regular users, check if they have workspace membership
-		if workspaceID != "" {
-			wsUUID, err := uuid.Parse(workspaceID)
-			if err == nil {
-				// Verify user is member of workspace
-				var uw models.UserWorkspace
-				if err := h.db.Where("user_id = ? AND workspace_id = ?", user.ID, wsUUID).First(&uw).Error; err != nil {
-					return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado ao workspace"})
-				}
-				q = q.Where("workspace_id = ?", wsUUID)
-			}
-		} else {
-			// No workspace filter: show owned instances OR instances in workspaces they belong to
-			q = q.Where("user_id = ? OR workspace_id IN (SELECT workspace_id FROM user_workspaces WHERE user_id = ?)", user.ID, user.ID)
-		}
+		// No workspace filter: show owned instances OR instances in workspaces they belong to
+		q = q.Where("user_id = ? OR workspace_id IN (SELECT workspace_id FROM user_workspaces WHERE user_id = ?)", user.ID, user.ID)
 	}
 
 	if err := q.Find(&instances).Error; err != nil {
