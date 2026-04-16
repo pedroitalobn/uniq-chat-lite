@@ -82,18 +82,19 @@ export default function WebhooksPage() {
   });
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <a href="/instances" className="text-xs px-2 py-1.5 rounded-lg" style={{ background: "hsl(240 12% 10%)", color: "hsl(240 8% 48)" }}>
-            ← Voltar
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <a href="/settings" className="text-xs px-2 py-1.5 rounded-lg" style={{ background: "hsl(240 12% 10%)", color: "hsl(240 8% 48)" }}>
+            ← <span className="hidden sm:inline">Voltar</span>
           </a>
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-3" style={{ color: "var(--text-1)" }}>
-              <Webhook className="w-6 h-6" style={{ color: "#8b5cf6" }} />
-              Webhooks Globais
+            <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-3" style={{ color: "var(--text-1)" }}>
+              <Webhook className="w-5 sm:w-6 h-5 sm:h-6" style={{ color: "#8b5cf6" }} />
+              <span className="hidden sm:inline">Webhooks Globais</span>
+              <span className="sm:hidden">Webhooks</span>
             </h1>
-            <p className="text-sm mt-1" style={{ color: "var(--text-3)" }}>
+            <p className="text-sm mt-1 hidden sm:block" style={{ color: "var(--text-3)" }}>
               Receba eventos da plataforma (usuários, pagamentos, workspaces)
             </p>
           </div>

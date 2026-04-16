@@ -609,19 +609,35 @@ export default function SettingsPage() {
   return (
     <div className="max-w-5xl">
       {/* Page header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text-1)" }}>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: "var(--text-1)" }}>
           {t("settings_title")}
         </h1>
-        <p className="text-sm mt-1" style={{ color: "var(--text-3)" }}>
+        <p className="text-sm mt-1 hidden sm:block" style={{ color: "var(--text-3)" }}>
           {t("settings_desc")}
         </p>
       </div>
 
-      <div className="flex gap-6 items-start">
-        {/* ── Submenu sidebar ── */}
-        <aside className="w-52 flex-shrink-0 sticky top-0">
-          <nav className="rounded-2xl overflow-hidden" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+      <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start">
+        {/* ── Submenu sidebar - hidden on mobile, tabs visible on mobile ── */}
+        {/* Mobile tabs */}
+        <div className="sm:hidden flex gap-1 p-1 rounded-xl w-full" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+          {SECTIONS.map((section) => {
+            const Icon = section.icon;
+            const isActive = active === section.id;
+            return (
+              <button key={section.id} onClick={() => setActive(section.id)} className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs font-medium transition-all"
+                style={{ background: isActive ? "rgba(0,212,106,0.15)" : "transparent", color: isActive ? "var(--green)" : "var(--text-3)" }}>
+                <Icon className="w-3.5 h-3.5" />
+                <span className="truncate">{section.label.split(" ")[0]}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Desktop sidebar */}
+        <aside className="hidden sm:flex w-44 lg:w-52 flex-shrink-0 sticky top-0">
+          <nav className="rounded-2xl overflow-hidden w-full" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
             {SECTIONS.map((section, i) => {
               const Icon = section.icon;
               const isActive = active === section.id;
@@ -630,7 +646,7 @@ export default function SettingsPage() {
                   key={section.id}
                   onClick={() => setActive(section.id)}
                   className={cn(
-                    "w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all duration-150 relative",
+                    "w-full flex items-center gap-3 px-3 lg:px-4 py-3 lg:py-3.5 text-left transition-all duration-150 relative",
                     i < SECTIONS.length - 1 ? "border-b" : ""
                   )}
                   style={{
@@ -656,7 +672,7 @@ export default function SettingsPage() {
                     <p className="text-xs font-semibold truncate" style={{ color: isActive ? "var(--green)" : "var(--text-1)" }}>
                       {section.label}
                     </p>
-                    <p className="text-[10px] truncate mt-0.5" style={{ color: "var(--text-3)" }}>
+                    <p className="text-[10px] truncate mt-0.5 hidden lg:block" style={{ color: "var(--text-3)" }}>
                       {section.description}
                     </p>
                   </div>

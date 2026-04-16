@@ -449,18 +449,19 @@ export default function AdminUsersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Customers</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Customers</h1>
           <p className="text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
             {users.length} usuário{users.length !== 1 ? "s" : ""} cadastrado{users.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
             style={{ background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.15)" }}>
             <Shield className="w-3.5 h-3.5" style={{ color: "#fbbf24" }} />
-            <span className="text-xs font-semibold" style={{ color: "#fbbf24" }}>Super Admin</span>
+            <span className="text-xs font-semibold hidden sm:inline" style={{ color: "#fbbf24" }}>Super Admin</span>
+            <span className="text-xs font-semibold sm:hidden" style={{ color: "#fbbf24" }}>Admin</span>
           </div>
           <button onClick={() => setShowCreate(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
@@ -468,7 +469,8 @@ export default function AdminUsersPage() {
             onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,212,106,0.16)")}
             onMouseLeave={e => (e.currentTarget.style.background = "rgba(0,212,106,0.1)")}>
             <Plus className="w-3.5 h-3.5" />
-            Novo usuário
+            <span className="hidden sm:inline">Novo usuário</span>
+            <span className="sm:hidden">Novo</span>
           </button>
         </div>
       </div>

@@ -568,16 +568,16 @@ export default function AdminPlansPage() {
   return (
     <div className="space-y-7 relative">
       {/* Header */}
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
             Planos
           </h1>
-          <p className="text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
+          <p className="text-sm mt-1 hidden sm:block" style={{ color: "hsl(240 8% 46%)" }}>
             Configure limites e recursos de cada plano.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => setActivePlanDrawer("new")}
             className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-all duration-150 active:scale-[0.97]"
@@ -586,11 +586,12 @@ export default function AdminPlansPage() {
             onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.1)" }}
           >
             <Plus className="w-4 h-4" />
-            Novo Plano
+            <span className="hidden sm:inline">Novo Plano</span>
+            <span className="sm:hidden">Novo</span>
           </button>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
             <Shield className="w-3.5 h-3.5 text-amber-500" />
-            <span className="text-xs font-semibold text-amber-500">Admin</span>
+            <span className="text-xs font-semibold text-amber-500 hidden sm:inline">Admin</span>
           </div>
         </div>
       </div>

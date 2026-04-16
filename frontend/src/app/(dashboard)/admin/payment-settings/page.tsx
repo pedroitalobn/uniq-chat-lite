@@ -193,10 +193,11 @@ export default function PaymentSettingsPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: "hsl(240 15% 93%)" }}>
-          Configurações de Pagamento
+        <h1 className="text-xl sm:text-2xl font-bold" style={{ color: "hsl(240 15% 93%)" }}>
+          <span className="hidden sm:inline">Configurações de Pagamento</span>
+          <span className="sm:hidden">Pagamento</span>
         </h1>
-        <p className="text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
+        <p className="text-sm mt-1 hidden sm:block" style={{ color: "hsl(240 8% 46%)" }}>
           Configure o provedor de pagamento e metode de checkout.
         </p>
       </div>
