@@ -7,7 +7,7 @@ import {
   Eye, EyeOff, Zap, Globe, Bot, Webhook, Play, Search,
   Key, FileJson, ExternalLink, Loader2, Shield, Link2, Copy, X,
 } from "lucide-react";
-import { integrationsApi, globalWebhooksApi, apiKeysApi, proxyPoolsApi, adminApi } from "@/lib/api";
+import { integrationsApi, globalWebhooksApi, apiKeysApi, proxyPoolsApi, adminApi, instancesApi } from "@/lib/api";
 import { toast } from "sonner";
 import type { APIKey, ProxyProviderConfig } from "@/types";
 
@@ -64,18 +64,18 @@ interface Integration {
   created_at: string;
 }
 
-type Section = "llm" | "api" | "webhook" | "proxy" | "docs";
+type Section = "agents" | "api" | "webhook" | "docs" | "mcp";
 
 export default function IntegrationsPage() {
-  const [section, setSection] = useState<Section>("llm");
+  const [section, setSection] = useState<Section>("agents");
   const [connecting, setConnecting] = useState<ProviderId | null>(null);
 
   const sections = [
-    { id: "llm" as const, label: "LLMs", icon: Bot, color: "var(--green)" },
+    { id: "agents" as const, label: "Agents", icon: Bot, color: "#8b5cf6" },
     { id: "api" as const, label: "API Keys", icon: Key, color: "#f59e0b" },
+    { id: "webhook" as const, label: "Webhooks", icon: Webhook, color: "#10b981" },
+    { id: "mcp" as const, label: "MCP", icon: Zap, color: "#f59e0b" },
     { id: "docs" as const, label: "API Docs", icon: FileJson, color: "#64748b" },
-    { id: "webhook" as const, label: "Webhooks", icon: Webhook, color: "#8b5cf6" },
-    { id: "proxy" as const, label: "Proxies", icon: Globe, color: "#06b6d4" },
   ];
 
   return (
@@ -100,10 +100,10 @@ export default function IntegrationsPage() {
           ))}
         </div>
 
-        {section === "llm" && <LLMSection onConnect={setConnecting} />}
+        {section === "agents" && <AgentsSection />}
         {section === "api" && <APIKeysSection />}
         {section === "webhook" && <WebhooksSection />}
-        {section === "proxy" && <ProxiesSection />}
+        {section === "mcp" && <MCPSection />}
         {section === "docs" && <DocsSection />}
       </div>
 
@@ -681,6 +681,173 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
           </div>
         )}
         <div className="flex gap-2 pt-2"><button onClick={onClose} className="btn-ghost flex-1">Cancelar</button><button onClick={() => create.mutate()} disabled={create.isPending || !form.api_key} className="btn-primary flex-1">{create.isPending ? "Conectando..." : "Conectar"}</button></div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Agents Section (Apps that consume Uniq API) ──────────────────────────────
+function AgentsSection() {
+  const { data: keys = [] } = useQuery<APIKey[]>({ queryKey: ["api-keys"], queryFn: () => apiKeysApi.list().then(r => r.data) });
+  const { data: instances = [] } = useQuery<any[]>({ queryKey: ["instances"], queryFn: () => instancesApi.list().then(r => r.data) });
+  const connectedInstances = instances.filter((i: any) => i.status === "connected");
+
+  const agentApps = [
+    {
+      id: "open_agent",
+      name: "Open Agent",
+      description: "Use Uniq como ferramenta no Open Agent (VSCode Extension)",
+      icon: "🤖",
+      color: "#3b82f6",
+      setup: "Configure a API Key e Instance UUID no Open Agent",
+    },
+    {
+      id: "open_code",
+      name: "Open Code",
+      description: "VSCode com IA que conecta ao Uniq para WhatsApp",
+      icon: "💻",
+      color: "#10b981",
+      setup: "Configure o endpoint da API no Open Code",
+    },
+    {
+      id: "claude_desktop",
+      name: "Claude Desktop",
+      description: "Use Uniq via MCP no Claude Desktop",
+      icon: "🧠",
+      color: "#f59e0b",
+      setup: "Configure o server MCP na seção MCP do Claude Desktop",
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl p-5" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(139,92,246,0.15)" }}>
+            <Bot className="w-5 h-5" style={{ color: "#8b5cf6" }} />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>Apps Agents</h2>
+            <p className="text-xs" style={{ color: "var(--text-3)" }}>Conecte apps de IA para consumir a API do Uniq</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {agentApps.map(app => (
+            <div key={app.id} className="rounded-xl p-4" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+              <div className="text-2xl mb-2">{app.icon}</div>
+              <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--text-1)" }}>{app.name}</h3>
+              <p className="text-xs mb-3" style={{ color: "var(--text-3)" }}>{app.description}</p>
+              <div className="space-y-2">
+                <div className="text-[10px] font-medium uppercase" style={{ color: "var(--text-3)" }}>Setup</div>
+                <code className="text-xs block p-2 rounded-lg" style={{ background: "var(--bg)", color: "var(--text-2)" }}>
+                  {app.setup}
+                </code>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Connection Info */}
+      <div className="rounded-2xl p-5" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+        <h3 className="text-sm font-semibold mb-4" style={{ color: "var(--text-1)" }}>Informações de Conexão</h3>
+        
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-2)" }}>Base URL</label>
+            <code className="text-xs block p-2 rounded-lg" style={{ background: "var(--bg)", color: "var(--text-2)" }}>
+              {typeof window !== 'undefined' ? window.location.origin : ''}/api
+            </code>
+          </div>
+          
+          {keys.length > 0 && (
+            <div>
+              <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-2)" }}>API Key</label>
+              <code className="text-xs block p-2 rounded-lg" style={{ background: "var(--bg)", color: "var(--text-2)" }}>
+                {keys[0].masked_key}
+              </code>
+            </div>
+          )}
+          
+          {connectedInstances.length > 0 && (
+            <div>
+              <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-2)" }}>Instance UUID</label>
+              <code className="text-xs block p-2 rounded-lg" style={{ background: "var(--bg)", color: "var(--text-2)" }}>
+                {connectedInstances[0].id}
+              </code>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MCP Section ────────────────────────────────────────────────────────────
+function MCPSection() {
+  const { data: instances = [] } = useQuery<any[]>({ queryKey: ["instances"], queryFn: () => instancesApi.list().then(r => r.data) });
+  const connectedInstances = instances.filter((i: any) => i.status === "connected");
+  const mcpInstances = connectedInstances.filter((i: any) => i.mcp_enabled);
+  const apiUrl = typeof window !== 'undefined' ? window.location.origin : '';
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl p-5" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(245,158,11,0.15)" }}>
+            <Zap className="w-5 h-5" style={{ color: "#f59e0b" }} />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>MCP Server</h2>
+            <p className="text-xs" style={{ color: "var(--text-3)" }}>Model Context Protocol para ferramentas de IA</p>
+          </div>
+        </div>
+
+        <p className="text-sm mb-4" style={{ color: "var(--text-2)" }}>
+          Use o MCP para conectar ferramentas de WhatsApp a apps de IA como Claude Desktop.
+        </p>
+
+        <div className="space-y-2">
+          <p className="text-xs font-medium" style={{ color: "var(--text-3)" }}>INSTÂNCIAS CONECTADAS COM MCP HABILITADO:</p>
+          {mcpInstances.length === 0 ? (
+            <p className="text-sm p-3 rounded-lg" style={{ background: "var(--surface-3)", color: "var(--text-3)" }}>
+              Nenhuma instância conectada com MCP habilitado
+            </p>
+          ) : (
+            mcpInstances.map((inst: any) => (
+              <div key={inst.id} className="p-3 rounded-xl" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+                <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{inst.name}</p>
+                <code className="text-xs block mt-1" style={{ color: "var(--text-2)" }}>
+                  {apiUrl}/api/v1/instances/{inst.id}/mcp/sse
+                </code>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* MCP Config for Claude Desktop */}
+      <div className="rounded-2xl p-5" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+        <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-1)" }}>Configuração Claude Desktop</h3>
+        
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-2)" }}>Adicione no arquivo de configuração:</label>
+            <pre className="text-xs p-3 rounded-lg overflow-x-auto" style={{ background: "var(--bg)", color: "var(--text-2)" }}>
+{`{
+  "mcpServers": {
+    "uniq-chat": {
+      "url": "${apiUrl}/api/v1/instances/INSTANCE_ID/mcp/sse"
+    }
+  }
+}`}
+            </pre>
+            <p className="text-xs mt-2" style={{ color: "var(--text-3)" }}>
+              Substitua INSTANCE_ID pelo UUID da instância acima.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
