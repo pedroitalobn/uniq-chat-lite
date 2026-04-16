@@ -363,12 +363,22 @@ export default function AdminProxyPage() {
 
   const setDefaultMutation = useMutation({
     mutationFn: async ({ id, country }: { id: string; country: string }) => {
-      const currentConfig = configs.find((c) => c.id === id);
+      const proxyToUpdate = configs.find((c) => c.id === id);
+      if (!proxyToUpdate) throw new Error("Proxy não encontrado");
+      
+      // Update existing proxy to be default (just set is_default and country)
       await adminApi.updateProxyConfig({
-        ...currentConfig,
+        id: id,
+        name: proxyToUpdate.name,
+        enabled: proxyToUpdate.enabled,
+        provider: proxyToUpdate.provider,
+        proxy_type: proxyToUpdate.proxy_type,
+        host: proxyToUpdate.host,
+        port: proxyToUpdate.port,
+        username: proxyToUpdate.username,
+        is_active: proxyToUpdate.is_active,
         is_default: true,
         country: country,
-        id: undefined,
       });
     },
     onSuccess: () => {
