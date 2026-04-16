@@ -192,6 +192,8 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 		Status:      models.StatusDisconnected,
 	}
 
+	log.Debug().Str("user", user.ID.String()).Str("name", req.Name).Msg("creating new instance with status=disconnected")
+
 	// Link to server if provided (and accessible by user)
 	if req.ServerID != "" {
 		if sid, err := uuid.Parse(req.ServerID); err == nil {

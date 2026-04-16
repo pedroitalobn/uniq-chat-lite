@@ -429,10 +429,10 @@ export default function AdminProxyPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: "hsl(240 15% 93%)" }}>Proxy Global</h1>
-          <p className="text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
+          <h1 className="text-xl sm:text-2xl font-bold" style={{ color: "hsl(240 15% 93%)" }}>Proxy Global</h1>
+          <p className="text-sm mt-1 hidden sm:block" style={{ color: "hsl(240 8% 46%)" }}>
             Configure proxies residenciais por país para reduzir banimento.
           </p>
         </div>
@@ -441,7 +441,8 @@ export default function AdminProxyPage() {
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold"
           style={{ background: "var(--green)", color: "#000" }}
         >
-          + Novo Proxy
+          + <span className="hidden sm:inline">Novo Proxy</span>
+          <span className="sm:hidden">Novo</span>
         </button>
       </div>
 

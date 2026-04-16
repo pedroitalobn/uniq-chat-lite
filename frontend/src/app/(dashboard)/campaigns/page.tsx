@@ -866,7 +866,7 @@ export default function CampaignsPage() {
 
   return (
     <div className="space-y-7">
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Campanhas</h1>
           <p className="text-sm mt-1.5" style={{ color: "hsl(240 8% 46%)" }}>
@@ -875,7 +875,7 @@ export default function CampaignsPage() {
             {completed > 0 && <span> · {completed} concluída{completed !== 1 ? "s" : ""}</span>}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-[10px] px-2 py-1 rounded-lg font-mono hidden sm:inline-flex items-center gap-1"
             style={{ background: "rgba(96,165,250,0.08)", color: "#60a5fa", border: "1px solid rgba(96,165,250,0.15)" }}>
             🕐 {timezone}
@@ -888,7 +888,8 @@ export default function CampaignsPage() {
               color: "var(--green)", 
               backdropFilter: "blur(8px)" 
             }}>
-            <Plus className="w-4 h-4" /> {t("campaigns_new")}
+            <Plus className="w-4 h-4" /> <span className="hidden sm:inline">{t("campaigns_new")}</span>
+            <span className="sm:hidden">Nova</span>
           </button>
         </div>
       </div>

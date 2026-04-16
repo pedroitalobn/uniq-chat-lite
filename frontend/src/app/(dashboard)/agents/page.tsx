@@ -1404,18 +1404,19 @@ function AgentsPageClient() {
     <div className="flex flex-col h-full min-h-0">
       {/* Page header */}
       <div className="mb-4 flex-shrink-0">
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3" style={{ color: "var(--text-1)" }}>
-          <Sparkles className="w-6 h-6" style={{ color: "#8b5cf6" }} />
-          Centro de Agentes
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-3" style={{ color: "var(--text-1)" }}>
+          <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: "#8b5cf6" }} />
+          <span className="hidden sm:inline">Centro de Agentes</span>
+          <span className="sm:hidden">Agentes</span>
         </h1>
-        <p className="text-sm mt-1" style={{ color: "var(--text-3)" }}>
+        <p className="text-sm mt-1 hidden sm:block" style={{ color: "var(--text-3)" }}>
           Crie jornadas estilo ManyChat via comandos em linguagem natural.
         </p>
       </div>
 
-      <div className="flex gap-6 flex-1 min-h-0">
-        {/* Submenu sidebar */}
-        <aside className="w-52 flex-shrink-0 space-y-4">
+      <div className="flex gap-4 sm:gap-6 flex-1 min-h-0">
+        {/* Submenu sidebar - hidden on mobile, shown as tabs */}
+        <aside className="hidden sm:flex w-44 lg:w-52 flex-shrink-0 flex-col gap-4">
           <nav className="rounded-2xl overflow-hidden" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
             {SECTIONS.map((section, i) => {
               const Icon = section.icon;
@@ -1425,7 +1426,7 @@ function AgentsPageClient() {
                   key={section.id}
                   onClick={() => setActive(section.id)}
                   className={cn(
-                    "w-full flex items-center gap-3 px-4 py-4 text-left transition-all duration-150 relative",
+                    "w-full flex items-center gap-3 px-3 lg:px-4 py-3 lg:py-4 text-left transition-all duration-150 relative",
                     i < SECTIONS.length - 1 ? "border-b" : ""
                   )}
                   style={{ borderColor: "var(--surface-border)", background: isActive ? "var(--surface-3)" : "transparent" }}
@@ -1486,6 +1487,21 @@ function AgentsPageClient() {
             </div>
           </div>
         </aside>
+
+        {/* Mobile tabs - visible only on mobile */}
+        <div className="sm:hidden flex gap-1 p-1 rounded-xl mb-2" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+          {SECTIONS.map((section) => {
+            const Icon = section.icon;
+            const isActive = active === section.id;
+            return (
+              <button key={section.id} onClick={() => setActive(section.id)} className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs font-medium transition-all"
+                style={{ background: isActive ? "rgba(0,212,106,0.15)" : "transparent", color: isActive ? "var(--green)" : "var(--text-3)" }}>
+                <Icon className="w-3.5 h-3.5" />
+                <span>{section.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
         {/* Content area */}
         <div className="flex-1 min-w-0 min-h-0 rounded-2xl overflow-hidden border" style={{ borderColor: "var(--surface-border)" }}>

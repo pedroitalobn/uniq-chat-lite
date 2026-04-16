@@ -91,11 +91,11 @@ export default function IntegrationsPage() {
           <p className="text-sm" style={{ color: "var(--text-3)" }}>Conecte LLMs, APIs, webhooks e proxies à sua conta</p>
         </div>
 
-        <div className="flex gap-1 p-1 rounded-xl" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+        <div className="flex flex-wrap gap-1 p-1 rounded-xl" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
           {sections.map((s) => (
-            <button key={s.id} onClick={() => setSection(s.id)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center"
+            <button key={s.id} onClick={() => setSection(s.id)} className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all flex-1 justify-center"
               style={{ background: section === s.id ? `${s.color}15` : "transparent", color: section === s.id ? s.color : "var(--text-3)" }}>
-              <s.icon className="w-4 h-4" /> {s.label}
+              <s.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="hidden sm:inline">{s.label}</span>
             </button>
           ))}
         </div>

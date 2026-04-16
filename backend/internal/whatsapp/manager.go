@@ -40,6 +40,14 @@ func NewManager(sessionDir string, db *gorm.DB) *Manager {
 
 // StartInstance starts (or restarts) the WhatsApp client for the given instance.
 func (m *Manager) StartInstance(instance *models.Instance) error {
+	// Defensive check: only allow starting if status is connected or disconnected
+	// prevent accidental auto-start for instances that were never paired
+	if instance.Status != models.StatusConnected && instance.Status != models.StatusDisconnected {
+		log.Warn().Str("instance", instance.ID.String()).Str("status", string(instance.Status)).
+			Msg("refusing to start instance with invalid status")
+		return fmt.Errorf("cannot start instance with status %s", instance.Status)
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -353,6 +361,8 @@ func (m *Manager) startReconnectionChecker() {
 			m.mu.RLock()
 			client, exists := m.clients[inst.ID.String()]
 			m.mu.RUnlock()
+
+			log.Debug().Str("instance", inst.ID.String()).Bool("exists_in_manager", exists).Msg("checking auto-reconnect")
 
 			// If not in clients map or not connected, try to start
 			if !exists || (client != nil && !client.IsConnected()) {

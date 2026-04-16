@@ -492,7 +492,7 @@ export default function CRMPage() {
   return (
     <div className="space-y-7">
       {/* Header */}
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>CRM</h1>
           <p className="text-sm mt-1.5" style={{ color: "hsl(240 8% 46%)" }}>
@@ -502,7 +502,7 @@ export default function CRMPage() {
             )}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {/* View toggle */}
           <div className="flex bg-white/5 p-1 rounded-xl items-center" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
             <button
@@ -528,7 +528,7 @@ export default function CRMPage() {
             onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 15% 93%)")}
             onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
           >
-            <TagIcon className="w-4 h-4" /> Tags
+            <TagIcon className="w-4 h-4" /> <span className="hidden sm:inline">Tags</span>
           </button>
           <button
             onClick={() => setFilterOpen(true)}
@@ -540,7 +540,7 @@ export default function CRMPage() {
             }}
           >
             <Filter className="w-4 h-4" />
-            Pipeline
+            <span className="hidden sm:inline">Pipeline</span>
             {activeFilterCount > 0 && (
               <span className="w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center"
                 style={{ background: "var(--green)", color: "#03170a" }}>
@@ -549,7 +549,8 @@ export default function CRMPage() {
             )}
           </button>
           <button onClick={() => setCreateOpen(true)} className="btn-primary">
-            <Plus className="w-4 h-4" /> Novo Contato
+            <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novo Contato</span>
+            <span className="sm:hidden">+ Novo</span>
           </button>
         </div>
       </div>
