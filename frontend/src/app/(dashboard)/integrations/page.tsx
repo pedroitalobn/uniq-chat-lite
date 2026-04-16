@@ -696,28 +696,37 @@ function AgentsSection() {
 
   const agentApps = [
     {
-      id: "open_agent",
-      name: "Open Agent",
-      description: "Use Uniq como ferramenta no Open Agent (VSCode Extension)",
-      icon: "🤖",
-      color: "#3b82f6",
-      setup: "Configure a API Key e Instance UUID no Open Agent",
+      id: "claude_desktop",
+      name: "Claude Desktop",
+      description: "Use Uniq via MCP para ferramentas de WhatsApp",
+      icon: "🧠",
+      docs: "https://modelcontextprotocol.io",
+      setup: "Configure o MCP server no arquivo settings.json",
+      config: `{"mcpServers":{"uniq-chat":{"url":"{url}/api/v1/instances/{instance_id}/mcp/sse"}}`,
     },
     {
       id: "open_code",
-      name: "Open Code",
+      name: "Open Code (VSCode)",
       description: "VSCode com IA que conecta ao Uniq para WhatsApp",
       icon: "💻",
-      color: "#10b981",
-      setup: "Configure o endpoint da API no Open Code",
+      docs: "https://github.com/omercnet/vscode-acp",
+      setup: "Use VSCode ACP extension + configure endpoint",
     },
     {
-      id: "claude_desktop",
-      name: "Claude Desktop",
-      description: "Use Uniq via MCP no Claude Desktop",
-      icon: "🧠",
-      color: "#f59e0b",
-      setup: "Configure o server MCP na seção MCP do Claude Desktop",
+      id: "open_agent",
+      name: "Open Agent / Claude Code",
+      description: "Agente de IA no terminal comtools WhatsApp",
+      icon: "🤖",
+      docs: "https://github.com/anthropic/claude-code",
+      setup: "Configure via variável de ambiente ou config",
+    },
+    {
+      id: "windsurf",
+      name: "Windsurf (Codeium)",
+      description: "Agente de IA da Codeium para VSCode",
+      icon: "🌊",
+      docs: "https://codeium.com/windsurf",
+      setup: "Configure API key e instance ID",
     },
   ];
 
@@ -734,17 +743,25 @@ function AgentsSection() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {agentApps.map(app => (
             <div key={app.id} className="rounded-xl p-4" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
-              <div className="text-2xl mb-2">{app.icon}</div>
-              <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--text-1)" }}>{app.name}</h3>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xl">{app.icon}</span>
+                <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>{app.name}</h3>
+              </div>
               <p className="text-xs mb-3" style={{ color: "var(--text-3)" }}>{app.description}</p>
               <div className="space-y-2">
                 <div className="text-[10px] font-medium uppercase" style={{ color: "var(--text-3)" }}>Setup</div>
-                <code className="text-xs block p-2 rounded-lg" style={{ background: "var(--bg)", color: "var(--text-2)" }}>
+                <code className="text-xs block p-2 rounded-lg break-all" style={{ background: "var(--bg)", color: "var(--text-2)" }}>
                   {app.setup}
                 </code>
+                {app.docs && (
+                  <a href={app.docs} target="_blank" rel="noopener noreferrer" 
+                    className="text-xs flex items-center gap-1 hover:underline" style={{ color: "var(--green)" }}>
+                    Ver documentação → 
+                  </a>
+                )}
               </div>
             </div>
           ))}
