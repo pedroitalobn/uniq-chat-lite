@@ -9,6 +9,7 @@ export interface User {
   is_active: boolean;
   blocked_until?: string;
   last_login_at?: string;
+  timezone?: string;
   created_at: string;
 }
 

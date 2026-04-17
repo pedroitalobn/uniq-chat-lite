@@ -600,7 +600,17 @@ export default function AdminUsersPage() {
                     <div className="text-center">
                       <span className="text-xs" style={{ color: "hsl(240 8% 50%)" }}>
                         {user.last_login_at 
-                          ? new Date(user.last_login_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+                          ? (() => {
+                              const date = new Date(user.last_login_at);
+                              const tz = user.timezone || "America/Sao_Paulo";
+                              return date.toLocaleString("pt-BR", { 
+                                timeZone: tz,
+                                day: "2-digit", 
+                                month: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit"
+                              });
+                            })()
                           : "—"}
                       </span>
                     </div>
