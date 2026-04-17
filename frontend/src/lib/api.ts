@@ -268,11 +268,12 @@ export const settingsApi = {
 
 export const proxyApi = {
   get: (id: string) => api.get(`/v1/instances/${id}/proxy`),
+  effective: (id: string) => api.get(`/v1/instances/${id}/proxy/effective`),
   set: (id: string, data: ProxyConfig) => api.put(`/v1/instances/${id}/proxy`, data),
   test: (id: string, data?: Partial<ProxyConfig>) =>
     api.post(`/v1/instances/${id}/proxy/test`, data || {}),
   delete: (id: string) => api.delete(`/v1/instances/${id}/proxy`),
-  setMode: (id: string, data: { mode: string; global_proxy_id?: string; provider_id?: string }) => 
+  setMode: (id: string, data: { mode: string; global_proxy_id?: string; provider_id?: string }) =>
     api.put(`/v1/instances/${id}/proxy/mode`, data),
 };
 

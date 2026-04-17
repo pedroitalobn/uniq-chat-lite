@@ -109,6 +109,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	globalWebhookH := handlers.NewGlobalWebhookHandler(db)
 	apiKeyH := handlers.NewAPIKeyHandler(db)
 	adminH := handlers.NewAdminHandler(db, emailSvc)
+	adminH.SetManager(manager) // permite propagar mudanças de proxy global às instâncias em runtime
 	wsH := handlers.NewWSHandler(db, manager)
 	mcpH := handlers.NewMCPHandler(db, manager)
 	contactH := handlers.NewContactHandler(db)
@@ -291,6 +292,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 
 	// Proxy
 	instance.Get("/proxy", proxyH.Get)
+	instance.Get("/proxy/effective", proxyH.Effective) // debug: exibe o proxy que o resolver escolheu
 	instance.Put("/proxy", proxyH.Set)
 	instance.Post("/proxy/test", proxyH.Test)
 	instance.Delete("/proxy", proxyH.Delete)

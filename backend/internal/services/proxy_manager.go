@@ -213,6 +213,9 @@ func (pm *ProxyManager) AssignProxy(instanceID uuid.UUID, plan *models.Plan) (*m
 		"proxy_password":    proxy.PasswordEncrypted,
 		"proxy_status":      models.ProxyStatusOK,
 		"proxy_last_tested": &now,
+		// Residencial vence sobre global — limpa herança para o resolver usar estes campos
+		"use_global_proxy": false,
+		"global_proxy_id":  nil,
 	})
 
 	log.Info().
@@ -254,7 +257,7 @@ func (pm *ProxyManager) ReleaseProxy(instanceID uuid.UUID) error {
 		}
 	}
 
-	// Clear instance proxy fields
+	// Clear instance proxy fields — incluindo flags de herança do global
 	pm.db.Model(&models.Instance{}).Where("id = ?", instanceID).Updates(map[string]interface{}{
 		"proxy_mode":        models.ProxyModeNone,
 		"proxy_enabled":     false,
@@ -267,6 +270,8 @@ func (pm *ProxyManager) ReleaseProxy(instanceID uuid.UUID) error {
 		"proxy_last_tested": nil,
 		"proxy_error":       "",
 		"proxy_external_ip": "",
+		"use_global_proxy":  false,
+		"global_proxy_id":   nil,
 	})
 
 	log.Info().

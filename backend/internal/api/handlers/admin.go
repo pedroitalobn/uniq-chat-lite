@@ -19,11 +19,17 @@ import (
 type AdminHandler struct {
 	db       *gorm.DB
 	emailSvc *email.Service
+	manager  *whatsapp.Manager
 }
 
 func NewAdminHandler(db *gorm.DB, emailSvc *email.Service) *AdminHandler {
 	return &AdminHandler{db: db, emailSvc: emailSvc}
 }
+
+// SetManager injeta o whatsapp.Manager usado para reiniciar instâncias após
+// mudanças de proxy global. Chamado no bootstrap (opcional — sem manager, o
+// handler apenas não reinicia automaticamente).
+func (h *AdminHandler) SetManager(m *whatsapp.Manager) { h.manager = m }
 
 // --- Payment Settings ---
 
@@ -592,27 +598,73 @@ func (h *AdminHandler) GetGlobalProxyConfig(c *fiber.Ctx) error {
 
 // TestGlobalProxy godoc
 // POST /admin/proxy-test
+// Body opcional: { "id": "<proxy_id>" }. Se omitido, testa o primeiro enabled.
+// Executa um GET real via proxy contra httpbin.org/ip e retorna o IP externo.
 func (h *AdminHandler) TestGlobalProxy(c *fiber.Ctx) error {
-	var cfgs []models.GlobalProxyConfig
-	if err := h.db.Where("enabled = ?", true).Find(&cfgs).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar proxy"})
+	var req struct {
+		ID string `json:"id"`
 	}
-	if len(cfgs) == 0 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nenhum proxy habilitado"})
+	_ = c.BodyParser(&req)
+
+	var cfg models.GlobalProxyConfig
+	q := h.db.Model(&models.GlobalProxyConfig{})
+	if req.ID != "" {
+		q = q.Where("id = ?", req.ID)
+	} else {
+		q = q.Where("enabled = ? AND is_active = ?", true, true).Order("is_default DESC, created_at DESC")
 	}
-	cfg := cfgs[0]
-
-	// Get proxy details
-	host := cfg.Host
-	port := cfg.Port
-	if cfg.UseEnv {
-		host = os.Getenv("BRIGHTDATA_HOST")
-		port, _ = strconv.Atoi(os.Getenv("BRIGHTDATA_PORT"))
+	if err := q.First(&cfg).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "proxy global não encontrado"})
 	}
 
-	log.Info().Str("host", host).Int("port", port).Msg("testing global proxy")
+	host, port, user, pass, proxyType, source := whatsapp.ResolveGlobalProxyFieldsExported(&cfg)
 
-	return c.JSON(fiber.Map{"status": "ok", "message": "Proxy configurado e pronto para uso"})
+	if host == "" || port <= 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"error":   "host ou porta vazios após resolução (use_env=" + strconv.FormatBool(cfg.UseEnv) + ")",
+			"source":  source,
+		})
+	}
+
+	log.Info().
+		Str("id", cfg.ID).
+		Str("source", source).
+		Str("host", host).
+		Int("port", port).
+		Str("type", proxyType).
+		Msg("admin: testing global proxy")
+
+	proxyCfg := &whatsapp.ProxyConfig{
+		Enabled:  true,
+		Type:     proxyType,
+		Host:     host,
+		Port:     port,
+		Username: user,
+		Password: pass,
+	}
+	externalIP, latencyMs, err := whatsapp.TestProxy(proxyCfg)
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"success":    false,
+			"error":      err.Error(),
+			"source":     source,
+			"host":       host,
+			"port":       port,
+			"proxy_type": proxyType,
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success":     true,
+		"external_ip": externalIP,
+		"latency_ms":  latencyMs,
+		"source":      source,
+		"host":        host,
+		"port":        port,
+		"proxy_type":  proxyType,
+		"tested_at":   time.Now(),
+	})
 }
 
 // UpdateGlobalProxyConfig godoc
@@ -751,7 +803,50 @@ func (h *AdminHandler) UpdateGlobalProxyConfig(c *fiber.Ctx) error {
 		}
 	}
 
+	// Propaga mudanças: reinicia instâncias que estão usando este global proxy
+	// (whatsmeow só aplica proxy novo em Disconnect+Connect).
+	go h.restartInstancesUsingGlobal(cfg.ID)
+
 	return h.GetGlobalProxyConfig(c)
+}
+
+// restartInstancesUsingGlobal reconecta todas as instâncias que referenciam
+// o GlobalProxyConfig informado para aplicar a nova configuração de proxy.
+// No-op se o manager não estiver injetado (bootstrap opcional).
+func (h *AdminHandler) restartInstancesUsingGlobal(globalProxyID string) {
+	if h.manager == nil {
+		log.Warn().Msg("proxy-config: manager not injected; skipping instance restart")
+		return
+	}
+	var instances []models.Instance
+	if err := h.db.Where(
+		"use_global_proxy = ? AND global_proxy_id = ? AND proxy_enabled = ?",
+		true, globalProxyID, true,
+	).Find(&instances).Error; err != nil {
+		log.Error().Err(err).Str("global_proxy_id", globalProxyID).Msg("proxy-config: failed to list instances")
+		return
+	}
+
+	restarted := 0
+	skipped := 0
+	for i := range instances {
+		inst := &instances[i]
+		if !h.manager.IsRunning(inst.ID.String()) {
+			skipped++
+			continue
+		}
+		if err := h.manager.RestartWithProxy(inst); err != nil {
+			log.Error().Err(err).Str("instance", inst.ID.String()).Msg("proxy-config: restart failed")
+			continue
+		}
+		restarted++
+	}
+	log.Info().
+		Str("global_proxy_id", globalProxyID).
+		Int("total", len(instances)).
+		Int("restarted", restarted).
+		Int("skipped_not_running", skipped).
+		Msg("proxy-config: propagated update to instances")
 }
 
 // DELETE /admin/proxy-config/:id

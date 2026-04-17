@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -452,37 +454,59 @@ func (m *Manager) RefreshWebhooks(instanceID string) {
 }
 
 // buildProxyCfg constructs a ProxyConfig from an instance model, decrypting the password.
+// Honra GlobalProxyConfig.UseEnv e valida host/port antes de propagar — retorna nil
+// se a configuração resolvida estiver inválida (evita passar "http://:0" para whatsmeow).
 func (m *Manager) buildProxyCfg(instance *models.Instance) *ProxyConfig {
+	cfg, _ := m.resolveEffectiveProxy(instance)
+	return cfg
+}
+
+// resolveEffectiveProxy retorna o proxy efetivamente aplicado + uma string de origem
+// para diagnóstico ("global_env", "global_db", "instance_manual", "disabled", "none").
+func (m *Manager) resolveEffectiveProxy(instance *models.Instance) (*ProxyConfig, string) {
 	if !instance.ProxyEnabled {
-		return nil
+		return nil, "disabled"
 	}
 
-	// Handle global proxy - fetch from GlobalProxyConfig
+	// Precedência: use_global_proxy > campos manuais na instância
 	if instance.UseGlobalProxy && instance.GlobalProxyID != nil {
 		var gProxy models.GlobalProxyConfig
-		if err := m.db.First(&gProxy, "id = ? AND enabled = ? AND is_active = ?", instance.GlobalProxyID.String(), true, true).Error; err != nil {
-			log.Warn().Err(err).Str("instance", instance.ID.String()).Str("global_proxy_id", instance.GlobalProxyID.String()).Msg("global proxy config not found")
-			return nil
+		if err := m.db.First(&gProxy, "id = ? AND enabled = ? AND is_active = ?",
+			instance.GlobalProxyID.String(), true, true).Error; err != nil {
+			log.Warn().Err(err).
+				Str("instance", instance.ID.String()).
+				Str("global_proxy_id", instance.GlobalProxyID.String()).
+				Msg("proxy: global proxy config not found or disabled")
+			return nil, "none"
 		}
 
-		password := ""
-		if gProxy.Password != "" {
-			dec, err := DecryptProxyPassword(gProxy.Password)
-			if err != nil {
-				log.Warn().Err(err).Str("instance", instance.ID.String()).Msg("failed to decrypt global proxy password")
-			} else {
-				password = dec
-			}
+		host, port, user, pass, proxyType, source := resolveGlobalProxyFields(&gProxy)
+		if host == "" || port <= 0 {
+			log.Warn().
+				Str("instance", instance.ID.String()).
+				Str("global_proxy_id", gProxy.ID).
+				Bool("use_env", gProxy.UseEnv).
+				Str("source", source).
+				Msg("proxy: global proxy resolved to empty host/port — falling back to no-proxy")
+			return nil, "none"
 		}
 
 		return &ProxyConfig{
 			Enabled:  true,
-			Type:     gProxy.ProxyType,
-			Host:     gProxy.Host,
-			Port:     gProxy.Port,
-			Username: gProxy.Username,
-			Password: password,
-		}
+			Type:     proxyType,
+			Host:     host,
+			Port:     port,
+			Username: user,
+			Password: pass,
+		}, source
+	}
+
+	// Proxy manual da instância (ou residencial — ambos usam os mesmos campos)
+	if instance.ProxyHost == "" || instance.ProxyPort <= 0 {
+		log.Warn().
+			Str("instance", instance.ID.String()).
+			Msg("proxy: instance marked ProxyEnabled but Host/Port are empty")
+		return nil, "none"
 	}
 
 	password := ""
@@ -502,7 +526,60 @@ func (m *Manager) buildProxyCfg(instance *models.Instance) *ProxyConfig {
 		Port:     instance.ProxyPort,
 		Username: instance.ProxyUsername,
 		Password: password,
+	}, "instance_manual"
+}
+
+// ResolveEffectiveProxyExported é a versão pública usada por handlers para debug
+// (endpoint /proxy/effective).
+func (m *Manager) ResolveEffectiveProxyExported(instance *models.Instance) (*ProxyConfig, string) {
+	return m.resolveEffectiveProxy(instance)
+}
+
+// resolveGlobalProxyFields retorna os campos efetivos de um GlobalProxyConfig,
+// honrando UseEnv (lê BRIGHTDATA_HOST/PORT/USER/PASS das envs).
+// Retorna (host, port, username, password_plaintext, proxy_type, source).
+func resolveGlobalProxyFields(g *models.GlobalProxyConfig) (string, int, string, string, string, string) {
+	host := g.Host
+	port := g.Port
+	user := g.Username
+	pass := ""
+	proxyType := g.ProxyType
+	source := "global_db"
+
+	if g.Password != "" {
+		if dec, err := DecryptProxyPassword(g.Password); err == nil {
+			pass = dec
+		}
 	}
+
+	if g.UseEnv {
+		source = "global_env"
+		if v := os.Getenv("BRIGHTDATA_HOST"); v != "" {
+			host = v
+		}
+		if v := os.Getenv("BRIGHTDATA_PORT"); v != "" {
+			if p, err := strconv.Atoi(v); err == nil && p > 0 {
+				port = p
+			}
+		}
+		if v := os.Getenv("BRIGHTDATA_USER"); v != "" {
+			user = v
+		}
+		if v := os.Getenv("BRIGHTDATA_PASS"); v != "" {
+			pass = v
+		}
+		if proxyType == "" {
+			proxyType = "http"
+		}
+	}
+
+	return host, port, user, pass, proxyType, source
+}
+
+// ResolveGlobalProxyFieldsExported expõe o helper para o pacote handlers
+// (necessário para o endpoint de admin de test do global proxy).
+func ResolveGlobalProxyFieldsExported(g *models.GlobalProxyConfig) (host string, port int, user, pass, proxyType, source string) {
+	return resolveGlobalProxyFields(g)
 }
 
 func (m *Manager) loadWebhooks(instanceID string) []webhookEntry {

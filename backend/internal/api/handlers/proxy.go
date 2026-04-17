@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -38,6 +39,69 @@ func checkProxyPlanAccess(c *fiber.Ctx) error {
 		})
 	}
 	return nil
+}
+
+// Effective godoc
+// GET /instances/:id/proxy/effective
+// Retorna exatamente o proxy que seria aplicado à instância pelo resolver
+// (same logic used by buildProxyCfg before Connect). Útil para debug.
+// Senha nunca é exposta — apenas marker "p***" se houver.
+func (h *ProxyHandler) Effective(c *fiber.Ctx) error {
+	if err := checkProxyPlanAccess(c); err != nil {
+		return err
+	}
+	instance, ok := c.Locals("instance").(*models.Instance)
+	if !ok {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	cfg, source := h.manager.ResolveEffectiveProxyExported(instance)
+	resp := fiber.Map{
+		"instance_id":      instance.ID,
+		"proxy_mode":       instance.ProxyMode,
+		"proxy_enabled":    instance.ProxyEnabled,
+		"use_global_proxy": instance.UseGlobalProxy,
+		"global_proxy_id":  instance.GlobalProxyID,
+		"pool_id":          instance.ProxyPoolID,
+		"running":          h.manager.IsRunning(instance.ID.String()),
+		"source":           source,
+	}
+	if cfg == nil || !cfg.Enabled {
+		resp["effective"] = nil
+		resp["note"] = "nenhum proxy será aplicado — conexão direta"
+		return c.JSON(resp)
+	}
+	passMarker := ""
+	if cfg.Password != "" {
+		passMarker = "p***"
+	}
+	resp["effective"] = fiber.Map{
+		"enabled":  cfg.Enabled,
+		"type":     cfg.Type,
+		"host":     cfg.Host,
+		"port":     cfg.Port,
+		"username": cfg.Username,
+		"password": passMarker,
+		"url":      maskedProxyURL(cfg),
+	}
+	return c.JSON(resp)
+}
+
+// maskedProxyURL monta a URL completa sem revelar senha
+func maskedProxyURL(cfg *whatsapp.ProxyConfig) string {
+	if cfg == nil || !cfg.Enabled {
+		return ""
+	}
+	scheme := cfg.Type
+	auth := ""
+	if cfg.Username != "" {
+		mask := ""
+		if cfg.Password != "" {
+			mask = ":***"
+		}
+		auth = cfg.Username + mask + "@"
+	}
+	return scheme + "://" + auth + cfg.Host + ":" + strconv.Itoa(cfg.Port)
 }
 
 // Get godoc
@@ -123,6 +187,17 @@ func (h *ProxyHandler) Set(c *fiber.Ctx) error {
 		"proxy_password": encryptedPassword,
 		"proxy_status":   models.ProxyStatusUntested,
 		"proxy_error":    "",
+		// Proxy manual tem precedência: desabilita qualquer herança do proxy global
+		// ou do pool residencial para manter um único source-of-truth por instância.
+		"use_global_proxy": false,
+		"global_proxy_id":  nil,
+		"proxy_pool_id":    nil,
+		"proxy_mode": func() models.ProxyMode {
+			if req.Enabled {
+				return models.ProxyModeManual
+			}
+			return models.ProxyModeNone
+		}(),
 	}
 
 	if err := h.db.Model(instance).Updates(updates).Error; err != nil {
@@ -257,6 +332,7 @@ func (h *ProxyHandler) Delete(c *fiber.Ctx) error {
 
 	if err := h.db.Model(instance).Updates(map[string]interface{}{
 		"proxy_enabled":     false,
+		"proxy_mode":        models.ProxyModeNone,
 		"proxy_type":        "",
 		"proxy_host":        "",
 		"proxy_port":        0,
@@ -266,6 +342,10 @@ func (h *ProxyHandler) Delete(c *fiber.Ctx) error {
 		"proxy_last_tested": nil,
 		"proxy_error":       "",
 		"proxy_external_ip": "",
+		// Limpa todas as origens herdadas para evitar estado inconsistente
+		"use_global_proxy": false,
+		"global_proxy_id":  nil,
+		"proxy_pool_id":    nil,
 	}).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao remover proxy"})
 	}
