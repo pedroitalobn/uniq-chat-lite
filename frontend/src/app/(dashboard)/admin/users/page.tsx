@@ -489,12 +489,13 @@ export default function AdminUsersPage() {
       {/* Table */}
       <div className="rounded-2xl overflow-hidden animate-fade-in-up"
         style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-        <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-3 text-[10px] font-semibold uppercase tracking-widest"
+        <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-4 px-5 py-3 text-[10px] font-semibold uppercase tracking-widest"
           style={{ color: "hsl(240 8% 36%)", borderBottom: "1px solid hsl(240 12% 10%)" }}>
           <span>Customer</span>
           <span className="text-center">Plano</span>
           <span className="text-center">Status</span>
           <span className="text-center">Role</span>
+          <span className="text-center">Último Acesso</span>
           <span>Ações</span>
         </div>
 
@@ -592,6 +593,15 @@ export default function AdminUsersPage() {
                           ? { background: "rgba(251,191,36,0.08)", color: "#fbbf24" }
                           : { background: "rgba(255,255,255,0.04)", color: "hsl(240 8% 50%)" }}>
                         {user.role}
+                      </span>
+                    </div>
+
+                    {/* Last Login */}
+                    <div className="text-center">
+                      <span className="text-xs" style={{ color: "hsl(240 8% 50%)" }}>
+                        {user.last_login_at 
+                          ? new Date(user.last_login_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+                          : "—"}
                       </span>
                     </div>
 

@@ -8,6 +8,7 @@ export interface User {
   plan?: Plan;
   is_active: boolean;
   blocked_until?: string;
+  last_login_at?: string;
   created_at: string;
 }
 

@@ -452,6 +452,10 @@ func (h *AuthHandler) loginWithCredentials(c *fiber.Ctx, identifier, password st
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": msg})
 	}
 
+	// Record last login time
+	now := time.Now()
+	h.db.Model(&user).Update("last_login_at", now)
+
 	accessToken, err := middleware.GenerateAccessToken(&user)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao gerar token"})

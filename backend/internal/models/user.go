@@ -28,6 +28,7 @@ type User struct {
 	Plan                     *Plan      `gorm:"foreignKey:PlanID" json:"plan,omitempty"`
 	IsActive                 bool       `gorm:"default:true" json:"is_active"`
 	BlockedUntil             *time.Time `json:"blocked_until,omitempty"`
+	LastLoginAt              *time.Time `json:"last_login_at,omitempty"`
 	StripeCustomerID         string     `gorm:"type:varchar(255)" json:"stripe_customer_id,omitempty"`
 	StripeSubscriptionID     string     `gorm:"type:varchar(255)" json:"stripe_subscription_id,omitempty"`
 	StripeSubscriptionStatus string     `gorm:"type:varchar(50)" json:"stripe_subscription_status,omitempty"`
