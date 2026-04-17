@@ -1087,8 +1087,15 @@ function JourneysSection({ onEditJourney }: { onEditJourney?: (journey: any) => 
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t flex-wrap" style={{ borderColor: "var(--surface-border)" }}>
+                    <a
+                      href={`/agents/builder/${j.id}`}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                      style={{ background: "rgba(0,212,106,0.12)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.25)" }}
+                    >
+                      <Wand2 className="w-3.5 h-3.5" /> Canvas
+                    </a>
                     <button onClick={() => onEditJourney?.(j)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors" style={{ background: "rgba(139,92,246,0.1)", color: "#8b5cf6", border: "1px solid rgba(139,92,246,0.2)" }}>
-                      <Edit3 className="w-3.5 h-3.5" /> Editar
+                      <Edit3 className="w-3.5 h-3.5" /> Editar via IA
                     </button>
                     <button onClick={() => duplicateMutation.mutate(j)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors" style={{ background: "rgba(59,130,246,0.1)", color: "#3b82f6", border: "1px solid rgba(59,130,246,0.2)" }}>
                       <Copy className="w-3.5 h-3.5" /> Duplicar

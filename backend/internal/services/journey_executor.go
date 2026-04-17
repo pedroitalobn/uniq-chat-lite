@@ -1,0 +1,1095 @@
+package services
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"math/rand"
+	"net/http"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
+	"github.com/uniq-chat/backend/internal/models"
+	"github.com/uniq-chat/backend/internal/senders"
+	"gorm.io/gorm"
+)
+
+// Re-exports dos tipos de senders para compatibilidade do código chamador
+type MessageSender = senders.MessageSender
+type Button = senders.Button
+type ListSection = senders.ListSection
+type ListRow = senders.ListRow
+
+// SimulationEvent representa uma ação que aconteceria (usado em modo simulação)
+type SimulationEvent struct {
+	StepID    string                 `json:"step_id"`
+	StepType  string                 `json:"step_type"`
+	Action    string                 `json:"action"` // send_text, wait, http_call, etc.
+	Payload   map[string]interface{} `json:"payload"`
+	Timestamp time.Time              `json:"timestamp"`
+}
+
+// JourneyExecutor é o motor de execução multi-step
+type JourneyExecutor struct {
+	db     *gorm.DB
+	sender MessageSender
+	llm    *LLMService
+	// MaxSteps limita loops infinitos por execução
+	MaxSteps int
+}
+
+func NewJourneyExecutor(db *gorm.DB, sender MessageSender, llm *LLMService) *JourneyExecutor {
+	return &JourneyExecutor{
+		db:       db,
+		sender:   sender,
+		llm:      llm,
+		MaxSteps: 50,
+	}
+}
+
+// execCtx é o contexto mutável de uma execução em andamento
+type execCtx struct {
+	journey    *models.Journey
+	execution  *models.JourneyExecution
+	flow       *models.JourneyFlow
+	vars       *models.ExecutionVars
+	fromJID    string
+	fromName   string
+	groupJID   string
+	instanceID string
+	inboundMsg string
+	simulate   bool
+	sim        []SimulationEvent
+	stepsRun   int
+}
+
+func (e *execCtx) emit(stepID, stepType, action string, payload map[string]interface{}) {
+	if !e.simulate {
+		return
+	}
+	e.sim = append(e.sim, SimulationEvent{
+		StepID: stepID, StepType: stepType, Action: action,
+		Payload: payload, Timestamp: time.Now(),
+	})
+}
+
+// HandleIncoming recebe mensagem do WhatsApp e decide se inicia/retoma jornada.
+// Retorna true se a mensagem foi "consumida" por uma jornada.
+func (e *JourneyExecutor) HandleIncoming(instanceID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) bool {
+	// 1. Comando reservado: sempre prioritário
+	if cmd := models.IsReservedCommand(messageText); cmd != "" {
+		return e.handleReservedCommand(cmd, instanceID, fromJID, fromName)
+	}
+
+	// 2. Tem execução ativa aguardando input desse contato?
+	var active models.JourneyExecution
+	err := e.db.Where(
+		"instance_id = ? AND contact_jid = ? AND status IN (?, ?)",
+		instanceID, fromJID,
+		models.ExecutionActive, "waiting_input",
+	).Order("started_at DESC").First(&active).Error
+
+	if err == nil && string(active.Status) == "waiting_input" {
+		// Retoma jornada aguardando input
+		var journey models.Journey
+		if e.db.Where("id = ?", active.JourneyID).First(&journey).Error == nil {
+			e.resumeWithInput(&journey, &active, messageText)
+			return true
+		}
+	}
+
+	// 3. Buscar jornadas aplicáveis
+	var journeys []models.Journey
+	if err := e.db.Where("instance_id = ? AND status = 'active'", instanceID).Find(&journeys).Error; err != nil {
+		return false
+	}
+
+	triggered := false
+	for i := range journeys {
+		j := &journeys[i]
+		if !j.ShouldTrigger(messageText, groupJID, messageType, isGroup) {
+			continue
+		}
+		triggered = true
+		go e.startNew(j, fromJID, fromName, groupJID, messageText)
+	}
+	return triggered
+}
+
+func (e *JourneyExecutor) handleReservedCommand(action, instanceID, fromJID, fromName string) bool {
+	switch action {
+	case "cancel_execution":
+		now := time.Now()
+		e.db.Model(&models.JourneyExecution{}).
+			Where("instance_id = ? AND contact_jid = ? AND status IN (?, ?)",
+				instanceID, fromJID, models.ExecutionActive, "waiting_input").
+			Updates(map[string]interface{}{
+				"status":       models.ExecutionPaused,
+				"completed_at": now,
+				"updated_at":   now,
+			})
+		_ = e.sender.SendText(instanceID, fromJID, "Conversa encerrada. Digite /menu para recomeçar.")
+		return true
+	case "restart_flow":
+		// Cancela execução atual
+		now := time.Now()
+		e.db.Model(&models.JourneyExecution{}).
+			Where("instance_id = ? AND contact_jid = ? AND status IN (?, ?)",
+				instanceID, fromJID, models.ExecutionActive, "waiting_input").
+			Updates(map[string]interface{}{
+				"status":       models.ExecutionCompleted,
+				"completed_at": now,
+				"updated_at":   now,
+			})
+		_ = e.sender.SendText(instanceID, fromJID, "Fluxo reiniciado. Envie sua mensagem para começar.")
+		return true
+	case "show_help":
+		help := "Comandos disponíveis:\n" +
+			"/menu - reiniciar o fluxo\n" +
+			"/stop - encerrar conversa\n" +
+			"/ajuda - exibir esta mensagem"
+		_ = e.sender.SendText(instanceID, fromJID, help)
+		return true
+	}
+	return false
+}
+
+// startNew inicia uma nova execução de jornada
+func (e *JourneyExecutor) startNew(journey *models.Journey, fromJID, fromName, groupJID, messageText string) {
+	flow := journey.GetFlow()
+	if flow == nil || len(flow.Steps) == 0 {
+		e.legacyFallback(journey, fromJID, fromName, groupJID, messageText)
+		return
+	}
+
+	start := flow.FirstStep()
+	if start == nil {
+		return
+	}
+
+	vars := &models.ExecutionVars{
+		Contact: map[string]interface{}{
+			"name":  fromName,
+			"jid":   fromJID,
+			"phone": strings.Split(fromJID, "@")[0],
+		},
+		Flow:      map[string]interface{}{},
+		LastInput: messageText,
+	}
+
+	execution := &models.JourneyExecution{
+		ID:          uuid.New().String(),
+		JourneyID:   journey.ID,
+		InstanceID:  journey.InstanceID,
+		ContactJID:  fromJID,
+		ContactName: fromName,
+		GroupJID:    groupJID,
+		Status:      models.ExecutionActive,
+		CurrentStep: start.ID,
+		StepIndex:   0,
+		TotalSteps:  len(flow.Steps),
+		StartedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	e.saveVars(execution, vars)
+	execution.AddMessage("inbound", messageText, "trigger")
+	e.db.Create(execution)
+
+	ctx := &execCtx{
+		journey:    journey,
+		execution:  execution,
+		flow:       flow,
+		vars:       vars,
+		fromJID:    fromJID,
+		fromName:   fromName,
+		groupJID:   groupJID,
+		instanceID: journey.InstanceID,
+		inboundMsg: messageText,
+	}
+
+	e.run(ctx, start)
+}
+
+// resumeWithInput retoma execução que aguardava input do usuário
+func (e *JourneyExecutor) resumeWithInput(journey *models.Journey, execution *models.JourneyExecution, inputText string) {
+	flow := journey.GetFlow()
+	if flow == nil {
+		return
+	}
+
+	vars := e.loadVars(execution)
+	vars.LastInput = inputText
+
+	// O step que estava aguardando
+	waitingStepID := vars.WaitingStep
+	if waitingStepID == "" {
+		waitingStepID = execution.CurrentStep
+	}
+	vars.WaitingStep = ""
+
+	// Step que estava capturando input
+	current := flow.FindStep(waitingStepID)
+	if current == nil {
+		return
+	}
+
+	// Salvar input em variável configurada
+	var cfg struct {
+		VariableName string `json:"variable_name"`
+		NextStepID   string `json:"next_step_id"`
+	}
+	_ = json.Unmarshal(current.Config, &cfg)
+	if cfg.VariableName != "" {
+		vars.Flow[cfg.VariableName] = inputText
+	}
+
+	execution.AddMessage("inbound", inputText, current.ID)
+	execution.Status = models.ExecutionActive
+	execution.UpdatedAt = time.Now()
+	e.saveVars(execution, vars)
+	e.db.Save(execution)
+
+	// Próximo step
+	nextID := cfg.NextStepID
+	if nextID == "" {
+		nextID = current.NextStepID
+	}
+	next := flow.FindStep(nextID)
+	if next == nil {
+		e.complete(&execCtx{journey: journey, execution: execution, vars: vars})
+		return
+	}
+
+	ctx := &execCtx{
+		journey:    journey,
+		execution:  execution,
+		flow:       flow,
+		vars:       vars,
+		fromJID:    execution.ContactJID,
+		fromName:   execution.ContactName,
+		groupJID:   execution.GroupJID,
+		instanceID: execution.InstanceID,
+		inboundMsg: inputText,
+	}
+	e.run(ctx, next)
+}
+
+// run executa steps sequencialmente até fim, wait ou input
+func (e *JourneyExecutor) run(ctx *execCtx, step *models.FlowStep) {
+	for step != nil {
+		if ctx.stepsRun >= e.MaxSteps {
+			e.fail(ctx, "max_steps_exceeded")
+			return
+		}
+		ctx.stepsRun++
+
+		ctx.execution.CurrentStep = step.ID
+		ctx.execution.StepIndex = ctx.stepsRun
+		ctx.execution.UpdatedAt = time.Now()
+		if !ctx.simulate {
+			e.db.Save(ctx.execution)
+		}
+
+		next, pause, err := e.executeStep(ctx, step)
+		if err != nil {
+			log.Error().Err(err).Str("step", step.ID).Str("type", string(step.Type)).Msg("step failed")
+			e.fail(ctx, err.Error())
+			return
+		}
+		if pause {
+			// Aguardando input - salvar estado e sair
+			ctx.execution.Status = "waiting_input"
+			ctx.vars.WaitingStep = step.ID
+			e.saveVars(ctx.execution, ctx.vars)
+			if !ctx.simulate {
+				e.db.Save(ctx.execution)
+			}
+			return
+		}
+		step = next
+	}
+	e.complete(ctx)
+}
+
+// executeStep processa um step e retorna (próximo step, pausar para input, erro)
+func (e *JourneyExecutor) executeStep(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+	switch step.Type {
+	case models.StepTypeMessage:
+		return e.stepMessage(ctx, step)
+	case models.StepTypeButtons:
+		return e.stepButtons(ctx, step)
+	case models.StepTypeList:
+		return e.stepList(ctx, step)
+	case models.StepTypeInput:
+		return e.stepInput(ctx, step)
+	case models.StepTypeWait:
+		return e.stepWait(ctx, step)
+	case models.StepTypeCondition:
+		return e.stepCondition(ctx, step)
+	case models.StepTypeAIResponse:
+		return e.stepAIResponse(ctx, step)
+	case models.StepTypeHTTP:
+		return e.stepHTTP(ctx, step)
+	case models.StepTypeMedia:
+		return e.stepMedia(ctx, step)
+	case models.StepTypeHandoff:
+		return e.stepHandoff(ctx, step)
+	case models.StepTypeGoto:
+		return e.stepGoto(ctx, step)
+	case models.StepTypeRandomize:
+		return e.stepRandomize(ctx, step)
+	case models.StepTypeSetVariable:
+		return e.stepSetVariable(ctx, step)
+	case models.StepTypeAddTag, models.StepTypeTag:
+		return e.stepAddTag(ctx, step)
+	case models.StepTypeRemoveTag:
+		return e.stepRemoveTag(ctx, step)
+	case models.StepTypeUpdateStage:
+		return e.stepUpdateStage(ctx, step)
+	case models.StepTypeEnd:
+		return nil, false, nil
+	default:
+		// Step desconhecido: segue para next
+		return ctx.flow.FindStep(step.NextStepID), false, nil
+	}
+}
+
+// ─── Step handlers ────────────────────────────────────────────────────────────
+
+func (e *JourneyExecutor) stepMessage(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+	var cfg struct {
+		Message string `json:"message"`
+		Mode    string `json:"mode"` // "private" | "group"
+	}
+	_ = json.Unmarshal(step.Config, &cfg)
+	text := e.interpolate(cfg.Message, ctx.vars)
+	jid := e.resolveRecipient(ctx, cfg.Mode)
+
+	ctx.emit(step.ID, string(step.Type), "send_text", map[string]interface{}{"to": jid, "text": text})
+	if !ctx.simulate {
+		if err := e.sender.SendText(ctx.instanceID, jid, text); err != nil {
+			return nil, false, err
+		}
+		ctx.execution.AddMessage("outbound", text, step.ID)
+	}
+	return ctx.flow.FindStep(step.NextStepID), false, nil
+}
+
+func (e *JourneyExecutor) stepButtons(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+	var cfg struct {
+		Message string   `json:"message"`
+		Buttons []Button `json:"buttons"`
+		Mode    string   `json:"mode"`
+	}
+	_ = json.Unmarshal(step.Config, &cfg)
+	text := e.interpolate(cfg.Message, ctx.vars)
+	jid := e.resolveRecipient(ctx, cfg.Mode)
+
+	ctx.emit(step.ID, string(step.Type), "send_buttons",
+		map[string]interface{}{"to": jid, "text": text, "buttons": cfg.Buttons})
+	if !ctx.simulate {
+		if err := e.sender.SendButtons(ctx.instanceID, jid, text, cfg.Buttons); err != nil {
+			return nil, false, err
+		}
+		ctx.execution.AddMessage("outbound", text, step.ID)
+	}
+	// Botão pausa para input (próxima msg = seleção)
+	return nil, true, nil
+}
+
+func (e *JourneyExecutor) stepList(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+	var cfg struct {
+		Message    string        `json:"message"`
+		ButtonText string        `json:"button_text"`
+		Sections   []ListSection `json:"sections"`
+		Mode       string        `json:"mode"`
+	}
+	_ = json.Unmarshal(step.Config, &cfg)
+	text := e.interpolate(cfg.Message, ctx.vars)
+	jid := e.resolveRecipient(ctx, cfg.Mode)
+	btn := cfg.ButtonText
+	if btn == "" {
+		btn = "Ver opções"
+	}
+
+	ctx.emit(step.ID, string(step.Type), "send_list",
+		map[string]interface{}{"to": jid, "text": text, "button": btn, "sections": cfg.Sections})
+	if !ctx.simulate {
+		if err := e.sender.SendList(ctx.instanceID, jid, text, btn, cfg.Sections); err != nil {
+			return nil, false, err
+		}
+		ctx.execution.AddMessage("outbound", text, step.ID)
+	}
+	return nil, true, nil
+}
+
+func (e *JourneyExecutor) stepInput(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+	var cfg struct {
+		Prompt       string `json:"prompt"`
+		VariableName string `json:"variable_name"`
+		Mode         string `json:"mode"`
+	}
+	_ = json.Unmarshal(step.Config, &cfg)
+	if cfg.Prompt != "" {
+		text := e.interpolate(cfg.Prompt, ctx.vars)
+		jid := e.resolveRecipient(ctx, cfg.Mode)
+		ctx.emit(step.ID, string(step.Type), "send_text", map[string]interface{}{"to": jid, "text": text})
+		if !ctx.simulate {
+			if err := e.sender.SendText(ctx.instanceID, jid, text); err != nil {
+				return nil, false, err
+			}
+			ctx.execution.AddMessage("outbound", text, step.ID)
+		}
+	}
+	// Modo simulação: usa inboundMsg como se fosse a resposta
+	if ctx.simulate {
+		if cfg.VariableName != "" {
+			ctx.vars.Flow[cfg.VariableName] = ctx.inboundMsg
+		}
+		ctx.vars.LastInput = ctx.inboundMsg
+		return ctx.flow.FindStep(step.NextStepID), false, nil
+	}
+	return nil, true, nil
+}
+
+func (e *JourneyExecutor) stepWait(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+	var cfg struct {
+		Duration string `json:"duration"`
+	}
+	_ = json.Unmarshal(step.Config, &cfg)
+	d, err := time.ParseDuration(cfg.Duration)
+	if err != nil || d <= 0 {
+		d = 2 * time.Second
+	}
+	if d > 24*time.Hour {
+		d = 24 * time.Hour
+	}
+	ctx.emit(step.ID, string(step.Type), "wait", map[string]interface{}{"duration_ms": d.Milliseconds()})
+	if !ctx.simulate {
+		time.Sleep(d)
+	}
+	return ctx.flow.FindStep(step.NextStepID), false, nil
+}
+
+func (e *JourneyExecutor) stepCondition(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+	var cfg struct {
+		Left     string `json:"left"`     // e.g. "{{last_input}}"
+		Operator string `json:"operator"` // eq, neq, contains, not_contains, gt, lt, regex, exists
+		Right    string `json:"right"`
+	}
+	_ = json.Unmarshal(step.Config, &cfg)
+	left := e.interpolate(cfg.Left, ctx.vars)
+	right := e.interpolate(cfg.Right, ctx.vars)
+
+	branchTrue := step.BranchTrue
+	branchFalse := step.BranchFalse
+	if branchFalse == "" {
+		branchFalse = step.NextStepID
+	}
+
+	ok := evalCondition(left, cfg.Operator, right)
+	ctx.emit(step.ID, string(step.Type), "condition",
+		map[string]interface{}{"left": left, "op": cfg.Operator, "right": right, "result": ok})
+
+	if ok {
+		return ctx.flow.FindStep(branchTrue), false, nil
+	}
+	return ctx.flow.FindStep(branchFalse), false, nil
+}
+
+func (e *JourneyExecutor) stepAIResponse(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+	var cfg struct {
+		SystemPrompt   string `json:"system_prompt"`
+		UserPrompt     string `json:"user_prompt"`
+		IntegrationID  string `json:"integration_id"`
+		VariableName   string `json:"variable_name"` // opcional: salva resposta em var
+		SendToUser     bool   `json:"send_to_user"`
+		Mode           string `json:"mode"`
+	}
+	_ = json.Unmarshal(step.Config, &cfg)
+
+	sysP := e.interpolate(cfg.SystemPrompt, ctx.vars)
+	usrP := e.interpolate(cfg.UserPrompt, ctx.vars)
+	if usrP == "" {
+		usrP = ctx.vars.LastInput
+	}
+
+	var integration *models.UserIntegration
+	if cfg.IntegrationID != "" {
+		_ = e.db.Where("id = ? AND is_active = true", cfg.IntegrationID).First(&integration).Error
+	}
+	if integration == nil {
+		e.db.Where("user_id = ? AND is_active = true AND provider IN ?",
+			ctx.journey.UserID,
+			[]string{"openai", "claude", "deepseek", "gemini", "openrouter"}).First(&integration)
+	}
+
+	c, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	reply, err := e.llm.CallChatWithSystem(c, integration, sysP, usrP, false)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if cfg.VariableName != "" {
+		ctx.vars.Flow[cfg.VariableName] = reply
+	}
+
+	ctx.emit(step.ID, string(step.Type), "ai_response",
+		map[string]interface{}{"reply": reply, "variable": cfg.VariableName})
+
+	if cfg.SendToUser || cfg.VariableName == "" {
+		jid := e.resolveRecipient(ctx, cfg.Mode)
+		if !ctx.simulate {
+			if err := e.sender.SendText(ctx.instanceID, jid, reply); err != nil {
+				return nil, false, err
+			}
+			ctx.execution.AddMessage("outbound", reply, step.ID)
+		}
+	}
+
+	return ctx.flow.FindStep(step.NextStepID), false, nil
+}
+
+func (e *JourneyExecutor) stepHTTP(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+	var cfg struct {
+		Method      string            `json:"method"`
+		URL         string            `json:"url"`
+		Headers     map[string]string `json:"headers"`
+		Body        string            `json:"body"`
+		SaveResult  string            `json:"save_result"`  // nome da variável
+		SaveField   string            `json:"save_field"`   // dot-path no JSON de resposta
+	}
+	_ = json.Unmarshal(step.Config, &cfg)
+	method := strings.ToUpper(cfg.Method)
+	if method == "" {
+		method = "GET"
+	}
+	url := e.interpolate(cfg.URL, ctx.vars)
+
+	var bodyReader io.Reader
+	if cfg.Body != "" {
+		body := e.interpolate(cfg.Body, ctx.vars)
+		bodyReader = bytes.NewBufferString(body)
+	}
+
+	req, err := http.NewRequest(method, url, bodyReader)
+	if err != nil {
+		return nil, false, err
+	}
+	for k, v := range cfg.Headers {
+		req.Header.Set(k, e.interpolate(v, ctx.vars))
+	}
+
+	ctx.emit(step.ID, string(step.Type), "http_request",
+		map[string]interface{}{"method": method, "url": url})
+
+	if ctx.simulate {
+		return ctx.flow.FindStep(step.NextStepID), false, nil
+	}
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, false, err
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	if cfg.SaveResult != "" {
+		val := string(respBody)
+		if cfg.SaveField != "" {
+			var parsed map[string]interface{}
+			if json.Unmarshal(respBody, &parsed) == nil {
+				if v := digField(parsed, cfg.SaveField); v != nil {
+					val = fmt.Sprintf("%v", v)
+				}
+			}
+		}
+		ctx.vars.Flow[cfg.SaveResult] = val
+	}
+	return ctx.flow.FindStep(step.NextStepID), false, nil
+}
+
+func (e *JourneyExecutor) stepMedia(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+	var cfg struct {
+		MediaType string `json:"media_type"` // image, video, audio, document
+		URL       string `json:"url"`
+		Caption   string `json:"caption"`
+		Mode      string `json:"mode"`
+	}
+	_ = json.Unmarshal(step.Config, &cfg)
+	url := e.interpolate(cfg.URL, ctx.vars)
+	caption := e.interpolate(cfg.Caption, ctx.vars)
+	jid := e.resolveRecipient(ctx, cfg.Mode)
+
+	ctx.emit(step.ID, string(step.Type), "send_media",
+		map[string]interface{}{"to": jid, "type": cfg.MediaType, "url": url, "caption": caption})
+	if !ctx.simulate {
+		if err := e.sender.SendMedia(ctx.instanceID, jid, cfg.MediaType, url, caption); err != nil {
+			return nil, false, err
+		}
+		ctx.execution.AddMessage("outbound", "["+cfg.MediaType+"] "+caption, step.ID)
+	}
+	return ctx.flow.FindStep(step.NextStepID), false, nil
+}
+
+func (e *JourneyExecutor) stepHandoff(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+	var cfg struct {
+		Message string `json:"message"`
+		UserID  string `json:"user_id"` // atribuir a qual operador
+	}
+	_ = json.Unmarshal(step.Config, &cfg)
+	if cfg.Message != "" {
+		text := e.interpolate(cfg.Message, ctx.vars)
+		jid := e.resolveRecipient(ctx, "private")
+		if !ctx.simulate {
+			_ = e.sender.SendText(ctx.instanceID, jid, text)
+			ctx.execution.AddMessage("outbound", text, step.ID)
+		}
+		ctx.emit(step.ID, string(step.Type), "handoff",
+			map[string]interface{}{"assigned_user": cfg.UserID, "message": text})
+	}
+	// Marca execução como completa e cria flag de handoff em metadata
+	ctx.vars.Flow["handed_off_to"] = cfg.UserID
+	return nil, false, nil
+}
+
+func (e *JourneyExecutor) stepGoto(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+	var cfg struct {
+		TargetStepID    string `json:"target_step_id"`
+		TargetJourneyID string `json:"target_journey_id"`
+	}
+	_ = json.Unmarshal(step.Config, &cfg)
+	ctx.emit(step.ID, string(step.Type), "goto",
+		map[string]interface{}{"target_step": cfg.TargetStepID, "target_journey": cfg.TargetJourneyID})
+
+	if cfg.TargetStepID != "" {
+		return ctx.flow.FindStep(cfg.TargetStepID), false, nil
+	}
+	// TODO: suporte a jump para outra jornada (TargetJourneyID) — marcado para fase 3
+	return ctx.flow.FindStep(step.NextStepID), false, nil
+}
+
+func (e *JourneyExecutor) stepRandomize(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+	var cfg struct {
+		Branches []struct {
+			StepID string  `json:"step_id"`
+			Weight float64 `json:"weight"`
+		} `json:"branches"`
+	}
+	_ = json.Unmarshal(step.Config, &cfg)
+	if len(cfg.Branches) == 0 {
+		return ctx.flow.FindStep(step.NextStepID), false, nil
+	}
+	total := 0.0
+	for _, b := range cfg.Branches {
+		w := b.Weight
+		if w <= 0 {
+			w = 1
+		}
+		total += w
+	}
+	r := rand.Float64() * total
+	acc := 0.0
+	for _, b := range cfg.Branches {
+		w := b.Weight
+		if w <= 0 {
+			w = 1
+		}
+		acc += w
+		if r <= acc {
+			ctx.emit(step.ID, string(step.Type), "randomize_pick",
+				map[string]interface{}{"picked": b.StepID})
+			return ctx.flow.FindStep(b.StepID), false, nil
+		}
+	}
+	return ctx.flow.FindStep(step.NextStepID), false, nil
+}
+
+func (e *JourneyExecutor) stepSetVariable(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+	var cfg struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	}
+	_ = json.Unmarshal(step.Config, &cfg)
+	if cfg.Name != "" {
+		ctx.vars.Flow[cfg.Name] = e.interpolate(cfg.Value, ctx.vars)
+	}
+	ctx.emit(step.ID, string(step.Type), "set_var",
+		map[string]interface{}{"name": cfg.Name, "value": ctx.vars.Flow[cfg.Name]})
+	return ctx.flow.FindStep(step.NextStepID), false, nil
+}
+
+func (e *JourneyExecutor) stepAddTag(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+	var cfg struct {
+		Tag string `json:"tag"`
+	}
+	_ = json.Unmarshal(step.Config, &cfg)
+	tag := e.interpolate(cfg.Tag, ctx.vars)
+	ctx.emit(step.ID, string(step.Type), "add_tag", map[string]interface{}{"tag": tag, "contact": ctx.fromJID})
+
+	if !ctx.simulate && tag != "" {
+		// Best-effort: localizar Contact por JID e adicionar tag — depende do schema CRM.
+		// Grava na metadata da execução para auditoria.
+		ctx.vars.Flow["_last_tag_added"] = tag
+	}
+	return ctx.flow.FindStep(step.NextStepID), false, nil
+}
+
+func (e *JourneyExecutor) stepRemoveTag(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+	var cfg struct {
+		Tag string `json:"tag"`
+	}
+	_ = json.Unmarshal(step.Config, &cfg)
+	tag := e.interpolate(cfg.Tag, ctx.vars)
+	ctx.emit(step.ID, string(step.Type), "remove_tag", map[string]interface{}{"tag": tag})
+	return ctx.flow.FindStep(step.NextStepID), false, nil
+}
+
+func (e *JourneyExecutor) stepUpdateStage(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+	var cfg struct {
+		StageID string `json:"stage_id"`
+	}
+	_ = json.Unmarshal(step.Config, &cfg)
+	ctx.emit(step.ID, string(step.Type), "update_stage", map[string]interface{}{"stage_id": cfg.StageID})
+	ctx.vars.Flow["_last_stage"] = cfg.StageID
+	return ctx.flow.FindStep(step.NextStepID), false, nil
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+func (e *JourneyExecutor) resolveRecipient(ctx *execCtx, mode string) string {
+	if mode == "group" && ctx.groupJID != "" {
+		return ctx.groupJID
+	}
+	jid := ctx.fromJID
+	if !strings.Contains(jid, "@") {
+		jid = jid + "@s.whatsapp.net"
+	}
+	return jid
+}
+
+func (e *JourneyExecutor) complete(ctx *execCtx) {
+	if ctx.simulate {
+		return
+	}
+	now := time.Now()
+	ctx.execution.Status = models.ExecutionCompleted
+	ctx.execution.CompletedAt = &now
+	ctx.execution.UpdatedAt = now
+	e.saveVars(ctx.execution, ctx.vars)
+	e.db.Save(ctx.execution)
+
+	e.db.Model(ctx.journey).Updates(map[string]interface{}{
+		"invocations":     ctx.journey.Invocations + 1,
+		"completed_count": ctx.journey.CompletedCount + 1,
+		"last_run_at":     now,
+	})
+}
+
+func (e *JourneyExecutor) fail(ctx *execCtx, errMsg string) {
+	if ctx.simulate {
+		return
+	}
+	now := time.Now()
+	ctx.execution.Status = models.ExecutionFailed
+	ctx.execution.ErrorMessage = errMsg
+	ctx.execution.UpdatedAt = now
+	if ctx.execution.CompletedAt == nil {
+		ctx.execution.CompletedAt = &now
+	}
+	e.saveVars(ctx.execution, ctx.vars)
+	e.db.Save(ctx.execution)
+	log.Error().Str("execution", ctx.execution.ID).Str("erro", errMsg).Msg("jornada falhou")
+}
+
+func (e *JourneyExecutor) saveVars(exec *models.JourneyExecution, vars *models.ExecutionVars) {
+	data, err := json.Marshal(vars)
+	if err == nil {
+		exec.Metadata = string(data)
+	}
+}
+
+func (e *JourneyExecutor) loadVars(exec *models.JourneyExecution) *models.ExecutionVars {
+	vars := &models.ExecutionVars{
+		Contact: map[string]interface{}{},
+		Flow:    map[string]interface{}{},
+	}
+	if exec.Metadata != "" && exec.Metadata != "{}" {
+		_ = json.Unmarshal([]byte(exec.Metadata), vars)
+	}
+	if vars.Contact == nil {
+		vars.Contact = map[string]interface{}{"name": exec.ContactName, "jid": exec.ContactJID}
+	}
+	if vars.Flow == nil {
+		vars.Flow = map[string]interface{}{}
+	}
+	return vars
+}
+
+var reVar = regexp.MustCompile(`\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}`)
+
+// interpolate substitui {{var.path}} pelo valor no contexto
+func (e *JourneyExecutor) interpolate(s string, vars *models.ExecutionVars) string {
+	if s == "" || vars == nil {
+		return s
+	}
+	return reVar.ReplaceAllStringFunc(s, func(m string) string {
+		sub := reVar.FindStringSubmatch(m)
+		if len(sub) < 2 {
+			return m
+		}
+		path := sub[1]
+		return fmt.Sprintf("%v", resolvePath(path, vars))
+	})
+}
+
+func resolvePath(path string, vars *models.ExecutionVars) interface{} {
+	parts := strings.Split(path, ".")
+	// atalhos comuns
+	switch parts[0] {
+	case "name", "contact_name":
+		if v, ok := vars.Contact["name"]; ok {
+			return v
+		}
+	case "last_input":
+		return vars.LastInput
+	}
+	if len(parts) == 1 {
+		if v, ok := vars.Flow[parts[0]]; ok {
+			return v
+		}
+		if v, ok := vars.Contact[parts[0]]; ok {
+			return v
+		}
+		return ""
+	}
+	var cur interface{}
+	switch parts[0] {
+	case "contact":
+		cur = vars.Contact
+	case "flow", "vars":
+		cur = vars.Flow
+	case "instance":
+		cur = vars.Instance
+	default:
+		return ""
+	}
+	for _, p := range parts[1:] {
+		m, ok := cur.(map[string]interface{})
+		if !ok {
+			return ""
+		}
+		cur = m[p]
+	}
+	if cur == nil {
+		return ""
+	}
+	return cur
+}
+
+func digField(m map[string]interface{}, path string) interface{} {
+	parts := strings.Split(path, ".")
+	var cur interface{} = m
+	for _, p := range parts {
+		mm, ok := cur.(map[string]interface{})
+		if !ok {
+			return nil
+		}
+		cur = mm[p]
+	}
+	return cur
+}
+
+func evalCondition(left, op, right string) bool {
+	switch strings.ToLower(op) {
+	case "eq", "=", "==":
+		return left == right
+	case "neq", "!=":
+		return left != right
+	case "contains", "includes":
+		return strings.Contains(strings.ToLower(left), strings.ToLower(right))
+	case "not_contains":
+		return !strings.Contains(strings.ToLower(left), strings.ToLower(right))
+	case "starts_with":
+		return strings.HasPrefix(strings.ToLower(left), strings.ToLower(right))
+	case "ends_with":
+		return strings.HasSuffix(strings.ToLower(left), strings.ToLower(right))
+	case "exists", "not_empty":
+		return strings.TrimSpace(left) != ""
+	case "empty":
+		return strings.TrimSpace(left) == ""
+	case "regex":
+		re, err := regexp.Compile(right)
+		if err != nil {
+			return false
+		}
+		return re.MatchString(left)
+	case "gt", ">":
+		return parseFloat(left) > parseFloat(right)
+	case "lt", "<":
+		return parseFloat(left) < parseFloat(right)
+	case "gte", ">=":
+		return parseFloat(left) >= parseFloat(right)
+	case "lte", "<=":
+		return parseFloat(left) <= parseFloat(right)
+	}
+	return false
+}
+
+func parseFloat(s string) float64 {
+	var f float64
+	_, _ = fmt.Sscanf(strings.TrimSpace(s), "%f", &f)
+	return f
+}
+
+// ─── Legacy fallback ─────────────────────────────────────────────────────────
+
+// legacyFallback reproduz o comportamento original (message_template único)
+// para jornadas ainda sem flow estruturado.
+func (e *JourneyExecutor) legacyFallback(j *models.Journey, fromJID, fromName, groupJID, messageText string) {
+	vars := &models.ExecutionVars{
+		Contact:   map[string]interface{}{"name": fromName, "jid": fromJID},
+		Flow:      map[string]interface{}{},
+		LastInput: messageText,
+	}
+
+	msg := j.MessageTemplate
+	if msg == "" {
+		msg = "Olá {{name}}! Recebi sua mensagem."
+	}
+	msg = e.interpolate(msg, vars)
+
+	recipient := fromJID
+	if j.ResponseMode == "group" && groupJID != "" {
+		recipient = groupJID
+	} else if !strings.Contains(recipient, "@") {
+		recipient = recipient + "@s.whatsapp.net"
+	}
+
+	exec := &models.JourneyExecution{
+		ID:          uuid.New().String(),
+		JourneyID:   j.ID,
+		InstanceID:  j.InstanceID,
+		ContactJID:  fromJID,
+		ContactName: fromName,
+		GroupJID:    groupJID,
+		Status:      models.ExecutionActive,
+		TotalSteps:  1,
+		CurrentStep: "send",
+		StartedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	exec.AddMessage("inbound", messageText, "trigger")
+	e.db.Create(exec)
+
+	if err := e.sender.SendText(j.InstanceID, recipient, msg); err != nil {
+		now := time.Now()
+		exec.Status = models.ExecutionFailed
+		exec.ErrorMessage = err.Error()
+		exec.CompletedAt = &now
+		exec.UpdatedAt = now
+		e.db.Save(exec)
+		return
+	}
+	exec.AddMessage("outbound", msg, "send")
+	now := time.Now()
+	exec.Status = models.ExecutionCompleted
+	exec.CompletedAt = &now
+	exec.UpdatedAt = now
+	e.db.Save(exec)
+
+	e.db.Model(j).Updates(map[string]interface{}{
+		"invocations":     j.Invocations + 1,
+		"completed_count": j.CompletedCount + 1,
+		"last_run_at":     now,
+	})
+}
+
+// ─── Simulação (sandbox) ─────────────────────────────────────────────────────
+
+// SimulationResult é o retorno da simulação
+type SimulationResult struct {
+	Events     []SimulationEvent      `json:"events"`
+	FinalVars  map[string]interface{} `json:"final_vars"`
+	StepsRun   int                    `json:"steps_run"`
+	StoppedAt  string                 `json:"stopped_at,omitempty"`
+	WaitingFor string                 `json:"waiting_for,omitempty"` // step id aguardando input
+	Error      string                 `json:"error,omitempty"`
+}
+
+// Simulate roda a jornada em modo sandbox (sem enviar mensagens reais)
+func (e *JourneyExecutor) Simulate(journey *models.Journey, inboundMsg, contactName string) *SimulationResult {
+	flow := journey.GetFlow()
+	if flow == nil || len(flow.Steps) == 0 {
+		return &SimulationResult{Error: "jornada sem fluxo configurado"}
+	}
+	start := flow.FirstStep()
+	if start == nil {
+		return &SimulationResult{Error: "start step não encontrado"}
+	}
+	if contactName == "" {
+		contactName = "Teste"
+	}
+
+	vars := &models.ExecutionVars{
+		Contact: map[string]interface{}{
+			"name":  contactName,
+			"jid":   "5511999999999@s.whatsapp.net",
+			"phone": "5511999999999",
+		},
+		Flow:      map[string]interface{}{},
+		LastInput: inboundMsg,
+	}
+
+	ctx := &execCtx{
+		journey:    journey,
+		flow:       flow,
+		vars:       vars,
+		fromJID:    "5511999999999@s.whatsapp.net",
+		fromName:   contactName,
+		groupJID:   "",
+		instanceID: journey.InstanceID,
+		inboundMsg: inboundMsg,
+		simulate:   true,
+		execution:  &models.JourneyExecution{ID: "sim"},
+	}
+
+	res := &SimulationResult{}
+	defer func() {
+		res.Events = ctx.sim
+		res.StepsRun = ctx.stepsRun
+		res.FinalVars = map[string]interface{}{
+			"contact":    ctx.vars.Contact,
+			"flow":       ctx.vars.Flow,
+			"last_input": ctx.vars.LastInput,
+		}
+	}()
+
+	step := start
+	for step != nil {
+		if ctx.stepsRun >= e.MaxSteps {
+			res.Error = "max_steps_exceeded"
+			return res
+		}
+		ctx.stepsRun++
+		next, pause, err := e.executeStep(ctx, step)
+		if err != nil {
+			res.Error = err.Error()
+			res.StoppedAt = step.ID
+			return res
+		}
+		if pause {
+			res.WaitingFor = step.ID
+			return res
+		}
+		step = next
+	}
+	return res
+}

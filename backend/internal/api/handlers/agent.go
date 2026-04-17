@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -14,6 +15,7 @@ import (
 // AgentHandler gerencia o centro de agentes
 type AgentHandler struct {
 	db      *gorm.DB
+	wsMu    sync.RWMutex
 	wsConns map[string]*websocket.Conn
 }
 
@@ -32,14 +34,45 @@ func (h *AgentHandler) GetStats(c *fiber.Ctx) error {
 		return err
 	}
 
-	var totalJourneys, activeJourneys, pausedJourneys, totalExecs, activeExecs, completedExecs, failedExecs, todayExecs int64
+	var totalJourneys, activeJourneys, pausedJourneys int64
+	var totalExecs, activeExecs, completedExecs, failedExecs, todayExecs, totalMessages int64
 
-	h.db.Model(&models.Journey{}).Where("user_id = ?", userID).Count(&totalJourneys)
-	h.db.Model(&models.Journey{}).Where("user_id = ? AND status = 'active'", userID).Count(&activeJourneys)
-	h.db.Model(&models.Journey{}).Where("user_id = ? AND status = 'paused'", userID).Count(&pausedJourneys)
+	h.db.Model(&models.Journey{}).Where("user_id = ?", userID.String()).Count(&totalJourneys)
+	h.db.Model(&models.Journey{}).Where("user_id = ? AND status = 'active'", userID.String()).Count(&activeJourneys)
+	h.db.Model(&models.Journey{}).Where("user_id = ? AND status = 'paused'", userID.String()).Count(&pausedJourneys)
 
+	// Contabilizar execuções relacionadas às jornadas do usuário
+	execQ := h.db.Model(&models.JourneyExecution{}).
+		Where("journey_id IN (SELECT id FROM journeys WHERE user_id = ?)", userID.String())
+	execQ.Count(&totalExecs)
+	execQ.Session(&gorm.Session{}).Where("status = 'active'").Count(&activeExecs)
+	execQ.Session(&gorm.Session{}).Where("status = 'completed'").Count(&completedExecs)
+	execQ.Session(&gorm.Session{}).Where("status = 'failed'").Count(&failedExecs)
+
+	startOfDay := time.Now().Truncate(24 * time.Hour)
+	execQ.Session(&gorm.Session{}).Where("started_at >= ?", startOfDay).Count(&todayExecs)
+
+	// Total de mensagens geradas pelas execuções (agregado via COUNT das invocações)
+	h.db.Model(&models.Journey{}).
+		Where("user_id = ?", userID.String()).
+		Select("COALESCE(SUM(invocations),0)").
+		Row().Scan(&totalMessages)
+
+	// Instâncias ativas
 	var instancesActive int64
-	h.db.Model(&models.Instance{}).Where("user_id = ? AND status = 'connected'", userID).Count(&instancesActive)
+	h.db.Model(&models.Instance{}).Where("user_id = ? AND status = 'connected'", userID.String()).Count(&instancesActive)
+
+	// Atividade recente (última hora)
+	var recentActivity int64
+	h.db.Model(&models.JourneyExecution{}).
+		Where("journey_id IN (SELECT id FROM journeys WHERE user_id = ?) AND started_at >= ?",
+			userID.String(), time.Now().Add(-time.Hour)).
+		Count(&recentActivity)
+
+	execRate := 0.0
+	if totalExecs > 0 {
+		execRate = float64(completedExecs) / float64(totalExecs) * 100
+	}
 
 	return c.JSON(fiber.Map{
 		"journeys": fiber.Map{
@@ -51,14 +84,18 @@ func (h *AgentHandler) GetStats(c *fiber.Ctx) error {
 			"completed_executions": completedExecs,
 			"failed_executions":    failedExecs,
 			"today_executions":     todayExecs,
+			"total_messages":       totalMessages,
 		},
-		"instances_active": instancesActive,
+		"instances_active":          instancesActive,
+		"executions_today":          todayExecs,
+		"execution_rate":            execRate,
+		"recent_activity_last_hour": recentActivity,
 	})
 }
 
 // GetActivity GET /api/agent/activity
 func (h *AgentHandler) GetActivity(c *fiber.Ctx) error {
-	_, err := h.currentUserID(c)
+	userID, err := h.currentUserID(c)
 	if err != nil {
 		return err
 	}
@@ -69,38 +106,73 @@ func (h *AgentHandler) GetActivity(c *fiber.Ctx) error {
 	}
 
 	var executions []models.JourneyExecution
-	h.db.Preload("Journey").Order("started_at DESC").Limit(limit).Find(&executions)
+	h.db.
+		Where("journey_id IN (SELECT id FROM journeys WHERE user_id = ?)", userID.String()).
+		Order("started_at DESC").
+		Limit(limit).
+		Find(&executions)
+
+	// Enriquecer com nome da jornada
+	type Enriched struct {
+		models.JourneyExecution
+		JourneyName string `json:"journey_name"`
+	}
+	result := make([]Enriched, 0, len(executions))
+	journeyNames := make(map[string]string)
+	for _, e := range executions {
+		name, ok := journeyNames[e.JourneyID]
+		if !ok {
+			var j models.Journey
+			if h.db.Select("name").Where("id = ?", e.JourneyID).First(&j).Error == nil {
+				name = j.Name
+				journeyNames[e.JourneyID] = name
+			}
+		}
+		result = append(result, Enriched{JourneyExecution: e, JourneyName: name})
+	}
 
 	return c.JSON(fiber.Map{
-		"items": executions,
-		"count": len(executions),
+		"items": result,
+		"count": len(result),
 	})
 }
 
-// GetExecutionsByJourney GET /api/agent/journeys/:id/executions
+// GetExecutionsByJourney GET /api/journeys/:id/executions
 func (h *AgentHandler) GetExecutionsByJourney(c *fiber.Ctx) error {
 	userID, err := h.currentUserID(c)
 	if err != nil {
 		return err
 	}
 
-	journeyID, err := uuid.Parse(c.Params("id"))
-	if err != nil {
+	journeyID := c.Params("id")
+	if journeyID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID de jornada inválido"})
 	}
 
-	// Verificar se a jornada pertence ao usuário
+	// Verificar ownership
 	var journey models.Journey
-	if err := h.db.Where("id = ? AND user_id = ?", journeyID, userID).First(&journey).Error; err != nil {
+	if err := h.db.Where("id = ? AND user_id = ?", journeyID, userID.String()).First(&journey).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "jornada não encontrada"})
 	}
 
 	limit := c.QueryInt("limit", 20)
 	offset := c.QueryInt("offset", 0)
+	if limit > 200 {
+		limit = 200
+	}
+
+	var total int64
+	h.db.Model(&models.JourneyExecution{}).Where("journey_id = ?", journeyID).Count(&total)
+
+	var executions []models.JourneyExecution
+	h.db.Where("journey_id = ?", journeyID).
+		Order("started_at DESC").
+		Limit(limit).Offset(offset).
+		Find(&executions)
 
 	return c.JSON(fiber.Map{
-		"executions": []interface{}{},
-		"total":      0,
+		"executions": executions,
+		"total":      total,
 		"limit":      limit,
 		"offset":     offset,
 	})
@@ -152,15 +224,15 @@ func (h *AgentHandler) StopExecution(c *fiber.Ctx) error {
 		return err
 	}
 
-	executionID, err := uuid.Parse(c.Params("id"))
-	if err != nil {
+	executionID := c.Params("id")
+	if executionID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID de execução inválido"})
 	}
 
 	// Verificar se a execução pertence ao usuário
 	var execution models.JourneyExecution
 	if err := h.db.
-		Where("id = ? AND journey_id IN (SELECT id FROM journeys WHERE user_id = ?)", executionID, userID).
+		Where("id = ? AND journey_id IN (SELECT id FROM journeys WHERE user_id = ?)", executionID, userID.String()).
 		First(&execution).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "execução não encontrada"})
 	}
@@ -185,12 +257,16 @@ func (h *AgentHandler) ActivityWS(c *websocket.Conn) {
 	}
 
 	connID := userID.String() + "-" + uuid.New().String()[:8]
+	h.wsMu.Lock()
 	h.wsConns[connID] = c
+	h.wsMu.Unlock()
 
 	log.Info().Str("connID", connID).Msg("cliente conectado ao WebSocket de agentes")
 
 	defer func() {
+		h.wsMu.Lock()
 		delete(h.wsConns, connID)
+		h.wsMu.Unlock()
 		c.Close()
 		log.Info().Str("connID", connID).Msg("cliente desconectado do WebSocket de agentes")
 	}()
@@ -215,19 +291,30 @@ func (h *AgentHandler) ActivityWS(c *websocket.Conn) {
 
 // BroadcastActivity envia atualização de atividade para todos os clientes conectados
 func (h *AgentHandler) BroadcastActivity(userID uuid.UUID, event string, data interface{}) {
+	h.wsMu.RLock()
+	targets := make([]*websocket.Conn, 0)
+	targetIDs := make([]string, 0)
 	for connID, conn := range h.wsConns {
-		// Verificar se o connID pertence ao userID
 		if len(connID) >= 36 && connID[:36] == userID.String() {
-			msg := map[string]interface{}{
-				"event":     event,
-				"data":      data,
-				"timestamp": time.Now(),
-			}
-			if err := conn.WriteJSON(msg); err != nil {
-				log.Error().Err(err).Str("connID", connID).Msg("falha ao enviar broadcast")
-				delete(h.wsConns, connID)
-				conn.Close()
-			}
+			targets = append(targets, conn)
+			targetIDs = append(targetIDs, connID)
+		}
+	}
+	h.wsMu.RUnlock()
+
+	msg := map[string]interface{}{
+		"event":     event,
+		"data":      data,
+		"timestamp": time.Now(),
+	}
+
+	for i, conn := range targets {
+		if err := conn.WriteJSON(msg); err != nil {
+			log.Error().Err(err).Str("connID", targetIDs[i]).Msg("falha ao enviar broadcast")
+			h.wsMu.Lock()
+			delete(h.wsConns, targetIDs[i])
+			h.wsMu.Unlock()
+			conn.Close()
 		}
 	}
 }

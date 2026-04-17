@@ -19,10 +19,16 @@ type JourneyHandler struct {
 	db      *gorm.DB
 	llm     *services.LLMService
 	manager *whatsapp.Manager
+	builder *services.FlowBuilder
 }
 
 func NewJourneyHandler(db *gorm.DB, llm *services.LLMService, manager *whatsapp.Manager) *JourneyHandler {
-	return &JourneyHandler{db: db, llm: llm, manager: manager}
+	return &JourneyHandler{
+		db:      db,
+		llm:     llm,
+		manager: manager,
+		builder: services.NewFlowBuilder(llm),
+	}
 }
 
 func (h *JourneyHandler) currentUserID(c *fiber.Ctx) (uuid.UUID, error) {
@@ -62,12 +68,20 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 		h.db.Where("user_id = ? AND is_active = true AND provider IN ?", userID, []string{"openai", "claude", "deepseek", "gemini", "openrouter", "kilo", "zai", "kimi", "qwen", "minimax", "manus"}).First(&integration)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	parsedRules, err := h.llm.ParseJourneyPrompt(ctx, integration, req.Prompt)
 	if err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "falha ao interpretar jornada: " + err.Error()})
+	}
+
+	// Gerar flow estruturado via FlowBuilder (best-effort — se falhar, journey é criada sem flow)
+	var flow *models.JourneyFlow
+	if h.builder != nil {
+		if f, fErr := h.builder.Build(ctx, integration, req.Prompt); fErr == nil {
+			flow = f
+		}
 	}
 
 	// Parse the prompt to extract trigger details
@@ -112,6 +126,11 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha interna ao codificar regras"})
 	}
 	journey.ParsedRules = string(rulesBytes)
+
+	// Persistir flow estruturado se o builder retornou
+	if flow != nil {
+		_ = journey.SetFlow(flow)
+	}
 
 	// Gerar nome da jornada baseado no prompt
 	if journey.Name == "" {
@@ -635,6 +654,205 @@ func (h *JourneyHandler) ExecuteJourney(journey *models.Journey, fromJID, fromNa
 
 	return nil
 }
+
+// ─── Flow & LLM editing ──────────────────────────────────────────────────────
+
+// UpdateFlow PATCH /api/journeys/:id/flow — salva flow editado via canvas
+func (h *JourneyHandler) UpdateFlow(c *fiber.Ctx) error {
+	userID, err := h.currentUserID(c)
+	if err != nil {
+		return err
+	}
+	id := c.Params("id")
+	var journey models.Journey
+	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&journey).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "jornada não encontrada"})
+	}
+
+	var flow models.JourneyFlow
+	if err := c.BodyParser(&flow); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "flow inválido"})
+	}
+	if len(flow.Steps) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "flow vazio"})
+	}
+
+	if err := journey.SetFlow(&flow); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao serializar flow"})
+	}
+	if err := h.db.Save(&journey).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao salvar"})
+	}
+
+	return c.JSON(fiber.Map{"ok": true, "flow": journey.GetFlow()})
+}
+
+// EditFlowWithLLM POST /api/journeys/:id/edit-llm
+// Body: { "instruction": "adicione um step para perguntar email", "integration_id": "..." }
+func (h *JourneyHandler) EditFlowWithLLM(c *fiber.Ctx) error {
+	userID, err := h.currentUserID(c)
+	if err != nil {
+		return err
+	}
+	id := c.Params("id")
+	var journey models.Journey
+	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&journey).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "jornada não encontrada"})
+	}
+
+	var req struct {
+		Instruction   string `json:"instruction"`
+		IntegrationID string `json:"integration_id"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.Instruction == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instruction obrigatório"})
+	}
+
+	// Resolver integração
+	var integration *models.UserIntegration
+	if req.IntegrationID != "" {
+		h.db.Where("id = ? AND user_id = ? AND is_active = true", req.IntegrationID, userID).First(&integration)
+	}
+	if integration == nil {
+		h.db.Where("user_id = ? AND is_active = true AND provider IN ?",
+			userID, []string{"openai", "claude", "deepseek", "gemini", "openrouter"}).First(&integration)
+	}
+
+	current := journey.GetFlow()
+	if current == nil {
+		// Sem flow existente: Build a partir da instrução como se fosse novo
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		built, err := h.builder.Build(ctx, integration, req.Instruction)
+		if err != nil {
+			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+		}
+		current = built
+	} else {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		edited, err := h.builder.Edit(ctx, integration, current, req.Instruction)
+		if err != nil {
+			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+		}
+		current = edited
+	}
+
+	if err := journey.SetFlow(current); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao serializar flow"})
+	}
+	if err := h.db.Save(&journey).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao salvar"})
+	}
+
+	return c.JSON(fiber.Map{
+		"ok":   true,
+		"flow": current,
+	})
+}
+
+// SimulateJourney POST /api/journeys/:id/simulate
+// Body: { "message": "oi", "contact_name": "João" }
+func (h *JourneyHandler) SimulateJourney(c *fiber.Ctx) error {
+	userID, err := h.currentUserID(c)
+	if err != nil {
+		return err
+	}
+	id := c.Params("id")
+	var journey models.Journey
+	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&journey).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "jornada não encontrada"})
+	}
+
+	var req struct {
+		Message     string `json:"message"`
+		ContactName string `json:"contact_name"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+	if req.Message == "" {
+		req.Message = "oi"
+	}
+
+	// Simulador sempre usa um executor próprio (nopSender) — não precisa do manager.
+	exec := services.NewJourneyExecutor(h.db, nopSender{}, h.llm)
+	res := exec.Simulate(&journey, req.Message, req.ContactName)
+	return c.JSON(res)
+}
+
+// ListTemplates GET /api/journeys/templates
+func (h *JourneyHandler) ListTemplates(c *fiber.Ctx) error {
+	return c.JSON(services.BuiltInTemplates())
+}
+
+// CreateFromTemplate POST /api/journeys/from-template/:slug
+// Body: { "instance_id": "...", "name": "..." }
+func (h *JourneyHandler) CreateFromTemplate(c *fiber.Ctx) error {
+	userID, err := h.currentUserID(c)
+	if err != nil {
+		return err
+	}
+	slug := c.Params("slug")
+	templates := services.BuiltInTemplates()
+
+	var tpl *services.JourneyTemplate
+	for i := range templates {
+		if templates[i].Slug == slug {
+			tpl = &templates[i]
+			break
+		}
+	}
+	if tpl == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "template não encontrado"})
+	}
+
+	var req struct {
+		InstanceID string `json:"instance_id"`
+		Name       string `json:"name"`
+	}
+	_ = c.BodyParser(&req)
+
+	kwJSON, _ := json.Marshal(tpl.Keywords)
+
+	name := req.Name
+	if name == "" {
+		name = tpl.Name
+	}
+
+	journey := models.Journey{
+		ID:           uuid.New().String(),
+		UserID:       userID.String(),
+		InstanceID:   req.InstanceID,
+		Name:         name,
+		Description:  tpl.Description,
+		Prompt:       "[template: " + tpl.Slug + "] " + tpl.Description,
+		TriggerType:  tpl.TriggerType,
+		Keywords:     string(kwJSON),
+		Status:       "active",
+		ResponseMode: "private",
+		ParsedRules:  "{}",
+	}
+	_ = journey.SetFlow(tpl.Flow)
+
+	if err := h.db.Create(&journey).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao criar jornada"})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"journey": journey,
+		"flow":    journey.GetFlow(),
+	})
+}
+
+// nopSender é um MessageSender de descarte usado no simulador quando o manager
+// não tem executor injetado.
+type nopSender struct{}
+
+func (nopSender) SendText(_, _, _ string) error                                 { return nil }
+func (nopSender) SendButtons(_, _, _ string, _ []services.Button) error         { return nil }
+func (nopSender) SendList(_, _, _, _ string, _ []services.ListSection) error    { return nil }
+func (nopSender) SendMedia(_, _, _, _, _ string) error                          { return nil }
 
 func buildResponseFromJourney(journey *models.Journey, fromName string) string {
 	if journey.MessageTemplate != "" {

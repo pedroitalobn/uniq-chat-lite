@@ -144,6 +144,78 @@ func (j *Journey) HasFlow() bool {
 	return flow != nil && len(flow.Steps) > 0
 }
 
+// SetFlow serializa e persiste o fluxo no campo JSON
+func (j *Journey) SetFlow(flow *JourneyFlow) error {
+	if flow == nil {
+		j.Flow = ""
+		return nil
+	}
+	data, err := json.Marshal(flow)
+	if err != nil {
+		return err
+	}
+	j.Flow = string(data)
+	return nil
+}
+
+// FindStep localiza um step pelo ID no flow
+func (f *JourneyFlow) FindStep(id string) *FlowStep {
+	if f == nil {
+		return nil
+	}
+	for i := range f.Steps {
+		if f.Steps[i].ID == id {
+			return &f.Steps[i]
+		}
+	}
+	return nil
+}
+
+// FirstStep retorna o step inicial (StartStep ou IsStartStep ou primeiro)
+func (f *JourneyFlow) FirstStep() *FlowStep {
+	if f == nil || len(f.Steps) == 0 {
+		return nil
+	}
+	if f.StartStep != "" {
+		if s := f.FindStep(f.StartStep); s != nil {
+			return s
+		}
+	}
+	for i := range f.Steps {
+		if f.Steps[i].IsStartStep {
+			return &f.Steps[i]
+		}
+	}
+	return &f.Steps[0]
+}
+
+// ExecutionVars representa variáveis de contexto persistidas em JourneyExecution.Metadata
+type ExecutionVars struct {
+	Contact  map[string]interface{} `json:"contact,omitempty"`
+	Flow     map[string]interface{} `json:"flow,omitempty"`
+	LastInput string                `json:"last_input,omitempty"`
+	WaitingStep string              `json:"waiting_step,omitempty"` // step id aguardando input
+	Instance map[string]interface{} `json:"instance,omitempty"`
+}
+
+// IsReservedCommand retorna o nome da ação se o texto for um comando reservado
+func IsReservedCommand(text string) string {
+	t := strings.TrimSpace(text)
+	if t == "" || t[0] != '/' {
+		return ""
+	}
+	// Extrai primeira palavra
+	first := t
+	if idx := strings.IndexAny(t, " \t\n"); idx > 0 {
+		first = t[:idx]
+	}
+	first = strings.ToLower(first)
+	if act, ok := ReservedCommands[first]; ok {
+		return act
+	}
+	return ""
+}
+
 type TriggerType string
 
 const (
@@ -164,7 +236,20 @@ const (
 	TriggerGroupLeave      TriggerType = "group_leave"
 	TriggerScheduled       TriggerType = "scheduled"
 	TriggerContactTag      TriggerType = "contact_tag"
+	TriggerUserCommand     TriggerType = "user_command" // /menu, /stop, /help...
+	TriggerButtonClick     TriggerType = "button_click" // id de quick-reply
+	TriggerListSelect      TriggerType = "list_select"  // row id de lista
 )
+
+// Reserved commands (always intercepted before flow evaluation)
+var ReservedCommands = map[string]string{
+	"/stop":    "cancel_execution",
+	"/parar":   "cancel_execution",
+	"/menu":    "restart_flow",
+	"/restart": "restart_flow",
+	"/help":    "show_help",
+	"/ajuda":   "show_help",
+}
 
 type ActionType string
 
@@ -190,12 +275,25 @@ const (
 type StepType string
 
 const (
-	StepTypeMessage    StepType = "message"
-	StepTypeWait       StepType = "wait"
-	StepTypeCondition  StepType = "condition"
-	StepTypeTag        StepType = "tag"
-	StepTypeAIResponse StepType = "ai_response"
-	StepTypeWebhook    StepType = "webhook"
+	StepTypeMessage     StepType = "message"
+	StepTypeWait        StepType = "wait"
+	StepTypeCondition   StepType = "condition"
+	StepTypeTag         StepType = "tag"
+	StepTypeAIResponse  StepType = "ai_response"
+	StepTypeWebhook     StepType = "webhook"
+	StepTypeButtons     StepType = "buttons"      // mensagem com quick-replies
+	StepTypeList        StepType = "list"         // lista interativa
+	StepTypeInput       StepType = "input"        // capturar resposta do usuário em variável
+	StepTypeMedia       StepType = "media"        // enviar imagem/vídeo/áudio/doc
+	StepTypeHTTP        StepType = "http_request" // chamar API externa
+	StepTypeHandoff     StepType = "handoff"      // transferir para humano
+	StepTypeGoto        StepType = "goto"         // pular para step/jornada
+	StepTypeRandomize   StepType = "randomize"    // A/B split
+	StepTypeSetVariable StepType = "set_variable" // define variável no contexto
+	StepTypeUpdateStage StepType = "update_stage" // atualiza estágio CRM
+	StepTypeAddTag      StepType = "add_tag"      // adiciona tag no contato
+	StepTypeRemoveTag   StepType = "remove_tag"   // remove tag
+	StepTypeEnd         StepType = "end"          // encerra execução explicitamente
 )
 
 type FlowStep struct {

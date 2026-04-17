@@ -13,6 +13,7 @@ import (
 	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/queue"
+	"github.com/uniq-chat/backend/internal/services"
 	"github.com/uniq-chat/backend/internal/storage"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/driver/postgres"
@@ -134,6 +135,12 @@ func main() {
 	if hub := whatsapp.GetHub(); hub != nil {
 		hub.SetManager(manager)
 	}
+
+	// Journey executor (ManyChat-style multi-step engine)
+	journeyLLM := services.NewLLMService()
+	journeySender := whatsapp.NewManagerSender(manager)
+	journeyExec := services.NewJourneyExecutor(db, journeySender, journeyLLM)
+	manager.SetJourneyExecutor(journeyExec)
 
 	// Scheduled recovery snapshots (check every hour)
 	recoveryH := handlers.NewRecoveryHandler(db, manager)

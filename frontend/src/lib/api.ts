@@ -552,6 +552,16 @@ export const journeysApi = {
   delete: (id: string) => api.delete(`/v1/journeys/${id}`),
   executions: (id: string, limit?: number, offset?: number) =>
     api.get(`/v1/journeys/${id}/executions`, { params: { limit: limit || 20, offset: offset || 0 } }),
+  // ─── Flow builder (canvas + LLM edit + simulator + templates) ─────────────
+  updateFlow: (id: string, flow: { start_step?: string; steps: unknown[] }) =>
+    api.patch(`/v1/journeys/${id}/flow`, flow),
+  editWithLLM: (id: string, instruction: string, integrationId?: string) =>
+    api.post(`/v1/journeys/${id}/edit-llm`, { instruction, integration_id: integrationId }),
+  simulate: (id: string, message: string, contactName?: string) =>
+    api.post(`/v1/journeys/${id}/simulate`, { message, contact_name: contactName }),
+  listTemplates: () => api.get("/v1/journeys/templates"),
+  createFromTemplate: (slug: string, instanceId?: string, name?: string) =>
+    api.post(`/v1/journeys/from-template/${slug}`, { instance_id: instanceId, name }),
 };
 
 export const aiApi = {
