@@ -36,17 +36,27 @@ const ProviderIcon = ({ id, color }: { id: string; color: string }) => {
     qwen: <svg viewBox="0 0 24 24" className="w-5 h-5"><circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" fill="none"/><path d="M8 8l8 8M16 8l-8 8" stroke={color} strokeWidth="2" strokeLinecap="round"/></svg>,
     n8n: <svg viewBox="0 0 24 24" className="w-5 h-5"><rect x="3" y="3" width="18" height="18" rx="4" stroke={color} strokeWidth="1.5" fill="none"/><path d="M8 16V8l4 4 4-4v8" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>,
     kilo: <svg viewBox="0 0 24 24" className="w-5 h-5"><circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" fill="none"/><path d="M8 8v8M8 12l4-4M8 12l4 4" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+    kimi: <svg viewBox="0 0 24 24" className="w-5 h-5"><circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" fill="none"/><circle cx="9" cy="11" r="1.2" fill={color}/><circle cx="15" cy="11" r="1.2" fill={color}/><path d="M8 15c1 1.5 2.5 2 4 2s3-.5 4-2" stroke={color} strokeWidth="1.6" strokeLinecap="round" fill="none"/></svg>,
+    mistral: <svg viewBox="0 0 24 24" className="w-5 h-5"><rect x="3" y="3" width="18" height="18" rx="3" stroke={color} strokeWidth="1.5" fill="none"/><path d="M6 16V8h3v4h3V8h3v4h3v4" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>,
+    zai: <svg viewBox="0 0 24 24" className="w-5 h-5"><circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" fill="none"/><path d="M8 8h8l-8 8h8" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>,
+    minimax: <svg viewBox="0 0 24 24" className="w-5 h-5"><circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" fill="none"/><path d="M8 14V10M12 14V10M16 14V10M6 16h12" stroke={color} strokeWidth="1.6" strokeLinecap="round"/></svg>,
+    manus: <svg viewBox="0 0 24 24" className="w-5 h-5"><circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" fill="none"/><path d="M8 16v-4c0-2 1.5-4 4-4s4 2 4 4v4M10 14v-2M14 14v-2" stroke={color} strokeWidth="1.6" strokeLinecap="round"/></svg>,
   };
   return icons[id] || <Plug className="w-5 h-5" style={{ color }} />;
 };
 
 const PROVIDERS = [
-  { id: "claude", name: "Claude (Anthropic)", description: "claude-sonnet-4-6, claude-opus-4-6", color: "#d4a27f", bg: "rgba(212,162,127,0.08)", border: "rgba(212,162,127,0.2)", models: ["claude-sonnet-4-6", "claude-opus-4-6"] },
+  { id: "claude", name: "Claude (Anthropic)", description: "API key OR login com conta claude.ai", color: "#d4a27f", bg: "rgba(212,162,127,0.08)", border: "rgba(212,162,127,0.2)", models: ["claude-sonnet-4-5", "claude-opus-4-5", "claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"], supportsOAuth: true },
   { id: "openai", name: "ChatGPT (OpenAI)", description: "gpt-4o, gpt-4o-mini, o1-preview", color: "#10a37f", bg: "rgba(16,163,127,0.08)", border: "rgba(16,163,127,0.2)", models: ["gpt-4o", "gpt-4o-mini", "o1-preview"] },
   { id: "deepseek", name: "DeepSeek", description: "deepseek-chat, deepseek-reasoner", color: "#4f6ef7", bg: "rgba(79,110,247,0.08)", border: "rgba(79,110,247,0.2)", models: ["deepseek-chat", "deepseek-reasoner"] },
-  { id: "gemini", name: "Gemini (Google)", description: "gemini-1.5-pro, gemini-1.5-flash", color: "#4285f4", bg: "rgba(66,133,244,0.08)", border: "rgba(66,133,244,0.2)", models: ["gemini-1.5-pro", "gemini-1.5-flash"] },
+  { id: "gemini", name: "Gemini (Google)", description: "gemini-1.5-pro, gemini-1.5-flash, gemini-2.0-flash", color: "#4285f4", bg: "rgba(66,133,244,0.08)", border: "rgba(66,133,244,0.2)", models: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash"] },
   { id: "openrouter", name: "OpenRouter", description: "100+ modelos via API unificada", color: "#7c3aed", bg: "rgba(124,58,237,0.08)", border: "rgba(124,58,237,0.2)", models: ["openai/gpt-4o", "anthropic/claude-3.5-sonnet"] },
   { id: "qwen", name: "Qwen (Alibaba)", description: "qwen-turbo, qwen-plus, qwen-max", color: "#ff6a00", bg: "rgba(255,106,0,0.08)", border: "rgba(255,106,0,0.2)", models: ["qwen-turbo", "qwen-plus", "qwen-max"] },
+  { id: "kimi", name: "Kimi (Moonshot)", description: "moonshot-v1-8k/32k/128k", color: "#1f8ae0", bg: "rgba(31,138,224,0.08)", border: "rgba(31,138,224,0.2)", models: ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"] },
+  { id: "mistral", name: "Mistral AI", description: "mistral-large, mistral-small, codestral", color: "#ff7000", bg: "rgba(255,112,0,0.08)", border: "rgba(255,112,0,0.2)", models: ["mistral-large-latest", "mistral-small-latest", "codestral-latest", "mistral-medium-latest"] },
+  { id: "zai", name: "Z.ai (ChatGLM)", description: "glm-4-plus, glm-4-flash, glm-4-air", color: "#6c5ce7", bg: "rgba(108,92,231,0.08)", border: "rgba(108,92,231,0.2)", models: ["glm-4-plus", "glm-4-flash", "glm-4-air"] },
+  { id: "minimax", name: "MiniMax", description: "Modelos da MiniMax", color: "#00bcd4", bg: "rgba(0,188,212,0.08)", border: "rgba(0,188,212,0.2)", models: ["MiniMax-Text-01", "abab6.5-chat"] },
+  { id: "manus", name: "Manus", description: "Modelos da Manus", color: "#eab308", bg: "rgba(234,179,8,0.08)", border: "rgba(234,179,8,0.2)", models: ["manus-base"] },
   { id: "n8n", name: "n8n", description: "Automações e workflows", color: "#ea5e0e", bg: "rgba(234,94,14,0.08)", border: "rgba(234,94,14,0.2)", models: [], hasBaseURL: true },
   { id: "kilo", name: "Kilo", description: "LLM Kilo - Modelo avançado", color: "#00d46a", bg: "rgba(0,212,106,0.08)", border: "rgba(0,212,106,0.2)", models: ["kilo/kilo-auto/balanced"] },
 ] as const;
@@ -722,9 +732,57 @@ function ProxiesSection() {
 function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId; onClose: () => void }) {
   const provider = PROVIDERS.find(p => p.id === providerId)!;
   const qc = useQueryClient();
+  // Tipo pode ser estritamente inferido só para providers que o suportam
+  const supportsOAuth = "supportsOAuth" in provider && (provider as { supportsOAuth?: boolean }).supportsOAuth === true;
+  const [authMode, setAuthMode] = useState<"api_key" | "oauth">(supportsOAuth ? "oauth" : "api_key");
   const [form, setForm] = useState<{ name: string; api_key: string; models: string[] }>({ name: provider.name, api_key: "", models: [] });
   const [showKey, setShowKey] = useState(false);
-  const create = useMutation({ mutationFn: () => integrationsApi.create({ provider: providerId, name: form.name, api_key: form.api_key, models: form.models.length ? form.models : undefined }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["integrations"] }); toast.success("Conectado!"); onClose(); }, onError: (e: any) => toast.error(e?.response?.data?.error || "Erro") });
+
+  // OAuth state
+  const [oauthURL, setOauthURL] = useState<string>("");
+  const [oauthState, setOauthState] = useState<string>("");
+  const [oauthCode, setOauthCode] = useState<string>("");
+  const [oauthStarting, setOauthStarting] = useState(false);
+  const [oauthCompleting, setOauthCompleting] = useState(false);
+
+  const create = useMutation({
+    mutationFn: () => integrationsApi.create({ provider: providerId, name: form.name, api_key: form.api_key, models: form.models.length ? form.models : undefined }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["integrations"] }); toast.success("Conectado!"); onClose(); },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro"),
+  });
+
+  const startOAuth = async () => {
+    setOauthStarting(true);
+    try {
+      const r = await integrationsApi.startClaudeOAuth();
+      setOauthURL(r.data.auth_url);
+      setOauthState(r.data.state);
+      // Abre em nova aba
+      window.open(r.data.auth_url, "_blank", "noopener,noreferrer");
+    } catch (e: unknown) {
+      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Falha ao iniciar OAuth");
+    } finally {
+      setOauthStarting(false);
+    }
+  };
+
+  const completeOAuth = async () => {
+    if (!oauthCode.trim() || !oauthState) {
+      toast.error("Cole o código mostrado após autorizar.");
+      return;
+    }
+    setOauthCompleting(true);
+    try {
+      await integrationsApi.completeClaudeOAuth({ code: oauthCode.trim(), state: oauthState, name: form.name });
+      qc.invalidateQueries({ queryKey: ["integrations"] });
+      toast.success("Claude.ai conectado via OAuth!");
+      onClose();
+    } catch (e: unknown) {
+      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Falha no OAuth");
+    } finally {
+      setOauthCompleting(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
@@ -733,23 +791,117 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
           <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: provider.bg, border: `1px solid ${provider.border}` }}><ProviderIcon id={provider.id} color={provider.color} /></div>
           <div><h2 className="font-semibold" style={{ color: "var(--text-1)" }}>Conectar {provider.name}</h2><p className="text-xs" style={{ color: "var(--text-3)" }}>{provider.description}</p></div>
         </div>
-        <div><label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Nome</label><input value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="input-field w-full" /></div>
-        <div>
-          <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>API Key</label>
-          <div className="relative">
-            <input type={showKey ? "text" : "password"} value={form.api_key} onChange={e => setForm({...form, api_key: e.target.value})} className="input-field w-full" style={{ paddingRight: "2.5rem" }} placeholder="sk-..." />
-            <button type="button" onClick={() => setShowKey(!showKey)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-3)" }}>
-              {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+
+        {/* Auth mode selector (apenas para providers com supportsOAuth) */}
+        {supportsOAuth && (
+          <div className="flex rounded-xl p-1" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+            <button
+              type="button"
+              onClick={() => setAuthMode("oauth")}
+              className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+              style={{ background: authMode === "oauth" ? provider.color + "22" : "transparent", color: authMode === "oauth" ? provider.color : "var(--text-3)" }}>
+              🔐 Login com Claude.ai
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuthMode("api_key")}
+              className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+              style={{ background: authMode === "api_key" ? "rgba(255,255,255,0.08)" : "transparent", color: authMode === "api_key" ? "var(--text-1)" : "var(--text-3)" }}>
+              🔑 API Key
             </button>
           </div>
+        )}
+
+        <div>
+          <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Nome</label>
+          <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="input-field w-full" />
         </div>
-        {provider.models.length > 0 && (
-          <div className="space-y-2">
-            <label className="text-xs font-medium" style={{ color: "var(--text-2)" }}>Modelos</label>
-            <div className="rounded-xl border p-3 max-h-40 overflow-y-auto" style={{ background: "var(--surface-3)", borderColor: "var(--surface-border)" }}>{provider.models.map(m => <label key={m} className="flex items-center gap-2"><input type="checkbox" checked={form.models.includes(m)} onChange={e => setForm(f => ({...f, models: e.target.checked ? [...f.models, m] : f.models.filter(x => x !== m)}))} className="rounded" /><span className="text-sm">{m}</span></label>)}</div>
+
+        {authMode === "api_key" ? (
+          <>
+            <div>
+              <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>API Key</label>
+              <div className="relative">
+                <input type={showKey ? "text" : "password"} value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })} className="input-field w-full" style={{ paddingRight: "2.5rem" }} placeholder="sk-..." />
+                <button type="button" onClick={() => setShowKey(!showKey)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-3)" }}>
+                  {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            {provider.models.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-xs font-medium" style={{ color: "var(--text-2)" }}>Modelos</label>
+                <div className="rounded-xl border p-3 max-h-40 overflow-y-auto" style={{ background: "var(--surface-3)", borderColor: "var(--surface-border)" }}>
+                  {provider.models.map(m => (
+                    <label key={m} className="flex items-center gap-2">
+                      <input type="checkbox" checked={form.models.includes(m)} onChange={e => setForm(f => ({ ...f, models: e.target.checked ? [...f.models, m] : f.models.filter(x => x !== m) }))} className="rounded" />
+                      <span className="text-sm">{m}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2 pt-2">
+              <button onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
+              <button onClick={() => create.mutate()} disabled={create.isPending || !form.api_key} className="btn-primary flex-1">
+                {create.isPending ? "Conectando..." : "Conectar"}
+              </button>
+            </div>
+          </>
+        ) : (
+          // ─── OAuth flow (Claude.ai) ─────────────────────────────────────────
+          <div className="space-y-3">
+            <div className="rounded-xl p-3 text-xs" style={{ background: "rgba(0,212,106,0.06)", border: "1px solid rgba(0,212,106,0.2)" }}>
+              <p style={{ color: "var(--text-1)" }}><strong>Como funciona:</strong></p>
+              <ol className="list-decimal list-inside space-y-1 mt-2" style={{ color: "var(--text-3)" }}>
+                <li>Clique &quot;Abrir autorização&quot; — uma nova aba com claude.ai abre.</li>
+                <li>Autorize o acesso da sua conta.</li>
+                <li>Copie o código mostrado ao final da página.</li>
+                <li>Cole abaixo e clique em &quot;Finalizar&quot;.</li>
+              </ol>
+            </div>
+
+            {!oauthState ? (
+              <button
+                onClick={startOAuth}
+                disabled={oauthStarting}
+                className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+                style={{ background: provider.color, color: "#0d0d0d" }}>
+                {oauthStarting ? "Gerando link..." : "🚀 Abrir autorização Claude.ai"}
+              </button>
+            ) : (
+              <>
+                {oauthURL && (
+                  <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
+                    Não abriu?{" "}
+                    <a href={oauthURL} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: provider.color }}>
+                      clique aqui
+                    </a>
+                  </p>
+                )}
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Código de autorização</label>
+                  <textarea
+                    value={oauthCode}
+                    onChange={e => setOauthCode(e.target.value)}
+                    placeholder="Cole o código mostrado pela página da Anthropic após autorizar..."
+                    rows={3}
+                    className="input-field w-full font-mono text-xs"
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
+                  <button
+                    onClick={completeOAuth}
+                    disabled={oauthCompleting || !oauthCode.trim()}
+                    className="btn-primary flex-1">
+                    {oauthCompleting ? "Finalizando..." : "Finalizar"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
-        <div className="flex gap-2 pt-2"><button onClick={onClose} className="btn-ghost flex-1">Cancelar</button><button onClick={() => create.mutate()} disabled={create.isPending || !form.api_key} className="btn-primary flex-1">{create.isPending ? "Conectando..." : "Conectar"}</button></div>
       </div>
     </div>
   );

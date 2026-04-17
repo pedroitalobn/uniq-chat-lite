@@ -215,6 +215,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	systemWebhooks.Get("/events", globalWebhookH.ListEvents)
 	systemWebhooks.Get("/", globalWebhookH.List)
 	systemWebhooks.Post("/", globalWebhookH.Create)
+	systemWebhooks.Put("/:id", globalWebhookH.Update)
 	systemWebhooks.Delete("/:id", globalWebhookH.Delete)
 	systemWebhooks.Post("/:id/test", globalWebhookH.Test)
 
@@ -443,9 +444,13 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	integrations := api.Group("/integrations")
 	integrations.Get("/", integrationH.List)
 	integrations.Post("/", integrationH.Create)
+	// Claude OAuth (claude.ai account login — alternativa a API key)
+	integrations.Post("/claude/oauth/start", integrationH.StartClaudeOAuth)
+	integrations.Post("/claude/oauth/callback", integrationH.CompleteClaudeOAuth)
 	integrations.Put("/:id", integrationH.Update)
 	integrations.Delete("/:id", integrationH.Delete)
 	integrations.Post("/:id/test", integrationH.Test)
+	integrations.Post("/:id/oauth/refresh", integrationH.RefreshClaudeOAuth)
 
 	// AI generation (uses user integrations)
 	api.Post("/ai/generate", integrationH.GenerateVariations)

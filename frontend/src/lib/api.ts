@@ -382,8 +382,10 @@ export const webhooksApi = {
 export const globalWebhooksApi = {
   listEvents: () => api.get("/v1/webhooks/system/events"),
   list: () => api.get("/v1/webhooks/system"),
-  create: (data: { name: string; url: string; events: string[] }) =>
+  create: (data: { name: string; url: string; events: string[]; is_active?: boolean }) =>
     api.post("/v1/webhooks/system", data),
+  update: (id: string, data: { name?: string; url?: string; events?: string[]; is_active?: boolean }) =>
+    api.put(`/v1/webhooks/system/${id}`, data),
   delete: (id: string) => api.delete(`/v1/webhooks/system/${id}`),
   test: (id: string) => api.post(`/v1/webhooks/system/${id}/test`, {}),
 };
@@ -537,6 +539,11 @@ export const integrationsApi = {
   }) => api.put(`/v1/integrations/${id}`, data),
   delete: (id: string) => api.delete(`/v1/integrations/${id}`),
   test: (id: string) => api.post(`/v1/integrations/${id}/test`),
+  // Claude OAuth (login com conta claude.ai — alternativa a API key)
+  startClaudeOAuth: () => api.post("/v1/integrations/claude/oauth/start"),
+  completeClaudeOAuth: (data: { code: string; state: string; name?: string }) =>
+    api.post("/v1/integrations/claude/oauth/callback", data),
+  refreshOAuth: (id: string) => api.post(`/v1/integrations/${id}/oauth/refresh`),
   getAgent: (instanceId: string) => api.get(`/v1/instances/${instanceId}/agent`),
   updateAgent: (instanceId: string, data: {
     integration_id?: string | null;

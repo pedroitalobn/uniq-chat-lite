@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/sashabaranov/go-openai"
@@ -213,10 +214,11 @@ Responda APENAS com JSON, sem markdown.`
 func (s *LLMService) callProvider(ctx context.Context, i *models.UserIntegration, system, user string, jsonMode bool) (string, error) {
 	switch i.Provider {
 	case models.ProviderClaude:
-		return s.callClaude(i, system, user, jsonMode)
+		return s.callClaude(ctx, i, system, user, jsonMode)
 	case models.ProviderOpenAI, models.ProviderDeepSeek, models.ProviderOpenRouter,
 		models.ProviderKilo, models.ProviderZai, models.ProviderKimi,
-		models.ProviderQwen, models.ProviderMiniMax, models.ProviderManus:
+		models.ProviderQwen, models.ProviderMiniMax, models.ProviderManus,
+		models.ProviderMistral:
 		return s.callOpenAICompat(i, system, user, jsonMode)
 	case models.ProviderGemini:
 		return s.callGemini(i, system+"\n\nUsuário: "+user, jsonMode)
@@ -227,7 +229,7 @@ func (s *LLMService) callProvider(ctx context.Context, i *models.UserIntegration
 
 // ─── Provider Specific Calls (logic moved from IntegrationHandler) ───────────
 
-func (s *LLMService) callClaude(i *models.UserIntegration, system, user string, jsonMode bool) (string, error) {
+func (s *LLMService) callClaude(ctx context.Context, i *models.UserIntegration, system, user string, jsonMode bool) (string, error) {
 	model := i.GetFirstModel()
 	if model == "" {
 		model = "claude-3-5-sonnet-latest"
@@ -240,12 +242,22 @@ func (s *LLMService) callClaude(i *models.UserIntegration, system, user string, 
 	}
 	// Note: Claude doesn't have a direct "jsonMode" parameter like OpenAI,
 	// but specifying it in system prompt is usually enough.
+	_ = jsonMode
 
 	body, _ := json.Marshal(bodyData)
-	req, _ := http.NewRequest(http.MethodPost, "https://api.anthropic.com/v1/messages", bytes.NewReader(body))
-	req.Header.Set("x-api-key", i.APIKey)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.anthropic.com/v1/messages", bytes.NewReader(body))
 	req.Header.Set("anthropic-version", "2023-06-01")
 	req.Header.Set("Content-Type", "application/json")
+
+	// Autenticação: OAuth (Bearer) quando AuthType=oauth, senão x-api-key.
+	// Claude Code e outras ferramentas first-party também usam o header
+	// "anthropic-beta: oauth-2025-04-20" quando acessam via OAuth.
+	if i.HasOAuth() {
+		req.Header.Set("Authorization", "Bearer "+i.OAuthAccessToken)
+		req.Header.Set("anthropic-beta", "oauth-2025-04-20")
+	} else {
+		req.Header.Set("x-api-key", i.APIKey)
+	}
 
 	client := &http.Client{Timeout: 40 * time.Second}
 	resp, err := client.Do(req)
@@ -270,55 +282,14 @@ func (s *LLMService) callClaude(i *models.UserIntegration, system, user string, 
 	if result.Error.Message != "" {
 		return "", fmt.Errorf("claude error: %s", result.Error.Message)
 	}
-	return "", fmt.Errorf("resposta vazia da Claude API")
+	return "", fmt.Errorf("resposta vazia da Claude API (status %d)", resp.StatusCode)
 }
 
 func (s *LLMService) callOpenAICompat(i *models.UserIntegration, system, user string, jsonMode bool) (string, error) {
-	baseURL := i.BaseURL
-	if baseURL == "" {
-		switch i.Provider {
-		case models.ProviderDeepSeek:
-			baseURL = "https://api.deepseek.com"
-		case models.ProviderOpenRouter:
-			baseURL = "https://openrouter.ai/api"
-		case models.ProviderKilo:
-			baseURL = "https://api.kilo.ai"
-		case models.ProviderZai:
-			baseURL = "https://api.z.ai"
-		case models.ProviderKimi:
-			baseURL = "https://api.moonshot.cn/v1"
-		case models.ProviderQwen:
-			baseURL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
-		case models.ProviderMiniMax:
-			baseURL = "https://api.minimaxi.com/v1"
-		case models.ProviderManus:
-			baseURL = "https://api.manus.chat/v1"
-		default:
-			baseURL = "https://api.openai.com"
-		}
-	}
+	baseURL, chatPath := resolveOpenAICompatBase(i.Provider, i.BaseURL)
 	model := i.GetFirstModel()
 	if model == "" {
-		switch i.Provider {
-		case models.ProviderDeepSeek:
-			model = "deepseek-chat"
-		case models.ProviderOpenRouter:
-			model = "openai/gpt-4o-mini"
-		case models.ProviderKilo:
-			model = "kilo/kilo-auto/balanced"
-		case models.ProviderZai:
-			model = "zai/balanco-7b"
-		case models.ProviderKimi:
-			model = "moonshot-v1-8k"
-		case models.ProviderQwen:
-			model = "qwen-turbo"
-		case models.ProviderMiniMax:
-			model = "abab6.5-chat"
-		case models.ProviderManus:
-			model = "manus-base"
-		default:
-			model = "gpt-4o-mini"
-		}
+		model = defaultModelFor(i.Provider)
 	}
 
 	payload := map[string]interface{}{
@@ -329,12 +300,12 @@ func (s *LLMService) callOpenAICompat(i *models.UserIntegration, system, user st
 			{"role": "user", "content": user},
 		},
 	}
-	if jsonMode {
+	if jsonMode && providerSupportsJSONMode(i.Provider) {
 		payload["response_format"] = map[string]string{"type": "json_object"}
 	}
 
 	body, _ := json.Marshal(payload)
-	url := baseURL + "/v1/chat/completions"
+	url := baseURL + chatPath
 	req, _ := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+i.APIKey)
 	req.Header.Set("Content-Type", "application/json")
@@ -365,6 +336,78 @@ func (s *LLMService) callOpenAICompat(i *models.UserIntegration, system, user st
 		return "", fmt.Errorf("%s error: %s", i.Provider, result.Error.Message)
 	}
 	return "", fmt.Errorf("resposta vazia da API %s", i.Provider)
+}
+
+// resolveOpenAICompatBase retorna (baseURL, chatCompletionsPath) para cada provider.
+// Alguns providers (Kimi, Qwen, MiniMax) já embutem "/v1" na própria base — por
+// isso o chatPath varia.
+func resolveOpenAICompatBase(p models.IntegrationProvider, override string) (string, string) {
+	if override != "" {
+		// Se o usuário passou base custom, assume que já é a raiz antes de /v1
+		return strings.TrimRight(override, "/"), "/v1/chat/completions"
+	}
+	switch p {
+	case models.ProviderDeepSeek:
+		return "https://api.deepseek.com", "/v1/chat/completions"
+	case models.ProviderOpenRouter:
+		return "https://openrouter.ai/api", "/v1/chat/completions"
+	case models.ProviderKilo:
+		return "https://api.kilo.ai", "/v1/chat/completions"
+	case models.ProviderZai:
+		// Z.ai (ChatGLM) API compat
+		return "https://api.z.ai/api/paas", "/v4/chat/completions"
+	case models.ProviderKimi:
+		// Moonshot/Kimi — api global usa .ai, api china usa .cn
+		return "https://api.moonshot.ai", "/v1/chat/completions"
+	case models.ProviderQwen:
+		// DashScope compatible-mode endpoint (OpenAI compat)
+		return "https://dashscope-intl.aliyuncs.com/compatible-mode", "/v1/chat/completions"
+	case models.ProviderMiniMax:
+		return "https://api.minimaxi.chat", "/v1/chat/completions"
+	case models.ProviderManus:
+		return "https://api.manus.chat", "/v1/chat/completions"
+	case models.ProviderMistral:
+		return "https://api.mistral.ai", "/v1/chat/completions"
+	default:
+		return "https://api.openai.com", "/v1/chat/completions"
+	}
+}
+
+func defaultModelFor(p models.IntegrationProvider) string {
+	switch p {
+	case models.ProviderDeepSeek:
+		return "deepseek-chat"
+	case models.ProviderOpenRouter:
+		return "openai/gpt-4o-mini"
+	case models.ProviderKilo:
+		return "kilo/kilo-auto/balanced"
+	case models.ProviderZai:
+		return "glm-4-flash"
+	case models.ProviderKimi:
+		return "moonshot-v1-8k"
+	case models.ProviderQwen:
+		return "qwen-turbo"
+	case models.ProviderMiniMax:
+		return "MiniMax-Text-01"
+	case models.ProviderManus:
+		return "manus-base"
+	case models.ProviderMistral:
+		return "mistral-small-latest"
+	default:
+		return "gpt-4o-mini"
+	}
+}
+
+// providerSupportsJSONMode reporta se o provider aceita response_format=json_object.
+// Nem todos os compatíveis suportam — enviar para quem não suporta pode causar 400.
+func providerSupportsJSONMode(p models.IntegrationProvider) bool {
+	switch p {
+	case models.ProviderOpenAI, models.ProviderDeepSeek, models.ProviderOpenRouter,
+		models.ProviderMistral, models.ProviderKimi, models.ProviderZai:
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *LLMService) callGemini(i *models.UserIntegration, prompt string, jsonMode bool) (string, error) {

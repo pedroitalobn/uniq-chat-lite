@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,15 +13,143 @@ import (
 	"github.com/google/uuid"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/models"
+	"github.com/uniq-chat/backend/internal/services"
 	"gorm.io/gorm"
 )
 
 type IntegrationHandler struct {
-	db *gorm.DB
+	db          *gorm.DB
+	claudeOAuth *services.ClaudeOAuth
 }
 
 func NewIntegrationHandler(db *gorm.DB) *IntegrationHandler {
-	return &IntegrationHandler{db: db}
+	return &IntegrationHandler{
+		db:          db,
+		claudeOAuth: services.NewClaudeOAuth(),
+	}
+}
+
+// StartClaudeOAuth inicia o fluxo OAuth do Claude.ai
+// POST /integrations/claude/oauth/start
+// Retorna: { auth_url, state, redirect_uri }
+func (h *IntegrationHandler) StartClaudeOAuth(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	authURL, state, err := h.claudeOAuth.StartAuthorization(user.ID.String())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{
+		"auth_url":     authURL,
+		"state":        state,
+		"redirect_uri": services.DefaultClaudeOAuthRedirect,
+		"instructions": "Abra a URL no navegador, autorize com sua conta Claude.ai, copie o código mostrado ao final e envie em /integrations/claude/oauth/callback junto com o state.",
+	})
+}
+
+// CompleteClaudeOAuth finaliza o fluxo OAuth trocando code por tokens.
+// POST /integrations/claude/oauth/callback
+// Body: { code, state, name? }
+func (h *IntegrationHandler) CompleteClaudeOAuth(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	var req struct {
+		Code  string `json:"code"`
+		State string `json:"state"`
+		Name  string `json:"name"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.Code == "" || req.State == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "code e state são obrigatórios"})
+	}
+
+	ctx, cancel := context.WithTimeout(c.Context(), 30*time.Second)
+	defer cancel()
+
+	tok, authUserID, err := h.claudeOAuth.ExchangeCode(ctx, req.Code, req.State)
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+	}
+	if authUserID != user.ID.String() {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "state não pertence ao usuário autenticado"})
+	}
+
+	// Persist integration
+	name := req.Name
+	if name == "" {
+		name = "Claude.ai (OAuth)"
+	}
+	modelsJSON, _ := json.Marshal([]string{"claude-sonnet-4-5", "claude-opus-4-5", "claude-3-5-sonnet-latest"})
+
+	var expiresAt *time.Time
+	if tok.ExpiresIn > 0 {
+		t := time.Now().Add(time.Duration(tok.ExpiresIn) * time.Second)
+		expiresAt = &t
+	}
+
+	integ := models.UserIntegration{
+		UserID:            user.ID,
+		Provider:          models.ProviderClaude,
+		Name:              name,
+		AuthType:          models.AuthTypeOAuth,
+		OAuthAccessToken:  tok.AccessToken,
+		OAuthRefreshToken: tok.RefreshToken,
+		OAuthExpiresAt:    expiresAt,
+		OAuthAccount:      tok.Account,
+		OAuthScope:        tok.Scope,
+		Models:            string(modelsJSON),
+		IsActive:          true,
+		Config:            "{}",
+	}
+	if err := h.db.Create(&integ).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao salvar integração"})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"id":              integ.ID,
+		"provider":        integ.Provider,
+		"name":            integ.Name,
+		"auth_type":       integ.AuthType,
+		"oauth_account":   integ.OAuthAccount,
+		"oauth_scope":     integ.OAuthScope,
+		"expires_at":      integ.OAuthExpiresAt,
+		"is_active":       integ.IsActive,
+	})
+}
+
+// RefreshClaudeOAuth renova o access token manualmente.
+// POST /integrations/:id/oauth/refresh
+func (h *IntegrationHandler) RefreshClaudeOAuth(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var integ models.UserIntegration
+	if err := h.db.Where("id = ? AND user_id = ?", id, user.ID).First(&integ).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "integração não encontrada"})
+	}
+	if integ.Provider != models.ProviderClaude || integ.AuthType != models.AuthTypeOAuth {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "integração não é OAuth do Claude"})
+	}
+	if integ.OAuthRefreshToken == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "sem refresh_token — reautentique"})
+	}
+
+	ctx, cancel := context.WithTimeout(c.Context(), 30*time.Second)
+	defer cancel()
+	tok, err := h.claudeOAuth.RefreshAccessToken(ctx, integ.OAuthRefreshToken)
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	updates := map[string]interface{}{
+		"o_auth_access_token":  tok.AccessToken,
+		"o_auth_refresh_token": tok.RefreshToken,
+	}
+	if tok.ExpiresIn > 0 {
+		updates["o_auth_expires_at"] = time.Now().Add(time.Duration(tok.ExpiresIn) * time.Second)
+	}
+	h.db.Model(&integ).Updates(updates)
+
+	return c.JSON(fiber.Map{"ok": true, "expires_at": updates["o_auth_expires_at"]})
 }
 
 // GET /integrations
@@ -297,8 +426,11 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 func testIntegration(i *models.UserIntegration) (bool, string) {
 	switch i.Provider {
 	case models.ProviderClaude:
-		return testClaude(i.APIKey)
-	case models.ProviderOpenAI, models.ProviderDeepSeek, models.ProviderOpenRouter:
+		return testClaude(i)
+	case models.ProviderOpenAI, models.ProviderDeepSeek, models.ProviderOpenRouter,
+		models.ProviderKilo, models.ProviderZai, models.ProviderKimi,
+		models.ProviderQwen, models.ProviderMiniMax, models.ProviderManus,
+		models.ProviderMistral:
 		return testOpenAICompat(i)
 	case models.ProviderGemini:
 		return testGemini(i.APIKey)
@@ -312,10 +444,15 @@ func testIntegration(i *models.UserIntegration) (bool, string) {
 	}
 }
 
-func testClaude(apiKey string) (bool, string) {
+func testClaude(i *models.UserIntegration) (bool, string) {
 	req, _ := http.NewRequest(http.MethodGet, "https://api.anthropic.com/v1/models", nil)
-	req.Header.Set("x-api-key", apiKey)
 	req.Header.Set("anthropic-version", "2023-06-01")
+	if i.HasOAuth() {
+		req.Header.Set("Authorization", "Bearer "+i.OAuthAccessToken)
+		req.Header.Set("anthropic-beta", "oauth-2025-04-20")
+	} else {
+		req.Header.Set("x-api-key", i.APIKey)
+	}
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -323,6 +460,9 @@ func testClaude(apiKey string) (bool, string) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == 200 {
+		if i.HasOAuth() {
+			return true, "Conexão OAuth com Claude.ai bem-sucedida"
+		}
 		return true, "Conexão com Claude API bem-sucedida"
 	}
 	return false, fmt.Sprintf("Claude API retornou status %d", resp.StatusCode)
@@ -330,17 +470,33 @@ func testClaude(apiKey string) (bool, string) {
 
 func testOpenAICompat(i *models.UserIntegration) (bool, string) {
 	baseURL := i.BaseURL
+	modelsPath := "/v1/models"
 	if baseURL == "" {
 		switch i.Provider {
 		case models.ProviderDeepSeek:
 			baseURL = "https://api.deepseek.com"
 		case models.ProviderOpenRouter:
 			baseURL = "https://openrouter.ai/api"
+		case models.ProviderKilo:
+			baseURL = "https://api.kilo.ai"
+		case models.ProviderZai:
+			baseURL = "https://api.z.ai/api/paas"
+			modelsPath = "/v4/models"
+		case models.ProviderKimi:
+			baseURL = "https://api.moonshot.ai"
+		case models.ProviderQwen:
+			baseURL = "https://dashscope-intl.aliyuncs.com/compatible-mode"
+		case models.ProviderMiniMax:
+			baseURL = "https://api.minimaxi.chat"
+		case models.ProviderManus:
+			baseURL = "https://api.manus.chat"
+		case models.ProviderMistral:
+			baseURL = "https://api.mistral.ai"
 		default:
 			baseURL = "https://api.openai.com"
 		}
 	}
-	req, _ := http.NewRequest(http.MethodGet, baseURL+"/v1/models", nil)
+	req, _ := http.NewRequest(http.MethodGet, baseURL+modelsPath, nil)
 	req.Header.Set("Authorization", "Bearer "+i.APIKey)
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)

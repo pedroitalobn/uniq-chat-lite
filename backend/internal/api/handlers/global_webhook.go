@@ -22,13 +22,17 @@ func NewGlobalWebhookHandler(db *gorm.DB) *GlobalWebhookHandler {
 	return &GlobalWebhookHandler{db: db}
 }
 
-// Available system events
-var SystemEvents = []struct {
+// SystemEventItem é o shape retornado pela API (lista de eventos disponíveis).
+type SystemEventItem struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Category    string `json:"category"`
-}{
+}
+
+// SystemEvents — fonte única da verdade para eventos disponíveis.
+// Adicione aqui antes de referenciar na UI.
+var SystemEvents = []SystemEventItem{
 	// User events
 	{ID: "user.registered", Name: "Usuário Registrado", Description: "Quando um novo usuário se registra", Category: "Usuário"},
 	{ID: "user.login", Name: "Login", Description: "Quando um usuário faz login", Category: "Usuário"},
@@ -73,30 +77,81 @@ var SystemEvents = []struct {
 	{ID: "webhook.test", Name: "Teste de Webhook", Description: "Evento de teste disparado manualmente", Category: "Sistema"},
 }
 
-// List available system events
-// GET /webhooks/system/events
+// validEventIDs retorna um set com todos os IDs válidos (para validar input).
+func validEventIDs() map[string]bool {
+	out := make(map[string]bool, len(SystemEvents))
+	for _, e := range SystemEvents {
+		out[e.ID] = true
+	}
+	return out
+}
+
+// resolveWebhookUserID extrai o userID dos Locals, tolerante ao tipo (ponteiro
+// ou valor). Retorna uuid.Nil se não for possível.
+// Evita o panic type-assertion que causava HTTP 500 quando o request vinha via
+// API key (middleware salva models.User por valor) vs JWT (por ponteiro).
+func resolveWebhookUserID(c *fiber.Ctx) (uuid.UUID, error) {
+	raw := c.Locals("user")
+	switch u := raw.(type) {
+	case *models.User:
+		if u == nil {
+			return uuid.Nil, fmt.Errorf("usuário nulo")
+		}
+		return u.ID, nil
+	case models.User:
+		return u.ID, nil
+	default:
+		// fallback: user_id setado diretamente em alguns middlewares
+		if uid, ok := c.Locals("user_id").(uuid.UUID); ok {
+			return uid, nil
+		}
+		log.Error().Str("user_type", fmt.Sprintf("%T", raw)).Msg("webhooks/system: unexpected locals[user] type")
+		return uuid.Nil, fmt.Errorf("não autenticado")
+	}
+}
+
+// ListEvents GET /webhooks/system/events
 func (h *GlobalWebhookHandler) ListEvents(c *fiber.Ctx) error {
 	return c.JSON(SystemEvents)
 }
 
-// List global webhooks
-// GET /webhooks/system
-func (h *GlobalWebhookHandler) List(c *fiber.Ctx) error {
-	localUser := c.Locals("user")
-	var userID uuid.UUID
+// webhookResponse é o shape exposto pela API (esconde secret etc).
+type webhookResponse struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	URL       string    `json:"url"`
+	IsActive  bool      `json:"is_active"`
+	Events    []string  `json:"events"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
 
-	switch u := localUser.(type) {
-	case *models.User:
-		if u == nil {
-			log.Error().Msg("webhooks/system list: user pointer is nil")
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+func toWebhookResponse(wh *models.GlobalWebhook) webhookResponse {
+	var events []string
+	if wh.Events != "" {
+		if err := json.Unmarshal([]byte(wh.Events), &events); err != nil {
+			events = []string{}
 		}
-		userID = u.ID
-	case models.User:
-		userID = u.ID
-	default:
-		log.Error().Str("user_type", fmt.Sprintf("%T", localUser)).Msg("webhooks/system list: unexpected user locals type")
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+	}
+	if events == nil {
+		events = []string{}
+	}
+	return webhookResponse{
+		ID:        wh.ID,
+		Name:      wh.Name,
+		URL:       wh.URL,
+		IsActive:  wh.IsActive,
+		Events:    events,
+		CreatedAt: wh.CreatedAt,
+		UpdatedAt: wh.UpdatedAt,
+	}
+}
+
+// List GET /webhooks/system
+func (h *GlobalWebhookHandler) List(c *fiber.Ctx) error {
+	userID, err := resolveWebhookUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	var webhooks []models.GlobalWebhook
@@ -105,47 +160,53 @@ func (h *GlobalWebhookHandler) List(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar webhooks"})
 	}
 
-	log.Debug().Str("user_id", userID.String()).Int("count", len(webhooks)).Msg("webhooks/system list: loaded webhooks")
-
-	// Parse events JSON
-	type webhookResponse struct {
-		ID        uuid.UUID `json:"id"`
-		Name      string    `json:"name"`
-		URL       string    `json:"url"`
-		IsActive  bool      `json:"is_active"`
-		Events    []string  `json:"events"`
-		CreatedAt time.Time `json:"created_at"`
-	}
-
 	result := make([]webhookResponse, len(webhooks))
-	for i, wh := range webhooks {
-		var events []string
-		if err := json.Unmarshal([]byte(wh.Events), &events); err != nil {
-			log.Warn().Err(err).Str("webhook_id", wh.ID.String()).Msg("webhooks/system list: invalid events json, using empty list")
-			events = []string{}
-		}
-		result[i] = webhookResponse{
-			ID:        wh.ID,
-			Name:      wh.Name,
-			URL:       wh.URL,
-			IsActive:  wh.IsActive,
-			Events:    events,
-			CreatedAt: wh.CreatedAt,
-		}
+	for i := range webhooks {
+		result[i] = toWebhookResponse(&webhooks[i])
 	}
-
 	return c.JSON(result)
 }
 
-// Create global webhook
-// POST /webhooks/system
+// validateEvents filtra e deduplica o array contra a lista canônica.
+// Retorna erro se a lista ficar vazia após filtragem.
+func validateEvents(events []string) ([]string, error) {
+	valid := validEventIDs()
+	seen := make(map[string]bool)
+	filtered := make([]string, 0, len(events))
+	invalid := make([]string, 0)
+
+	for _, ev := range events {
+		if seen[ev] {
+			continue
+		}
+		seen[ev] = true
+		if !valid[ev] {
+			invalid = append(invalid, ev)
+			continue
+		}
+		filtered = append(filtered, ev)
+	}
+	if len(filtered) == 0 {
+		if len(invalid) > 0 {
+			return nil, fmt.Errorf("nenhum evento válido — desconhecidos: %v", invalid)
+		}
+		return nil, fmt.Errorf("selecione ao menos um evento")
+	}
+	return filtered, nil
+}
+
+// Create POST /webhooks/system
 func (h *GlobalWebhookHandler) Create(c *fiber.Ctx) error {
-	user := c.Locals("user").(*models.User)
+	userID, err := resolveWebhookUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
+	}
 
 	var req struct {
-		Name   string   `json:"name"`
-		URL    string   `json:"url"`
-		Events []string `json:"events"`
+		Name     string   `json:"name"`
+		URL      string   `json:"url"`
+		Events   []string `json:"events"`
+		IsActive *bool    `json:"is_active"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -154,46 +215,123 @@ func (h *GlobalWebhookHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nome e url são obrigatórios"})
 	}
 
-	eventsJSON := "[]"
-	if len(req.Events) > 0 {
-		b, _ := json.Marshal(req.Events)
-		eventsJSON = string(b)
+	cleanEvents, err := validateEvents(req.Events)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+	eventsJSON, _ := json.Marshal(cleanEvents)
+
+	secret, err := models.GenerateSecret()
+	if err != nil {
+		log.Error().Err(err).Msg("webhooks/system create: failed to generate secret")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao gerar secret"})
 	}
 
-	secret, _ := models.GenerateSecret()
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
+	}
 
 	wh := models.GlobalWebhook{
-		UserID:   user.ID,
+		UserID:   userID,
 		Name:     req.Name,
 		URL:      req.URL,
 		Secret:   secret,
-		IsActive: true,
-		Events:   eventsJSON,
+		IsActive: isActive,
+		Events:   string(eventsJSON),
 	}
 
 	if err := h.db.Create(&wh).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar webhook"})
+		log.Error().Err(err).Str("user_id", userID.String()).Msg("webhooks/system create: db insert failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar webhook: " + err.Error()})
 	}
 
+	resp := toWebhookResponse(&wh)
+	// Retorna o secret em texto claro APENAS na criação (única vez que ele é visível).
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"id":         wh.ID,
-		"name":       wh.Name,
-		"url":        wh.URL,
+		"id":         resp.ID,
+		"name":       resp.Name,
+		"url":        resp.URL,
 		"secret":     secret,
-		"is_active":  wh.IsActive,
-		"events":     req.Events,
-		"created_at": wh.CreatedAt,
+		"is_active":  resp.IsActive,
+		"events":     resp.Events,
+		"created_at": resp.CreatedAt,
+		"updated_at": resp.UpdatedAt,
 	})
 }
 
-// Delete global webhook
-// DELETE /webhooks/system/:id
+// Update PUT /webhooks/system/:id — edita nome/url/events/is_active.
+// Todos os campos são opcionais (patch semantics).
+func (h *GlobalWebhookHandler) Update(c *fiber.Ctx) error {
+	userID, err := resolveWebhookUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	webhookID := c.Params("id")
+	var wh models.GlobalWebhook
+	if err := h.db.Where("id = ? AND user_id = ?", webhookID, userID).First(&wh).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "webhook não encontrado"})
+	}
+
+	var req struct {
+		Name     *string   `json:"name"`
+		URL      *string   `json:"url"`
+		Events   *[]string `json:"events"`
+		IsActive *bool     `json:"is_active"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
+	}
+
+	updates := map[string]interface{}{}
+	if req.Name != nil {
+		if *req.Name == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nome não pode ser vazio"})
+		}
+		updates["name"] = *req.Name
+	}
+	if req.URL != nil {
+		if *req.URL == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "url não pode ser vazia"})
+		}
+		updates["url"] = *req.URL
+	}
+	if req.Events != nil {
+		cleanEvents, err := validateEvents(*req.Events)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		eventsJSON, _ := json.Marshal(cleanEvents)
+		updates["events"] = string(eventsJSON)
+	}
+	if req.IsActive != nil {
+		updates["is_active"] = *req.IsActive
+	}
+
+	if len(updates) == 0 {
+		return c.JSON(toWebhookResponse(&wh))
+	}
+
+	if err := h.db.Model(&wh).Updates(updates).Error; err != nil {
+		log.Error().Err(err).Str("webhook_id", wh.ID.String()).Msg("webhooks/system update: db update failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao atualizar"})
+	}
+	// Reload
+	h.db.First(&wh, "id = ?", wh.ID)
+	return c.JSON(toWebhookResponse(&wh))
+}
+
+// Delete DELETE /webhooks/system/:id
 func (h *GlobalWebhookHandler) Delete(c *fiber.Ctx) error {
-	user := c.Locals("user").(*models.User)
+	userID, err := resolveWebhookUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
+	}
 	webhookID := c.Params("id")
 
 	var wh models.GlobalWebhook
-	if err := h.db.Where("id = ? AND user_id = ?", webhookID, user.ID).First(&wh).Error; err != nil {
+	if err := h.db.Where("id = ? AND user_id = ?", webhookID, userID).First(&wh).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "webhook não encontrado"})
 	}
 
@@ -204,14 +342,16 @@ func (h *GlobalWebhookHandler) Delete(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
-// Test global webhook - send a test event
-// POST /webhooks/system/:id/test
+// Test POST /webhooks/system/:id/test — dispara um evento "webhook.test"
 func (h *GlobalWebhookHandler) Test(c *fiber.Ctx) error {
-	user := c.Locals("user").(*models.User)
+	userID, err := resolveWebhookUserID(c)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
+	}
 	webhookID := c.Params("id")
 
 	var wh models.GlobalWebhook
-	if err := h.db.Where("id = ? AND user_id = ?", webhookID, user.ID).First(&wh).Error; err != nil {
+	if err := h.db.Where("id = ? AND user_id = ?", webhookID, userID).First(&wh).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "webhook não encontrado"})
 	}
 
@@ -219,11 +359,9 @@ func (h *GlobalWebhookHandler) Test(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "webhook está inativo"})
 	}
 
-	// Parse events to determine test payload
 	var events []string
-	json.Unmarshal([]byte(wh.Events), &events)
+	_ = json.Unmarshal([]byte(wh.Events), &events)
 
-	// Create test payload
 	testEvent := fiber.Map{
 		"event":      "webhook.test",
 		"timestamp":  time.Now().Unix(),
@@ -235,7 +373,6 @@ func (h *GlobalWebhookHandler) Test(c *fiber.Ctx) error {
 		},
 	}
 
-	// Send test request
 	payload, _ := json.Marshal(testEvent)
 
 	req, err := http.NewRequest("POST", wh.URL, bytes.NewBuffer(payload))

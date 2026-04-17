@@ -25,6 +25,15 @@ const (
 	ProviderQwen       IntegrationProvider = "qwen"
 	ProviderMiniMax    IntegrationProvider = "minimax"
 	ProviderManus      IntegrationProvider = "manus"
+	ProviderMistral    IntegrationProvider = "mistral"
+)
+
+// AuthType define como a integração autentica com o provider.
+type AuthType string
+
+const (
+	AuthTypeAPIKey AuthType = "api_key"
+	AuthTypeOAuth  AuthType = "oauth" // Claude.ai, Google accounts, etc.
 )
 
 // UserIntegration stores an account-level LLM/tool integration.
@@ -33,16 +42,37 @@ type UserIntegration struct {
 	UserID       uuid.UUID           `gorm:"type:uuid;not null;index" json:"user_id"`
 	Provider     IntegrationProvider `gorm:"type:varchar(50);not null" json:"provider"`
 	Name         string              `gorm:"type:varchar(100);not null" json:"name"`
-	APIKey       string              `gorm:"type:text" json:"-"`            // never exposed in JSON
-	MaskedKey    string              `gorm:"-" json:"masked_key,omitempty"` // computed on read
-	BaseURL      string              `gorm:"type:varchar(255)" json:"base_url,omitempty"`
-	Models       string              `gorm:"type:text" json:"models,omitempty"`              // JSON array of model names, e.g. ["gpt-4o","gpt-4o-mini"]
-	Config       string              `gorm:"type:text;default:'{}'" json:"config,omitempty"` // JSON extra config
-	IsActive     bool                `gorm:"default:true" json:"is_active"`
-	LastTestedAt *time.Time          `json:"last_tested_at,omitempty"`
-	TestStatus   string              `gorm:"type:varchar(20)" json:"test_status,omitempty"` // "ok" | "failed" | ""
-	CreatedAt    time.Time           `json:"created_at"`
-	UpdatedAt    time.Time           `json:"updated_at"`
+	// Autenticação: api_key (default, legado) ou oauth (Claude.ai, etc.)
+	AuthType     AuthType `gorm:"type:varchar(20);default:'api_key'" json:"auth_type"`
+	APIKey       string   `gorm:"type:text" json:"-"`            // never exposed in JSON
+	MaskedKey    string   `gorm:"-" json:"masked_key,omitempty"` // computed on read
+	// OAuth tokens (criptografados no runtime; json:"-" para nunca sair na API)
+	OAuthAccessToken  string     `gorm:"type:text" json:"-"`
+	OAuthRefreshToken string     `gorm:"type:text" json:"-"`
+	OAuthExpiresAt    *time.Time `json:"oauth_expires_at,omitempty"`
+	OAuthAccount      string     `gorm:"type:varchar(255)" json:"oauth_account,omitempty"` // email/ID legível
+	OAuthScope        string     `gorm:"type:varchar(512)" json:"oauth_scope,omitempty"`
+	BaseURL      string     `gorm:"type:varchar(255)" json:"base_url,omitempty"`
+	Models       string     `gorm:"type:text" json:"models,omitempty"`              // JSON array of model names, e.g. ["gpt-4o","gpt-4o-mini"]
+	Config       string     `gorm:"type:text;default:'{}'" json:"config,omitempty"` // JSON extra config
+	IsActive     bool       `gorm:"default:true" json:"is_active"`
+	LastTestedAt *time.Time `json:"last_tested_at,omitempty"`
+	TestStatus   string     `gorm:"type:varchar(20)" json:"test_status,omitempty"` // "ok" | "failed" | ""
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
+// HasOAuth retorna true se a integração tem tokens OAuth válidos.
+func (i *UserIntegration) HasOAuth() bool {
+	return i.AuthType == AuthTypeOAuth && i.OAuthAccessToken != ""
+}
+
+// IsOAuthExpired retorna true se o access token OAuth está expirado (ou prestes a expirar em 60s).
+func (i *UserIntegration) IsOAuthExpired() bool {
+	if i.OAuthExpiresAt == nil {
+		return false // sem expiração conhecida, assume válido
+	}
+	return time.Now().Add(60 * time.Second).After(*i.OAuthExpiresAt)
 }
 
 func (i *UserIntegration) BeforeCreate(tx *gorm.DB) error {
