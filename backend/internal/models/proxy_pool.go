@@ -11,9 +11,11 @@ import (
 type ProxyMode string
 
 const (
-	ProxyModeNone        ProxyMode = "none"
-	ProxyModeManual      ProxyMode = "manual"
-	ProxyModeResidencial ProxyMode = "residencial"
+	ProxyModeNone        ProxyMode = "none"        // instance/server explicitly without proxy
+	ProxyModeManual      ProxyMode = "manual"      // custom host/port/user/pass on the entity
+	ProxyModeResidencial ProxyMode = "residencial" // assigned from ProxyPool
+	ProxyModeGlobal      ProxyMode = "global"      // points to a GlobalProxyConfig
+	ProxyModeInherit     ProxyMode = "inherit"     // follow parent: server (for instance) or default global (for server)
 )
 
 // ProxyProvider identifies the residential proxy provider.

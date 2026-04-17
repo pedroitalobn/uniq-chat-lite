@@ -86,7 +86,8 @@ type Instance struct {
 	Status      InstanceStatus `gorm:"type:varchar(20);default:'disconnected'" json:"status"`
 
 	// Proxy fields
-	ProxyMode       ProxyMode          `gorm:"type:varchar(20);default:'none'" json:"proxy_mode"` // none | manual | residencial
+	// ProxyMode: none | manual | residencial | global | inherit (default = inherit → herda do Server → default GlobalProxy)
+	ProxyMode       ProxyMode          `gorm:"type:varchar(20);default:'inherit'" json:"proxy_mode"`
 	ProxyEnabled    bool               `gorm:"default:false" json:"proxy_enabled"`
 	ProxyType       ProxyType          `gorm:"type:varchar(10)" json:"proxy_type,omitempty"`
 	ProxyHost       string             `gorm:"type:varchar(255)" json:"proxy_host,omitempty"`

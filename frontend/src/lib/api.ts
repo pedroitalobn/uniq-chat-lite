@@ -182,6 +182,20 @@ export const serversApi = {
   instances: (id: string) => api.get(`/v1/servers/${id}/instances`),
   stats: (id: string) => api.get(`/v1/servers/${id}/stats`),
   action: (id: string, action: string) => api.post(`/v1/servers/${id}/actions`, { action }),
+  // Server-level proxy (heranças aplicam-se a todas as instâncias com mode=inherit)
+  getProxy: (id: string) => api.get(`/v1/servers/${id}/proxy`),
+  setProxy: (id: string, data: {
+    mode: "none" | "manual" | "residencial" | "global" | "inherit";
+    type?: "http" | "https" | "socks5";
+    host?: string;
+    port?: number;
+    username?: string;
+    password?: string;
+    global_proxy_id?: string;
+    proxy_pool_id?: string;
+  }) => api.put(`/v1/servers/${id}/proxy`, data),
+  deleteProxy: (id: string) => api.delete(`/v1/servers/${id}/proxy`),
+  testProxy: (id: string) => api.post(`/v1/servers/${id}/proxy/test`),
 };
 
 export const channelsApi = {

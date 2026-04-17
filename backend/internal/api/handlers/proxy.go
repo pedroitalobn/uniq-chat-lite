@@ -55,7 +55,7 @@ func (h *ProxyHandler) Effective(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
 	}
 
-	cfg, source := h.manager.ResolveEffectiveProxyExported(instance)
+	resolved := h.manager.ResolveEffectiveProxyDetailed(instance)
 	resp := fiber.Map{
 		"instance_id":      instance.ID,
 		"proxy_mode":       instance.ProxyMode,
@@ -63,14 +63,18 @@ func (h *ProxyHandler) Effective(c *fiber.Ctx) error {
 		"use_global_proxy": instance.UseGlobalProxy,
 		"global_proxy_id":  instance.GlobalProxyID,
 		"pool_id":          instance.ProxyPoolID,
+		"server_id":        instance.ServerID,
 		"running":          h.manager.IsRunning(instance.ID.String()),
-		"source":           source,
+		"source":           resolved.Source,
+		"level":            resolved.Level, // instance | server | default_global | none
+		"chain":            resolved.Chain, // decisão etapa-a-etapa
 	}
-	if cfg == nil || !cfg.Enabled {
+	if resolved.Config == nil || !resolved.Config.Enabled {
 		resp["effective"] = nil
 		resp["note"] = "nenhum proxy será aplicado — conexão direta"
 		return c.JSON(resp)
 	}
+	cfg := resolved.Config
 	passMarker := ""
 	if cfg.Password != "" {
 		passMarker = "p***"

@@ -526,6 +526,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	servers.Get("/:id/instances", serverH.Instances)
 	servers.Post("/:id/actions", serverH.BulkAction)
 	servers.Get("/:id/stats", serverH.Stats)
+	// Server-level proxy configuration (herded by child instances with mode=inherit)
+	servers.Get("/:id/proxy", serverH.GetProxy)
+	servers.Put("/:id/proxy", serverH.SetProxy)
+	servers.Delete("/:id/proxy", serverH.DeleteProxy)
+	servers.Post("/:id/proxy/test", serverH.TestProxy)
 
 	// ─── Admin routes ─────────────────────────────────────────────────────────
 	admin := api.Group("/admin", middleware.RequireAdmin())
