@@ -523,9 +523,9 @@ export default function AdminUsersPage() {
               return (
                 <div key={user.id}>
                   <div
-                    className={cn("grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 items-center px-5 py-3.5 transition-colors cursor-pointer",
+                    className={cn("grid gap-4 items-center px-5 py-3.5 transition-colors cursor-pointer",
                       blocked && "opacity-60")}
-                    style={{ borderBottom: i < filtered.length - 1 || isExpanded ? "1px solid rgba(255,255,255,0.04)" : undefined }}
+                    style={{ borderBottom: i < filtered.length - 1 || isExpanded ? "1px solid rgba(255,255,255,0.04)" : undefined, gridTemplateColumns: "1fr auto auto auto auto auto" }}
                     onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.015)")}
                     onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = "transparent")}
                     onClick={() => setExpandedId(isExpanded ? null : user.id)}
