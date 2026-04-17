@@ -239,6 +239,7 @@ const handleSelectProvider = (providerId: string) => {
 
   return (
     <div className="space-y-4 animate-fade-in-up">
+      <EffectiveProxyPanel instanceId={instanceId} />
       <div className="rounded-2xl p-6 space-y-5" style={cardStyle}>
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -516,6 +517,185 @@ const handleSelectProvider = (providerId: string) => {
             </button>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Effective Proxy Panel (exibe a cadeia de herança resolvida pelo backend) ─
+interface ResolutionStep {
+  level: string;   // instance | server | default_global
+  mode: string;    // none | manual | residencial | global | inherit
+  source?: string; // instance_manual | server_manual | global_db | global_env | ...
+  applied: boolean;
+  reason?: string;
+}
+
+interface EffectiveResponse {
+  instance_id: string;
+  proxy_mode: string;
+  proxy_enabled: boolean;
+  use_global_proxy: boolean;
+  global_proxy_id: string | null;
+  pool_id: string | null;
+  server_id: string | null;
+  running: boolean;
+  source: string;
+  level: string;
+  chain: ResolutionStep[];
+  effective: null | {
+    enabled: boolean;
+    type: string;
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    url: string;
+  };
+  note?: string;
+}
+
+const LEVEL_LABEL: Record<string, string> = {
+  instance: "Instância",
+  server: "Server",
+  default_global: "Proxy Global padrão",
+};
+
+const LEVEL_COLOR: Record<string, string> = {
+  instance: "#60a5fa",
+  server: "#818cf8",
+  default_global: "#34d399",
+};
+
+function EffectiveProxyPanel({ instanceId }: { instanceId: string }) {
+  const { data, isLoading, refetch, isFetching } = useQuery<EffectiveResponse>({
+    queryKey: ["proxy-effective", instanceId],
+    queryFn: async () => (await proxyApi.effective(instanceId)).data,
+    refetchInterval: 30000,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl p-4 flex items-center gap-2" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+        <Loader2 className="w-4 h-4 animate-spin" style={{ color: "hsl(240 8% 48%)" }} />
+        <span className="text-xs" style={{ color: "hsl(240 8% 55%)" }}>Calculando proxy efetivo...</span>
+      </div>
+    );
+  }
+  if (!data) return null;
+
+  const eff = data.effective;
+  const headerColor = eff ? "var(--green)" : "#f87171";
+  const headerLabel = eff ? "Proxy ativo" : "Sem proxy";
+
+  return (
+    <div className="rounded-2xl p-5 space-y-4"
+      style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: headerColor }} />
+          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: headerColor }}>
+            {headerLabel}
+          </span>
+          <span className="text-[10px] px-2 py-0.5 rounded-md" style={{ background: "hsl(240 12% 10%)", color: "hsl(240 8% 60%)" }}>
+            origem: {data.source}
+          </span>
+          <span className="text-[10px] px-2 py-0.5 rounded-md" style={{ background: "hsl(240 12% 10%)", color: "hsl(240 8% 60%)" }}>
+            nível: {LEVEL_LABEL[data.level] || data.level}
+          </span>
+        </div>
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="text-[10px] px-2 py-1 rounded-md transition-colors"
+          style={{ color: "hsl(240 8% 48%)", background: "hsl(240 12% 10%)" }}
+          onMouseEnter={e => (e.currentTarget.style.color = "var(--green)")}
+          onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 48%)")}
+        >
+          {isFetching ? "..." : "recalcular"}
+        </button>
+      </div>
+
+      {/* Effective config */}
+      {eff ? (
+        <div className="rounded-xl p-3" style={{ background: "rgba(0,212,106,0.05)", border: "1px solid rgba(0,212,106,0.15)" }}>
+          <p className="text-[10px] uppercase font-bold mb-1.5" style={{ color: "var(--green)" }}>Configuração que o whatsmeow está usando</p>
+          <p className="text-xs font-mono break-all" style={{ color: "hsl(240 15% 85%)" }}>{eff.url}</p>
+          <div className="mt-2 grid grid-cols-3 gap-2 text-[10px]" style={{ color: "hsl(240 8% 52%)" }}>
+            <div><span className="opacity-60">tipo:</span> {eff.type}</div>
+            <div><span className="opacity-60">host:</span> <span className="font-mono">{eff.host}</span></div>
+            <div><span className="opacity-60">porta:</span> <span className="font-mono">{eff.port}</span></div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl p-3" style={{ background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.15)" }}>
+          <p className="text-xs" style={{ color: "#f87171" }}>{data.note || "Conexão direta sem proxy."}</p>
+        </div>
+      )}
+
+      {/* Inheritance chain */}
+      {data.chain && data.chain.length > 0 && (
+        <div>
+          <p className="text-[10px] uppercase font-bold mb-2" style={{ color: "hsl(240 8% 55%)" }}>
+            Cadeia de resolução
+          </p>
+          <div className="space-y-1.5">
+            {data.chain.map((step, i) => {
+              const color = LEVEL_COLOR[step.level] || "hsl(240 8% 50%)";
+              return (
+                <div key={i} className="flex items-start gap-2 p-2 rounded-lg"
+                  style={{
+                    background: step.applied ? "rgba(0,212,106,0.06)" : "hsl(240 12% 8%)",
+                    border: `1px solid ${step.applied ? "rgba(0,212,106,0.2)" : "hsl(240 12% 12%)"}`,
+                  }}>
+                  <div className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                    style={{ background: step.applied ? "rgba(0,212,106,0.15)" : "hsl(240 12% 14%)", color: step.applied ? "var(--green)" : "hsl(240 8% 45%)" }}>
+                    {step.applied ? "✓" : i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase"
+                        style={{ background: `${color}22`, color, border: `1px solid ${color}44` }}>
+                        {LEVEL_LABEL[step.level] || step.level}
+                      </span>
+                      <span className="text-[10px]" style={{ color: "hsl(240 8% 50%)" }}>
+                        mode: <span className="font-mono" style={{ color: "hsl(240 15% 80%)" }}>{step.mode}</span>
+                      </span>
+                      {step.source && (
+                        <span className="text-[10px]" style={{ color: "hsl(240 8% 50%)" }}>
+                          origem: <span className="font-mono" style={{ color: "hsl(240 15% 80%)" }}>{step.source}</span>
+                        </span>
+                      )}
+                    </div>
+                    {step.reason && (
+                      <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 48%)" }}>{step.reason}</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* State summary */}
+      <div className="grid grid-cols-2 gap-2 text-[10px]" style={{ color: "hsl(240 8% 48%)" }}>
+        <div>
+          <span className="opacity-60">proxy_mode:</span>{" "}
+          <span className="font-mono" style={{ color: "hsl(240 15% 80%)" }}>{data.proxy_mode || "—"}</span>
+        </div>
+        <div>
+          <span className="opacity-60">executando:</span>{" "}
+          <span className="font-mono" style={{ color: data.running ? "var(--green)" : "#f87171" }}>
+            {data.running ? "sim" : "não"}
+          </span>
+        </div>
+        {data.server_id && (
+          <div className="col-span-2">
+            <span className="opacity-60">server_id:</span>{" "}
+            <span className="font-mono" style={{ color: "hsl(240 15% 80%)" }}>{data.server_id}</span>
+          </div>
+        )}
       </div>
     </div>
   );

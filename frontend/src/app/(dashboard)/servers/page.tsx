@@ -8,7 +8,7 @@ import {
   Server as ServerIcon, Plus, X, Trash2, Pencil, Globe,
   Smartphone, Loader2, Copy, Check, ExternalLink,
   Play, Pause, RefreshCw, LogOut, Trash, Link2, RotateCw,
-  Activity, Wifi, WifiOff, AlertCircle,
+  Activity, Wifi, WifiOff, AlertCircle, Shield, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { showConfirm } from "@/lib/confirm";
@@ -267,11 +267,295 @@ function ServerModal({
   );
 }
 
+// ─── Server Proxy Modal ──────────────────────────────────────────────────────
+type ProxyMode = "none" | "manual" | "residencial" | "global" | "inherit";
+
+interface ServerProxyData {
+  mode: ProxyMode;
+  type?: "http" | "https" | "socks5" | "";
+  host?: string;
+  port?: number;
+  username?: string;
+  password?: string;
+  global_proxy_id?: string | null;
+  proxy_pool_id?: string | null;
+}
+
+interface GlobalProxyOption { id: string; name: string; country: string; enabled: boolean; is_default: boolean; }
+
+function ServerProxyModal({
+  server, onClose, onSaved,
+}: {
+  server: Server; onClose: () => void; onSaved: () => void;
+}) {
+  const [data, setData] = useState<ServerProxyData>({ mode: "inherit" });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; external_ip?: string; latency_ms?: number; error?: string; url?: string; source?: string } | null>(null);
+
+  const { data: globals = [] } = useQuery<GlobalProxyOption[]>({
+    queryKey: ["global-proxies"],
+    queryFn: async () => {
+      try {
+        const r = await fetch("/api/v1/proxy/global", { credentials: "include" });
+        if (!r.ok) return [];
+        const d = await r.json();
+        return Array.isArray(d) ? d : [];
+      } catch { return []; }
+    },
+  });
+
+  const { data: pools = [] } = useQuery<ProxyPool[]>({
+    queryKey: ["proxy-pools"],
+    queryFn: () => proxyPoolsApi.list().then(r => r.data),
+  });
+
+  // Load current
+  useState(() => {
+    serversApi.getProxy(server.id).then(r => {
+      const d = r.data;
+      setData({
+        mode: (d.mode as ProxyMode) || "inherit",
+        type: d.type || "",
+        host: d.host || "",
+        port: d.port || 0,
+        username: d.username || "",
+        password: "",
+        global_proxy_id: d.global_proxy_id || "",
+        proxy_pool_id: d.proxy_pool_id || "",
+      });
+    }).catch(() => { /* use defaults */ })
+      .finally(() => setLoading(false));
+  });
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const payload: Record<string, unknown> = { mode: data.mode };
+      if (data.mode === "manual") {
+        payload.type = data.type || "http";
+        payload.host = data.host;
+        payload.port = data.port;
+        payload.username = data.username;
+        if (data.password) payload.password = data.password;
+      } else if (data.mode === "global") {
+        payload.global_proxy_id = data.global_proxy_id;
+      } else if (data.mode === "residencial") {
+        payload.proxy_pool_id = data.proxy_pool_id;
+      }
+      await serversApi.setProxy(server.id, payload as Parameters<typeof serversApi.setProxy>[1]);
+      toast.success("Proxy do server atualizado");
+      onSaved();
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Falha ao salvar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const test = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const r = await serversApi.testProxy(server.id);
+      setTestResult(r.data);
+    } catch (err: unknown) {
+      setTestResult({ success: false, error: (err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro" });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const modeDescription: Record<ProxyMode, string> = {
+    none: "Server sem proxy — bloqueia herança das instâncias.",
+    inherit: "Server sem configuração própria — instâncias caem no global default.",
+    manual: "Proxy custom configurado no server (host/port/credenciais próprias).",
+    residencial: "Usa um Proxy Pool residencial atribuído ao server.",
+    global: "Aponta para um Proxy Global compartilhado do sistema.",
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose} />
+      <div className="relative w-full max-w-lg rounded-2xl p-6 animate-fade-in-up max-h-[90vh] overflow-y-auto"
+        style={{ background: "hsl(240 18% 6%)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 32px 80px rgba(0,0,0,0.6)" }}>
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+              style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)" }}>
+              <Shield className="w-4 h-4" style={{ color: "#818cf8" }} />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Proxy do Server</h2>
+              <p className="text-xs" style={{ color: "hsl(240 8% 50%)" }}>{server.name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }}>
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--green)" }} />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Mode selector */}
+            <div>
+              <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+                Modo
+              </label>
+              <div className="grid grid-cols-5 gap-1.5">
+                {(["inherit", "global", "manual", "residencial", "none"] as ProxyMode[]).map(m => (
+                  <button
+                    key={m}
+                    onClick={() => setData(d => ({ ...d, mode: m }))}
+                    className="px-2 py-2 rounded-lg text-[10px] font-semibold uppercase transition-all"
+                    style={{
+                      background: data.mode === m ? "rgba(0,212,106,0.15)" : "hsl(240 12% 8%)",
+                      color: data.mode === m ? "var(--green)" : "hsl(240 8% 55%)",
+                      border: `1px solid ${data.mode === m ? "rgba(0,212,106,0.4)" : "hsl(240 12% 14%)"}`,
+                    }}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] mt-2" style={{ color: "hsl(240 8% 40%)" }}>
+                {modeDescription[data.mode]}
+              </p>
+            </div>
+
+            {/* Manual fields */}
+            {data.mode === "manual" && (
+              <div className="space-y-3 p-3 rounded-xl" style={{ background: "hsl(240 12% 8%)", border: "1px solid hsl(240 12% 14%)" }}>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="col-span-1">
+                    <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Tipo</label>
+                    <select className="input-field w-full text-xs"
+                      value={data.type || "http"}
+                      onChange={e => setData(d => ({ ...d, type: e.target.value as ServerProxyData["type"] }))}>
+                      <option value="http">http</option>
+                      <option value="https">https</option>
+                      <option value="socks5">socks5</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Host</label>
+                    <input className="input-field w-full text-xs"
+                      placeholder="brd.superproxy.io"
+                      value={data.host || ""}
+                      onChange={e => setData(d => ({ ...d, host: e.target.value }))} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Porta</label>
+                  <input type="number" className="input-field w-full text-xs"
+                    placeholder="33335"
+                    value={data.port || ""}
+                    onChange={e => setData(d => ({ ...d, port: parseInt(e.target.value) || 0 }))} />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Usuário</label>
+                    <input className="input-field w-full text-xs"
+                      value={data.username || ""}
+                      onChange={e => setData(d => ({ ...d, username: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Senha</label>
+                    <input type="password" className="input-field w-full text-xs"
+                      placeholder="(não alterar = deixe vazio)"
+                      value={data.password || ""}
+                      onChange={e => setData(d => ({ ...d, password: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Global selector */}
+            {data.mode === "global" && (
+              <div>
+                <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Proxy Global</label>
+                <select className="input-field w-full text-xs"
+                  value={data.global_proxy_id || ""}
+                  onChange={e => setData(d => ({ ...d, global_proxy_id: e.target.value }))}>
+                  <option value="">Selecione…</option>
+                  {globals.filter(g => g.enabled).map(g => (
+                    <option key={g.id} value={g.id}>
+                      {g.name} ({g.country.toUpperCase()}){g.is_default ? " · default" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Residential pool */}
+            {data.mode === "residencial" && (
+              <div>
+                <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Proxy Pool</label>
+                <select className="input-field w-full text-xs"
+                  value={data.proxy_pool_id || ""}
+                  onChange={e => setData(d => ({ ...d, proxy_pool_id: e.target.value }))}>
+                  <option value="">Selecione…</option>
+                  {pools.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.provider})</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Test result */}
+            {testResult && (
+              <div className="p-3 rounded-xl text-xs"
+                style={{
+                  background: testResult.success ? "rgba(0,212,106,0.08)" : "rgba(239,68,68,0.08)",
+                  border: `1px solid ${testResult.success ? "rgba(0,212,106,0.2)" : "rgba(239,68,68,0.2)"}`,
+                }}>
+                {testResult.success ? (
+                  <>
+                    <p className="font-semibold" style={{ color: "var(--green)" }}>✓ Proxy funcionando</p>
+                    <p className="mt-1 opacity-80">IP externo: <code>{testResult.external_ip}</code></p>
+                    <p className="opacity-60">Latência: {testResult.latency_ms}ms · fonte: {testResult.source}</p>
+                    {testResult.url && <p className="mt-1 opacity-50 break-all">{testResult.url}</p>}
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold" style={{ color: "#f87171" }}>✗ Teste falhou</p>
+                    <p className="mt-1 opacity-80">{testResult.error}</p>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <button onClick={test} disabled={testing}
+                className="btn-ghost flex-1 py-2 text-xs flex items-center justify-center gap-1.5">
+                {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Activity className="w-3.5 h-3.5" />}
+                Testar
+              </button>
+              <button onClick={save} disabled={saving}
+                className="flex-1 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
+                style={{ background: "var(--green)", color: "white", opacity: saving ? 0.7 : 1 }}>
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                Salvar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Server Card ──────────────────────────────────────────────────────────────
 function ServerCard({ server, onEdit, onDelete, onAction }: {
   server: Server; onEdit: () => void; onDelete: () => void; onAction: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [showProxyModal, setShowProxyModal] = useState(false);
 
   const copySlug = () => {
     navigator.clipboard.writeText(server.slug);
@@ -317,6 +601,14 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
           <ActionsMenu serverId={server.id} onAction={onAction} />
+          <button onClick={() => setShowProxyModal(true)}
+            title="Configurar proxy do server"
+            className="p-1.5 rounded-lg transition-colors"
+            style={{ color: "hsl(240 8% 38%)" }}
+            onMouseEnter={e => (e.currentTarget.style.color = "#818cf8")}
+            onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}>
+            <Shield className="w-3.5 h-3.5" />
+          </button>
           <button onClick={onEdit}
             className="p-1.5 rounded-lg transition-colors"
             style={{ color: "hsl(240 8% 38%)" }}
@@ -383,6 +675,17 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
           Ver instâncias <ExternalLink className="w-3 h-3" />
         </a>
       </div>
+
+      {showProxyModal && (
+        <ServerProxyModal
+          server={server}
+          onClose={() => setShowProxyModal(false)}
+          onSaved={() => {
+            onAction();
+            setShowProxyModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }
