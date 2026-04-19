@@ -184,6 +184,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.Instance{},
 		&models.APIKey{},
 		&models.Webhook{},
+		&models.GlobalWebhook{},
 		&models.MessageLog{},
 		&models.Contact{},
 		&models.Tag{},
