@@ -355,7 +355,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <a href="/settings/webhooks" className="text-[10px] px-2 py-1.5 rounded-lg" style={{ background: "hsl(240 12% 10%)", color: "hsl(240 8% 48)" }}>
+            <a href="/integrations?tab=webhook" className="text-[10px] px-2 py-1.5 rounded-lg" style={{ background: "hsl(240 12% 10%)", color: "hsl(240 8% 48)" }}>
               Ver globais
             </a>
             <button
