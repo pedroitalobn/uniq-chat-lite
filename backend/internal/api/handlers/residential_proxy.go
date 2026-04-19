@@ -215,20 +215,19 @@ func (h *ResidencialProxyHandler) GetPoolStats(c *fiber.Ctx) error {
 	return c.JSON(stats)
 }
 
-// PUT /proxy/mode/:id — change instance proxy mode (none | manual | global | residencial)
+// PUT /proxy/mode/:id — change instance proxy mode (none | manual | global | residencial | inherit)
 func (h *ResidencialProxyHandler) SetProxyMode(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 	instance, ok := c.Locals("instance").(*models.Instance)
 	if !ok {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
 	}
-
-	if instance.UserID != user.ID {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado"})
-	}
+	// Ownership/workspace membership já foi validado pelo middleware OwnsInstance.
+	// Checagem adicional direta `instance.UserID != user.ID` bloqueava
+	// super_admins e membros de workspace legitimamente — removida.
 
 	var req struct {
-		Mode          string `json:"mode"` // none | manual | global | residencial
+		Mode          string `json:"mode"` // none | manual | global | residencial | inherit
 		GlobalProxyID string `json:"global_proxy_id,omitempty"`
 		ProviderID    string `json:"provider_id,omitempty"` // for manual/custom proxy
 	}
@@ -274,18 +273,44 @@ func (h *ResidencialProxyHandler) SetProxyMode(c *fiber.Ctx) error {
 		if err := h.db.Where("id = ? AND user_id = ?", req.ProviderID, user.ID).First(&provider).Error; err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "proxy provider não encontrado"})
 		}
+		// IMPORTANTE: copia a senha criptografada do provider para a instância,
+		// senão o resolver conectaria sem auth e BrightData/etc devolve 407.
 		h.db.Model(instance).Updates(map[string]interface{}{
-			"proxy_mode":       models.ProxyModeManual,
-			"proxy_enabled":    true,
-			"use_global_proxy": false,
-			"global_proxy_id":  nil,
-			"proxy_type":       provider.ProxyType,
-			"proxy_host":       provider.ProxyHost,
-			"proxy_port":       provider.ProxyPort,
-			"proxy_username":   provider.ProxyUsername,
-			"proxy_status":     models.ProxyStatusUntested,
+			"proxy_mode":        models.ProxyModeManual,
+			"proxy_enabled":     true,
+			"use_global_proxy":  false,
+			"global_proxy_id":   nil,
+			"proxy_pool_id":     nil,
+			"proxy_type":        provider.ProxyType,
+			"proxy_host":        provider.ProxyHost,
+			"proxy_port":        provider.ProxyPort,
+			"proxy_username":    provider.ProxyUsername,
+			"proxy_password":    provider.ProxyPassword, // já vem criptografada do provider
+			"proxy_status":      models.ProxyStatusUntested,
+			"proxy_last_tested": nil,
+			"proxy_error":       "",
 		})
 		return c.JSON(fiber.Map{"mode": "manual", "provider": provider.Name})
+	}
+
+	// If switching to inherit — segue cadeia (server → default global)
+	if newMode == models.ProxyModeInherit {
+		h.db.Model(instance).Updates(map[string]interface{}{
+			"proxy_mode":        models.ProxyModeInherit,
+			"proxy_enabled":     true, // inherit pressupõe aplicar se houver cadeia
+			"use_global_proxy":  false,
+			"global_proxy_id":   nil,
+			"proxy_pool_id":     nil,
+			"proxy_host":        "",
+			"proxy_port":        0,
+			"proxy_username":    "",
+			"proxy_password":    "",
+			"proxy_type":        "",
+			"proxy_status":      models.ProxyStatusUntested,
+			"proxy_last_tested": nil,
+			"proxy_error":       "",
+		})
+		return c.JSON(fiber.Map{"mode": "inherit"})
 	}
 
 	// If switching to residencial, assign a proxy

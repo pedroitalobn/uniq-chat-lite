@@ -206,8 +206,19 @@ export const proxyPoolsApi = {
   list: () => api.get("/v1/proxy/pool"),
   listProviders: () => api.get("/v1/proxy/providers"),
   getGlobalProxies: () => api.get("/v1/proxy/global"),
-  createProvider: (data: { provider: string; name: string; api_key: string; country?: string }) =>
-    api.post("/v1/proxy/providers", data),
+  createProvider: (data: {
+    provider: string;
+    name: string;
+    api_key?: string;
+    country?: string;
+    // Campos para provider="manual" (proxy custom com host/port)
+    proxy_url?: string;
+    proxy_type?: "http" | "https" | "socks5";
+    proxy_host?: string;
+    proxy_port?: number;
+    proxy_username?: string;
+    proxy_password?: string;
+  }) => api.post("/v1/proxy/providers", data),
   updateProvider: (id: string, data: { name?: string; api_key?: string; country?: string; is_active?: boolean }) =>
     api.put(`/v1/proxy/providers/${id}`, data),
   deleteProvider: (id: string) => api.delete(`/v1/proxy/providers/${id}`),
