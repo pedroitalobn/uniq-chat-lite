@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Webhook, Plus, Trash2, Play, CheckCircle2, XCircle, Search, Globe,
-  Pencil, X, Copy, Check, ChevronDown, ChevronRight, Loader2,
+  Pencil, X, Copy, Check, Loader2, Sparkles,
 } from "lucide-react";
 import { globalWebhooksApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -296,14 +296,19 @@ function WebhookEditor({
 }) {
   const [draft, setDraft] = useState<Draft>(initial);
   const [search, setSearch] = useState("");
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
-  // Group by category
+  // Group by category (respeitando busca)
   const grouped = useMemo(() => {
     const map = new Map<string, SystemEvent[]>();
     const q = search.trim().toLowerCase();
     for (const ev of events) {
-      if (q && !ev.name.toLowerCase().includes(q) && !ev.id.toLowerCase().includes(q) && !ev.description.toLowerCase().includes(q)) continue;
+      if (
+        q &&
+        !ev.name.toLowerCase().includes(q) &&
+        !ev.id.toLowerCase().includes(q) &&
+        !ev.description.toLowerCase().includes(q)
+      )
+        continue;
       const cat = ev.category || "Outros";
       if (!map.has(cat)) map.set(cat, []);
       map.get(cat)!.push(ev);
@@ -320,7 +325,7 @@ function WebhookEditor({
     }));
   };
 
-  const toggleCategory = (cat: string, categoryEvents: SystemEvent[]) => {
+  const toggleCategory = (categoryEvents: SystemEvent[]) => {
     const allIds = categoryEvents.map((e) => e.id);
     const allSelected = allIds.every((id) => selectedSet.has(id));
     setDraft((d) => {
@@ -345,47 +350,45 @@ function WebhookEditor({
     });
   };
 
-  const toggleCollapse = (cat: string) => {
-    setCollapsed((c) => {
-      const next = new Set(c);
-      if (next.has(cat)) next.delete(cat);
-      else next.add(cat);
-      return next;
-    });
-  };
-
   const visibleCount = grouped.reduce((n, [, arr]) => n + arr.length, 0);
-  const allVisibleSelected = grouped.length > 0 && grouped.flatMap(([, a]) => a).every((e) => selectedSet.has(e.id));
+  const allVisibleSelected =
+    grouped.length > 0 && grouped.flatMap(([, a]) => a).every((e) => selectedSet.has(e.id));
 
   const canSave = draft.name.trim() && draft.url.trim() && draft.events.length > 0 && !saving;
 
   return (
     <div
       className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
-      onClick={onCancel}>
+      onClick={onCancel}
+    >
       <div
-        className="w-full max-w-xl rounded-2xl flex flex-col max-h-[90vh]"
+        className="w-full max-w-2xl rounded-2xl flex flex-col max-h-[92vh]"
         style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
-        onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b"
-          style={{ borderColor: "var(--surface-border)" }}>
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-6 py-4 border-b"
+          style={{ borderColor: "var(--surface-border)" }}
+        >
           <div>
             <h3 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>
               {draft.id ? "Editar Webhook" : "Criar Webhook"}
             </h3>
             <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
-              {draft.events.length} evento(s) selecionado(s)
+              {draft.events.length} de {events.length} evento(s) selecionado(s)
             </p>
           </div>
           <button
             onClick={onCancel}
-            className="p-1.5 rounded-lg"
-            style={{ color: "var(--text-3)" }}>
+            className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+            style={{ color: "var(--text-3)" }}
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 space-y-4 overflow-y-auto">
+        <div className="p-6 space-y-5 overflow-y-auto">
           {/* Basic fields */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
@@ -396,13 +399,23 @@ function WebhookEditor({
                 value={draft.name}
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                style={{ background: "var(--surface-3)", color: "var(--text-1)", border: "1px solid var(--surface-border)" }}
+                style={{
+                  background: "var(--surface-3)",
+                  color: "var(--text-1)",
+                  border: "1px solid var(--surface-border)",
+                }}
                 placeholder="Meu Webhook"
               />
             </div>
             <div className="flex items-end gap-2">
-              <label className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg border cursor-pointer w-full"
-                style={{ background: "var(--surface-3)", borderColor: "var(--surface-border)", color: "var(--text-2)" }}>
+              <label
+                className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg border cursor-pointer w-full"
+                style={{
+                  background: "var(--surface-3)",
+                  borderColor: "var(--surface-border)",
+                  color: "var(--text-2)",
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={draft.is_active}
@@ -421,39 +434,76 @@ function WebhookEditor({
               onChange={(e) => setDraft({ ...draft, url: e.target.value })}
               type="url"
               className="w-full px-3 py-2 rounded-lg text-sm outline-none font-mono"
-              style={{ background: "var(--surface-3)", color: "var(--text-1)", border: "1px solid var(--surface-border)" }}
+              style={{
+                background: "var(--surface-3)",
+                color: "var(--text-1)",
+                border: "1px solid var(--surface-border)",
+              }}
               placeholder="https://seu-site.com/webhook"
             />
           </div>
 
-          {/* Events selector */}
+          {/* Events selector — badge style */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-medium" style={{ color: "var(--text-2)" }}>
-                Eventos *
-              </label>
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium" style={{ color: "var(--text-2)" }}>
+                  Eventos *
+                </label>
+                <span
+                  className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                  style={{
+                    background:
+                      draft.events.length > 0 ? "rgba(139,92,246,0.15)" : "var(--surface-3)",
+                    color: draft.events.length > 0 ? "#8b5cf6" : "var(--text-3)",
+                  }}
+                >
+                  {draft.events.length}/{events.length}
+                </span>
+              </div>
               <button
+                type="button"
                 onClick={toggleAll}
-                className="text-[10px] px-2 py-1 rounded-md"
+                className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-md font-medium transition-colors"
                 style={{
-                  background: allVisibleSelected ? "rgba(239,68,68,0.1)" : "rgba(139,92,246,0.15)",
+                  background: allVisibleSelected
+                    ? "rgba(239,68,68,0.1)"
+                    : "rgba(139,92,246,0.15)",
                   color: allVisibleSelected ? "#ef4444" : "#8b5cf6",
-                }}>
-                {allVisibleSelected ? `Desmarcar todos (${visibleCount})` : `Selecionar todos (${visibleCount})`}
+                }}
+              >
+                {!allVisibleSelected && <Sparkles className="w-3 h-3" />}
+                {allVisibleSelected
+                  ? `Desmarcar todos (${visibleCount})`
+                  : `Selecionar todos (${visibleCount})`}
               </button>
             </div>
-            <div className="relative mb-2">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-3)" }} />
+
+            <div className="relative mb-3">
+              <Search
+                className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2"
+                style={{ color: "var(--text-3)" }}
+              />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar eventos..."
+                placeholder="Buscar evento por nome, id ou descrição..."
                 className="w-full pl-9 pr-3 py-2 rounded-lg text-xs outline-none"
-                style={{ background: "var(--surface-3)", color: "var(--text-1)", border: "1px solid var(--surface-border)" }}
+                style={{
+                  background: "var(--surface-3)",
+                  color: "var(--text-1)",
+                  border: "1px solid var(--surface-border)",
+                }}
               />
             </div>
-            <div className="rounded-xl border overflow-hidden max-h-[320px] overflow-y-auto"
-              style={{ borderColor: "var(--surface-border)", background: "var(--surface-3)" }}>
+
+            <div
+              className="rounded-xl border max-h-[360px] overflow-y-auto p-4 space-y-4"
+              style={{
+                borderColor: "var(--surface-border)",
+                background: "var(--surface-3)",
+              }}
+            >
               {grouped.length === 0 ? (
                 <div className="py-8 text-center text-xs" style={{ color: "var(--text-3)" }}>
                   Nenhum evento encontrado
@@ -461,89 +511,99 @@ function WebhookEditor({
               ) : (
                 grouped.map(([cat, list]) => {
                   const catIds = list.map((e) => e.id);
-                  const catSelected = catIds.filter((id) => selectedSet.has(id)).length;
-                  const isCollapsed = collapsed.has(cat);
-                  const allSelected = catSelected === list.length;
+                  const catSelectedCount = catIds.filter((id) => selectedSet.has(id)).length;
+                  const allSelected = catSelectedCount === list.length;
                   return (
-                    <div key={cat} className="border-b last:border-b-0"
-                      style={{ borderColor: "var(--surface-border)" }}>
-                      <div className="flex items-center justify-between px-3 py-2.5 sticky top-0"
-                        style={{ background: "var(--surface-2)" }}>
-                        <button
-                          onClick={() => toggleCollapse(cat)}
-                          className="flex items-center gap-1.5 text-xs font-semibold"
-                          style={{ color: "var(--text-1)" }}>
-                          {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                          {cat}
-                          <span className="text-[10px] font-normal px-1.5 py-0.5 rounded"
-                            style={{ background: "var(--surface-3)", color: "var(--text-3)" }}>
-                            {catSelected}/{list.length}
+                    <div key={cat}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="text-xs font-semibold uppercase tracking-wide"
+                            style={{ color: "var(--text-1)" }}
+                          >
+                            {cat}
                           </span>
-                        </button>
+                          <span
+                            className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+                            style={{
+                              background:
+                                catSelectedCount > 0 ? "rgba(139,92,246,0.15)" : "var(--surface-2)",
+                              color: catSelectedCount > 0 ? "#8b5cf6" : "var(--text-3)",
+                            }}
+                          >
+                            {catSelectedCount}/{list.length}
+                          </span>
+                        </div>
                         <button
-                          onClick={() => toggleCategory(cat, list)}
-                          className="text-[10px] px-2 py-0.5 rounded-md"
+                          type="button"
+                          onClick={() => toggleCategory(list)}
+                          className="text-[10px] px-2 py-0.5 rounded-md font-medium transition-colors"
                           style={{
-                            background: allSelected ? "rgba(239,68,68,0.08)" : "rgba(139,92,246,0.12)",
+                            background: allSelected
+                              ? "rgba(239,68,68,0.1)"
+                              : "rgba(139,92,246,0.12)",
                             color: allSelected ? "#ef4444" : "#8b5cf6",
-                          }}>
-                          {allSelected ? "desmarcar" : "todos"}
+                          }}
+                        >
+                          {allSelected ? "Desmarcar todos" : "Selecionar todos"}
                         </button>
                       </div>
-                      {!isCollapsed && (
-                        <div className="px-3 pb-2">
-                          {list.map((ev) => {
-                            const selected = selectedSet.has(ev.id);
-                            return (
-                              <button
-                                key={ev.id}
-                                onClick={() => toggleEvent(ev.id)}
-                                className="w-full flex items-start gap-2.5 py-1.5 px-2 rounded-lg text-left transition-colors"
-                                style={{
-                                  background: selected ? "rgba(139,92,246,0.08)" : "transparent",
-                                }}>
-                                <div
-                                  className="w-4 h-4 mt-0.5 rounded flex items-center justify-center flex-shrink-0 transition-colors"
-                                  style={{
-                                    background: selected ? "#8b5cf6" : "var(--surface-3)",
-                                    border: `1.5px solid ${selected ? "#8b5cf6" : "var(--surface-border)"}`,
-                                  }}>
-                                  {selected && <Check className="w-2.5 h-2.5" style={{ color: "#fff" }} strokeWidth={3} />}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-xs font-medium" style={{ color: "var(--text-1)" }}>
-                                    {ev.name}
-                                  </p>
-                                  <p className="text-[10px] truncate" style={{ color: "var(--text-3)" }}>
-                                    {ev.id}
-                                  </p>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
+                      <div className="flex flex-wrap gap-1.5">
+                        {list.map((ev) => {
+                          const selected = selectedSet.has(ev.id);
+                          return (
+                            <button
+                              key={ev.id}
+                              type="button"
+                              onClick={() => toggleEvent(ev.id)}
+                              title={`${ev.id}\n${ev.description}`}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all active:scale-95"
+                              style={{
+                                background: selected ? "#8b5cf6" : "var(--surface-2)",
+                                color: selected ? "#fff" : "var(--text-2)",
+                                border: `1px solid ${
+                                  selected ? "#8b5cf6" : "var(--surface-border)"
+                                }`,
+                                boxShadow: selected
+                                  ? "0 1px 2px rgba(139,92,246,0.3)"
+                                  : "none",
+                              }}
+                            >
+                              {selected && <Check className="w-3 h-3" strokeWidth={3} />}
+                              {ev.name}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 })
               )}
             </div>
+            <p className="text-[10px] mt-2" style={{ color: "var(--text-3)" }}>
+              Clique nos badges para selecionar. Passe o mouse para ver o ID e descrição.
+            </p>
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-6 py-4 border-t"
-          style={{ borderColor: "var(--surface-border)" }}>
+        {/* Footer */}
+        <div
+          className="flex justify-end gap-2 px-6 py-4 border-t"
+          style={{ borderColor: "var(--surface-border)" }}
+        >
           <button
             onClick={onCancel}
             className="px-4 py-2 rounded-lg text-sm font-medium"
-            style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
+            style={{ background: "var(--surface-3)", color: "var(--text-2)" }}
+          >
             Cancelar
           </button>
           <button
             onClick={() => onSave(draft)}
             disabled={!canSave}
             className="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2"
-            style={{ background: "#8b5cf6", color: "#fff" }}>
+            style={{ background: "#8b5cf6", color: "#fff" }}
+          >
             {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             {draft.id ? "Salvar" : "Criar"}
           </button>
