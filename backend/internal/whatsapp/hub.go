@@ -43,7 +43,7 @@ var globalHub *Hub
 func NewHub() *Hub {
 	return &Hub{
 		rooms:      make(map[string]map[*Client]bool),
-		broadcast:  make(chan *Event, 256),
+		broadcast:  make(chan *Event, 4096),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		users:      make(map[string]map[*Client]bool),
@@ -194,12 +194,17 @@ func (h *Hub) LeaveRoom(client *Client, room string) {
 	h.unregister <- client
 }
 
-// Broadcast sends an event to all relevant clients
+// Broadcast sends an event to all relevant clients.
+// Drops events silently when the buffer is saturated (e.g. during a
+// whatsmeow history-sync burst) to avoid blocking the caller. High-value
+// events (message.received etc.) are also persisted/dispatched via
+// webhooks, so a dropped WS frame only affects live UI updates.
 func (h *Hub) Broadcast(event *Event) {
 	select {
 	case h.broadcast <- event:
 	default:
-		log.Warn().Msg("broadcast channel full, dropping event")
+		log.Debug().Str("event_type", event.Type).Str("instance", event.Instance).
+			Msg("broadcast channel full, dropping event")
 	}
 }
 

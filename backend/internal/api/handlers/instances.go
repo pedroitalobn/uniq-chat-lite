@@ -457,6 +457,16 @@ func (h *InstanceHandler) Reconnect(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "reconexão disponível apenas para instâncias WhatsApp"})
 	}
 
+	// Clear stale "connecting" state from a previous aborted attempt —
+	// StartInstance refuses to run anything that isn't connected/disconnected,
+	// so /reconnect would otherwise 500 in a loop until List reset it.
+	if !h.manager.IsRunning(fresh.ID.String()) &&
+		fresh.Status != models.StatusConnected &&
+		fresh.Status != models.StatusDisconnected {
+		h.db.Model(&fresh).Update("status", models.StatusDisconnected)
+		fresh.Status = models.StatusDisconnected
+	}
+
 	if err := h.manager.StartInstance(&fresh); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao reconectar: " + err.Error()})
 	}
