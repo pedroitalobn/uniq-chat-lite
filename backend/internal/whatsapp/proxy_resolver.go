@@ -105,7 +105,7 @@ func (r *ProxyResolver) Resolve(instance *models.Instance) *ResolvedProxy {
 
 	case models.ProxyModeGlobal:
 		if instance.GlobalProxyID != nil {
-			cfg, src, ok := r.buildFromGlobalID(instance.GlobalProxyID.String())
+			cfg, src, ok := r.buildFromGlobalID(*instance.GlobalProxyID)
 			if ok {
 				res.Chain = append(res.Chain, ResolutionStep{
 					Level: "instance", Mode: "global", Applied: true, Source: src,

@@ -100,7 +100,7 @@ type Instance struct {
 	ProxyExternalIP string             `gorm:"type:varchar(64)" json:"proxy_external_ip,omitempty"`
 	ProxyPoolID     *uuid.UUID         `gorm:"type:uuid" json:"proxy_pool_id,omitempty"` // for residencial mode
 	UseGlobalProxy  bool               `gorm:"default:false" json:"use_global_proxy"`
-	GlobalProxyID   *uuid.UUID         `gorm:"type:uuid" json:"global_proxy_id,omitempty"`
+	GlobalProxyID   *string            `gorm:"type:varchar(64)" json:"global_proxy_id,omitempty"`
 	GlobalProxy     *GlobalProxyConfig `gorm:"foreignKey:GlobalProxyID" json:"global_proxy,omitempty"`
 
 	WebhookURL  string     `gorm:"type:text" json:"webhook_url,omitempty"`

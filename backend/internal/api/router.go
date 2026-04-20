@@ -66,7 +66,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	})
 
 	// Channels metadata (public — used by UI to list available channels)
-	app.Get("/channels", func(c *fiber.Ctx) error {
+	channelsHandler := func(c *fiber.Ctx) error {
 		type channelInfo struct {
 			ID          string `json:"id"`
 			Label       string `json:"label"`
@@ -85,7 +85,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 			{ID: "waba", Label: "WhatsApp Business", Color: "#25d366", Description: "Conecte números via WhatsApp Business API (WABA)", Available: true},
 		}
 		return c.JSON(channels)
-	})
+	}
+	app.Get("/channels", channelsHandler)
+	app.Get("/v1/channels", channelsHandler)
 
 	// Email service
 	emailSvc := email.New(

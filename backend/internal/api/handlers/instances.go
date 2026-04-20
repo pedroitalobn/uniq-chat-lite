@@ -274,10 +274,9 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 
 			if host != "" && port > 0 {
 				gProxyIDStr := gcfg.ID
-				gProxyID, _ := uuid.Parse(gProxyIDStr)
 				h.db.Model(&instance).Updates(map[string]interface{}{
 					"use_global_proxy": true,
-					"global_proxy_id":  gProxyID,
+					"global_proxy_id":  gProxyIDStr,
 					"proxy_mode":       models.ProxyModeNone,
 					"proxy_enabled":    true,
 					"proxy_type":       proxyType,
@@ -288,7 +287,7 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 					"proxy_status":     models.ProxyStatusOK, // Auto-mark as OK since it's from global proxy
 				})
 				instance.UseGlobalProxy = true
-				instance.GlobalProxyID = &gProxyID
+				instance.GlobalProxyID = &gProxyIDStr
 				instance.ProxyMode = models.ProxyModeNone
 				instance.ProxyEnabled = true
 				instance.ProxyType = models.ProxyType(proxyType)
