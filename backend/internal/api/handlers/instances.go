@@ -323,9 +323,34 @@ func (h *InstanceHandler) Delete(c *fiber.Ctx) error {
 	// Stop the WhatsApp connection
 	h.manager.StopInstance(instance.ID.String())
 
-	// Delete from database
+	// Cascade-clean child rows that reference this instance. Most tables
+	// were created through AutoMigrate without ON DELETE CASCADE, so a
+	// plain DELETE fails with FK violations in Postgres once any child
+	// row exists (messages, webhooks, campaigns, etc.).
+	instanceID := instance.ID
+	childTables := []string{
+		"message_logs",
+		"webhooks",
+		"campaigns",
+		"recoveries",
+		"otps",
+		"integrations",
+		"waba_instances",
+		"proxy_pool_assignments",
+	}
+	for _, t := range childTables {
+		if err := h.db.Exec("DELETE FROM "+t+" WHERE instance_id = ?", instanceID).Error; err != nil {
+			log.Warn().Err(err).Str("table", t).Str("instance", instanceID.String()).
+				Msg("failed to clean child rows during instance delete (continuing)")
+		}
+	}
+	// contacts.instance_id is nullable — detach rather than delete so
+	// CRM history is preserved.
+	_ = h.db.Exec("UPDATE contacts SET instance_id = NULL WHERE instance_id = ?", instanceID).Error
+
 	if err := h.db.Delete(instance).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao deletar instância"})
+		log.Error().Err(err).Str("instance", instanceID.String()).Msg("failed to delete instance row")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao deletar instância: " + err.Error()})
 	}
 
 	return c.JSON(fiber.Map{"message": "instância removida com sucesso"})
