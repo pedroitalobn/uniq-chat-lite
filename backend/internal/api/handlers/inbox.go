@@ -13,16 +13,16 @@ import (
 	"gorm.io/gorm"
 )
 
-// phoneKeyExpr returns a SQL expression that yields the part of to_j_id
+// phoneKeyExpr returns a SQL expression that yields the part of to_jid
 // before the '@' separator — used to group chats by phone number. The
 // previous INSTR/SUBSTR form is SQLite-only; on Postgres it errored and
 // the inbox came back empty because .Scan() swallowed the failure.
 func phoneKeyExpr(db *gorm.DB) string {
 	switch db.Dialector.Name() {
 	case "postgres":
-		return "SPLIT_PART(to_j_id, '@', 1)"
+		return "SPLIT_PART(to_jid, '@', 1)"
 	default:
-		return "SUBSTR(to_j_id, 1, CASE WHEN INSTR(to_j_id, '@') > 0 THEN INSTR(to_j_id, '@') - 1 ELSE LENGTH(to_j_id) END)"
+		return "SUBSTR(to_jid, 1, CASE WHEN INSTR(to_jid, '@') > 0 THEN INSTR(to_jid, '@') - 1 ELSE LENGTH(to_jid) END)"
 	}
 }
 
@@ -106,7 +106,7 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 	}
 
 	type rawChat struct {
-		ToJID         string `gorm:"column:to_j_id"`
+		ToJID         string `gorm:"column:to_jid"`
 		Content       string `gorm:"column:content"`
 		MaxTime       string `gorm:"column:max_time"`
 		MsgCount      int64  `gorm:"column:cnt"`
@@ -120,7 +120,7 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 
 	instancePhoneNormalized := ""
 	if instance.PhoneNumber != "" {
-		// Normalize the instance phone number to match the format in to_j_id
+		// Normalize the instance phone number to match the format in to_jid
 		phoneNum := strings.ReplaceAll(instance.PhoneNumber, "+", "")
 		phoneNum = strings.ReplaceAll(phoneNum, " ", "")
 		phoneNum = strings.ReplaceAll(phoneNum, "-", "")
@@ -139,7 +139,7 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 
 	// Base filter conditions. Use NOT is_deleted instead of `= 0` so
 	// both SQLite (integer) and Postgres (boolean) accept it.
-	baseWhere := "instance_id = ? AND to_j_id != '' " + excludeSelf + " AND to_j_id NOT LIKE '%@newsletter%' AND to_j_id NOT LIKE '%@lid%' AND to_j_id != 'status@broadcast' AND NOT is_deleted"
+	baseWhere := "instance_id = ? AND to_jid != '' " + excludeSelf + " AND to_jid NOT LIKE '%@newsletter%' AND to_jid NOT LIKE '%@lid%' AND to_jid != 'status@broadcast' AND NOT is_deleted"
 
 	if isFavorite != nil {
 		baseWhere += " AND is_favorite"
@@ -150,9 +150,9 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 
 	// Latest message per chat key using a window function. Groups keep
 	// the full JID as the key; individual chats normalize by phone.
-	partition := "CASE WHEN to_j_id LIKE '%@g.us' THEN to_j_id ELSE " + phoneExpr + " END"
+	partition := "CASE WHEN to_jid LIKE '%@g.us' THEN to_jid ELSE " + phoneExpr + " END"
 	query := `
-		SELECT to_j_id, content, created_at as max_time, cnt, contact_name, contact_avatar, direction
+		SELECT to_jid, content, created_at as max_time, cnt, contact_name, contact_avatar, direction
 		FROM (
 			SELECT *,
 				ROW_NUMBER() OVER (PARTITION BY ` + partition + ` ORDER BY created_at DESC) as rn,
@@ -168,9 +168,9 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 	params := []interface{}{instance.ID}
 
 	if search != "" {
-		searchWhere := baseWhere + " AND to_j_id LIKE ?"
+		searchWhere := baseWhere + " AND to_jid LIKE ?"
 		query = `
-			SELECT to_j_id, content, created_at as max_time, cnt, contact_name, contact_avatar, direction
+			SELECT to_jid, content, created_at as max_time, cnt, contact_name, contact_avatar, direction
 			FROM (
 				SELECT *,
 					ROW_NUMBER() OVER (PARTITION BY ` + partition + ` ORDER BY created_at DESC) as rn,
@@ -293,7 +293,7 @@ func (h *InboxHandler) GetChat(c *fiber.Ctx) error {
 	// Search by normalized phone number to handle different JID formats
 	h.db.Model(&models.MessageLog{}).
 		Select("contact_name, contact_avatar").
-		Where("instance_id = ? AND (to_j_id LIKE ? OR to_j_id LIKE ?)",
+		Where("instance_id = ? AND (to_jid LIKE ? OR to_jid LIKE ?)",
 			instance.ID,
 			phone+"@%",
 			"%"+phone+"%").
@@ -322,7 +322,7 @@ func (h *InboxHandler) GetChat(c *fiber.Ctx) error {
 					contactInfo.Avatar = picURL
 					// Also update stored info for future queries
 					h.db.Model(&models.MessageLog{}).
-						Where("instance_id = ? AND to_j_id LIKE ?", instance.ID, phone+"%").
+						Where("instance_id = ? AND to_jid LIKE ?", instance.ID, phone+"%").
 						Update("contact_avatar", picURL)
 				}
 			}
@@ -330,7 +330,7 @@ func (h *InboxHandler) GetChat(c *fiber.Ctx) error {
 				if _, pushName := client.GetContactInfo(queryJID); pushName != "" {
 					contactInfo.Name = pushName
 					h.db.Model(&models.MessageLog{}).
-						Where("instance_id = ? AND to_j_id LIKE ?", instance.ID, phone+"%").
+						Where("instance_id = ? AND to_jid LIKE ?", instance.ID, phone+"%").
 						Update("contact_name", pushName)
 				}
 			}
@@ -375,7 +375,7 @@ func (h *InboxHandler) GetChat(c *fiber.Ctx) error {
 			COALESCE(SUM(CASE WHEN direction = 'in' THEN 1 ELSE 0 END), 0) as total_received,
 			0 as unread_count
 		FROM message_logs 
-		WHERE instance_id = ? AND to_j_id = ?
+		WHERE instance_id = ? AND to_jid = ?
 	`, instance.ID, jid).Scan(&stats)
 
 	return c.JSON(fiber.Map{
@@ -410,8 +410,8 @@ func (h *InboxHandler) GetMessages(c *fiber.Ctx) error {
 	before := c.Query("before", "")
 
 	var logs []models.MessageLog
-	// Filter by canonical to_j_id and exclude deleted messages
-	query := h.db.Where("instance_id = ? AND (to_j_id = ? OR to_j_id = ?) AND is_deleted = ?", instance.ID, jid, canonicalJID, false).
+	// Filter by canonical to_jid and exclude deleted messages
+	query := h.db.Where("instance_id = ? AND (to_jid = ? OR to_jid = ?) AND is_deleted = ?", instance.ID, jid, canonicalJID, false).
 		Order("created_at DESC")
 
 	if before != "" {
@@ -457,7 +457,7 @@ func (h *InboxHandler) GetMessages(c *fiber.Ctx) error {
 	reverseMessages(messages)
 
 	var total int64
-	h.db.Model(&models.MessageLog{}).Where("instance_id = ? AND (to_j_id = ? OR to_j_id = ?)", instance.ID, jid, canonicalJID).Count(&total)
+	h.db.Model(&models.MessageLog{}).Where("instance_id = ? AND (to_jid = ? OR to_jid = ?)", instance.ID, jid, canonicalJID).Count(&total)
 
 	return c.JSON(fiber.Map{
 		"messages": messages,
@@ -661,7 +661,7 @@ func (h *InboxHandler) MarkRead(c *fiber.Ctx) error {
 	}
 
 	h.db.Model(&models.MessageLog{}).
-		Where("instance_id = ? AND to_j_id = ? AND direction = 'in' AND status != 'read'", instance.ID, jid).
+		Where("instance_id = ? AND to_jid = ? AND direction = 'in' AND status != 'read'", instance.ID, jid).
 		Update("status", models.MessageStatusRead)
 
 	return c.JSON(fiber.Map{"success": true})

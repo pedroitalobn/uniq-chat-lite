@@ -29,10 +29,10 @@ type MessageLog struct {
 	UserID        *uuid.UUID       `gorm:"type:uuid;index" json:"user_id,omitempty"`
 	Direction     MessageDirection `gorm:"type:varchar(5);not null" json:"direction"`
 	Type          string           `gorm:"type:varchar(30);not null" json:"type"`
-	ToJID         string           `gorm:"column:to_j_id;type:varchar(100)" json:"to_jid,omitempty"`
+	ToJID         string           `gorm:"column:to_jid;type:varchar(100)" json:"to_jid,omitempty"`
 	ContactName   string           `gorm:"type:varchar(255)" json:"contact_name,omitempty"`
 	ContactAvatar string           `gorm:"type:text" json:"contact_avatar,omitempty"`
-	SenderJID     string           `gorm:"type:varchar(100)" json:"sender_jid,omitempty"`
+	SenderJID     string           `gorm:"column:sender_jid;type:varchar(100)" json:"sender_jid,omitempty"`
 	SenderName    string           `gorm:"type:varchar(255)" json:"sender_name,omitempty"`
 	Content       string           `gorm:"type:text" json:"content"`
 	Status        MessageStatus    `gorm:"type:varchar(20);default:'pending'" json:"status"`

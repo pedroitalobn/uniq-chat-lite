@@ -29,9 +29,9 @@ type JourneyExecution struct {
 	ID           string                 `gorm:"primaryKey" json:"id"`
 	JourneyID    string                 `gorm:"not null;index" json:"journey_id"`
 	InstanceID   string                 `gorm:"not null;index" json:"instance_id"`
-	ContactJID   string                 `gorm:"type:varchar(255);not null" json:"contact_jid"`
+	ContactJID   string                 `gorm:"column:contact_jid;type:varchar(255);not null" json:"contact_jid"`
 	ContactName  string                 `gorm:"type:varchar(255)" json:"contact_name"`
-	GroupJID     string                 `gorm:"type:varchar(255)" json:"group_jid,omitempty"`
+	GroupJID     string                 `gorm:"column:group_jid;type:varchar(255)" json:"group_jid,omitempty"`
 	GroupName    string                 `gorm:"type:varchar(255)" json:"group_name,omitempty"`
 	Status       JourneyExecutionStatus `gorm:"type:varchar(20);not null;default:'active'" json:"status"`
 	CurrentStep  string                 `gorm:"type:varchar(100)" json:"current_step,omitempty"`

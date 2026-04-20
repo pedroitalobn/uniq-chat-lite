@@ -19,7 +19,7 @@ type Journey struct {
 	TriggerType     string     `gorm:"type:varchar(50);not null;default:'group_keyword'" json:"trigger_type"`
 	TriggerFilter   string     `gorm:"type:text" json:"trigger_filter"`
 	TriggerConfig   string     `gorm:"type:text" json:"trigger_config,omitempty"`
-	GroupJID        string     `gorm:"type:varchar(255)" json:"group_jid,omitempty"`
+	GroupJID        string     `gorm:"column:group_jid;type:varchar(255)" json:"group_jid,omitempty"`
 	Keywords        string     `gorm:"type:text" json:"keywords,omitempty"`
 	MessageTemplate string     `gorm:"type:text" json:"message_template,omitempty"`
 	Flow            string     `gorm:"type:text" json:"flow,omitempty"`

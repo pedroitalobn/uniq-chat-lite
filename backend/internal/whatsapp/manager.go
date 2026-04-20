@@ -257,11 +257,14 @@ func (m *Manager) SaveMessage(instanceID string, toJID string, content string, d
 		Status:        models.MessageStatusSent,
 	}
 
-	// Check for duplicate - don't save if same message was saved in last 2 seconds
+	// Check for duplicate - don't save if same message was saved in last 2 seconds.
+	// Use a Go-computed cutoff instead of datetime('now', ...) so the query
+	// works on both SQLite (dev) and Postgres (prod).
 	var count int64
+	cutoff := time.Now().Add(-2 * time.Second)
 	m.db.Model(&models.MessageLog{}).Where(
-		"instance_id = ? AND to_j_id = ? AND content = ? AND direction = ? AND created_at > datetime('now', '-2 seconds')",
-		instUUID, toJID, string(contentJSON), direction,
+		"instance_id = ? AND to_jid = ? AND content = ? AND direction = ? AND created_at > ?",
+		instUUID, toJID, string(contentJSON), direction, cutoff,
 	).Count(&count)
 
 	if count > 0 {
