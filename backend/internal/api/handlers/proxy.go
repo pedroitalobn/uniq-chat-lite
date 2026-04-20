@@ -61,7 +61,6 @@ func (h *ProxyHandler) Effective(c *fiber.Ctx) error {
 		"proxy_mode":       instance.ProxyMode,
 		"proxy_enabled":    instance.ProxyEnabled,
 		"use_global_proxy": instance.UseGlobalProxy,
-		"global_proxy_id":  instance.GlobalProxyID,
 		"pool_id":          instance.ProxyPoolID,
 		"server_id":        instance.ServerID,
 		"running":          h.manager.IsRunning(instance.ID.String()),
@@ -75,18 +74,30 @@ func (h *ProxyHandler) Effective(c *fiber.Ctx) error {
 		return c.JSON(resp)
 	}
 	cfg := resolved.Config
-	passMarker := ""
-	if cfg.Password != "" {
-		passMarker = "p***"
-	}
-	resp["effective"] = fiber.Map{
-		"enabled":  cfg.Enabled,
-		"type":     cfg.Type,
-		"host":     cfg.Host,
-		"port":     cfg.Port,
-		"username": cfg.Username,
-		"password": passMarker,
-		"url":      maskedProxyURL(cfg),
+	// Only expose host/port/username/url when the proxy was configured
+	// at the instance level by the user. Server- and global-level proxies
+	// are managed by the platform — users should see only status/type.
+	if resolved.Level == "instance" {
+		passMarker := ""
+		if cfg.Password != "" {
+			passMarker = "p***"
+		}
+		resp["effective"] = fiber.Map{
+			"enabled":  cfg.Enabled,
+			"type":     cfg.Type,
+			"host":     cfg.Host,
+			"port":     cfg.Port,
+			"username": cfg.Username,
+			"password": passMarker,
+			"url":      maskedProxyURL(cfg),
+		}
+	} else {
+		resp["effective"] = fiber.Map{
+			"enabled": cfg.Enabled,
+			"type":    cfg.Type,
+			"managed": true,
+			"note":    "proxy gerenciado pela plataforma — detalhes ocultos",
+		}
 	}
 	return c.JSON(resp)
 }
@@ -118,6 +129,19 @@ func (h *ProxyHandler) Get(c *fiber.Ctx) error {
 	instance, ok := c.Locals("instance").(*models.Instance)
 	if !ok {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	// When the instance is using a global proxy (platform-managed),
+	// hide the underlying credentials/host/port — only expose status.
+	if instance.UseGlobalProxy {
+		return c.JSON(fiber.Map{
+			"enabled":     instance.ProxyEnabled,
+			"type":        instance.ProxyType,
+			"managed":     true,
+			"status":      instance.ProxyStatus,
+			"last_tested": instance.ProxyLastTested,
+			"note":        "proxy gerenciado pela plataforma — detalhes ocultos",
+		})
 	}
 
 	maskedPassword := ""

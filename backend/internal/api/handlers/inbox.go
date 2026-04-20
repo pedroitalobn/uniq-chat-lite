@@ -7,10 +7,24 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
 )
+
+// phoneKeyExpr returns a SQL expression that yields the part of to_j_id
+// before the '@' separator — used to group chats by phone number. The
+// previous INSTR/SUBSTR form is SQLite-only; on Postgres it errored and
+// the inbox came back empty because .Scan() swallowed the failure.
+func phoneKeyExpr(db *gorm.DB) string {
+	switch db.Dialector.Name() {
+	case "postgres":
+		return "SPLIT_PART(to_j_id, '@', 1)"
+	default:
+		return "SUBSTR(to_j_id, 1, CASE WHEN INSTR(to_j_id, '@') > 0 THEN INSTR(to_j_id, '@') - 1 ELSE LENGTH(to_j_id) END)"
+	}
+}
 
 type InboxHandler struct {
 	db      *gorm.DB
@@ -115,44 +129,37 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 		instancePhoneNormalized = phoneNum
 	}
 
+	phoneExpr := phoneKeyExpr(h.db)
+
 	// Base filter to exclude the instance's own number
 	excludeSelf := ""
 	if instancePhoneNormalized != "" {
-		excludeSelf = "AND SUBSTR(to_j_id, 1, INSTR(to_j_id, '@') - 1) != '" + instancePhoneNormalized + "'"
+		excludeSelf = "AND " + phoneExpr + " != '" + instancePhoneNormalized + "'"
 	}
 
-	// Base filter conditions
-	baseWhere := "instance_id = ? AND to_j_id != '' " + excludeSelf + " AND to_j_id NOT LIKE '%@newsletter%' AND to_j_id NOT LIKE '%@lid%' AND to_j_id != 'status@broadcast' AND is_deleted = 0"
+	// Base filter conditions. Use NOT is_deleted instead of `= 0` so
+	// both SQLite (integer) and Postgres (boolean) accept it.
+	baseWhere := "instance_id = ? AND to_j_id != '' " + excludeSelf + " AND to_j_id NOT LIKE '%@newsletter%' AND to_j_id NOT LIKE '%@lid%' AND to_j_id != 'status@broadcast' AND NOT is_deleted"
 
-	// Add filter conditions
 	if isFavorite != nil {
-		baseWhere += " AND is_favorite = 1"
+		baseWhere += " AND is_favorite"
 	}
 	if isArchived != nil {
-		baseWhere += " AND is_archived = 1"
+		baseWhere += " AND is_archived"
 	}
 
-	// Simple query: get latest message per phone number using window function
-	// Include groups (@g.us) but filter out newsletter
+	// Latest message per chat key using a window function. Groups keep
+	// the full JID as the key; individual chats normalize by phone.
+	partition := "CASE WHEN to_j_id LIKE '%@g.us' THEN to_j_id ELSE " + phoneExpr + " END"
 	query := `
 		SELECT to_j_id, content, created_at as max_time, cnt, contact_name, contact_avatar, direction
 		FROM (
 			SELECT *,
-				ROW_NUMBER() OVER (PARTITION BY 
-					CASE 
-						WHEN to_j_id LIKE '%@g.us' THEN to_j_id  -- groups kept as-is
-						ELSE SUBSTR(to_j_id, 1, CASE WHEN INSTR(to_j_id, '@') > 0 THEN INSTR(to_j_id, '@') - 1 ELSE LENGTH(to_j_id) END)  -- normalize phones
-					END
-				ORDER BY created_at DESC) as rn,
-				COUNT(*) OVER (PARTITION BY 
-					CASE 
-						WHEN to_j_id LIKE '%@g.us' THEN to_j_id
-						ELSE SUBSTR(to_j_id, 1, CASE WHEN INSTR(to_j_id, '@') > 0 THEN INSTR(to_j_id, '@') - 1 ELSE LENGTH(to_j_id) END)
-					END
-				) as cnt
+				ROW_NUMBER() OVER (PARTITION BY ` + partition + ` ORDER BY created_at DESC) as rn,
+				COUNT(*) OVER (PARTITION BY ` + partition + `) as cnt
 			FROM message_logs
 			WHERE ` + baseWhere + `
-		)
+		) sub
 		WHERE rn = 1
 		ORDER BY created_at DESC
 		LIMIT 50
@@ -166,21 +173,11 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 			SELECT to_j_id, content, created_at as max_time, cnt, contact_name, contact_avatar, direction
 			FROM (
 				SELECT *,
-					ROW_NUMBER() OVER (PARTITION BY 
-						CASE 
-							WHEN to_j_id LIKE '%@g.us' THEN to_j_id
-							ELSE SUBSTR(to_j_id, 1, CASE WHEN INSTR(to_j_id, '@') > 0 THEN INSTR(to_j_id, '@') - 1 ELSE LENGTH(to_j_id) END)
-						END
-					ORDER BY created_at DESC) as rn,
-					COUNT(*) OVER (PARTITION BY 
-						CASE 
-							WHEN to_j_id LIKE '%@g.us' THEN to_j_id
-							ELSE SUBSTR(to_j_id, 1, CASE WHEN INSTR(to_j_id, '@') > 0 THEN INSTR(to_j_id, '@') - 1 ELSE LENGTH(to_j_id) END)
-						END
-					) as cnt
+					ROW_NUMBER() OVER (PARTITION BY ` + partition + ` ORDER BY created_at DESC) as rn,
+					COUNT(*) OVER (PARTITION BY ` + partition + `) as cnt
 				FROM message_logs
 				WHERE ` + searchWhere + `
-			)
+			) sub
 			WHERE rn = 1
 			ORDER BY created_at DESC
 			LIMIT 50
@@ -188,7 +185,10 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 		params = append(params, "%"+search+"%")
 	}
 
-	h.db.Raw(query, params...).Scan(&rawChatsResult)
+	if err := h.db.Raw(query, params...).Scan(&rawChatsResult).Error; err != nil {
+		log.Error().Err(err).Str("instance", instance.ID.String()).Msg("inbox chats query failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao carregar conversas"})
+	}
 
 	// Track seen JIDs to prevent duplicates
 	// For non-groups, use normalized phone; for groups, use full JID

@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -247,60 +245,26 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 		}
 
 		if found {
-			proxyType := gcfg.ProxyType
-			host := gcfg.Host
-			port := gcfg.Port
-			username := gcfg.Username
-			passwordEncrypted := gcfg.Password
-
-			if gcfg.UseEnv {
-				if envHost := os.Getenv("BRIGHTDATA_HOST"); envHost != "" {
-					host = envHost
-				}
-				if envPort := os.Getenv("BRIGHTDATA_PORT"); envPort != "" {
-					if p, convErr := strconv.Atoi(envPort); convErr == nil && p > 0 {
-						port = p
-					}
-				}
-				if envUser := os.Getenv("BRIGHTDATA_USER"); envUser != "" {
-					username = envUser
-				}
-				if envPass := os.Getenv("BRIGHTDATA_PASS"); envPass != "" {
-					if enc, encErr := whatsapp.EncryptProxyPassword(envPass); encErr == nil {
-						passwordEncrypted = enc
-					}
-				}
-				if proxyType == "" {
-					proxyType = "http"
-				}
-			}
-
-			if host != "" && port > 0 {
-				gProxyIDStr := gcfg.ID
-				h.db.Model(&instance).Updates(map[string]interface{}{
-					"use_global_proxy": true,
-					"global_proxy_id":  gProxyIDStr,
-					"proxy_mode":       models.ProxyModeNone,
-					"proxy_enabled":    true,
-					"proxy_type":       proxyType,
-					"proxy_host":       host,
-					"proxy_port":       port,
-					"proxy_username":   username,
-					"proxy_password":   passwordEncrypted,
-					"proxy_status":     models.ProxyStatusOK, // Auto-mark as OK since it's from global proxy
-				})
-				instance.UseGlobalProxy = true
-				instance.GlobalProxyID = &gProxyIDStr
-				instance.ProxyMode = models.ProxyModeNone
-				instance.ProxyEnabled = true
-				instance.ProxyType = models.ProxyType(proxyType)
-				instance.ProxyHost = host
-				instance.ProxyPort = port
-				instance.ProxyUsername = username
-				instance.ProxyPassword = passwordEncrypted
-				instance.ProxyStatus = models.ProxyStatusOK
-				log.Info().Str("instance", instance.ID.String()).Str("global_proxy_id", gProxyIDStr).Msg("global proxy auto-assigned on instance creation")
-			}
+			// Do NOT copy host/port/username/password into the instance
+			// columns — that would leak platform-managed proxy details
+			// through GET /instances and /proxy. The resolver looks up
+			// the effective proxy at connect time via global_proxy_id
+			// (when UseGlobalProxy=true) or by falling through to the
+			// default global proxy when proxy_mode=inherit.
+			gProxyIDStr := gcfg.ID
+			h.db.Model(&instance).Updates(map[string]interface{}{
+				"use_global_proxy": true,
+				"global_proxy_id":  gProxyIDStr,
+				"proxy_mode":       models.ProxyModeInherit,
+				"proxy_enabled":    true,
+				"proxy_status":     models.ProxyStatusOK,
+			})
+			instance.UseGlobalProxy = true
+			instance.GlobalProxyID = &gProxyIDStr
+			instance.ProxyMode = models.ProxyModeInherit
+			instance.ProxyEnabled = true
+			instance.ProxyStatus = models.ProxyStatusOK
+			log.Info().Str("instance", instance.ID.String()).Str("global_proxy_id", gProxyIDStr).Msg("global proxy auto-assigned on instance creation")
 		} else {
 			log.Debug().Str("user_id", user.ID.String()).Msg("no global proxy available for auto-assign")
 		}

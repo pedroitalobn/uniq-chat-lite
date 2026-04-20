@@ -49,14 +49,23 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 		AllowMethods:     "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD",
 	}))
 
-	// Force HTTPS in production
+	// Force HTTPS in production. Trust X-Forwarded-Proto from the
+	// reverse proxy (the TLS terminator forwards us plain HTTP) and
+	// never redirect WebSocket upgrades — browsers don't follow 301
+	// on WS, so the event channel would break.
 	if config.AppConfig.AppURL != "" && strings.HasPrefix(config.AppConfig.AppURL, "https") {
 		app.Use(func(c *fiber.Ctx) error {
-			if c.Protocol() != "https" {
-				httpsURL := "https://" + c.Hostname() + c.OriginalURL()
-				return c.Redirect(httpsURL, fiber.StatusMovedPermanently)
+			if strings.EqualFold(c.Get("Upgrade"), "websocket") {
+				return c.Next()
 			}
-			return c.Next()
+			if c.Protocol() == "https" {
+				return c.Next()
+			}
+			if strings.EqualFold(c.Get("X-Forwarded-Proto"), "https") {
+				return c.Next()
+			}
+			httpsURL := "https://" + c.Hostname() + c.OriginalURL()
+			return c.Redirect(httpsURL, fiber.StatusMovedPermanently)
 		})
 	}
 
