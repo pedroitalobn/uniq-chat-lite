@@ -1971,18 +1971,27 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		log.Info().Str("instance", ic.ID).Str("id", v.ID.String()).Msg("WhatsApp paired successfully")
 
 	case *events.Connected:
-		select {
-		case ic.statusChan <- "connected":
-		default:
+		// events.Connected fires as soon as the WebSocket handshake
+		// completes — including for a brand-new instance that is still
+		// showing a QR code. Only report "connected" when the store
+		// already has a paired account; otherwise pairing will emit
+		// events.PairSuccess, which is where we flip the status.
+		if ic.client.IsLoggedIn() && ic.client.Store.ID != nil {
+			select {
+			case ic.statusChan <- "connected":
+			default:
+			}
+			if ic.getSettings().AlwaysOnline {
+				go func() {
+					_ = ic.client.SendPresence(context.Background(), types.PresenceAvailable)
+				}()
+			}
+			ic.broadcastWS("status", map[string]string{"status": "connected"})
+			ic.dispatchEvent("instance.connected", map[string]string{"status": "connected"}, eventContext{})
+			log.Info().Str("instance", ic.ID).Msg("WhatsApp connected")
+		} else {
+			log.Debug().Str("instance", ic.ID).Msg("WebSocket connected but not logged in yet — waiting for QR pairing")
 		}
-		if ic.getSettings().AlwaysOnline {
-			go func() {
-				_ = ic.client.SendPresence(context.Background(), types.PresenceAvailable)
-			}()
-		}
-		ic.broadcastWS("status", map[string]string{"status": "connected"})
-		ic.dispatchEvent("instance.connected", map[string]string{"status": "connected"}, eventContext{})
-		log.Info().Str("instance", ic.ID).Msg("WhatsApp connected")
 
 	case *events.Disconnected:
 		select {

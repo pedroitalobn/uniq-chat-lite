@@ -85,10 +85,13 @@ func (h *InstanceHandler) List(c *fiber.Ctx) error {
 		id := instances[i].ID.String()
 		if h.manager.IsRunning(id) {
 			client := h.manager.GetInstance(id)
-			if client != nil && client.IsConnected() {
+			// IsConnected() reports only the WebSocket; a fresh instance
+			// showing a QR code also returns true. Require IsLoggedIn()
+			// to confirm an authenticated WhatsApp session.
+			if client != nil && client.IsConnected() && client.IsLoggedIn() {
 				instances[i].Status = models.StatusConnected
 			} else if client != nil {
-				// Running but not yet connected → keep as connecting
+				// Running but not yet logged in → still pairing/connecting
 				instances[i].Status = models.StatusConnecting
 			}
 		} else {
@@ -314,10 +317,10 @@ func (h *InstanceHandler) Get(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
 	}
 
-	// Live status — only override DB when truly connected
+	// Live status — only override DB when truly connected (authenticated)
 	if h.manager.IsRunning(instance.ID.String()) {
 		client := h.manager.GetInstance(instance.ID.String())
-		if client != nil && client.IsConnected() {
+		if client != nil && client.IsConnected() && client.IsLoggedIn() {
 			instance.Status = models.StatusConnected
 		}
 	}
