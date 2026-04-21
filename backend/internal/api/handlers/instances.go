@@ -139,7 +139,7 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "server é obrigatório"})
 	}
 
-	// Validate workspace if provided
+	// Validate workspace if provided, else fall back to the user's default.
 	var wsUUID *uuid.UUID
 	if req.WorkspaceID != nil && *req.WorkspaceID != "" {
 		parsed, err := uuid.Parse(*req.WorkspaceID)
@@ -147,10 +147,13 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "workspace_id inválido"})
 		}
 		wsUUID = &parsed
-		// Verify user has access to workspace
 		var uw models.UserWorkspace
 		if err := h.db.Where("user_id = ? AND workspace_id = ?", user.ID, parsed).First(&uw).Error; err != nil {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado ao workspace"})
+		}
+	} else {
+		if def := resolveDefaultWorkspaceID(h.db, user.ID); def != uuid.Nil {
+			wsUUID = &def
 		}
 	}
 

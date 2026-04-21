@@ -23,6 +23,23 @@ func NewServerHandler(db *gorm.DB, hub *whatsapp.Hub) *ServerHandler {
 // List godoc
 // GET /servers
 // Query params: workspace_id (optional)
+// resolveDefaultWorkspaceID devolve o workspace padrão do usuário — o primeiro
+// onde ele é owner. Se o usuário não tem workspace ainda (cenário legado),
+// retorna uuid.Nil e o caller deixa workspace_id como NULL.
+func resolveDefaultWorkspaceID(db *gorm.DB, userID uuid.UUID) uuid.UUID {
+	var uw models.UserWorkspace
+	if err := db.Where("user_id = ? AND is_owner = ?", userID, true).
+		Order("created_at ASC").First(&uw).Error; err == nil {
+		return uw.WorkspaceID
+	}
+	// Fallback: qualquer workspace em que o usuário está
+	if err := db.Where("user_id = ?", userID).
+		Order("created_at ASC").First(&uw).Error; err == nil {
+		return uw.WorkspaceID
+	}
+	return uuid.Nil
+}
+
 func (h *ServerHandler) List(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 	workspaceID := c.Query("workspace_id")
@@ -77,7 +94,7 @@ func (h *ServerHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'name' é obrigatório"})
 	}
 
-	// Validate workspace if provided
+	// Validate workspace if provided, else fall back to the user's default.
 	var wsUUID *uuid.UUID
 	if req.WorkspaceID != nil && *req.WorkspaceID != "" {
 		parsed, err := uuid.Parse(*req.WorkspaceID)
@@ -85,10 +102,13 @@ func (h *ServerHandler) Create(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "workspace_id inválido"})
 		}
 		wsUUID = &parsed
-		// Verify user has access to workspace
 		var uw models.UserWorkspace
 		if err := h.db.Where("user_id = ? AND workspace_id = ?", user.ID, parsed).First(&uw).Error; err != nil {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado ao workspace"})
+		}
+	} else {
+		if def := resolveDefaultWorkspaceID(h.db, user.ID); def != uuid.Nil {
+			wsUUID = &def
 		}
 	}
 

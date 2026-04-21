@@ -169,46 +169,20 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		MarkInviteCodeUsed(h.db, req.InviteCode, user.ID)
 	}
 
-	// For paid plans, create workspace here (but user won't have access until activated)
-	var workspace *models.Workspace
-	if req.WorkspaceName != "" {
-		workspace = &models.Workspace{
-			OwnerID: user.ID,
-			Name:    req.WorkspaceName,
+	// Todo usuário ganha um workspace default, usando o nome fornecido ou
+	// "<primeiro nome>'s Workspace" como fallback. Assim servers/instâncias
+	// criados pelo usuário ficam sempre vinculados a um workspace, evitando
+	// o cenário em que um workspace novo "esconde" os recursos órfãos.
+	workspaceName := req.WorkspaceName
+	if workspaceName == "" {
+		firstName := strings.Fields(user.Name)
+		if len(firstName) > 0 {
+			workspaceName = firstName[0] + "'s Workspace"
+		} else {
+			workspaceName = "Meu Workspace"
 		}
-		if err := h.db.Create(workspace).Error; err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar workspace"})
-		}
-
-		// Create default admin role with all permissions
-		adminRole := models.Role{
-			WorkspaceID: workspace.ID,
-			Name:        "Admin",
-			Description: "Acesso total ao workspace",
-			IsDefault:   true,
-		}
-		h.db.Create(&adminRole)
-
-		// Add all permissions to admin role
-		var permissions []models.Permission
-		h.db.Find(&permissions)
-		for _, p := range permissions {
-			h.db.Create(&models.RolePermission{
-				RoleID:       adminRole.ID,
-				PermissionID: p.ID,
-			})
-		}
-
-		// Add user as owner (but won't have access until activated)
-		h.db.Create(&models.UserWorkspace{
-			UserID:      user.ID,
-			WorkspaceID: workspace.ID,
-			RoleID:      &adminRole.ID,
-			IsOwner:     true,
-		})
-
-		h.db.Preload("Role").First(workspace, workspace.ID)
 	}
+	workspace := createDefaultWorkspace(h.db, &user, workspaceName)
 
 	// If paid plan, create payment session and return payment URL
 	if isPaidPlan && plan != nil {
@@ -350,6 +324,39 @@ type AuthHandler struct {
 	db       *gorm.DB
 	emailSvc *email.Service
 	manager  *whatsapp.Manager
+}
+
+// createDefaultWorkspace cria (idempotente) um workspace "default" pro usuário:
+//   - cria a linha em workspaces
+//   - cria um role Admin com todas as permissions
+//   - adiciona o usuário como owner do workspace
+// Retorna o workspace criado. Se algo falhar, retorna nil (caller decide o
+// que fazer — no fluxo de registro a gente simplesmente não associa).
+func createDefaultWorkspace(db *gorm.DB, user *models.User, name string) *models.Workspace {
+	ws := &models.Workspace{OwnerID: user.ID, Name: name}
+	if err := db.Create(ws).Error; err != nil {
+		return nil
+	}
+	adminRole := models.Role{
+		WorkspaceID: ws.ID,
+		Name:        "Admin",
+		Description: "Acesso total ao workspace",
+		IsDefault:   true,
+	}
+	db.Create(&adminRole)
+	var permissions []models.Permission
+	db.Find(&permissions)
+	for _, p := range permissions {
+		db.Create(&models.RolePermission{RoleID: adminRole.ID, PermissionID: p.ID})
+	}
+	db.Create(&models.UserWorkspace{
+		UserID:      user.ID,
+		WorkspaceID: ws.ID,
+		RoleID:      &adminRole.ID,
+		IsOwner:     true,
+	})
+	db.Preload("Role").First(ws, ws.ID)
+	return ws
 }
 
 func NewAuthHandler(db *gorm.DB, emailSvc *email.Service, manager *whatsapp.Manager) *AuthHandler {
