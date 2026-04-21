@@ -282,12 +282,20 @@ func extractPhoneFromJID(jid string) string {
 	return jid
 }
 
-// canonicalJID normalizes personal chats to @s.whatsapp.net to avoid split conversations
+// canonicalJID normalizes personal chats to @s.whatsapp.net to avoid split conversations.
+// LID-form JIDs are left untouched so we never fabricate a "phone" JID from a LID
+// user-id hash — that would split the inbox (@lid row vs. real @s.whatsapp.net row).
+// Upstream code (InstanceClient.resolveChatPNJID) is responsible for mapping LID → PN
+// before calling SaveMessage; any @lid that still reaches here is filtered out of
+// the inbox listing downstream.
 func canonicalJID(jid string) string {
 	if jid == "" {
 		return jid
 	}
 	if strings.HasSuffix(jid, "@g.us") || strings.HasSuffix(jid, "@newsletter") || jid == "status@broadcast" {
+		return jid
+	}
+	if strings.HasSuffix(jid, "@lid") {
 		return jid
 	}
 	phone := extractPhoneFromJID(jid)

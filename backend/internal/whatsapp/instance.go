@@ -305,20 +305,50 @@ func normalizeJID(input string) string {
 	return cleaned + "@s.whatsapp.net"
 }
 
-// resolveRecipient resolves a phone-number JID to the canonical JID used by WhatsApp,
-// and pre-populates the LID cache so SendMessage can resolve the LID without errors.
-// This handles cases like Brazilian numbers with/without the 9th digit.
-// resolveRecipient transforma um phone JID no destino que o whatsmeow
-// espera. Usamos um cache local (alimentado por lookups prévios e pelo
-// Store.LIDs que o whatsmeow popula com mensagens recebidas) pra evitar
-// o rate-limit (429) do usync. Somente chamamos IsOnWhatsApp quando não
-// temos nenhuma informação sobre o contato.
+// resolveChatPNJID returns the chat JID in phone-number form (@s.whatsapp.net)
+// whenever possible. Contacts that migrated to LID addressing arrive with
+// Chat.Server == "lid"; if we save that unchanged, the inbox ends up with a
+// second row separate from the phone-JID row used by outgoing sends. We prefer
+// the alt JID that whatsmeow already resolved for us (RecipientAlt for
+// outgoing DMs, SenderAlt for incoming DMs) and fall back to the persisted
+// LID↔PN map. Groups and broadcast chats are returned as-is.
+func (ic *InstanceClient) resolveChatPNJID(info types.MessageInfo) types.JID {
+	chat := info.Chat
+	if chat.Server != types.HiddenUserServer {
+		return chat
+	}
+	if info.IsFromMe && !info.RecipientAlt.IsEmpty() && info.RecipientAlt.Server == types.DefaultUserServer {
+		return info.RecipientAlt
+	}
+	if !info.SenderAlt.IsEmpty() && info.SenderAlt.Server == types.DefaultUserServer {
+		return info.SenderAlt
+	}
+	if !info.RecipientAlt.IsEmpty() && info.RecipientAlt.Server == types.DefaultUserServer {
+		return info.RecipientAlt
+	}
+	if ic.client != nil && ic.client.Store != nil && ic.client.Store.LIDs != nil {
+		if pn, err := ic.client.Store.LIDs.GetPNForLID(context.Background(), chat); err == nil && !pn.IsEmpty() {
+			return pn
+		}
+	}
+	return chat
+}
+
+// resolveRecipient turns a phone-number JID into the destination whatsmeow expects
+// for SendMessage. Strategy: only consult caches that are already populated (our
+// in-memory map + whatsmeow's persisted LID↔PN store). We do NOT call usync
+// endpoints (IsOnWhatsApp / GetUserInfo) here — whatsmeow.SendMessage already
+// runs GetUserInfo as a fallback when LIDMigrationTimestamp > 0 and the store
+// misses. Running an additional usync query on our side meant two round-trips per
+// first-time send, which regularly tripped the server's rate-overlimit (429) and
+// aborted the send (non-retriable). Incoming messages auto-populate Store.LIDs
+// via SenderAlt/RecipientAlt, so contacts who've messaged the instance resolve
+// without any network call.
 func (ic *InstanceClient) resolveRecipient(ctx context.Context, jid types.JID) types.JID {
 	if jid.Server != types.DefaultUserServer {
 		return jid
 	}
 
-	// 1. Cache local.
 	ic.recipientCacheMu.RLock()
 	cached, ok := ic.recipientCache[jid.String()]
 	ic.recipientCacheMu.RUnlock()
@@ -326,8 +356,6 @@ func (ic *InstanceClient) resolveRecipient(ctx context.Context, jid types.JID) t
 		return cached
 	}
 
-	// 2. LID store persistido pelo whatsmeow (mensagens recebidas
-	//    alimentam esse cache automaticamente).
 	if ic.client.Store != nil && ic.client.Store.LIDs != nil {
 		if lid, err := ic.client.Store.LIDs.GetLIDForPN(ctx, jid); err == nil && !lid.IsEmpty() {
 			ic.cacheRecipient(jid, lid)
@@ -335,35 +363,7 @@ func (ic *InstanceClient) resolveRecipient(ctx context.Context, jid types.JID) t
 		}
 	}
 
-	needsLID := ic.client.Store != nil && ic.client.Store.LIDMigrationTimestamp > 0
-
-	// 3. Lookup via IsOnWhatsApp — canonicaliza número e o próprio
-	//    whatsmeow já cacheia o LID no Store.LIDs. Se der rate-limit,
-	//    retornamos o phone JID mesmo e whatsmeow que decide.
-	phone := "+" + jid.User
-	resp, err := ic.client.IsOnWhatsApp(ctx, []string{phone})
-	canonical := jid
-	if err == nil && len(resp) > 0 && resp[0].IsIn && !resp[0].JID.IsEmpty() {
-		canonical = resp[0].JID
-	}
-
-	if !needsLID {
-		ic.cacheRecipient(jid, canonical)
-		return canonical
-	}
-
-	// Depois do IsOnWhatsApp, o Store.LIDs pode ter sido populado.
-	if ic.client.Store != nil && ic.client.Store.LIDs != nil {
-		if lid, err := ic.client.Store.LIDs.GetLIDForPN(ctx, canonical); err == nil && !lid.IsEmpty() {
-			ic.cacheRecipient(jid, lid)
-			return lid
-		}
-	}
-
-	// Sem LID disponível — retorna phone JID (send provavelmente vai
-	// falhar com "no LID found", e a gente não faz retry pra não
-	// queimar rate-limit).
-	return canonical
+	return jid
 }
 
 func (ic *InstanceClient) cacheRecipient(phoneJID, resolved types.JID) {
@@ -1793,11 +1793,14 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 				msgText = "—"
 			}
 		}
-		chatJID := v.Info.Chat.String()
+		chatJID := ic.resolveChatPNJID(v.Info).String()
 		pushName := v.Info.PushName
-		isGroupMsg := v.Info.Chat.Server == "g.us"
+		isGroupMsg := v.Info.Chat.Server == types.GroupServer
 		log.Printf("DEBUG: Saving message - chatJID=%s, pushName=%s, isGroup=%v", chatJID, pushName, isGroupMsg)
 		senderJID := v.Info.Sender.String()
+		if !isGroupMsg && v.Info.Sender.Server == types.HiddenUserServer && !v.Info.SenderAlt.IsEmpty() && v.Info.SenderAlt.Server == types.DefaultUserServer {
+			senderJID = v.Info.SenderAlt.String()
+		}
 		go func() {
 			if GlobalManager != nil {
 				_ = GlobalManager.SaveMessage(ic.ID, chatJID, msgText, direction, msgType, pushName, isGroupMsg, senderJID)
@@ -1807,15 +1810,15 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		// Check and execute journeys for incoming messages
 		if evName == "message.received" && !isFromMe {
 			if GlobalManager != nil {
-				chatJID := v.Info.Chat.String()
-				senderJID := v.Info.Sender.String()
+				journeyChatJID := chatJID
+				journeySenderJID := senderJID
 				pushName := v.Info.PushName
 				if pushName == "" {
 					pushName = "Cliente"
 				}
-				isGroup := v.Info.Chat.Server == "g.us"
+				isGroup := isGroupMsg
 				// Check journeys for both text and media messages
-				go GlobalManager.CheckJourneys(ic.ID, senderJID, pushName, chatJID, text, msgType, isGroup)
+				go GlobalManager.CheckJourneys(ic.ID, journeySenderJID, pushName, journeyChatJID, text, msgType, isGroup)
 			}
 		}
 
