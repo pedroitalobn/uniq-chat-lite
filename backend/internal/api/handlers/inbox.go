@@ -7,7 +7,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/rs/zerolog/log"
+	zlog "github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
@@ -188,7 +188,7 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 	}
 
 	if err := h.db.Raw(query, params...).Scan(&rawChatsResult).Error; err != nil {
-		log.Error().Err(err).Str("instance", instance.ID.String()).Msg("inbox chats query failed")
+		zlog.Error().Err(err).Str("instance", instance.ID.String()).Msg("inbox chats query failed")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao carregar conversas"})
 	}
 
@@ -575,27 +575,31 @@ func (h *InboxHandler) SendMessage(c *fiber.Ctx) error {
 	h.db.Create(&log)
 
 	go func() {
-		var msgIDStr string
-		var err error
-
-		switch req.Type {
-		case "text":
-			msgIDStr, err = client.SendTextMessage(jid, req.Content)
-		default:
-			// For media types, treat content as text for now
-			// Media sending should use separate endpoint with file upload
-			msgIDStr, err = client.SendTextMessage(jid, req.Content)
-		}
-
-		status := models.MessageStatusSent
+		msgIDStr, err := client.SendTextMessage(jid, req.Content)
 		if err != nil {
-			status = models.MessageStatusFailed
+			zlog.Error().Err(err).
+				Str("instance", instance.ID.String()).
+				Str("to_jid", jid).
+				Str("message_id", msgID.String()).
+				Msg("inbox: failed to send message via whatsmeow")
+			h.db.Model(&log).Updates(map[string]interface{}{
+				"status": models.MessageStatusFailed,
+				"content": string(func() []byte {
+					b, _ := json.Marshal(map[string]string{
+						"text":  req.Content,
+						"error": err.Error(),
+					})
+					return b
+				}()),
+			})
+			return
 		}
-
-		h.db.Model(&log).Updates(map[string]interface{}{
-			"status": status,
-		})
-		_ = msgIDStr
+		zlog.Info().
+			Str("instance", instance.ID.String()).
+			Str("to_jid", jid).
+			Str("whatsmeow_msg_id", msgIDStr).
+			Msg("inbox: message sent")
+		h.db.Model(&log).Update("status", models.MessageStatusSent)
 	}()
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
