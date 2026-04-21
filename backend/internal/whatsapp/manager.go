@@ -567,6 +567,12 @@ func (m *Manager) loadWebhooks(instanceID string) []webhookEntry {
 	return entries
 }
 
+// disconnectedDebounce delays persisting/broadcasting a "disconnected" event
+// so brief socket flaps — which whatsmeow's built-in auto-reconnect recovers
+// from in 0–2 seconds — don't flash the UI. Tuned above the common flap
+// window but below where a user would suspect a real outage.
+const disconnectedDebounce = 15 * time.Second
+
 func (m *Manager) watchStatus(instanceID string, client *InstanceClient) {
 	// If the instance hasn't connected within 60 s, reset to disconnected.
 	connectTimer := time.AfterFunc(60*time.Second, func() {
@@ -577,6 +583,17 @@ func (m *Manager) watchStatus(instanceID string, client *InstanceClient) {
 			log.Info().Str("instance", instanceID).Msg("connection timeout — reset to disconnected")
 		}
 	})
+
+	var disconnectTimer *time.Timer
+	var disconnectTimerMu sync.Mutex
+	cancelDisconnect := func() {
+		disconnectTimerMu.Lock()
+		if disconnectTimer != nil {
+			disconnectTimer.Stop()
+			disconnectTimer = nil
+		}
+		disconnectTimerMu.Unlock()
+	}
 
 	for status := range client.GetStatusChan() {
 		connectTimer.Stop()
@@ -589,6 +606,9 @@ func (m *Manager) watchStatus(instanceID string, client *InstanceClient) {
 		}
 
 		if status == "connected" {
+			// Cancel any pending debounced disconnect — we recovered in time.
+			cancelDisconnect()
+
 			now := time.Now()
 			m.db.Model(&models.Instance{}).Where("id = ?", instanceID).Updates(map[string]interface{}{
 				"status":       models.StatusConnected,
@@ -600,12 +620,25 @@ func (m *Manager) watchStatus(instanceID string, client *InstanceClient) {
 				hub.BroadcastInstanceStatus(instanceID, "connected", phone)
 			}
 		} else {
-			m.db.Model(&models.Instance{}).Where("id = ?", instanceID).Update("status", models.StatusDisconnected)
-
-			// Broadcast disconnection event
-			if hub := GetHub(); hub != nil {
-				hub.BroadcastInstanceStatus(instanceID, "disconnected", phone)
-			}
+			// Debounce: hold the disconnect for disconnectedDebounce. If a
+			// "connected" arrives before then, cancel and never surface the
+			// blip. If we're still down after the window, commit it.
+			cancelDisconnect()
+			phoneCopy := phone
+			disconnectTimerMu.Lock()
+			disconnectTimer = time.AfterFunc(disconnectedDebounce, func() {
+				if client.IsConnected() {
+					// whatsmeow reconnected without emitting a new status —
+					// treat as still connected and skip broadcast.
+					return
+				}
+				m.db.Model(&models.Instance{}).Where("id = ?", instanceID).Update("status", models.StatusDisconnected)
+				if hub := GetHub(); hub != nil {
+					hub.BroadcastInstanceStatus(instanceID, "disconnected", phoneCopy)
+				}
+				log.Info().Str("instance", instanceID).Msg("disconnect sustained past debounce window — surfacing")
+			})
+			disconnectTimerMu.Unlock()
 		}
 	}
 }
