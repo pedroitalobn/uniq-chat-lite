@@ -170,11 +170,10 @@ export const serversApi = {
   get: (id: string) => api.get(`/v1/servers/${id}`),
   create: (data: { name: string; slug?: string; description?: string; workspace_id?: string }) =>
     api.post("/v1/servers", data),
-  update: (id: string, data: { 
-    name?: string; 
-    description?: string; 
+  update: (id: string, data: {
+    name?: string;
+    description?: string;
     is_active?: boolean;
-    proxy_pool_id?: string;
     webhook_url?: string;
     apply_webhook?: boolean;
   }) => api.put(`/v1/servers/${id}`, data),
@@ -182,18 +181,10 @@ export const serversApi = {
   instances: (id: string) => api.get(`/v1/servers/${id}/instances`),
   stats: (id: string) => api.get(`/v1/servers/${id}/stats`),
   action: (id: string, action: string) => api.post(`/v1/servers/${id}/actions`, { action }),
-  // Server-level proxy (heranças aplicam-se a todas as instâncias com mode=inherit)
+  // Proxy do server — todas as instâncias vinculadas compartilham.
   getProxy: (id: string) => api.get(`/v1/servers/${id}/proxy`),
-  setProxy: (id: string, data: {
-    mode: "none" | "manual" | "residencial" | "global" | "inherit";
-    type?: "http" | "https" | "socks5";
-    host?: string;
-    port?: number;
-    username?: string;
-    password?: string;
-    global_proxy_id?: string;
-    proxy_pool_id?: string;
-  }) => api.put(`/v1/servers/${id}/proxy`, data),
+  setProxy: (id: string, proxyId: string | null) =>
+    api.put(`/v1/servers/${id}/proxy`, { proxy_id: proxyId }),
   deleteProxy: (id: string) => api.delete(`/v1/servers/${id}/proxy`),
   testProxy: (id: string) => api.post(`/v1/servers/${id}/proxy/test`),
 };
@@ -202,26 +193,30 @@ export const channelsApi = {
   list: () => api.get("/v1/channels"),
 };
 
-export const proxyPoolsApi = {
-  list: () => api.get("/v1/proxy/pool"),
-  listProviders: () => api.get("/v1/proxy/providers"),
-  getGlobalProxies: () => api.get("/v1/proxy/global"),
-  createProvider: (data: {
-    provider: string;
+// Catálogo de proxies (plataforma + próprios do usuário)
+export const proxiesApi = {
+  listAvailable: () => api.get("/v1/proxies"),
+  listMine: () => api.get("/v1/proxies/mine"),
+  create: (data: {
     name: string;
-    api_key?: string;
     country?: string;
-    // Campos para provider="manual" (proxy custom com host/port)
-    proxy_url?: string;
     proxy_type?: "http" | "https" | "socks5";
-    proxy_host?: string;
-    proxy_port?: number;
-    proxy_username?: string;
-    proxy_password?: string;
-  }) => api.post("/v1/proxy/providers", data),
-  updateProvider: (id: string, data: { name?: string; api_key?: string; country?: string; is_active?: boolean }) =>
-    api.put(`/v1/proxy/providers/${id}`, data),
-  deleteProvider: (id: string) => api.delete(`/v1/proxy/providers/${id}`),
+    host: string;
+    port: number;
+    username?: string;
+    password?: string;
+  }) => api.post("/v1/proxies", data),
+  update: (id: string, data: Partial<{
+    name: string;
+    country: string;
+    proxy_type: "http" | "https" | "socks5";
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+  }>) => api.put(`/v1/proxies/${id}`, data),
+  remove: (id: string) => api.delete(`/v1/proxies/${id}`),
+  test: (id: string) => api.post(`/v1/proxies/${id}/test`),
 };
 
 export const instancesApi = {
@@ -291,15 +286,10 @@ export const settingsApi = {
   }>) => api.put(`/v1/instances/${id}/settings`, data),
 };
 
+// Read-only: a config efetiva da instância sai do server. Pra alterar, vai no server.
 export const proxyApi = {
   get: (id: string) => api.get(`/v1/instances/${id}/proxy`),
   effective: (id: string) => api.get(`/v1/instances/${id}/proxy/effective`),
-  set: (id: string, data: ProxyConfig) => api.put(`/v1/instances/${id}/proxy`, data),
-  test: (id: string, data?: Partial<ProxyConfig>) =>
-    api.post(`/v1/instances/${id}/proxy/test`, data || {}),
-  delete: (id: string) => api.delete(`/v1/instances/${id}/proxy`),
-  setMode: (id: string, data: { mode: string; global_proxy_id?: string; provider_id?: string }) =>
-    api.put(`/v1/instances/${id}/proxy/mode`, data),
 };
 
 export const messagesApi = {
@@ -618,7 +608,10 @@ export const adminApi = {
   listUsers: () => api.get("/v1/admin/users"),
   getProxyConfig: () => api.get("/v1/admin/proxy-config"),
   updateProxyConfig: (data: Record<string, unknown>) => api.put("/v1/admin/proxy-config", data),
+  updateGlobalProxy: (data: Record<string, unknown>) => api.put("/v1/admin/proxy-config", data),
   deleteProxyConfig: (id: string) => api.delete(`/v1/admin/proxy-config/${id}`),
+  deleteGlobalProxy: (id: string) => api.delete(`/v1/admin/proxy-config/${id}`),
+  testGlobalProxy: (id?: string) => api.post("/v1/admin/proxy-test", id ? { id } : {}),
   getProxyStats: () => api.get("/v1/admin/proxy-stats"),
   createUser: (data: {
     name: string; email: string; username?: string;

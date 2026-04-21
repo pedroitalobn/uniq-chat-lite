@@ -15,6 +15,23 @@ export interface User {
 
 export type UserRole = "super_admin" | "customer" | "lead";
 
+export interface Proxy {
+  id: string;
+  owner_id?: string;
+  is_platform: boolean;
+  name: string;
+  country?: string;
+  provider?: string;
+  proxy_type?: "http" | "https" | "socks5";
+  host?: string;
+  port?: number;
+  username?: string;
+  use_env?: boolean;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Server {
   id: string;
   user_id: string;
@@ -22,8 +39,8 @@ export interface Server {
   slug: string;
   description?: string;
   is_active: boolean;
-  proxy_pool_id?: string;
-  proxy_pool?: ProxyPool;
+  proxy_id?: string;
+  proxy?: Proxy;
   webhook_url?: string;
   created_at: string;
   updated_at: string;
@@ -126,21 +143,22 @@ export interface Instance {
   channel: ChannelType;
   phone_number?: string;
   status: InstanceStatus;
-  // Proxy
+  // Proxy: config efetiva vem do Server.proxy (ver interface Server).
+  // Campos legados aqui só pra não quebrar código antigo enquanto a UI
+  // é migrada — serão removidos em seguida.
   proxy_mode?: ProxyMode;
-  proxy_enabled: boolean;
+  proxy_enabled?: boolean;
   proxy_type?: ProxyType;
   proxy_host?: string;
   proxy_port?: number;
   proxy_username?: string;
-  proxy_status: ProxyStatus;
+  proxy_status?: ProxyStatus;
   proxy_last_tested?: string;
   proxy_external_ip?: string;
   proxy_error?: string;
-  proxy_pool_id?: string;
   use_global_proxy?: boolean;
   global_proxy_id?: string;
-  global_proxy?: GlobalProxyConfig;
+  global_proxy?: { id: string; name?: string; country?: string; host?: string };
   connected_at?: string;
   // MCP
   mcp_enabled: boolean;

@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { serversApi, proxyPoolsApi } from "@/lib/api";
-import type { Server, ServerStats, ProxyPool } from "@/types";
+import { serversApi, proxiesApi } from "@/lib/api";
+import type { Server, ServerStats } from "@/types";
 import {
   Server as ServerIcon, Plus, X, Trash2, Pencil, Globe,
   Smartphone, Loader2, Copy, Check, ExternalLink,
@@ -108,18 +108,11 @@ function ServerModal({
   const [name, setName]         = useState(server?.name || "");
   const [slug, setSlug]         = useState(server?.slug || "");
   const [description, setDesc]  = useState(server?.description || "");
-  const [proxyPoolId, setProxyPoolId] = useState(server?.proxy_pool_id || "");
   const [webhookUrl, setWebhookUrl] = useState(server?.webhook_url || "");
   const [applyWebhook, setApplyWebhook] = useState(false);
   const [slugTouched, setSlugTouched] = useState(isEdit);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
-
-  const { data: proxyPools = [] } = useQuery<ProxyPool[]>({
-    queryKey: ["proxy-pools"],
-    queryFn: () => proxyPoolsApi.list().then(r => r.data),
-    enabled: isEdit,
-  });
 
   const autoSlug = (v: string) =>
     v.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/--+/g, "-").replace(/^-|-$/g, "");
@@ -136,10 +129,9 @@ function ServerModal({
     setError("");
     try {
       if (isEdit) {
-        await serversApi.update(server.id, { 
-          name: name.trim(), 
+        await serversApi.update(server.id, {
+          name: name.trim(),
           description,
-          proxy_pool_id: proxyPoolId || undefined,
           webhook_url: webhookUrl || undefined,
           apply_webhook: applyWebhook,
         });
@@ -227,19 +219,6 @@ function ServerModal({
             <>
               <div>
                 <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
-                  Proxy Pool
-                </label>
-                <select value={proxyPoolId} onChange={e => setProxyPoolId(e.target.value)}
-                  className="input-field w-full">
-                  <option value="">Nenhum</option>
-                  {proxyPools.map(pool => (
-                    <option key={pool.id} value={pool.id}>{pool.name} ({pool.provider})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
                   Webhook Padrão
                 </label>
                 <input value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)}
@@ -251,6 +230,10 @@ function ServerModal({
                   className="rounded" />
                 Aplicar webhook a todas as instâncias
               </label>
+
+              <p className="text-[11px] mt-1" style={{ color: "hsl(240 8% 40%)" }}>
+                Proxy: use o botão <Shield className="w-3 h-3 inline" /> no card do server.
+              </p>
             </>
           )}
 
@@ -268,83 +251,159 @@ function ServerModal({
 }
 
 // ─── Server Proxy Modal ──────────────────────────────────────────────────────
-type ProxyMode = "none" | "manual" | "residencial" | "global" | "inherit";
-
-interface ServerProxyData {
-  mode: ProxyMode;
-  type?: "http" | "https" | "socks5" | "";
+interface CatalogProxy {
+  id: string;
+  name: string;
+  country?: string;
+  type?: string;
+  is_platform: boolean;
+  is_active?: boolean;
   host?: string;
   port?: number;
   username?: string;
-  password?: string;
-  global_proxy_id?: string | null;
-  proxy_pool_id?: string | null;
 }
 
-interface GlobalProxyOption { id: string; name: string; country: string; enabled: boolean; is_default: boolean; }
+const COUNTRY_FLAGS: Record<string, string> = {
+  br: "🇧🇷", us: "🇺🇸", gb: "🇬🇧", ar: "🇦🇷", co: "🇨🇴", mx: "🇲🇽",
+  es: "🇪🇸", de: "🇩🇪", fr: "🇫🇷", it: "🇮🇹", jp: "🇯🇵", cn: "🇨🇳",
+};
+
+function CreateProxyInline({ onCreated, onCancel }: { onCreated: (proxyId: string) => void; onCancel: () => void }) {
+  const [form, setForm] = useState({
+    name: "", host: "", port: 0, username: "", password: "",
+    proxy_type: "http" as "http" | "https" | "socks5",
+  });
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; external_ip?: string; latency_ms?: number; error?: string } | null>(null);
+
+  const submit = async (alsoLink: boolean) => {
+    setSaving(true);
+    try {
+      const r = await proxiesApi.create({
+        name: form.name.trim(),
+        host: form.host.trim(),
+        port: form.port,
+        username: form.username,
+        password: form.password,
+        proxy_type: form.proxy_type,
+      });
+      toast.success("Proxy criado");
+      if (alsoLink) onCreated(r.data.id);
+      else onCancel();
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao criar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const doTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const r = await proxiesApi.create({
+        name: form.name.trim() || "temp",
+        host: form.host.trim(),
+        port: form.port,
+        username: form.username,
+        password: form.password,
+        proxy_type: form.proxy_type,
+      });
+      const created = r.data;
+      const t = await proxiesApi.test(created.id);
+      setTestResult(t.data);
+      // Se o teste falhou, apaga; se passou, deixa criado pro usuário vincular depois
+      if (!t.data.success) {
+        await proxiesApi.remove(created.id);
+      } else {
+        toast.success(`Proxy testado — IP ${t.data.external_ip}`);
+      }
+    } catch (err: unknown) {
+      setTestResult({ success: false, error: (err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro" });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const valid = form.name.trim() && form.host.trim() && form.port > 0;
+
+  return (
+    <div className="p-3 rounded-xl space-y-3" style={{ background: "hsl(240 12% 8%)", border: "1px solid hsl(240 12% 14%)" }}>
+      <div className="text-xs font-semibold" style={{ color: "hsl(240 15% 85%)" }}>Criar proxy novo</div>
+      <input className="input-field w-full text-xs" placeholder="Nome (ex: Brightdata BR)"
+        value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+      <div className="grid grid-cols-3 gap-2">
+        <select className="input-field text-xs col-span-1" value={form.proxy_type}
+          onChange={e => setForm(f => ({ ...f, proxy_type: e.target.value as "http" | "https" | "socks5" }))}>
+          <option value="http">http</option>
+          <option value="https">https</option>
+          <option value="socks5">socks5</option>
+        </select>
+        <input className="input-field text-xs col-span-2" placeholder="host"
+          value={form.host} onChange={e => setForm(f => ({ ...f, host: e.target.value }))} />
+      </div>
+      <input type="number" className="input-field w-full text-xs" placeholder="porta"
+        value={form.port || ""} onChange={e => setForm(f => ({ ...f, port: parseInt(e.target.value) || 0 }))} />
+      <div className="grid grid-cols-2 gap-2">
+        <input className="input-field text-xs" placeholder="usuário"
+          value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} />
+        <input type="password" className="input-field text-xs" placeholder="senha"
+          value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
+      </div>
+      {testResult && (
+        <div className="text-[11px] p-2 rounded-lg" style={{
+          background: testResult.success ? "rgba(0,212,106,0.08)" : "rgba(239,68,68,0.08)",
+          color: testResult.success ? "var(--green)" : "#f87171",
+        }}>
+          {testResult.success
+            ? `✓ OK · IP ${testResult.external_ip} · ${testResult.latency_ms}ms`
+            : `✗ ${testResult.error}`}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <button onClick={doTest} disabled={!valid || testing} className="btn-ghost flex-1 py-2 text-xs">
+          {testing ? <Loader2 className="w-3 h-3 animate-spin inline" /> : "Testar"}
+        </button>
+        <button onClick={() => submit(true)} disabled={!valid || saving} className="flex-1 py-2 rounded-xl text-xs font-semibold"
+          style={{ background: "var(--green)", color: "white", opacity: saving ? 0.7 : 1 }}>
+          {saving ? <Loader2 className="w-3 h-3 animate-spin inline" /> : "Salvar e vincular"}
+        </button>
+      </div>
+      <button onClick={onCancel} className="w-full text-[11px] opacity-60 hover:opacity-100">cancelar</button>
+    </div>
+  );
+}
 
 function ServerProxyModal({
   server, onClose, onSaved,
 }: {
   server: Server; onClose: () => void; onSaved: () => void;
 }) {
-  const [data, setData] = useState<ServerProxyData>({ mode: "inherit" });
+  const [selectedId, setSelectedId] = useState<string | "" | "none">("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; external_ip?: string; latency_ms?: number; error?: string; url?: string; source?: string } | null>(null);
+  const [testResult, setTestResult] = useState<{ success: boolean; external_ip?: string; latency_ms?: number; error?: string } | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
 
-  const { data: globals = [] } = useQuery<GlobalProxyOption[]>({
-    queryKey: ["global-proxies"],
-    queryFn: async () => {
-      try {
-        const r = await fetch("/api/v1/proxy/global", { credentials: "include" });
-        if (!r.ok) return [];
-        const d = await r.json();
-        return Array.isArray(d) ? d : [];
-      } catch { return []; }
-    },
+  const { data: catalog = [], refetch } = useQuery<CatalogProxy[]>({
+    queryKey: ["proxies-available"],
+    queryFn: () => proxiesApi.listAvailable().then(r => r.data),
   });
 
-  const { data: pools = [] } = useQuery<ProxyPool[]>({
-    queryKey: ["proxy-pools"],
-    queryFn: () => proxyPoolsApi.list().then(r => r.data),
-  });
-
-  // Load current
   useState(() => {
     serversApi.getProxy(server.id).then(r => {
-      const d = r.data;
-      setData({
-        mode: (d.mode as ProxyMode) || "inherit",
-        type: d.type || "",
-        host: d.host || "",
-        port: d.port || 0,
-        username: d.username || "",
-        password: "",
-        global_proxy_id: d.global_proxy_id || "",
-        proxy_pool_id: d.proxy_pool_id || "",
-      });
-    }).catch(() => { /* use defaults */ })
+      const d = r.data as { has_proxy?: boolean; proxy_id?: string };
+      setSelectedId(d.has_proxy ? (d.proxy_id || "") : "none");
+    }).catch(() => setSelectedId("none"))
       .finally(() => setLoading(false));
   });
 
   const save = async () => {
     setSaving(true);
     try {
-      const payload: Record<string, unknown> = { mode: data.mode };
-      if (data.mode === "manual") {
-        payload.type = data.type || "http";
-        payload.host = data.host;
-        payload.port = data.port;
-        payload.username = data.username;
-        if (data.password) payload.password = data.password;
-      } else if (data.mode === "global") {
-        payload.global_proxy_id = data.global_proxy_id;
-      } else if (data.mode === "residencial") {
-        payload.proxy_pool_id = data.proxy_pool_id;
-      }
-      await serversApi.setProxy(server.id, payload as Parameters<typeof serversApi.setProxy>[1]);
+      await serversApi.setProxy(server.id, selectedId === "none" || !selectedId ? null : selectedId);
       toast.success("Proxy do server atualizado");
       onSaved();
     } catch (err: unknown) {
@@ -365,14 +424,6 @@ function ServerProxyModal({
     } finally {
       setTesting(false);
     }
-  };
-
-  const modeDescription: Record<ProxyMode, string> = {
-    none: "Server sem proxy — bloqueia herança das instâncias.",
-    inherit: "Server sem configuração própria — instâncias caem no global default.",
-    manual: "Proxy custom configurado no server (host/port/credenciais próprias).",
-    residencial: "Usa um Proxy Pool residencial atribuído ao server.",
-    global: "Aponta para um Proxy Global compartilhado do sistema.",
   };
 
   return (
@@ -402,112 +453,80 @@ function ServerProxyModal({
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Mode selector */}
-            <div>
-              <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
-                Modo
-              </label>
-              <div className="grid grid-cols-5 gap-1.5">
-                {(["inherit", "global", "manual", "residencial", "none"] as ProxyMode[]).map(m => (
-                  <button
-                    key={m}
-                    onClick={() => setData(d => ({ ...d, mode: m }))}
-                    className="px-2 py-2 rounded-lg text-[10px] font-semibold uppercase transition-all"
+            <p className="text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
+              Todas as instâncias deste server compartilham o proxy selecionado.
+            </p>
+
+            {/* Sem proxy */}
+            <label className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all"
+              style={{
+                background: selectedId === "none" ? "rgba(0,212,106,0.08)" : "hsl(240 12% 8%)",
+                border: `1px solid ${selectedId === "none" ? "rgba(0,212,106,0.3)" : "hsl(240 12% 14%)"}`,
+              }}>
+              <input type="radio" className="mt-1" checked={selectedId === "none"} onChange={() => setSelectedId("none")} />
+              <div>
+                <div className="text-xs font-semibold" style={{ color: "hsl(240 15% 85%)" }}>Sem proxy</div>
+                <div className="text-[11px] opacity-60">Conexão direta do server</div>
+              </div>
+            </label>
+
+            {/* Catálogo */}
+            {catalog.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="text-[10px] uppercase font-bold opacity-60">Proxies disponíveis</div>
+                {catalog.map(p => (
+                  <label key={p.id}
+                    className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all"
                     style={{
-                      background: data.mode === m ? "rgba(0,212,106,0.15)" : "hsl(240 12% 8%)",
-                      color: data.mode === m ? "var(--green)" : "hsl(240 8% 55%)",
-                      border: `1px solid ${data.mode === m ? "rgba(0,212,106,0.4)" : "hsl(240 12% 14%)"}`,
-                    }}
-                  >
-                    {m}
-                  </button>
+                      background: selectedId === p.id ? "rgba(0,212,106,0.08)" : "hsl(240 12% 8%)",
+                      border: `1px solid ${selectedId === p.id ? "rgba(0,212,106,0.3)" : "hsl(240 12% 14%)"}`,
+                    }}>
+                    <input type="radio" className="mt-1" checked={selectedId === p.id} onChange={() => setSelectedId(p.id)} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-semibold" style={{ color: "hsl(240 15% 85%)" }}>{p.name}</span>
+                        {p.country && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "hsl(240 12% 14%)", color: "hsl(240 8% 65%)" }}>
+                            {COUNTRY_FLAGS[p.country] || "🌐"} {p.country.toUpperCase()}
+                          </span>
+                        )}
+                        <span className="text-[10px] px-1.5 py-0.5 rounded"
+                          style={{
+                            background: p.is_platform ? "rgba(167,139,250,0.12)" : "rgba(99,102,241,0.12)",
+                            color: p.is_platform ? "#a78bfa" : "#818cf8",
+                          }}>
+                          {p.is_platform ? "Plataforma" : "Custom"}
+                        </span>
+                      </div>
+                      {!p.is_platform && p.host && (
+                        <div className="text-[10px] opacity-50 font-mono mt-0.5 truncate">
+                          {p.type || "http"}://{p.host}:{p.port}
+                        </div>
+                      )}
+                    </div>
+                  </label>
                 ))}
               </div>
-              <p className="text-[10px] mt-2" style={{ color: "hsl(240 8% 40%)" }}>
-                {modeDescription[data.mode]}
-              </p>
-            </div>
-
-            {/* Manual fields */}
-            {data.mode === "manual" && (
-              <div className="space-y-3 p-3 rounded-xl" style={{ background: "hsl(240 12% 8%)", border: "1px solid hsl(240 12% 14%)" }}>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="col-span-1">
-                    <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Tipo</label>
-                    <select className="input-field w-full text-xs"
-                      value={data.type || "http"}
-                      onChange={e => setData(d => ({ ...d, type: e.target.value as ServerProxyData["type"] }))}>
-                      <option value="http">http</option>
-                      <option value="https">https</option>
-                      <option value="socks5">socks5</option>
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Host</label>
-                    <input className="input-field w-full text-xs"
-                      placeholder="brd.superproxy.io"
-                      value={data.host || ""}
-                      onChange={e => setData(d => ({ ...d, host: e.target.value }))} />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Porta</label>
-                  <input type="number" className="input-field w-full text-xs"
-                    placeholder="33335"
-                    value={data.port || ""}
-                    onChange={e => setData(d => ({ ...d, port: parseInt(e.target.value) || 0 }))} />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Usuário</label>
-                    <input className="input-field w-full text-xs"
-                      value={data.username || ""}
-                      onChange={e => setData(d => ({ ...d, username: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Senha</label>
-                    <input type="password" className="input-field w-full text-xs"
-                      placeholder="(não alterar = deixe vazio)"
-                      value={data.password || ""}
-                      onChange={e => setData(d => ({ ...d, password: e.target.value }))} />
-                  </div>
-                </div>
-              </div>
             )}
 
-            {/* Global selector */}
-            {data.mode === "global" && (
-              <div>
-                <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Proxy Global</label>
-                <select className="input-field w-full text-xs"
-                  value={data.global_proxy_id || ""}
-                  onChange={e => setData(d => ({ ...d, global_proxy_id: e.target.value }))}>
-                  <option value="">Selecione…</option>
-                  {globals.filter(g => g.enabled).map(g => (
-                    <option key={g.id} value={g.id}>
-                      {g.name} ({g.country.toUpperCase()}){g.is_default ? " · default" : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {/* Criar novo */}
+            {!showCreate ? (
+              <button onClick={() => setShowCreate(true)}
+                className="w-full py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                style={{ background: "hsl(240 12% 8%)", color: "hsl(240 8% 70%)", border: "1px dashed hsl(240 12% 20%)" }}>
+                <Plus className="w-3.5 h-3.5" /> Criar novo proxy
+              </button>
+            ) : (
+              <CreateProxyInline
+                onCreated={async (id) => {
+                  setShowCreate(false);
+                  await refetch();
+                  setSelectedId(id);
+                }}
+                onCancel={() => setShowCreate(false)}
+              />
             )}
 
-            {/* Residential pool */}
-            {data.mode === "residencial" && (
-              <div>
-                <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Proxy Pool</label>
-                <select className="input-field w-full text-xs"
-                  value={data.proxy_pool_id || ""}
-                  onChange={e => setData(d => ({ ...d, proxy_pool_id: e.target.value }))}>
-                  <option value="">Selecione…</option>
-                  {pools.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.provider})</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Test result */}
             {testResult && (
               <div className="p-3 rounded-xl text-xs"
                 style={{
@@ -518,8 +537,7 @@ function ServerProxyModal({
                   <>
                     <p className="font-semibold" style={{ color: "var(--green)" }}>✓ Proxy funcionando</p>
                     <p className="mt-1 opacity-80">IP externo: <code>{testResult.external_ip}</code></p>
-                    <p className="opacity-60">Latência: {testResult.latency_ms}ms · fonte: {testResult.source}</p>
-                    {testResult.url && <p className="mt-1 opacity-50 break-all">{testResult.url}</p>}
+                    <p className="opacity-60">Latência: {testResult.latency_ms}ms</p>
                   </>
                 ) : (
                   <>
@@ -654,9 +672,9 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
             <><WifiOff className="w-3 h-3" style={{ color: "hsl(240 8% 36%)" }} /><span style={{ color: "hsl(240 8% 36%)" }}>0</span></>
           )}
         </div>
-        {server.proxy_pool_id && (
+        {server.proxy_id && (
           <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs" style={{ background: "rgba(167,139,250,0.08)" }}>
-            <Link2 className="w-3 h-3" style={{ color: "#a78bfa" }} />
+            <Shield className="w-3 h-3" style={{ color: "#a78bfa" }} />
             <span style={{ color: "#a78bfa" }}>Proxy</span>
           </div>
         )}

@@ -9,10 +9,10 @@ import {
   Key, FileJson, ExternalLink, Loader2, Link2, Copy, X,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { integrationsApi, apiKeysApi, proxyPoolsApi, adminApi, instancesApi } from "@/lib/api";
+import { integrationsApi, apiKeysApi, proxiesApi, adminApi, instancesApi } from "@/lib/api";
 import { toast } from "sonner";
 import { WebhooksPanel } from "@/components/webhooks/WebhooksPanel";
-import type { APIKey, ProxyProviderConfig } from "@/types";
+import type { APIKey, Proxy } from "@/types";
 
 type GlobalProxyConfig = {
   id: string;
@@ -306,109 +306,123 @@ const PROXY_PROVIDERS = [
 
 function ProxiesSection() {
   const queryClient = useQueryClient();
-  const { data: globalProxies, isLoading: globalProxyLoading } = useQuery<GlobalProxyConfig[]>({ queryKey: ["global-proxies"], queryFn: () => proxyPoolsApi.getGlobalProxies().then(r => r.data) });
-  const { data: proxyList, isLoading } = useQuery<ProxyProviderConfig[]>({ queryKey: ["proxy-providers"], queryFn: () => proxyPoolsApi.listProviders().then(r => r.data) });
-  const create = useMutation({ mutationFn: (d: any) => proxyPoolsApi.createProvider(d), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["proxy-providers"] }); toast.success("Proxy criado com sucesso!"); }, onError: (e: any) => toast.error(e?.response?.data?.error || "Erro ao criar proxy") });
-  const del = useMutation({ mutationFn: (id: string) => proxyPoolsApi.deleteProvider(id), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["proxy-providers"] }); toast.success("Proxy removido"); } });
+  const { data: proxies = [], isLoading } = useQuery<Proxy[]>({
+    queryKey: ["my-proxies"],
+    queryFn: () => proxiesApi.listMine().then(r => r.data),
+  });
+  const del = useMutation({
+    mutationFn: (id: string) => proxiesApi.remove(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-proxies"] });
+      toast.success("Proxy removido");
+    },
+  });
+  const test = useMutation({
+    mutationFn: (id: string) => proxiesApi.test(id).then(r => r.data),
+    onSuccess: (data: { success: boolean; external_ip?: string; latency_ms?: number; error?: string }) => {
+      if (data.success) toast.success(`IP ${data.external_ip} · ${data.latency_ms}ms`);
+      else toast.error(data.error || "Teste falhou");
+    },
+  });
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: "", proxy_url: "", proxy_type: "socks5", proxy_host: "", proxy_port: 33335, proxy_username: "", proxy_password: "" });
+  const [form, setForm] = useState({
+    name: "",
+    proxy_type: "http" as "http" | "https" | "socks5",
+    host: "",
+    port: 0,
+    username: "",
+    password: "",
+  });
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; external_ip?: string; latency_ms?: number; error?: string; proxyId?: string } | null>(null);
 
-  const isGlobalProxyActive = globalProxies?.some(p => p.enabled && (p.host || p.use_env));
-  const hasAnyGlobalProxy = globalProxies && globalProxies.length > 0;
+  const saveDisabled = !form.name.trim() || !form.host.trim() || form.port <= 0;
 
-  const handleSave = () => {
-    if (!form.name) {
-      toast.error("Nome é obrigatório");
-      return;
+  const testBeforeSave = async () => {
+    if (saveDisabled) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const created = await proxiesApi.create({
+        name: form.name,
+        host: form.host,
+        port: form.port,
+        username: form.username,
+        password: form.password,
+        proxy_type: form.proxy_type,
+      }).then(r => r.data);
+      const t = await proxiesApi.test(created.id).then(r => r.data);
+      setTestResult({ ...t, proxyId: created.id });
+      if (!t.success) {
+        await proxiesApi.remove(created.id);
+        setTestResult({ ...t, proxyId: undefined });
+      } else {
+        toast.success("Proxy testado e salvo");
+        queryClient.invalidateQueries({ queryKey: ["my-proxies"] });
+      }
+    } catch (err: unknown) {
+      setTestResult({ success: false, error: (err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro" });
+    } finally {
+      setTesting(false);
     }
-    if (!form.proxy_url && (!form.proxy_host || !form.proxy_port)) {
-      toast.error("Forneça a URL do proxy ou host:porta");
-      return;
-    }
-    create.mutate({ 
-      provider: "manual", 
-      name: form.name, 
-      proxy_url: form.proxy_url, 
-      proxy_type: form.proxy_type, 
-      proxy_host: form.proxy_host, 
-      proxy_port: form.proxy_port, 
-      proxy_username: form.proxy_username, 
-      proxy_password: form.proxy_password
-    });
-    setShowModal(false);
-    setForm({ name: "", proxy_url: "", proxy_type: "socks5", proxy_host: "", proxy_port: 33335, proxy_username: "", proxy_password: "" });
   };
 
-  const COUNTRY_FLAGS: Record<string, string> = { br: "🇧🇷", us: "🇺🇸", global: "🌍" };
-  const COUNTRY_NAMES: Record<string, string> = { br: "Brasil", us: "EUA", global: "Global" };
+  const save = async () => {
+    try {
+      await proxiesApi.create({
+        name: form.name,
+        host: form.host,
+        port: form.port,
+        username: form.username,
+        password: form.password,
+        proxy_type: form.proxy_type,
+      });
+      toast.success("Proxy criado");
+      queryClient.invalidateQueries({ queryKey: ["my-proxies"] });
+      setShowModal(false);
+      setTestResult(null);
+      setForm({ name: "", proxy_type: "http", host: "", port: 0, username: "", password: "" });
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao criar proxy");
+    }
+  };
+
+  const COUNTRY_FLAGS: Record<string, string> = { br: "🇧🇷", us: "🇺🇸", gb: "🇬🇧", ar: "🇦🇷" };
 
   return (
     <div className="space-y-4">
-      {/* Global Proxy Status */}
-      {globalProxyLoading ? (
-        <div className="flex items-center gap-2 p-4 rounded-2xl" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
-          <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--text-3)" }} />
-          <span className="text-sm" style={{ color: "var(--text-3)" }}>Carregando...</span>
-        </div>
-      ) : hasAnyGlobalProxy ? (
-        <div className="rounded-2xl border p-4" style={{ background: isGlobalProxyActive ? "rgba(0,212,106,0.08)" : "rgba(0,212,106,0.04)", borderColor: isGlobalProxyActive ? "rgba(0,212,106,0.3)" : "rgba(0,212,106,0.15)" }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(0,212,106,0.15)" }}>
-                <Globe className="w-5 h-5" style={{ color: "#00d46a" }} />
-              </div>
-              <div>
-                <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Proxy Global Uniq</p>
-                <p className="text-xs" style={{ color: "var(--text-3)" }}>
-                  {isGlobalProxyActive ? "Ativo • Aplicado automaticamente" : "Configurado • Aguardando instância"}
-                </p>
-              </div>
-            </div>
-            {isGlobalProxyActive ? (
-              <span className="text-xs px-3 py-1.5 rounded-lg font-medium" style={{ background: "var(--green)", color: "#04200f" }}>
-                Ativo
-              </span>
-            ) : (
-              <a href="/admin/proxy" className="text-xs px-3 py-1.5 rounded-lg" style={{ background: "rgba(0,212,106,0.15)", color: "#00d46a" }}>
-                Configurar
-              </a>
-            )}
+      <div className="rounded-2xl border p-4" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(96,165,250,0.1)" }}>
+            <Globe className="w-5 h-5" style={{ color: "#60a5fa" }} />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Proxies customizados</p>
+            <p className="text-xs" style={{ color: "var(--text-3)" }}>
+              Criados aqui e selecionáveis na tela de cada server. Todas as instâncias do server herdam o proxy.
+            </p>
           </div>
         </div>
-      ) : (
-        <div className="rounded-2xl border p-4" style={{ background: "rgba(0,212,106,0.04)", borderColor: "rgba(0,212,106,0.15)" }}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(0,212,106,0.1)" }}>
-                <Globe className="w-5 h-5" style={{ color: "#00d46a" }} />
-              </div>
-              <div>
-                <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Proxy Global Uniq</p>
-                <p className="text-xs" style={{ color: "var(--text-3)" }}>Disponível automaticamente em novas instâncias</p>
-              </div>
-            </div>
-            <a href="/admin/proxy" className="text-xs px-3 py-1.5 rounded-lg" style={{ background: "rgba(0,212,106,0.15)", color: "#00d46a" }}>
-              Configurar
-            </a>
-          </div>
-        </div>
-      )}
+      </div>
 
-      {/* Add New Proxy Button */}
       <button
-        onClick={() => setShowModal(true)}
+        onClick={() => { setShowModal(true); setTestResult(null); }}
         className="w-full rounded-2xl border-2 border-dashed p-4 flex items-center justify-center gap-2 transition-all hover:bg-white/5"
         style={{ borderColor: "var(--surface-border)", color: "var(--text-2)" }}
       >
         <Plus className="w-5 h-5" />
-        <span className="text-sm font-medium">Adicionar Proxy</span>
+        <span className="text-sm font-medium">Adicionar proxy</span>
       </button>
 
-      {/* Proxy List */}
-      {proxyList && proxyList.length > 0 && (
+      {isLoading ? (
+        <div className="flex items-center gap-2 p-4">
+          <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--text-3)" }} />
+          <span className="text-xs" style={{ color: "var(--text-3)" }}>Carregando…</span>
+        </div>
+      ) : proxies.length > 0 ? (
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--text-3)" }}>Meus Proxies</h3>
-          {proxyList.map(p => (
+          <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--text-3)" }}>Meus proxies</h3>
+          {proxies.map(p => (
             <div key={p.id} className="rounded-xl border p-3 flex items-center gap-3" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(96,165,250,0.1)" }}>
                 <Globe className="w-4 h-4" style={{ color: "#60a5fa" }} />
@@ -416,20 +430,20 @@ function ProxiesSection() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{p.name}</p>
                 <p className="text-xs truncate" style={{ color: "var(--text-3)" }}>
-                  {p.proxy_host ? `${p.proxy_host}:${p.proxy_port}` : p.provider}
-                  {p.proxy_type && ` · ${p.proxy_type.toUpperCase()}`}
+                  {p.host}:{p.port}{p.proxy_type && ` · ${p.proxy_type.toUpperCase()}`}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {p.country ? (
+                {p.country && (
                   <span className="text-xs px-2 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.05)", color: "var(--text-2)" }}>
-                    {COUNTRY_FLAGS[p.country.toLowerCase()] || "🌍"} {COUNTRY_NAMES[p.country.toLowerCase()] || "Global"}
-                  </span>
-                ) : (
-                  <span className="text-xs px-2 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.05)", color: "var(--text-3)" }}>
-                    Detectando...
+                    {COUNTRY_FLAGS[p.country.toLowerCase()] || "🌍"} {p.country.toUpperCase()}
                   </span>
                 )}
+                <button onClick={() => test.mutate(p.id)}
+                  disabled={test.isPending}
+                  className="text-xs px-2 py-1 rounded-lg" style={{ background: "rgba(96,165,250,0.1)", color: "#60a5fa" }}>
+                  {test.isPending ? "…" : "Testar"}
+                </button>
                 <button onClick={() => del.mutate(p.id)} className="p-1.5 rounded-lg hover:bg-red-500/10" style={{ color: "var(--text-3)" }}>
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -437,106 +451,84 @@ function ProxiesSection() {
             </div>
           ))}
         </div>
-      )}
+      ) : null}
 
-      {/* Add Proxy Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
           <div className="w-full max-w-md rounded-2xl border p-5 space-y-4" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold" style={{ color: "var(--text-1)" }}>Adicionar Proxy</h2>
+              <h2 className="font-semibold" style={{ color: "var(--text-1)" }}>Novo proxy</h2>
               <button onClick={() => setShowModal(false)} style={{ color: "var(--text-3)" }}>
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div>
-              <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Nome do Proxy</label>
-              <input 
-                value={form.name} 
-                onChange={e => setForm({...form, name: e.target.value})} 
-                className="input-field w-full" 
-                placeholder="Meu Proxy Brasil" 
-              />
+              <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Nome</label>
+              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
+                className="input-field w-full" placeholder="Meu Proxy BR" />
             </div>
 
-            <div>
-              <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>
-                URL do Proxy <span style={{ color: "var(--text-3)" }}>(ou cole tudo aqui)</span>
-              </label>
-              <input 
-                value={form.proxy_url} 
-                onChange={e => setForm({...form, proxy_url: e.target.value})} 
-                className="input-field w-full" 
-                placeholder="socks5://user:pass@host:port"
-              />
-              <p className="text-[11px] mt-1" style={{ color: "var(--text-3)" }}>
-                Supported: socks5://, socks4://, http://, https://
-              </p>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Tipo</label>
-              <select value={form.proxy_type} onChange={e => setForm({...form, proxy_type: e.target.value})} className="input-field w-full">
-                <option value="socks5">SOCKS5</option>
-                <option value="http">HTTP</option>
-                <option value="https">HTTPS</option>
-                <option value="socks4">SOCKS4</option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Tipo</label>
+                <select value={form.proxy_type}
+                  onChange={e => setForm({ ...form, proxy_type: e.target.value as "http" | "https" | "socks5" })}
+                  className="input-field w-full">
+                  <option value="http">HTTP</option>
+                  <option value="https">HTTPS</option>
+                  <option value="socks5">SOCKS5</option>
+                </select>
+              </div>
+              <div className="col-span-2">
                 <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Host</label>
-                <input 
-                  value={form.proxy_host} 
-                  onChange={e => setForm({...form, proxy_host: e.target.value})} 
-                  className="input-field w-full" 
-                  placeholder="proxy.exemplo.com"
-                />
+                <input value={form.host} onChange={e => setForm({ ...form, host: e.target.value })}
+                  className="input-field w-full" placeholder="proxy.exemplo.com" />
               </div>
-              <div>
-                <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Porta</label>
-                <input 
-                  type="number" 
-                  value={form.proxy_port} 
-                  onChange={e => setForm({...form, proxy_port: parseInt(e.target.value) || 33335})} 
-                  className="input-field w-full" 
-                  placeholder="33335"
-                />
-              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Porta</label>
+              <input type="number" value={form.port || ""}
+                onChange={e => setForm({ ...form, port: parseInt(e.target.value) || 0 })}
+                className="input-field w-full" placeholder="8080" />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>
-                  Usuário <span style={{ color: "var(--text-3)" }}>(opcional)</span>
-                </label>
-                <input 
-                  value={form.proxy_username} 
-                  onChange={e => setForm({...form, proxy_username: e.target.value})} 
-                  className="input-field w-full" 
-                  placeholder="usuário"
-                />
+                <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Usuário</label>
+                <input value={form.username} onChange={e => setForm({ ...form, username: e.target.value })}
+                  className="input-field w-full" />
               </div>
               <div>
-                <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>
-                  Senha <span style={{ color: "var(--text-3)" }}>(opcional)</span>
-                </label>
-                <input 
-                  type="password" 
-                  value={form.proxy_password} 
-                  onChange={e => setForm({...form, proxy_password: e.target.value})} 
-                  className="input-field w-full" 
-                  placeholder="senha"
-                />
+                <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Senha</label>
+                <input type="password" value={form.password}
+                  onChange={e => setForm({ ...form, password: e.target.value })}
+                  className="input-field w-full" />
               </div>
             </div>
+
+            {testResult && (
+              <div className="p-3 rounded-xl text-xs"
+                style={{
+                  background: testResult.success ? "rgba(0,212,106,0.08)" : "rgba(239,68,68,0.08)",
+                  color: testResult.success ? "var(--green)" : "#f87171",
+                }}>
+                {testResult.success
+                  ? `✓ OK · IP ${testResult.external_ip} · ${testResult.latency_ms}ms — salvo no catálogo`
+                  : `✗ ${testResult.error}`}
+              </div>
+            )}
 
             <div className="flex gap-2 pt-2">
               <button onClick={() => setShowModal(false)} className="btn-ghost flex-1">Cancelar</button>
-              <button onClick={handleSave} disabled={create.isPending} className="btn-primary flex-1">
-                {create.isPending ? "Salvando..." : "Salvar Proxy"}
+              <button onClick={testBeforeSave} disabled={saveDisabled || testing}
+                className="btn-ghost flex-1 flex items-center justify-center gap-1.5">
+                {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                Testar
+              </button>
+              <button onClick={save} disabled={saveDisabled} className="btn-primary flex-1">
+                Salvar
               </button>
             </div>
           </div>

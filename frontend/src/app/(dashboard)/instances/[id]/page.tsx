@@ -19,7 +19,7 @@ import { showConfirm } from "@/lib/confirm";
 import type { Instance, InstanceSettings, MessageLog, InstanceProfile, InstanceContactLookup, Webhook } from "@/types";
 import Link from "next/link";
 import { QRCodeModal } from "@/components/instances/QRCodeModal";
-import { ProxyConfigForm } from "@/components/instances/ProxyConfigForm";
+import ProxyConfigForm from "@/components/instances/ProxyConfigForm";
 
 type Tab = "geral" | "proxy" | "webhooks" | "logs" | "recovery" | "dm" | "actions" | "scraping" | "posts" | "stories" | "media";
 

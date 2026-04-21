@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api";
-import { Activity, Globe, Loader2, Save, Server, Shield, Users, X, Edit2, Trash2, Star, Check } from "lucide-react";
+import { Activity, Globe, Loader2, Save, Server, Shield, Users, X, Edit2, Trash2, Star, Check, TestTube2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -93,6 +93,8 @@ function ProxyModal({
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [hasExistingPassword, setHasExistingPassword] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; external_ip?: string; latency_ms?: number; error?: string; country?: string } | null>(null);
 
   // Reset form when proxy changes
   useEffect(() => {
@@ -141,6 +143,67 @@ function ProxyModal({
     }
   };
 
+  // Testa o proxy antes de salvar: cria temporariamente, chama /test, se OK
+  // detecta o país pelo IP externo e pré-preenche; depois remove.
+  const handleTest = async () => {
+    if (!form.host || !form.port) {
+      toast.error("Host e porta são obrigatórios pra testar");
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      // Cria um proxy temp de plataforma (POST /admin/proxy-config sem id)
+      const created = await adminApi.updateGlobalProxy({
+        name: "__test_temp__",
+        provider: form.provider || "manual",
+        proxy_type: form.proxy_type,
+        host: form.host,
+        port: form.port,
+        username: form.username,
+        password: password || undefined,
+        is_active: true,
+        country: form.country || "br",
+      }).then((r) => {
+        const arr = Array.isArray(r.data) ? r.data : [];
+        return arr.find((p: { name: string }) => p.name === "__test_temp__");
+      });
+      if (!created) throw new Error("proxy temp não criado");
+      const tested = await adminApi.testGlobalProxy(created.id).then((r) => r.data);
+      // Remove o temp
+      await adminApi.deleteGlobalProxy(created.id).catch(() => {});
+      if (!tested.success) {
+        setTestResult({ success: false, error: tested.error });
+        toast.error(tested.error || "Teste falhou");
+        return;
+      }
+      // Detecta país pelo IP externo via ipapi.co
+      let detectedCountry: string | undefined;
+      try {
+        const geo = await fetch(`https://ipapi.co/${tested.external_ip}/country/`).then(r => r.text());
+        if (geo && geo.length === 2) detectedCountry = geo.toLowerCase();
+      } catch { /* ignore */ }
+      if (detectedCountry) {
+        setForm(p => ({ ...p, country: detectedCountry }));
+      }
+      setTestResult({
+        success: true,
+        external_ip: tested.external_ip,
+        latency_ms: tested.latency_ms,
+        country: detectedCountry,
+      });
+      toast.success(`Proxy OK · IP ${tested.external_ip}${detectedCountry ? ` · ${detectedCountry.toUpperCase()}` : ""}`);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error
+        || (err as { message?: string })?.message
+        || "Erro no teste";
+      setTestResult({ success: false, error: msg });
+      toast.error(msg);
+    } finally {
+      setTesting(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -164,17 +227,7 @@ function ProxyModal({
               className="input-field w-full text-sm" placeholder="Meu Proxy BR" />
           </div>
 
-          <div>
-            <label className="text-[11px] font-medium block mb-1.5" style={{ color: "hsl(240 8% 58%)" }}>País</label>
-            <select value={form.country || "br"} onChange={(e) => setForm(p => ({ ...p, country: e.target.value }))}
-              className="input-field w-full text-sm">
-              {COUNTRIES.map(c => (
-                <option key={c.code} value={c.code}>{c.flag} {c.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
+          <div className="col-span-2">
             <label className="text-[11px] font-medium block mb-1.5" style={{ color: "hsl(240 8% 58%)" }}>Tipo</label>
             <select value={form.proxy_type || "http"} onChange={(e) => setForm(p => ({ ...p, proxy_type: e.target.value }))}
               className="input-field w-full text-sm">
@@ -215,12 +268,38 @@ function ProxyModal({
           </label>
         </div>
 
+        {testResult && (
+          <div className="p-3 rounded-xl text-xs"
+            style={{
+              background: testResult.success ? "rgba(0,212,106,0.08)" : "rgba(239,68,68,0.08)",
+              border: `1px solid ${testResult.success ? "rgba(0,212,106,0.2)" : "rgba(239,68,68,0.2)"}`,
+              color: testResult.success ? "var(--green)" : "#f87171",
+            }}>
+            {testResult.success ? (
+              <>
+                ✓ IP externo <code>{testResult.external_ip}</code> · {testResult.latency_ms}ms
+                {testResult.country && (
+                  <> · país detectado: <strong>{getCountryInfo(testResult.country).flag} {getCountryInfo(testResult.country).label}</strong></>
+                )}
+              </>
+            ) : (
+              <>✗ {testResult.error}</>
+            )}
+          </div>
+        )}
+
         <div className="flex gap-2 pt-2">
-          <button onClick={handleSubmit} disabled={saving}
+          <button onClick={handleTest} disabled={testing || !form.host || !form.port}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold"
+            style={{ background: "hsl(240 12% 12%)", color: "hsl(240 15% 85%)", opacity: (testing || !form.host || !form.port) ? 0.5 : 1 }}>
+            {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <TestTube2 className="w-4 h-4" />}
+            Testar
+          </button>
+          <button onClick={handleSubmit} disabled={saving || (testResult && !testResult.success) || false}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold"
             style={{ background: "var(--green)", color: "#04200f", opacity: saving ? 0.7 : 1 }}>
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            {proxy?.id ? "Salvar Alterações" : "Criar Proxy"}
+            {proxy?.id ? "Salvar" : "Criar Proxy"}
           </button>
         </div>
       </div>
