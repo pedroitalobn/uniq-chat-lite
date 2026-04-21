@@ -479,7 +479,7 @@ func (m *Manager) ResolveEffectiveProxyDetailed(instance *models.Instance) *Reso
 // resolveGlobalProxyFields retorna os campos efetivos de um GlobalProxyConfig,
 // honrando UseEnv (lê BRIGHTDATA_HOST/PORT/USER/PASS das envs).
 // Retorna (host, port, username, password_plaintext, proxy_type, source).
-func resolveGlobalProxyFields(g *models.GlobalProxyConfig) (string, int, string, string, string, string) {
+func resolveGlobalProxyFields(g *models.Proxy) (string, int, string, string, string, string) {
 	host := g.Host
 	port := g.Port
 	user := g.Username
@@ -519,7 +519,7 @@ func resolveGlobalProxyFields(g *models.GlobalProxyConfig) (string, int, string,
 
 // ResolveGlobalProxyFieldsExported expõe o helper para o pacote handlers
 // (necessário para o endpoint de admin de test do global proxy).
-func ResolveGlobalProxyFieldsExported(g *models.GlobalProxyConfig) (host string, port int, user, pass, proxyType, source string) {
+func ResolveGlobalProxyFieldsExported(g *models.Proxy) (host string, port int, user, pass, proxyType, source string) {
 	return resolveGlobalProxyFields(g)
 }
 

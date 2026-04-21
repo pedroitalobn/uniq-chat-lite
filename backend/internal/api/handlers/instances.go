@@ -55,7 +55,7 @@ func (h *InstanceHandler) List(c *fiber.Ctx) error {
 	workspaceID := c.Query("workspace_id")
 
 	var instances []models.Instance
-	q := h.db.Preload("Server").Preload("GlobalProxy").Order("created_at DESC")
+	q := h.db.Preload("Server").Preload("Server.Proxy").Order("created_at DESC")
 
 	// Regular users and super admins both need workspace membership
 	// (Super admins should use /admin/inspect to see all instances)
@@ -227,48 +227,8 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar instância"})
 	}
 
-	// Optional global proxy assignment (plan-gated)
-	// Auto-assigns if user has plan allowing proxy AND any global proxy is configured and active
-	// Prioritizes is_default=true, then falls back to any enabled active proxy
-	if user.Plan != nil && user.Plan.AllowProxy {
-		var gcfg models.GlobalProxyConfig
-		found := false
-
-		// First try to find the default proxy
-		if err := h.db.Where("is_default = ? AND enabled = ? AND is_active = ?", true, true, true).First(&gcfg).Error; err == nil {
-			found = true
-		} else {
-			// Fall back to any enabled active proxy
-			if err := h.db.Where("enabled = ? AND is_active = ?", true, true).First(&gcfg).Error; err == nil {
-				found = true
-			}
-		}
-
-		if found {
-			// Do NOT copy host/port/username/password into the instance
-			// columns — that would leak platform-managed proxy details
-			// through GET /instances and /proxy. The resolver looks up
-			// the effective proxy at connect time via global_proxy_id
-			// (when UseGlobalProxy=true) or by falling through to the
-			// default global proxy when proxy_mode=inherit.
-			gProxyIDStr := gcfg.ID
-			h.db.Model(&instance).Updates(map[string]interface{}{
-				"use_global_proxy": true,
-				"global_proxy_id":  gProxyIDStr,
-				"proxy_mode":       models.ProxyModeInherit,
-				"proxy_enabled":    true,
-				"proxy_status":     models.ProxyStatusOK,
-			})
-			instance.UseGlobalProxy = true
-			instance.GlobalProxyID = &gProxyIDStr
-			instance.ProxyMode = models.ProxyModeInherit
-			instance.ProxyEnabled = true
-			instance.ProxyStatus = models.ProxyStatusOK
-			log.Info().Str("instance", instance.ID.String()).Str("global_proxy_id", gProxyIDStr).Msg("global proxy auto-assigned on instance creation")
-		} else {
-			log.Debug().Str("user_id", user.ID.String()).Msg("no global proxy available for auto-assign")
-		}
-	}
+	// Instâncias não carregam mais proxy próprio — o proxy aplicado vem
+	// do server vinculado (ver Server.ProxyID). Nada a fazer aqui.
 
 	return c.Status(fiber.StatusCreated).JSON(instance)
 }

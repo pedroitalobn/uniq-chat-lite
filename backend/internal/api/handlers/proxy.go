@@ -2,9 +2,10 @@ package handlers
 
 import (
 	"strconv"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/whatsapp"
@@ -20,16 +21,310 @@ func NewProxyHandler(db *gorm.DB, manager *whatsapp.Manager) *ProxyHandler {
 	return &ProxyHandler{db: db, manager: manager}
 }
 
-type proxyConfigRequest struct {
-	Enabled  bool   `json:"enabled"`
-	Type     string `json:"type"`
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+// ─── Catálogo de Proxies (user + platform) ──────────────────────────────
+// Retorna proxies visíveis pro usuário: is_platform=true (disponíveis pra
+// todos) + is_platform=false com owner_id=user (proxies custom do usuário).
+
+func (h *ProxyHandler) ListAvailable(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	var proxies []models.Proxy
+	if err := h.db.Where("is_platform = ? OR owner_id = ?", true, user.ID).
+		Where("is_active = ?", true).
+		Order("is_platform DESC, name ASC").
+		Find(&proxies).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao listar proxies"})
+	}
+	return c.JSON(summarizeProxies(proxies))
 }
 
-// checkProxyPlanAccess returns 403 if the user's plan doesn't allow proxy.
+func (h *ProxyHandler) ListMine(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	var proxies []models.Proxy
+	if err := h.db.Where("owner_id = ?", user.ID).Order("created_at DESC").Find(&proxies).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao listar proxies"})
+	}
+	return c.JSON(summarizeProxies(proxies))
+}
+
+func (h *ProxyHandler) Create(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	if err := checkProxyPlanAccess(c); err != nil {
+		return err
+	}
+	var req proxyCreateRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
+	}
+	if req.Name == "" || req.Host == "" || req.Port <= 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name, host e port são obrigatórios"})
+	}
+	pType := req.ProxyType
+	if pType == "" {
+		pType = "http"
+	}
+	country := req.Country
+	if country == "" {
+		country = "br"
+	}
+	ownerID := user.ID
+	p := models.Proxy{
+		OwnerID:    &ownerID,
+		IsPlatform: false,
+		Name:       req.Name,
+		Country:    country,
+		Provider:   "custom",
+		ProxyType:  pType,
+		Host:       req.Host,
+		Port:       req.Port,
+		Username:   req.Username,
+		IsActive:   true,
+	}
+	if req.Password != "" {
+		enc, err := whatsapp.EncryptProxyPassword(req.Password)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criptografar senha"})
+		}
+		p.Password = enc
+	}
+	if err := h.db.Create(&p).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar proxy"})
+	}
+	return c.Status(fiber.StatusCreated).JSON(summarizeProxy(&p))
+}
+
+func (h *ProxyHandler) Update(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var p models.Proxy
+	if err := h.db.First(&p, "id = ?", id).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "proxy não encontrado"})
+	}
+	if !p.EditableBy(user.ID) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "sem permissão"})
+	}
+	var req proxyCreateRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
+	}
+	updates := map[string]interface{}{}
+	if req.Name != "" {
+		updates["name"] = req.Name
+	}
+	if req.Country != "" {
+		updates["country"] = req.Country
+	}
+	if req.ProxyType != "" {
+		updates["proxy_type"] = req.ProxyType
+	}
+	if req.Host != "" {
+		updates["host"] = req.Host
+	}
+	if req.Port > 0 {
+		updates["port"] = req.Port
+	}
+	if req.Username != "" {
+		updates["username"] = req.Username
+	}
+	if req.Password != "" {
+		enc, err := whatsapp.EncryptProxyPassword(req.Password)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criptografar senha"})
+		}
+		updates["password"] = enc
+	}
+	if len(updates) > 0 {
+		if err := h.db.Model(&p).Updates(updates).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao salvar"})
+		}
+	}
+	// Reinicia instâncias cujo server usa este proxy, pra aplicar mudanças
+	go restartServersUsingProxy(h.db, h.manager, p.ID)
+	_ = h.db.First(&p, "id = ?", id).Error
+	return c.JSON(summarizeProxy(&p))
+}
+
+func (h *ProxyHandler) Delete(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var p models.Proxy
+	if err := h.db.First(&p, "id = ?", id).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "proxy não encontrado"})
+	}
+	if !p.EditableBy(user.ID) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "sem permissão"})
+	}
+	// Detach servers pointing here
+	h.db.Model(&models.Server{}).Where("proxy_id = ?", id).Update("proxy_id", nil)
+	if err := h.db.Delete(&p).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao remover"})
+	}
+	return c.JSON(fiber.Map{"success": true})
+}
+
+func (h *ProxyHandler) Test(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var p models.Proxy
+	if err := h.db.First(&p, "id = ?", id).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "proxy não encontrado"})
+	}
+	if !p.VisibleTo(user.ID) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "sem permissão"})
+	}
+	cfg, source, ok := whatsapp.BuildProxyConfigExported(&p)
+	if !ok {
+		return c.JSON(fiber.Map{"success": false, "error": "host/porta vazios", "source": source})
+	}
+	externalIP, latencyMs, err := whatsapp.TestProxy(cfg)
+	if err != nil {
+		return c.JSON(fiber.Map{"success": false, "error": err.Error(), "source": source})
+	}
+	return c.JSON(fiber.Map{
+		"success":     true,
+		"external_ip": externalIP,
+		"latency_ms":  latencyMs,
+		"source":      source,
+	})
+}
+
+// ─── Visão read-only pra uma instância ──────────────────────────────────
+// A UI da instância mostra qual proxy ela está usando (e de qual server).
+// Pra alterar, o usuário vai até o server.
+
+// Effective godoc
+// GET /instances/:id/proxy/effective
+func (h *ProxyHandler) Effective(c *fiber.Ctx) error {
+	instance, ok := c.Locals("instance").(*models.Instance)
+	if !ok {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	resolved := h.manager.ResolveEffectiveProxyDetailed(instance)
+
+	resp := fiber.Map{
+		"instance_id": instance.ID,
+		"running":     h.manager.IsRunning(instance.ID.String()),
+		"server_id":   instance.ServerID,
+		"level":       resolved.Level,
+		"chain":       resolved.Chain,
+		"source":      resolved.Source,
+	}
+	if resolved.Config == nil {
+		resp["effective"] = nil
+		resp["note"] = "conexão direta (sem proxy)"
+		return c.JSON(resp)
+	}
+	// Se veio de plataforma, ocultar host/port/user
+	if resolved.Source == "platform" || resolved.Source == "platform_env" {
+		resp["effective"] = fiber.Map{
+			"enabled": resolved.Config.Enabled,
+			"type":    resolved.Config.Type,
+			"managed": true,
+			"note":    "proxy gerenciado pela plataforma",
+		}
+	} else {
+		resp["effective"] = fiber.Map{
+			"enabled":  resolved.Config.Enabled,
+			"type":     resolved.Config.Type,
+			"host":     resolved.Config.Host,
+			"port":     resolved.Config.Port,
+			"username": resolved.Config.Username,
+		}
+	}
+	return c.JSON(resp)
+}
+
+// Get godoc
+// GET /instances/:id/proxy
+// Read-only: retorna metadados do proxy que a instância usa (vem do server).
+func (h *ProxyHandler) Get(c *fiber.Ctx) error {
+	instance, ok := c.Locals("instance").(*models.Instance)
+	if !ok {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	if instance.ServerID == nil {
+		return c.JSON(fiber.Map{"has_proxy": false, "note": "instância sem server"})
+	}
+	var srv models.Server
+	if err := h.db.Preload("Proxy").First(&srv, "id = ?", *instance.ServerID).Error; err != nil {
+		return c.JSON(fiber.Map{"has_proxy": false})
+	}
+	if srv.ProxyID == nil || srv.Proxy == nil {
+		return c.JSON(fiber.Map{
+			"has_proxy":   false,
+			"server_id":   srv.ID,
+			"server_name": srv.Name,
+			"note":        "o server dessa instância não tem proxy configurado",
+		})
+	}
+	p := srv.Proxy
+	resp := fiber.Map{
+		"has_proxy":   true,
+		"server_id":   srv.ID,
+		"server_name": srv.Name,
+		"country":     p.Country,
+		"type":        p.ProxyType,
+		"is_platform": p.IsPlatform,
+		"name":        p.Name,
+	}
+	if !p.IsPlatform {
+		// User owns (or shares via workspace) — mostra host/port/user
+		resp["host"] = p.Host
+		resp["port"] = p.Port
+		resp["username"] = p.Username
+	} else {
+		resp["managed"] = true
+	}
+	return c.JSON(resp)
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────
+
+type proxyCreateRequest struct {
+	Name      string `json:"name"`
+	Country   string `json:"country"`
+	ProxyType string `json:"proxy_type"`
+	Host      string `json:"host"`
+	Port      int    `json:"port"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+}
+
+func summarizeProxy(p *models.Proxy) fiber.Map {
+	m := fiber.Map{
+		"id":          p.ID,
+		"name":        p.Name,
+		"country":     p.Country,
+		"type":        p.ProxyType,
+		"is_platform": p.IsPlatform,
+		"is_active":   p.IsActive,
+		"created_at":  p.CreatedAt,
+	}
+	if !p.IsPlatform {
+		m["host"] = p.Host
+		m["port"] = p.Port
+		m["username"] = p.Username
+		m["has_password"] = p.Password != ""
+	}
+	return m
+}
+
+func summarizeProxies(ps []models.Proxy) []fiber.Map {
+	out := make([]fiber.Map, len(ps))
+	for i := range ps {
+		out[i] = summarizeProxy(&ps[i])
+	}
+	return out
+}
+
 func checkProxyPlanAccess(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 	if user.Plan == nil || !user.Plan.AllowProxy {
@@ -41,73 +336,37 @@ func checkProxyPlanAccess(c *fiber.Ctx) error {
 	return nil
 }
 
-// Effective godoc
-// GET /instances/:id/proxy/effective
-// Retorna exatamente o proxy que seria aplicado à instância pelo resolver
-// (same logic used by buildProxyCfg before Connect). Útil para debug.
-// Senha nunca é exposta — apenas marker "p***" se houver.
-func (h *ProxyHandler) Effective(c *fiber.Ctx) error {
-	if err := checkProxyPlanAccess(c); err != nil {
-		return err
+// restartServersUsingProxy reinicia as instâncias dos servers que usam um
+// proxy específico, pra aplicar mudanças de credenciais.
+func restartServersUsingProxy(db *gorm.DB, manager *whatsapp.Manager, proxyID uuid.UUID) {
+	if manager == nil {
+		return
 	}
-	instance, ok := c.Locals("instance").(*models.Instance)
-	if !ok {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+	var serverIDs []uuid.UUID
+	db.Model(&models.Server{}).Where("proxy_id = ?", proxyID).Pluck("id", &serverIDs)
+	if len(serverIDs) == 0 {
+		return
 	}
-
-	resolved := h.manager.ResolveEffectiveProxyDetailed(instance)
-	resp := fiber.Map{
-		"instance_id":      instance.ID,
-		"proxy_mode":       instance.ProxyMode,
-		"proxy_enabled":    instance.ProxyEnabled,
-		"use_global_proxy": instance.UseGlobalProxy,
-		"pool_id":          instance.ProxyPoolID,
-		"server_id":        instance.ServerID,
-		"running":          h.manager.IsRunning(instance.ID.String()),
-		"source":           resolved.Source,
-		"level":            resolved.Level, // instance | server | default_global | none
-		"chain":            resolved.Chain, // decisão etapa-a-etapa
+	var instances []models.Instance
+	if err := db.Where("server_id IN ?", serverIDs).Find(&instances).Error; err != nil {
+		return
 	}
-	if resolved.Config == nil || !resolved.Config.Enabled {
-		resp["effective"] = nil
-		resp["note"] = "nenhum proxy será aplicado — conexão direta"
-		return c.JSON(resp)
-	}
-	cfg := resolved.Config
-	// Only expose host/port/username/url when the proxy was configured
-	// at the instance level by the user. Server- and global-level proxies
-	// are managed by the platform — users should see only status/type.
-	if resolved.Level == "instance" {
-		passMarker := ""
-		if cfg.Password != "" {
-			passMarker = "p***"
+	for i := range instances {
+		inst := &instances[i]
+		if !manager.IsRunning(inst.ID.String()) {
+			continue
 		}
-		resp["effective"] = fiber.Map{
-			"enabled":  cfg.Enabled,
-			"type":     cfg.Type,
-			"host":     cfg.Host,
-			"port":     cfg.Port,
-			"username": cfg.Username,
-			"password": passMarker,
-			"url":      maskedProxyURL(cfg),
-		}
-	} else {
-		resp["effective"] = fiber.Map{
-			"enabled": cfg.Enabled,
-			"type":    cfg.Type,
-			"managed": true,
-			"note":    "proxy gerenciado pela plataforma — detalhes ocultos",
+		if err := manager.RestartWithProxy(inst); err != nil {
+			log.Warn().Err(err).Str("instance", inst.ID.String()).Msg("failed to restart instance on proxy update")
 		}
 	}
-	return c.JSON(resp)
 }
 
-// maskedProxyURL monta a URL completa sem revelar senha
+// maskedProxyURL é mantido pra compat (outros lugares podem importar).
 func maskedProxyURL(cfg *whatsapp.ProxyConfig) string {
 	if cfg == nil || !cfg.Enabled {
 		return ""
 	}
-	scheme := cfg.Type
 	auth := ""
 	if cfg.Username != "" {
 		mask := ""
@@ -116,298 +375,5 @@ func maskedProxyURL(cfg *whatsapp.ProxyConfig) string {
 		}
 		auth = cfg.Username + mask + "@"
 	}
-	return scheme + "://" + auth + cfg.Host + ":" + strconv.Itoa(cfg.Port)
-}
-
-// Get godoc
-// GET /instances/:id/proxy
-func (h *ProxyHandler) Get(c *fiber.Ctx) error {
-	if err := checkProxyPlanAccess(c); err != nil {
-		return err
-	}
-
-	instance, ok := c.Locals("instance").(*models.Instance)
-	if !ok {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
-	}
-
-	// When the instance is using a global proxy (platform-managed),
-	// hide the underlying credentials/host/port — only expose status.
-	if instance.UseGlobalProxy {
-		return c.JSON(fiber.Map{
-			"enabled":     instance.ProxyEnabled,
-			"type":        instance.ProxyType,
-			"managed":     true,
-			"status":      instance.ProxyStatus,
-			"last_tested": instance.ProxyLastTested,
-			"note":        "proxy gerenciado pela plataforma — detalhes ocultos",
-		})
-	}
-
-	maskedPassword := ""
-	if instance.ProxyPassword != "" {
-		maskedPassword = "p***"
-	}
-
-	return c.JSON(fiber.Map{
-		"enabled":     instance.ProxyEnabled,
-		"type":        instance.ProxyType,
-		"host":        instance.ProxyHost,
-		"port":        instance.ProxyPort,
-		"username":    instance.ProxyUsername,
-		"password":    maskedPassword,
-		"status":      instance.ProxyStatus,
-		"last_tested": instance.ProxyLastTested,
-		"external_ip": instance.ProxyExternalIP,
-		"error":       instance.ProxyError,
-	})
-}
-
-// Set godoc
-// PUT /instances/:id/proxy
-func (h *ProxyHandler) Set(c *fiber.Ctx) error {
-	if err := checkProxyPlanAccess(c); err != nil {
-		return err
-	}
-
-	instance, ok := c.Locals("instance").(*models.Instance)
-	if !ok {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
-	}
-
-	var req proxyConfigRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
-	}
-
-	// Validate
-	if req.Enabled {
-		if req.Type != "http" && req.Type != "https" && req.Type != "socks5" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "tipo de proxy inválido: use http, https ou socks5"})
-		}
-		if req.Host == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "host é obrigatório"})
-		}
-		if req.Port <= 0 || req.Port > 65535 {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "porta inválida"})
-		}
-	}
-
-	// Encrypt password
-	encryptedPassword := ""
-	if req.Password != "" {
-		var err error
-		encryptedPassword, err = whatsapp.EncryptProxyPassword(req.Password)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criptografar senha do proxy"})
-		}
-	} else if instance.ProxyPassword != "" && req.Enabled {
-		// Keep existing password if not provided
-		encryptedPassword = instance.ProxyPassword
-	}
-
-	updates := map[string]interface{}{
-		"proxy_enabled":  req.Enabled,
-		"proxy_type":     req.Type,
-		"proxy_host":     req.Host,
-		"proxy_port":     req.Port,
-		"proxy_username": req.Username,
-		"proxy_password": encryptedPassword,
-		"proxy_status":   models.ProxyStatusUntested,
-		"proxy_error":    "",
-		// Proxy manual tem precedência: desabilita qualquer herança do proxy global
-		// ou do pool residencial para manter um único source-of-truth por instância.
-		"use_global_proxy": false,
-		"global_proxy_id":  nil,
-		"proxy_pool_id":    nil,
-		"proxy_mode": func() models.ProxyMode {
-			if req.Enabled {
-				return models.ProxyModeManual
-			}
-			return models.ProxyModeNone
-		}(),
-	}
-
-	if err := h.db.Model(instance).Updates(updates).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao salvar proxy"})
-	}
-
-	// Auto-test if enabled
-	if req.Enabled {
-		go h.runProxyTest(instance.ID.String(), &whatsapp.ProxyConfig{
-			Enabled:  true,
-			Type:     req.Type,
-			Host:     req.Host,
-			Port:     req.Port,
-			Username: req.Username,
-			Password: req.Password,
-		})
-	}
-
-	// Reconnect if instance is running
-	var fresh models.Instance
-	if err := h.db.First(&fresh, "id = ?", instance.ID).Error; err == nil {
-		if h.manager.IsRunning(instance.ID.String()) {
-			go func() {
-				_ = h.manager.RestartWithProxy(&fresh)
-			}()
-		}
-	}
-
-	return c.JSON(fiber.Map{
-		"proxy_status": models.ProxyStatusUntested,
-		"message":      "Proxy configurado. Testando conectividade em background...",
-	})
-}
-
-// Test godoc
-// POST /instances/:id/proxy/test
-func (h *ProxyHandler) Test(c *fiber.Ctx) error {
-	if err := checkProxyPlanAccess(c); err != nil {
-		return err
-	}
-
-	instance, ok := c.Locals("instance").(*models.Instance)
-	if !ok {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
-	}
-
-	var req proxyConfigRequest
-	_ = c.BodyParser(&req) // Optional body
-
-	var cfg *whatsapp.ProxyConfig
-
-	if req.Host != "" {
-		// Test with provided config (without saving)
-		cfg = &whatsapp.ProxyConfig{
-			Enabled:  true,
-			Type:     req.Type,
-			Host:     req.Host,
-			Port:     req.Port,
-			Username: req.Username,
-			Password: req.Password,
-		}
-	} else if instance.ProxyEnabled {
-		// Test existing saved proxy
-		password := ""
-		if instance.ProxyPassword != "" {
-			dec, err := whatsapp.DecryptProxyPassword(instance.ProxyPassword)
-			if err == nil {
-				password = dec
-			}
-		}
-		cfg = &whatsapp.ProxyConfig{
-			Enabled:  true,
-			Type:     string(instance.ProxyType),
-			Host:     instance.ProxyHost,
-			Port:     instance.ProxyPort,
-			Username: instance.ProxyUsername,
-			Password: password,
-		}
-	} else {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nenhum proxy configurado para testar"})
-	}
-
-	now := time.Now()
-	externalIP, latencyMs, err := whatsapp.TestProxy(cfg)
-
-	if err != nil {
-		// Persist failure if testing saved proxy
-		if req.Host == "" {
-			h.db.Model(instance).Updates(map[string]interface{}{
-				"proxy_status":      models.ProxyStatusFailed,
-				"proxy_last_tested": now,
-				"proxy_error":       err.Error(),
-				"proxy_external_ip": "",
-			})
-		}
-		return c.JSON(fiber.Map{
-			"success":   false,
-			"error":     err.Error(),
-			"tested_at": now,
-		})
-	}
-
-	// Persist success if testing saved proxy
-	if req.Host == "" {
-		h.db.Model(instance).Updates(map[string]interface{}{
-			"proxy_status":      models.ProxyStatusOK,
-			"proxy_last_tested": now,
-			"proxy_error":       "",
-			"proxy_external_ip": externalIP,
-		})
-	}
-
-	return c.JSON(fiber.Map{
-		"success":    true,
-		"external_ip": externalIP,
-		"latency_ms": latencyMs,
-		"tested_at":  now,
-	})
-}
-
-// Delete godoc
-// DELETE /instances/:id/proxy
-func (h *ProxyHandler) Delete(c *fiber.Ctx) error {
-	if err := checkProxyPlanAccess(c); err != nil {
-		return err
-	}
-
-	instance, ok := c.Locals("instance").(*models.Instance)
-	if !ok {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
-	}
-
-	if err := h.db.Model(instance).Updates(map[string]interface{}{
-		"proxy_enabled":     false,
-		"proxy_mode":        models.ProxyModeNone,
-		"proxy_type":        "",
-		"proxy_host":        "",
-		"proxy_port":        0,
-		"proxy_username":    "",
-		"proxy_password":    "",
-		"proxy_status":      models.ProxyStatusUntested,
-		"proxy_last_tested": nil,
-		"proxy_error":       "",
-		"proxy_external_ip": "",
-		// Limpa todas as origens herdadas para evitar estado inconsistente
-		"use_global_proxy": false,
-		"global_proxy_id":  nil,
-		"proxy_pool_id":    nil,
-	}).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao remover proxy"})
-	}
-
-	// Restart without proxy if running
-	var fresh models.Instance
-	if err := h.db.First(&fresh, "id = ?", instance.ID).Error; err == nil {
-		if h.manager.IsRunning(instance.ID.String()) {
-			go func() {
-				_ = h.manager.RestartWithProxy(&fresh)
-			}()
-		}
-	}
-
-	return c.JSON(fiber.Map{"message": "Proxy removido. Instância usará conexão direta."})
-}
-
-func (h *ProxyHandler) runProxyTest(instanceID string, cfg *whatsapp.ProxyConfig) {
-	now := time.Now()
-	externalIP, _, err := whatsapp.TestProxy(cfg)
-
-	updates := map[string]interface{}{
-		"proxy_last_tested": now,
-	}
-
-	if err != nil {
-		updates["proxy_status"] = models.ProxyStatusFailed
-		updates["proxy_error"] = err.Error()
-		updates["proxy_external_ip"] = ""
-	} else {
-		updates["proxy_status"] = models.ProxyStatusOK
-		updates["proxy_error"] = ""
-		updates["proxy_external_ip"] = externalIP
-	}
-
-	h.db.Model(&models.Instance{}).Where("id = ?", instanceID).Updates(updates)
+	return cfg.Type + "://" + auth + cfg.Host + ":" + strconv.Itoa(cfg.Port)
 }

@@ -14,14 +14,12 @@ import (
 	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/email"
 	"github.com/uniq-chat/backend/internal/models"
-	"github.com/uniq-chat/backend/internal/services"
 	"gorm.io/gorm"
 )
 
 type StripeHandler struct {
 	db       *gorm.DB
 	emailSvc *email.Service
-	proxyMgr *services.ProxyManager
 
 	stripeCheckoutType string
 }
@@ -30,7 +28,6 @@ func NewStripeHandler(db *gorm.DB, emailSvc *email.Service) *StripeHandler {
 	return &StripeHandler{
 		db:       db,
 		emailSvc: emailSvc,
-		proxyMgr: services.NewProxyManager(db),
 	}
 }
 
@@ -327,12 +324,7 @@ func (h *StripeHandler) handleCheckoutCompleted(sess *stripe.CheckoutSession) {
 		})
 	}
 
-	// Provision residential proxy pool capacity if plan allows
-	if plan.AllowProxyResidencial {
-		if uid, err := uuid.Parse(sess.ClientReferenceID); err == nil {
-			h.proxyMgr.EnsurePoolHasCapacity(uid, &plan)
-		}
-	}
+	// Proxy provisioning is now handled at server-level; no per-user pool.
 
 	// Send payment confirmed email
 	var user models.User
@@ -373,19 +365,7 @@ func (h *StripeHandler) handleSubscriptionUpdated(sub *stripe.Subscription) {
 				h.emailSvc.SendPlanChanged(user.Email, user.Name, oldPlanName, newPlan.Name)
 			}
 
-			// If upgrading to a plan with proxy residencial, provision pool
-			if newPlan.AllowProxyResidencial {
-				if uid, err := uuid.Parse(userID); err == nil {
-					h.proxyMgr.EnsurePoolHasCapacity(uid, &newPlan)
-				}
-			}
-
-			// If downgrading to a plan without proxy, release proxies
-			if user.Plan != nil && user.Plan.AllowProxyResidencial && !newPlan.AllowProxyResidencial {
-				if uid, err := uuid.Parse(userID); err == nil {
-					h.proxyMgr.ReleaseAllForUser(uid)
-				}
-			}
+			// Proxy provisioning/release handled at server level; no-op here.
 		}
 	}
 }
@@ -399,10 +379,7 @@ func (h *StripeHandler) handleSubscriptionDeleted(sub *stripe.Subscription) {
 		return
 	}
 
-	// Release all proxies for this user (downgrade protection)
-	if uid, err := uuid.Parse(userID); err == nil {
-		h.proxyMgr.ReleaseAllForUser(uid)
-	}
+	// Proxy release handled at server level; no-op here.
 
 	var freePlan models.Plan
 	if h.db.First(&freePlan, "name = 'Free'").Error != nil {

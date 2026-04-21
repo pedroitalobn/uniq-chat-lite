@@ -22,19 +22,13 @@ type Server struct {
 	Description string     `gorm:"type:text" json:"description,omitempty"`
 	IsActive    bool       `gorm:"default:true" json:"is_active"`
 
-	// ── Proxy configuration (server-level, herded by instances with mode=inherit) ──
-	// ProxyMode determina qual estratégia aplicar; default "inherit" = segue o global padrão.
-	ProxyMode     ProxyMode  `gorm:"type:varchar(20);default:'inherit'" json:"proxy_mode"`
-	ProxyPoolID   *uuid.UUID `gorm:"type:uuid" json:"proxy_pool_id,omitempty"` // para mode=residencial (legado + pool residencial)
-	ProxyPool     *ProxyPool `gorm:"foreignKey:ProxyPoolID" json:"proxy_pool,omitempty"`
-	GlobalProxyID *string    `gorm:"type:varchar(32)" json:"global_proxy_id,omitempty"`   // para mode=global
-	GlobalProxy   *GlobalProxyConfig `gorm:"foreignKey:GlobalProxyID" json:"global_proxy,omitempty"`
-	// Campos para mode=manual no server (proxy custom)
-	ProxyType     ProxyType `gorm:"type:varchar(10)" json:"proxy_type,omitempty"`
-	ProxyHost     string    `gorm:"type:varchar(255)" json:"proxy_host,omitempty"`
-	ProxyPort     int       `json:"proxy_port,omitempty"`
-	ProxyUsername string    `gorm:"type:varchar(255)" json:"proxy_username,omitempty"`
-	ProxyPassword string    `gorm:"type:varchar(512)" json:"-"` // encrypted
+	// ── Proxy ──
+	// O server aponta pra zero ou um Proxy do catálogo. Todas as instâncias
+	// ligadas a este server compartilham esse proxy. Sem ProxyID = sem proxy.
+	// Os demais campos proxy_* da tabela ficam apenas para backward-compat
+	// durante a migração e não são mais lidos/escritos pelo código.
+	ProxyID *uuid.UUID `gorm:"type:uuid;index" json:"proxy_id,omitempty"`
+	Proxy   *Proxy     `gorm:"foreignKey:ProxyID" json:"proxy,omitempty"`
 
 	WebhookURL string    `gorm:"type:varchar(500)" json:"webhook_url,omitempty"`
 	CreatedAt  time.Time `json:"created_at"`

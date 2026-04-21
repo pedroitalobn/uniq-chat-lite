@@ -135,10 +135,6 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	taktikSvc := services.NewTaktikService(db)
 	tiktokH := handlers.NewTikTokHandler(db, taktikSvc)
 
-	// Proxy Manager (residential proxy pool)
-	proxyMgr := services.NewProxyManager(db)
-	resProxyH := handlers.NewResidencialProxyHandler(db, proxyMgr)
-
 	// AI Services
 	llmService := services.NewLLMService()
 	toolsH := handlers.NewToolsHandler(db, manager)
@@ -302,18 +298,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	instance.Post("/mcp/message", mcpH.Message)
 	instance.Get("/mcp/tools", mcpH.Tools)
 
-	// Proxy
+	// Proxy (read-only na instância — config fica no server)
 	instance.Get("/proxy", proxyH.Get)
-	instance.Get("/proxy/effective", proxyH.Effective) // debug: exibe o proxy que o resolver escolheu
-	instance.Put("/proxy", proxyH.Set)
-	instance.Post("/proxy/test", proxyH.Test)
-	instance.Delete("/proxy", proxyH.Delete)
-
-	// Proxy residencial (residential proxy pool)
-	instance.Get("/proxy/residencial", resProxyH.GetInstanceProxy)
-	instance.Post("/proxy/residencial/assign", resProxyH.AssignProxy)
-	instance.Delete("/proxy/residencial/release", resProxyH.ReleaseProxy)
-	instance.Put("/proxy/mode", resProxyH.SetProxyMode)
+	instance.Get("/proxy/effective", proxyH.Effective)
 
 	// Messages
 	msgs := instance.Group("/messages")
@@ -519,18 +506,18 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	apiKeys.Post("/", apiKeyH.Create)
 	apiKeys.Delete("/:id", apiKeyH.Delete)
 
-	// Proxy pool (admin only)
-	proxyPool := api.Group("/proxy")
-	proxyPool.Get("/pool", resProxyH.ListPool)
-	proxyPool.Get("/stats", resProxyH.GetPoolStats)
-	// Global proxy configs (admin only alias for frontend compatibility)
+	// ─── Proxies (catálogo) ──────────────────────────────────────────────────
+	// Plataforma (is_platform=true, admin-managed) + custom do usuário.
+	proxies := api.Group("/proxies")
+	proxies.Get("/", proxyH.ListAvailable)       // platform + próprios, pra usar no server
+	proxies.Get("/mine", proxyH.ListMine)        // só os próprios (integrations)
+	proxies.Post("/", proxyH.Create)             // criar custom (plano pago)
+	proxies.Put("/:id", proxyH.Update)           // editar próprio
+	proxies.Delete("/:id", proxyH.Delete)        // deletar próprio
+	proxies.Post("/:id/test", proxyH.Test)       // testar qualquer visível
+	// Alias legado: /proxy/global (admin) continua funcionando pra UI antiga
 	api.Get("/proxy/global", middleware.RequireAdmin(), adminH.GetGlobalProxyConfig)
 	api.Put("/proxy/global", middleware.RequireAdmin(), adminH.UpdateGlobalProxyConfig)
-	// Proxy provider configs (user-specific)
-	proxyPool.Get("/providers", resProxyH.ListProviderConfigs)
-	proxyPool.Post("/providers", resProxyH.CreateProviderConfig)
-	proxyPool.Put("/providers/:id", resProxyH.UpdateProviderConfig)
-	proxyPool.Delete("/providers/:id", resProxyH.DeleteProviderConfig)
 
 	// ─── Servers ──────────────────────────────────────────────────────────────
 	servers := api.Group("/servers")

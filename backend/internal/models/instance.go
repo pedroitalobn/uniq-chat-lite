@@ -85,23 +85,22 @@ type Instance struct {
 	PhoneNumber string         `gorm:"index" json:"phone_number"`
 	Status      InstanceStatus `gorm:"type:varchar(20);default:'disconnected'" json:"status"`
 
-	// Proxy fields
-	// ProxyMode: none | manual | residencial | global | inherit (default = inherit → herda do Server → default GlobalProxy)
-	ProxyMode       ProxyMode          `gorm:"type:varchar(20);default:'inherit'" json:"proxy_mode"`
-	ProxyEnabled    bool               `gorm:"default:false" json:"proxy_enabled"`
-	ProxyType       ProxyType          `gorm:"type:varchar(10)" json:"proxy_type,omitempty"`
-	ProxyHost       string             `gorm:"type:varchar(255)" json:"proxy_host,omitempty"`
-	ProxyPort       int                `json:"proxy_port,omitempty"`
-	ProxyUsername   string             `gorm:"type:varchar(255)" json:"proxy_username,omitempty"`
-	ProxyPassword   string             `gorm:"type:varchar(512)" json:"-"` // encrypted, never expose
-	ProxyStatus     ProxyStatus        `gorm:"type:varchar(20);default:'untested'" json:"proxy_status"`
-	ProxyLastTested *time.Time         `json:"proxy_last_tested,omitempty"`
-	ProxyError      string             `gorm:"type:text" json:"proxy_error,omitempty"`
-	ProxyExternalIP string             `gorm:"type:varchar(64)" json:"proxy_external_ip,omitempty"`
-	ProxyPoolID     *uuid.UUID         `gorm:"type:uuid" json:"proxy_pool_id,omitempty"` // for residencial mode
-	UseGlobalProxy  bool               `gorm:"default:false" json:"use_global_proxy"`
-	GlobalProxyID   *string            `gorm:"type:varchar(64)" json:"global_proxy_id,omitempty"`
-	GlobalProxy     *GlobalProxyConfig `gorm:"foreignKey:GlobalProxyID" json:"global_proxy,omitempty"`
+	// Proxy: instâncias não carregam mais configuração própria de proxy.
+	// O proxy aplicado é o do Server onde a instância está (ver Server.ProxyID).
+	// As colunas proxy_* permanecem na tabela apenas para backward-compat
+	// durante a migração, mas não são mais lidas/escritas pelo código — os
+	// campos abaixo ficam ignorados pelo GORM.
+	ProxyMode       ProxyMode   `gorm:"-" json:"-"`
+	ProxyEnabled    bool        `gorm:"-" json:"-"`
+	ProxyType       ProxyType   `gorm:"-" json:"-"`
+	ProxyHost       string      `gorm:"-" json:"-"`
+	ProxyPort       int         `gorm:"-" json:"-"`
+	ProxyUsername   string      `gorm:"-" json:"-"`
+	ProxyPassword   string      `gorm:"-" json:"-"`
+	ProxyStatus     ProxyStatus `gorm:"-" json:"-"`
+	ProxyLastTested *time.Time  `gorm:"-" json:"-"`
+	ProxyError      string      `gorm:"-" json:"-"`
+	ProxyExternalIP string      `gorm:"-" json:"-"`
 
 	WebhookURL  string     `gorm:"type:text" json:"webhook_url,omitempty"`
 	SessionData string     `gorm:"type:text" json:"-"`

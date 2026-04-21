@@ -196,9 +196,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.RecoverySnapshot{},
 		&models.InstanceAgent{},
 		&models.PasswordResetToken{},
-		&models.ProxyPool{},
-		&models.ProxyProviderConfig{},
-		&models.InstanceProxyAssignment{},
+		&models.Proxy{},
 		&models.InstagramAccount{},
 		&models.TikTokAccount{},
 		&models.SocialDM{},
@@ -219,7 +217,6 @@ func autoMigrate(db *gorm.DB) error {
 		&models.SystemSetting{},
 		// Payment
 		&models.PaymentSettings{},
-		&models.GlobalProxyConfig{},
 		// WABA
 		&models.WABAInstance{},
 	)

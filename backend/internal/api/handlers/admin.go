@@ -2,13 +2,11 @@ package handlers
 
 import (
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/email"
 	"github.com/uniq-chat/backend/internal/models"
@@ -540,142 +538,111 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 	return c.JSON(plan)
 }
 
+// ─── Platform Proxies (admin) ────────────────────────────────────────────
+// Proxies da plataforma (is_platform=true) — gerenciados pelo admin e
+// disponíveis pra todos os users selecionarem no server deles.
+
 // GetGlobalProxyConfig godoc
-// GET /admin/proxy-config
+// GET /admin/proxy-config  — lista proxies da plataforma
 func (h *AdminHandler) GetGlobalProxyConfig(c *fiber.Ctx) error {
-	var cfgs []models.GlobalProxyConfig
-	if err := h.db.Order("created_at DESC").Find(&cfgs).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar configurações de proxy"})
+	var proxies []models.Proxy
+	if err := h.db.Where("is_platform = ?", true).Order("created_at DESC").Find(&proxies).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar proxies"})
 	}
 
-	if len(cfgs) == 0 {
-		cfg := models.GlobalProxyConfig{ID: "default", Enabled: false, Provider: "manual", ProxyType: "http", UseEnv: true, IsActive: true, Country: "br", Name: "Default"}
-		if createErr := h.db.Create(&cfg).Error; createErr != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar configuração de proxy global"})
-		}
-		cfgs = append(cfgs, cfg)
-	}
-
-	result := make([]fiber.Map, len(cfgs))
-	for i, cfg := range cfgs {
-		username := cfg.Username
-		host := cfg.Host
-		port := cfg.Port
-		proxyType := cfg.ProxyType
-		if cfg.UseEnv {
-			host = os.Getenv("BRIGHTDATA_HOST")
-			if host == "" {
-				host = cfg.Host
+	result := make([]fiber.Map, len(proxies))
+	for i, p := range proxies {
+		host := p.Host
+		port := p.Port
+		user := p.Username
+		pType := p.ProxyType
+		if p.UseEnv {
+			if envHost := os.Getenv("BRIGHTDATA_HOST"); envHost != "" {
+				host = envHost
 			}
-			proxyType = "http"
-			if username == "" {
-				username = os.Getenv("BRIGHTDATA_USER")
+			if envUser := os.Getenv("BRIGHTDATA_USER"); envUser != "" {
+				user = envUser
+			}
+			if pType == "" {
+				pType = "http"
 			}
 			if port == 0 {
 				port = 33335
 			}
 		}
-
 		result[i] = fiber.Map{
-			"id":           cfg.ID,
-			"name":         cfg.Name,
-			"enabled":      cfg.Enabled,
-			"is_default":   cfg.IsDefault,
-			"provider":     cfg.Provider,
-			"proxy_type":   proxyType,
+			"id":           p.ID,
+			"name":         p.Name,
+			"provider":     p.Provider,
+			"proxy_type":   pType,
 			"host":         host,
 			"port":         port,
-			"username":     username,
-			"use_env":      cfg.UseEnv,
-			"is_active":    cfg.IsActive,
-			"has_password": cfg.Password != "" || os.Getenv("BRIGHTDATA_PASS") != "",
-			"country":      cfg.Country,
+			"username":     user,
+			"use_env":      p.UseEnv,
+			"is_active":    p.IsActive,
+			"is_platform":  p.IsPlatform,
+			"has_password": p.Password != "" || os.Getenv("BRIGHTDATA_PASS") != "",
+			"country":      p.Country,
+			"created_at":   p.CreatedAt,
 		}
 	}
-
 	return c.JSON(result)
 }
 
 // TestGlobalProxy godoc
-// POST /admin/proxy-test
-// Body opcional: { "id": "<proxy_id>" }. Se omitido, testa o primeiro enabled.
-// Executa um GET real via proxy contra httpbin.org/ip e retorna o IP externo.
+// POST /admin/proxy-test — testa um proxy de plataforma
 func (h *AdminHandler) TestGlobalProxy(c *fiber.Ctx) error {
 	var req struct {
 		ID string `json:"id"`
 	}
 	_ = c.BodyParser(&req)
 
-	var cfg models.GlobalProxyConfig
-	q := h.db.Model(&models.GlobalProxyConfig{})
+	var p models.Proxy
+	q := h.db.Model(&models.Proxy{}).Where("is_platform = ?", true)
 	if req.ID != "" {
 		q = q.Where("id = ?", req.ID)
 	} else {
-		q = q.Where("enabled = ? AND is_active = ?", true, true).Order("is_default DESC, created_at DESC")
+		q = q.Where("is_active = ?", true).Order("created_at DESC")
 	}
-	if err := q.First(&cfg).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "proxy global não encontrado"})
+	if err := q.First(&p).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "proxy não encontrado"})
 	}
 
-	host, port, user, pass, proxyType, source := whatsapp.ResolveGlobalProxyFieldsExported(&cfg)
-
-	if host == "" || port <= 0 {
+	cfg, source, ok := whatsapp.BuildProxyConfigExported(&p)
+	if !ok {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"success": false,
-			"error":   "host ou porta vazios após resolução (use_env=" + strconv.FormatBool(cfg.UseEnv) + ")",
+			"error":   "host ou porta vazios após resolução",
 			"source":  source,
 		})
 	}
-
-	log.Info().
-		Str("id", cfg.ID).
-		Str("source", source).
-		Str("host", host).
-		Int("port", port).
-		Str("type", proxyType).
-		Msg("admin: testing global proxy")
-
-	proxyCfg := &whatsapp.ProxyConfig{
-		Enabled:  true,
-		Type:     proxyType,
-		Host:     host,
-		Port:     port,
-		Username: user,
-		Password: pass,
-	}
-	externalIP, latencyMs, err := whatsapp.TestProxy(proxyCfg)
+	externalIP, latencyMs, err := whatsapp.TestProxy(cfg)
 	if err != nil {
 		return c.JSON(fiber.Map{
-			"success":    false,
-			"error":      err.Error(),
-			"source":     source,
-			"host":       host,
-			"port":       port,
-			"proxy_type": proxyType,
+			"success": false,
+			"error":   err.Error(),
+			"source":  source,
+			"host":    cfg.Host,
+			"port":    cfg.Port,
 		})
 	}
-
 	return c.JSON(fiber.Map{
 		"success":     true,
 		"external_ip": externalIP,
 		"latency_ms":  latencyMs,
 		"source":      source,
-		"host":        host,
-		"port":        port,
-		"proxy_type":  proxyType,
+		"host":        cfg.Host,
+		"port":        cfg.Port,
 		"tested_at":   time.Now(),
 	})
 }
 
 // UpdateGlobalProxyConfig godoc
-// PUT /admin/proxy-config
-// Can create new proxy (if id is missing) or update existing
+// PUT /admin/proxy-config — cria ou atualiza um proxy de plataforma
 func (h *AdminHandler) UpdateGlobalProxyConfig(c *fiber.Ctx) error {
 	var req struct {
 		ID        string `json:"id"`
 		Name      string `json:"name"`
-		Enabled   *bool  `json:"enabled"`
-		IsDefault *bool  `json:"is_default"`
 		Provider  string `json:"provider"`
 		ProxyType string `json:"proxy_type"`
 		Host      string `json:"host"`
@@ -687,73 +654,60 @@ func (h *AdminHandler) UpdateGlobalProxyConfig(c *fiber.Ctx) error {
 		Country   string `json:"country"`
 	}
 	if err := c.BodyParser(&req); err != nil {
-		log.Error().Err(err).Msg("proxy-config: failed to parse body")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
 	}
 
-	log.Info().Str("id", req.ID).Str("name", req.Name).Msg("proxy-config update request")
-
-	// Create new proxy if no id provided
 	if req.ID == "" {
-		// Truncate UUID to 32 chars (max varchar(32) in DB)
-		req.ID = uuid.New().String()[:32]
-
-		// If setting as default, clear other defaults only for the same country
-		if req.IsDefault != nil && *req.IsDefault {
-			h.db.Model(&models.GlobalProxyConfig{}).
-				Where("is_default = ? AND country = ?", true, req.Country).
-				Update("is_default", false)
+		// Create new platform proxy
+		p := models.Proxy{
+			IsPlatform: true,
+			Name:       req.Name,
+			Provider:   req.Provider,
+			ProxyType:  req.ProxyType,
+			Host:       req.Host,
+			Port:       req.Port,
+			Username:   req.Username,
+			UseEnv:     req.UseEnv != nil && *req.UseEnv,
+			IsActive:   req.IsActive == nil || *req.IsActive,
+			Country:    req.Country,
 		}
-
-		cfg := models.GlobalProxyConfig{
-			ID:        req.ID,
-			Name:      req.Name,
-			Enabled:   req.Enabled != nil && *req.Enabled,
-			IsDefault: req.IsDefault != nil && *req.IsDefault,
-			Provider:  req.Provider,
-			ProxyType: req.ProxyType,
-			Host:      req.Host,
-			Port:      req.Port,
-			Username:  req.Username,
-			UseEnv:    req.UseEnv != nil && *req.UseEnv,
-			IsActive:  req.IsActive != nil && *req.IsActive,
-			Country:   req.Country,
+		if p.Name == "" {
+			p.Name = "Proxy " + p.Country
+		}
+		if p.Country == "" {
+			p.Country = "br"
+		}
+		if p.ProxyType == "" {
+			p.ProxyType = "http"
+		}
+		if p.Provider == "" {
+			p.Provider = "manual"
 		}
 		if req.Password != "" {
-			encrypted, err := whatsapp.EncryptProxyPassword(req.Password)
+			enc, err := whatsapp.EncryptProxyPassword(req.Password)
 			if err != nil {
-				log.Error().Err(err).Msg("proxy-config: failed to encrypt password")
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criptografar senha"})
 			}
-			cfg.Password = encrypted
+			p.Password = enc
 		}
-		if cfg.Name == "" {
-			cfg.Name = "Proxy " + cfg.Country
-		}
-		if cfg.Country == "" {
-			cfg.Country = "br"
-		}
-		log.Info().Msg("proxy-config: creating new config")
-		log.Info().Any("config", cfg).Msg("proxy-config: config struct")
-		if err := h.db.Create(&cfg).Error; err != nil {
-			log.Error().Err(err).Msg("proxy-config: failed to create config")
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar configuração"})
+		if err := h.db.Create(&p).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar proxy"})
 		}
 		return h.GetGlobalProxyConfig(c)
 	}
 
 	// Update existing
-	var cfg models.GlobalProxyConfig
-	if err := h.db.Where("id = ?", req.ID).First(&cfg).Error; err != nil {
+	pid, err := uuid.Parse(req.ID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var p models.Proxy
+	if err := h.db.Where("id = ? AND is_platform = ?", pid, true).First(&p).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "proxy não encontrado"})
 	}
-
 	updates := map[string]interface{}{}
 	if req.Name != "" {
 		updates["name"] = req.Name
-	}
-	if req.Enabled != nil {
-		updates["enabled"] = *req.Enabled
 	}
 	if req.Provider != "" {
 		updates["provider"] = req.Provider
@@ -771,24 +725,14 @@ func (h *AdminHandler) UpdateGlobalProxyConfig(c *fiber.Ctx) error {
 		updates["username"] = req.Username
 	}
 	if req.Password != "" {
-		encrypted, err := whatsapp.EncryptProxyPassword(req.Password)
+		enc, err := whatsapp.EncryptProxyPassword(req.Password)
 		if err != nil {
-			log.Error().Err(err).Msg("proxy-config: failed to encrypt password on update")
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criptografar senha"})
 		}
-		updates["password"] = encrypted
+		updates["password"] = enc
 	}
 	if req.UseEnv != nil {
 		updates["use_env"] = *req.UseEnv
-	}
-	if req.IsDefault != nil {
-		if *req.IsDefault {
-			// Clear other defaults ONLY for the same country (not global)
-			h.db.Model(&models.GlobalProxyConfig{}).
-				Where("is_default = ? AND country = ? AND id != ?", true, req.Country, cfg.ID).
-				Update("is_default", false)
-		}
-		updates["is_default"] = *req.IsDefault
 	}
 	if req.IsActive != nil {
 		updates["is_active"] = *req.IsActive
@@ -796,82 +740,51 @@ func (h *AdminHandler) UpdateGlobalProxyConfig(c *fiber.Ctx) error {
 	if req.Country != "" {
 		updates["country"] = req.Country
 	}
-
 	if len(updates) > 0 {
-		if err := h.db.Model(&cfg).Updates(updates).Error; err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao salvar configuração"})
+		if err := h.db.Model(&p).Updates(updates).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao salvar"})
 		}
 	}
-
-	// Propaga mudanças: reinicia instâncias que estão usando este global proxy
-	// (whatsmeow só aplica proxy novo em Disconnect+Connect).
-	go h.restartInstancesUsingGlobal(cfg.ID)
-
+	go h.restartInstancesUsingProxy(p.ID)
 	return h.GetGlobalProxyConfig(c)
 }
 
-// restartInstancesUsingGlobal reconecta todas as instâncias que referenciam
-// o GlobalProxyConfig informado para aplicar a nova configuração de proxy.
-// No-op se o manager não estiver injetado (bootstrap opcional).
-func (h *AdminHandler) restartInstancesUsingGlobal(globalProxyID string) {
+// restartInstancesUsingProxy reinicia instâncias cujo server aponta pro proxy
+// atualizado, pra aplicar as novas credenciais no whatsmeow.
+func (h *AdminHandler) restartInstancesUsingProxy(proxyID uuid.UUID) {
 	if h.manager == nil {
-		log.Warn().Msg("proxy-config: manager not injected; skipping instance restart")
+		return
+	}
+	var serverIDs []uuid.UUID
+	h.db.Model(&models.Server{}).Where("proxy_id = ?", proxyID).Pluck("id", &serverIDs)
+	if len(serverIDs) == 0 {
 		return
 	}
 	var instances []models.Instance
-	if err := h.db.Where(
-		"use_global_proxy = ? AND global_proxy_id = ? AND proxy_enabled = ?",
-		true, globalProxyID, true,
-	).Find(&instances).Error; err != nil {
-		log.Error().Err(err).Str("global_proxy_id", globalProxyID).Msg("proxy-config: failed to list instances")
+	if err := h.db.Where("server_id IN ?", serverIDs).Find(&instances).Error; err != nil {
 		return
 	}
-
-	restarted := 0
-	skipped := 0
 	for i := range instances {
 		inst := &instances[i]
 		if !h.manager.IsRunning(inst.ID.String()) {
-			skipped++
 			continue
 		}
-		if err := h.manager.RestartWithProxy(inst); err != nil {
-			log.Error().Err(err).Str("instance", inst.ID.String()).Msg("proxy-config: restart failed")
-			continue
-		}
-		restarted++
+		_ = h.manager.RestartWithProxy(inst)
 	}
-	log.Info().
-		Str("global_proxy_id", globalProxyID).
-		Int("total", len(instances)).
-		Int("restarted", restarted).
-		Int("skipped_not_running", skipped).
-		Msg("proxy-config: propagated update to instances")
 }
 
 // DELETE /admin/proxy-config/:id
 func (h *AdminHandler) DeleteGlobalProxyConfig(c *fiber.Ctx) error {
-	id := c.Params("id")
-
-	// First check if proxy exists
-	var proxy models.GlobalProxyConfig
-	if err := h.db.Where("id = ?", id).First(&proxy).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "proxy não encontrado"})
+	idStr := c.Params("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
 	}
-
-	// Check if proxy is being used by any instance
-	var count int64
-	h.db.Model(&models.Instance{}).Where("use_global_proxy = ? AND proxy_enabled = ?", true, true).Count(&count)
-
-	// If proxy is "default" and enabled and being used, block deletion
-	if id == "default" && proxy.Enabled && count > 0 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "não é possível remover - proxy está em uso por instâncias"})
-	}
-
-	if err := h.db.Where("id = ?", id).Delete(&models.GlobalProxyConfig{}).Error; err != nil {
+	// Detach servers still pointing to this proxy
+	h.db.Model(&models.Server{}).Where("proxy_id = ?", id).Update("proxy_id", nil)
+	if err := h.db.Where("id = ? AND is_platform = ?", id, true).Delete(&models.Proxy{}).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao remover proxy"})
 	}
-
 	return c.JSON(fiber.Map{"success": true})
 }
 
@@ -881,9 +794,19 @@ func (h *AdminHandler) GetGlobalProxyStats(c *fiber.Ctx) error {
 	stats := models.ProxyUsageStats{}
 	h.db.Model(&models.User{}).Count(&stats.TotalUsers)
 	h.db.Model(&models.Instance{}).Count(&stats.TotalInstances)
-	h.db.Model(&models.Instance{}).Where("use_global_proxy = ?", true).Count(&stats.GlobalProxyInstances)
+	// Instâncias cujo server tem proxy (plataforma ou custom)
+	h.db.Raw(`
+		SELECT COUNT(*) FROM instances i
+		JOIN servers s ON s.id = i.server_id
+		WHERE s.proxy_id IS NOT NULL
+	`).Scan(&stats.GlobalProxyInstances)
 	h.db.Model(&models.User{}).Joins("JOIN plans ON plans.id = users.plan_id").Where("plans.allow_proxy = ?", true).Count(&stats.EligibleUsersByPlan)
-	h.db.Model(&models.Instance{}).Where("use_global_proxy = ? AND proxy_status = ?", true, models.ProxyStatusOK).Count(&stats.ConnectedProxySamples)
+	// Connected samples: instâncias conectadas usando proxy
+	h.db.Raw(`
+		SELECT COUNT(*) FROM instances i
+		JOIN servers s ON s.id = i.server_id
+		WHERE s.proxy_id IS NOT NULL AND i.status = 'connected'
+	`).Scan(&stats.ConnectedProxySamples)
 
 	var rows []models.ProxyUserUsage
 	h.db.Raw(`
@@ -893,7 +816,9 @@ func (h *AdminHandler) GetGlobalProxyStats(c *fiber.Ctx) error {
 			MAX(i.updated_at) as last_updated_at
 		FROM users u
 		LEFT JOIN plans p ON p.id = u.plan_id
-		LEFT JOIN instances i ON i.user_id = u.id AND i.use_global_proxy = true
+		LEFT JOIN instances i ON i.user_id = u.id
+		LEFT JOIN servers sv ON sv.id = i.server_id AND sv.proxy_id IS NOT NULL
+		WHERE sv.id IS NOT NULL
 		GROUP BY u.id, u.name, u.email, p.name
 		HAVING COUNT(i.id) > 0
 		ORDER BY COUNT(i.id) DESC
@@ -904,6 +829,7 @@ func (h *AdminHandler) GetGlobalProxyStats(c *fiber.Ctx) error {
 		"users":   rows,
 	})
 }
+
 
 // Stats godoc
 // GET /admin/stats

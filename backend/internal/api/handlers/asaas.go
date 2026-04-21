@@ -9,26 +9,22 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/email"
 	"github.com/uniq-chat/backend/internal/models"
-	"github.com/uniq-chat/backend/internal/services"
 	"gorm.io/gorm"
 )
 
 type AsaasHandler struct {
 	db       *gorm.DB
 	emailSvc *email.Service
-	proxyMgr *services.ProxyManager
 }
 
 func NewAsaasHandler(db *gorm.DB, emailSvc *email.Service) *AsaasHandler {
 	return &AsaasHandler{
 		db:       db,
 		emailSvc: emailSvc,
-		proxyMgr: services.NewProxyManager(db),
 	}
 }
 
@@ -302,11 +298,9 @@ func (h *AsaasHandler) Webhook(c *fiber.Ctx) error {
 						"asaas_subscription_status": "active",
 					})
 
-					if plan.AllowProxyResidencial {
-						if uid, err := uuid.Parse(userID); err == nil {
-							h.proxyMgr.EnsurePoolHasCapacity(uid, &plan)
-						}
-					}
+					// Proxy provisioning moved to server-level configuration;
+					// no per-user pool to allocate here.
+					_ = userID
 
 					var user models.User
 					if h.db.First(&user, "id = ?", userID).Error == nil {
@@ -339,10 +333,6 @@ func (h *AsaasHandler) Webhook(c *fiber.Ctx) error {
 						"asaas_subscription_id":     "",
 						"asaas_subscription_status": "canceled",
 					})
-
-					if uid, err := uuid.Parse(user.ID.String()); err == nil {
-						h.proxyMgr.ReleaseAllForUser(uid)
-					}
 
 					h.emailSvc.SendSubscriptionCanceled(user.Email, user.Name)
 				}
