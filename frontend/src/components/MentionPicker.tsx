@@ -1,25 +1,25 @@
 "use client";
 
 /**
- * MentionPicker — textarea com autocomplete de "menções" tipadas.
+ * MentionPicker — editor rich com menções tipadas renderizadas como chips.
  *
- * Como o usuário usa:
- *  - digita `/` para abrir o menu de categorias (instância, grupo, contato,
- *    tag, jornada) e depois busca dentro da categoria.
- *  - digita `@` para abrir uma busca global (procura em todas as categorias
- *    ao mesmo tempo por nome).
+ * Substitui o textarea por um `contenteditable` div. Cada menção vira um
+ * <span> não-editável com estilo próprio (cor da categoria), tornando o
+ * token legível em vez do formato cru `@[label](type:id)`.
  *
- * Ao escolher um item, injetamos no texto um token no formato
- *   @[Label](type:id)
- * que é facilmente parseável com uma regex. O componente expõe:
- *  - `value`: string raw com os tokens dentro.
- *  - `renderedText`: string com tokens substituídos pelos labels (o que vai
- *    no prompt "humano" exibido no chat).
- *  - `mentions`: array estruturado com os itens referenciados (o backend usa
- *    como hint autoritativo de resolução).
+ * API externa:
+ *  - `value` (string) é o formato canônico serializado (`@[label](type:id)`).
+ *    Parent continua controlando igual a um textarea; emitimos no onChange.
+ *  - `renderedText` (tokens → labels) e `mentions[]` vêm no payload do
+ *    onChange/onSend como antes — zero mudança no agents/page.tsx.
  *
- * Fallback: se o usuário digitar livre, sem menção, o backend continua
- * tentando adivinhar por nome (comportamento atual).
+ * Interação:
+ *  - Digite `/` no editor → popup abre com categorias.
+ *  - Digite `@` → popup abre em busca global.
+ *  - Popup tem CAMPO DE BUSCA visível e auto-focado; lista os itens mais
+ *    recentes da categoria (limite 8). Setas/Enter/Esc navegam.
+ *  - Ao escolher, o trecho `/xxx` ou `@xxx` no editor é substituído por
+ *    um chip estilizado e o foco volta pro editor na posição certa.
  */
 
 import {
@@ -28,7 +28,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type ChangeEvent,
   type KeyboardEvent,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -42,8 +41,8 @@ import {
   AtSign,
   GitBranch,
   Hash,
-  MessageSquare,
   Route,
+  Search as SearchIcon,
   Smartphone,
   Tag as TagIcon,
   User,
@@ -62,16 +61,12 @@ export interface Mention {
   type: MentionType;
   id: string;
   label: string;
-  // extras úteis para o backend (ex: JID cru do grupo)
   meta?: Record<string, string>;
 }
 
 export interface MentionPickerHandles {
-  /** valor atual com tokens embutidos */
   value: string;
-  /** valor renderizado (tokens → labels) — o que vai pro LLM */
   renderedText: string;
-  /** menções extraídas do texto */
   mentions: Mention[];
 }
 
@@ -85,8 +80,57 @@ interface Props {
   isLoading?: boolean;
 }
 
-// ─── Token parser ────────────────────────────────────────────────────────────
+// ─── RichMentionText ─────────────────────────────────────────────────────────
+// Renderiza texto com tokens `@[label](type:id)` substituindo cada token por
+// um chip estilizado igual ao do editor. Usar no histórico de chat para que a
+// mensagem enviada pelo usuário mantenha o destaque visual das menções.
+export function RichMentionText({ text, className }: { text: string; className?: string }) {
+  const parts: Array<{ kind: "text"; value: string } | { kind: "chip"; type: MentionType; id: string; label: string }> = [];
+  let last = 0;
+  const re = /@\[([^\]]+)\]\((instance|group|contact|tag|funnel|journey):([A-Za-z0-9_@.\-]+)\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push({ kind: "text", value: text.slice(last, m.index) });
+    parts.push({ kind: "chip", label: m[1], type: m[2] as MentionType, id: m[3] });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push({ kind: "text", value: text.slice(last) });
 
+  if (parts.length === 0) return <span className={className}>{text}</span>;
+
+  return (
+    <span className={className} style={{ whiteSpace: "pre-wrap" }}>
+      {parts.map((p, i) => {
+        if (p.kind === "text") return <span key={i}>{p.value}</span>;
+        const meta = CATEGORIES.find((c) => c.type === p.type);
+        const c = meta?.color ?? "#64748b";
+        return (
+          <span
+            key={i}
+            title={`${meta?.label ?? p.type}: ${p.label}`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              padding: "1px 8px",
+              margin: "0 1px",
+              borderRadius: "6px",
+              fontSize: "90%",
+              fontWeight: 600,
+              background: c + "22",
+              color: c,
+              border: `1px solid ${c}55`,
+            }}
+          >
+            @{p.label}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+// ─── Token parse/serialize ───────────────────────────────────────────────────
 const TOKEN_RE = /@\[([^\]]+)\]\((instance|group|contact|tag|funnel|journey):([A-Za-z0-9_@.\-]+)\)/g;
 
 export function parseMentions(text: string): { mentions: Mention[]; rendered: string } {
@@ -98,15 +142,10 @@ export function parseMentions(text: string): { mentions: Mention[]; rendered: st
   return { mentions, rendered };
 }
 
-function tokenFor(type: MentionType, id: string, label: string): string {
-  return `@[${label}](${type}:${id})`;
-}
-
-// ─── Category definitions ────────────────────────────────────────────────────
-
+// ─── Category metadata ───────────────────────────────────────────────────────
 const CATEGORIES: {
   type: MentionType;
-  slash: string; // atalho digitado após /
+  slash: string;
   label: string;
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   color: string;
@@ -118,76 +157,199 @@ const CATEGORIES: {
   { type: "funnel",   slash: "funil",     label: "Funil",              icon: GitBranch,  color: "#ec4899" },
   { type: "journey",  slash: "jornada",   label: "Jornada",            icon: Route,      color: "#22d3ee" },
 ];
+const catMeta = (t: MentionType) => CATEGORIES.find((c) => c.type === t)!;
+
+// ─── DOM helpers ─────────────────────────────────────────────────────────────
+
+function createChipEl(type: MentionType, id: string, label: string, meta?: Record<string, string>): HTMLSpanElement {
+  const chip = document.createElement("span");
+  chip.setAttribute("data-m-type", type);
+  chip.setAttribute("data-m-id", id);
+  if (meta?.jid) chip.setAttribute("data-m-jid", meta.jid);
+  if (meta?.phone) chip.setAttribute("data-m-phone", meta.phone);
+  chip.setAttribute("contenteditable", "false");
+  const c = catMeta(type).color;
+  chip.className = "mention-chip";
+  chip.style.cssText = [
+    "display:inline-flex",
+    "align-items:center",
+    "gap:4px",
+    "padding:1px 8px",
+    "margin:0 1px",
+    "border-radius:6px",
+    "font-size:12px",
+    "font-weight:600",
+    "line-height:1.6",
+    "cursor:default",
+    "user-select:none",
+    `background:${c}22`,
+    `color:${c}`,
+    `border:1px solid ${c}55`,
+  ].join(";");
+  chip.textContent = "@" + label;
+  return chip;
+}
+
+function renderValueToDOM(el: HTMLDivElement, value: string) {
+  el.innerHTML = "";
+  let last = 0;
+  TOKEN_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = TOKEN_RE.exec(value)) !== null) {
+    const [full, label, type, id] = m;
+    const start = m.index;
+    if (start > last) el.appendChild(document.createTextNode(value.slice(last, start)));
+    el.appendChild(createChipEl(type as MentionType, id, label));
+    last = start + full.length;
+  }
+  if (last < value.length) el.appendChild(document.createTextNode(value.slice(last)));
+  // Garante que sempre há um nó de texto no fim (caret precisa pousar em algum lugar)
+  if (el.lastChild?.nodeType !== Node.TEXT_NODE) {
+    el.appendChild(document.createTextNode(""));
+  }
+}
+
+function readEditor(el: HTMLDivElement | null): MentionPickerHandles {
+  if (!el) return { value: "", renderedText: "", mentions: [] };
+  let value = "", rendered = "";
+  const mentions: Mention[] = [];
+  const walk = (node: ChildNode) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      value += node.textContent ?? "";
+      rendered += node.textContent ?? "";
+      return;
+    }
+    if (node instanceof HTMLElement) {
+      if (node.dataset.mType) {
+        const label = (node.textContent ?? "").replace(/^@/, "");
+        const m: Mention = {
+          type: node.dataset.mType as MentionType,
+          id: node.dataset.mId ?? "",
+          label,
+        };
+        const meta: Record<string, string> = {};
+        if (node.dataset.mJid) meta.jid = node.dataset.mJid;
+        if (node.dataset.mPhone) meta.phone = node.dataset.mPhone;
+        if (Object.keys(meta).length) m.meta = meta;
+        mentions.push(m);
+        value += `@[${label}](${m.type}:${m.id})`;
+        rendered += label;
+        return;
+      }
+      if (node.tagName === "BR") { value += "\n"; rendered += "\n"; return; }
+      node.childNodes.forEach(walk);
+    }
+  };
+  el.childNodes.forEach(walk);
+  return { value, renderedText: rendered, mentions };
+}
+
+// ─── Picker state ────────────────────────────────────────────────────────────
+
+interface PickerAnchor {
+  // snapshot do range do trigger (`/` ou `@` + letras depois) para apagar
+  // e substituir pelo chip no momento do pick.
+  textNode: Text;
+  startOffset: number;
+  endOffset: number;
+}
+
+interface PickerState {
+  open: boolean;
+  trigger: "/" | "@";
+  mode: "category" | "search";
+  category: MentionType | null;
+  query: string;
+  anchor: PickerAnchor | null;
+}
+
+const CLOSED: PickerState = {
+  open: false, trigger: "/", mode: "category", category: null, query: "", anchor: null,
+};
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function MentionPicker({
-  value, onChange, onSend, onKeyDown, placeholder, disabled, isLoading,
+  value, onChange, onSend, placeholder, disabled, isLoading,
 }: Props) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [picker, setPicker] = useState<
-    | { open: false }
-    | { open: true; mode: "category" | "search"; category?: MentionType; triggerPos: number; query: string }
-  >({ open: false });
+  const editorRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const lastEmittedValue = useRef("");
+  const [picker, setPicker] = useState<PickerState>(CLOSED);
   const [highlight, setHighlight] = useState(0);
+  const [editorFocused, setEditorFocused] = useState(false);
 
-  const { mentions, rendered } = useMemo(() => parseMentions(value), [value]);
-
-  // Autosize textarea
+  // ─── Sync parent value → DOM (só quando muda externamente) ─────────────────
   useEffect(() => {
-    const el = textareaRef.current;
+    const el = editorRef.current;
     if (!el) return;
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 180) + "px";
+    if (value === lastEmittedValue.current) return;
+    renderValueToDOM(el, value);
+    lastEmittedValue.current = value;
   }, [value]);
 
-  // ─── Data fetching (por categoria; habilitado on demand) ────────────────────
-  const mentionedInstanceId = mentions.find((m) => m.type === "instance")?.id;
+  // ─── Emissão ────────────────────────────────────────────────────────────────
+  const emit = useCallback(() => {
+    const info = readEditor(editorRef.current);
+    lastEmittedValue.current = info.value;
+    onChange(info.value, info);
+  }, [onChange]);
+
+  // ─── Data fetching on-demand ────────────────────────────────────────────────
+  const mentionedInstanceId = useMemo(() => {
+    const info = readEditor(editorRef.current);
+    return info.mentions.find((m) => m.type === "instance")?.id;
+  }, [value]);
+
+  const q = useCallback(<T,>(key: any[], fn: () => Promise<T>, enabled: boolean) =>
+    useQuery<T>({ queryKey: key, queryFn: fn, enabled, staleTime: 60_000 }), []);
+
+  const needsCategory = (c: MentionType) =>
+    picker.open && (picker.category === c || picker.mode === "search" && !picker.category);
 
   const { data: instances = [] } = useQuery<any[]>({
     queryKey: ["mention", "instances"],
     queryFn: async () => (await instancesApi.list()).data ?? [],
-    enabled: picker.open && (picker.category === "instance" || picker.mode === "search"),
+    enabled: needsCategory("instance"),
     staleTime: 60_000,
   });
   const { data: groupsData } = useQuery<any>({
     queryKey: ["mention", "groups", mentionedInstanceId ?? "any"],
     queryFn: async () => {
-      if (mentionedInstanceId) return (await groupsApi.list(mentionedInstanceId)).data;
-      return null;
+      if (!mentionedInstanceId) return null;
+      return (await groupsApi.list(mentionedInstanceId)).data;
     },
-    enabled: picker.open && (picker.category === "group" || picker.mode === "search") && !!mentionedInstanceId,
+    enabled: needsCategory("group") && !!mentionedInstanceId,
     staleTime: 30_000,
   });
   const { data: contacts = [] } = useQuery<any[]>({
     queryKey: ["mention", "contacts"],
-    queryFn: async () => (await crmApi.listContacts({ limit: 100 })).data?.data ?? [],
-    enabled: picker.open && (picker.category === "contact" || picker.mode === "search"),
+    queryFn: async () => (await crmApi.listContacts({ limit: 200 })).data?.data ?? [],
+    enabled: needsCategory("contact"),
     staleTime: 60_000,
   });
   const { data: tags = [] } = useQuery<any[]>({
     queryKey: ["mention", "tags"],
     queryFn: async () => (await crmApi.listTags()).data ?? [],
-    enabled: picker.open && (picker.category === "tag" || picker.mode === "search"),
+    enabled: needsCategory("tag"),
     staleTime: 60_000,
   });
   const { data: funnels = [] } = useQuery<any[]>({
     queryKey: ["mention", "funnels"],
     queryFn: async () => (await crmApi.listFunnels()).data ?? [],
-    enabled: picker.open && (picker.category === "funnel" || picker.mode === "search"),
+    enabled: needsCategory("funnel"),
     staleTime: 60_000,
   });
   const { data: journeys = [] } = useQuery<any[]>({
     queryKey: ["mention", "journeys"],
     queryFn: async () => (await journeysApi.list()).data ?? [],
-    enabled: picker.open && (picker.category === "journey" || picker.mode === "search"),
+    enabled: needsCategory("journey"),
     staleTime: 30_000,
   });
 
-  // ─── Helpers ─────────────────────────────────────────────────────────────
   const groupItems: { type: MentionType; id: string; label: string; meta?: Record<string, string> }[] =
     Array.isArray(groupsData?.groups)
-      ? groupsData.groups.map((g: any) => ({ type: "group", id: g.jid, label: g.name || g.subject || g.jid, meta: { jid: g.jid } }))
+      ? groupsData.groups.map((g: any) => ({ type: "group" as MentionType, id: g.jid, label: g.name || g.subject || g.jid, meta: { jid: g.jid } }))
       : [];
 
   const allItems = useMemo(() => ({
@@ -199,160 +361,181 @@ export function MentionPicker({
     journey:  journeys.map((j: any) => ({ type: "journey" as MentionType, id: j.id, label: j.name })),
   }), [instances, groupItems, contacts, tags, funnels, journeys]);
 
-  // ─── Filter items based on current picker query ─────────────────────────
+  // ─── Sugestões filtradas ────────────────────────────────────────────────────
   type Suggestion = {
-    type: MentionType;
-    id: string;
-    label: string;
-    meta?: Record<string, string>;
+    type: MentionType; id: string; label: string; meta?: Record<string, string>;
     icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
     color: string;
   };
   const suggestions = useMemo<Suggestion[]>(() => {
     if (!picker.open) return [];
-    const q = picker.query.toLowerCase();
-    const matchesQuery = (label: string) => !q || label.toLowerCase().includes(q);
+    const q = picker.query.toLowerCase().trim();
+    const matches = (label: string) => !q || label.toLowerCase().includes(q);
 
     if (picker.mode === "category") {
-      return CATEGORIES.filter((c) => !q || c.slash.includes(q) || c.label.toLowerCase().includes(q))
+      return CATEGORIES
+        .filter((c) => !q || c.slash.includes(q) || c.label.toLowerCase().includes(q))
         .map<Suggestion>((c) => ({ type: c.type, id: `__cat__:${c.type}`, label: c.label, icon: c.icon, color: c.color }));
     }
-
-    const categoryMeta = (t: MentionType) => CATEGORIES.find((c) => c.type === t)!;
-
-    if (picker.mode === "search") {
-      if (picker.category) {
-        const list = allItems[picker.category] ?? [];
-        const meta = categoryMeta(picker.category);
-        return list.filter((i) => matchesQuery(i.label)).slice(0, 8).map((i) => ({ ...i, icon: meta.icon, color: meta.color }));
-      }
-      // global search (@): mistura tudo
-      const buckets: (MentionType)[] = ["instance", "group", "contact", "tag", "funnel", "journey"];
-      const out: { type: MentionType; id: string; label: string; meta?: Record<string, string>; icon: any; color: string }[] = [];
-      for (const t of buckets) {
-        const meta = categoryMeta(t);
-        const list = allItems[t] ?? [];
-        for (const i of list) {
-          if (matchesQuery(i.label)) out.push({ ...i, icon: meta.icon, color: meta.color });
-          if (out.length >= 8) return out;
+    if (picker.mode === "search" && picker.category) {
+      const meta = catMeta(picker.category);
+      const list = allItems[picker.category] ?? [];
+      return list.filter((i) => matches(i.label)).slice(0, 8).map<Suggestion>((i) => ({ ...i, icon: meta.icon, color: meta.color }));
+    }
+    // busca global (@)
+    const out: Suggestion[] = [];
+    (["instance", "group", "contact", "tag", "funnel", "journey"] as MentionType[]).forEach((t) => {
+      const meta = catMeta(t);
+      for (const i of allItems[t] ?? []) {
+        if (matches(i.label) && out.length < 8) {
+          out.push({ ...i, icon: meta.icon, color: meta.color });
         }
       }
-      return out;
-    }
-    return [];
+    });
+    return out;
   }, [picker, allItems]);
 
-  // Discriminated union: só acessa campos internos quando aberto.
-  const pickerMode = picker.open ? picker.mode : null;
-  const pickerCategory = picker.open ? picker.category : null;
-  const pickerQuery = picker.open ? picker.query : "";
-  useEffect(() => { setHighlight(0); }, [picker.open, pickerMode, pickerCategory, pickerQuery]);
+  useEffect(() => { setHighlight(0); }, [picker.mode, picker.category, picker.query]);
 
-  // ─── Input handling ─────────────────────────────────────────────────────
-
-  const handleChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
-    const next = e.target.value;
-    const cursor = e.target.selectionStart ?? next.length;
-    updatePickerFromCursor(next, cursor);
-    emitChange(next);
-  };
-
-  const updatePickerFromCursor = (text: string, cursor: number) => {
-    // olha os últimos caracteres antes do cursor até um whitespace/início
+  // ─── Detecção de trigger após mutação do editor ─────────────────────────────
+  const detectTriggerFromCaret = useCallback(() => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) { setPicker(CLOSED); return; }
+    const range = sel.getRangeAt(0);
+    const container = range.startContainer;
+    if (container.nodeType !== Node.TEXT_NODE) { setPicker(CLOSED); return; }
+    const text = container.textContent ?? "";
+    const cursor = range.startOffset;
     const before = text.slice(0, cursor);
-    const triggerMatch = /(?:^|\s)([/@])([\w\-áéíóúâêôãõç]*)$/i.exec(before);
-    if (!triggerMatch) {
-      if (picker.open) setPicker({ open: false });
-      return;
-    }
-    const [, trig, q] = triggerMatch;
-    const triggerPos = before.length - (trig.length + q.length);
-
-    if (trig === "/") {
-      // pode ser modo categoria (sem "/" pick ainda) OU modo search após escolher
-      setPicker((prev) => {
-        if (prev.open && prev.mode === "search" && prev.category) {
-          return { ...prev, query: q, triggerPos };
-        }
-        return { open: true, mode: "category", triggerPos, query: q.toLowerCase() };
-      });
-    } else {
-      // '@' busca global
-      setPicker({ open: true, mode: "search", triggerPos, query: q });
-    }
-  };
-
-  const emitChange = (next: string) => {
-    const info = parseMentions(next);
-    onChange(next, { value: next, renderedText: info.rendered, mentions: info.mentions });
-  };
-
-  const applySuggestion = useCallback((
-    item: { type: MentionType; id: string; label: string; meta?: Record<string, string> } | null
-  ) => {
-    if (!picker.open || !item) return;
-    const el = textareaRef.current;
-    if (!el) return;
-    const cursor = el.selectionStart ?? value.length;
-    const before = value.slice(0, cursor);
-    const after = value.slice(cursor);
-
-    // categoria: não injeta token, só muda modo pra search
-    if (picker.mode === "category") {
-      setPicker({ open: true, mode: "search", category: item.type, triggerPos: picker.triggerPos, query: "" });
-      // remove o fragmento "/catquery" e deixa só o "/" como âncora? Simplificamos: apaga o trecho digitado desde trigger e deixa cursor lá.
-      const newText = before.slice(0, picker.triggerPos) + after;
-      emitChange(newText);
-      requestAnimationFrame(() => {
-        el.focus();
-        el.setSelectionRange(picker.triggerPos, picker.triggerPos);
-      });
-      return;
-    }
-
-    // insere o token
-    const token = tokenFor(item.type, item.id, item.label);
-    const newText = before.slice(0, picker.triggerPos) + token + " " + after;
-    const caret = (before.slice(0, picker.triggerPos) + token + " ").length;
-    emitChange(newText);
-    setPicker({ open: false });
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(caret, caret);
+    const m = /(?:^|\s)([/@])([\w\-áéíóúâêôãõçÁÉÍÓÚÂÊÔÃÕÇ ]*)$/.exec(before);
+    if (!m) { setPicker(CLOSED); return; }
+    const [, trig, query] = m;
+    const startOffset = before.length - (trig.length + query.length);
+    const endOffset = cursor;
+    const anchor: PickerAnchor = {
+      textNode: container as Text,
+      startOffset,
+      endOffset,
+    };
+    setPicker((prev) => {
+      // Mantém categoria já escolhida se ainda estamos dentro do mesmo trigger
+      if (prev.open && prev.mode === "search" && prev.category && prev.trigger === (trig as "/" | "@")) {
+        return { ...prev, anchor, query };
+      }
+      return {
+        open: true,
+        trigger: trig as "/" | "@",
+        mode: trig === "/" ? "category" : "search",
+        category: trig === "/" ? null : null,
+        query,
+        anchor,
+      };
     });
-  }, [picker, value]);
+  }, []);
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (picker.open && suggestions.length > 0) {
+  const onInput = () => {
+    emit();
+    detectTriggerFromCaret();
+  };
+
+  // ─── Aplicar sugestão ───────────────────────────────────────────────────────
+  const closePicker = () => setPicker(CLOSED);
+
+  const applySuggestion = useCallback((s: Suggestion | null) => {
+    if (!picker.open || !s) return;
+
+    // Categoria → troca pro modo de busca na categoria escolhida. Mantém o
+    // trigger `/` no editor (user pode continuar digitando).
+    if (picker.mode === "category") {
+      setPicker((p) => ({ ...p, mode: "search", category: s.type, query: "" }));
+      searchRef.current?.focus();
+      return;
+    }
+
+    // Substitui o trecho do trigger pelo chip.
+    const anchor = picker.anchor;
+    if (!anchor) return;
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const textNode = anchor.textNode;
+    if (!textNode.parentNode) return;
+    const fullText = textNode.textContent ?? "";
+    const before = fullText.slice(0, anchor.startOffset);
+    const after = fullText.slice(anchor.endOffset);
+
+    const chip = createChipEl(s.type, s.id, s.label, s.meta);
+    const beforeNode = document.createTextNode(before);
+    // NBSP logo após o chip pra o caret ter onde pousar sem comer o chip
+    const afterNode = document.createTextNode("\u00A0" + after);
+    const parent = textNode.parentNode;
+    parent.replaceChild(afterNode, textNode);
+    parent.insertBefore(chip, afterNode);
+    parent.insertBefore(beforeNode, chip);
+
+    // Reposiciona caret logo depois do chip (após o NBSP)
+    const sel = window.getSelection();
+    const r = document.createRange();
+    r.setStart(afterNode, 1);
+    r.collapse(true);
+    sel?.removeAllRanges();
+    sel?.addRange(r);
+    editor.focus();
+
+    closePicker();
+    emit();
+  }, [picker, emit]);
+
+  // ─── Teclado no editor ──────────────────────────────────────────────────────
+  const onEditorKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    // Atalhos do popup se estiver aberto e o usuário não tiver focado o input
+    // de busca (a navegação via input tem seu próprio handler).
+    if (picker.open && document.activeElement !== searchRef.current && suggestions.length > 0) {
       if (e.key === "ArrowDown") { e.preventDefault(); setHighlight((h) => Math.min(h + 1, suggestions.length - 1)); return; }
       if (e.key === "ArrowUp")   { e.preventDefault(); setHighlight((h) => Math.max(h - 1, 0)); return; }
-      if (e.key === "Enter" || e.key === "Tab") {
+      if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey && suggestions[highlight])) {
         e.preventDefault();
-        const s = suggestions[highlight];
-        applySuggestion(s ? { type: s.type, id: s.id, label: s.label, meta: s.meta } : null);
+        applySuggestion(suggestions[highlight] ?? null);
         return;
       }
-      if (e.key === "Escape") { e.preventDefault(); setPicker({ open: false }); return; }
+      if (e.key === "Escape") { e.preventDefault(); closePicker(); return; }
     }
-    if (e.key === "Enter" && !e.shiftKey) {
+
+    // Enter solto (sem popup ativo) = enviar
+    if (e.key === "Enter" && !e.shiftKey && !picker.open) {
       e.preventDefault();
-      const info = parseMentions(value);
-      if (value.trim() && !disabled && !isLoading) {
-        onSend({ value, renderedText: info.rendered, mentions: info.mentions });
-      }
+      doSend();
       return;
     }
-    onKeyDown?.(e);
   };
 
-  const handleSend = () => {
-    const info = parseMentions(value);
-    if (!value.trim() || disabled || isLoading) return;
-    onSend({ value, renderedText: info.rendered, mentions: info.mentions });
+  const onSearchKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setHighlight((h) => Math.min(h + 1, suggestions.length - 1)); return; }
+    if (e.key === "ArrowUp")   { e.preventDefault(); setHighlight((h) => Math.max(h - 1, 0)); return; }
+    if (e.key === "Enter")     { e.preventDefault(); applySuggestion(suggestions[highlight] ?? null); return; }
+    if (e.key === "Escape")    { e.preventDefault(); closePicker(); editorRef.current?.focus(); return; }
   };
 
-  // ─── Render ─────────────────────────────────────────────────────────────
-  const canSend = !!value.trim() && !disabled;
+  // ─── Envio ──────────────────────────────────────────────────────────────────
+  const doSend = () => {
+    const info = readEditor(editorRef.current);
+    if (!info.value.trim() || disabled || isLoading) return;
+    onSend(info);
+  };
+
+  // ─── Foco automático no input de busca quando o popup abre em modo search ───
+  useEffect(() => {
+    if (picker.open && picker.mode === "search") {
+      // pequeno atraso para garantir que o DOM da lista já renderizou
+      const id = requestAnimationFrame(() => searchRef.current?.focus());
+      return () => cancelAnimationFrame(id);
+    }
+  }, [picker.open, picker.mode]);
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
+  const info = readEditor(editorRef.current);
+  const hasContent = info.renderedText.trim().length > 0;
+  const canSend = hasContent && !disabled;
 
   return (
     <div className="px-6 pb-5 pt-3 relative">
@@ -360,27 +543,35 @@ export function MentionPicker({
         className="flex items-end gap-2 rounded-2xl px-4 py-3 relative"
         style={{
           background: isLoading ? "rgba(0,212,106,0.08)" : "var(--surface-3)",
-          border: `1px solid ${isLoading ? "rgba(0,212,106,0.3)" : "var(--surface-border)"}`,
-          transition: "all 0.2s ease",
+          border: `1px solid ${isLoading ? "rgba(0,212,106,0.3)" : editorFocused ? "rgba(0,212,106,0.3)" : "var(--surface-border)"}`,
+          transition: "border-color .15s ease",
         }}
       >
-        <textarea
-          ref={textareaRef}
-          value={value}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          onSelect={(e) => {
-            const el = e.currentTarget;
-            updatePickerFromCursor(el.value, el.selectionStart ?? 0);
+        <div
+          ref={editorRef}
+          contentEditable={!disabled && !isLoading}
+          suppressContentEditableWarning
+          onInput={onInput}
+          onKeyDown={onEditorKeyDown}
+          onFocus={() => setEditorFocused(true)}
+          onBlur={() => setEditorFocused(false)}
+          role="textbox"
+          aria-multiline="true"
+          aria-placeholder={placeholder}
+          data-placeholder={placeholder || "Digite / para mencionar instância, grupo, contato, tag, funil ou jornada…"}
+          className="mention-editor flex-1 bg-transparent outline-none text-sm leading-relaxed py-0.5"
+          style={{
+            color: "var(--text-1)",
+            minHeight: "22px",
+            maxHeight: "180px",
+            overflowY: "auto",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            opacity: isLoading ? 0.6 : 1,
           }}
-          placeholder={placeholder || "Digite / para mencionar instância, grupo, contato, tag, funil ou jornada…"}
-          disabled={disabled || isLoading}
-          rows={1}
-          className="flex-1 bg-transparent resize-none outline-none text-sm leading-relaxed py-0.5"
-          style={{ color: "var(--text-1)", maxHeight: "180px", opacity: isLoading ? 0.6 : 1 }}
         />
         <button
-          onClick={handleSend}
+          onClick={doSend}
           disabled={!canSend || isLoading}
           className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center"
           style={{
@@ -390,79 +581,118 @@ export function MentionPicker({
           }}
           title="Enviar (Enter)"
         >
-          <MessageSquare className="w-4 h-4" style={{ color: canSend ? "white" : "var(--text-3)" }} />
+          <Hash className="w-4 h-4" style={{ color: canSend ? "white" : "var(--text-3)" }} />
         </button>
       </div>
 
+      {/* Placeholder via CSS */}
+      <style>{`
+        .mention-editor:empty::before {
+          content: attr(data-placeholder);
+          color: var(--text-3);
+          pointer-events: none;
+          display: block;
+        }
+      `}</style>
+
       {/* Picker dropdown */}
-      {picker.open && suggestions.length > 0 && (
+      {picker.open && (
         <div
           className="absolute left-6 right-6 bottom-full mb-2 rounded-xl overflow-hidden shadow-2xl z-20"
           style={{ background: "hsl(240 18% 8%)", border: "1px solid hsl(240 12% 16%)" }}
+          onMouseDown={(e) => { e.preventDefault(); /* evita blur do editor */ }}
         >
-          <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider flex items-center gap-1.5"
-            style={{ color: "hsl(240 8% 48%)", borderBottom: "1px solid hsl(240 12% 14%)" }}>
-            {picker.mode === "category" ? (
-              <><Hash className="w-3 h-3" /> Categoria</>
-            ) : picker.category ? (
-              <><Hash className="w-3 h-3" /> {CATEGORIES.find((c) => c.type === picker.category)?.label}</>
-            ) : (
-              <><AtSign className="w-3 h-3" /> Busca global</>
+          {/* Header com label + search */}
+          <div className="px-3 pt-2.5 pb-2" style={{ borderBottom: "1px solid hsl(240 12% 14%)" }}>
+            <div className="flex items-center gap-1.5 mb-1.5 text-[10px] uppercase tracking-wider"
+              style={{ color: "hsl(240 8% 48%)" }}>
+              {picker.mode === "category" ? (
+                <><Hash className="w-3 h-3" /> Escolha a categoria</>
+              ) : picker.category ? (
+                <>
+                  <Hash className="w-3 h-3" />
+                  {catMeta(picker.category).label}
+                  <button
+                    onClick={() => { setPicker((p) => ({ ...p, mode: "category", category: null, query: "" })); }}
+                    className="ml-auto text-[10px] normal-case tracking-normal underline"
+                    style={{ color: "hsl(240 8% 60%)" }}>
+                    ← trocar
+                  </button>
+                </>
+              ) : (
+                <><AtSign className="w-3 h-3" /> Busca global (todos os tipos)</>
+              )}
+            </div>
+            {picker.mode === "search" && (
+              <div className="flex items-center gap-2 rounded-lg px-2 py-1.5"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 14%)" }}>
+                <SearchIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 46%)" }} />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={picker.query}
+                  onChange={(e) => setPicker((p) => ({ ...p, query: e.target.value }))}
+                  onKeyDown={onSearchKeyDown}
+                  placeholder={picker.category
+                    ? `Buscar ${catMeta(picker.category).label.toLowerCase()}…`
+                    : "Buscar em todos os tipos…"}
+                  className="flex-1 bg-transparent outline-none text-xs"
+                  style={{ color: "hsl(240 15% 90%)" }}
+                />
+                {picker.query && (
+                  <button
+                    onClick={() => setPicker((p) => ({ ...p, query: "" }))}
+                    className="text-[10px]"
+                    style={{ color: "hsl(240 8% 46%)" }}>limpar</button>
+                )}
+              </div>
             )}
           </div>
-          <ul className="max-h-60 overflow-y-auto">
-            {suggestions.map((s, idx) => {
-              const Icon = s.icon;
-              const active = idx === highlight;
-              return (
-                <li key={`${s.type}-${s.id}`}>
-                  <button
-                    onMouseEnter={() => setHighlight(idx)}
-                    onClick={() => applySuggestion({ type: s.type, id: s.id, label: s.label, meta: s.meta })}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors"
-                    style={{ background: active ? "rgba(255,255,255,0.04)" : "transparent" }}
-                  >
-                    <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: s.color }} />
-                    <span className="flex-1 text-sm truncate" style={{ color: "hsl(240 15% 90%)" }}>{s.label}</span>
-                    <span className="text-[10px] uppercase tracking-wider" style={{ color: "hsl(240 8% 42%)" }}>
-                      {s.type}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+
+          {/* Lista */}
+          {suggestions.length > 0 ? (
+            <ul className="max-h-64 overflow-y-auto py-1">
+              {suggestions.map((s, idx) => {
+                const Icon = s.icon;
+                const active = idx === highlight;
+                return (
+                  <li key={`${s.type}-${s.id}`}>
+                    <button
+                      onMouseEnter={() => setHighlight(idx)}
+                      onClick={() => applySuggestion(s)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors"
+                      style={{ background: active ? "rgba(255,255,255,0.05)" : "transparent" }}
+                    >
+                      <span className="flex items-center justify-center w-5 h-5 rounded"
+                        style={{ background: s.color + "22" }}>
+                        <Icon className="w-3 h-3" style={{ color: s.color }} />
+                      </span>
+                      <span className="flex-1 text-sm truncate" style={{ color: "hsl(240 15% 90%)" }}>{s.label}</span>
+                      <span className="text-[10px] uppercase tracking-wider" style={{ color: "hsl(240 8% 42%)" }}>
+                        {s.type}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="px-4 py-6 text-center text-xs" style={{ color: "hsl(240 8% 48%)" }}>
+              {picker.mode === "search" && picker.category === "group" && !mentionedInstanceId
+                ? "Selecione uma instância primeiro com /instancia"
+                : picker.query
+                  ? "Nenhum resultado."
+                  : "Carregando…"}
+            </div>
+          )}
         </div>
       )}
 
       <p className="text-center text-xs mt-2" style={{ color: "var(--text-3)" }}>
-        {isLoading ? (
-          <span style={{ color: "var(--green)" }}>Aguarde, processando…</span>
-        ) : (
-          <>Enter envia · Shift+Enter quebra linha · <b>/</b> categoria · <b>@</b> busca global</>
-        )}
+        {isLoading
+          ? <span style={{ color: "var(--green)" }}>Aguarde, processando…</span>
+          : <>Enter envia · Shift+Enter quebra linha · <b>/</b> categoria · <b>@</b> busca global</>}
       </p>
-
-      {/* Debug: mostra menções ativas (útil durante rollout). Mantém silencioso se nenhuma. */}
-      {mentions.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-2 px-2">
-          {mentions.map((m, i) => {
-            const meta = CATEGORIES.find((c) => c.type === m.type);
-            const Icon = meta?.icon ?? Hash;
-            return (
-              <span key={`${m.type}-${m.id}-${i}`}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono"
-                style={{ background: (meta?.color ?? "#64748b") + "22", color: meta?.color ?? "#64748b" }}>
-                <Icon className="w-2.5 h-2.5" />
-                {m.label}
-              </span>
-            );
-          })}
-        </div>
-      )}
-
-      {/* renderedText mantém-se acessível via onChange; não precisa de UI aqui */}
-      {!rendered && null}
     </div>
   );
 }

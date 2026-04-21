@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import ReactMarkdown from "react-markdown";
 import type { ChannelType } from "@/types";
-import { MentionPicker, type Mention, type MentionPickerHandles } from "@/components/MentionPicker";
+import { MentionPicker, RichMentionText, type Mention, type MentionPickerHandles } from "@/components/MentionPicker";
 
 type AgentSection = "chat" | "journeys" | "activity";
 
@@ -278,7 +278,7 @@ function ChatMessage({ message, isNew = false }: { message: Message; isNew?: boo
         </p>
         <div className="text-sm leading-relaxed" style={{ color: "var(--text-1)" }}>
           {isUser ? (
-            <span className="whitespace-pre-wrap">{message.content}</span>
+            <RichMentionText className="block" text={message.content} />
           ) : (
             isNew ? <TypewriterText text={message.content} /> : (
               <ReactMarkdown
@@ -480,18 +480,20 @@ function ChatSection() {
     }
   }, [messages]);
 
-  const sendMessage = useCallback(async (messageText: string, extras?: { renderedText?: string; mentions?: Mention[] }) => {
+  const sendMessage = useCallback(async (messageText: string, extras?: { renderedText?: string; mentions?: Mention[]; displayText?: string }) => {
     if (isStreaming) return;
 
-    // O que vai visualmente no histórico é o texto renderizado (tokens
-    // substituídos por labels) — legível. O texto cru com tokens fica só
-    // no stream para o backend.
-    const displayText = extras?.renderedText || messageText;
+    // `messageText` é o payload que vai pro backend (pode ser um wrapper
+    // "Analise este pedido..." para fluxo de jornada). Se veio `displayText`,
+    // esse é o texto RAW original do usuário (com tokens `@[label](type:id)`)
+    // — usado no bubble para exibir chips via RichMentionText. Caso contrário,
+    // exibe o próprio messageText.
+    const bubbleContent = extras?.displayText ?? messageText;
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: "user",
-      content: displayText,
+      content: bubbleContent,
       createdAt: new Date(),
     };
 
@@ -641,21 +643,18 @@ function ChatSection() {
 
     if (isJourney) {
       setIsCreatingJourney(true);
-      // Guarda o RAW (com tokens) + rendered + mentions para o backend
-      // resolver via mentions quando o usuário confirmar.
-      // Consumido em confirmJourneyCreation → POST /v1/journeys.
       setPendingJourneyPrompt(raw);
       setPendingJourneyRendered(rendered);
       setPendingJourneyMentions(mentions);
-      // Mensagens resolvidas entre backend+LLM: usamos rendered no prompt
-      // (legível) mas enviamos mentions como fonte autoritativa.
       sendMessage(
         `Analise este pedido de automação WhatsApp e confirme os detalhes:\n\n"${rendered}"\n\nExtraia:\n- Qual instância será usada (se mencionada)\n- Qual grupo será monitorado (se mencionado)\n- Qual a palavra-chave ou mensagem que aciona\n- Qual ação será tomada (enviar mensagem no privado/grupo, adicionar tag, etc)\n\nResponda de forma clara e pergunte se o usuário confirma.`,
-        { renderedText: rendered, mentions }
+        { renderedText: rendered, mentions, displayText: raw }
       );
     } else {
-      sendMessage(raw, { renderedText: rendered, mentions });
+      sendMessage(raw, { renderedText: rendered, mentions, displayText: raw });
     }
+    // Limpa o editor após disparar o envio
+    setPrompt("");
   };
 
   const confirmJourneyCreation = () => {
