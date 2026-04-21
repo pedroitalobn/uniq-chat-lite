@@ -63,7 +63,9 @@ export type MentionType =
   // conceitos do canvas (static — paridade com StepType/TriggerType do backend)
   | "trigger"
   | "step"
-  | "keyword";
+  | "keyword"
+  // ação composta (tipo de ação + parâmetro inline, ex: responder privado "X")
+  | "action";
 
 export interface Mention {
   type: MentionType;
@@ -86,6 +88,15 @@ interface Props {
   placeholder?: string;
   disabled?: boolean;
   isLoading?: boolean;
+  /** Filtra quais categorias aparecem no picker. Default: todas. */
+  allowedCategories?: MentionType[];
+  /** Steps adicionais (ex: steps existentes do flow atual) que aparecem em /passo. */
+  extraSteps?: { type: "step"; id: string; label: string; meta?: Record<string, string> }[];
+  /** Se setado, usa como JID da instância para resolver grupos (usado no canvas quando
+   * o usuário ainda não mencionou uma instância no texto mas ela está selecionada em outro lugar). */
+  defaultInstanceId?: string;
+  /** Altura mínima do editor em px. Default 22 (uma linha). */
+  minRows?: number;
 }
 
 // ─── RichMentionText ─────────────────────────────────────────────────────────
@@ -139,7 +150,7 @@ export function RichMentionText({ text, className }: { text: string; className?:
 }
 
 // ─── Token parse/serialize ───────────────────────────────────────────────────
-const TOKEN_RE = /@\[([^\]]+)\]\((instance|group|contact|tag|funnel|journey|trigger|step|keyword):([A-Za-z0-9_@.\-]+)\)/g;
+const TOKEN_RE = /@\[([^\]]+)\]\((instance|group|contact|tag|funnel|journey|trigger|step|keyword|action):([A-Za-z0-9_@.\-]+)\)/g;
 
 export function parseMentions(text: string): { mentions: Mention[]; rendered: string } {
   const mentions: Mention[] = [];
@@ -167,6 +178,7 @@ const CATEGORIES: {
   { type: "journey",  slash: "jornada",   label: "Jornada",            icon: Route,      color: "#22d3ee" },
   // Conceitos do canvas (enum estático)
   { type: "trigger",  slash: "gatilho",   label: "Gatilho",            icon: Zap,        color: "#fbbf24" },
+  { type: "action",   slash: "acao",      label: "Ação",               icon: Route,      color: "#10b981" },
   { type: "step",     slash: "passo",     label: "Tipo de passo",      icon: Layers,     color: "#94a3b8" },
   { type: "keyword",  slash: "palavra",   label: "Palavra-chave",      icon: TypeIcon,   color: "#ef4444" },
 ];
@@ -193,6 +205,48 @@ export const TRIGGER_OPTIONS: { id: string; label: string; hint?: string }[] = [
   { id: "scheduled",              label: "Agendado (cron)" },
   { id: "no_response",            label: "Contato sem resposta" },
   { id: "contact_tag",            label: "Contato recebeu tag" },
+];
+
+// Triggers que requerem uma palavra-chave associada. Quando o usuário
+// escolhe um destes no picker, abrimos um follow-up inline perguntando a
+// palavra e inserimos uma segunda menção do tipo keyword logo depois.
+export const TRIGGER_NEEDS_KEYWORD = new Set<string>([
+  "group_keyword",
+  "private_keyword",
+  "user_command",
+]);
+
+// Ações = combinações curadas de step_type + parâmetro. Quase todas pedem
+// um texto/valor inline via follow-up. O backend transforma a menção em
+// overrides (message_template, action_type, etc).
+export const ACTION_OPTIONS: {
+  id: string;           // action id (backend interpreta)
+  label: string;
+  hint?: string;
+  prompt: string;       // pergunta do follow-up
+  paramLabel: (v: string) => string; // como montar o label da chip
+  needsParam?: boolean;  // default true
+}[] = [
+  { id: "reply_private", label: "Responder no privado", hint: "Manda mensagem em DM pro contato",
+    prompt: "Qual mensagem enviar?", paramLabel: (v) => `Responder privado: "${v}"` },
+  { id: "reply_group",   label: "Responder no grupo",   hint: "Manda mensagem no mesmo grupo",
+    prompt: "Qual mensagem enviar?", paramLabel: (v) => `Responder no grupo: "${v}"` },
+  { id: "ai_response",   label: "Responder com IA",     hint: "LLM gera a resposta",
+    prompt: "Prompt/sistema da IA?", paramLabel: (v) => `IA: "${v}"` },
+  { id: "add_tag",       label: "Adicionar tag",        hint: "Tag CRM no contato",
+    prompt: "Qual tag?", paramLabel: (v) => `Tag: ${v}` },
+  { id: "remove_tag",    label: "Remover tag",          hint: "Remove tag CRM",
+    prompt: "Qual tag remover?", paramLabel: (v) => `Remove tag: ${v}` },
+  { id: "update_stage",  label: "Mudar etapa no CRM",   hint: "Atualiza stage do contato",
+    prompt: "Nome/id da etapa?", paramLabel: (v) => `Etapa: ${v}` },
+  { id: "set_variable",  label: "Definir variável",     hint: "Armazena valor",
+    prompt: "nome=valor", paramLabel: (v) => `Var: ${v}` },
+  { id: "webhook",       label: "Chamar webhook",       hint: "POST para URL externa",
+    prompt: "URL do webhook?", paramLabel: (v) => `Webhook: ${v}` },
+  { id: "handoff",       label: "Transferir p/ humano", hint: "Encerra automação e notifica time",
+    prompt: "Mensagem de encerramento?", paramLabel: (v) => `Handoff: "${v}"` },
+  { id: "end",           label: "Encerrar fluxo",       hint: "Finaliza sem resposta", needsParam: false,
+    prompt: "", paramLabel: () => "Encerrar" },
 ];
 
 export const STEP_OPTIONS: { id: string; label: string; hint?: string }[] = [
@@ -314,10 +368,15 @@ interface PickerAnchor {
 interface PickerState {
   open: boolean;
   trigger: "/" | "@";
-  mode: "category" | "search";
+  mode: "category" | "search" | "followUp";
   category: MentionType | null;
   query: string;
   anchor: PickerAnchor | null;
+  followUp?: {
+    prompt: string;
+    apply: (value: string) => Mention[] | null; // menções a inserir no submit
+    headerLabel: string;  // texto de título do follow-up (ex: "Gatilho: Palavra-chave no grupo")
+  };
 }
 
 const CLOSED: PickerState = {
@@ -328,6 +387,7 @@ const CLOSED: PickerState = {
 
 export function MentionPicker({
   value, onChange, onSend, placeholder, disabled, isLoading,
+  allowedCategories, extraSteps, defaultInstanceId, minRows,
 }: Props) {
   const editorRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -355,8 +415,8 @@ export function MentionPicker({
   // ─── Data fetching on-demand ────────────────────────────────────────────────
   const mentionedInstanceId = useMemo(() => {
     const info = readEditor(editorRef.current);
-    return info.mentions.find((m) => m.type === "instance")?.id;
-  }, [value]);
+    return info.mentions.find((m) => m.type === "instance")?.id || defaultInstanceId;
+  }, [value, defaultInstanceId]);
 
   const q = useCallback(<T,>(key: any[], fn: () => Promise<T>, enabled: boolean) =>
     useQuery<T>({ queryKey: key, queryFn: fn, enabled, staleTime: 60_000 }), []);
@@ -417,10 +477,14 @@ export function MentionPicker({
     funnel:   funnels.map((f: any) => ({ type: "funnel" as MentionType, id: f.id, label: f.name })),
     journey:  journeys.map((j: any) => ({ type: "journey" as MentionType, id: j.id, label: j.name })),
     trigger:  TRIGGER_OPTIONS.map((t) => ({ type: "trigger" as MentionType, id: t.id, label: t.label, meta: t.hint ? { hint: t.hint } : undefined })),
-    step:     STEP_OPTIONS.map((s) => ({ type: "step" as MentionType, id: s.id, label: s.label, meta: s.hint ? { hint: s.hint } : undefined })),
+    action:   ACTION_OPTIONS.map((a) => ({ type: "action" as MentionType, id: a.id, label: a.label, meta: a.hint ? { hint: a.hint } : undefined })),
+    step:     [
+      ...(extraSteps ?? []),
+      ...STEP_OPTIONS.map((s) => ({ type: "step" as MentionType, id: s.id, label: s.label, meta: s.hint ? { hint: s.hint } : undefined })),
+    ],
     // keyword é dinâmico — tratado direto em `suggestions`
     keyword:  [] as { type: MentionType; id: string; label: string; meta?: Record<string, string> }[],
-  }), [instances, groupItems, contacts, tags, funnels, journeys]);
+  }), [instances, groupItems, contacts, tags, funnels, journeys, extraSteps]);
 
   // ─── Sugestões filtradas ────────────────────────────────────────────────────
   type Suggestion = {
@@ -434,8 +498,11 @@ export function MentionPicker({
     const matches = (label: string) => !q || label.toLowerCase().includes(q);
 
     if (picker.mode === "category") {
+      const allow = allowedCategories && allowedCategories.length > 0
+        ? new Set(allowedCategories) : null;
       return CATEGORIES
-        .filter((c) => !q || c.slash.includes(q) || c.label.toLowerCase().includes(q))
+        .filter((c) => (!allow || allow.has(c.type))
+          && (!q || c.slash.includes(q) || c.label.toLowerCase().includes(q)))
         .map<Suggestion>((c) => ({ type: c.type, id: `__cat__:${c.type}`, label: c.label, icon: c.icon, color: c.color }));
     }
     if (picker.mode === "search" && picker.category) {
@@ -523,41 +590,40 @@ export function MentionPicker({
   // ─── Aplicar sugestão ───────────────────────────────────────────────────────
   const closePicker = () => setPicker(CLOSED);
 
-  const applySuggestion = useCallback((s: Suggestion | null) => {
-    if (!picker.open || !s) return;
-    // Placeholder do keyword vazio — apenas ignora
-    if (s.id === "__placeholder__") return;
-
-    // Categoria → troca pro modo de busca na categoria escolhida. Mantém o
-    // trigger `/` no editor (user pode continuar digitando).
-    if (picker.mode === "category") {
-      setPicker((p) => ({ ...p, mode: "search", category: s.type, query: "" }));
-      searchRef.current?.focus();
-      return;
-    }
-
-    // Substitui o trecho do trigger pelo chip.
+  // Insere uma sequência de menções no lugar do anchor. Primeira menção
+  // substitui a âncora; as seguintes vão sendo inseridas logo depois.
+  const insertMentionsAtAnchor = useCallback((mentions: Mention[]) => {
     const anchor = picker.anchor;
-    if (!anchor) return;
     const editor = editorRef.current;
-    if (!editor) return;
-
+    if (!anchor || !editor) return;
     const textNode = anchor.textNode;
     if (!textNode.parentNode) return;
     const fullText = textNode.textContent ?? "";
     const before = fullText.slice(0, anchor.startOffset);
     const after = fullText.slice(anchor.endOffset);
 
-    const chip = createChipEl(s.type, s.id, s.label, s.meta);
-    const beforeNode = document.createTextNode(before);
-    // NBSP logo após o chip pra o caret ter onde pousar sem comer o chip
-    const afterNode = document.createTextNode("\u00A0" + after);
     const parent = textNode.parentNode;
+    const beforeNode = document.createTextNode(before);
+    // o texto depois começa com NBSP pra garantir que há um espaço entre o
+    // último chip e o que o usuário já escreveu
+    const afterNode = document.createTextNode("\u00A0" + after);
     parent.replaceChild(afterNode, textNode);
-    parent.insertBefore(chip, afterNode);
-    parent.insertBefore(beforeNode, chip);
+    parent.insertBefore(beforeNode, afterNode);
 
-    // Reposiciona caret logo depois do chip (após o NBSP)
+    let lastNode: Node = beforeNode;
+    mentions.forEach((m, i) => {
+      const chip = createChipEl(m.type, m.id, m.label, m.meta);
+      parent.insertBefore(chip, afterNode);
+      lastNode = chip;
+      // espaço entre chips
+      if (i < mentions.length - 1) {
+        const sp = document.createTextNode(" ");
+        parent.insertBefore(sp, afterNode);
+        lastNode = sp;
+      }
+    });
+    void lastNode;
+
     const sel = window.getSelection();
     const r = document.createRange();
     r.setStart(afterNode, 1);
@@ -565,10 +631,91 @@ export function MentionPicker({
     sel?.removeAllRanges();
     sel?.addRange(r);
     editor.focus();
-
-    closePicker();
     emit();
-  }, [picker, emit]);
+  }, [picker.anchor, emit]);
+
+  const applySuggestion = useCallback((s: Suggestion | null) => {
+    if (!picker.open || !s) return;
+    if (s.id === "__placeholder__") return;
+
+    // Categoria → troca pro modo de busca na categoria escolhida
+    if (picker.mode === "category") {
+      setPicker((p) => ({ ...p, mode: "search", category: s.type, query: "" }));
+      searchRef.current?.focus();
+      return;
+    }
+
+    // Trigger que precisa de keyword: insere o chip do trigger e muda pra
+    // follow-up perguntando a palavra.
+    if (picker.mode === "search" && picker.category === "trigger" && TRIGGER_NEEDS_KEYWORD.has(s.id)) {
+      insertMentionsAtAnchor([{ type: "trigger", id: s.id, label: s.label }]);
+      setPicker((p) => ({
+        ...p,
+        mode: "followUp",
+        query: "",
+        followUp: {
+          prompt: "Qual palavra-chave? (Enter pra confirmar)",
+          headerLabel: `Gatilho: ${s.label}`,
+          apply: (v) => {
+            const raw = v.trim();
+            if (!raw) return null;
+            const safe = raw.replace(/[^A-Za-z0-9_@.\-]/g, "_");
+            return [{ type: "keyword", id: safe, label: raw }];
+          },
+        },
+      }));
+      // pequeno delay pra o popup re-renderizar e pegar o foco no search
+      requestAnimationFrame(() => searchRef.current?.focus());
+      return;
+    }
+
+    // Ação com parâmetro: NÃO insere ainda. Entra em follow-up pedindo o
+    // valor; ao submeter, insere uma única chip "action" com meta.value.
+    if (picker.mode === "search" && picker.category === "action") {
+      const action = ACTION_OPTIONS.find((a) => a.id === s.id);
+      if (!action) return;
+      if (action.needsParam === false) {
+        insertMentionsAtAnchor([{ type: "action", id: action.id, label: action.label }]);
+        closePicker();
+        return;
+      }
+      setPicker((p) => ({
+        ...p,
+        mode: "followUp",
+        query: "",
+        followUp: {
+          prompt: action.prompt,
+          headerLabel: `Ação: ${action.label}`,
+          apply: (v) => {
+            const val = v.trim();
+            if (!val) return null;
+            return [{
+              type: "action",
+              id: action.id,
+              label: action.paramLabel(val),
+              meta: { value: val, action_type: action.id },
+            }];
+          },
+        },
+      }));
+      requestAnimationFrame(() => searchRef.current?.focus());
+      return;
+    }
+
+    // Caminho padrão: insere um chip único e fecha
+    insertMentionsAtAnchor([{ type: s.type, id: s.id, label: s.label, meta: s.meta }]);
+    closePicker();
+  }, [picker, insertMentionsAtAnchor]);
+
+  // Submit do follow-up — chamado via Enter no search
+  const submitFollowUp = useCallback(() => {
+    if (picker.mode !== "followUp" || !picker.followUp) return;
+    const result = picker.followUp.apply(picker.query);
+    if (result && result.length > 0) {
+      insertMentionsAtAnchor(result);
+    }
+    closePicker();
+  }, [picker, insertMentionsAtAnchor]);
 
   // ─── Teclado no editor ──────────────────────────────────────────────────────
   const onEditorKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -594,6 +741,12 @@ export function MentionPicker({
   };
 
   const onSearchKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    // Em follow-up Enter submete o valor escrito
+    if (picker.mode === "followUp") {
+      if (e.key === "Enter")  { e.preventDefault(); submitFollowUp(); return; }
+      if (e.key === "Escape") { e.preventDefault(); closePicker(); editorRef.current?.focus(); return; }
+      return;
+    }
     if (e.key === "ArrowDown") { e.preventDefault(); setHighlight((h) => Math.min(h + 1, suggestions.length - 1)); return; }
     if (e.key === "ArrowUp")   { e.preventDefault(); setHighlight((h) => Math.max(h - 1, 0)); return; }
     if (e.key === "Enter")     { e.preventDefault(); applySuggestion(suggestions[highlight] ?? null); return; }
@@ -690,7 +843,18 @@ export function MentionPicker({
           <div className="px-3 pt-2.5 pb-2" style={{ borderBottom: "1px solid hsl(240 12% 14%)" }}>
             <div className="flex items-center gap-1.5 mb-1.5 text-[10px] uppercase tracking-wider"
               style={{ color: "hsl(240 8% 48%)" }}>
-              {picker.mode === "category" ? (
+              {picker.mode === "followUp" ? (
+                <>
+                  <Zap className="w-3 h-3" style={{ color: "#fbbf24" }} />
+                  {picker.followUp?.headerLabel || "Preencha o valor"}
+                  <button
+                    onClick={closePicker}
+                    className="ml-auto text-[10px] normal-case tracking-normal underline"
+                    style={{ color: "hsl(240 8% 60%)" }}>
+                    cancelar
+                  </button>
+                </>
+              ) : picker.mode === "category" ? (
                 <><Hash className="w-3 h-3" /> Escolha a categoria</>
               ) : picker.category ? (
                 <>
@@ -707,7 +871,7 @@ export function MentionPicker({
                 <><AtSign className="w-3 h-3" /> Busca global (todos os tipos)</>
               )}
             </div>
-            {picker.mode === "search" && (
+            {(picker.mode === "search" || picker.mode === "followUp") && (
               <div className="flex items-center gap-2 rounded-lg px-2 py-1.5"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 14%)" }}>
                 <SearchIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 46%)" }} />
@@ -717,24 +881,39 @@ export function MentionPicker({
                   value={picker.query}
                   onChange={(e) => setPicker((p) => ({ ...p, query: e.target.value }))}
                   onKeyDown={onSearchKeyDown}
-                  placeholder={picker.category
-                    ? `Buscar ${catMeta(picker.category).label.toLowerCase()}…`
-                    : "Buscar em todos os tipos…"}
+                  placeholder={
+                    picker.mode === "followUp"
+                      ? picker.followUp?.prompt || "Digite o valor"
+                      : picker.category
+                        ? `Buscar ${catMeta(picker.category).label.toLowerCase()}…`
+                        : "Buscar em todos os tipos…"
+                  }
                   className="flex-1 bg-transparent outline-none text-xs"
                   style={{ color: "hsl(240 15% 90%)" }}
                 />
-                {picker.query && (
+                {picker.query && picker.mode !== "followUp" && (
                   <button
                     onClick={() => setPicker((p) => ({ ...p, query: "" }))}
                     className="text-[10px]"
                     style={{ color: "hsl(240 8% 46%)" }}>limpar</button>
                 )}
+                {picker.mode === "followUp" && (
+                  <button
+                    onClick={submitFollowUp}
+                    className="text-[10px] px-2 py-0.5 rounded"
+                    style={{ background: "var(--green)", color: "white" }}
+                  >OK</button>
+                )}
               </div>
             )}
           </div>
 
-          {/* Lista */}
-          {suggestions.length > 0 ? (
+          {/* Lista — em follow-up só mostra um hint de ajuda, sem sugestões */}
+          {picker.mode === "followUp" ? (
+            <div className="px-4 py-4 text-xs" style={{ color: "hsl(240 8% 60%)" }}>
+              <p>Digite o valor e pressione <b>Enter</b> para inserir a menção.</p>
+            </div>
+          ) : suggestions.length > 0 ? (
             <ul className="max-h-64 overflow-y-auto py-1">
               {suggestions.map((s, idx) => {
                 const Icon = s.icon;

@@ -28,9 +28,10 @@ import {
   Trash2, X, PlayCircle, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { journeysApi } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { journeysApi, instancesApi, groupsApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { MentionPicker, type MentionPickerHandles } from "@/components/MentionPicker";
+import { MentionPicker, parseMentions, type MentionPickerHandles } from "@/components/MentionPicker";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type StepType =
@@ -626,6 +627,86 @@ function ConfigPanel({
   );
 }
 
+// ─── Seletores inline (instância/grupo) para o TriggerPanel ────────────────
+// Alternativa aos <input> manuais — lista as instâncias/grupos via API e
+// mostra o label humano (nome). O valor persistido continua sendo o ID/JID
+// canônico, que é o que o backend consome.
+function InstancePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { data: instances = [], isLoading } = useQuery<any[]>({
+    queryKey: ["builder-instances"],
+    queryFn: async () => (await instancesApi.list()).data ?? [],
+    staleTime: 60_000,
+  });
+  const current = instances.find((i: any) => i.id === value);
+  return (
+    <div>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none cursor-pointer"
+        style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+      >
+        <option value="">— selecione —</option>
+        {instances.map((i: any) => (
+          <option key={i.id} value={i.id} style={{ background: "hsl(240 18% 8%)" }}>
+            {i.name || i.phone_number || i.id}
+            {i.status ? ` · ${i.status === "connected" ? "🟢" : "⚫"}` : ""}
+          </option>
+        ))}
+      </select>
+      {isLoading && <p className="text-[10px] mt-1 opacity-60">Carregando…</p>}
+      {!isLoading && instances.length === 0 && (
+        <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>Nenhuma instância encontrada.</p>
+      )}
+      {current && value && (
+        <p className="text-[10px] mt-1 font-mono" style={{ color: "var(--text-3)" }}>
+          id: {value.slice(0, 8)}…
+        </p>
+      )}
+    </div>
+  );
+}
+
+function GroupPicker({ value, onChange, instanceId }: { value: string; onChange: (v: string) => void; instanceId?: string }) {
+  const { data, isLoading } = useQuery<any>({
+    queryKey: ["builder-groups", instanceId],
+    queryFn: async () => instanceId ? (await groupsApi.list(instanceId)).data : null,
+    enabled: !!instanceId,
+    staleTime: 30_000,
+  });
+  const groups: any[] = Array.isArray(data?.groups) ? data.groups : [];
+  return (
+    <div>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={!instanceId}
+        className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none cursor-pointer disabled:opacity-50"
+        style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+      >
+        <option value="">— selecione —</option>
+        {groups.map((g: any) => (
+          <option key={g.jid} value={g.jid} style={{ background: "hsl(240 18% 8%)" }}>
+            {g.name || g.subject || g.jid}
+          </option>
+        ))}
+      </select>
+      {!instanceId && (
+        <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
+          Selecione uma instância primeiro.
+        </p>
+      )}
+      {instanceId && isLoading && <p className="text-[10px] mt-1 opacity-60">Carregando grupos…</p>}
+      {instanceId && !isLoading && groups.length === 0 && (
+        <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>Nenhum grupo encontrado nesta instância.</p>
+      )}
+      {value && (
+        <p className="text-[10px] mt-1 font-mono" style={{ color: "var(--text-3)" }}>jid: {value}</p>
+      )}
+    </div>
+  );
+}
+
 // ─── Trigger panel ────────────────────────────────────────────────────────────
 // Edita o gatilho da jornada (trigger_type, keywords, instância, grupo,
 // response_mode, status) sem passar por LLM. Persiste via
@@ -775,29 +856,14 @@ function TriggerPanel({
 
       {needsGroup && (
         <div>
-          <label className="text-[10px] uppercase tracking-wider font-semibold mb-1 block opacity-60">JID do grupo</label>
-          <input
-            value={groupJID}
-            onChange={(e) => setGroupJID(e.target.value)}
-            placeholder="120363...@g.us"
-            className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none font-mono"
-            style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
-          />
-          <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
-            Dica: abra o grupo no inbox e copie o JID da URL; versão com picker vem depois.
-          </p>
+          <label className="text-[10px] uppercase tracking-wider font-semibold mb-1 block opacity-60">Grupo WhatsApp</label>
+          <GroupPicker value={groupJID} onChange={setGroupJID} instanceId={instanceId} />
         </div>
       )}
 
       <div>
-        <label className="text-[10px] uppercase tracking-wider font-semibold mb-1 block opacity-60">Instância (UUID)</label>
-        <input
-          value={instanceId}
-          onChange={(e) => setInstanceId(e.target.value)}
-          placeholder="uuid da instância"
-          className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none font-mono"
-          style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
-        />
+        <label className="text-[10px] uppercase tracking-wider font-semibold mb-1 block opacity-60">Instância WhatsApp</label>
+        <InstancePicker value={instanceId} onChange={setInstanceId} />
       </div>
 
       <div>
@@ -1277,6 +1343,16 @@ function BuilderCanvas() {
                 placeholder="Ex: adicione um /passo pedindo email depois do primeiro passo; responda /palavra preco com tabela"
                 disabled={llmBusy}
                 isLoading={llmBusy}
+                extraSteps={nodes.map((n) => {
+                  const s = n.data?.step as FlowStep | undefined;
+                  const label = s?.label || s?.id || n.id;
+                  return {
+                    type: "step" as const,
+                    id: s?.id || n.id,
+                    label: `#${s?.id || n.id} · ${label}`,
+                    meta: s?.type ? { step_type: s.type, existing: "true" } : { existing: "true" },
+                  };
+                })}
               />
             </div>
           </div>

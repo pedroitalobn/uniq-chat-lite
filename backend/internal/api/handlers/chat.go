@@ -230,6 +230,38 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 				}
 			}
 		}
+		// isPrivateReply é usado em vários pontos (preview + criação) — define
+		// uma única vez aqui com base no texto renderizado.
+		isPrivateReply := strings.Contains(strings.ToLower(promptText), "no privado") ||
+			strings.Contains(strings.ToLower(promptText), "responde no privado")
+
+		// Ação explícita (ex: /acao → Responder no privado → "feijão")
+		// sobrescreve o messageTemplate deduzido. O meta.value da menção
+		// carrega o conteúdo (mensagem/tag/url/etc).
+		var actionID string
+		if am := firstMention(req.Mentions, "action"); am != nil {
+			actionID = am.ID
+			val := ""
+			if am.Meta != nil {
+				val = am.Meta["value"]
+			}
+			switch am.ID {
+			case "reply_private":
+				messageTemplate = val
+			case "reply_group":
+				messageTemplate = val
+			case "ai_response":
+				// Não mexe no messageTemplate — o flow builder/executor lida via ai_response step
+				messageTemplate = val
+			case "add_tag", "remove_tag", "update_stage":
+				// Mantém o valor no template para log; ação real fica em parsedRules
+				messageTemplate = val
+			case "webhook":
+				messageTemplate = val
+			case "handoff":
+				messageTemplate = val
+			}
+		}
 
 		// Check if this is a confirmation request
 		lowerConfirm := strings.ToLower(promptText)
@@ -242,9 +274,8 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 			var kwList []string
 			json.Unmarshal([]byte(keywords), &kwList)
 
-			// Detect if action is private reply
-			isPrivateReply := strings.Contains(strings.ToLower(promptText), "no privado") ||
-				strings.Contains(strings.ToLower(promptText), "responde no privado")
+			// (isPrivateReply agora é definido uma única vez acima, fora deste
+			// bloco, pra ser compartilhado entre preview e criação.)
 
 			// Resolve group — menção autoritativa (ID é o JID) > fuzzy match.
 			// Preferimos o LABEL da menção (nome do grupo) pra mostrar, e o
@@ -292,7 +323,31 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 			}
 
 			response += "\n**Ação após gatilho:**\n"
-			if isPrivateReply {
+			// Se o usuário mencionou /acao, mostramos o label humano da ação.
+			if actionID != "" {
+				switch actionID {
+				case "reply_private":
+					response += "- Responder no **privado** com: \"" + messageTemplate + "\"\n"
+				case "reply_group":
+					response += "- Responder no **grupo** com: \"" + messageTemplate + "\"\n"
+				case "ai_response":
+					response += "- Responder com IA (prompt: \"" + messageTemplate + "\")\n"
+				case "add_tag":
+					response += "- Adicionar tag: " + messageTemplate + "\n"
+				case "remove_tag":
+					response += "- Remover tag: " + messageTemplate + "\n"
+				case "update_stage":
+					response += "- Mover contato para etapa: " + messageTemplate + "\n"
+				case "webhook":
+					response += "- Chamar webhook: " + messageTemplate + "\n"
+				case "handoff":
+					response += "- Transferir para humano — mensagem: \"" + messageTemplate + "\"\n"
+				case "end":
+					response += "- Encerrar fluxo (sem resposta)\n"
+				default:
+					response += "- " + actionID + ": " + messageTemplate + "\n"
+				}
+			} else if isPrivateReply {
 				response += "- Responder no **privado** com: \"" + messageTemplate + "\"\n"
 			} else if messageTemplate != "" {
 				response += "- Enviar mensagem: \"" + messageTemplate + "\"\n"
@@ -336,6 +391,14 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 			journeyName = "Palavra: " + strings.Join(kwList, ", ")
 		}
 
+		// Ação explícita define o modo de resposta autoritativamente.
+		responseMode := "private"
+		if actionID == "reply_group" {
+			responseMode = "group"
+		} else if actionID == "" && !isPrivateReply {
+			responseMode = "group"
+		}
+
 		journey := models.Journey{
 			UserID:          userID.String(),
 			Name:            journeyName,
@@ -346,6 +409,7 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 			MessageTemplate: messageTemplate,
 			Status:          "active",
 			InstanceID:      instanceID.String(),
+			ResponseMode:    responseMode,
 		}
 
 		// Grupo: mesma preferência menção → fuzzy.
