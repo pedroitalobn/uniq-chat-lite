@@ -28,7 +28,7 @@ func (h *ServerHandler) List(c *fiber.Ctx) error {
 	workspaceID := c.Query("workspace_id")
 
 	var servers []models.Server
-	q := h.db.Order("created_at DESC")
+	q := h.db.Preload("Proxy").Order("created_at DESC")
 
 	// Regular users and super admins both need workspace membership
 	// (Super admins should use /admin/inspect to see all servers)
@@ -216,7 +216,7 @@ func (h *ServerHandler) getOwned(c *fiber.Ctx) *models.Server {
 	}
 
 	var server models.Server
-	if err := h.db.First(&server, "id = ?", serverID).Error; err != nil {
+	if err := h.db.Preload("Proxy").First(&server, "id = ?", serverID).Error; err != nil {
 		c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "server não encontrado"})
 		return nil
 	}

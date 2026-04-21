@@ -665,8 +665,30 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
             <><WifiOff className="w-3 h-3" style={{ color: "hsl(240 8% 36%)" }} /><span style={{ color: "hsl(240 8% 36%)" }}>0</span></>
           )}
         </div>
-        {server.proxy_id && (
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs" style={{ background: "rgba(167,139,250,0.08)" }}>
+        {server.proxy_id && server.proxy && (
+          <div
+            className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs"
+            title={`Proxy ativo: ${server.proxy.name}${server.proxy.is_platform ? " (plataforma)" : " (custom)"}`}
+            style={{
+              background: server.proxy.is_active ? "rgba(0,212,106,0.1)" : "rgba(167,139,250,0.08)",
+              border: `1px solid ${server.proxy.is_active ? "rgba(0,212,106,0.25)" : "rgba(167,139,250,0.25)"}`,
+            }}
+          >
+            <Shield className="w-3 h-3" style={{ color: server.proxy.is_active ? "var(--green)" : "#a78bfa" }} />
+            <span style={{ color: server.proxy.is_active ? "var(--green)" : "#a78bfa" }}>
+              {server.proxy.country ? `${COUNTRY_FLAGS[server.proxy.country] || "🌐"} ` : ""}
+              {server.proxy.name || "Proxy"}
+            </span>
+            {!server.proxy.is_active && (
+              <span style={{ color: "hsl(240 8% 50%)" }}>· inativo</span>
+            )}
+          </div>
+        )}
+        {server.proxy_id && !server.proxy && (
+          <div
+            className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs"
+            style={{ background: "rgba(167,139,250,0.08)" }}
+          >
             <Shield className="w-3 h-3" style={{ color: "#a78bfa" }} />
             <span style={{ color: "#a78bfa" }}>Proxy</span>
           </div>
