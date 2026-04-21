@@ -1019,7 +1019,7 @@ export default function InboxPage() {
 
           {/* Chat list */}
           <div className="flex-1 overflow-y-auto">
-            {!instance ? (
+            {!(instance || selectedInstances.length > 0) ? (
               <div className="flex flex-col items-center justify-center h-full p-6 text-center">
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3" style={{ background: `${curChannel.color}10` }}>
                   <MessageSquare className="w-7 h-7" style={{ color: curChannel.color, opacity: 0.4 }} />
