@@ -52,7 +52,7 @@ const PROVIDERS = [
   { id: "openai", name: "ChatGPT (OpenAI)", description: "gpt-4o, gpt-4o-mini, o1-preview", color: "#10a37f", bg: "rgba(16,163,127,0.08)", border: "rgba(16,163,127,0.2)", models: ["gpt-4o", "gpt-4o-mini", "o1-preview"] },
   { id: "deepseek", name: "DeepSeek", description: "deepseek-chat, deepseek-reasoner", color: "#4f6ef7", bg: "rgba(79,110,247,0.08)", border: "rgba(79,110,247,0.2)", models: ["deepseek-chat", "deepseek-reasoner"] },
   { id: "gemini", name: "Gemini (Google)", description: "gemini-1.5-pro, gemini-1.5-flash, gemini-2.0-flash", color: "#4285f4", bg: "rgba(66,133,244,0.08)", border: "rgba(66,133,244,0.2)", models: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash"] },
-  { id: "openrouter", name: "OpenRouter", description: "100+ modelos via API unificada", color: "#7c3aed", bg: "rgba(124,58,237,0.08)", border: "rgba(124,58,237,0.2)", models: ["openai/gpt-4o", "anthropic/claude-3.5-sonnet"] },
+  { id: "openrouter", name: "OpenRouter", description: "API key OR login com conta OpenRouter — 100+ modelos", color: "#7c3aed", bg: "rgba(124,58,237,0.08)", border: "rgba(124,58,237,0.2)", models: ["anthropic/claude-sonnet-4.5", "openai/gpt-5", "google/gemini-2.5-pro"], supportsOAuth: true },
   { id: "qwen", name: "Qwen (Alibaba)", description: "qwen-turbo, qwen-plus, qwen-max", color: "#ff6a00", bg: "rgba(255,106,0,0.08)", border: "rgba(255,106,0,0.2)", models: ["qwen-turbo", "qwen-plus", "qwen-max"] },
   { id: "kimi", name: "Kimi (Moonshot)", description: "moonshot-v1-8k/32k/128k", color: "#1f8ae0", bg: "rgba(31,138,224,0.08)", border: "rgba(31,138,224,0.2)", models: ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"] },
   { id: "mistral", name: "Mistral AI", description: "mistral-large, mistral-small, codestral", color: "#ff7000", bg: "rgba(255,112,0,0.08)", border: "rgba(255,112,0,0.2)", models: ["mistral-large-latest", "mistral-small-latest", "codestral-latest", "mistral-medium-latest"] },
@@ -557,10 +557,15 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
   const startOAuth = async () => {
     setOauthStarting(true);
     try {
-      const r = await integrationsApi.startClaudeOAuth();
+      let r;
+      if (providerId === "openrouter") {
+        const callbackUrl = `${window.location.origin}/integrations/openrouter/callback`;
+        r = await integrationsApi.startOpenRouterOAuth(callbackUrl);
+      } else {
+        r = await integrationsApi.startClaudeOAuth();
+      }
       setOauthURL(r.data.auth_url);
       setOauthState(r.data.state);
-      // Abre em nova aba
       window.open(r.data.auth_url, "_blank", "noopener,noreferrer");
     } catch (e: unknown) {
       toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Falha ao iniciar OAuth");
@@ -576,9 +581,14 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
     }
     setOauthCompleting(true);
     try {
-      await integrationsApi.completeClaudeOAuth({ code: oauthCode.trim(), state: oauthState, name: form.name });
+      if (providerId === "openrouter") {
+        await integrationsApi.completeOpenRouterOAuth({ code: oauthCode.trim(), state: oauthState, name: form.name });
+        toast.success("OpenRouter conectado via OAuth!");
+      } else {
+        await integrationsApi.completeClaudeOAuth({ code: oauthCode.trim(), state: oauthState, name: form.name });
+        toast.success("Claude.ai conectado via OAuth!");
+      }
       qc.invalidateQueries({ queryKey: ["integrations"] });
-      toast.success("Claude.ai conectado via OAuth!");
       onClose();
     } catch (e: unknown) {
       toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Falha no OAuth");
@@ -603,7 +613,7 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
               onClick={() => setAuthMode("oauth")}
               className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors"
               style={{ background: authMode === "oauth" ? provider.color + "22" : "transparent", color: authMode === "oauth" ? provider.color : "var(--text-3)" }}>
-              🔐 Login com Claude.ai
+              🔐 Login com {providerId === "openrouter" ? "OpenRouter" : "Claude.ai"}
             </button>
             <button
               type="button"
@@ -652,15 +662,25 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
             </div>
           </>
         ) : (
-          // ─── OAuth flow (Claude.ai) ─────────────────────────────────────────
+          // ─── OAuth flow ────────────────────────────────────────────────────
           <div className="space-y-3">
             <div className="rounded-xl p-3 text-xs" style={{ background: "rgba(0,212,106,0.06)", border: "1px solid rgba(0,212,106,0.2)" }}>
               <p style={{ color: "var(--text-1)" }}><strong>Como funciona:</strong></p>
               <ol className="list-decimal list-inside space-y-1 mt-2" style={{ color: "var(--text-3)" }}>
-                <li>Clique &quot;Abrir autorização&quot; — uma nova aba com claude.ai abre.</li>
-                <li>Autorize o acesso da sua conta.</li>
-                <li>Copie o código mostrado ao final da página.</li>
-                <li>Cole abaixo e clique em &quot;Finalizar&quot;.</li>
+                {providerId === "openrouter" ? (
+                  <>
+                    <li>Clique &quot;Abrir autorização&quot; — uma nova aba com openrouter.ai abre.</li>
+                    <li>Autorize o acesso da sua conta.</li>
+                    <li>O OpenRouter redireciona automaticamente de volta pra esta aplicação — não precisa copiar nada.</li>
+                  </>
+                ) : (
+                  <>
+                    <li>Clique &quot;Abrir autorização&quot; — uma nova aba com claude.ai abre.</li>
+                    <li>Autorize o acesso da sua conta.</li>
+                    <li>Copie o código mostrado ao final da página.</li>
+                    <li>Cole abaixo e clique em &quot;Finalizar&quot;.</li>
+                  </>
+                )}
               </ol>
             </div>
 
@@ -670,8 +690,22 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
                 disabled={oauthStarting}
                 className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
                 style={{ background: provider.color, color: "#0d0d0d" }}>
-                {oauthStarting ? "Gerando link..." : "🚀 Abrir autorização Claude.ai"}
+                {oauthStarting ? "Gerando link..." : `🚀 Abrir autorização ${providerId === "openrouter" ? "OpenRouter" : "Claude.ai"}`}
               </button>
+            ) : providerId === "openrouter" ? (
+              <div className="rounded-xl p-3 text-xs space-y-2" style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)" }}>
+                <p style={{ color: "var(--text-1)" }}>
+                  Aguardando o OpenRouter redirecionar a outra aba de volta para esta aplicação…
+                </p>
+                {oauthURL && (
+                  <p style={{ color: "var(--text-3)" }}>
+                    Não abriu?{" "}
+                    <a href={oauthURL} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: provider.color }}>
+                      clique aqui
+                    </a>
+                  </p>
+                )}
+              </div>
             ) : (
               <>
                 {oauthURL && (

@@ -445,6 +445,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Claude OAuth (claude.ai account login — alternativa a API key)
 	integrations.Post("/claude/oauth/start", integrationH.StartClaudeOAuth)
 	integrations.Post("/claude/oauth/callback", integrationH.CompleteClaudeOAuth)
+	// OpenRouter OAuth PKCE — devolve API key persistente vinculada à conta
+	integrations.Post("/openrouter/oauth/start", integrationH.StartOpenRouterOAuth)
+	integrations.Post("/openrouter/oauth/callback", integrationH.CompleteOpenRouterOAuth)
 	integrations.Put("/:id", integrationH.Update)
 	integrations.Delete("/:id", integrationH.Delete)
 	integrations.Post("/:id/test", integrationH.Test)

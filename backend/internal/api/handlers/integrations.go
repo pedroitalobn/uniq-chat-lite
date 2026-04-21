@@ -18,14 +18,16 @@ import (
 )
 
 type IntegrationHandler struct {
-	db          *gorm.DB
-	claudeOAuth *services.ClaudeOAuth
+	db              *gorm.DB
+	claudeOAuth     *services.ClaudeOAuth
+	openRouterOAuth *services.OpenRouterOAuth
 }
 
 func NewIntegrationHandler(db *gorm.DB) *IntegrationHandler {
 	return &IntegrationHandler{
-		db:          db,
-		claudeOAuth: services.NewClaudeOAuth(),
+		db:              db,
+		claudeOAuth:     services.NewClaudeOAuth(),
+		openRouterOAuth: services.NewOpenRouterOAuth(),
 	}
 }
 
@@ -111,6 +113,95 @@ func (h *IntegrationHandler) CompleteClaudeOAuth(c *fiber.Ctx) error {
 		"oauth_scope":     integ.OAuthScope,
 		"expires_at":      integ.OAuthExpiresAt,
 		"is_active":       integ.IsActive,
+	})
+}
+
+// StartOpenRouterOAuth inicia o fluxo OAuth PKCE do OpenRouter.
+// POST /integrations/openrouter/oauth/start
+// Body opcional: { callback_url } — se omitido, usa APP_URL/integrations/openrouter/callback.
+// Retorna: { auth_url, state, callback_url }
+func (h *IntegrationHandler) StartOpenRouterOAuth(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	var req struct {
+		CallbackURL string `json:"callback_url"`
+	}
+	_ = c.BodyParser(&req)
+
+	authURL, state, callbackURL, err := h.openRouterOAuth.StartAuthorization(user.ID.String(), req.CallbackURL)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{
+		"auth_url":     authURL,
+		"state":        state,
+		"callback_url": callbackURL,
+		"instructions": "Abra auth_url no navegador. Após autorizar, o OpenRouter vai redirecionar para callback_url com ?code=... Envie o code + state para /integrations/openrouter/oauth/callback.",
+	})
+}
+
+// CompleteOpenRouterOAuth troca o authorization_code pela API key persistente.
+// POST /integrations/openrouter/oauth/callback
+// Body: { code, state, name? }
+func (h *IntegrationHandler) CompleteOpenRouterOAuth(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	var req struct {
+		Code  string `json:"code"`
+		State string `json:"state"`
+		Name  string `json:"name"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.Code == "" || req.State == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "code e state são obrigatórios"})
+	}
+
+	ctx, cancel := context.WithTimeout(c.Context(), 30*time.Second)
+	defer cancel()
+
+	tok, authUserID, err := h.openRouterOAuth.ExchangeCode(ctx, req.Code, req.State)
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+	}
+	if authUserID != user.ID.String() {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "state não pertence ao usuário autenticado"})
+	}
+
+	name := req.Name
+	if name == "" {
+		name = "OpenRouter (OAuth)"
+		if tok.UserName != "" {
+			name = fmt.Sprintf("OpenRouter · %s", tok.UserName)
+		}
+	}
+	// Dois modelos de boas práticas por padrão — usuário pode editar depois.
+	modelsJSON, _ := json.Marshal([]string{
+		"anthropic/claude-sonnet-4.5",
+		"openai/gpt-5",
+		"google/gemini-2.5-pro",
+	})
+
+	integ := models.UserIntegration{
+		UserID:       user.ID,
+		Provider:     models.ProviderOpenRouter,
+		Name:         name,
+		AuthType:     models.AuthTypeOAuth, // marca origem; key vive em APIKey
+		APIKey:       tok.Key,
+		OAuthAccount: tok.UserName,
+		BaseURL:      "https://openrouter.ai/api",
+		Models:       string(modelsJSON),
+		IsActive:     true,
+		Config:       "{}",
+	}
+	if err := h.db.Create(&integ).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao salvar integração"})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"id":            integ.ID,
+		"provider":      integ.Provider,
+		"name":          integ.Name,
+		"auth_type":     integ.AuthType,
+		"oauth_account": integ.OAuthAccount,
+		"masked_key":    models.MaskAPIKey(integ.APIKey),
+		"is_active":     integ.IsActive,
 	})
 }
 

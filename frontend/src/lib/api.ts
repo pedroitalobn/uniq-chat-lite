@@ -561,6 +561,11 @@ export const integrationsApi = {
   completeClaudeOAuth: (data: { code: string; state: string; name?: string }) =>
     api.post("/v1/integrations/claude/oauth/callback", data),
   refreshOAuth: (id: string) => api.post(`/v1/integrations/${id}/oauth/refresh`),
+  // OpenRouter OAuth PKCE — devolve API key persistente vinculada à conta
+  startOpenRouterOAuth: (callbackUrl?: string) =>
+    api.post("/v1/integrations/openrouter/oauth/start", { callback_url: callbackUrl }),
+  completeOpenRouterOAuth: (data: { code: string; state: string; name?: string }) =>
+    api.post("/v1/integrations/openrouter/oauth/callback", data),
   getAgent: (instanceId: string) => api.get(`/v1/instances/${instanceId}/agent`),
   updateAgent: (instanceId: string, data: {
     integration_id?: string | null;
