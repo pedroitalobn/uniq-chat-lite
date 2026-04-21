@@ -30,6 +30,7 @@ import {
 import { toast } from "sonner";
 import { journeysApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { MentionPicker, type MentionPickerHandles } from "@/components/MentionPicker";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type StepType =
@@ -1128,8 +1129,11 @@ function BuilderCanvas() {
   // deleteStep, setStartStep, onConnect) também.
   const markDirty = useCallback(() => setDirty(true), []);
 
-  const editWithLLM = async () => {
-    if (!llmPrompt.trim()) return;
+  const editWithLLM = async (info?: MentionPickerHandles) => {
+    const raw = (info?.value ?? llmPrompt).trim();
+    if (!raw) return;
+    const rendered = info?.renderedText?.trim() || raw;
+    const mentions = info?.mentions ?? [];
     setLlmBusy(true);
     try {
       // Salva flow atual primeiro para que o LLM edite a versão correta
@@ -1137,7 +1141,10 @@ function BuilderCanvas() {
       if (currentFlow.steps.length > 0) {
         await journeysApi.updateFlow(journeyId, currentFlow);
       }
-      const res = await journeysApi.editWithLLM(journeyId, llmPrompt);
+      const res = await journeysApi.editWithLLM(journeyId, raw, undefined, {
+        rendered_text: rendered,
+        mentions,
+      });
       const newFlow: JourneyFlow | null = res.data?.flow || null;
       if (newFlow) {
         const { nodes: ns, edges: es } = flowToGraph(newFlow);
@@ -1145,6 +1152,7 @@ function BuilderCanvas() {
         setEdges(es);
         toast.success("Fluxo atualizado pela IA");
         setLlmPrompt("");
+        setDirty(true); // o LLM altera o grafo; precisa salvar
       } else {
         toast.error("IA não retornou fluxo válido");
       }
@@ -1249,45 +1257,28 @@ function BuilderCanvas() {
             }} />
           </ReactFlow>
 
-          {/* LLM edit bar */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[min(720px,calc(100%-2rem))]"
+          {/* LLM edit bar — usa MentionPicker para referenciar passos,
+              gatilhos, palavras-chave, instâncias etc. Igual ao chat de
+              /agents, só que o onSend aqui dispara edição do flow. */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[min(760px,calc(100%-2rem))]"
             style={{ zIndex: 10 }}>
-            <motion.div
-              className="flex items-end gap-2 rounded-2xl p-2 pl-4 shadow-lg"
-              style={{
-                background: "var(--surface-2)",
-                border: "1px solid var(--surface-border)",
-              }}
-            >
-              <Sparkles className="w-4 h-4 mt-2 flex-shrink-0" style={{ color: "var(--green)" }} />
-              <textarea
-                ref={llmInputRef}
-                rows={1}
-                placeholder="Edite o fluxo via IA: 'adicione um step pedindo email', 'troque a mensagem do welcome'..."
+            <div className="rounded-2xl shadow-lg overflow-hidden"
+              style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+              <div className="flex items-center gap-2 px-4 pt-2 text-[10px] uppercase tracking-wider"
+                style={{ color: "var(--text-3)" }}>
+                <Sparkles className="w-3 h-3" style={{ color: "var(--green)" }} />
+                Editar com IA — <b>/</b> abre categorias (passo, palavra, gatilho…)
+                {llmBusy && <Loader2 className="w-3 h-3 animate-spin ml-auto" style={{ color: "var(--green)" }} />}
+              </div>
+              <MentionPicker
                 value={llmPrompt}
-                onChange={e => setLlmPrompt(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    editWithLLM();
-                  }
-                }}
-                className="flex-1 bg-transparent outline-none text-xs resize-none py-1.5"
-                style={{ color: "var(--text-1)", maxHeight: 120 }}
+                onChange={(v) => setLlmPrompt(v)}
+                onSend={(info) => editWithLLM(info)}
+                placeholder="Ex: adicione um /passo pedindo email depois do primeiro passo; responda /palavra preco com tabela"
+                disabled={llmBusy}
+                isLoading={llmBusy}
               />
-              <button
-                onClick={editWithLLM}
-                disabled={!llmPrompt.trim() || llmBusy}
-                className="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5"
-                style={{
-                  background: llmPrompt.trim() && !llmBusy ? "var(--green)" : "var(--surface-3)",
-                  color: llmPrompt.trim() && !llmBusy ? "white" : "var(--text-3)",
-                }}
-              >
-                {llmBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
-                Editar com IA
-              </button>
-            </motion.div>
+            </div>
           </div>
 
           {nodes.length === 0 && (

@@ -41,21 +41,29 @@ import {
   AtSign,
   GitBranch,
   Hash,
+  Layers,
   Route,
   Search as SearchIcon,
   Smartphone,
   Tag as TagIcon,
+  Type as TypeIcon,
   User,
   Users,
+  Zap,
 } from "lucide-react";
 
 export type MentionType =
+  // entidades (referência a registros do banco)
   | "instance"
   | "group"
   | "contact"
   | "tag"
   | "funnel"
-  | "journey";
+  | "journey"
+  // conceitos do canvas (static — paridade com StepType/TriggerType do backend)
+  | "trigger"
+  | "step"
+  | "keyword";
 
 export interface Mention {
   type: MentionType;
@@ -87,7 +95,7 @@ interface Props {
 export function RichMentionText({ text, className }: { text: string; className?: string }) {
   const parts: Array<{ kind: "text"; value: string } | { kind: "chip"; type: MentionType; id: string; label: string }> = [];
   let last = 0;
-  const re = /@\[([^\]]+)\]\((instance|group|contact|tag|funnel|journey):([A-Za-z0-9_@.\-]+)\)/g;
+  const re = /@\[([^\]]+)\]\((instance|group|contact|tag|funnel|journey|trigger|step|keyword):([A-Za-z0-9_@.\-]+)\)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) parts.push({ kind: "text", value: text.slice(last, m.index) });
@@ -131,7 +139,7 @@ export function RichMentionText({ text, className }: { text: string; className?:
 }
 
 // ─── Token parse/serialize ───────────────────────────────────────────────────
-const TOKEN_RE = /@\[([^\]]+)\]\((instance|group|contact|tag|funnel|journey):([A-Za-z0-9_@.\-]+)\)/g;
+const TOKEN_RE = /@\[([^\]]+)\]\((instance|group|contact|tag|funnel|journey|trigger|step|keyword):([A-Za-z0-9_@.\-]+)\)/g;
 
 export function parseMentions(text: string): { mentions: Mention[]; rendered: string } {
   const mentions: Mention[] = [];
@@ -150,12 +158,61 @@ const CATEGORIES: {
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   color: string;
 }[] = [
+  // Entidades (referência a registro no banco)
   { type: "instance", slash: "instancia", label: "Instância WhatsApp", icon: Smartphone, color: "#00d46a" },
   { type: "group",    slash: "grupo",     label: "Grupo WhatsApp",     icon: Users,      color: "#60a5fa" },
   { type: "contact",  slash: "contato",   label: "Contato CRM",        icon: User,       color: "#a78bfa" },
   { type: "tag",      slash: "tag",       label: "Tag",                icon: TagIcon,    color: "#f59e0b" },
   { type: "funnel",   slash: "funil",     label: "Funil",              icon: GitBranch,  color: "#ec4899" },
   { type: "journey",  slash: "jornada",   label: "Jornada",            icon: Route,      color: "#22d3ee" },
+  // Conceitos do canvas (enum estático)
+  { type: "trigger",  slash: "gatilho",   label: "Gatilho",            icon: Zap,        color: "#fbbf24" },
+  { type: "step",     slash: "passo",     label: "Tipo de passo",      icon: Layers,     color: "#94a3b8" },
+  { type: "keyword",  slash: "palavra",   label: "Palavra-chave",      icon: TypeIcon,   color: "#ef4444" },
+];
+
+// Enums estáticos que o canvas entende. Espelha backend/internal/models/journey.go.
+export const TRIGGER_OPTIONS: { id: string; label: string; hint?: string }[] = [
+  { id: "any_message",            label: "Qualquer mensagem",      hint: "Dispara em qualquer DM/grupo" },
+  { id: "group_keyword",          label: "Palavra-chave no grupo", hint: "Keyword recebida em grupo específico" },
+  { id: "group_message",          label: "Mensagem no grupo",      hint: "Qualquer msg num grupo" },
+  { id: "group_mention",          label: "Menção no grupo",        hint: "Quando mencionam a instância" },
+  { id: "private_keyword",        label: "Palavra-chave privada",  hint: "Keyword em DM" },
+  { id: "private_message",        label: "Mensagem privada",       hint: "Qualquer DM" },
+  { id: "first_message",          label: "Primeira mensagem",      hint: "Primeira interação do contato" },
+  { id: "contact_media_image",    label: "Recebeu imagem",         hint: "Contato enviou imagem" },
+  { id: "contact_media_audio",    label: "Recebeu áudio",          hint: "Contato enviou áudio" },
+  { id: "contact_media_video",    label: "Recebeu vídeo",          hint: "Contato enviou vídeo" },
+  { id: "contact_media_document", label: "Recebeu documento",      hint: "Contato enviou documento" },
+  { id: "contact_call",           label: "Ligação recebida" },
+  { id: "group_join",             label: "Alguém entrou no grupo" },
+  { id: "group_leave",            label: "Alguém saiu do grupo" },
+  { id: "user_command",           label: "Comando (/start, /menu)" },
+  { id: "button_click",           label: "Clicou em botão" },
+  { id: "list_select",            label: "Selecionou item da lista" },
+  { id: "scheduled",              label: "Agendado (cron)" },
+  { id: "no_response",            label: "Contato sem resposta" },
+  { id: "contact_tag",            label: "Contato recebeu tag" },
+];
+
+export const STEP_OPTIONS: { id: string; label: string; hint?: string }[] = [
+  { id: "message",      label: "Enviar mensagem",       hint: "Texto ao contato" },
+  { id: "buttons",      label: "Enviar botões",         hint: "Mensagem com quick-replies" },
+  { id: "list",         label: "Enviar lista",          hint: "Menu com seções" },
+  { id: "input",        label: "Aguardar resposta",     hint: "Coleta input do usuário" },
+  { id: "wait",         label: "Esperar tempo",         hint: "Delay antes do próximo passo" },
+  { id: "condition",    label: "Condição (if/else)",    hint: "Ramifica por variável" },
+  { id: "ai_response",  label: "Resposta com IA",       hint: "LLM gera a resposta" },
+  { id: "http_request", label: "Chamar API externa",    hint: "GET/POST, salva resultado" },
+  { id: "media",        label: "Enviar mídia",          hint: "Imagem, vídeo, áudio, doc" },
+  { id: "handoff",      label: "Transferir p/ humano",  hint: "Atendimento manual" },
+  { id: "goto",         label: "Ir para step",          hint: "Pula para outro passo" },
+  { id: "randomize",    label: "A/B split",             hint: "Divide em branches" },
+  { id: "set_variable", label: "Definir variável",      hint: "Armazena valor" },
+  { id: "add_tag",      label: "Adicionar tag",         hint: "Tag no contato CRM" },
+  { id: "remove_tag",   label: "Remover tag",           hint: "Remove tag do CRM" },
+  { id: "update_stage", label: "Mover de etapa",        hint: "Atualiza CRM stage" },
+  { id: "end",          label: "Encerrar fluxo" },
 ];
 const catMeta = (t: MentionType) => CATEGORIES.find((c) => c.type === t)!;
 
@@ -359,6 +416,10 @@ export function MentionPicker({
     tag:      tags.map((t: any) => ({ type: "tag" as MentionType, id: t.id, label: t.name })),
     funnel:   funnels.map((f: any) => ({ type: "funnel" as MentionType, id: f.id, label: f.name })),
     journey:  journeys.map((j: any) => ({ type: "journey" as MentionType, id: j.id, label: j.name })),
+    trigger:  TRIGGER_OPTIONS.map((t) => ({ type: "trigger" as MentionType, id: t.id, label: t.label, meta: t.hint ? { hint: t.hint } : undefined })),
+    step:     STEP_OPTIONS.map((s) => ({ type: "step" as MentionType, id: s.id, label: s.label, meta: s.hint ? { hint: s.hint } : undefined })),
+    // keyword é dinâmico — tratado direto em `suggestions`
+    keyword:  [] as { type: MentionType; id: string; label: string; meta?: Record<string, string> }[],
   }), [instances, groupItems, contacts, tags, funnels, journeys]);
 
   // ─── Sugestões filtradas ────────────────────────────────────────────────────
@@ -379,6 +440,27 @@ export function MentionPicker({
     }
     if (picker.mode === "search" && picker.category) {
       const meta = catMeta(picker.category);
+      // Keyword: user-defined. A query vira o próprio valor.
+      if (picker.category === "keyword") {
+        const raw = picker.query.trim();
+        if (!raw) {
+          return [{
+            type: "keyword" as MentionType,
+            id: "__placeholder__",
+            label: "Digite a palavra pra marcar",
+            icon: meta.icon,
+            color: meta.color,
+          }];
+        }
+        const safe = raw.replace(/[^A-Za-z0-9_@.\-]/g, "_"); // id-safe
+        return [{
+          type: "keyword" as MentionType,
+          id: safe,
+          label: raw,
+          icon: meta.icon,
+          color: meta.color,
+        }];
+      }
       const list = allItems[picker.category] ?? [];
       return list.filter((i) => matches(i.label)).slice(0, 8).map<Suggestion>((i) => ({ ...i, icon: meta.icon, color: meta.color }));
     }
@@ -443,6 +525,8 @@ export function MentionPicker({
 
   const applySuggestion = useCallback((s: Suggestion | null) => {
     if (!picker.open || !s) return;
+    // Placeholder do keyword vazio — apenas ignora
+    if (s.id === "__placeholder__") return;
 
     // Categoria → troca pro modo de busca na categoria escolhida. Mantém o
     // trigger `/` no editor (user pode continuar digitando).

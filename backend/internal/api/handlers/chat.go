@@ -63,6 +63,66 @@ func firstMention(mentions []Mention, t string) *Mention {
 	return nil
 }
 
+// allMentionsOfType returns all mentions matching the given type.
+func allMentionsOfType(mentions []Mention, t string) []Mention {
+	out := make([]Mention, 0)
+	for _, m := range mentions {
+		if m.Type == t {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// humanTriggerLabel maps a trigger_type enum id to the Portuguese label
+// shown on the confirmation dialog. Fallback to the raw id so usuários
+// veem algo útil mesmo pra triggers não mapeados aqui (novos tipos).
+func humanTriggerLabel(t string) string {
+	switch t {
+	case "any_message":            return "Qualquer mensagem"
+	case "group_keyword":          return "Palavra-chave no grupo"
+	case "group_message":          return "Mensagem no grupo"
+	case "group_mention":          return "Menção no grupo"
+	case "private_keyword":        return "Palavra-chave privada"
+	case "private_message":        return "Mensagem privada"
+	case "first_message":          return "Primeira mensagem"
+	case "contact_media_image":    return "Recebeu imagem"
+	case "contact_media_audio":    return "Recebeu áudio"
+	case "contact_media_video":    return "Recebeu vídeo"
+	case "contact_media_document": return "Recebeu documento"
+	case "contact_call":           return "Ligação recebida"
+	case "group_join":             return "Alguém entrou no grupo"
+	case "group_leave":            return "Alguém saiu do grupo"
+	case "user_command":           return "Comando (/start, /menu…)"
+	case "button_click":           return "Clicou em botão"
+	case "list_select":            return "Selecionou item da lista"
+	case "scheduled":              return "Agendado"
+	case "no_response":            return "Contato sem resposta"
+	case "contact_tag":            return "Contato recebeu tag"
+	}
+	return t
+}
+
+// resolveGroupName tenta buscar o nome humano do grupo via whatsmeow.
+// Retorna string vazia se a busca falhar (fallback pra mostrar o JID cru).
+func resolveGroupName(mgr *whatsapp.Manager, instanceID, jid string) string {
+	if mgr == nil || instanceID == "" || jid == "" {
+		return ""
+	}
+	client := mgr.GetInstance(instanceID)
+	if client == nil || !client.IsConnected() {
+		return ""
+	}
+	info, err := client.GetGroupInfo(jid)
+	if err != nil {
+		return ""
+	}
+	if name, ok := info["name"].(string); ok && name != "" {
+		return name
+	}
+	return ""
+}
+
 type ToolCall struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
@@ -147,6 +207,30 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 
 		triggerType, triggerFilter, keywords, messageTemplate := parsePromptForJourney(promptText, parsedRules)
 
+		// Menções têm precedência sobre o que a LLM deduziu. Trigger mention
+		// sobrescreve o tipo; keyword mentions alimentam a lista de keywords.
+		if tm := firstMention(req.Mentions, "trigger"); tm != nil {
+			triggerType = models.TriggerType(tm.ID)
+			triggerFilter = humanTriggerLabel(tm.ID)
+			// Quando o usuário escolhe o trigger explicitamente, também
+			// anexamos o label legível ao filter pra a confirmação ficar clara.
+		}
+		// Keywords mencionadas explicitamente pelo usuário (via /palavra)
+		// substituem a lista inferida — usuário é autoritativo.
+		if kws := allMentionsOfType(req.Mentions, "keyword"); len(kws) > 0 {
+			labels := make([]string, 0, len(kws))
+			for _, m := range kws {
+				if lbl := strings.TrimSpace(m.Label); lbl != "" {
+					labels = append(labels, lbl)
+				}
+			}
+			if len(labels) > 0 {
+				if kwBytes, err := json.Marshal(labels); err == nil {
+					keywords = string(kwBytes)
+				}
+			}
+		}
+
 		// Check if this is a confirmation request
 		lowerConfirm := strings.ToLower(promptText)
 		isConfirmation := strings.Contains(lowerConfirm, "confirmo") || strings.Contains(lowerConfirm, "confirmar") ||
@@ -162,11 +246,30 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 			isPrivateReply := strings.Contains(strings.ToLower(promptText), "no privado") ||
 				strings.Contains(strings.ToLower(promptText), "responde no privado")
 
+			// Resolve group — menção autoritativa (ID é o JID) > fuzzy match.
+			// Preferimos o LABEL da menção (nome do grupo) pra mostrar, e o
+			// JID fica no campo "id" pra persistir depois. Se só temos o JID
+			// (fuzzy match), tentamos buscar o nome via whatsmeow.
+			var groupJID, groupLabel string
+			if m := firstMention(req.Mentions, "group"); m != nil {
+				if m.Meta != nil && m.Meta["jid"] != "" {
+					groupJID = m.Meta["jid"]
+				} else {
+					groupJID = m.ID
+				}
+				groupLabel = strings.TrimSpace(m.Label)
+			} else if instanceID != uuid.Nil {
+				groupJID = journeyHandler.resolveGroupFromPrompt(promptText, instanceID.String())
+			}
+			if groupJID != "" && groupLabel == "" {
+				groupLabel = resolveGroupName(journeyMgr, instanceID.String(), groupJID)
+			}
+
 			// Build confirmation message with proper markdown
 			response := "📋 **Confirmação de Jornada**\n\n"
 			response += "Por favor, confirme se esta configuração está correta:\n\n"
 			response += "**Gatilho (trigger):**\n"
-			response += "- Tipo: " + string(triggerType) + "\n"
+			response += "- Tipo: " + humanTriggerLabel(string(triggerType)) + "\n"
 			response += "- Filtro: " + triggerFilter + "\n"
 
 			if len(kwList) > 0 {
@@ -180,19 +283,12 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 				}
 			}
 
-			// Resolve group — menção autoritativa (ID já é o JID) antes de fuzzy match.
-			var groupJID string
-			if m := firstMention(req.Mentions, "group"); m != nil {
-				if m.Meta != nil && m.Meta["jid"] != "" {
-					groupJID = m.Meta["jid"]
-				} else {
-					groupJID = m.ID // id do frontend é o próprio JID
-				}
-			} else if instanceID != uuid.Nil {
-				groupJID = journeyHandler.resolveGroupFromPrompt(promptText, instanceID.String())
-			}
 			if groupJID != "" {
-				response += "- Grupo: " + groupJID + "\n"
+				if groupLabel != "" {
+					response += "- Grupo: **" + groupLabel + "**\n"
+				} else {
+					response += "- Grupo: `" + groupJID + "`\n"
+				}
 			}
 
 			response += "\n**Ação após gatilho:**\n"

@@ -641,8 +641,21 @@ export const journeysApi = {
   // ─── Flow builder (canvas + LLM edit + simulator + templates) ─────────────
   updateFlow: (id: string, flow: { start_step?: string; steps: unknown[] }) =>
     api.patch(`/v1/journeys/${id}/flow`, flow),
-  editWithLLM: (id: string, instruction: string, integrationId?: string) =>
-    api.post(`/v1/journeys/${id}/edit-llm`, { instruction, integration_id: integrationId }),
+  editWithLLM: (
+    id: string,
+    instruction: string,
+    integrationId?: string,
+    extras?: {
+      rendered_text?: string;
+      mentions?: { type: string; id: string; label: string; meta?: Record<string, string> }[];
+    },
+  ) =>
+    api.post(`/v1/journeys/${id}/edit-llm`, {
+      instruction,
+      integration_id: integrationId,
+      rendered_text: extras?.rendered_text,
+      mentions: extras?.mentions,
+    }),
   simulate: (id: string, message: string, contactName?: string) =>
     api.post(`/v1/journeys/${id}/simulate`, { message, contact_name: contactName }),
   listTemplates: () => api.get("/v1/journeys/templates"),

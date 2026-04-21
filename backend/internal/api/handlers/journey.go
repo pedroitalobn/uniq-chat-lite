@@ -108,6 +108,24 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 	// Parse the prompt to extract trigger details
 	triggerType, triggerFilter, keywords, messageTemplate := parsePromptForJourney(promptText, parsedRules)
 
+	// Menções de trigger/keyword sobrescrevem o que foi deduzido pela LLM.
+	if tm := firstMention(req.Mentions, "trigger"); tm != nil {
+		triggerType = models.TriggerType(tm.ID)
+	}
+	if kws := allMentionsOfType(req.Mentions, "keyword"); len(kws) > 0 {
+		labels := make([]string, 0, len(kws))
+		for _, m := range kws {
+			if lbl := strings.TrimSpace(m.Label); lbl != "" {
+				labels = append(labels, lbl)
+			}
+		}
+		if len(labels) > 0 {
+			if kwBytes, err := json.Marshal(labels); err == nil {
+				keywords = string(kwBytes)
+			}
+		}
+	}
+
 	journey := models.Journey{
 		ID:              uuid.New().String(),
 		UserID:          userID.String(),
@@ -738,11 +756,27 @@ func (h *JourneyHandler) EditFlowWithLLM(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		Instruction   string `json:"instruction"`
-		IntegrationID string `json:"integration_id"`
+		Instruction   string    `json:"instruction"`
+		IntegrationID string    `json:"integration_id"`
+		RenderedText  string    `json:"rendered_text,omitempty"`
+		Mentions      []Mention `json:"mentions,omitempty"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.Instruction == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instruction obrigatório"})
+	}
+
+	// Usa rendered_text (tokens → labels) como fonte pra LLM. Menções de
+	// step/keyword são anexadas como contexto estruturado pra o LLM não
+	// errar nomes/tipos.
+	promptText := req.RenderedText
+	if promptText == "" {
+		promptText = req.Instruction
+	}
+	if len(req.Mentions) > 0 {
+		hints := buildMentionHints(req.Mentions)
+		if hints != "" {
+			promptText = promptText + "\n\n" + hints
+		}
 	}
 
 	// Resolver integração
@@ -760,7 +794,7 @@ func (h *JourneyHandler) EditFlowWithLLM(c *fiber.Ctx) error {
 		// Sem flow existente: Build a partir da instrução como se fosse novo
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
-		built, err := h.builder.Build(ctx, integration, req.Instruction)
+		built, err := h.builder.Build(ctx, integration, promptText)
 		if err != nil {
 			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
 		}
@@ -768,7 +802,7 @@ func (h *JourneyHandler) EditFlowWithLLM(c *fiber.Ctx) error {
 	} else {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
-		edited, err := h.builder.Edit(ctx, integration, current, req.Instruction)
+		edited, err := h.builder.Edit(ctx, integration, current, promptText)
 		if err != nil {
 			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
 		}
@@ -910,6 +944,45 @@ func buildResponseFromJourney(journey *models.Journey, fromName string) string {
 	}
 
 	return "Olá " + fromName + "! Obrigado por entrar em contato. Como posso ajudar?"
+}
+
+// buildMentionHints converte a lista de menções em um bloco textual anexado
+// ao prompt do LLM. Ajuda o modelo a não inventar nomes: damos a ele o par
+// label + tipo + id pra que tome decisões determinísticas (ex: "este é o
+// passo s_abc123 do tipo message").
+func buildMentionHints(mentions []Mention) string {
+	if len(mentions) == 0 {
+		return ""
+	}
+	lines := []string{"CONTEXTO (menções explícitas do usuário — use como autoritativo):"}
+	for _, m := range mentions {
+		label := strings.TrimSpace(m.Label)
+		switch m.Type {
+		case "instance":
+			lines = append(lines, fmt.Sprintf("- instância %q (id: %s)", label, m.ID))
+		case "group":
+			jid := m.ID
+			if m.Meta != nil && m.Meta["jid"] != "" {
+				jid = m.Meta["jid"]
+			}
+			lines = append(lines, fmt.Sprintf("- grupo %q (jid: %s)", label, jid))
+		case "contact":
+			lines = append(lines, fmt.Sprintf("- contato %q (id: %s)", label, m.ID))
+		case "tag":
+			lines = append(lines, fmt.Sprintf("- tag %q (id: %s)", label, m.ID))
+		case "funnel":
+			lines = append(lines, fmt.Sprintf("- funil %q (id: %s)", label, m.ID))
+		case "journey":
+			lines = append(lines, fmt.Sprintf("- jornada %q (id: %s)", label, m.ID))
+		case "trigger":
+			lines = append(lines, fmt.Sprintf("- trigger_type = %q (label: %s)", m.ID, label))
+		case "step":
+			lines = append(lines, fmt.Sprintf("- tipo de passo = %q (label: %s)", m.ID, label))
+		case "keyword":
+			lines = append(lines, fmt.Sprintf("- palavra-chave = %q", label))
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // createBlankJourney cria uma jornada em branco pronta pra edição no canvas.
