@@ -466,6 +466,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	journeys.Post("/from-template/:slug", journeyH.CreateFromTemplate)
 	journeys.Patch("/:id/status", journeyH.ToggleStatus)
 	journeys.Patch("/:id/flow", journeyH.UpdateFlow)
+	journeys.Patch("/:id/trigger", journeyH.UpdateTrigger)
 	journeys.Post("/:id/edit-llm", journeyH.EditFlowWithLLM)
 	journeys.Post("/:id/simulate", journeyH.SimulateJourney)
 	journeys.Delete("/:id", journeyH.DeleteJourney)

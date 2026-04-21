@@ -625,6 +625,227 @@ function ConfigPanel({
   );
 }
 
+// ─── Trigger panel ────────────────────────────────────────────────────────────
+// Edita o gatilho da jornada (trigger_type, keywords, instância, grupo,
+// response_mode, status) sem passar por LLM. Persiste via
+// PATCH /v1/journeys/:id/trigger + toggle de status via /status.
+const TRIGGER_TYPES: { value: string; label: string; hint: string }[] = [
+  { value: "any_message",            label: "Qualquer mensagem",      hint: "Dispara pra TODA mensagem recebida." },
+  { value: "group_keyword",          label: "Palavra-chave em grupo", hint: "Filtra por grupo + keywords." },
+  { value: "group_message",          label: "Mensagem em grupo",      hint: "Qualquer msg num grupo específico." },
+  { value: "group_mention",          label: "Menção no grupo",        hint: "Quando mencionam a instância no grupo." },
+  { value: "private_keyword",        label: "Palavra-chave privada",  hint: "Filtra DM por keywords." },
+  { value: "private_message",        label: "Mensagem privada",       hint: "Toda mensagem direta." },
+  { value: "first_message",          label: "Primeira mensagem",      hint: "Só na primeira interação do contato." },
+  { value: "contact_media_image",    label: "Recebeu imagem",         hint: "Quando o contato envia imagem." },
+  { value: "contact_media_audio",    label: "Recebeu áudio",          hint: "Quando o contato envia áudio." },
+  { value: "contact_media_video",    label: "Recebeu vídeo",          hint: "Quando o contato envia vídeo." },
+  { value: "contact_media_document", label: "Recebeu documento",      hint: "Quando o contato envia documento." },
+  { value: "user_command",           label: "Comando (/start, /menu)",hint: "Comandos reservados no início da msg." },
+];
+
+function TriggerPanel({
+  journeyId, initial, onSaved,
+}: {
+  journeyId: string;
+  initial: JourneyMeta | null;
+  onSaved: (next: Partial<JourneyMeta & { status: string }>) => void;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [triggerType, setTriggerType] = useState(initial?.trigger_type ?? "any_message");
+  const [keywordsStr, setKeywordsStr] = useState(
+    Array.isArray(initial?.keywords) ? (initial!.keywords as string[]).join(", ") : (initial?.keywords as string | undefined ?? ""),
+  );
+  const [instanceId, setInstanceId] = useState(initial?.instance_id ?? "");
+  const [groupJID, setGroupJID] = useState(initial?.group_jid ?? "");
+  const [responseMode, setResponseMode] = useState(initial?.response_mode ?? "private");
+  const [saving, setSaving] = useState(false);
+  const [togglingStatus, setTogglingStatus] = useState(false);
+
+  // Re-sync quando a jornada externa recarrega
+  useEffect(() => {
+    if (!initial) return;
+    setName(initial.name ?? "");
+    setTriggerType(initial.trigger_type ?? "any_message");
+    setKeywordsStr(
+      Array.isArray(initial.keywords) ? (initial.keywords as string[]).join(", ") : ((initial.keywords as string | undefined) ?? ""),
+    );
+    setInstanceId(initial.instance_id ?? "");
+    setGroupJID(initial.group_jid ?? "");
+    setResponseMode(initial.response_mode ?? "private");
+  }, [initial]);
+
+  const needsKeywords = triggerType === "group_keyword" || triggerType === "private_keyword" || triggerType === "user_command";
+  const needsGroup = triggerType.startsWith("group_");
+
+  const persist = async () => {
+    setSaving(true);
+    try {
+      const keywords = needsKeywords
+        ? keywordsStr.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+      const res = await journeysApi.updateTrigger(journeyId, {
+        name: name.trim() || undefined,
+        trigger_type: triggerType,
+        keywords,
+        group_jid: needsGroup ? groupJID : "",
+        instance_id: instanceId,
+        response_mode: responseMode,
+      });
+      toast.success("Gatilho salvo ✓");
+      onSaved({
+        name: res.data?.name,
+        trigger_type: res.data?.trigger_type,
+        trigger_filter: res.data?.trigger_filter,
+        keywords: res.data?.keywords,
+        group_jid: res.data?.group_jid,
+        instance_id: res.data?.instance_id,
+        response_mode: res.data?.response_mode,
+      });
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
+        || "Falha ao salvar gatilho";
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleStatus = async () => {
+    const next = initial?.status === "active" ? "paused" : "active";
+    setTogglingStatus(true);
+    try {
+      await journeysApi.updateStatus(journeyId, next);
+      toast.success(next === "active" ? "Jornada ativada" : "Jornada pausada");
+      onSaved({ status: next });
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
+        || "Falha ao alterar status";
+      toast.error(msg);
+    } finally {
+      setTogglingStatus(false);
+    }
+  };
+
+  const currentType = TRIGGER_TYPES.find((t) => t.value === triggerType) || TRIGGER_TYPES[0];
+
+  return (
+    <div className="h-full overflow-y-auto p-4 space-y-3">
+      <div>
+        <label className="text-[10px] uppercase tracking-wider font-semibold mb-1 block opacity-60">Nome</label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="ex: Onboarding B2B"
+          className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none"
+          style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+        />
+      </div>
+
+      <div>
+        <label className="text-[10px] uppercase tracking-wider font-semibold mb-1 block opacity-60">Tipo de gatilho</label>
+        <select
+          value={triggerType}
+          onChange={(e) => setTriggerType(e.target.value)}
+          className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none cursor-pointer"
+          style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+        >
+          {TRIGGER_TYPES.map((t) => (
+            <option key={t.value} value={t.value} style={{ background: "hsl(240 18% 8%)" }}>{t.label}</option>
+          ))}
+        </select>
+        <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>{currentType.hint}</p>
+      </div>
+
+      {needsKeywords && (
+        <div>
+          <label className="text-[10px] uppercase tracking-wider font-semibold mb-1 block opacity-60">
+            Palavras-chave (separadas por vírgula)
+          </label>
+          <input
+            value={keywordsStr}
+            onChange={(e) => setKeywordsStr(e.target.value)}
+            placeholder="ex: teste, oi, menu"
+            className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none"
+            style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+          />
+        </div>
+      )}
+
+      {needsGroup && (
+        <div>
+          <label className="text-[10px] uppercase tracking-wider font-semibold mb-1 block opacity-60">JID do grupo</label>
+          <input
+            value={groupJID}
+            onChange={(e) => setGroupJID(e.target.value)}
+            placeholder="120363...@g.us"
+            className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none font-mono"
+            style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+          />
+          <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
+            Dica: abra o grupo no inbox e copie o JID da URL; versão com picker vem depois.
+          </p>
+        </div>
+      )}
+
+      <div>
+        <label className="text-[10px] uppercase tracking-wider font-semibold mb-1 block opacity-60">Instância (UUID)</label>
+        <input
+          value={instanceId}
+          onChange={(e) => setInstanceId(e.target.value)}
+          placeholder="uuid da instância"
+          className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none font-mono"
+          style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+        />
+      </div>
+
+      <div>
+        <label className="text-[10px] uppercase tracking-wider font-semibold mb-1 block opacity-60">Resposta padrão</label>
+        <div className="flex gap-1 rounded-lg p-1" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+          {[["private", "Privado"], ["group", "No grupo"]].map(([v, lbl]) => (
+            <button
+              key={v}
+              onClick={() => setResponseMode(v)}
+              className="flex-1 py-1.5 rounded-md text-xs font-semibold transition-colors"
+              style={{
+                background: responseMode === v ? "var(--green)" : "transparent",
+                color: responseMode === v ? "white" : "var(--text-2)",
+              }}
+            >
+              {lbl}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="pt-2 flex gap-2">
+        <button
+          onClick={persist}
+          disabled={saving}
+          className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
+          style={{ background: "var(--green)", color: "white", opacity: saving ? 0.7 : 1 }}
+        >
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+          Salvar gatilho
+        </button>
+        <button
+          onClick={toggleStatus}
+          disabled={togglingStatus}
+          className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
+          style={{
+            background: initial?.status === "active" ? "rgba(239,68,68,0.12)" : "rgba(0,212,106,0.12)",
+            color: initial?.status === "active" ? "#ef4444" : "var(--green)",
+            border: `1px solid ${initial?.status === "active" ? "rgba(239,68,68,0.3)" : "rgba(0,212,106,0.3)"}`,
+          }}
+        >
+          {togglingStatus ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : initial?.status === "active" ? <X className="w-3.5 h-3.5" /> : <PlayCircle className="w-3.5 h-3.5" />}
+          {initial?.status === "active" ? "Pausar" : "Ativar"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Simulator panel ──────────────────────────────────────────────────────────
 function SimulatorPanel({ journeyId }: { journeyId: string }) {
   const [input, setInput] = useState("oi");
@@ -703,36 +924,85 @@ function SimulatorPanel({ journeyId }: { journeyId: string }) {
   );
 }
 
+// Flow inicial padrão — usado quando a jornada chega do backend sem flow
+// (caso de jornadas criadas só pelo prompt sem FlowBuilder rodando, ou
+// de jornadas antigas). Prefere um seed "Olá" a deixar o canvas vazio,
+// que é confuso e dá medo do "edit não funciona".
+function seedFlow(): JourneyFlow {
+  return {
+    start_step: "s1",
+    steps: [
+      {
+        id: "s1",
+        type: "message",
+        label: "Mensagem de boas-vindas",
+        is_start_step: true,
+        config: { message: "Olá {{name}}! 👋", mode: "private" },
+      },
+    ],
+  };
+}
+
 // ─── Main builder page ────────────────────────────────────────────────────────
+interface JourneyMeta {
+  name?: string;
+  status?: string;
+  trigger_type?: string;
+  trigger_filter?: string;
+  keywords?: string[] | string;
+  group_jid?: string;
+  instance_id?: string;
+  response_mode?: string;
+}
+
 function BuilderCanvas() {
   const params = useParams();
   const router = useRouter();
   const journeyId = String(params.id);
 
-  const [journey, setJourney] = useState<{ name?: string; status?: string } | null>(null);
+  const [journey, setJourney] = useState<JourneyMeta | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savedOnce, setSavedOnce] = useState(false); // false = seed ainda não persistido
+  const [dirty, setDirty] = useState(false);         // true = mudanças não salvas
   const [llmBusy, setLlmBusy] = useState(false);
   const [llmPrompt, setLlmPrompt] = useState("");
-  const [rightTab, setRightTab] = useState<"config" | "simulate">("config");
+  const [rightTab, setRightTab] = useState<"config" | "trigger" | "simulate">("config");
   const llmInputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Carregar journey + flow
+  // Carregar journey + flow. Se o backend devolver null/empty flow, plantamos
+  // um flow mínimo no canvas e marcamos `savedOnce=false` pra sinalizar que
+  // o seed ainda não foi persistido (dirty=true).
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await journeysApi.get(journeyId);
       const data = res.data;
-      setJourney({ name: data.journey?.name, status: data.journey?.status });
-      const flow: JourneyFlow | null = data.flow || data.journey?.flow || null;
-      const { nodes: ns, edges: es } = flowToGraph(flow);
+      const j = data.journey || {};
+      setJourney({
+        name: j.name,
+        status: j.status,
+        trigger_type: j.trigger_type,
+        trigger_filter: j.trigger_filter,
+        keywords: data.keywords ?? j.keywords,
+        group_jid: j.group_jid,
+        instance_id: j.instance_id,
+        response_mode: j.response_mode,
+      });
+      const flow: JourneyFlow | null = data.flow || j.flow || null;
+      const effective = flow && Array.isArray(flow.steps) && flow.steps.length > 0 ? flow : seedFlow();
+      const { nodes: ns, edges: es } = flowToGraph(effective);
       setNodes(ns);
       setEdges(es);
-    } catch {
-      toast.error("Falha ao carregar jornada");
+      setSavedOnce(!!flow && Array.isArray(flow.steps) && flow.steps.length > 0);
+      setDirty(!flow || !Array.isArray(flow.steps) || flow.steps.length === 0);
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
+        || "Falha ao carregar jornada";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -753,6 +1023,7 @@ function BuilderCanvas() {
         markerEnd: { type: MarkerType.ArrowClosed, color },
         style: { stroke: color, strokeWidth: 2 },
       }, es));
+      setDirty(true);
     },
     [setEdges],
   );
@@ -776,6 +1047,7 @@ function BuilderCanvas() {
       },
     ]);
     setSelectedId(id);
+    setDirty(true);
   };
 
   const selectedStep: FlowStep | null = useMemo(() => {
@@ -790,6 +1062,7 @@ function BuilderCanvas() {
         ? { ...n, data: { step: updated, preview: stepPreview(updated) } }
         : n,
     ));
+    setDirty(true);
   };
 
   const deleteStep = () => {
@@ -797,6 +1070,7 @@ function BuilderCanvas() {
     setNodes(ns => ns.filter(n => n.id !== selectedId));
     setEdges(es => es.filter(e => e.source !== selectedId && e.target !== selectedId));
     setSelectedId(null);
+    setDirty(true);
   };
 
   const setStartStep = () => {
@@ -808,20 +1082,51 @@ function BuilderCanvas() {
         step: { ...(n.data.step as FlowStep), is_start_step: n.id === selectedId },
       },
     })));
+    setDirty(true);
   };
+
+  // onNodesChange/onEdgesChange vindos do ReactFlow disparam pra tudo
+  // (inclusive `select`). Marcamos dirty só em mudanças reais (move, remove,
+  // resize) pra não poluir.
+  const handleNodesChange: typeof onNodesChange = useCallback((changes) => {
+    onNodesChange(changes);
+    if (changes.some((c) => c.type === "position" || c.type === "remove" || c.type === "dimensions")) {
+      setDirty(true);
+    }
+  }, [onNodesChange]);
+  const handleEdgesChange: typeof onEdgesChange = useCallback((changes) => {
+    onEdgesChange(changes);
+    if (changes.some((c) => c.type === "remove")) setDirty(true);
+  }, [onEdgesChange]);
 
   const save = async () => {
     setSaving(true);
     try {
       const flow = graphToFlow(nodes, edges);
+      if (!flow.steps.length) {
+        toast.error("Flow vazio — adicione ao menos um step antes de salvar.");
+        return;
+      }
       await journeysApi.updateFlow(journeyId, flow);
-      toast.success("Jornada salva");
-    } catch {
-      toast.error("Falha ao salvar");
+      toast.success("Jornada salva ✓");
+      setSavedOnce(true);
+      setDirty(false);
+    } catch (e: unknown) {
+      // Surface o erro real do backend no toast em vez de mensagem genérica
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
+        || (e as { message?: string })?.message
+        || "Falha ao salvar";
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
   };
+
+  // Qualquer mutação no grafo marca como dirty — o toast do botão Salvar
+  // indica o estado atual. Usamos um wrapper em volta dos setters de nodes/
+  // edges que já dispara; nos handlers de edit (addStep, updateStep,
+  // deleteStep, setStartStep, onConnect) também.
+  const markDirty = useCallback(() => setDirty(true), []);
 
   const editWithLLM = async () => {
     if (!llmPrompt.trim()) return;
@@ -865,13 +1170,30 @@ function BuilderCanvas() {
       {/* Topbar */}
       <div className="h-14 flex items-center px-4 gap-3 border-b"
         style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
-        <button onClick={() => router.push("/agents")}
-          className="p-1.5 rounded-lg hover:bg-[var(--surface-3)]">
+        <button
+          onClick={async () => {
+            if (dirty && !window.confirm("Você tem alterações não salvas. Sair mesmo assim?")) return;
+            router.push("/agents");
+          }}
+          className="p-1.5 rounded-lg hover:bg-[var(--surface-3)]"
+          title="Voltar para /agents"
+        >
           <ArrowLeft className="w-4 h-4" />
         </button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <p className="text-[10px] uppercase font-bold opacity-60">Flow Builder</p>
           <p className="text-sm font-semibold truncate">{journey?.name || "Jornada sem nome"}</p>
+        </div>
+        {/* Save state indicator */}
+        <div className="text-[10px] px-2 py-1 rounded-md font-medium flex items-center gap-1"
+          style={{
+            background: dirty ? "rgba(234,179,8,0.12)" : "rgba(0,212,106,0.12)",
+            color: dirty ? "#eab308" : "var(--green)",
+          }}
+          title={dirty ? "Alterações não salvas" : "Tudo salvo"}
+        >
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: dirty ? "#eab308" : "var(--green)" }} />
+          {dirty ? "Não salvo" : savedOnce ? "Salvo" : "Pronto para salvar"}
         </div>
         <div className="text-[10px] px-2 py-1 rounded-md"
           style={{
@@ -880,9 +1202,16 @@ function BuilderCanvas() {
           }}>
           {journey?.status}
         </div>
-        <button onClick={save} disabled={saving}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5"
-          style={{ background: "var(--green)", color: "white", opacity: saving ? 0.7 : 1 }}>
+        <button onClick={save} disabled={saving || !dirty}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-opacity"
+          style={{
+            background: "var(--green)",
+            color: "white",
+            opacity: saving ? 0.7 : dirty ? 1 : 0.4,
+            cursor: saving || !dirty ? "default" : "pointer",
+          }}
+          title={dirty ? "Salvar alterações" : "Nada para salvar"}
+        >
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
           Salvar
         </button>
@@ -901,8 +1230,8 @@ function BuilderCanvas() {
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
+            onNodesChange={handleNodesChange}
+            onEdgesChange={handleEdgesChange}
             onConnect={onConnect}
             nodeTypes={nodeTypes}
             onNodeClick={(_, n) => setSelectedId(n.id)}
@@ -972,11 +1301,11 @@ function BuilderCanvas() {
           )}
         </div>
 
-        {/* Right: config / simulate */}
+        {/* Right: config / trigger / simulate */}
         <div className="w-[320px] flex-shrink-0 border-l flex flex-col"
           style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
           <div className="flex border-b" style={{ borderColor: "var(--surface-border)" }}>
-            {(["config", "simulate"] as const).map(t => (
+            {(["config", "trigger", "simulate"] as const).map(t => (
               <button
                 key={t}
                 onClick={() => setRightTab(t)}
@@ -987,7 +1316,7 @@ function BuilderCanvas() {
                   color: rightTab === t ? "var(--text-1)" : "var(--text-2)",
                 }}
               >
-                {t === "config" ? "Configuração" : "Simulador"}
+                {t === "config" ? "Step" : t === "trigger" ? "Gatilho" : "Simulador"}
               </button>
             ))}
           </div>
@@ -998,6 +1327,12 @@ function BuilderCanvas() {
                 onChange={updateStep}
                 onDelete={deleteStep}
                 onSetStart={setStartStep}
+              />
+            ) : rightTab === "trigger" ? (
+              <TriggerPanel
+                journeyId={journeyId}
+                initial={journey}
+                onSaved={(next) => setJourney((j) => ({ ...j, ...next }))}
               />
             ) : (
               <SimulatorPanel journeyId={journeyId} />

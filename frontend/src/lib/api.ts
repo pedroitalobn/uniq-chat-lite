@@ -618,6 +618,20 @@ export const journeysApi = {
       rendered_text: extras?.rendered_text,
       mentions: extras?.mentions,
     }),
+  createBlank: (data?: { name?: string; instance_id?: string }) =>
+    api.post("/v1/journeys", { blank: true, name: data?.name, instance_id: data?.instance_id }),
+  updateTrigger: (
+    id: string,
+    data: Partial<{
+      name: string;
+      trigger_type: string;
+      trigger_filter: string;
+      keywords: string[];
+      group_jid: string;
+      instance_id: string;
+      response_mode: string;
+    }>,
+  ) => api.patch(`/v1/journeys/${id}/trigger`, data),
   get: (id: string) => api.get(`/v1/journeys/${id}`),
   updateStatus: (id: string, status: "active" | "paused") =>
     api.patch(`/v1/journeys/${id}/status`, { status }),

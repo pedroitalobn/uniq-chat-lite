@@ -56,9 +56,21 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 		InstanceID    string    `json:"instance_id"`
 		RenderedText  string    `json:"rendered_text,omitempty"`
 		Mentions      []Mention `json:"mentions,omitempty"`
+		// Blank=true cria uma jornada pronta pra ser editada no canvas,
+		// sem chamar LLM. Prompt pode vir vazio; criamos um flow inicial
+		// mínimo (message "Olá") e status=paused.
+		Blank bool   `json:"blank,omitempty"`
+		Name  string `json:"name,omitempty"` // opcional — usado quando Blank
 	}
-	if err := c.BodyParser(&req); err != nil || req.Prompt == "" {
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "requisição inválida"})
+	}
+	if !req.Blank && req.Prompt == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "prompt inválido ou vazio"})
+	}
+
+	if req.Blank {
+		return h.createBlankJourney(c, userID, req.Name, req.InstanceID)
 	}
 
 	// Usa rendered_text (tokens → labels) como fonte pro parser/LLM. Mantém
@@ -898,4 +910,137 @@ func buildResponseFromJourney(journey *models.Journey, fromName string) string {
 	}
 
 	return "Olá " + fromName + "! Obrigado por entrar em contato. Como posso ajudar?"
+}
+
+// createBlankJourney cria uma jornada em branco pronta pra edição no canvas.
+// Nada de LLM, nada de parsing — só um flow inicial mínimo e status=paused
+// (pra não sair disparando sem o usuário configurar o trigger).
+func (h *JourneyHandler) createBlankJourney(c *fiber.Ctx, userID uuid.UUID, name, instanceID string) error {
+	if name == "" {
+		name = "Nova jornada"
+	}
+
+	startID := "s1"
+	flow := &models.JourneyFlow{
+		StartStep: startID,
+		Steps: []models.FlowStep{
+			{
+				ID:          startID,
+				Type:        models.StepTypeMessage,
+				Label:       "Mensagem de boas-vindas",
+				IsStartStep: true,
+				Config:      json.RawMessage(`{"message":"Olá {{name}}! 👋","mode":"private"}`),
+			},
+		},
+	}
+
+	journey := models.Journey{
+		ID:            uuid.New().String(),
+		UserID:        userID.String(),
+		Name:          name,
+		Prompt:        "", // sem prompt — foi criada direto no canvas
+		TriggerType:   string(models.TriggerAnyMessage),
+		TriggerFilter: "Qualquer mensagem (configure o gatilho para filtrar)",
+		Keywords:      "[]",
+		Status:        "paused",
+		ResponseMode:  "private",
+		InstanceID:    instanceID,
+	}
+	if err := journey.SetFlow(flow); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao codificar flow inicial"})
+	}
+	if err := h.db.Create(&journey).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao salvar jornada no banco"})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"id":            journey.ID,
+		"name":          journey.Name,
+		"status":        journey.Status,
+		"trigger_type":  journey.TriggerType,
+		"instance_id":   journey.InstanceID,
+		"response_mode": journey.ResponseMode,
+		"flow":          flow,
+		"blank":         true,
+		"created_at":    journey.CreatedAt,
+	})
+}
+
+// UpdateTrigger PATCH /api/journeys/:id/trigger
+// Atualiza campos de gatilho da jornada sem afetar o flow. Permite editar
+// trigger_type, keywords, group_jid, instance_id, response_mode e name
+// a partir do canvas (sem LLM).
+func (h *JourneyHandler) UpdateTrigger(c *fiber.Ctx) error {
+	userID, err := h.currentUserID(c)
+	if err != nil {
+		return err
+	}
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id ausente"})
+	}
+
+	var journey models.Journey
+	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&journey).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "jornada não encontrada"})
+	}
+
+	var req struct {
+		Name          *string  `json:"name,omitempty"`
+		TriggerType   *string  `json:"trigger_type,omitempty"`
+		TriggerFilter *string  `json:"trigger_filter,omitempty"`
+		Keywords      []string `json:"keywords,omitempty"`
+		GroupJID      *string  `json:"group_jid,omitempty"`
+		InstanceID    *string  `json:"instance_id,omitempty"`
+		ResponseMode  *string  `json:"response_mode,omitempty"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "requisição inválida"})
+	}
+
+	updates := map[string]interface{}{}
+	if req.Name != nil {
+		updates["name"] = strings.TrimSpace(*req.Name)
+	}
+	if req.TriggerType != nil {
+		updates["trigger_type"] = *req.TriggerType
+	}
+	if req.TriggerFilter != nil {
+		updates["trigger_filter"] = *req.TriggerFilter
+	}
+	if req.Keywords != nil {
+		kwBytes, _ := json.Marshal(req.Keywords)
+		updates["keywords"] = string(kwBytes)
+	}
+	if req.GroupJID != nil {
+		updates["group_jid"] = *req.GroupJID
+	}
+	if req.InstanceID != nil {
+		updates["instance_id"] = *req.InstanceID
+	}
+	if req.ResponseMode != nil {
+		updates["response_mode"] = *req.ResponseMode
+	}
+
+	if len(updates) == 0 {
+		return c.JSON(fiber.Map{"ok": true, "message": "nada pra atualizar"})
+	}
+
+	if err := h.db.Model(&journey).Updates(updates).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao salvar gatilho"})
+	}
+	// Recarrega pra devolver o estado atualizado
+	h.db.Where("id = ? AND user_id = ?", id, userID).First(&journey)
+
+	return c.JSON(fiber.Map{
+		"ok":             true,
+		"id":             journey.ID,
+		"name":           journey.Name,
+		"trigger_type":   journey.TriggerType,
+		"trigger_filter": journey.TriggerFilter,
+		"keywords":       journey.GetKeywords(),
+		"group_jid":      journey.GroupJID,
+		"instance_id":    journey.InstanceID,
+		"response_mode":  journey.ResponseMode,
+	})
 }
