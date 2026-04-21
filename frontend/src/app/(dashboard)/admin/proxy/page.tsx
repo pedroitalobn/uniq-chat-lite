@@ -143,8 +143,9 @@ function ProxyModal({
     }
   };
 
-  // Testa o proxy antes de salvar: cria temporariamente, chama /test, se OK
-  // detecta o país pelo IP externo e pré-preenche; depois remove.
+  // Testa credenciais antes de salvar, sem criar nada no banco. O backend
+  // recebe host/port/user/pass diretamente, testa a conexão e devolve
+  // external_ip + country (detectado server-side). Nada fica persistido.
   const handleTest = async () => {
     if (!form.host || !form.port) {
       toast.error("Host e porta são obrigatórios pra testar");
@@ -153,39 +154,20 @@ function ProxyModal({
     setTesting(true);
     setTestResult(null);
     try {
-      // Cria um proxy temp de plataforma (POST /admin/proxy-config sem id)
-      const created = await adminApi.updateGlobalProxy({
-        name: "__test_temp__",
-        provider: form.provider || "manual",
+      const tested = await adminApi.testGlobalProxyInline({
         proxy_type: form.proxy_type,
         host: form.host,
         port: form.port,
         username: form.username,
         password: password || undefined,
-        is_active: true,
-        country: form.country || "br",
-      }).then((r) => {
-        const arr = Array.isArray(r.data) ? r.data : [];
-        return arr.find((p: { name: string }) => p.name === "__test_temp__");
-      });
-      if (!created) throw new Error("proxy temp não criado");
-      const tested = await adminApi.testGlobalProxy(created.id).then((r) => r.data);
-      // Remove o temp
-      await adminApi.deleteGlobalProxy(created.id).catch(() => {});
+      }).then((r) => r.data);
       if (!tested.success) {
         setTestResult({ success: false, error: tested.error });
         toast.error(tested.error || "Teste falhou");
         return;
       }
-      // Detecta país pelo IP externo via ipapi.co
-      let detectedCountry: string | undefined;
-      try {
-        const geo = await fetch(`https://ipapi.co/${tested.external_ip}/country/`).then(r => r.text());
-        if (geo && geo.length === 2) detectedCountry = geo.toLowerCase();
-      } catch { /* ignore */ }
-      if (detectedCountry) {
-        setForm(p => ({ ...p, country: detectedCountry }));
-      }
+      const detectedCountry: string | undefined = tested.country ? String(tested.country).toLowerCase() : undefined;
+      if (detectedCountry) setForm(p => ({ ...p, country: detectedCountry }));
       setTestResult({
         success: true,
         external_ip: tested.external_ip,

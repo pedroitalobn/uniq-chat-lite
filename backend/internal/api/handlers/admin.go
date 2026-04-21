@@ -592,47 +592,74 @@ func (h *AdminHandler) GetGlobalProxyConfig(c *fiber.Ctx) error {
 // TestGlobalProxy godoc
 // POST /admin/proxy-test — testa um proxy de plataforma
 func (h *AdminHandler) TestGlobalProxy(c *fiber.Ctx) error {
+	// Aceita tanto { id } (testa um proxy já salvo) quanto credenciais
+	// inline { host, port, username, password, proxy_type } — útil pra
+	// "testar antes de salvar" sem ter que criar um proxy temporário no DB.
 	var req struct {
-		ID string `json:"id"`
+		ID        string `json:"id"`
+		Host      string `json:"host"`
+		Port      int    `json:"port"`
+		Username  string `json:"username"`
+		Password  string `json:"password"`
+		ProxyType string `json:"proxy_type"`
 	}
 	_ = c.BodyParser(&req)
 
-	var p models.Proxy
-	q := h.db.Model(&models.Proxy{}).Where("is_platform = ?", true)
-	if req.ID != "" {
-		q = q.Where("id = ?", req.ID)
+	var cfg *whatsapp.ProxyConfig
+	source := "inline"
+
+	if req.Host != "" && req.Port > 0 {
+		pType := req.ProxyType
+		if pType == "" {
+			pType = "http"
+		}
+		cfg = &whatsapp.ProxyConfig{
+			Enabled:  true,
+			Type:     pType,
+			Host:     req.Host,
+			Port:     req.Port,
+			Username: req.Username,
+			Password: req.Password, // plaintext — nunca persistido nesse caminho
+		}
 	} else {
-		q = q.Where("is_active = ?", true).Order("created_at DESC")
-	}
-	if err := q.First(&p).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "proxy não encontrado"})
+		var p models.Proxy
+		q := h.db.Model(&models.Proxy{}).Where("is_platform = ?", true)
+		if req.ID != "" {
+			q = q.Where("id = ?", req.ID)
+		} else {
+			q = q.Where("is_active = ?", true).Order("created_at DESC")
+		}
+		if err := q.First(&p).Error; err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "proxy não encontrado"})
+		}
+		var ok bool
+		cfg, source, ok = whatsapp.BuildProxyConfigExported(&p)
+		if !ok {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"success": false,
+				"error":   "host ou porta vazios após resolução",
+				"source":  source,
+			})
+		}
 	}
 
-	cfg, source, ok := whatsapp.BuildProxyConfigExported(&p)
-	if !ok {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"error":   "host ou porta vazios após resolução",
-			"source":  source,
-		})
-	}
 	externalIP, latencyMs, err := whatsapp.TestProxy(cfg)
 	if err != nil {
 		return c.JSON(fiber.Map{
 			"success": false,
 			"error":   err.Error(),
 			"source":  source,
-			"host":    cfg.Host,
-			"port":    cfg.Port,
 		})
 	}
+	// Resolve país server-side pelo IP externo pra evitar lookup cross-origin
+	// no browser. Falha silenciosa — o test continua "success" mesmo sem país.
+	country, _ := whatsapp.DetectCountryByIP(externalIP)
 	return c.JSON(fiber.Map{
 		"success":     true,
 		"external_ip": externalIP,
 		"latency_ms":  latencyMs,
+		"country":     country,
 		"source":      source,
-		"host":        cfg.Host,
-		"port":        cfg.Port,
 		"tested_at":   time.Now(),
 	})
 }

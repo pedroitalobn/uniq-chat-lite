@@ -302,23 +302,16 @@ function CreateProxyInline({ onCreated, onCancel }: { onCreated: (proxyId: strin
     setTesting(true);
     setTestResult(null);
     try {
-      const r = await proxiesApi.create({
-        name: form.name.trim() || "temp",
+      const t = await proxiesApi.testInline({
+        proxy_type: form.proxy_type,
         host: form.host.trim(),
         port: form.port,
         username: form.username,
         password: form.password,
-        proxy_type: form.proxy_type,
       });
-      const created = r.data;
-      const t = await proxiesApi.test(created.id);
       setTestResult(t.data);
-      // Se o teste falhou, apaga; se passou, deixa criado pro usuário vincular depois
-      if (!t.data.success) {
-        await proxiesApi.remove(created.id);
-      } else {
-        toast.success(`Proxy testado — IP ${t.data.external_ip}`);
-      }
+      if (t.data.success) toast.success(`IP ${t.data.external_ip} · ${t.data.latency_ms}ms`);
+      else toast.error(t.data.error || "Teste falhou");
     } catch (err: unknown) {
       setTestResult({ success: false, error: (err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro" });
     } finally {

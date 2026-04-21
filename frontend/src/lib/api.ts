@@ -217,6 +217,13 @@ export const proxiesApi = {
   }>) => api.put(`/v1/proxies/${id}`, data),
   remove: (id: string) => api.delete(`/v1/proxies/${id}`),
   test: (id: string) => api.post(`/v1/proxies/${id}/test`),
+  testInline: (data: {
+    proxy_type?: "http" | "https" | "socks5";
+    host: string;
+    port: number;
+    username?: string;
+    password?: string;
+  }) => api.post("/v1/proxies/test-inline", data),
 };
 
 export const instancesApi = {
@@ -612,6 +619,13 @@ export const adminApi = {
   deleteProxyConfig: (id: string) => api.delete(`/v1/admin/proxy-config/${id}`),
   deleteGlobalProxy: (id: string) => api.delete(`/v1/admin/proxy-config/${id}`),
   testGlobalProxy: (id?: string) => api.post("/v1/admin/proxy-test", id ? { id } : {}),
+  testGlobalProxyInline: (data: {
+    proxy_type?: string;
+    host: string;
+    port: number;
+    username?: string;
+    password?: string;
+  }) => api.post("/v1/admin/proxy-test", data),
   getProxyStats: () => api.get("/v1/admin/proxy-stats"),
   createUser: (data: {
     name: string; email: string; username?: string;

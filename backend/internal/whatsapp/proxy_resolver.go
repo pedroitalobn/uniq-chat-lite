@@ -151,7 +151,11 @@ func buildProxyConfig(p *models.Proxy) (*ProxyConfig, string, bool) {
 	}
 	pass := ""
 	if passEnc != "" {
-		if dec, err := DecryptProxyPassword(passEnc); err == nil {
+		dec, err := DecryptProxyPassword(passEnc)
+		if err != nil {
+			log.Error().Err(err).Str("proxy_id", p.ID.String()).Str("proxy_name", p.Name).
+				Msg("proxy: failed to decrypt password — will authenticate with empty password (check PROXY_ENCRYPTION_KEY)")
+		} else {
 			pass = dec
 		}
 	}

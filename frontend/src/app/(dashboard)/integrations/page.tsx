@@ -343,23 +343,16 @@ function ProxiesSection() {
     setTesting(true);
     setTestResult(null);
     try {
-      const created = await proxiesApi.create({
-        name: form.name,
+      const t = await proxiesApi.testInline({
+        proxy_type: form.proxy_type,
         host: form.host,
         port: form.port,
         username: form.username,
         password: form.password,
-        proxy_type: form.proxy_type,
       }).then(r => r.data);
-      const t = await proxiesApi.test(created.id).then(r => r.data);
-      setTestResult({ ...t, proxyId: created.id });
-      if (!t.success) {
-        await proxiesApi.remove(created.id);
-        setTestResult({ ...t, proxyId: undefined });
-      } else {
-        toast.success("Proxy testado e salvo");
-        queryClient.invalidateQueries({ queryKey: ["my-proxies"] });
-      }
+      setTestResult(t);
+      if (t.success) toast.success(`IP ${t.external_ip} · ${t.latency_ms}ms`);
+      else toast.error(t.error || "Teste falhou");
     } catch (err: unknown) {
       setTestResult({ success: false, error: (err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro" });
     } finally {

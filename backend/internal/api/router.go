@@ -515,6 +515,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	proxies.Put("/:id", proxyH.Update)           // editar próprio
 	proxies.Delete("/:id", proxyH.Delete)        // deletar próprio
 	proxies.Post("/:id/test", proxyH.Test)       // testar qualquer visível
+	proxies.Post("/test-inline", proxyH.TestInline) // testar credenciais sem persistir
 	// Alias legado: /proxy/global (admin) continua funcionando pra UI antiga
 	api.Get("/proxy/global", middleware.RequireAdmin(), adminH.GetGlobalProxyConfig)
 	api.Put("/proxy/global", middleware.RequireAdmin(), adminH.UpdateGlobalProxyConfig)

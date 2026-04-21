@@ -196,6 +196,48 @@ func (h *ProxyHandler) Test(c *fiber.Ctx) error {
 	})
 }
 
+// TestInline valida credenciais passadas diretamente no body, sem persistir
+// nada. Serve ao fluxo "testar antes de salvar" da UI.
+// POST /proxies/test-inline
+func (h *ProxyHandler) TestInline(c *fiber.Ctx) error {
+	if err := checkProxyPlanAccess(c); err != nil {
+		return err
+	}
+	var req struct {
+		ProxyType string `json:"proxy_type"`
+		Host      string `json:"host"`
+		Port      int    `json:"port"`
+		Username  string `json:"username"`
+		Password  string `json:"password"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.Host == "" || req.Port <= 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "host e port são obrigatórios"})
+	}
+	pType := req.ProxyType
+	if pType == "" {
+		pType = "http"
+	}
+	cfg := &whatsapp.ProxyConfig{
+		Enabled:  true,
+		Type:     pType,
+		Host:     req.Host,
+		Port:     req.Port,
+		Username: req.Username,
+		Password: req.Password,
+	}
+	externalIP, latencyMs, err := whatsapp.TestProxy(cfg)
+	if err != nil {
+		return c.JSON(fiber.Map{"success": false, "error": err.Error()})
+	}
+	country, _ := whatsapp.DetectCountryByIP(externalIP)
+	return c.JSON(fiber.Map{
+		"success":     true,
+		"external_ip": externalIP,
+		"latency_ms":  latencyMs,
+		"country":     country,
+	})
+}
+
 // ─── Visão read-only pra uma instância ──────────────────────────────────
 // A UI da instância mostra qual proxy ela está usando (e de qual server).
 // Pra alterar, o usuário vai até o server.
