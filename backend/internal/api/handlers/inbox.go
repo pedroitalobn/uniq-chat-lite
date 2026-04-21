@@ -610,15 +610,36 @@ func sendInboxMessageWithRetry(db *gorm.DB, client *whatsapp.InstanceClient, msg
 		}
 		lastErr = err
 		errStr := err.Error()
-		// Rate-limit (429), JID inválido ou destinatário sem LID na
-		// migração LID do WhatsApp não vão se resolver com retry imediato.
-		if strings.Contains(errStr, "rate-overlimit") || strings.Contains(errStr, "429") || strings.Contains(errStr, "invalid JID") || strings.Contains(errStr, "no LID found") {
+		// Rate-limit (429) e JID inválido não têm chance de sucesso
+		// sem intervenção — aborta o loop.
+		if strings.Contains(errStr, "rate-overlimit") || strings.Contains(errStr, "429") || strings.Contains(errStr, "invalid JID") {
 			zlog.Warn().Err(err).
 				Str("instance", instanceID).
 				Str("to_jid", jid).
 				Int("attempt", attempt).
 				Msg("inbox: non-retriable error, aborting")
 			break
+		}
+		// "no LID found" costuma ser transitório: a primeira chamada
+		// a IsOnWhatsApp popula o cache do whatsmeow, o próximo send
+		// consegue o LID. Dá uma respirada maior (10s) e tenta mais
+		// UMA vez — evita amplificar rate-limit mas aproveita a janela.
+		if strings.Contains(errStr, "no LID found") {
+			if attempt >= 2 {
+				zlog.Warn().Err(err).
+					Str("instance", instanceID).
+					Str("to_jid", jid).
+					Int("attempt", attempt).
+					Msg("inbox: LID still unavailable after retry, aborting")
+				break
+			}
+			zlog.Warn().Err(err).
+				Str("instance", instanceID).
+				Str("to_jid", jid).
+				Int("attempt", attempt).
+				Msg("inbox: LID not yet populated, retrying after cache warm-up")
+			time.Sleep(10 * time.Second)
+			continue
 		}
 		zlog.Warn().Err(err).
 			Str("instance", instanceID).
