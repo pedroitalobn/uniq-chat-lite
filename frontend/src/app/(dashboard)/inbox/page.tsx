@@ -28,6 +28,17 @@ const CHANNELS: { id: ChannelType; label: string; color: string; description: st
 
 type FilterType = "all" | "unread" | "starred" | "archived";
 
+// Initials ignora conectores ("da", "de", etc.) e combina a primeira letra
+// de cada palavra em caixa alta — "Pedro Benevides" → "PB".
+function initialsFromName(name: string | undefined | null): string {
+  if (!name) return "?";
+  const skip = new Set(["da", "de", "di", "do", "du", "das", "dos", "e", "van", "von", "la", "le", "del", "der"]);
+  const words = name.trim().split(/\s+/).filter(w => w.length > 0 && !skip.has(w.toLowerCase()));
+  if (words.length === 0) return name.slice(0, 2).toUpperCase();
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
 interface ChatContact {
   jid: string; name: string; phone: string; avatar?: string;
   last_message: string; last_time: string; unread_count: number;
@@ -259,7 +270,7 @@ function ContactItem({
         ) : (
           <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-semibold"
             style={{ background: `${channelColor}18`, color: channelColor }}>
-            {contact.is_group ? <Users className="w-5 h-5" /> : contact.name.slice(0, 2).toUpperCase()}
+            {contact.is_group ? <Users className="w-5 h-5" /> : initialsFromName(contact.name)}
           </div>
         )}
         {contact.is_online && !contact.is_group && (
@@ -327,7 +338,13 @@ function MessageBubble({
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
   const sent = msg.from_me;
-  const senderDisplay = msg.sender_name?.trim() || (msg.sender_jid ? msg.sender_jid.split("@")[0] : "Contato");
+  const senderPhone = msg.sender_jid ? msg.sender_jid.split("@")[0].split(":")[0] : "";
+  const senderName = msg.sender_name?.trim() || "";
+  // Em grupos mostramos o nome de quem enviou (ou só o telefone quando não
+  // temos pushName), e em parênteses o número para facilitar identificar.
+  const senderDisplay = senderName
+    ? (senderPhone && senderPhone !== senderName ? `${senderName} · ${senderPhone}` : senderName)
+    : (senderPhone || "Contato");
 
   return (
     <div className={cn("flex gap-2 group", sent ? "justify-end" : "items-end")}
@@ -338,7 +355,7 @@ function MessageBubble({
           ? <img src={contactAvatar} className="w-7 h-7 rounded-full object-cover flex-shrink-0 mb-5" alt="" />
           : <div className="w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-semibold flex-shrink-0 mb-5"
               style={{ background: `${channelColor}18`, color: channelColor }}>
-              {senderDisplay.slice(0, 2).toUpperCase()}
+              {initialsFromName(senderDisplay)}
             </div>
       )}
 
@@ -613,7 +630,7 @@ export default function InboxPage() {
 
   const readMut = useMutation({
     mutationFn: () => inboxApi.markRead(activeInstance, chat!),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["chats", selectedInstances.join(",") || instance] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chats"] }),
   });
 
   const updateMessageMut = useMutation({
@@ -629,9 +646,15 @@ export default function InboxPage() {
 
   const list: ChatContact[] = useMemo(() => {
     const chats = chatsD?.chats || [];
+    // Dedupe por telefone (normalizado) em vez de jid cru — evita aparecer
+    // duas vezes o mesmo contato quando o backend guardou entradas com o
+    // sufixo @s.whatsapp.net e outras sem. Para grupos (@g.us), mantém o
+    // jid completo como chave.
     const seen = new Set<string>();
     return chats.filter(c => {
-      const key = c.jid;
+      const isGroup = (c.jid || "").includes("@g.us");
+      const key = isGroup ? c.jid : (c.phone || c.jid?.split("@")[0] || c.jid);
+      if (!key) return false;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -1076,7 +1099,7 @@ export default function InboxPage() {
                   ) : (
                     <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold"
                       style={{ background: `${curChannel.color}18`, color: curChannel.color }}>
-                      {ct.name.slice(0, 2).toUpperCase()}
+                      {initialsFromName(ct.name)}
                     </div>
                   )}
                   <div>
@@ -1228,7 +1251,7 @@ export default function InboxPage() {
               ) : (
                 <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center text-lg font-bold"
                   style={{ background: `${curChannel.color}18`, color: curChannel.color }}>
-                  {ct.name.slice(0, 2).toUpperCase()}
+                  {initialsFromName(ct.name)}
                 </div>
               )}
               <h3 className="text-sm font-semibold mt-3" style={{ color: "var(--text-1)" }}>{ct.name}</h3>

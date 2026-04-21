@@ -47,6 +47,8 @@ type InboxChat struct {
 	IsOnline    bool   `json:"is_online"`
 	Typing      bool   `json:"typing"`
 	IsGroup     bool   `json:"is_group"`
+	IsFavorite  bool   `json:"is_favorite,omitempty"`
+	IsArchived  bool   `json:"is_archived,omitempty"`
 }
 
 type InboxMessage struct {
@@ -92,28 +94,17 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 	search := c.Query("search", "")
 	filter := c.Query("filter", "all") // all, unread, starred, archived
 
-	// Determine which is_favorite/is_archived value to filter by
-	var isFavorite, isArchived *bool
-	switch filter {
-	case "starred":
-		isFavoriteVal := true
-		isFavorite = &isFavoriteVal
-	case "archived":
-		isArchivedVal := true
-		isArchived = &isArchivedVal
-	case "unread":
-		// Unread filter handled separately
-	}
-
 	type rawChat struct {
 		ToJID         string `gorm:"column:to_jid"`
 		Content       string `gorm:"column:content"`
 		MaxTime       string `gorm:"column:max_time"`
 		MsgCount      int64  `gorm:"column:cnt"`
+		UnreadCount   int64  `gorm:"column:unread_cnt"`
 		ContactName   string `gorm:"column:contact_name"`
 		ContactAvatar string `gorm:"column:contact_avatar"`
 		Direction     string `gorm:"column:direction"`
-		InstanceID    string `gorm:"column:instance_id"`
+		IsFavorite    bool   `gorm:"column:is_favorite"`
+		IsArchived    bool   `gorm:"column:is_archived"`
 	}
 
 	var rawChatsResult []rawChat
@@ -137,30 +128,40 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 		excludeSelf = "AND " + phoneExpr + " != '" + instancePhoneNormalized + "'"
 	}
 
-	// Base filter conditions. Use NOT is_deleted instead of `= 0` so
-	// both SQLite (integer) and Postgres (boolean) accept it.
+	// Base filter: descarta newsletter, lid, broadcast e mensagens apagadas.
+	// O filtro de arquivados/starred/unread é aplicado no outer SELECT pra
+	// usar o unread_count agregado por chat.
 	baseWhere := "instance_id = ? AND to_jid != '' " + excludeSelf + " AND to_jid NOT LIKE '%@newsletter%' AND to_jid NOT LIKE '%@lid%' AND to_jid != 'status@broadcast' AND NOT is_deleted"
 
-	if isFavorite != nil {
-		baseWhere += " AND is_favorite"
-	}
-	if isArchived != nil {
-		baseWhere += " AND is_archived"
+	// Outer filter muda conforme a aba escolhida.
+	outerWhere := "rn = 1"
+	switch filter {
+	case "starred":
+		outerWhere += " AND is_favorite = TRUE"
+	case "archived":
+		outerWhere += " AND is_archived = TRUE"
+	case "unread":
+		outerWhere += " AND unread_cnt > 0 AND is_archived = FALSE"
+	default: // "all"
+		outerWhere += " AND is_archived = FALSE"
 	}
 
-	// Latest message per chat key using a window function. Groups keep
-	// the full JID as the key; individual chats normalize by phone.
 	partition := "CASE WHEN to_jid LIKE '%@g.us' THEN to_jid ELSE " + phoneExpr + " END"
+	// Postgres e SQLite aceitam CASE dentro de SUM() pra unread_cnt (mais
+	// portátil que FILTER).
+	unreadExpr := "SUM(CASE WHEN direction = 'in' AND status <> 'read' THEN 1 ELSE 0 END) OVER (PARTITION BY " + partition + ")"
+
 	query := `
-		SELECT to_jid, content, created_at as max_time, cnt, contact_name, contact_avatar, direction
+		SELECT to_jid, content, created_at as max_time, cnt, unread_cnt, contact_name, contact_avatar, direction, is_favorite, is_archived
 		FROM (
 			SELECT *,
 				ROW_NUMBER() OVER (PARTITION BY ` + partition + ` ORDER BY created_at DESC) as rn,
-				COUNT(*) OVER (PARTITION BY ` + partition + `) as cnt
+				COUNT(*) OVER (PARTITION BY ` + partition + `) as cnt,
+				` + unreadExpr + ` as unread_cnt
 			FROM message_logs
 			WHERE ` + baseWhere + `
 		) sub
-		WHERE rn = 1
+		WHERE ` + outerWhere + `
 		ORDER BY created_at DESC
 		LIMIT 50
 	`
@@ -170,15 +171,16 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 	if search != "" {
 		searchWhere := baseWhere + " AND to_jid LIKE ?"
 		query = `
-			SELECT to_jid, content, created_at as max_time, cnt, contact_name, contact_avatar, direction
+			SELECT to_jid, content, created_at as max_time, cnt, unread_cnt, contact_name, contact_avatar, direction, is_favorite, is_archived
 			FROM (
 				SELECT *,
 					ROW_NUMBER() OVER (PARTITION BY ` + partition + ` ORDER BY created_at DESC) as rn,
-					COUNT(*) OVER (PARTITION BY ` + partition + `) as cnt
+					COUNT(*) OVER (PARTITION BY ` + partition + `) as cnt,
+					` + unreadExpr + ` as unread_cnt
 				FROM message_logs
 				WHERE ` + searchWhere + `
 			) sub
-			WHERE rn = 1
+			WHERE ` + outerWhere + `
 			ORDER BY created_at DESC
 			LIMIT 50
 		`
@@ -224,19 +226,29 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 			name = phone
 		}
 
-		// Determine if this is a group chat
+		// Determine if this is a group chat and canonicalize the JID we
+		// hand back. Messages can get saved with raw phone ("5585...") or
+		// the full WhatsApp form ("5585...@s.whatsapp.net"); normalize
+		// to the full form so the frontend doesn't end up with twin rows
+		// for the same contact.
 		isGroup := strings.Contains(rc.ToJID, "@g.us")
+		canonicalJid := rc.ToJID
+		if !isGroup && !strings.Contains(canonicalJid, "@") {
+			canonicalJid = phone + "@s.whatsapp.net"
+		}
 
 		chats = append(chats, InboxChat{
 			InstanceID:  instance.ID.String(),
-			JID:         rc.ToJID,
+			JID:         canonicalJid,
 			Name:        name,
 			Phone:       phone,
 			Avatar:      avatar,
 			LastMessage: truncateMessage(lastMsg, 60),
 			LastTime:    rc.MaxTime,
-			UnreadCount: int(rc.MsgCount),
+			UnreadCount: int(rc.UnreadCount),
 			IsGroup:     isGroup,
+			IsFavorite:  rc.IsFavorite,
+			IsArchived:  rc.IsArchived,
 		})
 	}
 
