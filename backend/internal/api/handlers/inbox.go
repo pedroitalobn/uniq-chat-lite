@@ -531,6 +531,26 @@ func (h *InboxHandler) UpdateMessage(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "message": "mensagem atualizada"})
 }
 
+// latestContactInfo fetches the most recent non-empty contact_name/contact_avatar
+// for a given (instance, to_jid). Used by outbound send handlers so the newly
+// created row carries the same display info as prior rows — otherwise the
+// inbox list (which picks the most recent row per chat) shows a blank name/
+// avatar right after a send.
+func (h *InboxHandler) latestContactInfo(instanceID uuid.UUID, jid string) (name string, avatar string) {
+	var row struct {
+		ContactName   string `gorm:"column:contact_name"`
+		ContactAvatar string `gorm:"column:contact_avatar"`
+	}
+	h.db.Model(&models.MessageLog{}).
+		Select("contact_name, contact_avatar").
+		Where("instance_id = ? AND to_jid = ?", instanceID, jid).
+		Where("contact_name <> '' OR contact_avatar <> ''").
+		Order("created_at DESC").
+		Limit(1).
+		Scan(&row)
+	return row.ContactName, row.ContactAvatar
+}
+
 // SendMessage sends a message to a contact
 func (h *InboxHandler) SendMessage(c *fiber.Ctx) error {
 	instance, ok := c.Locals("instance").(*models.Instance)
@@ -582,15 +602,19 @@ func (h *InboxHandler) SendMessage(c *fiber.Ctx) error {
 
 	msgID := uuid.New()
 
+	contactName, contactAvatar := h.latestContactInfo(instance.ID, jid)
+
 	contentJSON, _ := json.Marshal(req.Content)
 	log := models.MessageLog{
-		ID:         msgID,
-		InstanceID: instance.ID,
-		Direction:  models.DirectionOut,
-		Type:       req.Type,
-		ToJID:      jid,
-		Content:    string(contentJSON),
-		Status:     models.MessageStatusPending,
+		ID:            msgID,
+		InstanceID:    instance.ID,
+		Direction:     models.DirectionOut,
+		Type:          req.Type,
+		ToJID:         jid,
+		ContactName:   contactName,
+		ContactAvatar: contactAvatar,
+		Content:       string(contentJSON),
+		Status:        models.MessageStatusPending,
 	}
 	h.db.Create(&log)
 
@@ -830,14 +854,17 @@ func (h *InboxHandler) SendMedia(c *fiber.Ctx) error {
 		"filename":  req.Filename,
 		"caption":   req.Caption,
 	})
+	contactName, contactAvatar := h.latestContactInfo(instance.ID, jid)
 	msgLog := models.MessageLog{
-		ID:         msgID,
-		InstanceID: instance.ID,
-		Direction:  models.DirectionOut,
-		Type:       msgType,
-		ToJID:      jid,
-		Content:    string(content),
-		Status:     models.MessageStatusPending,
+		ID:            msgID,
+		InstanceID:    instance.ID,
+		Direction:     models.DirectionOut,
+		Type:          msgType,
+		ToJID:         jid,
+		ContactName:   contactName,
+		ContactAvatar: contactAvatar,
+		Content:       string(content),
+		Status:        models.MessageStatusPending,
 	}
 	h.db.Create(&msgLog)
 
