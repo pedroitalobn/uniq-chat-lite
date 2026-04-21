@@ -51,12 +51,21 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		Prompt        string `json:"prompt"`
-		IntegrationID string `json:"integration_id"`
-		InstanceID    string `json:"instance_id"`
+		Prompt        string    `json:"prompt"`
+		IntegrationID string    `json:"integration_id"`
+		InstanceID    string    `json:"instance_id"`
+		RenderedText  string    `json:"rendered_text,omitempty"`
+		Mentions      []Mention `json:"mentions,omitempty"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.Prompt == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "prompt inválido ou vazio"})
+	}
+
+	// Usa rendered_text (tokens → labels) como fonte pro parser/LLM. Mantém
+	// Prompt original (com tokens @[…](type:id)) para rastreabilidade.
+	promptText := req.RenderedText
+	if promptText == "" {
+		promptText = req.Prompt
 	}
 
 	// Fetch integration if provided, or find default
@@ -71,7 +80,7 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	parsedRules, err := h.llm.ParseJourneyPrompt(ctx, integration, req.Prompt)
+	parsedRules, err := h.llm.ParseJourneyPrompt(ctx, integration, promptText)
 	if err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "falha ao interpretar jornada: " + err.Error()})
 	}
@@ -79,13 +88,13 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 	// Gerar flow estruturado via FlowBuilder (best-effort — se falhar, journey é criada sem flow)
 	var flow *models.JourneyFlow
 	if h.builder != nil {
-		if f, fErr := h.builder.Build(ctx, integration, req.Prompt); fErr == nil {
+		if f, fErr := h.builder.Build(ctx, integration, promptText); fErr == nil {
 			flow = f
 		}
 	}
 
 	// Parse the prompt to extract trigger details
-	triggerType, triggerFilter, keywords, messageTemplate := parsePromptForJourney(req.Prompt, parsedRules)
+	triggerType, triggerFilter, keywords, messageTemplate := parsePromptForJourney(promptText, parsedRules)
 
 	journey := models.Journey{
 		ID:              uuid.New().String(),
@@ -100,21 +109,37 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 		ResponseMode:    "private",
 	}
 
-	// Resolve instance by ID or by name from prompt
+	// Resolve instance: explicit ID > mention > fuzzy prompt match.
 	var resolvedInstanceID string
 	if req.InstanceID != "" {
 		resolvedInstanceID = req.InstanceID
-	} else {
-		// Try to find instance name mentioned in prompt (e.g. "instância pedro-sp")
-		if instUUID := h.resolveInstanceFromPrompt(req.Prompt, userID); instUUID != uuid.Nil {
+	}
+	if resolvedInstanceID == "" {
+		if m := firstMention(req.Mentions, "instance"); m != nil {
+			if parsed, err := uuid.Parse(m.ID); err == nil {
+				var inst models.Instance
+				if h.db.Where("id = ? AND user_id = ?", parsed, userID).First(&inst).Error == nil {
+					resolvedInstanceID = parsed.String()
+				}
+			}
+		}
+	}
+	if resolvedInstanceID == "" {
+		if instUUID := h.resolveInstanceFromPrompt(promptText, userID); instUUID != uuid.Nil {
 			resolvedInstanceID = instUUID.String()
 		}
 	}
 	journey.InstanceID = resolvedInstanceID
 
-	// Resolve group JID from prompt if instance is known
-	if resolvedInstanceID != "" {
-		journey.GroupJID = h.resolveGroupFromPrompt(req.Prompt, resolvedInstanceID)
+	// Resolve group: menção > fuzzy.
+	if m := firstMention(req.Mentions, "group"); m != nil {
+		if m.Meta != nil && m.Meta["jid"] != "" {
+			journey.GroupJID = m.Meta["jid"]
+		} else {
+			journey.GroupJID = m.ID
+		}
+	} else if resolvedInstanceID != "" {
+		journey.GroupJID = h.resolveGroupFromPrompt(promptText, resolvedInstanceID)
 	}
 
 	// Parse prompt for structured flow using LLM executor
@@ -134,7 +159,7 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 
 	// Gerar nome da jornada baseado no prompt
 	if journey.Name == "" {
-		journey.Name = generateJourneyName(req.Prompt, triggerType)
+		journey.Name = generateJourneyName(promptText, triggerType)
 	}
 
 	if err := h.db.Create(&journey).Error; err != nil {

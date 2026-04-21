@@ -34,6 +34,33 @@ type ChatRequest struct {
 	Model         string `json:"model"` // specific model to use (optional)
 	Message       string `json:"message"`
 	UseTools      bool   `json:"use_tools"`
+	// Opcional: texto já com tokens @[label](type:id) substituídos por labels
+	// — serve como "prompt legível" pra LLM. O backend usa Mentions como
+	// autoritativo na resolução de instância/grupo; o Message original mantém
+	// os tokens pra rastreabilidade.
+	RenderedText string    `json:"rendered_text,omitempty"`
+	Mentions     []Mention `json:"mentions,omitempty"`
+}
+
+// Mention é uma menção tipada produzida pelo MentionPicker do frontend. O
+// backend prefere estas entradas em vez de fuzzy matching por nome quando
+// estão disponíveis; cai no parser antigo quando não houver menção do tipo
+// relevante (fallback).
+type Mention struct {
+	Type  string            `json:"type"`  // instance|group|contact|tag|funnel|journey
+	ID    string            `json:"id"`
+	Label string            `json:"label"`
+	Meta  map[string]string `json:"meta,omitempty"`
+}
+
+// firstMention returns the first mention of the given type, or nil.
+func firstMention(mentions []Mention, t string) *Mention {
+	for i := range mentions {
+		if mentions[i].Type == t {
+			return &mentions[i]
+		}
+	}
+	return nil
 }
 
 type ToolCall struct {
@@ -66,8 +93,16 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
+	// Prefer o texto já "renderizado" (tokens → labels) para qualquer parsing
+	// baseado em regex/keywords. O Message cru (com tokens) só serve para
+	// auditoria. Se não veio rendered_text, assume que o message já é plano.
+	promptText := req.RenderedText
+	if promptText == "" {
+		promptText = req.Message
+	}
+
 	// Check if user wants to create a journey
-	lowerMsg := strings.ToLower(req.Message)
+	lowerMsg := strings.ToLower(promptText)
 	isJourneyRequest := contains(lowerMsg, "crie") || contains(lowerMsg, "criar") ||
 		contains(lowerMsg, "automação") || contains(lowerMsg, "automacao") ||
 		contains(lowerMsg, "jornada") || contains(lowerMsg, "campanha") ||
@@ -81,8 +116,20 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 		}
 		journeyHandler := &JourneyHandler{db: h.db, llm: h.llm, manager: journeyMgr}
 
-		// Resolve instance from prompt
-		instanceID := journeyHandler.resolveInstanceFromPrompt(req.Message, userID)
+		// Resolve instance from prompt — menção autoritativa antes de fuzzy match.
+		var instanceID uuid.UUID
+		if m := firstMention(req.Mentions, "instance"); m != nil {
+			if parsed, err := uuid.Parse(m.ID); err == nil {
+				// valida que pertence ao usuário
+				var inst models.Instance
+				if h.db.Where("id = ? AND user_id = ?", parsed, userID).First(&inst).Error == nil {
+					instanceID = parsed
+				}
+			}
+		}
+		if instanceID == uuid.Nil {
+			instanceID = journeyHandler.resolveInstanceFromPrompt(promptText, userID)
+		}
 
 		// Find integration
 		var integration *models.UserIntegration
@@ -93,15 +140,15 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 			h.db.Where("user_id = ? AND is_active = true AND provider IN ?", userID, []string{"openai", "claude", "deepseek", "gemini", "openrouter", "kilo", "zai", "kimi", "qwen", "minimax", "manus"}).First(&integration)
 		}
 
-		parsedRules, parseErr := h.llm.ParseJourneyPrompt(ctx, integration, req.Message)
+		parsedRules, parseErr := h.llm.ParseJourneyPrompt(ctx, integration, promptText)
 		if parseErr != nil {
 			return c.JSON(fiber.Map{"response": "Entendi o pedido, mas não consegui interpretar as regras da automação: " + parseErr.Error()})
 		}
 
-		triggerType, triggerFilter, keywords, messageTemplate := parsePromptForJourney(req.Message, parsedRules)
+		triggerType, triggerFilter, keywords, messageTemplate := parsePromptForJourney(promptText, parsedRules)
 
 		// Check if this is a confirmation request
-		lowerConfirm := strings.ToLower(req.Message)
+		lowerConfirm := strings.ToLower(promptText)
 		isConfirmation := strings.Contains(lowerConfirm, "confirmo") || strings.Contains(lowerConfirm, "confirmar") ||
 			strings.Contains(lowerConfirm, "sim") || strings.Contains(lowerConfirm, "criar") ||
 			strings.Contains(lowerConfirm, "ok") || strings.Contains(lowerConfirm, "pode criar")
@@ -112,8 +159,8 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 			json.Unmarshal([]byte(keywords), &kwList)
 
 			// Detect if action is private reply
-			isPrivateReply := strings.Contains(strings.ToLower(req.Message), "no privado") ||
-				strings.Contains(strings.ToLower(req.Message), "responde no privado")
+			isPrivateReply := strings.Contains(strings.ToLower(promptText), "no privado") ||
+				strings.Contains(strings.ToLower(promptText), "responde no privado")
 
 			// Build confirmation message with proper markdown
 			response := "📋 **Confirmação de Jornada**\n\n"
@@ -133,10 +180,16 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 				}
 			}
 
-			// Resolve group
+			// Resolve group — menção autoritativa (ID já é o JID) antes de fuzzy match.
 			var groupJID string
-			if instanceID != uuid.Nil {
-				groupJID = journeyHandler.resolveGroupFromPrompt(req.Message, instanceID.String())
+			if m := firstMention(req.Mentions, "group"); m != nil {
+				if m.Meta != nil && m.Meta["jid"] != "" {
+					groupJID = m.Meta["jid"]
+				} else {
+					groupJID = m.ID // id do frontend é o próprio JID
+				}
+			} else if instanceID != uuid.Nil {
+				groupJID = journeyHandler.resolveGroupFromPrompt(promptText, instanceID.String())
 			}
 			if groupJID != "" {
 				response += "- Grupo: " + groupJID + "\n"
@@ -190,7 +243,7 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 		journey := models.Journey{
 			UserID:          userID.String(),
 			Name:            journeyName,
-			Prompt:          req.Message,
+			Prompt:          req.Message, // mantém cru com tokens para rastreabilidade
 			TriggerType:     string(triggerType),
 			TriggerFilter:   triggerFilter,
 			Keywords:        string(keywords),
@@ -199,8 +252,15 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 			InstanceID:      instanceID.String(),
 		}
 
-		if instanceID != uuid.Nil {
-			journey.GroupJID = journeyHandler.resolveGroupFromPrompt(req.Message, instanceID.String())
+		// Grupo: mesma preferência menção → fuzzy.
+		if m := firstMention(req.Mentions, "group"); m != nil {
+			if m.Meta != nil && m.Meta["jid"] != "" {
+				journey.GroupJID = m.Meta["jid"]
+			} else {
+				journey.GroupJID = m.ID
+			}
+		} else if instanceID != uuid.Nil {
+			journey.GroupJID = journeyHandler.resolveGroupFromPrompt(promptText, instanceID.String())
 		}
 
 		rulesBytes, _ := json.Marshal(parsedRules)

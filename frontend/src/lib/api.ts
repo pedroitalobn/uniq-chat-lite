@@ -578,8 +578,22 @@ export const integrationsApi = {
 };
 
 export const agentsApi = {
-  chat: (message: string, integrationId?: string, model?: string) =>
-    api.post("/v1/ai/chat", { message, integration_id: integrationId, model }),
+  chat: (
+    message: string,
+    integrationId?: string,
+    model?: string,
+    extras?: {
+      rendered_text?: string;
+      mentions?: { type: string; id: string; label: string; meta?: Record<string, string> }[];
+    },
+  ) =>
+    api.post("/v1/ai/chat", {
+      message,
+      integration_id: integrationId,
+      model,
+      rendered_text: extras?.rendered_text,
+      mentions: extras?.mentions,
+    }),
   stats: () => api.get("/v1/agent/stats"),
   activity: (limit?: number) => api.get("/v1/agent/activity", { params: limit ? { limit } : undefined }),
   instances: () => api.get("/v1/agent/instances"),
@@ -588,8 +602,22 @@ export const agentsApi = {
 
 export const journeysApi = {
   list: () => api.get("/v1/journeys"),
-  create: (prompt: string, integrationId?: string, instanceId?: string) =>
-    api.post("/v1/journeys", { prompt, integration_id: integrationId, instance_id: instanceId }),
+  create: (
+    prompt: string,
+    integrationId?: string,
+    instanceId?: string,
+    extras?: {
+      rendered_text?: string;
+      mentions?: { type: string; id: string; label: string; meta?: Record<string, string> }[];
+    },
+  ) =>
+    api.post("/v1/journeys", {
+      prompt,
+      integration_id: integrationId,
+      instance_id: instanceId,
+      rendered_text: extras?.rendered_text,
+      mentions: extras?.mentions,
+    }),
   get: (id: string) => api.get(`/v1/journeys/${id}`),
   updateStatus: (id: string, status: "active" | "paused") =>
     api.patch(`/v1/journeys/${id}/status`, { status }),

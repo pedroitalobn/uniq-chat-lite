@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import ReactMarkdown from "react-markdown";
 import type { ChannelType } from "@/types";
+import { MentionPicker, type Mention, type MentionPickerHandles } from "@/components/MentionPicker";
 
 type AgentSection = "chat" | "journeys" | "activity";
 
@@ -401,6 +402,8 @@ function ChatSection() {
   const [groupedIntegrations, setGroupedIntegrations] = useState<Record<string, any[]>>({});
   const [isCreatingJourney, setIsCreatingJourney] = useState(false);
   const [pendingJourneyPrompt, setPendingJourneyPrompt] = useState<string>("");
+  const [pendingJourneyRendered, setPendingJourneyRendered] = useState<string>("");
+  const [pendingJourneyMentions, setPendingJourneyMentions] = useState<Mention[]>([]);
   const [pendingJourneyData, setPendingJourneyData] = useState<any>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoadingIntegrations, setIsLoadingIntegrations] = useState(true);
@@ -477,23 +480,36 @@ function ChatSection() {
     }
   }, [messages]);
 
-  const sendMessage = useCallback(async (messageText: string) => {
+  const sendMessage = useCallback(async (messageText: string, extras?: { renderedText?: string; mentions?: Mention[] }) => {
     if (isStreaming) return;
-    
+
+    // O que vai visualmente no histórico é o texto renderizado (tokens
+    // substituídos por labels) — legível. O texto cru com tokens fica só
+    // no stream para o backend.
+    const displayText = extras?.renderedText || messageText;
+
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: "user",
-      content: messageText,
+      content: displayText,
       createdAt: new Date(),
     };
-    
+
     const assistantMessageId = crypto.randomUUID();
-    
+
     setMessages(prev => [...prev, userMessage]);
     setIsStreaming(true);
-    
+
     try {
-      const res = await agentsApi.chat(messageText, selectedIntegration || undefined, selectedModel || undefined);
+      const res = await agentsApi.chat(
+        messageText,
+        selectedIntegration || undefined,
+        selectedModel || undefined,
+        {
+          rendered_text: extras?.renderedText,
+          mentions: extras?.mentions,
+        },
+      );
       const content = res.data?.response || res.data?.content || res.data || "";
       
       // Check if this is a journey preview that needs confirmation
@@ -537,8 +553,17 @@ function ChatSection() {
   }, [selectedIntegration, groupedIntegrations]);
 
   const createJourneyMutation = useMutation({
-    mutationFn: async (data: { prompt: string; integrationId?: string; instanceId?: string }) => {
-      const res = await journeysApi.create(data.prompt, data.integrationId, data.instanceId);
+    mutationFn: async (data: {
+      prompt: string;
+      integrationId?: string;
+      instanceId?: string;
+      renderedText?: string;
+      mentions?: Mention[];
+    }) => {
+      const res = await journeysApi.create(data.prompt, data.integrationId, data.instanceId, {
+        rendered_text: data.renderedText,
+        mentions: data.mentions,
+      });
       return res.data;
     },
     onSuccess: (res) => {
@@ -564,6 +589,8 @@ function ChatSection() {
       }]);
       setIsCreatingJourney(false);
       setPendingJourneyPrompt("");
+      setPendingJourneyRendered("");
+      setPendingJourneyMentions([]);
       toast.success("Jornada criada!");
     },
     onError: (err: any) => {
@@ -597,34 +624,37 @@ function ChatSection() {
     }
   };
 
-  const handleSend = () => {
-    if (!prompt.trim() || isStreaming) return;
-    
-    const userMessage = prompt.trim();
-    const lowerMsg = userMessage.toLowerCase();
-    
-    // Detecção de criação de jornada
+  const handleSend = (info?: MentionPickerHandles) => {
+    const raw = (info?.value ?? prompt).trim();
+    if (!raw || isStreaming) return;
+
+    // `rendered` é o texto humanamente legível (tokens → labels). Usado como
+    // "pergunta original" do usuário na conversa com a LLM.
+    const rendered = (info?.renderedText ?? raw).trim();
+    const mentions = info?.mentions ?? [];
+    const lowerMsg = rendered.toLowerCase();
+
     const isJourney = lowerMsg.includes("crie") || lowerMsg.includes("criar") ||
                       lowerMsg.includes("jornada") || lowerMsg.includes("automação") ||
                       lowerMsg.includes("quando alguém") || lowerMsg.includes("responda") ||
                       lowerMsg.includes("quando mandar") || lowerMsg.includes("envie mensagem");
-    
+
     if (isJourney) {
       setIsCreatingJourney(true);
-      setPendingJourneyPrompt(userMessage);
-      sendMessage(`Analise este pedido de automação WhatsApp e confirme os detalhes:
-
-"${userMessage}"
-
-Extraia:
-- Qual instância será usada (se mencionada)
-- Qual grupo será monitorado (se mencionado)
-- Qual a palavra-chave ou mensagem que aciona
-- Qual ação será tomada (enviar mensagem no privado/grupo, adicionar tag, etc)
-
-Responda de forma clara e pergunte se o usuário confirma.`);
+      // Guarda o RAW (com tokens) + rendered + mentions para o backend
+      // resolver via mentions quando o usuário confirmar.
+      // Consumido em confirmJourneyCreation → POST /v1/journeys.
+      setPendingJourneyPrompt(raw);
+      setPendingJourneyRendered(rendered);
+      setPendingJourneyMentions(mentions);
+      // Mensagens resolvidas entre backend+LLM: usamos rendered no prompt
+      // (legível) mas enviamos mentions como fonte autoritativa.
+      sendMessage(
+        `Analise este pedido de automação WhatsApp e confirme os detalhes:\n\n"${rendered}"\n\nExtraia:\n- Qual instância será usada (se mencionada)\n- Qual grupo será monitorado (se mencionado)\n- Qual a palavra-chave ou mensagem que aciona\n- Qual ação será tomada (enviar mensagem no privado/grupo, adicionar tag, etc)\n\nResponda de forma clara e pergunte se o usuário confirma.`,
+        { renderedText: rendered, mentions }
+      );
     } else {
-      sendMessage(userMessage);
+      sendMessage(raw, { renderedText: rendered, mentions });
     }
   };
 
@@ -636,26 +666,23 @@ Responda de forma clara e pergunte se o usuário confirma.`);
     createJourneyMutation.mutate({
       prompt: pendingJourneyPrompt,
       integrationId: selectedIntegration || undefined,
-      instanceId: selectedInstance || undefined
+      instanceId: selectedInstance || undefined,
+      renderedText: pendingJourneyRendered || undefined,
+      mentions: pendingJourneyMentions.length > 0 ? pendingJourneyMentions : undefined,
     });
   };
 
   const cancelJourneyCreation = () => {
     setIsCreatingJourney(false);
     setPendingJourneyPrompt("");
+    setPendingJourneyRendered("");
+    setPendingJourneyMentions([]);
     setPendingJourneyData(null);
     setMessages((prev) => [...prev, {
       role: "assistant",
       content: "Entendido. Pode me perguntar outras coisas ou criar uma jornada quando quiser.",
       id: crypto.randomUUID()
     }]);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
   };
 
   return (
@@ -810,14 +837,15 @@ Responda de forma clara e pergunte se o usuário confirma.`);
         )}
         
         <div className="flex-shrink-0">
-          <PromptInput
+          <MentionPicker
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
+            onChange={(v) => setPrompt(v)}
             onSend={handleSend}
-            onKeyDown={handleKeyDown}
             disabled={isStreaming}
             isLoading={isStreaming}
-            placeholder={selectedInstance ? "Descreva uma automação para esta instância..." : "Descreva a automação que deseja criar..."}
+            placeholder={selectedInstance
+              ? "Descreva uma automação… use /grupo, /contato, /tag etc. pra referenciar."
+              : "Descreva a automação… use /instancia, /grupo, /contato, /tag, /funil ou /jornada."}
           />
         </div>
       </div>
