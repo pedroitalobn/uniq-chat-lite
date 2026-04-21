@@ -496,6 +496,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	inbox.Post("/chats/:jid/typing", inboxH.Typing)
 	inbox.Put("/contacts/:id", inboxH.UpdateContact)
 	inbox.Patch("/messages/:id", inboxH.UpdateMessage)
+	inbox.Post("/messages/:msgID/resend", inboxH.Resend)
 
 	// Legacy chats endpoint
 	instance.Get("/chats", msgH.GetChats)

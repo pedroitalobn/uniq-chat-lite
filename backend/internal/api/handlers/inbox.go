@@ -574,39 +574,106 @@ func (h *InboxHandler) SendMessage(c *fiber.Ctx) error {
 	}
 	h.db.Create(&log)
 
-	go func() {
-		msgIDStr, err := client.SendTextMessage(jid, req.Content)
-		if err != nil {
-			zlog.Error().Err(err).
-				Str("instance", instance.ID.String()).
-				Str("to_jid", jid).
-				Str("message_id", msgID.String()).
-				Msg("inbox: failed to send message via whatsmeow")
-			h.db.Model(&log).Updates(map[string]interface{}{
-				"status": models.MessageStatusFailed,
-				"content": string(func() []byte {
-					b, _ := json.Marshal(map[string]string{
-						"text":  req.Content,
-						"error": err.Error(),
-					})
-					return b
-				}()),
-			})
-			return
-		}
-		zlog.Info().
-			Str("instance", instance.ID.String()).
-			Str("to_jid", jid).
-			Str("whatsmeow_msg_id", msgIDStr).
-			Msg("inbox: message sent")
-		h.db.Model(&log).Update("status", models.MessageStatusSent)
-	}()
+	go sendInboxMessageWithRetry(h.db, client, &log, instance.ID.String(), jid, req.Content)
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"id":        msgID.String(),
 		"status":    "sending",
 		"timestamp": time.Now().Unix(),
 	})
+}
+
+// sendInboxMessageWithRetry tenta enviar 3× com backoff exponencial (1s, 2s, 4s)
+// antes de marcar a mensagem como failed. O erro da última tentativa fica
+// gravado no content em JSON junto com o texto original pra aparecer na UI.
+func sendInboxMessageWithRetry(db *gorm.DB, client *whatsapp.InstanceClient, msgLog *models.MessageLog, instanceID, jid, text string) {
+	const maxAttempts = 3
+	var lastErr error
+	backoff := time.Second
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		msgIDStr, err := client.SendTextMessage(jid, text)
+		if err == nil {
+			zlog.Info().
+				Str("instance", instanceID).
+				Str("to_jid", jid).
+				Str("whatsmeow_msg_id", msgIDStr).
+				Int("attempt", attempt).
+				Msg("inbox: message sent")
+			db.Model(msgLog).Update("status", models.MessageStatusSent)
+			return
+		}
+		lastErr = err
+		zlog.Warn().Err(err).
+			Str("instance", instanceID).
+			Str("to_jid", jid).
+			Int("attempt", attempt).
+			Msg("inbox: send attempt failed, will retry")
+		if attempt < maxAttempts {
+			time.Sleep(backoff)
+			backoff *= 2
+		}
+	}
+
+	zlog.Error().Err(lastErr).
+		Str("instance", instanceID).
+		Str("to_jid", jid).
+		Msg("inbox: all send attempts failed")
+	b, _ := json.Marshal(map[string]string{"text": text, "error": lastErr.Error()})
+	db.Model(msgLog).Updates(map[string]interface{}{
+		"status":  models.MessageStatusFailed,
+		"content": string(b),
+	})
+}
+
+// Resend reenvia uma mensagem previamente marcada como failed.
+// POST /instances/:id/inbox/messages/:msgID/resend
+func (h *InboxHandler) Resend(c *fiber.Ctx) error {
+	instance, ok := c.Locals("instance").(*models.Instance)
+	if !ok {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	msgIDStr := c.Params("msgID")
+	msgID, err := uuid.Parse(msgIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "msg id inválido"})
+	}
+	var msgLog models.MessageLog
+	if err := h.db.First(&msgLog, "id = ? AND instance_id = ?", msgID, instance.ID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "mensagem não encontrada"})
+	}
+	if msgLog.Direction != models.DirectionOut {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "apenas mensagens enviadas podem ser reenviadas"})
+	}
+	if msgLog.Status != models.MessageStatusFailed {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "essa mensagem não está em estado 'failed'"})
+	}
+
+	// Extrai texto original do content (pode ser string JSON ou {text,error})
+	var text string
+	if err := json.Unmarshal([]byte(msgLog.Content), &text); err != nil {
+		var obj map[string]string
+		if err := json.Unmarshal([]byte(msgLog.Content), &obj); err == nil {
+			text = obj["text"]
+		}
+	}
+	if text == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "não foi possível recuperar o texto original"})
+	}
+
+	client := h.manager.GetInstance(instance.ID.String())
+	if client == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "cliente não conectado"})
+	}
+
+	// Marca como pending e dispara o retry em background
+	h.db.Model(&msgLog).Updates(map[string]interface{}{
+		"status":  models.MessageStatusPending,
+		"content": func() string { b, _ := json.Marshal(text); return string(b) }(),
+	})
+	go sendInboxMessageWithRetry(h.db, client, &msgLog, instance.ID.String(), msgLog.ToJID, text)
+
+	return c.JSON(fiber.Map{"id": msgLog.ID.String(), "status": "resending"})
 }
 
 // SendMedia sends a media message

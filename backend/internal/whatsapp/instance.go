@@ -307,17 +307,32 @@ func (ic *InstanceClient) resolveRecipient(ctx context.Context, jid types.JID) t
 	if jid.Server != types.DefaultUserServer {
 		return jid // groups, LID JIDs etc — no resolution needed
 	}
-	// IsOnWhatsApp resolves the canonical JID (may differ due to number formatting)
+
+	// Canonicaliza via IsOnWhatsApp (pode corrigir formatação de número)
 	phone := "+" + jid.User
 	resp, err := ic.client.IsOnWhatsApp(ctx, []string{phone})
-	if err != nil || len(resp) == 0 || !resp[0].IsIn {
-		return jid // can't resolve, use original
+	canonical := jid
+	if err == nil && len(resp) > 0 && resp[0].IsIn && !resp[0].JID.IsEmpty() {
+		canonical = resp[0].JID
 	}
-	canonical := resp[0].JID
-	if canonical.IsEmpty() {
-		return jid
+
+	// Se nossa própria conta já migrou pra LID, o servidor só aceita
+	// SendMessage pra @lid. Tenta o cache, depois UserInfo pra popular,
+	// e retorna o LID como destino. Se LID ficar vazio, cai de volta no
+	// phone JID (o send vai falhar com mensagem clara do whatsmeow).
+	if ic.client.Store != nil && ic.client.Store.LIDMigrationTimestamp > 0 {
+		if lid, err := ic.client.Store.LIDs.GetLIDForPN(ctx, canonical); err == nil && !lid.IsEmpty() {
+			return lid
+		}
+		if info, err := ic.client.GetUserInfo(ctx, []types.JID{canonical}); err == nil {
+			if lid := info[canonical].LID; !lid.IsEmpty() {
+				return lid
+			}
+		}
+		return canonical
 	}
-	// Pre-fetch user info to populate the LID cache before SendMessage needs it
+
+	// Sem migração — pre-fetch UserInfo pra aquecer caches e usa o phone JID.
 	_, _ = ic.client.GetUserInfo(ctx, []types.JID{canonical})
 	return canonical
 }

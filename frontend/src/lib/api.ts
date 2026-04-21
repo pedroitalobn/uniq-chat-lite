@@ -345,6 +345,8 @@ export const inboxApi = {
     api.post(`/v1/instances/${instanceId}/inbox/chats/${jid}/messages/media`, data),
   markRead: (instanceId: string, jid: string) =>
     api.post(`/v1/instances/${instanceId}/inbox/chats/${jid}/read`),
+  resendMessage: (instanceId: string, msgId: string) =>
+    api.post(`/v1/instances/${instanceId}/inbox/messages/${msgId}/resend`),
   sendTyping: (instanceId: string, jid: string, typing: boolean) =>
     api.post(`/v1/instances/${instanceId}/inbox/chats/${jid}/typing`, { typing }),
   updateContact: (instanceId: string, contactId: string, data: { name?: string; phone?: string; email?: string; notes?: string; funnel?: string; stage?: string; journey?: string; owner?: string; tag_ids?: string[] }) =>

@@ -332,10 +332,11 @@ function ContactItem({
 // ─── Message Bubble ─────────────────────────────────────────────────────────
 
 function MessageBubble({
-  msg, channelColor, contactAvatar, contactName, isGroupChat, onContextMenu,
+  msg, channelColor, contactAvatar, contactName, isGroupChat, onContextMenu, onResend,
 }: {
   msg: ChatMessage; channelColor: string; contactAvatar?: string; contactName: string; isGroupChat?: boolean;
   onContextMenu: (e: React.MouseEvent) => void;
+  onResend?: (msgId: string) => void;
 }) {
   const sent = msg.from_me;
   const senderPhone = msg.sender_jid ? msg.sender_jid.split("@")[0].split(":")[0] : "";
@@ -388,6 +389,17 @@ function MessageBubble({
             msg.status === "read" ? <CheckCheck className="w-3.5 h-3.5 text-blue-400" />
             : msg.status === "delivered" ? <CheckCheck className="w-3.5 h-3.5" style={{ color: "var(--text-3)" }} />
             : msg.status === "sent" ? <Check className="w-3.5 h-3.5" style={{ color: "var(--text-3)" }} />
+            : msg.status === "failed" ? (
+                <button
+                  onClick={() => onResend?.(msg.id)}
+                  title="Reenviar — clique para tentar de novo"
+                  className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded transition-colors"
+                  style={{ background: "rgba(239,68,68,0.12)", color: "#f87171" }}
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Reenviar</span>
+                </button>
+              )
             : null
           )}
         </div>
@@ -631,6 +643,15 @@ export default function InboxPage() {
   const readMut = useMutation({
     mutationFn: () => inboxApi.markRead(activeInstance, chat!),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["chats"] }),
+  });
+
+  const resendMut = useMutation({
+    mutationFn: (msgId: string) => inboxApi.resendMessage(activeInstance, msgId),
+    onSuccess: () => {
+      toast.success("Reenviando…");
+      qc.invalidateQueries({ queryKey: ["msgs", activeInstance, chat] });
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Falha ao reenviar"),
   });
 
   const updateMessageMut = useMutation({
@@ -1195,6 +1216,7 @@ export default function InboxPage() {
                           setSelectedMsgId(m.id);
                         }
                       }}
+                      onResend={(id) => resendMut.mutate(id)}
                     />
                   ))
                 )}
