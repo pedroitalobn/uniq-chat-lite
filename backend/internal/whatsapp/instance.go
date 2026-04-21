@@ -309,17 +309,16 @@ func normalizeJID(input string) string {
 // and pre-populates the LID cache so SendMessage can resolve the LID without errors.
 // This handles cases like Brazilian numbers with/without the 9th digit.
 // resolveRecipient transforma um phone JID no destino que o whatsmeow
-// espera. Evita chamar qualquer usync (IsOnWhatsApp / GetUserInfo) aqui
-// porque o whatsmeow já faz isso dentro de SendMessage quando precisa —
-// duplicar a query estoura o rate-limit do servidor (429). Apenas lemos
-// o cache de LID já populado pelo Store (alimentado quando recebemos
-// mensagens do contato) e retornamos o LID direto quando existe, pra
-// whatsmeow pular sua própria lookup.
+// espera. Usamos um cache local (alimentado por lookups prévios e pelo
+// Store.LIDs que o whatsmeow popula com mensagens recebidas) pra evitar
+// o rate-limit (429) do usync. Somente chamamos IsOnWhatsApp quando não
+// temos nenhuma informação sobre o contato.
 func (ic *InstanceClient) resolveRecipient(ctx context.Context, jid types.JID) types.JID {
 	if jid.Server != types.DefaultUserServer {
 		return jid
 	}
 
+	// 1. Cache local.
 	ic.recipientCacheMu.RLock()
 	cached, ok := ic.recipientCache[jid.String()]
 	ic.recipientCacheMu.RUnlock()
@@ -327,6 +326,8 @@ func (ic *InstanceClient) resolveRecipient(ctx context.Context, jid types.JID) t
 		return cached
 	}
 
+	// 2. LID store persistido pelo whatsmeow (mensagens recebidas
+	//    alimentam esse cache automaticamente).
 	if ic.client.Store != nil && ic.client.Store.LIDs != nil {
 		if lid, err := ic.client.Store.LIDs.GetLIDForPN(ctx, jid); err == nil && !lid.IsEmpty() {
 			ic.cacheRecipient(jid, lid)
@@ -334,11 +335,35 @@ func (ic *InstanceClient) resolveRecipient(ctx context.Context, jid types.JID) t
 		}
 	}
 
-	// Sem LID cacheado — devolvemos o phone JID mesmo. Se a conta tiver
-	// migrado pra LID, whatsmeow tenta resolver uma única vez dentro de
-	// SendMessage. Se der 429, o send falha mas não amplificamos o
-	// rate-limit.
-	return jid
+	needsLID := ic.client.Store != nil && ic.client.Store.LIDMigrationTimestamp > 0
+
+	// 3. Lookup via IsOnWhatsApp — canonicaliza número e o próprio
+	//    whatsmeow já cacheia o LID no Store.LIDs. Se der rate-limit,
+	//    retornamos o phone JID mesmo e whatsmeow que decide.
+	phone := "+" + jid.User
+	resp, err := ic.client.IsOnWhatsApp(ctx, []string{phone})
+	canonical := jid
+	if err == nil && len(resp) > 0 && resp[0].IsIn && !resp[0].JID.IsEmpty() {
+		canonical = resp[0].JID
+	}
+
+	if !needsLID {
+		ic.cacheRecipient(jid, canonical)
+		return canonical
+	}
+
+	// Depois do IsOnWhatsApp, o Store.LIDs pode ter sido populado.
+	if ic.client.Store != nil && ic.client.Store.LIDs != nil {
+		if lid, err := ic.client.Store.LIDs.GetLIDForPN(ctx, canonical); err == nil && !lid.IsEmpty() {
+			ic.cacheRecipient(jid, lid)
+			return lid
+		}
+	}
+
+	// Sem LID disponível — retorna phone JID (send provavelmente vai
+	// falhar com "no LID found", e a gente não faz retry pra não
+	// queimar rate-limit).
+	return canonical
 }
 
 func (ic *InstanceClient) cacheRecipient(phoneJID, resolved types.JID) {

@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
+	"io"
+	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -607,8 +610,9 @@ func sendInboxMessageWithRetry(db *gorm.DB, client *whatsapp.InstanceClient, msg
 		}
 		lastErr = err
 		errStr := err.Error()
-		// Rate-limit (429) ou JID inválido não vão se resolver com retry imediato.
-		if strings.Contains(errStr, "rate-overlimit") || strings.Contains(errStr, "429") || strings.Contains(errStr, "invalid JID") {
+		// Rate-limit (429), JID inválido ou destinatário sem LID na
+		// migração LID do WhatsApp não vão se resolver com retry imediato.
+		if strings.Contains(errStr, "rate-overlimit") || strings.Contains(errStr, "429") || strings.Contains(errStr, "invalid JID") || strings.Contains(errStr, "no LID found") {
 			zlog.Warn().Err(err).
 				Str("instance", instanceID).
 				Str("to_jid", jid).
@@ -688,7 +692,9 @@ func (h *InboxHandler) Resend(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"id": msgLog.ID.String(), "status": "resending"})
 }
 
-// SendMedia sends a media message
+// SendMedia envia uma mídia (imagem/áudio/vídeo/documento) baixando o
+// arquivo a partir de uma URL (normalmente o que /media/upload devolveu).
+// Detecta o tipo pelo mime e chama o SendXxxMessage correto do whatsmeow.
 func (h *InboxHandler) SendMedia(c *fiber.Ctx) error {
 	instance, ok := c.Locals("instance").(*models.Instance)
 	if !ok {
@@ -699,11 +705,16 @@ func (h *InboxHandler) SendMedia(c *fiber.Ctx) error {
 	if jid == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "jid é obrigatório"})
 	}
+	if !strings.HasSuffix(jid, "@g.us") && !strings.HasSuffix(jid, "@newsletter") && jid != "status@broadcast" {
+		jid = extractPhoneFromJID(jid) + "@s.whatsapp.net"
+	}
 
 	var req struct {
 		URL      string `json:"url"`
-		Caption  string `json:"caption"`
 		MimeType string `json:"mime_type"`
+		Filename string `json:"filename"`
+		Caption  string `json:"caption"`
+		PTT      bool   `json:"ptt"` // voice note (audio apenas)
 	}
 	if err := c.BodyParser(&req); err != nil || req.URL == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "url é obrigatório"})
@@ -714,33 +725,117 @@ func (h *InboxHandler) SendMedia(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "cliente não conectado"})
 	}
 
+	// Download dos bytes. Timeout curto — o arquivo já vive no nosso MinIO.
+	httpClient := &http.Client{Timeout: 60 * time.Second}
+	resp, err := httpClient.Get(req.URL)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "falha ao baixar a mídia: " + err.Error()})
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "mídia inacessível (HTTP " + strconv.Itoa(resp.StatusCode) + ")"})
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro lendo mídia"})
+	}
+
+	mime := req.MimeType
+	if mime == "" {
+		mime = resp.Header.Get("Content-Type")
+	}
+	msgType := classifyMediaType(mime)
+	if msgType == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "mime_type não suportado: " + mime})
+	}
+
 	msgID := uuid.New()
-	contentJSON, _ := json.Marshal(map[string]string{"url": req.URL, "caption": req.Caption})
-	log := models.MessageLog{
+	content, _ := json.Marshal(map[string]interface{}{
+		"url":       req.URL,
+		"mime_type": mime,
+		"filename":  req.Filename,
+		"caption":   req.Caption,
+	})
+	msgLog := models.MessageLog{
 		ID:         msgID,
 		InstanceID: instance.ID,
 		Direction:  models.DirectionOut,
-		Type:       "image",
+		Type:       msgType,
 		ToJID:      jid,
-		Content:    string(contentJSON),
+		Content:    string(content),
 		Status:     models.MessageStatusPending,
 	}
-	h.db.Create(&log)
+	h.db.Create(&msgLog)
 
 	go func() {
-		_, err := client.SendTextMessage(jid, req.Caption)
-		status := models.MessageStatusSent
-		if err != nil {
-			status = models.MessageStatusFailed
+		var waMsgID string
+		var sendErr error
+		switch msgType {
+		case "image":
+			waMsgID, sendErr = client.SendImageMessage(jid, data, mime, req.Caption)
+		case "audio":
+			waMsgID, sendErr = client.SendAudioMessage(jid, data, mime, req.PTT)
+		case "video":
+			waMsgID, sendErr = client.SendVideoMessage(jid, data, mime, req.Caption)
+		case "document":
+			fname := req.Filename
+			if fname == "" {
+				fname = "arquivo"
+			}
+			waMsgID, sendErr = client.SendDocumentMessage(jid, data, mime, fname)
 		}
-		h.db.Model(&log).Updates(map[string]interface{}{"status": status})
+		if sendErr != nil {
+			zlog.Error().Err(sendErr).
+				Str("instance", instance.ID.String()).
+				Str("to_jid", jid).
+				Str("type", msgType).
+				Msg("inbox: failed to send media")
+			errContent, _ := json.Marshal(map[string]interface{}{
+				"url":       req.URL,
+				"mime_type": mime,
+				"filename":  req.Filename,
+				"caption":   req.Caption,
+				"error":     sendErr.Error(),
+			})
+			h.db.Model(&msgLog).Updates(map[string]interface{}{
+				"status":  models.MessageStatusFailed,
+				"content": string(errContent),
+			})
+			return
+		}
+		zlog.Info().
+			Str("instance", instance.ID.String()).
+			Str("to_jid", jid).
+			Str("type", msgType).
+			Str("whatsmeow_msg_id", waMsgID).
+			Msg("inbox: media sent")
+		h.db.Model(&msgLog).Update("status", models.MessageStatusSent)
 	}()
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"id":        msgID.String(),
+		"type":      msgType,
 		"status":    "sending",
 		"timestamp": time.Now().Unix(),
 	})
+}
+
+// classifyMediaType devolve o tipo de mensagem do WhatsApp a partir do
+// mime do arquivo. Retorna "" quando não é um tipo de mídia suportado.
+func classifyMediaType(mime string) string {
+	mime = strings.ToLower(strings.TrimSpace(mime))
+	switch {
+	case strings.HasPrefix(mime, "image/"):
+		return "image"
+	case strings.HasPrefix(mime, "audio/"):
+		return "audio"
+	case strings.HasPrefix(mime, "video/"):
+		return "video"
+	case mime == "":
+		return ""
+	default:
+		return "document"
+	}
 }
 
 // MarkRead marks messages as read

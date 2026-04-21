@@ -80,15 +80,66 @@ function MsgTime(ts: number) {
 }
 
 function MsgBody({ msg }: { msg: ChatMessage }) {
-  let t = msg.content;
-  try { if (t?.startsWith('"') && t?.endsWith('"')) t = JSON.parse(t); } catch {}
-  if (msg.type === "reaction") return <span className="text-xl">{t || "👍"}</span>;
+  // O content pode ser:
+  //  - uma string JSON-encoded (texto simples)
+  //  - um objeto JSON com { url, mime_type, filename, caption, error }
+  //    para mensagens de mídia enviadas via /inbox/.../messages/media
+  let parsed: any = null;
+  try { parsed = JSON.parse(msg.content); } catch {}
+  const isObj = parsed && typeof parsed === "object" && !Array.isArray(parsed);
+  const text = typeof parsed === "string" ? parsed : (isObj ? (parsed.caption || parsed.text || "") : msg.content);
+  const url = isObj ? parsed.url as string | undefined : undefined;
+  const errMsg = isObj ? parsed.error as string | undefined : undefined;
+
+  if (msg.type === "reaction") return <span className="text-xl">{text || "👍"}</span>;
+
+  if (msg.type === "image" && url) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <a href={url} target="_blank" rel="noopener noreferrer">
+          <img src={url} alt={parsed.filename || "imagem"} className="max-w-[260px] max-h-[260px] rounded-lg object-cover" />
+        </a>
+        {text && <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{text}</span>}
+        {errMsg && <span className="text-[10px] text-red-400">{errMsg}</span>}
+      </div>
+    );
+  }
+  if (msg.type === "video" && url) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <video src={url} controls className="max-w-[300px] rounded-lg" />
+        {text && <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{text}</span>}
+        {errMsg && <span className="text-[10px] text-red-400">{errMsg}</span>}
+      </div>
+    );
+  }
+  if (msg.type === "audio" && url) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <audio src={url} controls className="max-w-[260px]" />
+        {errMsg && <span className="text-[10px] text-red-400">{errMsg}</span>}
+      </div>
+    );
+  }
+  if (msg.type === "document" && url) {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer"
+        className="flex items-center gap-2 p-2 rounded-lg hover:bg-white/5 transition-colors"
+        style={{ background: "rgba(255,255,255,0.03)" }}>
+        <FileText className="w-5 h-5 flex-shrink-0" />
+        <span className="text-xs truncate">{parsed.filename || "Documento"}</span>
+      </a>
+    );
+  }
+
+  // Fallback para mídias sem URL (recebidas) — ícone + label
   const icons: Record<string, React.ReactNode> = {
     image: <Image className="w-4 h-4" />, audio: <Mic className="w-4 h-4" />,
-    document: <FileText className="w-4 h-4" />, location: <MapPin className="w-4 h-4" />,
+    video: <Image className="w-4 h-4" />, document: <FileText className="w-4 h-4" />,
+    location: <MapPin className="w-4 h-4" />,
   };
-  if (icons[msg.type]) return <span className="flex items-center gap-1.5 opacity-80">{icons[msg.type]}<span>{t}</span></span>;
-  return <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{t}</span>;
+  if (icons[msg.type]) return <span className="flex items-center gap-1.5 opacity-80">{icons[msg.type]}<span>{text}</span></span>;
+  return <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{text}</span>;
 }
 
 // ─── WebSocket Hook for Real-Time Messages (Global) ──────────────────────────
@@ -444,6 +495,7 @@ export default function InboxPage() {
   const [newStageName, setNewStageName] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const inpRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const msgsContainerRef = useRef<HTMLDivElement>(null);
   const instanceDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -652,6 +704,26 @@ export default function InboxPage() {
       qc.invalidateQueries({ queryKey: ["msgs", activeInstance, chat] });
     },
     onError: (e: any) => toast.error(e?.response?.data?.error || "Falha ao reenviar"),
+  });
+
+  // Upload do arquivo pro MinIO e depois envio da mídia com o URL.
+  const uploadAndSend = useMutation({
+    mutationFn: async (file: File) => {
+      if (!activeInstance || !chat) throw new Error("sem chat ativo");
+      const up = await inboxApi.uploadMedia(activeInstance, file);
+      const { url, mime_type } = up.data as { url: string; mime_type: string };
+      await inboxApi.sendMedia(activeInstance, chat, {
+        url,
+        mime_type,
+        filename: file.name,
+      });
+    },
+    onSuccess: () => {
+      toast.success("Enviando mídia…");
+      qc.invalidateQueries({ queryKey: ["msgs", activeInstance, chat] });
+      qc.invalidateQueries({ queryKey: ["chats"] });
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Falha ao enviar mídia"),
   });
 
   const updateMessageMut = useMutation({
@@ -1235,9 +1307,21 @@ export default function InboxPage() {
               {/* Input */}
               <div className="px-4 py-3 border-t shrink-0" style={{ borderColor: "var(--surface-border)", background: "var(--surface-2)" }}>
                 <div className="flex items-center gap-3">
-                  <button className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-white/5 transition-colors flex-shrink-0"
-                    style={{ color: "var(--text-3)" }}>
-                    <Paperclip className="w-4 h-4" />
+                  <input ref={fileInputRef} type="file" className="hidden"
+                    accept="image/*,video/*,audio/*,application/pdf,application/*"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) uploadAndSend.mutate(f);
+                      if (e.target) e.target.value = "";
+                    }} />
+                  <button onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadAndSend.isPending}
+                    className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-white/5 transition-colors flex-shrink-0 disabled:opacity-40"
+                    style={{ color: "var(--text-3)" }}
+                    title="Anexar imagem, áudio ou documento">
+                    {uploadAndSend.isPending
+                      ? <RefreshCw className="w-4 h-4 animate-spin" />
+                      : <Paperclip className="w-4 h-4" />}
                   </button>
                   <div className="flex-1">
                     <input ref={inpRef} value={input} onChange={e => setInput(e.target.value)}

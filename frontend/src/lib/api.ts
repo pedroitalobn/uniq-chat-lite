@@ -341,8 +341,15 @@ export const inboxApi = {
     api.get(`/v1/instances/${instanceId}/inbox/chats/${jid}/messages`, { params }),
   sendMessage: (instanceId: string, jid: string, data: { content: string; type?: string }) =>
     api.post(`/v1/instances/${instanceId}/inbox/chats/${jid}/messages`, data),
-  sendMedia: (instanceId: string, jid: string, data: { url: string; caption?: string; mime_type?: string }) =>
+  sendMedia: (instanceId: string, jid: string, data: { url: string; mime_type: string; filename?: string; caption?: string; ptt?: boolean }) =>
     api.post(`/v1/instances/${instanceId}/inbox/chats/${jid}/messages/media`, data),
+  uploadMedia: (instanceId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return api.post(`/v1/instances/${instanceId}/media/upload`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
   markRead: (instanceId: string, jid: string) =>
     api.post(`/v1/instances/${instanceId}/inbox/chats/${jid}/read`),
   resendMessage: (instanceId: string, msgId: string) =>
