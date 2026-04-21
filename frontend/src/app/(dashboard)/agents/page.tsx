@@ -1127,10 +1127,29 @@ function JourneysSection({ onEditJourney }: { onEditJourney?: (journey: any) => 
             ))}
           </div>
         ) : journeys.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 opacity-40 text-center">
-            <Wand2 className="w-12 h-12 mb-3" style={{ color: "var(--text-3)" }} />
-            <p className="text-sm" style={{ color: "var(--text-3)" }}>Nenhuma jornada criada</p>
-            <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>Vá para Chat IA para criar uma</p>
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <Wand2 className="w-12 h-12 mb-3 opacity-40" style={{ color: "var(--text-3)" }} />
+            <p className="text-sm font-semibold" style={{ color: "var(--text-2)" }}>Nenhuma jornada ainda</p>
+            <p className="text-xs mt-1 mb-4 max-w-sm" style={{ color: "var(--text-3)" }}>
+              Você pode descrever em linguagem natural pelo Chat IA, começar de um template, ou montar direto no canvas.
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await journeysApi.createBlank();
+                    const id = res.data?.id;
+                    if (id) window.location.href = `/agents/builder/${id}`;
+                  } catch (e: any) {
+                    toast.error(e?.response?.data?.error || "Falha ao criar jornada");
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-2"
+                style={{ background: "var(--green)", color: "white" }}
+              >
+                <Plus className="w-3.5 h-3.5" /> Canvas em branco
+              </button>
+            </div>
           </div>
         ) : (
           journeys.map((j: any) => (
