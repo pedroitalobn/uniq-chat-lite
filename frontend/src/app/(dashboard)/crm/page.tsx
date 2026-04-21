@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { crmApi } from "@/lib/api";
+import { crmApi, journeysApi } from "@/lib/api";
 import { Contact, Tag } from "@/types";
 import {
   Plus, Search, Tag as TagIcon, Trash2, Phone, Mail, Edit2,
   X, Check, User, StickyNote, GitBranch, Layers, Route,
   Hash, UserCheck, ChevronDown, Filter, List as ListIcon, KanbanSquare, GripVertical,
+  Pause, Play, ExternalLink,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -79,12 +81,48 @@ function FieldInput({
   );
 }
 
+function FieldSelect({
+  icon: Icon, label, value, onChange, options, onManage, manageLabel, emptyHint, disabled,
+}: {
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+  label: string; value: string; onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  onManage?: () => void; manageLabel?: string; emptyHint?: string; disabled?: boolean;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-xs font-medium" style={{ color: "hsl(240 8% 48%)" }}>{label}</label>
+        {onManage && (
+          <button type="button" onClick={onManage} className="text-[10px] font-medium transition-opacity hover:opacity-80"
+            style={{ color: "var(--green)" }}>
+            + {manageLabel}
+          </button>
+        )}
+      </div>
+      <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
+        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 16%)", opacity: disabled ? 0.5 : 1 }}>
+        <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }} />
+        <select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}
+          className="flex-1 bg-transparent text-sm outline-none cursor-pointer" style={{ color: "hsl(240 15% 90%)" }}>
+          <option value="" style={{ background: "#111" }}>— nenhum —</option>
+          {options.map(o => <option key={o.value} value={o.value} style={{ background: "#111" }}>{o.label}</option>)}
+        </select>
+      </div>
+      {options.length === 0 && emptyHint && (
+        <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 38%)" }}>{emptyHint}</p>
+      )}
+    </div>
+  );
+}
+
 // ─── Contact Modal ─────────────────────────────────────────────────────────────
 
 function ContactModal({
-  contact, tags, onClose, onSaved, workspaceId,
+  contact, tags, onClose, onSaved, workspaceId, onManageFunnels, onManageJourneys,
 }: {
   contact?: Contact; tags: Tag[]; onClose: () => void; onSaved: () => void; workspaceId?: string;
+  onManageFunnels: () => void; onManageJourneys: () => void;
 }) {
   const [name, setName]           = useState(contact?.name ?? "");
   const [phone, setPhone]         = useState(contact?.phone ?? "");
@@ -100,6 +138,21 @@ function ContactModal({
   );
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<"basic" | "pipeline">("basic");
+
+  const { data: funnels = [] } = useQuery<Funnel[]>({
+    queryKey: ["funnels", workspaceId],
+    queryFn: () => crmApi.listFunnels(workspaceId).then(r => r.data),
+  });
+  const selectedFunnel = funnels.find(f => f.name === funnel);
+  const { data: funnelStages = [] } = useQuery<FunnelStage[]>({
+    queryKey: ["funnel-stages", selectedFunnel?.id],
+    queryFn: () => selectedFunnel ? crmApi.listFunnelStages(selectedFunnel.id).then(r => r.data) : Promise.resolve([]),
+    enabled: !!selectedFunnel,
+  });
+  const { data: journeys = [] } = useQuery<Journey[]>({
+    queryKey: ["journeys"],
+    queryFn: () => journeysApi.list().then(r => r.data),
+  });
 
   const toggleTag = (id: string) =>
     setSelectedTags((prev) => prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]);
@@ -222,9 +275,37 @@ function ContactModal({
                 </p>
               </div>
 
-              <FieldInput icon={GitBranch} label="Funil (funnel)"     value={funnel}   onChange={setFunnel}   placeholder="ex: Vendas B2B" />
-              <FieldInput icon={Layers}    label="Etapa (stage)"      value={stage}    onChange={setStage}    placeholder="ex: Qualificação" />
-              <FieldInput icon={Route}     label="Jornada (journey)"  value={journey}  onChange={setJourney}  placeholder="ex: Consideração" />
+              <FieldSelect
+                icon={GitBranch}
+                label="Funil"
+                value={funnel}
+                onChange={(v) => { setFunnel(v); setStage(""); }}
+                options={funnels.map(f => ({ value: f.name, label: f.name }))}
+                onManage={onManageFunnels}
+                manageLabel="Gerenciar funis"
+                emptyHint="Nenhum funil criado — crie antes de atribuir."
+              />
+              <FieldSelect
+                icon={Layers}
+                label="Etapa"
+                value={stage}
+                onChange={setStage}
+                options={funnelStages.map(s => ({ value: s.name, label: s.name }))}
+                onManage={onManageFunnels}
+                manageLabel="Gerenciar etapas do funil"
+                emptyHint={selectedFunnel ? "Este funil ainda não tem etapas." : "Escolha um funil primeiro."}
+                disabled={!selectedFunnel}
+              />
+              <FieldSelect
+                icon={Route}
+                label="Jornada"
+                value={journey}
+                onChange={setJourney}
+                options={journeys.filter(j => j.status === "active").map(j => ({ value: j.name, label: j.name }))}
+                onManage={onManageJourneys}
+                manageLabel="Gerenciar jornadas"
+                emptyHint="Nenhuma jornada ativa."
+              />
               <FieldInput icon={Hash}      label="ID Externo"         value={externalId} onChange={setExtId} placeholder="ex: CRM-001 ou Hubspot ID" />
               <FieldInput icon={UserCheck} label="Responsável (owner)" value={owner}   onChange={setOwner}   placeholder="ex: Maria Santos" />
             </div>
@@ -315,6 +396,271 @@ function TagManager({ onClose, workspaceId }: { onClose: () => void; workspaceId
             </div>
           ))}
           {tags.length === 0 && <p className="text-center text-xs py-4" style={{ color: "hsl(240 8% 38%)" }}>Nenhuma tag ainda</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Funnel Manager ───────────────────────────────────────────────────────────
+
+type FunnelStage = { id: string; funnel_id: string; name: string; color?: string; order?: number };
+type Funnel = { id: string; name: string; description?: string; color?: string; stages?: FunnelStage[] };
+
+function FunnelManager({ onClose, workspaceId }: { onClose: () => void; workspaceId?: string }) {
+  const qc = useQueryClient();
+  const { data: funnels = [] } = useQuery<Funnel[]>({
+    queryKey: ["funnels", workspaceId],
+    queryFn: () => crmApi.listFunnels(workspaceId).then(r => r.data),
+  });
+  const [name, setName] = useState("");
+  const [color, setColor] = useState(PRESET_COLORS[0]);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const createFunnel = useMutation({
+    mutationFn: () => crmApi.createFunnel({ name: name.trim(), color, workspace_id: workspaceId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["funnels"] });
+      qc.invalidateQueries({ queryKey: ["funnel-options"] });
+      setName("");
+      toast.success("Funil criado");
+    },
+    onError: () => toast.error("Erro ao criar funil"),
+  });
+
+  const deleteFunnel = useMutation({
+    mutationFn: (id: string) => crmApi.deleteFunnel(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["funnels"] });
+      qc.invalidateQueries({ queryKey: ["funnel-options"] });
+      toast.success("Funil removido");
+    },
+    onError: () => toast.error("Erro ao remover funil"),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose} />
+      <div className="relative w-full max-w-md rounded-2xl p-6 shadow-2xl animate-fade-in-up"
+        style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Gerenciar Funis</h2>
+          <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }} className="hover:opacity-70 transition-opacity"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="space-y-3 mb-4">
+          <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 16%)" }}>
+            <GitBranch className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }} />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome do funil (ex: Vendas B2B)"
+              className="flex-1 bg-transparent text-sm outline-none" style={{ color: "hsl(240 15% 90%)" }}
+              onKeyDown={(e) => e.key === "Enter" && name.trim() && createFunnel.mutate()} />
+          </div>
+          <div className="flex gap-1.5 flex-wrap">
+            {PRESET_COLORS.map((c) => (
+              <button key={c} onClick={() => setColor(c)} className="w-6 h-6 rounded-full transition-all"
+                style={{ background: c, boxShadow: color === c ? `0 0 0 2px hsl(240 18% 6%), 0 0 0 4px ${c}` : "none" }} />
+            ))}
+          </div>
+          <button onClick={() => name.trim() && createFunnel.mutate()} disabled={!name.trim() || createFunnel.isPending}
+            className="w-full text-sm font-semibold py-2 rounded-xl transition-all disabled:opacity-40"
+            style={{ background: "var(--green)", color: "#03170a" }}>
+            Criar Funil
+          </button>
+        </div>
+        <div className="space-y-1.5 max-h-80 overflow-y-auto">
+          {funnels.map((f) => (
+            <FunnelRow
+              key={f.id}
+              funnel={f}
+              expanded={expanded === f.id}
+              onToggle={() => setExpanded(expanded === f.id ? null : f.id)}
+              onDelete={() => deleteFunnel.mutate(f.id)}
+            />
+          ))}
+          {funnels.length === 0 && <p className="text-center text-xs py-4" style={{ color: "hsl(240 8% 38%)" }}>Nenhum funil ainda</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FunnelRow({ funnel, expanded, onToggle, onDelete }: {
+  funnel: Funnel; expanded: boolean; onToggle: () => void; onDelete: () => void;
+}) {
+  const qc = useQueryClient();
+  const { data: stages = [] } = useQuery<FunnelStage[]>({
+    queryKey: ["funnel-stages", funnel.id],
+    queryFn: () => crmApi.listFunnelStages(funnel.id).then(r => r.data),
+    enabled: expanded,
+  });
+  const [stageName, setStageName] = useState("");
+  const [stageColor, setStageColor] = useState(PRESET_COLORS[1]);
+
+  const createStage = useMutation({
+    mutationFn: () => crmApi.createFunnelStage(funnel.id, { name: stageName.trim(), color: stageColor }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["funnel-stages", funnel.id] });
+      qc.invalidateQueries({ queryKey: ["stage-options"] });
+      setStageName("");
+      toast.success("Etapa criada");
+    },
+    onError: () => toast.error("Erro ao criar etapa"),
+  });
+
+  const deleteStage = useMutation({
+    mutationFn: (stageId: string) => crmApi.deleteFunnelStage(funnel.id, stageId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["funnel-stages", funnel.id] });
+      qc.invalidateQueries({ queryKey: ["stage-options"] });
+    },
+    onError: () => toast.error("Erro ao remover etapa"),
+  });
+
+  return (
+    <div className="rounded-xl" style={{ background: "rgba(255,255,255,0.02)" }}>
+      <div className="flex items-center justify-between p-2 gap-2">
+        <button onClick={onToggle} className="flex items-center gap-2 flex-1 min-w-0 text-left">
+          <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 transition-transform" style={{
+            color: "hsl(240 8% 46%)",
+            transform: expanded ? "rotate(0deg)" : "rotate(-90deg)",
+          }} />
+          <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ background: funnel.color || "#a78bfa" }} />
+          <span className="text-sm truncate" style={{ color: "hsl(240 15% 90%)" }}>{funnel.name}</span>
+        </button>
+        <button onClick={onDelete} className="p-1 rounded-lg transition-colors hover:text-red-400" style={{ color: "hsl(240 8% 38%)" }}>
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      {expanded && (
+        <div className="px-2 pb-2 space-y-1.5">
+          {stages.map((s) => (
+            <div key={s.id} className="flex items-center justify-between pl-6 pr-2 py-1 rounded-lg" style={{ background: "rgba(255,255,255,0.02)" }}>
+              <span className="inline-flex items-center gap-2 text-xs" style={{ color: "hsl(240 15% 88%)" }}>
+                <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: s.color || "#60a5fa" }} />
+                {s.name}
+              </span>
+              <button onClick={() => deleteStage.mutate(s.id)} className="p-0.5 rounded transition-colors hover:text-red-400" style={{ color: "hsl(240 8% 38%)" }}>
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+          <div className="flex items-center gap-1.5 pl-6">
+            <div className="flex items-center gap-2 rounded-lg px-2 py-1.5 flex-1 min-w-0"
+              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 14%)" }}>
+              <Layers className="w-3 h-3 flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }} />
+              <input value={stageName} onChange={(e) => setStageName(e.target.value)} placeholder="Nova etapa"
+                className="flex-1 bg-transparent text-xs outline-none min-w-0" style={{ color: "hsl(240 15% 90%)" }}
+                onKeyDown={(e) => e.key === "Enter" && stageName.trim() && createStage.mutate()} />
+            </div>
+            <select value={stageColor} onChange={(e) => setStageColor(e.target.value)}
+              className="rounded-lg px-2 py-1.5 text-xs outline-none"
+              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 14%)", color: stageColor }}>
+              {PRESET_COLORS.map((c) => <option key={c} value={c} style={{ background: "#111" }}>{c}</option>)}
+            </select>
+            <button onClick={() => stageName.trim() && createStage.mutate()} disabled={!stageName.trim() || createStage.isPending}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
+              style={{ background: "var(--green)", color: "#03170a" }}>
+              <Plus className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Journey Manager ──────────────────────────────────────────────────────────
+
+type Journey = { id: string; name: string; description?: string; prompt?: string; status: string };
+
+function JourneyManager({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const { data: journeys = [] } = useQuery<Journey[]>({
+    queryKey: ["journeys"],
+    queryFn: () => journeysApi.list().then(r => r.data),
+  });
+  const [prompt, setPrompt] = useState("");
+
+  const createJourney = useMutation({
+    mutationFn: () => journeysApi.create(prompt.trim()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["journeys"] });
+      qc.invalidateQueries({ queryKey: ["journey-options"] });
+      setPrompt("");
+      toast.success("Jornada criada — refine o fluxo em /journeys");
+    },
+    onError: () => toast.error("Erro ao criar jornada"),
+  });
+
+  const deleteJourney = useMutation({
+    mutationFn: (id: string) => journeysApi.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["journeys"] });
+      qc.invalidateQueries({ queryKey: ["journey-options"] });
+    },
+    onError: () => toast.error("Erro ao remover jornada"),
+  });
+
+  const toggleStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: "active" | "paused" }) => journeysApi.updateStatus(id, status),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["journeys"] }),
+    onError: () => toast.error("Erro ao alterar status"),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose} />
+      <div className="relative w-full max-w-md rounded-2xl p-6 shadow-2xl animate-fade-in-up"
+        style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Gerenciar Jornadas</h2>
+          <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }} className="hover:opacity-70 transition-opacity"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="space-y-3 mb-4">
+          <div className="rounded-xl p-3" style={{ background: "rgba(0,212,106,0.04)", border: "1px solid rgba(0,212,106,0.1)" }}>
+            <p className="text-[11px]" style={{ color: "hsl(240 8% 52%)" }}>
+              Descreva o objetivo da jornada em linguagem natural — a IA gera o fluxo inicial. Você pode refinar depois em <Link href="/journeys" className="underline" style={{ color: "var(--green)" }}>/journeys</Link>.
+            </p>
+          </div>
+          <div className="rounded-xl px-3 py-2.5"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 16%)" }}>
+            <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Ex: Qualificar leads B2B, agendar reunião com SDR quando interesse for confirmado..."
+              rows={3}
+              className="w-full bg-transparent text-sm outline-none resize-none" style={{ color: "hsl(240 15% 90%)" }} />
+          </div>
+          <button onClick={() => prompt.trim() && createJourney.mutate()} disabled={!prompt.trim() || createJourney.isPending}
+            className="w-full text-sm font-semibold py-2 rounded-xl transition-all disabled:opacity-40"
+            style={{ background: "var(--green)", color: "#03170a" }}>
+            {createJourney.isPending ? "Criando..." : "Criar Jornada"}
+          </button>
+        </div>
+        <div className="space-y-1.5 max-h-80 overflow-y-auto">
+          {journeys.map((j) => (
+            <div key={j.id} className="flex items-center justify-between gap-2 p-2 rounded-xl" style={{ background: "rgba(255,255,255,0.02)" }}>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <Route className="w-3.5 h-3.5 flex-shrink-0" style={{ color: j.status === "active" ? "var(--green)" : "hsl(240 8% 46%)" }} />
+                  <span className="text-sm truncate" style={{ color: "hsl(240 15% 90%)" }}>{j.name}</span>
+                </div>
+                <span className="text-[10px] ml-5" style={{ color: j.status === "active" ? "var(--green)" : "hsl(240 8% 46%)" }}>
+                  {j.status === "active" ? "ativa" : "pausada"}
+                </span>
+              </div>
+              <button onClick={() => toggleStatus.mutate({ id: j.id, status: j.status === "active" ? "paused" : "active" })}
+                className="p-1 rounded-lg transition-colors" style={{ color: "hsl(240 8% 46%)" }}
+                title={j.status === "active" ? "Pausar" : "Ativar"}>
+                {j.status === "active" ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+              </button>
+              <Link href={`/journeys/${j.id}`} className="p-1 rounded-lg transition-colors hover:opacity-80" style={{ color: "hsl(240 8% 46%)" }} title="Editar fluxo">
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+              <button onClick={() => deleteJourney.mutate(j.id)} className="p-1 rounded-lg transition-colors hover:text-red-400" style={{ color: "hsl(240 8% 38%)" }}>
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+          {journeys.length === 0 && <p className="text-center text-xs py-4" style={{ color: "hsl(240 8% 38%)" }}>Nenhuma jornada ainda</p>}
         </div>
       </div>
     </div>
@@ -428,6 +774,8 @@ export default function CRMPage() {
   const [createOpen, setCreateOpen]       = useState(false);
   const [editContact, setEditContact]     = useState<Contact | null>(null);
   const [tagsOpen, setTagsOpen]           = useState(false);
+  const [funnelsOpen, setFunnelsOpen]     = useState(false);
+  const [journeysOpen, setJourneysOpen]   = useState(false);
   const [filterOpen, setFilterOpen]       = useState(false);
   const [viewMode, setViewMode]           = useState<"list" | "kanban">("list");
   const [kanbanGroup, setKanbanGroup]     = useState<"stage" | "journey" | "funnel">("stage");
@@ -529,6 +877,24 @@ export default function CRMPage() {
             onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
           >
             <TagIcon className="w-4 h-4" /> <span className="hidden sm:inline">Tags</span>
+          </button>
+          <button
+            onClick={() => setFunnelsOpen(true)}
+            className="flex items-center gap-2 text-sm font-medium px-3.5 py-2.5 rounded-xl transition-all"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 8% 62%)" }}
+            onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 15% 93%)")}
+            onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
+          >
+            <GitBranch className="w-4 h-4" /> <span className="hidden sm:inline">Funis</span>
+          </button>
+          <button
+            onClick={() => setJourneysOpen(true)}
+            className="flex items-center gap-2 text-sm font-medium px-3.5 py-2.5 rounded-xl transition-all"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 8% 62%)" }}
+            onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 15% 93%)")}
+            onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
+          >
+            <Route className="w-4 h-4" /> <span className="hidden sm:inline">Jornadas</span>
           </button>
           <button
             onClick={() => setFilterOpen(true)}
@@ -861,9 +1227,13 @@ export default function CRMPage() {
           workspaceId={currentWorkspace?.id}
           onClose={() => { setCreateOpen(false); setEditContact(null); }}
           onSaved={() => { queryClient.invalidateQueries({ queryKey: ["contacts"] }); queryClient.invalidateQueries({ queryKey: ["contacts-all"] }); }}
+          onManageFunnels={() => setFunnelsOpen(true)}
+          onManageJourneys={() => setJourneysOpen(true)}
         />
       )}
-      {tagsOpen  && <TagManager onClose={() => setTagsOpen(false)} workspaceId={currentWorkspace?.id} />}
+      {tagsOpen     && <TagManager     onClose={() => setTagsOpen(false)}     workspaceId={currentWorkspace?.id} />}
+      {funnelsOpen  && <FunnelManager  onClose={() => setFunnelsOpen(false)}  workspaceId={currentWorkspace?.id} />}
+      {journeysOpen && <JourneyManager onClose={() => setJourneysOpen(false)} />}
       {filterOpen && (
         <FilterPanel
           contacts={allContacts}
