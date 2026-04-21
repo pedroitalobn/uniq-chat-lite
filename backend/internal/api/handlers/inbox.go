@@ -586,6 +586,8 @@ func (h *InboxHandler) SendMessage(c *fiber.Ctx) error {
 // sendInboxMessageWithRetry tenta enviar 3× com backoff exponencial (1s, 2s, 4s)
 // antes de marcar a mensagem como failed. O erro da última tentativa fica
 // gravado no content em JSON junto com o texto original pra aparecer na UI.
+// Erros não-transientes (rate-limit 429, JID inválido) abortam imediatamente
+// pra não agravar o rate-limit.
 func sendInboxMessageWithRetry(db *gorm.DB, client *whatsapp.InstanceClient, msgLog *models.MessageLog, instanceID, jid, text string) {
 	const maxAttempts = 3
 	var lastErr error
@@ -604,6 +606,16 @@ func sendInboxMessageWithRetry(db *gorm.DB, client *whatsapp.InstanceClient, msg
 			return
 		}
 		lastErr = err
+		errStr := err.Error()
+		// Rate-limit (429) ou JID inválido não vão se resolver com retry imediato.
+		if strings.Contains(errStr, "rate-overlimit") || strings.Contains(errStr, "429") || strings.Contains(errStr, "invalid JID") {
+			zlog.Warn().Err(err).
+				Str("instance", instanceID).
+				Str("to_jid", jid).
+				Int("attempt", attempt).
+				Msg("inbox: non-retriable error, aborting")
+			break
+		}
 		zlog.Warn().Err(err).
 			Str("instance", instanceID).
 			Str("to_jid", jid).

@@ -47,6 +47,11 @@ type InstanceClient struct {
 	wsConns  []wsConn
 	webhooks []webhookEntry
 	settings InstanceSettings
+
+	// Cache de resolução de destinatário (phone JID → LID ou canonical
+	// @s.whatsapp.net) pra evitar rate-limit 429 do usync do WhatsApp.
+	recipientCacheMu sync.RWMutex
+	recipientCache   map[string]types.JID
 }
 
 type ContactLookup struct {
@@ -303,38 +308,46 @@ func normalizeJID(input string) string {
 // resolveRecipient resolves a phone-number JID to the canonical JID used by WhatsApp,
 // and pre-populates the LID cache so SendMessage can resolve the LID without errors.
 // This handles cases like Brazilian numbers with/without the 9th digit.
+// resolveRecipient transforma um phone JID no destino que o whatsmeow
+// espera. Evita chamar qualquer usync (IsOnWhatsApp / GetUserInfo) aqui
+// porque o whatsmeow já faz isso dentro de SendMessage quando precisa —
+// duplicar a query estoura o rate-limit do servidor (429). Apenas lemos
+// o cache de LID já populado pelo Store (alimentado quando recebemos
+// mensagens do contato) e retornamos o LID direto quando existe, pra
+// whatsmeow pular sua própria lookup.
 func (ic *InstanceClient) resolveRecipient(ctx context.Context, jid types.JID) types.JID {
 	if jid.Server != types.DefaultUserServer {
-		return jid // groups, LID JIDs etc — no resolution needed
+		return jid
 	}
 
-	// Canonicaliza via IsOnWhatsApp (pode corrigir formatação de número)
-	phone := "+" + jid.User
-	resp, err := ic.client.IsOnWhatsApp(ctx, []string{phone})
-	canonical := jid
-	if err == nil && len(resp) > 0 && resp[0].IsIn && !resp[0].JID.IsEmpty() {
-		canonical = resp[0].JID
+	ic.recipientCacheMu.RLock()
+	cached, ok := ic.recipientCache[jid.String()]
+	ic.recipientCacheMu.RUnlock()
+	if ok && !cached.IsEmpty() {
+		return cached
 	}
 
-	// Se nossa própria conta já migrou pra LID, o servidor só aceita
-	// SendMessage pra @lid. Tenta o cache, depois UserInfo pra popular,
-	// e retorna o LID como destino. Se LID ficar vazio, cai de volta no
-	// phone JID (o send vai falhar com mensagem clara do whatsmeow).
-	if ic.client.Store != nil && ic.client.Store.LIDMigrationTimestamp > 0 {
-		if lid, err := ic.client.Store.LIDs.GetLIDForPN(ctx, canonical); err == nil && !lid.IsEmpty() {
+	if ic.client.Store != nil && ic.client.Store.LIDs != nil {
+		if lid, err := ic.client.Store.LIDs.GetLIDForPN(ctx, jid); err == nil && !lid.IsEmpty() {
+			ic.cacheRecipient(jid, lid)
 			return lid
 		}
-		if info, err := ic.client.GetUserInfo(ctx, []types.JID{canonical}); err == nil {
-			if lid := info[canonical].LID; !lid.IsEmpty() {
-				return lid
-			}
-		}
-		return canonical
 	}
 
-	// Sem migração — pre-fetch UserInfo pra aquecer caches e usa o phone JID.
-	_, _ = ic.client.GetUserInfo(ctx, []types.JID{canonical})
-	return canonical
+	// Sem LID cacheado — devolvemos o phone JID mesmo. Se a conta tiver
+	// migrado pra LID, whatsmeow tenta resolver uma única vez dentro de
+	// SendMessage. Se der 429, o send falha mas não amplificamos o
+	// rate-limit.
+	return jid
+}
+
+func (ic *InstanceClient) cacheRecipient(phoneJID, resolved types.JID) {
+	ic.recipientCacheMu.Lock()
+	defer ic.recipientCacheMu.Unlock()
+	if ic.recipientCache == nil {
+		ic.recipientCache = make(map[string]types.JID)
+	}
+	ic.recipientCache[phoneJID.String()] = resolved
 }
 
 // sendMessage resolves the canonical JID/LID then calls SendMessage.
@@ -1743,8 +1756,16 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 				msgText = "📍 Localização"
 			case "contact":
 				msgText = "👤 Contato"
+			case "poll":
+				msgText = "📊 Enquete"
+			case "reaction":
+				msgText = "👍 Reação"
+			case "protocol":
+				msgText = "Mensagem removida"
 			default:
-				msgText = msgType
+				// Evita mostrar literalmente "text" quando o conteúdo chega vazio
+				// (acontece com reações, edits silenciosos, tipos desconhecidos).
+				msgText = "—"
 			}
 		}
 		chatJID := v.Info.Chat.String()
