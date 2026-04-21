@@ -55,22 +55,15 @@ new_roles AS (
     FROM new_ws
     RETURNING id, workspace_id
 )
-INSERT INTO role_permissions (id, role_id, permission_id, created_at, updated_at)
-SELECT gen_random_uuid(), nr.id, p.id, now(), now()
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT nr.id, p.id
 FROM new_roles nr
 CROSS JOIN permissions p
 ON CONFLICT DO NOTHING;
 
 -- 3. Adiciona o owner como membro do workspace com o role Admin
-INSERT INTO user_workspaces (id, user_id, workspace_id, role_id, is_owner, created_at, updated_at)
-SELECT
-    gen_random_uuid(),
-    w.owner_id,
-    w.id,
-    r.id,
-    true,
-    now(),
-    now()
+INSERT INTO user_workspaces (id, user_id, workspace_id, role_id, is_owner, joined_at)
+SELECT gen_random_uuid(), w.owner_id, w.id, r.id, true, now()
 FROM workspaces w
 JOIN roles r ON r.workspace_id = w.id AND r.name = 'Admin'
 WHERE NOT EXISTS (
@@ -84,7 +77,7 @@ SET workspace_id = (
     SELECT uw.workspace_id
     FROM user_workspaces uw
     WHERE uw.user_id = s.user_id AND uw.is_owner = true
-    ORDER BY uw.created_at ASC
+    ORDER BY uw.joined_at ASC
     LIMIT 1
 )
 WHERE s.workspace_id IS NULL;
@@ -95,7 +88,7 @@ SET workspace_id = (
     SELECT uw.workspace_id
     FROM user_workspaces uw
     WHERE uw.user_id = i.user_id AND uw.is_owner = true
-    ORDER BY uw.created_at ASC
+    ORDER BY uw.joined_at ASC
     LIMIT 1
 )
 WHERE i.workspace_id IS NULL;

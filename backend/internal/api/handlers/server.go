@@ -29,12 +29,12 @@ func NewServerHandler(db *gorm.DB, hub *whatsapp.Hub) *ServerHandler {
 func resolveDefaultWorkspaceID(db *gorm.DB, userID uuid.UUID) uuid.UUID {
 	var uw models.UserWorkspace
 	if err := db.Where("user_id = ? AND is_owner = ?", userID, true).
-		Order("created_at ASC").First(&uw).Error; err == nil {
+		Order("joined_at ASC").First(&uw).Error; err == nil {
 		return uw.WorkspaceID
 	}
 	// Fallback: qualquer workspace em que o usuário está
 	if err := db.Where("user_id = ?", userID).
-		Order("created_at ASC").First(&uw).Error; err == nil {
+		Order("joined_at ASC").First(&uw).Error; err == nil {
 		return uw.WorkspaceID
 	}
 	return uuid.Nil
