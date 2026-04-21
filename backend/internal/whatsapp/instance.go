@@ -305,6 +305,25 @@ func normalizeJID(input string) string {
 	return cleaned + "@s.whatsapp.net"
 }
 
+// ResolvePNForLID looks up the phone-form JID string for a raw LID JID string
+// using the persisted LID↔PN map. Returns the input unchanged if the lookup
+// fails or the input isn't an @lid JID. Safe for handlers to call without
+// worrying about client-is-nil.
+func (ic *InstanceClient) ResolvePNForLID(raw string) string {
+	if ic == nil || ic.client == nil || ic.client.Store == nil || ic.client.Store.LIDs == nil {
+		return raw
+	}
+	jid, err := types.ParseJID(raw)
+	if err != nil || jid.Server != types.HiddenUserServer {
+		return raw
+	}
+	pn, err := ic.client.Store.LIDs.GetPNForLID(context.Background(), jid)
+	if err != nil || pn.IsEmpty() {
+		return raw
+	}
+	return pn.String()
+}
+
 // resolveChatPNJID returns the chat JID in phone-number form (@s.whatsapp.net)
 // whenever possible. Contacts that migrated to LID addressing arrive with
 // Chat.Server == "lid"; if we save that unchanged, the inbox ends up with a
@@ -1589,6 +1608,13 @@ func (ic *InstanceClient) getSettings() InstanceSettings {
 	ic.mu.Lock()
 	defer ic.mu.Unlock()
 	return ic.settings
+}
+
+// BroadcastWS is the public entry point so other packages (inbox handler) can
+// push real-time events to connected clients without importing unexported
+// machinery. Delegates to the unexported implementation.
+func (ic *InstanceClient) BroadcastWS(msgType string, data interface{}) {
+	ic.broadcastWS(msgType, data)
 }
 
 func (ic *InstanceClient) broadcastWS(msgType string, data interface{}) {

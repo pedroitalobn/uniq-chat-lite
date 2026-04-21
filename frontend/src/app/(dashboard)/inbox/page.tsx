@@ -8,7 +8,7 @@ import {
   Search, Send, Check, CheckCheck, Image, Mic, FileText, MapPin,
   Users, Phone, Video, MessageSquare, User, Archive, Trash2, Star,
   MoreHorizontal, ChevronRight, ChevronDown, Filter, EyeOff, Pin, Tag, BellOff,
-  Smile, Paperclip, ArrowDown, RefreshCw, Copy
+  Smile, Paperclip, ArrowDown, RefreshCw, Copy, Clock
 } from "lucide-react";
 import { instancesApi, inboxApi, crmApi, workspacesApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -440,6 +440,9 @@ function MessageBubble({
             msg.status === "read" ? <CheckCheck className="w-3.5 h-3.5 text-blue-400" />
             : msg.status === "delivered" ? <CheckCheck className="w-3.5 h-3.5" style={{ color: "var(--text-3)" }} />
             : msg.status === "sent" ? <Check className="w-3.5 h-3.5" style={{ color: "var(--text-3)" }} />
+            : msg.status === "pending" ? (
+                <Clock className="w-3 h-3 animate-pulse" style={{ color: "var(--text-3)" }} aria-label="enviando" />
+              )
             : msg.status === "failed" ? (
                 <button
                   onClick={() => onResend?.(msg.id)}

@@ -542,9 +542,6 @@ func (h *InboxHandler) SendMessage(c *fiber.Ctx) error {
 	if jid == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "jid é obrigatório"})
 	}
-	if !strings.HasSuffix(jid, "@g.us") && !strings.HasSuffix(jid, "@newsletter") && jid != "status@broadcast" {
-		jid = extractPhoneFromJID(jid) + "@s.whatsapp.net"
-	}
 
 	var req struct {
 		Content string `json:"content"`
@@ -561,6 +558,26 @@ func (h *InboxHandler) SendMessage(c *fiber.Ctx) error {
 	client := h.manager.GetInstance(instance.ID.String())
 	if client == nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "cliente não conectado"})
+	}
+
+	// If the UI passed an @lid JID (cached before the LID→PN resolution fix),
+	// try to resolve to the real phone JID. Only fall back to phone-form
+	// fabrication for JIDs that already have the @s.whatsapp.net suffix.
+	// Never mint "<lid-hash>@s.whatsapp.net" — that's what caused send to go
+	// to a nonexistent number.
+	if strings.HasSuffix(jid, "@lid") {
+		resolved := client.ResolvePNForLID(jid)
+		if strings.HasSuffix(resolved, "@s.whatsapp.net") {
+			jid = resolved
+		} else {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "contato em formato LID sem telefone conhecido — abra a conversa novamente após receber uma nova mensagem",
+			})
+		}
+	} else if !strings.HasSuffix(jid, "@g.us") && !strings.HasSuffix(jid, "@newsletter") && jid != "status@broadcast" {
+		if !strings.Contains(jid, "@") {
+			jid = jid + "@s.whatsapp.net"
+		}
 	}
 
 	msgID := uuid.New()
@@ -596,6 +613,13 @@ func sendInboxMessageWithRetry(db *gorm.DB, client *whatsapp.InstanceClient, msg
 	var lastErr error
 	backoff := time.Second
 
+	zlog.Info().
+		Str("instance", instanceID).
+		Str("to_jid", jid).
+		Str("msg_id", msgLog.ID.String()).
+		Int("text_len", len(text)).
+		Msg("inbox: send start")
+
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		msgIDStr, err := client.SendTextMessage(jid, text)
 		if err == nil {
@@ -603,49 +627,71 @@ func sendInboxMessageWithRetry(db *gorm.DB, client *whatsapp.InstanceClient, msg
 				Str("instance", instanceID).
 				Str("to_jid", jid).
 				Str("whatsmeow_msg_id", msgIDStr).
+				Str("msg_id", msgLog.ID.String()).
 				Int("attempt", attempt).
 				Msg("inbox: message sent")
 			db.Model(msgLog).Update("status", models.MessageStatusSent)
+			client.BroadcastWS("message.status", map[string]interface{}{
+				"id":     msgLog.ID.String(),
+				"chat":   jid,
+				"status": string(models.MessageStatusSent),
+			})
 			return
 		}
 		lastErr = err
 		errStr := err.Error()
-		// Rate-limit (429) e JID inválido não têm chance de sucesso
-		// sem intervenção — aborta o loop.
-		if strings.Contains(errStr, "rate-overlimit") || strings.Contains(errStr, "429") || strings.Contains(errStr, "invalid JID") {
+		zlog.Warn().Err(err).
+			Str("instance", instanceID).
+			Str("to_jid", jid).
+			Str("msg_id", msgLog.ID.String()).
+			Int("attempt", attempt).
+			Str("err_body", errStr).
+			Msg("inbox: send attempt failed")
+
+		// Rate-limit (429) precisa de pausa longa antes de retry; o
+		// IsOnWhatsApp já foi removido do resolveRecipient, então só
+		// o GetUserInfo interno do whatsmeow conta como usync. Tentamos
+		// uma vez após 30s — se o 429 persistir, aborta.
+		if strings.Contains(errStr, "rate-overlimit") || strings.Contains(errStr, "429") {
+			if attempt >= 2 {
+				zlog.Warn().Err(err).
+					Str("instance", instanceID).
+					Str("to_jid", jid).
+					Msg("inbox: rate-limit persists after backoff, aborting")
+				break
+			}
+			zlog.Warn().
+				Str("instance", instanceID).
+				Str("to_jid", jid).
+				Msg("inbox: rate-overlimit, waiting 30s before retry")
+			time.Sleep(30 * time.Second)
+			continue
+		}
+		if strings.Contains(errStr, "invalid JID") {
 			zlog.Warn().Err(err).
 				Str("instance", instanceID).
 				Str("to_jid", jid).
-				Int("attempt", attempt).
-				Msg("inbox: non-retriable error, aborting")
+				Msg("inbox: invalid JID, aborting")
 			break
 		}
-		// "no LID found" costuma ser transitório: a primeira chamada
-		// a IsOnWhatsApp popula o cache do whatsmeow, o próximo send
-		// consegue o LID. Dá uma respirada maior (10s) e tenta mais
-		// UMA vez — evita amplificar rate-limit mas aproveita a janela.
+		// "no LID found" costuma ser transitório: ao falhar, whatsmeow
+		// pode ter populado Store.LIDs via GetUserInfo. Dá 10s pra o
+		// estado propagar e tenta mais UMA vez.
 		if strings.Contains(errStr, "no LID found") {
 			if attempt >= 2 {
 				zlog.Warn().Err(err).
 					Str("instance", instanceID).
 					Str("to_jid", jid).
-					Int("attempt", attempt).
 					Msg("inbox: LID still unavailable after retry, aborting")
 				break
 			}
-			zlog.Warn().Err(err).
+			zlog.Warn().
 				Str("instance", instanceID).
 				Str("to_jid", jid).
-				Int("attempt", attempt).
 				Msg("inbox: LID not yet populated, retrying after cache warm-up")
 			time.Sleep(10 * time.Second)
 			continue
 		}
-		zlog.Warn().Err(err).
-			Str("instance", instanceID).
-			Str("to_jid", jid).
-			Int("attempt", attempt).
-			Msg("inbox: send attempt failed, will retry")
 		if attempt < maxAttempts {
 			time.Sleep(backoff)
 			backoff *= 2
@@ -655,11 +701,18 @@ func sendInboxMessageWithRetry(db *gorm.DB, client *whatsapp.InstanceClient, msg
 	zlog.Error().Err(lastErr).
 		Str("instance", instanceID).
 		Str("to_jid", jid).
+		Str("msg_id", msgLog.ID.String()).
 		Msg("inbox: all send attempts failed")
 	b, _ := json.Marshal(map[string]string{"text": text, "error": lastErr.Error()})
 	db.Model(msgLog).Updates(map[string]interface{}{
 		"status":  models.MessageStatusFailed,
 		"content": string(b),
+	})
+	client.BroadcastWS("message.status", map[string]interface{}{
+		"id":     msgLog.ID.String(),
+		"chat":   jid,
+		"status": string(models.MessageStatusFailed),
+		"error":  lastErr.Error(),
 	})
 }
 
