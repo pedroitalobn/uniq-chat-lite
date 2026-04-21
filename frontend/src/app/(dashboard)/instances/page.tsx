@@ -374,7 +374,7 @@ function InstancesContent() {
 
     hasAutoReconnected.current = true;
 
-    const toReconnect = instances.filter((i) => (i.channel === "whatsapp" || !i.channel) && (i.status === "disconnected" || i.status === "connecting"));
+    const toReconnect = instances.filter((i) => (i.channel === "whatsapp" || !i.channel) && i.status === "disconnected");
     if (toReconnect.length === 0) return;
 
     console.log("[Instances] Auto-reconnecting", toReconnect.length, "instances");

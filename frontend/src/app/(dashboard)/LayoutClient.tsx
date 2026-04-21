@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { authApi, instancesApi } from "@/lib/api";
 
@@ -41,28 +41,33 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
     staleTime: 30000,
   });
 
-  // Auto-reconnect disconnected instances on mount
+  // Auto-reconnect disconnected instances ONCE per session.
+  // Without the ref guard this re-fired every time the instances query
+  // refetched (every poll), and since each reconnect leaves the row in
+  // "connecting", the next refetch would trigger another reconnect — a
+  // tight 2s loop that hammered the backend and never let pairing settle.
+  const hasAutoReconnected = useRef(false);
   useEffect(() => {
+    if (hasAutoReconnected.current) return;
     if (!instances || instances.length === 0) return;
-    
-    const disconnected = instances.filter(
-      (i: any) => (i.channel === "whatsapp" || !i.channel) && (i.status === "disconnected" || i.status === "connecting")
-    );
-    
-    if (disconnected.length > 0) {
-      console.log("[Layout] Auto-reconnecting", disconnected.length, "instances");
-      
-      disconnected.forEach((inst: any, idx: number) => {
-        setTimeout(() => {
-          instancesApi.reconnect(inst.id).catch(() => {});
-        }, idx * 500);
-      });
 
-      // Refresh after reconnects
+    const disconnected = instances.filter(
+      (i: any) => (i.channel === "whatsapp" || !i.channel) && i.status === "disconnected"
+    );
+    if (disconnected.length === 0) return;
+
+    hasAutoReconnected.current = true;
+    console.log("[Layout] Auto-reconnecting", disconnected.length, "instances");
+
+    disconnected.forEach((inst: any, idx: number) => {
       setTimeout(() => {
-        qc.invalidateQueries({ queryKey: ["instances"] });
-      }, disconnected.length * 500 + 3000);
-    }
+        instancesApi.reconnect(inst.id).catch(() => {});
+      }, idx * 500);
+    });
+
+    setTimeout(() => {
+      qc.invalidateQueries({ queryKey: ["instances"] });
+    }, disconnected.length * 500 + 3000);
   }, [instances, qc]);
 
   // Refresh inbox chats when instances are loaded
