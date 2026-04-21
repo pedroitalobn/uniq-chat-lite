@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { instancesApi } from "@/lib/api";
 import { getSession } from "next-auth/react";
 import { X, RefreshCw, QrCode, CheckCircle2, Smartphone, Copy, Check, Clock } from "lucide-react";
@@ -240,7 +241,11 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  return (
+  // Render via portal no document.body pra escapar de qualquer ancestral
+  // com `transform`/`filter`/`contain`, que viraria o containing block do
+  // position: fixed e empurraria o modal pra fora do centro da viewport.
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
         className="absolute inset-0 backdrop-blur-sm"
@@ -481,6 +486,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
