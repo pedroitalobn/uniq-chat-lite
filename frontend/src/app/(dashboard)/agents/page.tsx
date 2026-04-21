@@ -988,103 +988,45 @@ function JourneysSection({ onEditJourney }: { onEditJourney?: (journey: any) => 
     refetchInterval: 30000,
   });
 
+  // Usa os wrappers em journeysApi (que já resolvem base URL + auth via
+  // interceptors do axios). Antes chamávamos fetch() direto em
+  // `${baseURL}/journeys/...` — o path estava sem o prefixo /v1, então
+  // toda PATCH/DELETE voltava 404 silenciosamente e o botão parecia travado.
   const toggleMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const session = await import("next-auth/react").then(m => m.getSession());
-      const token = (session as any)?.accessToken;
-      console.log("Toggling journey:", id, status, "Token exists:", !!token);
-      
-      const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      const res = await fetch(`${baseURL}/journeys/${id}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ status }),
-        credentials: "include",
-      });
-      
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Erro ao atualizar status");
-      }
-      
-      return res.json();
-    },
+    mutationFn: ({ id, status }: { id: string; status: "active" | "paused" }) =>
+      journeysApi.updateStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["journeys"] });
-      toast.success("Status atualizado!");
+      toast.success("Status atualizado");
     },
-    onError: (err) => {
-      console.error("Toggle error:", err);
-      toast.error("Erro: " + (err as Error).message);
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error || err?.message || "Erro ao atualizar status");
     },
   });
 
   const duplicateMutation = useMutation({
-    mutationFn: async (journey: any) => {
-      const session = await import("next-auth/react").then(m => m.getSession());
-      const token = (session as any)?.accessToken;
-      const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      
-      const res = await fetch(`${baseURL}/journeys`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          prompt: `Cópia de ${journey.prompt}`,
-          instance_id: journey.instance_id
-        }),
-        credentials: "include",
-      });
-      
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Erro ao duplicar jornada");
-      }
-      
-      return res.json();
-    },
+    mutationFn: (journey: any) =>
+      journeysApi.create(`Cópia de ${journey.prompt}`, undefined, journey.instance_id || undefined),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["journeys"] });
-      toast.success("Jornada duplicada!");
+      toast.success("Jornada duplicada");
     },
-    onError: (err) => {
-      toast.error("Erro ao duplicar: " + (err as Error).message);
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error || err?.message || "Erro ao duplicar");
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const session = await import("next-auth/react").then(m => m.getSession());
-      const token = (session as any)?.accessToken;
-      
-      const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      const res = await fetch(`${baseURL}/journeys/${id}`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
-        },
-        credentials: "include",
-      });
-      
-      if (!res.ok) {
-        throw new Error("Erro ao deletar jornada");
-      }
-      
-      return true;
+      await journeysApi.delete(id);
+      return { ok: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["journeys"] });
-      toast.success("Jornada removida!");
+      toast.success("Jornada removida");
     },
-    onError: (err) => {
-      console.error("Delete error:", err);
-      toast.error("Erro: " + (err as Error).message);
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error || err?.message || "Erro ao remover");
     },
   });
 
@@ -1188,7 +1130,7 @@ function JourneysSection({ onEditJourney }: { onEditJourney?: (journey: any) => 
                 </div>
                 <div className="flex items-center gap-1 ml-4" onClick={(e) => e.stopPropagation()}>
                   <button
-                    onClick={() => { console.log("Click on pause/delete buttons, journey id:", j.id); toggleMutation.mutate({ id: j.id, status: j.status === "active" ? "paused" : "active" }); }}
+                    onClick={() => toggleMutation.mutate({ id: j.id, status: j.status === "active" ? "paused" : "active" })}
                     className="p-2 rounded-lg transition-colors"
                     style={{ color: j.status === "active" ? "#00d46a" : "var(--text-3)", background: j.status === "active" ? "rgba(0,212,106,0.1)" : "transparent" }}
                     title={j.status === "active" ? "Pausar" : "Ativar"}
