@@ -31,7 +31,7 @@ func ResolveV1Instance(db *gorm.DB) fiber.Handler {
 		// Verify token
 		token := extractInstanceToken(c)
 		if token == "" {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "instance token required (Authorization: Bearer <token> or X-Instance-Token)"})
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "instance token required (apikey: <token> or Authorization: Bearer <token>)"})
 		}
 		if token != instance.Token {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid instance token"})
@@ -53,6 +53,12 @@ func ResolveV1Instance(db *gorm.DB) fiber.Handler {
 }
 
 func extractInstanceToken(c *fiber.Ctx) string {
+	// `apikey` é o header canônico documentado em /api-docs. Mantemos
+	// X-Instance-Token e Authorization: Bearer aceitos pra não quebrar
+	// integrações antigas.
+	if t := c.Get("apikey"); t != "" {
+		return t
+	}
 	if t := c.Get("X-Instance-Token"); t != "" {
 		return t
 	}

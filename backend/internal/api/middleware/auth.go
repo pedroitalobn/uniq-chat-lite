@@ -144,7 +144,13 @@ func extractToken(c *fiber.Ctx) string {
 }
 
 func tryAPIKey(c *fiber.Ctx, db *gorm.DB) error {
-	key := c.Get("X-API-Key")
+	// `apikey` é o header canônico. Mantemos `X-API-Key` aceito pra
+	// não quebrar integrações antigas — toda a documentação nova
+	// (api-docs) aponta pro `apikey`.
+	key := c.Get("apikey")
+	if key == "" {
+		key = c.Get("X-API-Key")
+	}
 	if key == "" {
 		// Also accept ?token= query param (used by MCP SSE clients)
 		key = c.Query("token")
