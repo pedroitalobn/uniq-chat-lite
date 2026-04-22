@@ -257,12 +257,14 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 			// Quando o usuário escolhe o trigger explicitamente, também
 			// anexamos o label legível ao filter pra a confirmação ficar clara.
 		}
-		// Keywords mencionadas explicitamente pelo usuário (via /palavra)
-		// substituem a lista inferida — usuário é autoritativo. Se o meta
-		// da menção carrega `op`, usa como operador; senão default "contains".
-		if kws := allMentionsOfType(req.Mentions, "keyword"); len(kws) > 0 {
-			rules := make([]models.KeywordRule, 0, len(kws))
-			for _, m := range kws {
+		// Keywords: se o usuário marcou /palavra explícito, isso vira regra.
+		// Se NÃO marcou nenhuma palavra + a action mention é explícita,
+		// descartamos o que o regex/LLM achou — provavelmente extraiu
+		// "o que foi?" do label da ação e criou keyword fantasma.
+		keywordMentions := allMentionsOfType(req.Mentions, "keyword")
+		if len(keywordMentions) > 0 {
+			rules := make([]models.KeywordRule, 0, len(keywordMentions))
+			for _, m := range keywordMentions {
 				word := strings.TrimSpace(m.Label)
 				if word == "" {
 					continue
@@ -278,6 +280,11 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 					keywords = string(kwBytes)
 				}
 			}
+		} else if hasExplicitAction {
+			// Usuário foi autoritativo na ação mas não indicou nenhuma
+			// palavra. Limpa keywords extraídas por heurística — essas
+			// vazavam do label/mensagem da ação.
+			keywords = "[]"
 		}
 		// isPrivateReply é usado em vários pontos (preview + criação) — define
 		// uma única vez aqui com base no texto renderizado.

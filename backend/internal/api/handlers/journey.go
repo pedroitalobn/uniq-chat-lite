@@ -149,9 +149,10 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 		triggerType = models.TriggerType(tm.ID)
 		triggerFilter = humanTriggerLabel(tm.ID)
 	}
-	if kws := allMentionsOfType(req.Mentions, "keyword"); len(kws) > 0 {
-		rules := make([]models.KeywordRule, 0, len(kws))
-		for _, m := range kws {
+	keywordMentions := allMentionsOfType(req.Mentions, "keyword")
+	if len(keywordMentions) > 0 {
+		rules := make([]models.KeywordRule, 0, len(keywordMentions))
+		for _, m := range keywordMentions {
 			word := strings.TrimSpace(m.Label)
 			if word == "" {
 				continue
@@ -167,6 +168,11 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 				keywords = string(kwBytes)
 			}
 		}
+	} else if hasExplicitAction {
+		// Ação explícita sem /palavra indica que o usuário não quer
+		// filtro por palavra — ignora keywords que o regex/LLM achou
+		// (tipicamente vazam do label da ação, tipo "o que foi?").
+		keywords = "[]"
 	}
 	// Action mention define a ação real: seu meta.value vira o
 	// messageTemplate (ou nome da tag, URL do webhook, etc).
