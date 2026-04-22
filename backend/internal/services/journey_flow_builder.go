@@ -182,6 +182,23 @@ func normalizeFlow(f *models.JourneyFlow) {
 			f.Steps[i].Config = json.RawMessage("{}")
 		}
 	}
+	// Sanitiza ponteiros "next_step_id" que criariam ciclos óbvios:
+	//  - self-reference (next = id do próprio step) → limpa (fim do flow)
+	//  - aponta pra step inexistente → limpa
+	// Ciclos indiretos (A→B→A) ainda podem existir, mas o executor tem
+	// cap por step-visit que derruba esses em runtime.
+	for i := range f.Steps {
+		s := &f.Steps[i]
+		if s.NextStepID == s.ID || (s.NextStepID != "" && !seen[s.NextStepID]) {
+			s.NextStepID = ""
+		}
+		if s.BranchTrue == s.ID || (s.BranchTrue != "" && !seen[s.BranchTrue]) {
+			s.BranchTrue = ""
+		}
+		if s.BranchFalse == s.ID || (s.BranchFalse != "" && !seen[s.BranchFalse]) {
+			s.BranchFalse = ""
+		}
+	}
 	// Garantir start_step
 	if f.StartStep == "" || !seen[f.StartStep] {
 		for i := range f.Steps {

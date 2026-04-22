@@ -40,8 +40,13 @@ type JourneyExecutor struct {
 	db     *gorm.DB
 	sender MessageSender
 	llm    *LLMService
-	// MaxSteps limita loops infinitos por execução
+	// MaxSteps limita o total de steps executados por execução. Flows
+	// normais têm 3-10 steps; se estamos passando disso algo está
+	// errado (ciclo, build defeituoso do LLM, etc).
 	MaxSteps int
+	// MaxStepVisits cap por step ID — mesmo em flows com goto
+	// legítimo, re-entrar no mesmo step mais que isso é ciclo.
+	MaxStepVisits int
 
 	// Dedup de mensagens: whatsmeow re-emite o mesmo *events.Message em
 	// history-sync/reconexão. Sem dedup cada re-emissão dispara as
@@ -54,12 +59,13 @@ type JourneyExecutor struct {
 
 func NewJourneyExecutor(db *gorm.DB, sender MessageSender, llm *LLMService) *JourneyExecutor {
 	return &JourneyExecutor{
-		db:          db,
-		sender:      sender,
-		llm:         llm,
-		MaxSteps:    50,
-		seenMsgs:    make(map[string]time.Time),
-		dedupWindow: 5 * time.Minute,
+		db:            db,
+		sender:        sender,
+		llm:           llm,
+		MaxSteps:      20,
+		MaxStepVisits: 3,
+		seenMsgs:      make(map[string]time.Time),
+		dedupWindow:   5 * time.Minute,
 	}
 }
 
@@ -90,6 +96,33 @@ func (e *JourneyExecutor) seenRecently(instanceID, messageID string) bool {
 	}
 	e.seenMsgs[key] = now
 	return false
+}
+
+// sanitizeFlowForExec zera ponteiros next/branch que criam self-loop ou
+// apontam pra steps inexistentes. Não reorganiza o flow — só evita que
+// o executor entre em ciclo óbvio. O FlowBuilder (journey_flow_builder.go)
+// faz essa mesma normalização em novas gerações; aqui é defesa extra
+// pra jornadas antigas salvas com flow quebrado.
+func sanitizeFlowForExec(f *models.JourneyFlow) {
+	if f == nil {
+		return
+	}
+	seen := make(map[string]bool, len(f.Steps))
+	for i := range f.Steps {
+		seen[f.Steps[i].ID] = true
+	}
+	for i := range f.Steps {
+		s := &f.Steps[i]
+		if s.NextStepID == s.ID || (s.NextStepID != "" && !seen[s.NextStepID]) {
+			s.NextStepID = ""
+		}
+		if s.BranchTrue == s.ID || (s.BranchTrue != "" && !seen[s.BranchTrue]) {
+			s.BranchTrue = ""
+		}
+		if s.BranchFalse == s.ID || (s.BranchFalse != "" && !seen[s.BranchFalse]) {
+			s.BranchFalse = ""
+		}
+	}
 }
 
 // isJourneyActive confere no banco se a jornada continua ativa. Pausas feitas
@@ -229,6 +262,12 @@ func (e *JourneyExecutor) startNew(journey *models.Journey, fromJID, fromName, g
 		e.legacyFallback(journey, fromJID, fromName, groupJID, messageText)
 		return
 	}
+	// Sanitiza flow em runtime — jornadas antigas podem ter sido salvas
+	// com self-loops (next_step_id == id do próprio step) ou refs pra
+	// steps inexistentes. Isso é o que causava "manda 50x a mesma msg".
+	// Aqui só normalizamos IDs/configs/start; cap por visita no run()
+	// pega ciclos indiretos.
+	sanitizeFlowForExec(flow)
 
 	start := flow.FirstStep()
 	if start == nil {
@@ -342,11 +381,34 @@ func (e *JourneyExecutor) resumeWithInput(journey *models.Journey, execution *mo
 	e.run(ctx, next)
 }
 
-// run executa steps sequencialmente até fim, wait ou input
+// run executa steps sequencialmente até fim, wait ou input.
+// Proteções contra ciclo no flow (evita "manda a mesma mensagem 50x"):
+//  - MaxSteps total (limite duro global)
+//  - MaxStepVisits por step ID (detecta revisita excessiva)
+//  - self-loop check (step.NextStepID == step.ID → encerra)
 func (e *JourneyExecutor) run(ctx *execCtx, step *models.FlowStep) {
+	visits := make(map[string]int)
 	for step != nil {
 		if ctx.stepsRun >= e.MaxSteps {
+			log.Warn().
+				Str("journey", ctx.journey.ID).
+				Str("exec", ctx.execution.ID).
+				Int("max", e.MaxSteps).
+				Msg("journey: flow atingiu MaxSteps — possível ciclo; abortando")
 			e.fail(ctx, "max_steps_exceeded")
+			return
+		}
+		// Cap de revisita por step — pega ciclos indiretos (A→B→A→B…).
+		visits[step.ID]++
+		if visits[step.ID] > e.MaxStepVisits {
+			log.Warn().
+				Str("journey", ctx.journey.ID).
+				Str("exec", ctx.execution.ID).
+				Str("step", step.ID).
+				Str("step_type", string(step.Type)).
+				Int("visits", visits[step.ID]).
+				Msg("journey: step revisitado acima do limite — ciclo no flow; abortando")
+			e.fail(ctx, fmt.Sprintf("step_cycle:%s", step.ID))
 			return
 		}
 		// Re-checa status da jornada antes de cada step. Se o usuário
@@ -383,6 +445,16 @@ func (e *JourneyExecutor) run(ctx *execCtx, step *models.FlowStep) {
 				e.db.Save(ctx.execution)
 			}
 			return
+		}
+		// Self-loop direto: step aponta pra si mesmo. Isso é sempre bug
+		// (flow mal gerado); encerramos com log pra usuário identificar.
+		if next != nil && next.ID == step.ID {
+			log.Warn().
+				Str("journey", ctx.journey.ID).
+				Str("step", step.ID).
+				Str("step_type", string(step.Type)).
+				Msg("journey: self-loop detectado — step aponta pra ele mesmo; encerrando flow aqui")
+			break
 		}
 		step = next
 	}
