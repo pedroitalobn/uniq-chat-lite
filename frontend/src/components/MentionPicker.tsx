@@ -486,25 +486,61 @@ export function MentionPicker({
       : [];
 
   const allItems = useMemo(() => ({
-    instance: instances.map((i: any) => ({ type: "instance" as MentionType, id: i.id, label: i.name || i.phone_number || "(sem nome)" })),
+    instance: instances.map((i: any) => ({
+      type: "instance" as MentionType,
+      id: i.id,
+      label: i.name || i.phone_number || "(sem nome)",
+      sublabel: i.phone_number && i.name ? formatPhoneBR(i.phone_number) : undefined,
+    })),
     group:    groupItems,
-    contact:  contacts.map((c: any) => ({ type: "contact" as MentionType, id: c.id, label: c.name || c.phone, meta: { phone: c.phone } })),
+    contact:  contacts.map((c: any) => {
+      // Garante nome legível em vez de cair pra phone cru (que parece JID).
+      // Ordem: name → push_name → phone formatado → "Contato sem nome".
+      const phone = c.phone || "";
+      const rawName = (c.name || "").trim();
+      const name = rawName && rawName !== phone ? rawName : (c.push_name || "").trim();
+      const finalLabel = name || formatPhoneBR(phone) || "Contato sem nome";
+      return {
+        type: "contact" as MentionType,
+        id: c.id,
+        label: finalLabel,
+        // Sublabel mostra o telefone formatado quando o label não é o
+        // próprio telefone — dá pra diferenciar João Silva / João Pereira.
+        sublabel: name && phone ? formatPhoneBR(phone) : undefined,
+        meta: { phone, name: finalLabel },
+      };
+    }),
     tag:      tags.map((t: any) => ({ type: "tag" as MentionType, id: t.id, label: t.name })),
     funnel:   funnels.map((f: any) => ({ type: "funnel" as MentionType, id: f.id, label: f.name })),
-    journey:  journeys.map((j: any) => ({ type: "journey" as MentionType, id: j.id, label: j.name })),
-    trigger:  TRIGGER_OPTIONS.map((t) => ({ type: "trigger" as MentionType, id: t.id, label: t.label, meta: t.hint ? { hint: t.hint } : undefined })),
-    action:   ACTION_OPTIONS.map((a) => ({ type: "action" as MentionType, id: a.id, label: a.label, meta: a.hint ? { hint: a.hint } : undefined })),
+    journey:  journeys.map((j: any) => ({ type: "journey" as MentionType, id: j.id, label: j.name, sublabel: j.status === "paused" ? "pausada" : undefined })),
+    trigger:  TRIGGER_OPTIONS.map((t) => ({ type: "trigger" as MentionType, id: t.id, label: t.label, sublabel: t.hint, meta: t.hint ? { hint: t.hint } : undefined })),
+    action:   ACTION_OPTIONS.map((a) => ({ type: "action" as MentionType, id: a.id, label: a.label, sublabel: a.hint, meta: a.hint ? { hint: a.hint } : undefined })),
     step:     [
       ...(extraSteps ?? []),
-      ...STEP_OPTIONS.map((s) => ({ type: "step" as MentionType, id: s.id, label: s.label, meta: s.hint ? { hint: s.hint } : undefined })),
+      ...STEP_OPTIONS.map((s) => ({ type: "step" as MentionType, id: s.id, label: s.label, sublabel: s.hint, meta: s.hint ? { hint: s.hint } : undefined })),
     ],
     // keyword é dinâmico — tratado direto em `suggestions`
     keyword:  [] as { type: MentionType; id: string; label: string; meta?: Record<string, string> }[],
   }), [instances, groupItems, contacts, tags, funnels, journeys, extraSteps]);
 
+  // formatPhoneBR: converte "5511999998888" em "+55 11 99999-8888". Retorna
+  // vazio pra entrada vazia. Cai pra formato bruto pra telefones não-BR.
+  function formatPhoneBR(raw: string): string {
+    if (!raw) return "";
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length === 13 && digits.startsWith("55")) {
+      return `+55 ${digits.slice(2, 4)} ${digits.slice(4, 9)}-${digits.slice(9)}`;
+    }
+    if (digits.length === 12 && digits.startsWith("55")) {
+      return `+55 ${digits.slice(2, 4)} ${digits.slice(4, 8)}-${digits.slice(8)}`;
+    }
+    return digits ? "+" + digits : raw;
+  }
+
   // ─── Sugestões filtradas ────────────────────────────────────────────────────
   type Suggestion = {
-    type: MentionType; id: string; label: string; meta?: Record<string, string>;
+    type: MentionType; id: string; label: string; sublabel?: string;
+    meta?: Record<string, string>;
     icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
     color: string;
   };
@@ -523,6 +559,12 @@ export function MentionPicker({
     }
     if (picker.mode === "search" && picker.category) {
       const meta = catMeta(picker.category);
+      // Filtra por label OU sublabel (pra o user achar "João" digitando
+      // o telefone "11999...", e vice-versa).
+      const matchesRich = (i: { label: string; sublabel?: string }) =>
+        !q
+          || i.label.toLowerCase().includes(q)
+          || (!!i.sublabel && i.sublabel.toLowerCase().includes(q));
       // Keyword: user-defined. A query vira o próprio valor.
       if (picker.category === "keyword") {
         const raw = picker.query.trim();
@@ -545,14 +587,16 @@ export function MentionPicker({
         }];
       }
       const list = allItems[picker.category] ?? [];
-      return list.filter((i) => matches(i.label)).slice(0, 8).map<Suggestion>((i) => ({ ...i, icon: meta.icon, color: meta.color }));
+      return list.filter(matchesRich).slice(0, 8).map<Suggestion>((i) => ({ ...i, icon: meta.icon, color: meta.color }));
     }
-    // busca global (@)
+    // busca global (@). Também filtra por label OU sublabel.
+    const matchesGlobal = (i: { label: string; sublabel?: string }) =>
+      !q || i.label.toLowerCase().includes(q) || (!!i.sublabel && i.sublabel.toLowerCase().includes(q));
     const out: Suggestion[] = [];
     (["instance", "group", "contact", "tag", "funnel", "journey"] as MentionType[]).forEach((t) => {
       const meta = catMeta(t);
       for (const i of allItems[t] ?? []) {
-        if (matches(i.label) && out.length < 8) {
+        if (matchesGlobal(i) && out.length < 8) {
           out.push({ ...i, icon: meta.icon, color: meta.color });
         }
       }
@@ -983,12 +1027,19 @@ export function MentionPicker({
                       className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors"
                       style={{ background: active ? "rgba(255,255,255,0.05)" : "transparent" }}
                     >
-                      <span className="flex items-center justify-center w-5 h-5 rounded"
+                      <span className="flex items-center justify-center w-5 h-5 rounded flex-shrink-0"
                         style={{ background: s.color + "22" }}>
                         <Icon className="w-3 h-3" style={{ color: s.color }} />
                       </span>
-                      <span className="flex-1 text-sm truncate" style={{ color: "hsl(240 15% 90%)" }}>{s.label}</span>
-                      <span className="text-[10px] uppercase tracking-wider" style={{ color: "hsl(240 8% 42%)" }}>
+                      <div className="flex-1 min-w-0 flex flex-col">
+                        <span className="text-sm truncate" style={{ color: "hsl(240 15% 90%)" }}>{s.label}</span>
+                        {s.sublabel && (
+                          <span className="text-[10px] truncate" style={{ color: "hsl(240 8% 48%)" }}>
+                            {s.sublabel}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] uppercase tracking-wider flex-shrink-0" style={{ color: "hsl(240 8% 42%)" }}>
                         {s.type}
                       </span>
                     </button>
