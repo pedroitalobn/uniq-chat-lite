@@ -652,7 +652,7 @@ function JourneyManager({ onClose }: { onClose: () => void }) {
                 title={j.status === "active" ? "Pausar" : "Ativar"}>
                 {j.status === "active" ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
               </button>
-              <Link href={`/journeys/${j.id}`} className="p-1 rounded-lg transition-colors hover:opacity-80" style={{ color: "hsl(240 8% 46%)" }} title="Editar fluxo">
+              <Link href={`/agents/builder/${j.id}`} className="p-1 rounded-lg transition-colors hover:opacity-80" style={{ color: "hsl(240 8% 46%)" }} title="Editar fluxo">
                 <ExternalLink className="w-3.5 h-3.5" />
               </Link>
               <button onClick={() => deleteJourney.mutate(j.id)} className="p-1 rounded-lg transition-colors hover:text-red-400" style={{ color: "hsl(240 8% 38%)" }}>
