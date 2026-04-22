@@ -150,14 +150,20 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 		triggerFilter = humanTriggerLabel(tm.ID)
 	}
 	if kws := allMentionsOfType(req.Mentions, "keyword"); len(kws) > 0 {
-		labels := make([]string, 0, len(kws))
+		rules := make([]models.KeywordRule, 0, len(kws))
 		for _, m := range kws {
-			if lbl := strings.TrimSpace(m.Label); lbl != "" {
-				labels = append(labels, lbl)
+			word := strings.TrimSpace(m.Label)
+			if word == "" {
+				continue
 			}
+			op := "contains"
+			if m.Meta != nil && m.Meta["op"] != "" {
+				op = m.Meta["op"]
+			}
+			rules = append(rules, models.KeywordRule{Word: word, Op: op})
 		}
-		if len(labels) > 0 {
-			if kwBytes, err := json.Marshal(labels); err == nil {
+		if len(rules) > 0 {
+			if kwBytes, err := json.Marshal(rules); err == nil {
 				keywords = string(kwBytes)
 			}
 		}

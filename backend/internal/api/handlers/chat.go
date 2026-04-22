@@ -258,16 +258,23 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 			// anexamos o label legível ao filter pra a confirmação ficar clara.
 		}
 		// Keywords mencionadas explicitamente pelo usuário (via /palavra)
-		// substituem a lista inferida — usuário é autoritativo.
+		// substituem a lista inferida — usuário é autoritativo. Se o meta
+		// da menção carrega `op`, usa como operador; senão default "contains".
 		if kws := allMentionsOfType(req.Mentions, "keyword"); len(kws) > 0 {
-			labels := make([]string, 0, len(kws))
+			rules := make([]models.KeywordRule, 0, len(kws))
 			for _, m := range kws {
-				if lbl := strings.TrimSpace(m.Label); lbl != "" {
-					labels = append(labels, lbl)
+				word := strings.TrimSpace(m.Label)
+				if word == "" {
+					continue
 				}
+				op := "contains"
+				if m.Meta != nil && m.Meta["op"] != "" {
+					op = m.Meta["op"]
+				}
+				rules = append(rules, models.KeywordRule{Word: word, Op: op})
 			}
-			if len(labels) > 0 {
-				if kwBytes, err := json.Marshal(labels); err == nil {
+			if len(rules) > 0 {
+				if kwBytes, err := json.Marshal(rules); err == nil {
 					keywords = string(kwBytes)
 				}
 			}

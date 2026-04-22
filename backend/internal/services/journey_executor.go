@@ -155,24 +155,60 @@ func triggerMatchReason(j *models.Journey, messageText, groupJID, messageType st
 			return "msg_type_nao_eh_call:" + messageType
 		}
 	}
-	// Keywords: se não há, passa. Se há, precisa bater uma.
-	if j.Keywords == "" || j.Keywords == "[]" {
-		return ""
-	}
-	var keywords []string
-	if err := json.Unmarshal([]byte(j.Keywords), &keywords); err != nil {
-		return "keywords_json_invalido"
-	}
-	if len(keywords) == 0 {
+	// Keywords: se não há, passa. Usa GetKeywordRules pra respeitar o
+	// operador de cada palavra (equal/contains/starts_with/etc).
+	rules := j.GetKeywordRules()
+	if len(rules) == 0 {
 		return ""
 	}
 	lowerMsg := strings.ToLower(messageText)
-	for _, kw := range keywords {
-		if strings.Contains(lowerMsg, strings.ToLower(kw)) {
+	for _, r := range rules {
+		if evalKeywordRuleLocal(lowerMsg, r) {
 			return ""
 		}
 	}
-	return "nenhuma_keyword_bateu:" + strings.Join(keywords, ",")
+	// Monta lista pra diagnóstico
+	parts := make([]string, 0, len(rules))
+	for _, r := range rules {
+		op := r.Op
+		if op == "" {
+			op = "contains"
+		}
+		parts = append(parts, op+":"+r.Word)
+	}
+	return "nenhuma_keyword_bateu:" + strings.Join(parts, ",")
+}
+
+// evalKeywordRuleLocal é um espelho de models.evalKeywordRule — duplicado
+// aqui pra o triggerMatchReason (diagnóstico) não depender de detalhes
+// internos do pacote de models. Mudanças no operador precisam ser feitas
+// nos dois lugares.
+func evalKeywordRuleLocal(lowerMsg string, r models.KeywordRule) bool {
+	word := strings.ToLower(strings.TrimSpace(r.Word))
+	op := strings.ToLower(strings.TrimSpace(r.Op))
+	if op == "" {
+		op = "contains"
+	}
+	switch op {
+	case "equal":
+		return lowerMsg == word
+	case "not_equal":
+		return lowerMsg != word
+	case "contains":
+		return word != "" && strings.Contains(lowerMsg, word)
+	case "not_contains":
+		return word != "" && !strings.Contains(lowerMsg, word)
+	case "starts_with":
+		return word != "" && strings.HasPrefix(lowerMsg, word)
+	case "not_starts_with":
+		return word != "" && !strings.HasPrefix(lowerMsg, word)
+	case "ends_with":
+		return word != "" && strings.HasSuffix(lowerMsg, word)
+	case "not_ends_with":
+		return word != "" && !strings.HasSuffix(lowerMsg, word)
+	default:
+		return word != "" && strings.Contains(lowerMsg, word)
+	}
 }
 
 // sanitizeFlowForExec zera ponteiros next/branch que criam self-loop ou

@@ -400,6 +400,18 @@ interface PickerAnchor {
   endOffset: number;
 }
 
+// Operador de match pra keywords (mapeia pra backend KeywordRule.Op).
+export const KEYWORD_OPERATORS: { value: string; label: string; short: string }[] = [
+  { value: "contains",        label: "contém",          short: "∋" },
+  { value: "equal",           label: "igual a",         short: "=" },
+  { value: "starts_with",     label: "começa com",      short: "▸" },
+  { value: "ends_with",       label: "termina com",     short: "◂" },
+  { value: "not_contains",    label: "não contém",      short: "∌" },
+  { value: "not_equal",       label: "diferente de",    short: "≠" },
+  { value: "not_starts_with", label: "não começa com",  short: "▸̸" },
+  { value: "not_ends_with",   label: "não termina com", short: "◂̸" },
+];
+
 interface PickerState {
   open: boolean;
   trigger: "/" | "@";
@@ -417,9 +429,14 @@ interface PickerState {
     // Chip "preview" mostrado no header enquanto o usuário digita o valor
     // — dá feedback de "o que já escolhi / o que falta responder".
     previewChip?: Mention;
-    apply: (value: string) => Mention[] | null;
+    // `op` é o operador selecionado no dropdown (opcional — só pra /palavra).
+    // Passamos pra apply quando o follow-up tem operatorOptions.
+    op?: string;
+    apply: (value: string, op?: string) => Mention[] | null;
     headerLabel: string;
     allowEmpty?: boolean; // true = Enter com input vazio ainda insere (casos sem param)
+    // Se setado, renderiza um dropdown de operador no follow-up.
+    operatorOptions?: { value: string; label: string; short: string }[];
   };
 }
 
@@ -753,8 +770,43 @@ export function MentionPicker({
     if (!picker.open || !s) return;
     if (s.id === "__placeholder__") return;
 
-    // Categoria → troca pro modo de busca na categoria escolhida
+    // Categoria → troca pro modo de busca na categoria escolhida.
+    // Exceção: /palavra entra direto em follow-up com dropdown de operador
+    // (contains, equal, starts_with, etc) ao lado do campo de texto. Isso
+    // permite "arroz igual" vs "arroz contém" na hora da definição.
     if (picker.mode === "category") {
+      if (s.type === "keyword") {
+        setPicker((p) => ({
+          ...p,
+          mode: "followUp",
+          query: "",
+          followUp: {
+            prompt: "Qual palavra-chave?",
+            headerLabel: "Palavra-chave",
+            op: "contains",
+            operatorOptions: KEYWORD_OPERATORS,
+            apply: (value, op) => {
+              const raw = value.trim();
+              if (!raw) return null;
+              const safe = raw.replace(/[^A-Za-z0-9_@.\-]/g, "_");
+              const operator = op || "contains";
+              const opMeta = KEYWORD_OPERATORS.find((k) => k.value === operator);
+              const opSuffix = opMeta ? ` (${opMeta.label})` : "";
+              return [{
+                type: "keyword",
+                id: safe,
+                label: raw,
+                meta: { op: operator, op_label: opMeta?.label || operator },
+                // Label humano: "arroz (igual a)" — ajuda o usuário a ver
+                // na confirmação qual operador cada keyword usa.
+              }];
+              void opSuffix;
+            },
+          },
+        }));
+        requestAnimationFrame(() => searchRef.current?.focus());
+        return;
+      }
       setPicker((p) => ({ ...p, mode: "search", category: s.type, query: "" }));
       searchRef.current?.focus();
       return;
@@ -835,11 +887,9 @@ export function MentionPicker({
   // válido até o momento do insert final (evita bug de stale anchor).
   const submitFollowUp = useCallback(() => {
     if (picker.mode !== "followUp" || !picker.followUp) return;
-    const applyResult = picker.followUp.apply(picker.query) ?? [];
+    const applyResult = picker.followUp.apply(picker.query, picker.followUp.op) ?? [];
     const pending = picker.followUp.pendingChips ?? [];
     const all = [...pending, ...applyResult];
-    // Se o campo é opcional e ficou vazio, o apply pode retornar só o
-    // chip da ação (sem param). Ainda insere tudo.
     if (all.length > 0) {
       insertMentionsAtAnchor(all);
     }
@@ -1020,6 +1070,28 @@ export function MentionPicker({
             {(picker.mode === "search" || picker.mode === "followUp") && (
               <div className="flex items-center gap-2 rounded-lg px-2 py-1.5"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 14%)" }}>
+                {/* Operador dropdown aparece antes do input quando o
+                    follow-up tem operatorOptions (caso atual: /palavra). */}
+                {picker.mode === "followUp" && picker.followUp?.operatorOptions && (
+                  <select
+                    value={picker.followUp.op ?? "contains"}
+                    onChange={(e) => setPicker((p) => p.open && p.mode === "followUp" && p.followUp
+                      ? { ...p, followUp: { ...p.followUp, op: e.target.value } }
+                      : p)}
+                    className="text-[10px] bg-transparent outline-none cursor-pointer"
+                    style={{ color: "hsl(240 15% 85%)", maxWidth: 130 }}
+                    title="Operador de match"
+                  >
+                    {picker.followUp.operatorOptions.map((op) => (
+                      <option key={op.value} value={op.value} style={{ background: "hsl(240 18% 8%)" }}>
+                        {op.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {picker.mode === "followUp" && picker.followUp?.operatorOptions && (
+                  <span style={{ color: "hsl(240 8% 38%)", fontSize: 11 }}>·</span>
+                )}
                 <SearchIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 46%)" }} />
                 <input
                   ref={searchRef}

@@ -108,36 +108,93 @@ func (j *Journey) ShouldTrigger(messageText, groupJID, messageType string, isGro
 		// For other triggers, continue checking
 	}
 
-	// For message triggers, check keywords (including media triggers)
-	if j.Keywords == "" || j.Keywords == "[]" {
+	// For message triggers, check keyword rules.
+	rules := j.GetKeywordRules()
+	if len(rules) == 0 {
 		return true
 	}
-
-	var keywords []string
-	if err := json.Unmarshal([]byte(j.Keywords), &keywords); err != nil {
-		return false
-	}
-
-	if len(keywords) == 0 {
-		return true
-	}
-
 	lowerMsg := strings.ToLower(messageText)
-	for _, kw := range keywords {
-		if strings.Contains(lowerMsg, strings.ToLower(kw)) {
+	for _, r := range rules {
+		if evalKeywordRule(lowerMsg, r) {
 			return true
 		}
 	}
 	return false
 }
 
-func (j *Journey) GetKeywords() []string {
-	if j.Keywords == "" {
-		return []string{}
+// KeywordRule descreve uma condição de match por palavra. `Op` default
+// é "contains" (para compat com jornadas antigas que salvaram só a
+// string da palavra). Operadores suportados: contains, not_contains,
+// equal, not_equal, starts_with, not_starts_with, ends_with, not_ends_with.
+type KeywordRule struct {
+	Word string `json:"word"`
+	Op   string `json:"op,omitempty"`
+}
+
+// evalKeywordRule aplica o operador da regra sobre a mensagem (já
+// lowercased pelo caller). Retorna true se a regra casou.
+func evalKeywordRule(lowerMsg string, r KeywordRule) bool {
+	word := strings.ToLower(strings.TrimSpace(r.Word))
+	op := strings.ToLower(strings.TrimSpace(r.Op))
+	if op == "" {
+		op = "contains"
 	}
-	var keywords []string
-	json.Unmarshal([]byte(j.Keywords), &keywords)
-	return keywords
+	switch op {
+	case "equal":
+		return lowerMsg == word
+	case "not_equal":
+		return lowerMsg != word
+	case "contains":
+		return word != "" && strings.Contains(lowerMsg, word)
+	case "not_contains":
+		return word != "" && !strings.Contains(lowerMsg, word)
+	case "starts_with":
+		return word != "" && strings.HasPrefix(lowerMsg, word)
+	case "not_starts_with":
+		return word != "" && !strings.HasPrefix(lowerMsg, word)
+	case "ends_with":
+		return word != "" && strings.HasSuffix(lowerMsg, word)
+	case "not_ends_with":
+		return word != "" && !strings.HasSuffix(lowerMsg, word)
+	default:
+		// Operador desconhecido: fallback seguro pra contains.
+		return word != "" && strings.Contains(lowerMsg, word)
+	}
+}
+
+// GetKeywordRules desserializa o campo Keywords com compat retroativa:
+// aceita tanto o formato novo [{"word":"x","op":"equal"}, ...] quanto
+// o legado ["x","y"] (tratado como contains).
+func (j *Journey) GetKeywordRules() []KeywordRule {
+	if j.Keywords == "" || j.Keywords == "[]" {
+		return nil
+	}
+	// Tenta novo formato (objetos)
+	var rules []KeywordRule
+	if err := json.Unmarshal([]byte(j.Keywords), &rules); err == nil && len(rules) > 0 && rules[0].Word != "" {
+		return rules
+	}
+	// Fallback legado: array de strings
+	var words []string
+	if err := json.Unmarshal([]byte(j.Keywords), &words); err != nil {
+		return nil
+	}
+	out := make([]KeywordRule, 0, len(words))
+	for _, w := range words {
+		if w != "" {
+			out = append(out, KeywordRule{Word: w, Op: "contains"})
+		}
+	}
+	return out
+}
+
+func (j *Journey) GetKeywords() []string {
+	rules := j.GetKeywordRules()
+	out := make([]string, 0, len(rules))
+	for _, r := range rules {
+		out = append(out, r.Word)
+	}
+	return out
 }
 
 func (j *Journey) GetFlow() *JourneyFlow {
