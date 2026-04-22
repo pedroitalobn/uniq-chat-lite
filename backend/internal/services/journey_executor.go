@@ -361,23 +361,72 @@ func (e *JourneyExecutor) handleReservedCommand(action, instanceID, fromJID, fro
 	return false
 }
 
-// flowHasSendStep retorna true se o flow tem pelo menos um step que produz
-// uma mensagem outbound. Usado pra detectar flows "inúteis" (só end/wait/
-// set_variable) — nesses casos caímos no legacyFallback, que ao menos
-// envia o journey.MessageTemplate se houver.
-func flowHasSendStep(f *models.JourneyFlow) bool {
-	if f == nil {
+// isSendStepType retorna true se o tipo de step produz mensagem outbound.
+func isSendStepType(t models.StepType) bool {
+	switch t {
+	case models.StepTypeMessage,
+		models.StepTypeButtons,
+		models.StepTypeList,
+		models.StepTypeMedia,
+		models.StepTypeAIResponse,
+		models.StepTypeHandoff:
+		return true
+	}
+	return false
+}
+
+// reachableSendStepFromStart faz BFS do start_step seguindo next_step_id +
+// BranchTrue + BranchFalse e retorna true se QUALQUER step de envio é
+// alcançável. Diferente do flowHasSendStep, que só checava presença, esse
+// cobre o caso "flow tem send step mas condition no início não leva a ele"
+// — LLM às vezes gera branches vazios que fazem a execução morrer no
+// primeiro step sem nunca atingir o send.
+func reachableSendStepFromStart(f *models.JourneyFlow) bool {
+	if f == nil || len(f.Steps) == 0 {
 		return false
 	}
+	stepByID := make(map[string]*models.FlowStep, len(f.Steps))
 	for i := range f.Steps {
-		switch f.Steps[i].Type {
-		case models.StepTypeMessage,
-			models.StepTypeButtons,
-			models.StepTypeList,
-			models.StepTypeMedia,
-			models.StepTypeAIResponse,
-			models.StepTypeHandoff:
+		stepByID[f.Steps[i].ID] = &f.Steps[i]
+	}
+	startID := f.StartStep
+	if startID == "" {
+		// usa o primeiro step marcado IsStartStep, ou o primeiro do array
+		for i := range f.Steps {
+			if f.Steps[i].IsStartStep {
+				startID = f.Steps[i].ID
+				break
+			}
+		}
+		if startID == "" && len(f.Steps) > 0 {
+			startID = f.Steps[0].ID
+		}
+	}
+	visited := make(map[string]bool, len(f.Steps))
+	queue := []string{startID}
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		if id == "" || visited[id] {
+			continue
+		}
+		visited[id] = true
+		s := stepByID[id]
+		if s == nil {
+			continue
+		}
+		if isSendStepType(s.Type) {
 			return true
+		}
+		// Enfileira todos os próximos possíveis
+		if s.NextStepID != "" {
+			queue = append(queue, s.NextStepID)
+		}
+		if s.BranchTrue != "" {
+			queue = append(queue, s.BranchTrue)
+		}
+		if s.BranchFalse != "" {
+			queue = append(queue, s.BranchFalse)
 		}
 	}
 	return false
@@ -407,7 +456,7 @@ func (e *JourneyExecutor) startNew(journey *models.Journey, fromJID, fromName, g
 		Str("name", journey.Name).
 		Bool("flow_nil", flow == nil).
 		Int("flow_steps", flowSteps).
-		Bool("has_send_step", flowHasSendStep(flow)).
+		Bool("has_reachable_send", reachableSendStepFromStart(flow)).
 		Int("msg_template_len", len(journey.MessageTemplate)).
 		Str("response_mode", journey.ResponseMode).
 		Str("from_jid", fromJID).
@@ -423,11 +472,12 @@ func (e *JourneyExecutor) startNew(journey *models.Journey, fromJID, fromName, g
 	// (caso comum de FlowBuilder gerando só "end" ou step desconhecido
 	// que não dispara SendText), e mesmo assim temos messageTemplate
 	// definido, preferimos o legacyFallback — pelo menos o DM sai.
-	if !flowHasSendStep(flow) && strings.TrimSpace(journey.MessageTemplate) != "" {
+	if !reachableSendStepFromStart(flow) && strings.TrimSpace(journey.MessageTemplate) != "" {
 		log.Info().
 			Str("journey", journey.ID).
 			Int("steps", len(flow.Steps)).
-			Msg("journey: flow sem step de envio + messageTemplate presente → usando legacyFallback")
+			Str("start_step", flow.StartStep).
+			Msg("journey: nenhum step de envio alcançável a partir do start + messageTemplate presente → legacyFallback")
 		e.legacyFallback(journey, fromJID, fromName, groupJID, messageText)
 		return
 	}
@@ -834,10 +884,28 @@ func (e *JourneyExecutor) stepCondition(ctx *execCtx, step *models.FlowStep) (*m
 	ctx.emit(step.ID, string(step.Type), "condition",
 		map[string]interface{}{"left": left, "op": cfg.Operator, "right": right, "result": ok})
 
+	// Log do resultado da condition. Essencial pra diagnosticar flows
+	// que "completam" sem enviar — se o branch resolvido aponta pra step
+	// inexistente (BFS cancela), run() termina limpo sem mandar nada.
+	var nextBranch string
 	if ok {
-		return ctx.flow.FindStep(branchTrue), false, nil
+		nextBranch = branchTrue
+	} else {
+		nextBranch = branchFalse
 	}
-	return ctx.flow.FindStep(branchFalse), false, nil
+	nextStep := ctx.flow.FindStep(nextBranch)
+	log.Info().
+		Str("journey", ctx.journey.ID).
+		Str("step", step.ID).
+		Str("op", cfg.Operator).
+		Bool("result", ok).
+		Str("left", firstN(left, 40)).
+		Str("right", firstN(right, 40)).
+		Str("next_branch_id", nextBranch).
+		Bool("next_found", nextStep != nil).
+		Msg("journey: condition avaliada")
+
+	return nextStep, false, nil
 }
 
 func (e *JourneyExecutor) stepAIResponse(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
