@@ -8,7 +8,7 @@ import {
   Search, Send, Check, CheckCheck, Image, Mic, FileText, MapPin,
   Users, Phone, Video, MessageSquare, User, Archive, Trash2, Star,
   MoreHorizontal, ChevronRight, ChevronDown, Filter, EyeOff, Pin, Tag, BellOff,
-  Smile, Paperclip, ArrowDown, RefreshCw, Copy, Clock
+  Smile, Paperclip, ArrowDown, RefreshCw, Copy, Clock, AlertCircle
 } from "lucide-react";
 import { instancesApi, inboxApi, crmApi, workspacesApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -561,19 +561,26 @@ export default function InboxPage() {
     refetchInterval: 5000,
     queryFn: async () => {
       const instId = selectedInstances[0] || instance;
-      if (!instId) return { chats: [] };
+      if (!instId) return { chats: [], connected: true };
       const instIds = [instId];
-      
+
       const allChats: any[] = [];
+      // `connected` reflete se pelo menos uma das instâncias consultadas está
+      // viva. Quando TODAS vierem com connected=false, a UI mostra banner
+      // "instância desconectada" em vez de empty state genérico.
+      let anyConnected = false;
+      let sawAny = false;
       for (const instId of instIds) {
         try {
           const res = await inboxApi.getChats(instId, search, filter);
+          sawAny = true;
+          if (res.data?.connected !== false) anyConnected = true;
           const chats = res.data?.chats || [];
           chats.forEach((c: any) => c.instance_id = instId);
           allChats.push(...chats);
         } catch {}
       }
-      
+
       // Deduplicate by jid, keeping most recent
       const seen = new Map<string, any>();
       for (const chat of allChats) {
@@ -582,10 +589,13 @@ export default function InboxPage() {
           seen.set(chat.jid, chat);
         }
       }
-      
-      return { chats: Array.from(seen.values()).sort((a, b) => 
-        new Date(b.last_time).getTime() - new Date(a.last_time).getTime()
-      )};
+
+      return {
+        chats: Array.from(seen.values()).sort((a, b) =>
+          new Date(b.last_time).getTime() - new Date(a.last_time).getTime()
+        ),
+        connected: sawAny ? anyConnected : true,
+      };
     }
   });
 
@@ -1145,6 +1155,24 @@ export default function InboxPage() {
                 </div>
                 <p className="text-sm font-medium" style={{ color: "var(--text-2)" }}>Sem instância conectada</p>
                 <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>Conecte uma instância para ver conversas</p>
+              </div>
+            ) : chatsD?.connected === false ? (
+              <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3"
+                  style={{ background: "rgba(234,179,8,0.1)", border: "1px solid rgba(234,179,8,0.25)" }}>
+                  <AlertCircle className="w-7 h-7" style={{ color: "#eab308" }} />
+                </div>
+                <p className="text-sm font-medium" style={{ color: "var(--text-2)" }}>Instância desconectada</p>
+                <p className="text-xs mt-1 max-w-xs" style={{ color: "var(--text-3)" }}>
+                  As conversas voltam assim que a instância reconectar. O histórico está salvo.
+                </p>
+                <a
+                  href="/instances"
+                  className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5"
+                  style={{ background: "rgba(234,179,8,0.15)", color: "#eab308", border: "1px solid rgba(234,179,8,0.3)" }}
+                >
+                  Reconectar em /instances
+                </a>
               </div>
             ) : list.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full p-6 text-center">

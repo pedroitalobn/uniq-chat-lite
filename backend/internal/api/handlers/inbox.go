@@ -38,6 +38,18 @@ func NewInboxHandler(db *gorm.DB, manager *whatsapp.Manager) *InboxHandler {
 	return &InboxHandler{db: db, manager: manager}
 }
 
+// isInstanceLive retorna true se a instância está efetivamente conectada ao
+// WhatsApp (manager rodando + socket up + sessão autenticada). O inbox usa
+// isso pra esconder mensagens de instâncias desconectadas — as linhas
+// continuam no banco, só não são exibidas até a instância reconectar.
+func (h *InboxHandler) isInstanceLive(instanceID string) bool {
+	if !h.manager.IsRunning(instanceID) {
+		return false
+	}
+	client := h.manager.GetInstance(instanceID)
+	return client != nil && client.IsConnected() && client.IsLoggedIn()
+}
+
 type InboxChat struct {
 	InstanceID  string `json:"instance_id,omitempty"`
 	JID         string `json:"jid"`
@@ -92,6 +104,18 @@ func (h *InboxHandler) GetChats(c *fiber.Ctx) error {
 	instance, ok := c.Locals("instance").(*models.Instance)
 	if !ok {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	// Se a instância não está viva, retornamos vazio — mas SEM apagar nada
+	// do banco. Assim que o usuário reconectar, os chats voltam com o histórico
+	// intacto e novas mensagens começam a chegar via WS normalmente.
+	if !h.isInstanceLive(instance.ID.String()) {
+		return c.JSON(fiber.Map{
+			"chats":     []InboxChat{},
+			"total":     0,
+			"connected": false,
+			"reason":    "instance_disconnected",
+		})
 	}
 
 	search := c.Query("search", "")
@@ -413,6 +437,18 @@ func (h *InboxHandler) GetMessages(c *fiber.Ctx) error {
 	jid := c.Params("jid")
 	if jid == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "jid é obrigatório"})
+	}
+
+	// Instância offline: não entrega histórico nem total. Dados permanecem
+	// no banco; voltam assim que reconectar.
+	if !h.isInstanceLive(instance.ID.String()) {
+		return c.JSON(fiber.Map{
+			"messages":  []InboxMessage{},
+			"total":     0,
+			"has_more":  false,
+			"connected": false,
+			"reason":    "instance_disconnected",
+		})
 	}
 
 	canonicalJID := jid
