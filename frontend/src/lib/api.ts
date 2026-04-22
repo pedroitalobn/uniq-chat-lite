@@ -584,6 +584,7 @@ export const agentsApi = {
     model?: string,
     extras?: {
       rendered_text?: string;
+      original_input?: string;
       mentions?: { type: string; id: string; label: string; meta?: Record<string, string> }[];
     },
   ) =>
@@ -592,6 +593,7 @@ export const agentsApi = {
       integration_id: integrationId,
       model,
       rendered_text: extras?.rendered_text,
+      original_input: extras?.original_input,
       mentions: extras?.mentions,
     }),
   stats: () => api.get("/v1/agent/stats"),
@@ -608,6 +610,7 @@ export const journeysApi = {
     instanceId?: string,
     extras?: {
       rendered_text?: string;
+      original_input?: string;
       mentions?: { type: string; id: string; label: string; meta?: Record<string, string> }[];
     },
   ) =>
@@ -616,6 +619,7 @@ export const journeysApi = {
       integration_id: integrationId,
       instance_id: instanceId,
       rendered_text: extras?.rendered_text,
+      original_input: extras?.original_input,
       mentions: extras?.mentions,
     }),
   createBlank: (data?: { name?: string; instance_id?: string }) =>

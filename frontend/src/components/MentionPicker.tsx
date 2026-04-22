@@ -283,8 +283,18 @@ function createChipEl(type: MentionType, id: string, label: string, meta?: Recor
   const chip = document.createElement("span");
   chip.setAttribute("data-m-type", type);
   chip.setAttribute("data-m-id", id);
-  if (meta?.jid) chip.setAttribute("data-m-jid", meta.jid);
-  if (meta?.phone) chip.setAttribute("data-m-phone", meta.phone);
+  chip.setAttribute("data-m-label", label);
+  // Persiste TODOS os campos do meta como data-m-meta-<key>. Antes só
+  // salvávamos jid/phone explicitamente e perdíamos o resto (ex: o
+  // `value` das ações, que guarda o texto da mensagem). Sem isso, a
+  // confirmação da jornada saía com o texto vazio.
+  if (meta) {
+    for (const [k, v] of Object.entries(meta)) {
+      if (v !== undefined && v !== null && v !== "") {
+        chip.setAttribute("data-m-meta-" + k, String(v));
+      }
+    }
+  }
   chip.setAttribute("contenteditable", "false");
   const c = catMeta(type).color;
   chip.className = "mention-chip";
@@ -339,15 +349,29 @@ function readEditor(el: HTMLDivElement | null): MentionPickerHandles {
     }
     if (node instanceof HTMLElement) {
       if (node.dataset.mType) {
-        const label = (node.textContent ?? "").replace(/^@/, "");
+        // Preferimos data-m-label (setado quando a chip é criada) sobre o
+        // textContent cru — esse último vem com o prefixo "@" que fizemos
+        // questão de mostrar visualmente mas NÃO é parte do valor semântico.
+        const label = (node.dataset.mLabel ?? (node.textContent ?? "").replace(/^@/, ""));
         const m: Mention = {
           type: node.dataset.mType as MentionType,
           id: node.dataset.mId ?? "",
           label,
         };
+        // Reconstrói meta lendo TODAS as data-m-meta-<key>. Antes só líamos
+        // jid/phone e perdíamos `value` (action), `action_type`, etc.
         const meta: Record<string, string> = {};
-        if (node.dataset.mJid) meta.jid = node.dataset.mJid;
-        if (node.dataset.mPhone) meta.phone = node.dataset.mPhone;
+        for (const key of Object.keys(node.dataset)) {
+          // dataset usa camelCase, data-m-meta-value vira mMetaValue
+          if (key.startsWith("mMeta")) {
+            const metaKey = key.substring(5).replace(/^[A-Z]/, (c) => c.toLowerCase());
+            const val = (node.dataset as any)[key];
+            if (val) meta[metaKey] = String(val);
+          }
+        }
+        // Compat: atributos antigos (pré-fix) usavam data-m-jid / data-m-phone.
+        if (!meta.jid && node.dataset.mJid) meta.jid = node.dataset.mJid;
+        if (!meta.phone && node.dataset.mPhone) meta.phone = node.dataset.mPhone;
         if (Object.keys(meta).length) m.meta = meta;
         mentions.push(m);
         value += `@[${label}](${m.type}:${m.id})`;

@@ -38,8 +38,14 @@ type ChatRequest struct {
 	// — serve como "prompt legível" pra LLM. O backend usa Mentions como
 	// autoritativo na resolução de instância/grupo; o Message original mantém
 	// os tokens pra rastreabilidade.
-	RenderedText string    `json:"rendered_text,omitempty"`
-	Mentions     []Mention `json:"mentions,omitempty"`
+	RenderedText string `json:"rendered_text,omitempty"`
+	// OriginalInput = texto CRU do usuário (com tokens). Usado como
+	// Journey.Prompt quando a jornada é criada via confirmação no chat —
+	// sem isso o "Prompt original" exibido no card mostrava o wrapper
+	// "Analise este pedido..." que mandamos pra LLM, e não o que o usuário
+	// realmente escreveu.
+	OriginalInput string    `json:"original_input,omitempty"`
+	Mentions      []Mention `json:"mentions,omitempty"`
 }
 
 // Mention é uma menção tipada produzida pelo MentionPicker do frontend. O
@@ -51,6 +57,21 @@ type Mention struct {
 	ID    string            `json:"id"`
 	Label string            `json:"label"`
 	Meta  map[string]string `json:"meta,omitempty"`
+}
+
+// pickUserPrompt retorna o texto original do usuário pra salvar como
+// Journey.Prompt. Prioridade: OriginalInput (raw com tokens) →
+// RenderedText (tokens → labels) → Message (pode ser o wrapper LLM).
+// Evitar salvar "Analise este pedido de automação..." como prompt da
+// jornada é o objetivo aqui.
+func pickUserPrompt(req ChatRequest) string {
+	if strings.TrimSpace(req.OriginalInput) != "" {
+		return req.OriginalInput
+	}
+	if strings.TrimSpace(req.RenderedText) != "" {
+		return req.RenderedText
+	}
+	return req.Message
 }
 
 // firstMention returns the first mention of the given type, or nil.
@@ -405,7 +426,7 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 		journey := models.Journey{
 			UserID:          userID.String(),
 			Name:            journeyName,
-			Prompt:          req.Message, // mantém cru com tokens para rastreabilidade
+			Prompt:          pickUserPrompt(req), // texto do usuário, não o wrapper LLM
 			TriggerType:     string(triggerType),
 			TriggerFilter:   triggerFilter,
 			Keywords:        string(keywords),

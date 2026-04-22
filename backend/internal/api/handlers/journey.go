@@ -55,6 +55,11 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 		IntegrationID string    `json:"integration_id"`
 		InstanceID    string    `json:"instance_id"`
 		RenderedText  string    `json:"rendered_text,omitempty"`
+		// OriginalInput é a mensagem CRUA que o usuário escreveu (com tokens
+		// @[label](type:id) embutidos). Salva em Journey.Prompt pra exibir
+		// "Prompt original" no card da jornada; sem isso acabávamos salvando
+		// o wrapper "Analise este pedido..." que mandamos pra LLM.
+		OriginalInput string    `json:"original_input,omitempty"`
 		Mentions      []Mention `json:"mentions,omitempty"`
 		// Blank=true cria uma jornada pronta pra ser editada no canvas,
 		// sem chamar LLM. Prompt pode vir vazio; criamos um flow inicial
@@ -108,9 +113,11 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 	// Parse the prompt to extract trigger details
 	triggerType, triggerFilter, keywords, messageTemplate := parsePromptForJourney(promptText, parsedRules)
 
-	// Menções de trigger/keyword sobrescrevem o que foi deduzido pela LLM.
+	// Menções de trigger/keyword/action sobrescrevem o que foi deduzido
+	// pela LLM — o usuário é autoritativo.
 	if tm := firstMention(req.Mentions, "trigger"); tm != nil {
 		triggerType = models.TriggerType(tm.ID)
+		triggerFilter = humanTriggerLabel(tm.ID)
 	}
 	if kws := allMentionsOfType(req.Mentions, "keyword"); len(kws) > 0 {
 		labels := make([]string, 0, len(kws))
@@ -125,19 +132,49 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 			}
 		}
 	}
+	// Action mention define a ação real: seu meta.value vira o
+	// messageTemplate (ou nome da tag, URL do webhook, etc).
+	var actionID string
+	responseMode := "private"
+	if am := firstMention(req.Mentions, "action"); am != nil {
+		actionID = am.ID
+		val := ""
+		if am.Meta != nil {
+			val = am.Meta["value"]
+		}
+		switch am.ID {
+		case "reply_private":
+			messageTemplate = val
+			responseMode = "private"
+		case "reply_group":
+			messageTemplate = val
+			responseMode = "group"
+		case "ai_response", "add_tag", "remove_tag", "update_stage", "webhook", "handoff":
+			messageTemplate = val
+		}
+	}
+
+	// Usa o texto CRU do usuário (com tokens) como Prompt visível no card.
+	// Se não veio, cai pra req.Prompt (que pode ser o wrapper da LLM, mas
+	// pelo menos não quebra).
+	displayPrompt := req.OriginalInput
+	if strings.TrimSpace(displayPrompt) == "" {
+		displayPrompt = req.Prompt
+	}
 
 	journey := models.Journey{
 		ID:              uuid.New().String(),
 		UserID:          userID.String(),
-		Prompt:          req.Prompt,
+		Prompt:          displayPrompt,
 		TriggerType:     string(triggerType),
 		TriggerFilter:   triggerFilter,
 		Keywords:        keywords,
 		MessageTemplate: messageTemplate,
 		Status:          "active",
 		Invocations:     0,
-		ResponseMode:    "private",
+		ResponseMode:    responseMode,
 	}
+	_ = actionID // reservado pra futuras actions que precisem de lógica extra
 
 	// Resolve instance: explicit ID > mention > fuzzy prompt match.
 	var resolvedInstanceID string

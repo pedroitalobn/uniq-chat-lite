@@ -510,6 +510,10 @@ function ChatSection() {
         selectedModel || undefined,
         {
           rendered_text: extras?.renderedText,
+          // Passa o displayText (texto crú do usuário, com tokens) como
+          // original_input — o backend usa pra Journey.Prompt em vez do
+          // wrapper "Analise este pedido…" que vai pra LLM.
+          original_input: extras?.displayText,
           mentions: extras?.mentions,
         },
       );
@@ -565,6 +569,10 @@ function ChatSection() {
     }) => {
       const res = await journeysApi.create(data.prompt, data.integrationId, data.instanceId, {
         rendered_text: data.renderedText,
+        // data.prompt é o texto CRU com tokens — o backend usa esse mesmo
+        // campo como original_input pra salvar em Journey.Prompt, evitando
+        // que o wrapper "Analise este pedido..." vá pra lá por engano.
+        original_input: data.prompt,
         mentions: data.mentions,
       });
       return res.data;
