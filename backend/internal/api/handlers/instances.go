@@ -27,28 +27,53 @@ func NewInstanceHandler(db *gorm.DB, manager *whatsapp.Manager) *InstanceHandler
 }
 
 // resolveLiveStatus unifica a regra de "qual é o status real" da instância
-// para List e Get. Antes, cada endpoint tinha uma lógica diferente e a UI
-// acabava mostrando status conflitantes no card da lista vs. no manager
-// (ex: lista "connecting" e detalhe "disconnected" pra mesma instância).
+// para List, Get e o polling de /status.
 //
-// Regra:
-//  - manager rodando + client conectado + logado → "connected"
-//  - manager rodando mas não totalmente logado   → "connecting"
-//  - manager não rodando                          → status do DB, com
-//      auto-correção: se DB ficou "connecting" sem client em memória,
-//      foi um reconnect que morreu — promove pra "disconnected" e
-//      persiste pra a UI poder oferecer "reconectar".
+// Matriz de estados (client é o InstanceClient no manager):
 //
-// Side effects: persiste correção "stuck connecting" no banco quando aplicável.
+//   IsConnected  IsLoggedIn   Status
+//   true         true         connected     — WS autenticado, tudo OK
+//   false        true         connecting    — sessão válida, whatsmeow
+//                                             tentando reconectar (auto
+//                                             reconnect em andamento)
+//   true         false        connecting    — acabou de abrir WS, ainda
+//                                             fazendo handshake/login
+//   false        false        disconnected  — sessão caiu sem ter
+//                                             autenticação guardada;
+//                                             o cliente está "vivo" no
+//                                             mapa mas sem conexão nem
+//                                             credencial válida
+//
+// Com essa matriz NUNCA reportamos "connecting" pra um cliente totalmente
+// offline. O bug que estávamos vendo era: sessão expirava (QR/2FA), o
+// InstanceClient continuava em memória e eu devolvia "connecting"
+// eternamente. Agora só devolve connecting se houver pelo menos UMA
+// evidência de vida (socket up OU sessão autenticada guardada).
+//
+// Quando nem IsRunning:
+//  - DB "connecting" → stale (reconnect que morreu), promove pra
+//    disconnected e persiste pra a UI oferecer reconectar.
+//  - Caso contrário usa o status do DB.
 func (h *InstanceHandler) resolveLiveStatus(inst *models.Instance) models.InstanceStatus {
 	id := inst.ID.String()
 	if h.manager.IsRunning(id) {
 		client := h.manager.GetInstance(id)
-		if client != nil && client.IsConnected() && client.IsLoggedIn() {
-			return models.StatusConnected
-		}
 		if client != nil {
-			return models.StatusConnecting
+			connected := client.IsConnected()
+			loggedIn := client.IsLoggedIn()
+			if connected && loggedIn {
+				return models.StatusConnected
+			}
+			if connected || loggedIn {
+				// Um dos dois verdadeiro = estado transitório real
+				return models.StatusConnecting
+			}
+			// Client existe mas nem socket nem sessão — tá morto.
+			// Persiste pra a UI não pedir polling infinito.
+			if inst.Status != models.StatusDisconnected {
+				h.db.Model(inst).Update("status", models.StatusDisconnected)
+			}
+			return models.StatusDisconnected
 		}
 	}
 	// Manager não tem client em memória — DB é a fonte da verdade. Se o
