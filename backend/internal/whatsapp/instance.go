@@ -1867,6 +1867,16 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 				messageID := v.Info.ID // usado para dedup — evita loop em history-sync
 				go GlobalManager.CheckJourneys(ic.ID, messageID, journeySenderJID, pushName, journeyChatJID, text, msgType, isGroup)
 			}
+		} else if isFromMe && GlobalManager != nil {
+			// Log explícito: jornadas NUNCA disparam pra mensagens enviadas
+			// pela própria instância. Se o usuário está testando mandando
+			// a keyword do próprio número da instância, nada acontece. Esse
+			// log ajuda a diagnosticar — peça pra outra pessoa enviar.
+			log.Debug().
+				Str("instance", ic.ID).
+				Str("chat", chatJID).
+				Bool("is_group", isGroupMsg).
+				Msg("journey: mensagem saiu da própria instância (isFromMe) — não dispara jornada")
 		}
 
 	// ── Read receipts / delivery ─────────────────────────────────────────────

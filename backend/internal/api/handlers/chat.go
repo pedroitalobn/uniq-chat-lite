@@ -388,6 +388,8 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 			}
 
 			response += "\n\n**Responda com 'confirmo' ou 'sim' para criar a jornada.**"
+			response += "\n\n_Dica: a jornada só dispara pra mensagens de OUTRAS pessoas. " +
+				"Se você testar mandando a palavra-chave do próprio número da instância, nada acontece — peça pra outro número enviar._"
 
 			return c.JSON(fiber.Map{
 				"response":        response,

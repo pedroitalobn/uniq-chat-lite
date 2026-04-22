@@ -98,6 +98,70 @@ func (e *JourneyExecutor) seenRecently(instanceID, messageID string) bool {
 	return false
 }
 
+// triggerMatchReason: espelha ShouldTrigger mas RETORNA A RAZÃO do não-match
+// em string (ou "" quando match). Usado só pra logs diagnósticos; o
+// ShouldTrigger original continua sendo a fonte de verdade.
+func triggerMatchReason(j *models.Journey, messageText, groupJID, messageType string, isGroup bool) string {
+	if j.Status != "active" {
+		return "journey_status_not_active:" + j.Status
+	}
+	isGroupTrigger := strings.Contains(j.TriggerType, "group_")
+	if isGroupTrigger && !isGroup {
+		return "trigger_exige_grupo_mas_msg_nao_eh_de_grupo"
+	}
+	isPrivateTrigger := j.TriggerType == "private_message" || j.TriggerType == "private_keyword"
+	if isPrivateTrigger && isGroup {
+		return "trigger_exige_privado_mas_msg_eh_de_grupo"
+	}
+	if j.GroupJID != "" && j.GroupJID != groupJID {
+		return fmt.Sprintf("group_jid_diff:esperado=%s recebido=%s", j.GroupJID, groupJID)
+	}
+	switch models.TriggerType(j.TriggerType) {
+	case models.TriggerContactVideo:
+		if messageType != "video" {
+			return "msg_type_nao_eh_video:" + messageType
+		}
+	case models.TriggerContactAudio:
+		if messageType != "audio" {
+			return "msg_type_nao_eh_audio:" + messageType
+		}
+	case models.TriggerContactDocument:
+		if messageType != "document" {
+			return "msg_type_nao_eh_document:" + messageType
+		}
+	case models.TriggerContactImage:
+		if messageType != "image" {
+			return "msg_type_nao_eh_image:" + messageType
+		}
+	case models.TriggerContactLocation:
+		if messageType != "location" {
+			return "msg_type_nao_eh_location:" + messageType
+		}
+	case models.TriggerContactCall:
+		if messageType != "call" {
+			return "msg_type_nao_eh_call:" + messageType
+		}
+	}
+	// Keywords: se não há, passa. Se há, precisa bater uma.
+	if j.Keywords == "" || j.Keywords == "[]" {
+		return ""
+	}
+	var keywords []string
+	if err := json.Unmarshal([]byte(j.Keywords), &keywords); err != nil {
+		return "keywords_json_invalido"
+	}
+	if len(keywords) == 0 {
+		return ""
+	}
+	lowerMsg := strings.ToLower(messageText)
+	for _, kw := range keywords {
+		if strings.Contains(lowerMsg, strings.ToLower(kw)) {
+			return ""
+		}
+	}
+	return "nenhuma_keyword_bateu:" + strings.Join(keywords, ",")
+}
+
 // sanitizeFlowForExec zera ponteiros next/branch que criam self-loop ou
 // apontam pra steps inexistentes. Não reorganiza o flow — só evita que
 // o executor entre em ciclo óbvio. O FlowBuilder (journey_flow_builder.go)
@@ -205,12 +269,38 @@ func (e *JourneyExecutor) HandleIncoming(instanceID, messageID, fromJID, fromNam
 		return false
 	}
 
+	// Log estruturado pra ajudar a diagnosticar "por que a jornada não
+	// disparou". Inclui o estado da mensagem recebida e quantas jornadas
+	// ativas existem pra essa instância.
+	log.Debug().
+		Str("instance", instanceID).
+		Str("from", fromJID).
+		Str("group", groupJID).
+		Bool("is_group", isGroup).
+		Str("msg_type", messageType).
+		Int("text_len", len(messageText)).
+		Int("active_journeys", len(journeys)).
+		Msg("journey: avaliando trigger")
+
 	triggered := false
 	for i := range journeys {
 		j := &journeys[i]
-		if !j.ShouldTrigger(messageText, groupJID, messageType, isGroup) {
+		reason := triggerMatchReason(j, messageText, groupJID, messageType, isGroup)
+		if reason != "" {
+			log.Debug().
+				Str("journey", j.ID).
+				Str("name", j.Name).
+				Str("trigger_type", j.TriggerType).
+				Str("skipped_because", reason).
+				Msg("journey: trigger NÃO bateu")
 			continue
 		}
+		log.Info().
+			Str("journey", j.ID).
+			Str("name", j.Name).
+			Str("trigger_type", j.TriggerType).
+			Str("from", fromJID).
+			Msg("journey: trigger bateu — iniciando execução")
 		triggered = true
 		go e.startNew(j, fromJID, fromName, groupJID, messageText)
 	}
