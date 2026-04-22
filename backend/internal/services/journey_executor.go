@@ -361,10 +361,46 @@ func (e *JourneyExecutor) handleReservedCommand(action, instanceID, fromJID, fro
 	return false
 }
 
+// flowHasSendStep retorna true se o flow tem pelo menos um step que produz
+// uma mensagem outbound. Usado pra detectar flows "inúteis" (só end/wait/
+// set_variable) — nesses casos caímos no legacyFallback, que ao menos
+// envia o journey.MessageTemplate se houver.
+func flowHasSendStep(f *models.JourneyFlow) bool {
+	if f == nil {
+		return false
+	}
+	for i := range f.Steps {
+		switch f.Steps[i].Type {
+		case models.StepTypeMessage,
+			models.StepTypeButtons,
+			models.StepTypeList,
+			models.StepTypeMedia,
+			models.StepTypeAIResponse,
+			models.StepTypeHandoff:
+			return true
+		}
+	}
+	return false
+}
+
 // startNew inicia uma nova execução de jornada
 func (e *JourneyExecutor) startNew(journey *models.Journey, fromJID, fromName, groupJID, messageText string) {
 	flow := journey.GetFlow()
 	if flow == nil || len(flow.Steps) == 0 {
+		e.legacyFallback(journey, fromJID, fromName, groupJID, messageText)
+		return
+	}
+	// Rede de segurança: se o flow salvo não tem NENHUM step de envio
+	// (caso comum de FlowBuilder gerando só "end" ou step desconhecido
+	// que não dispara SendText), e mesmo assim temos messageTemplate
+	// definido, preferimos o legacyFallback — pelo menos o DM sai.
+	// Isso salva jornadas antigas que tinham flow quebrado mas já haviam
+	// capturado messageTemplate via action mention.
+	if !flowHasSendStep(flow) && strings.TrimSpace(journey.MessageTemplate) != "" {
+		log.Info().
+			Str("journey", journey.ID).
+			Int("steps", len(flow.Steps)).
+			Msg("journey: flow sem step de envio + messageTemplate presente → usando legacyFallback")
 		e.legacyFallback(journey, fromJID, fromName, groupJID, messageText)
 		return
 	}

@@ -124,9 +124,15 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "falha ao interpretar jornada: " + err.Error()})
 	}
 
-	// Gerar flow estruturado via FlowBuilder (best-effort — se falhar, journey é criada sem flow)
+	// Gerar flow estruturado via FlowBuilder (best-effort). PULAMOS quando
+	// há uma action mention explícita — nesse caso a intenção do usuário
+	// já está totalmente capturada (messageTemplate + responseMode), e o
+	// legacyFallback do executor envia direto sem depender de a LLM ter
+	// gerado um flow com step de message. Eliminamos o caso "flow sem
+	// step de envio → execução completa 100% sem mandar nada".
 	var flow *models.JourneyFlow
-	if h.builder != nil {
+	hasExplicitAction := firstMention(req.Mentions, "action") != nil
+	if !hasExplicitAction && h.builder != nil {
 		if f, fErr := h.builder.Build(ctx, integration, promptText); fErr == nil {
 			flow = f
 		}
