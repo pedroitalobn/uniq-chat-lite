@@ -1377,6 +1377,7 @@ func (h *JourneyHandler) UpdateTrigger(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "requisição inválida"})
 	}
 
+	oldName := journey.Name
 	updates := map[string]interface{}{}
 	if req.Name != nil {
 		updates["name"] = strings.TrimSpace(*req.Name)
@@ -1410,6 +1411,18 @@ func (h *JourneyHandler) UpdateTrigger(c *fiber.Ctx) error {
 	}
 	// Recarrega pra devolver o estado atualizado
 	h.db.Where("id = ? AND user_id = ?", id, userID).First(&journey)
+
+	// Cascade jornada → CRM: se o nome mudou, atualiza todos os contatos
+	// que apontam pra ela. Assim /crm e /inbox refletem o novo nome sem
+	// precisar re-disparar as jornadas.
+	if req.Name != nil && oldName != "" && oldName != journey.Name {
+		if err := h.db.Model(&models.Contact{}).
+			Where("user_id = ? AND journey = ?", userID, oldName).
+			Update("journey", journey.Name).Error; err != nil {
+			// best-effort — só loga
+			_ = err
+		}
+	}
 
 	return c.JSON(fiber.Map{
 		"ok":             true,

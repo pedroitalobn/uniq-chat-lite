@@ -8,7 +8,7 @@ import {
   Search, Send, Check, CheckCheck, Image, Mic, FileText, MapPin,
   Users, Phone, Video, MessageSquare, User, Archive, Trash2, Star,
   MoreHorizontal, ChevronRight, ChevronDown, Filter, EyeOff, Pin, Tag, BellOff,
-  Smile, Paperclip, ArrowDown, RefreshCw, Copy, Clock, AlertCircle
+  Smile, Paperclip, ArrowDown, RefreshCw, Copy, Clock, AlertCircle, Zap
 } from "lucide-react";
 import { instancesApi, inboxApi, crmApi, workspacesApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -1227,7 +1227,18 @@ export default function InboxPage() {
                     </div>
                   )}
                   <div>
-                    <div className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>{ct.name}</div>
+                    <div className="text-sm font-semibold flex items-center gap-2" style={{ color: "var(--text-1)" }}>
+                      <span>{ct.name}</span>
+                      {ct.journey && (
+                        <span
+                          title={`Este contato está na jornada "${ct.journey}"`}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+                          style={{ background: "#a855f71a", color: "#c084fc", border: "1px solid #a855f733" }}>
+                          <Zap className="w-2.5 h-2.5" />
+                          {ct.journey}
+                        </span>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={() => {

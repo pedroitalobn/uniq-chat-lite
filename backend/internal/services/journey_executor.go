@@ -468,6 +468,74 @@ func reachableSendStepFromStart(f *models.JourneyFlow) bool {
 	return false
 }
 
+// upsertContactForJourney garante que existe um Contact no CRM pra esse
+// fromJID e marca a jornada ativa em contact.Journey. Usa o nome atual
+// da jornada — renames propagam via cascade em UpdateTrigger.
+// Não bloqueia a execução: qualquer erro é só logado.
+func (e *JourneyExecutor) upsertContactForJourney(journey *models.Journey, fromJID, fromName string) {
+	if e.db == nil || fromJID == "" {
+		return
+	}
+	// Ignora grupos: fromJID no executor é sempre o remetente individual.
+	// Mas preservamos a checagem pra @lid e formatos estranhos.
+	if strings.HasSuffix(fromJID, "@g.us") || strings.HasSuffix(fromJID, "@newsletter") || strings.Contains(fromJID, "-") {
+		return
+	}
+	// Extrai o telefone cru (parte antes do @)
+	phone := fromJID
+	if idx := strings.Index(phone, "@"); idx > 0 {
+		phone = phone[:idx]
+	}
+	if phone == "" {
+		return
+	}
+	userUUID, err := uuid.Parse(journey.UserID)
+	if err != nil {
+		return
+	}
+
+	// Busca contato existente pelo phone do usuário dono da jornada.
+	var contact models.Contact
+	err = e.db.Where("user_id = ? AND phone LIKE ?", userUUID, "%"+phone+"%").First(&contact).Error
+	if err == nil {
+		// Já existe — atualiza apenas journey se mudou.
+		if contact.Journey != journey.Name {
+			e.db.Model(&contact).Update("journey", journey.Name)
+			log.Info().Str("contact", contact.ID.String()).Str("journey", journey.Name).
+				Msg("journey → crm: contato atualizado com nova jornada")
+		}
+		return
+	}
+
+	// Cria novo contato. Nome = fromName (push name) ou o phone.
+	name := strings.TrimSpace(fromName)
+	if name == "" || name == "Cliente" {
+		name = phone
+	}
+	newContact := models.Contact{
+		ID:      uuid.New(),
+		UserID:  userUUID,
+		Name:    name,
+		Phone:   phone,
+		Journey: journey.Name,
+		Source:  models.SourceWhatsApp,
+	}
+	// workspace: herda da instância
+	var inst models.Instance
+	if e.db.Where("id = ?", journey.InstanceID).First(&inst).Error == nil && inst.WorkspaceID != nil {
+		newContact.WorkspaceID = inst.WorkspaceID
+	}
+	if err := e.db.Create(&newContact).Error; err != nil {
+		log.Warn().Err(err).Str("phone", phone).Msg("journey → crm: falha ao criar contato")
+		return
+	}
+	log.Info().
+		Str("contact", newContact.ID.String()).
+		Str("phone", phone).
+		Str("journey", journey.Name).
+		Msg("journey → crm: contato criado automaticamente pela jornada")
+}
+
 // startNew inicia uma nova execução de jornada
 func (e *JourneyExecutor) startNew(journey *models.Journey, fromJID, fromName, groupJID, messageText string) {
 	// Recover pra evitar que panic num step (config inválida, etc) deixe
@@ -481,6 +549,10 @@ func (e *JourneyExecutor) startNew(journey *models.Journey, fromJID, fromName, g
 				Msg("journey: PANIC em startNew — execução abortada")
 		}
 	}()
+
+	// Integra jornada ↔ CRM: cria/atualiza Contact pra todo usuário que
+	// entra numa jornada. Best-effort (não bloqueia execução).
+	e.upsertContactForJourney(journey, fromJID, fromName)
 
 	flow := journey.GetFlow()
 	flowSteps := 0
@@ -1416,6 +1488,9 @@ func parseFloat(s string) float64 {
 // legacyFallback reproduz o comportamento original (message_template único)
 // para jornadas ainda sem flow estruturado.
 func (e *JourneyExecutor) legacyFallback(j *models.Journey, fromJID, fromName, groupJID, messageText string) {
+	// Integra jornada ↔ CRM (idempotente — startNew pode já ter chamado).
+	e.upsertContactForJourney(j, fromJID, fromName)
+
 	vars := &models.ExecutionVars{
 		Contact:   map[string]interface{}{"name": fromName, "jid": fromJID},
 		Flow:      map[string]interface{}{},
