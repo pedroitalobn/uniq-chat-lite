@@ -623,7 +623,20 @@ func (e *JourneyExecutor) stepMessage(ctx *execCtx, step *models.FlowStep) (*mod
 
 	ctx.emit(step.ID, string(step.Type), "send_text", map[string]interface{}{"to": jid, "text": text})
 	if !ctx.simulate {
+		log.Info().
+			Str("journey", ctx.journey.ID).
+			Str("step", step.ID).
+			Str("mode", cfg.Mode).
+			Str("to", jid).
+			Int("text_len", len(text)).
+			Str("text_preview", firstN(text, 60)).
+			Msg("journey: enviando mensagem")
 		if err := e.sender.SendText(ctx.instanceID, jid, text); err != nil {
+			log.Error().Err(err).
+				Str("journey", ctx.journey.ID).
+				Str("step", step.ID).
+				Str("to", jid).
+				Msg("journey: falha ao enviar mensagem")
 			return nil, false, err
 		}
 		ctx.execution.AddMessage("outbound", text, step.ID)
@@ -1240,7 +1253,19 @@ func (e *JourneyExecutor) legacyFallback(j *models.Journey, fromJID, fromName, g
 	exec.AddMessage("inbound", messageText, "trigger")
 	e.db.Create(exec)
 
+	log.Info().
+		Str("journey", j.ID).
+		Str("mode", j.ResponseMode).
+		Str("to", recipient).
+		Int("text_len", len(msg)).
+		Str("text_preview", firstN(msg, 60)).
+		Msg("journey (legacy): enviando mensagem")
+
 	if err := e.sender.SendText(j.InstanceID, recipient, msg); err != nil {
+		log.Error().Err(err).
+			Str("journey", j.ID).
+			Str("to", recipient).
+			Msg("journey (legacy): falha ao enviar mensagem")
 		now := time.Now()
 		exec.Status = models.ExecutionFailed
 		exec.ErrorMessage = err.Error()
