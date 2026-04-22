@@ -137,6 +137,31 @@ func NewInstanceClient(instanceID, sessionDir string, proxyCfg *ProxyConfig, web
 
 	waClient := whatsmeow.NewClient(deviceStore, logger)
 
+	// Auto-reconnect do whatsmeow: CRÍTICO pra UX. Sem isso, qualquer flap
+	// de rede (keepalive timeout, stream replaced transitório, CAT
+	// refresh) emite events.Disconnected e fica esperando nosso poller
+	// de 30s reabrir o socket. Com Enable=true, a lib reconecta em
+	// 0-18s usando exponential backoff interno (2s * errors), zerando
+	// no primeiro sucesso.
+	//
+	// InitialAutoReconnect=true = aplicado já na primeira conexão.
+	// AutoReconnectHook retorna false quando o backoff ultrapassa 5
+	// tentativas — avisa que tem algo errado e deixa o nosso poller
+	// externo assumir (manager.go startReconnectionChecker).
+	waClient.EnableAutoReconnect = true
+	waClient.InitialAutoReconnect = true
+	waClient.AutoReconnectHook = func(err error) bool {
+		if waClient.AutoReconnectErrors > 5 {
+			log.Error().
+				Str("instance", instanceID).
+				Int("errors", waClient.AutoReconnectErrors).
+				Err(err).
+				Msg("whatsmeow: auto-reconnect esgotou backoff — caindo pro poller externo")
+			return false
+		}
+		return true
+	}
+
 	ic := &InstanceClient{
 		ID:         instanceID,
 		client:     waClient,

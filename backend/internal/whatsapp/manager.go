@@ -572,10 +572,11 @@ func (m *Manager) loadWebhooks(instanceID string) []webhookEntry {
 }
 
 // disconnectedDebounce delays persisting/broadcasting a "disconnected" event
-// so brief socket flaps — which whatsmeow's built-in auto-reconnect recovers
-// from in 0–2 seconds — don't flash the UI. Tuned above the common flap
-// window but below where a user would suspect a real outage.
-const disconnectedDebounce = 15 * time.Second
+// pra ocultar flaps transitórios. Com EnableAutoReconnect=true no whatsmeow,
+// a lib reconecta em 0-18s via exponential backoff interno — o debounce só
+// precisa cobrir o tempo entre o evento Disconnected e o evento Connected
+// da reconexão. 8s pega 90% dos flaps sem atrasar demais o feedback real.
+const disconnectedDebounce = 8 * time.Second
 
 func (m *Manager) watchStatus(instanceID string, client *InstanceClient) {
 	// If the instance hasn't connected within 60 s, reset to disconnected.
@@ -632,8 +633,10 @@ func (m *Manager) watchStatus(instanceID string, client *InstanceClient) {
 			disconnectTimerMu.Lock()
 			disconnectTimer = time.AfterFunc(disconnectedDebounce, func() {
 				if client.IsConnected() {
-					// whatsmeow reconnected without emitting a new status —
-					// treat as still connected and skip broadcast.
+					// whatsmeow reconectou silenciosamente dentro da janela
+					// de debounce — ótimo, flap escondido do usuário.
+					log.Debug().Str("instance", instanceID).
+						Msg("disconnect hidden: whatsmeow reconectou dentro do debounce window")
 					return
 				}
 				m.db.Model(&models.Instance{}).Where("id = ?", instanceID).Update("status", models.StatusDisconnected)
