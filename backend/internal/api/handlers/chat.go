@@ -9,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/services"
 	"github.com/uniq-chat/backend/internal/whatsapp"
@@ -224,9 +225,26 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 			h.db.Where("user_id = ? AND is_active = true AND provider IN ?", userID, []string{"openai", "claude", "deepseek", "gemini", "openrouter", "kilo", "zai", "kimi", "qwen", "minimax", "manus"}).First(&integration)
 		}
 
-		parsedRules, parseErr := h.llm.ParseJourneyPrompt(ctx, integration, promptText)
-		if parseErr != nil {
-			return c.JSON(fiber.Map{"response": "Entendi o pedido, mas não consegui interpretar as regras da automação: " + parseErr.Error()})
+		// Pula a chamada LLM quando já temos trigger + action via menções
+		// explícitas — a intenção está totalmente estruturada; chamar a
+		// LLM só abre espaço pra alucinação (Palavra-chave virando string
+		// literal, etc). Menções populam os campos mais abaixo.
+		hasExplicitTrigger := firstMention(req.Mentions, "trigger") != nil
+		hasExplicitAction := firstMention(req.Mentions, "action") != nil
+		canSkipLLMParse := hasExplicitTrigger && hasExplicitAction
+
+		var parsedRules services.ParsedRules
+		if canSkipLLMParse {
+			log.Info().
+				Str("instance", instanceID.String()).
+				Msg("journey (chat): menções completas — pulando LLM parse")
+			parsedRules = services.ParsedRules{}
+		} else {
+			pr, parseErr := h.llm.ParseJourneyPrompt(ctx, integration, promptText)
+			if parseErr != nil {
+				return c.JSON(fiber.Map{"response": "Entendi o pedido, mas não consegui interpretar as regras da automação: " + parseErr.Error()})
+			}
+			parsedRules = pr
 		}
 
 		triggerType, triggerFilter, keywords, messageTemplate := parsePromptForJourney(promptText, parsedRules)

@@ -119,22 +119,22 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	parsedRules, err := h.llm.ParseJourneyPrompt(ctx, integration, promptText)
-	if err != nil {
-		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "falha ao interpretar jornada: " + err.Error()})
-	}
-
-	// Gerar flow estruturado via FlowBuilder (best-effort). PULAMOS quando
-	// há uma action mention explícita — nesse caso a intenção do usuário
-	// já está totalmente capturada (messageTemplate + responseMode), e o
-	// legacyFallback do executor envia direto sem depender de a LLM ter
-	// gerado um flow com step de message. Eliminamos o caso "flow sem
-	// step de envio → execução completa 100% sem mandar nada".
-	var flow *models.JourneyFlow
+	// Checa se já temos dados estruturados suficientes via menções. Se sim,
+	// pulamos a chamada LLM de parse — a intenção está toda capturada e
+	// chamar a LLM só abre espaço pra alucinação.
 	hasExplicitAction := firstMention(req.Mentions, "action") != nil
-	if !hasExplicitAction && h.builder != nil {
-		if f, fErr := h.builder.Build(ctx, integration, promptText); fErr == nil {
-			flow = f
+	hasExplicitTrigger := firstMention(req.Mentions, "trigger") != nil
+	canSkipLLMParse := hasExplicitAction && hasExplicitTrigger
+
+	var parsedRules services.ParsedRules
+	if canSkipLLMParse {
+		// Estrutura vazia; menções vão popular os campos mais abaixo.
+		parsedRules = services.ParsedRules{}
+	} else {
+		var err error
+		parsedRules, err = h.llm.ParseJourneyPrompt(ctx, integration, promptText)
+		if err != nil {
+			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "falha ao interpretar jornada: " + err.Error()})
 		}
 	}
 
@@ -179,6 +179,23 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 			responseMode = "group"
 		case "ai_response", "add_tag", "remove_tag", "update_stage", "webhook", "handoff":
 			messageTemplate = val
+		}
+	}
+
+	// Flow: dois caminhos.
+	//  1) Action mention explícita → monta flow 1-step determinístico com
+	//     messageTemplate + responseMode. Zero alucinação, visível no card
+	//     como "1 passo · Responder". Vai pelo stepMessage normal do
+	//     executor — sem depender de legacyFallback.
+	//  2) Prompt 100% livre (sem action mention) → LLM FlowBuilder gera
+	//     o flow. Pode produzir branching, condições, etc. Fallbacks do
+	//     executor pegam casos degenerados.
+	var flow *models.JourneyFlow
+	if hasExplicitAction {
+		flow = buildDeterministicFlow(messageTemplate, responseMode)
+	} else if h.builder != nil {
+		if f, fErr := h.builder.Build(ctx, integration, promptText); fErr == nil {
+			flow = f
 		}
 	}
 
@@ -1024,6 +1041,45 @@ func buildResponseFromJourney(journey *models.Journey, fromName string) string {
 	}
 
 	return "Olá " + fromName + "! Obrigado por entrar em contato. Como posso ajudar?"
+}
+
+// buildDeterministicFlow monta um JourneyFlow simples a partir de dados
+// estruturados — usado quando o usuário preencheu explicitamente a ação
+// via /ação (action mention). Evita chamar o FlowBuilder/LLM pra algo
+// que já sabemos: "quando trigger X, envie Y em modo Z".
+//
+// O flow gerado sempre tem UM único step de message com IsStartStep=true,
+// mode private/group, e NextStepID vazio (fim do flow). Determinístico;
+// não sofre das alucinações que a LLM produzia (condition inalcançável,
+// literals de metadata como keyword, etc).
+//
+// Retorna nil se messageTemplate estiver vazio — nesse caso o caller
+// deixa o flow = nil e o executor cai no legacyFallback.
+func buildDeterministicFlow(messageTemplate, responseMode string) *models.JourneyFlow {
+	if strings.TrimSpace(messageTemplate) == "" {
+		return nil
+	}
+	mode := responseMode
+	if mode == "" {
+		mode = "private"
+	}
+	cfg := map[string]string{
+		"message": messageTemplate,
+		"mode":    mode,
+	}
+	cfgBytes, _ := json.Marshal(cfg)
+	return &models.JourneyFlow{
+		StartStep: "s1",
+		Steps: []models.FlowStep{
+			{
+				ID:          "s1",
+				Type:        models.StepTypeMessage,
+				Label:       "Responder",
+				IsStartStep: true,
+				Config:      json.RawMessage(cfgBytes),
+			},
+		},
+	}
 }
 
 // buildMentionHints converte a lista de menções em um bloco textual anexado
