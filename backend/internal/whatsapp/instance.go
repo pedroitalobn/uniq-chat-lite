@@ -1872,7 +1872,7 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 			// pela própria instância. Se o usuário está testando mandando
 			// a keyword do próprio número da instância, nada acontece. Esse
 			// log ajuda a diagnosticar — peça pra outra pessoa enviar.
-			log.Debug().
+			log.Info().
 				Str("instance", ic.ID).
 				Str("chat", chatJID).
 				Bool("is_group", isGroupMsg).

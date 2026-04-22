@@ -98,6 +98,19 @@ func (e *JourneyExecutor) seenRecently(instanceID, messageID string) bool {
 	return false
 }
 
+// firstN retorna no máximo n runes do começo da string — útil em logs
+// pra não imprimir mensagens enormes quebrando o JSON no logger.
+func firstN(s string, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= n {
+		return s
+	}
+	return string(runes[:n]) + "…"
+}
+
 // triggerMatchReason: espelha ShouldTrigger mas RETORNA A RAZÃO do não-match
 // em string (ou "" quando match). Usado só pra logs diagnósticos; o
 // ShouldTrigger original continua sendo a fonte de verdade.
@@ -270,9 +283,9 @@ func (e *JourneyExecutor) HandleIncoming(instanceID, messageID, fromJID, fromNam
 	}
 
 	// Log estruturado pra ajudar a diagnosticar "por que a jornada não
-	// disparou". Inclui o estado da mensagem recebida e quantas jornadas
-	// ativas existem pra essa instância.
-	log.Debug().
+	// disparou". Info level (não Debug) pra aparecer em prod sem precisar
+	// mexer em config de log. Fica até decidirmos rebaixar depois.
+	log.Info().
 		Str("instance", instanceID).
 		Str("from", fromJID).
 		Str("group", groupJID).
@@ -280,6 +293,7 @@ func (e *JourneyExecutor) HandleIncoming(instanceID, messageID, fromJID, fromNam
 		Str("msg_type", messageType).
 		Int("text_len", len(messageText)).
 		Int("active_journeys", len(journeys)).
+		Str("msg_preview", firstN(messageText, 40)).
 		Msg("journey: avaliando trigger")
 
 	triggered := false
@@ -287,12 +301,14 @@ func (e *JourneyExecutor) HandleIncoming(instanceID, messageID, fromJID, fromNam
 		j := &journeys[i]
 		reason := triggerMatchReason(j, messageText, groupJID, messageType, isGroup)
 		if reason != "" {
-			log.Debug().
+			log.Info().
 				Str("journey", j.ID).
 				Str("name", j.Name).
 				Str("trigger_type", j.TriggerType).
+				Str("journey_group_jid", j.GroupJID).
+				Str("journey_keywords", j.Keywords).
 				Str("skipped_because", reason).
-				Msg("journey: trigger NÃO bateu")
+				Msg("journey: trigger NÃO bateu — ver campo skipped_because")
 			continue
 		}
 		log.Info().

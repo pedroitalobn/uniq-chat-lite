@@ -9,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/services"
 	"github.com/uniq-chat/backend/internal/whatsapp"
@@ -72,6 +73,27 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 	}
 	if !req.Blank && req.Prompt == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "prompt inválido ou vazio"})
+	}
+
+	// Log diagnóstico: mostra exatamente que mentions chegaram do frontend.
+	// Ajuda a debugar "por que meu trigger/group/action não foi salvo" —
+	// se o mention não aparece aqui, o bug é no frontend (picker/roundtrip).
+	if !req.Blank && len(req.Mentions) > 0 {
+		mentionSummary := make([]string, 0, len(req.Mentions))
+		for _, m := range req.Mentions {
+			val := ""
+			if m.Meta != nil {
+				val = m.Meta["value"]
+				if val == "" {
+					val = m.Meta["jid"]
+				}
+			}
+			mentionSummary = append(mentionSummary, fmt.Sprintf("%s:%s[%s]=%q", m.Type, m.ID, m.Label, val))
+		}
+		log.Info().
+			Strs("mentions", mentionSummary).
+			Int("count", len(req.Mentions)).
+			Msg("journey: criando com mentions")
 	}
 
 	if req.Blank {
