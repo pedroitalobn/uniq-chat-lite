@@ -481,6 +481,21 @@ func (e *JourneyExecutor) startNew(journey *models.Journey, fromJID, fromName, g
 		e.legacyFallback(journey, fromJID, fromName, groupJID, messageText)
 		return
 	}
+	// Heurística anti-condition-sem-sentido: LLM às vezes gera flow com
+	// condition como primeiro step testando algo bobo (ex: last_input
+	// contains "Palavra-chave"), cujos branches mandam o fluxo pra lugar
+	// nenhum quando a condition dá false. Se temos um messageTemplate
+	// explícito (user marcou /ação), o flow de condition é um erro de
+	// interpretação da LLM e preferimos o caminho simples legacyFallback.
+	if first := flow.FirstStep(); first != nil && first.Type == models.StepTypeCondition &&
+		strings.TrimSpace(journey.MessageTemplate) != "" {
+		log.Info().
+			Str("journey", journey.ID).
+			Str("first_step_type", string(first.Type)).
+			Msg("journey: flow começa com condition + messageTemplate presente (provável alucinação da LLM) → legacyFallback")
+		e.legacyFallback(journey, fromJID, fromName, groupJID, messageText)
+		return
+	}
 	// Sanitiza flow em runtime — jornadas antigas podem ter sido salvas
 	// com self-loops (next_step_id == id do próprio step) ou refs pra
 	// steps inexistentes. Isso é o que causava "manda 50x a mesma msg".
