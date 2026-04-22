@@ -623,6 +623,21 @@ func (h *JourneyHandler) ToggleStatus(c *fiber.Ctx) error {
 	journey.Status = req.Status
 	h.db.Save(&journey)
 
+	// Ao pausar, marca todas as execuções ativas/waiting_input como paused
+	// pra interromper quaisquer goroutines ainda rodando (ex: durante um
+	// wait ou entre sends). O executor re-checa o status da jornada antes
+	// de cada step, então isso é belt-and-suspenders.
+	if req.Status == "paused" {
+		now := time.Now()
+		h.db.Model(&models.JourneyExecution{}).
+			Where("journey_id = ? AND status IN (?, ?)", journey.ID, models.ExecutionActive, "waiting_input").
+			Updates(map[string]interface{}{
+				"status":       models.ExecutionPaused,
+				"completed_at": now,
+				"updated_at":   now,
+			})
+	}
+
 	return c.JSON(fiber.Map{"status": journey.Status})
 }
 

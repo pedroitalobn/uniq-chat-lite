@@ -1843,8 +1843,8 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 					pushName = "Cliente"
 				}
 				isGroup := isGroupMsg
-				// Check journeys for both text and media messages
-				go GlobalManager.CheckJourneys(ic.ID, journeySenderJID, pushName, journeyChatJID, text, msgType, isGroup)
+				messageID := v.Info.ID // usado para dedup — evita loop em history-sync
+				go GlobalManager.CheckJourneys(ic.ID, messageID, journeySenderJID, pushName, journeyChatJID, text, msgType, isGroup)
 			}
 		}
 

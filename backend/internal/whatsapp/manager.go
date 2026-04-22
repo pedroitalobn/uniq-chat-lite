@@ -19,8 +19,12 @@ import (
 
 // JourneyExecutor é a interface mínima que o Manager precisa para delegar
 // execução de jornadas. Fica aqui para evitar ciclo com o pacote services.
+//
+// HandleIncoming recebe o ID da mensagem WhatsApp (`messageID`) para
+// deduplicação: whatsmeow re-emite eventos na reconexão/history sync, e
+// sem dedup cada re-emissão dispara a jornada de novo (loop de envio).
 type JourneyExecutor interface {
-	HandleIncoming(instanceID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) bool
+	HandleIncoming(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) bool
 }
 
 // Manager manages all active WhatsApp instance clients.
@@ -666,10 +670,10 @@ func parseEventsJSON(raw string) []string {
 
 // CheckJourneys checks if any journey should be triggered for the given message
 // and executes them asynchronously. Delega ao JourneyExecutor quando injetado.
-func (m *Manager) CheckJourneys(instanceID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) {
+func (m *Manager) CheckJourneys(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) {
 	ex := m.JourneyExecutorRef()
 	if ex != nil {
-		ex.HandleIncoming(instanceID, fromJID, fromName, groupJID, messageText, messageType, isGroup)
+		ex.HandleIncoming(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType, isGroup)
 		return
 	}
 

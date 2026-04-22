@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,15 +42,66 @@ type JourneyExecutor struct {
 	llm    *LLMService
 	// MaxSteps limita loops infinitos por execução
 	MaxSteps int
+
+	// Dedup de mensagens: whatsmeow re-emite o mesmo *events.Message em
+	// history-sync/reconexão. Sem dedup cada re-emissão dispara as
+	// jornadas de novo, gerando loop de envio. Guardamos os últimos
+	// IDs vistos por `dedupWindow` e ignoramos repetidos.
+	dedupMu     sync.Mutex
+	seenMsgs    map[string]time.Time
+	dedupWindow time.Duration
 }
 
 func NewJourneyExecutor(db *gorm.DB, sender MessageSender, llm *LLMService) *JourneyExecutor {
 	return &JourneyExecutor{
-		db:       db,
-		sender:   sender,
-		llm:      llm,
-		MaxSteps: 50,
+		db:          db,
+		sender:      sender,
+		llm:         llm,
+		MaxSteps:    50,
+		seenMsgs:    make(map[string]time.Time),
+		dedupWindow: 5 * time.Minute,
 	}
+}
+
+// seenRecently retorna true se o (instanceID, messageID) foi processado nos
+// últimos `dedupWindow`. Atualiza o cache e faz GC oportunista de entradas
+// expiradas.
+func (e *JourneyExecutor) seenRecently(instanceID, messageID string) bool {
+	if messageID == "" {
+		return false // sem ID não dá pra deduplicar — deixa passar
+	}
+	key := instanceID + "|" + messageID
+	now := time.Now()
+	e.dedupMu.Lock()
+	defer e.dedupMu.Unlock()
+	if e.seenMsgs == nil {
+		e.seenMsgs = make(map[string]time.Time)
+	}
+	// GC oportunista: se o mapa está grande, limpa entradas velhas.
+	if len(e.seenMsgs) > 1024 {
+		for k, t := range e.seenMsgs {
+			if now.Sub(t) > e.dedupWindow {
+				delete(e.seenMsgs, k)
+			}
+		}
+	}
+	if t, ok := e.seenMsgs[key]; ok && now.Sub(t) < e.dedupWindow {
+		return true
+	}
+	e.seenMsgs[key] = now
+	return false
+}
+
+// isJourneyActive confere no banco se a jornada continua ativa. Pausas feitas
+// pelo usuário depois que o goroutine começou devem interromper o envio.
+func (e *JourneyExecutor) isJourneyActive(journeyID string) bool {
+	var row struct {
+		Status string
+	}
+	if err := e.db.Table("journeys").Select("status").Where("id = ?", journeyID).Scan(&row).Error; err != nil {
+		return false
+	}
+	return row.Status == "active"
 }
 
 // execCtx é o contexto mutável de uma execução em andamento
@@ -80,7 +132,18 @@ func (e *execCtx) emit(stepID, stepType, action string, payload map[string]inter
 
 // HandleIncoming recebe mensagem do WhatsApp e decide se inicia/retoma jornada.
 // Retorna true se a mensagem foi "consumida" por uma jornada.
-func (e *JourneyExecutor) HandleIncoming(instanceID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) bool {
+//
+// messageID é o ID único da mensagem WhatsApp. Usamos pra deduplicar eventos
+// duplicados em history-sync/reconexão (sem isso o whatsmeow re-emite o
+// mesmo *events.Message e cada re-emissão dispara a jornada → loop).
+func (e *JourneyExecutor) HandleIncoming(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) bool {
+	// 0. Dedup: se já processamos esse ID recentemente, ignora. Protege
+	//    contra re-emissão de eventos em reconexão/history-sync.
+	if e.seenRecently(instanceID, messageID) {
+		log.Debug().Str("instance", instanceID).Str("msg", messageID).Msg("journey: dedup — mensagem já processada")
+		return false
+	}
+
 	// 1. Comando reservado: sempre prioritário
 	if cmd := models.IsReservedCommand(messageText); cmd != "" {
 		return e.handleReservedCommand(cmd, instanceID, fromJID, fromName)
@@ -284,6 +347,16 @@ func (e *JourneyExecutor) run(ctx *execCtx, step *models.FlowStep) {
 	for step != nil {
 		if ctx.stepsRun >= e.MaxSteps {
 			e.fail(ctx, "max_steps_exceeded")
+			return
+		}
+		// Re-checa status da jornada antes de cada step. Se o usuário
+		// pausou enquanto a goroutine estava em flight (ex: durante um
+		// wait ou entre sends), abortamos imediatamente — o que vier
+		// depois não deve ser enviado.
+		if !ctx.simulate && !e.isJourneyActive(ctx.journey.ID) {
+			log.Info().Str("journey", ctx.journey.ID).Str("exec", ctx.execution.ID).
+				Msg("journey: execução abortada — jornada foi pausada/desativada")
+			e.fail(ctx, "journey_paused")
 			return
 		}
 		ctx.stepsRun++
