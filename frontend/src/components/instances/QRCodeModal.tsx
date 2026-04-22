@@ -38,12 +38,20 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fetchAttemptRef = useRef(0);
+  // ready = true assim que a UI pediu QR ou entrou em modo pareamento.
+  // Usado pra gate de "connected": antes de a UI estar pronta, ignoramos
+  // eventos (evita fechar o modal num flag residual de conexão antiga).
+  // Usar REF em vez de state evita a classe inteira de bugs com stale
+  // closure no setInterval/WS handler.
+  const readyRef = useRef(false);
+  const connectedRef = useRef(false);
 
   const markConnected = () => {
-    if (connected) return; // Prevent double calls
+    if (connectedRef.current) return; // idempotente
+    connectedRef.current = true;
     setConnected(true);
     onConnected?.();
-    setTimeout(onClose, 2000);
+    setTimeout(onClose, 1500);
   };
 
   const stopAllTimers = () => {
@@ -57,16 +65,18 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
     }
   };
 
-  // Poll instance status - ONLY start after QR is shown
+  // Poll instance status. Só começa depois que a UI está pronta (QR
+  // renderizado OU pareamento iniciado) — evita fechar o modal num flag
+  // residual. Usa readyRef pra não sofrer com stale closure.
   const startPolling = () => {
     if (pollRef.current) return;
-    if (!qrShown) return; // Don't poll until QR is shown
-    
+    if (!readyRef.current) return;
+
     pollRef.current = setInterval(async () => {
+      if (!readyRef.current || connectedRef.current) return;
       try {
         const res = await instancesApi.status(instanceId);
-        // Only mark connected if we've shown a QR and status is truly connected
-        if (res.data.status === "connected" && qrShown) {
+        if (res.data.status === "connected") {
           stopAllTimers();
           markConnected();
         }
@@ -119,6 +129,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
       } else if (res.data.qr) {
         setQrCode(res.data.qr);
         setQrShown(true);
+        readyRef.current = true;
         // Start countdown for auto-refresh
         startQrCountdown();
         // Start polling now that we have a QR
@@ -162,15 +173,19 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
-        // Only accept connected event if we've shown QR first
-        if (msg.type === "status" && msg.data?.status === "connected" && qrShown) {
+        // Aceita o connected se a UI já está pronta (readyRef). Isso cobre
+        // tanto o fluxo de QR (readyRef setado quando QR é exibido) quanto
+        // o de pareamento (readyRef setado no mount do modo pairing).
+        if (msg.type === "status" && msg.data?.status === "connected" && readyRef.current) {
           stopAllTimers();
           markConnected();
         }
         if (msg.type === "qr" && msg.data?.qr) {
           setQrCode(msg.data.qr);
           setQrShown(true);
+          readyRef.current = true;
           startQrCountdown();
+          startPolling();
         }
       } catch { /* ignore */ }
     };
@@ -193,12 +208,16 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, instanceId]);
 
-  // Pairing mode
+  // Pairing mode — inicia WS e polling. A UI já está "pronta" assim que
+  // o usuário entrou em pairing (não depende de QR), então setamos
+  // readyRef imediatamente pra que connected events sejam aceitos.
   useEffect(() => {
     if (mode !== "pairing") return;
     stopAllTimers();
+    readyRef.current = true;
     openWebSocket();
-    
+    startPolling();
+
     return () => {
       wsRef.current?.close();
     };
