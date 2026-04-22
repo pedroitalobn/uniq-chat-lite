@@ -230,24 +230,28 @@ export const ACTION_OPTIONS: {
   paramLabel: (v: string) => string; // como montar o label da chip
   needsParam?: boolean;  // default true
 }[] = [
-  { id: "reply_private", label: "Responder no privado", hint: "Manda mensagem em DM pro contato",
-    prompt: "Qual mensagem enviar?", paramLabel: (v) => `Responder privado: "${v}"` },
-  { id: "reply_group",   label: "Responder no grupo",   hint: "Manda mensagem no mesmo grupo",
-    prompt: "Qual mensagem enviar?", paramLabel: (v) => `Responder no grupo: "${v}"` },
-  { id: "ai_response",   label: "Responder com IA",     hint: "LLM gera a resposta",
-    prompt: "Prompt/sistema da IA?", paramLabel: (v) => `IA: "${v}"` },
-  { id: "add_tag",       label: "Adicionar tag",        hint: "Tag CRM no contato",
-    prompt: "Qual tag?", paramLabel: (v) => `Tag: ${v}` },
-  { id: "remove_tag",    label: "Remover tag",          hint: "Remove tag CRM",
-    prompt: "Qual tag remover?", paramLabel: (v) => `Remove tag: ${v}` },
-  { id: "update_stage",  label: "Mudar etapa no CRM",   hint: "Atualiza stage do contato",
-    prompt: "Nome/id da etapa?", paramLabel: (v) => `Etapa: ${v}` },
-  { id: "set_variable",  label: "Definir variável",     hint: "Armazena valor",
+  // Respostas diretas (texto fixo)
+  { id: "reply_private", label: "Responder privado (texto fixo)", hint: "Envia uma mensagem pré-escrita no DM do contato",
+    prompt: "Qual mensagem enviar? (texto literal)", paramLabel: (v) => `Privado: "${v}"` },
+  { id: "reply_group",   label: "Responder no grupo (texto fixo)", hint: "Envia uma mensagem pré-escrita no mesmo grupo",
+    prompt: "Qual mensagem enviar? (texto literal)", paramLabel: (v) => `Grupo: "${v}"` },
+  // Resposta dinâmica via IA
+  { id: "ai_response",   label: "Responder com IA (dinâmico)",     hint: "Gera a resposta na hora via LLM; o prompt é opcional",
+    prompt: "Instrução pra IA (ex: 'seja breve e em tom formal')", paramLabel: (v) => `IA: "${v}"` },
+  // Ações CRM
+  { id: "add_tag",       label: "Adicionar tag no CRM", hint: "Marca o contato com uma tag",
+    prompt: "Qual tag?", paramLabel: (v) => `+Tag ${v}` },
+  { id: "remove_tag",    label: "Remover tag no CRM",   hint: "Tira uma tag do contato",
+    prompt: "Qual tag remover?", paramLabel: (v) => `−Tag ${v}` },
+  { id: "update_stage",  label: "Mudar etapa do funil", hint: "Move o contato pra outro stage do CRM",
+    prompt: "Nome ou id da etapa?", paramLabel: (v) => `Etapa → ${v}` },
+  // Avançado
+  { id: "set_variable",  label: "Definir variável",     hint: "Armazena valor (usar como nome=valor)",
     prompt: "nome=valor", paramLabel: (v) => `Var: ${v}` },
   { id: "webhook",       label: "Chamar webhook",       hint: "POST para URL externa",
     prompt: "URL do webhook?", paramLabel: (v) => `Webhook: ${v}` },
-  { id: "handoff",       label: "Transferir p/ humano", hint: "Encerra automação e notifica time",
-    prompt: "Mensagem de encerramento?", paramLabel: (v) => `Handoff: "${v}"` },
+  { id: "handoff",       label: "Transferir p/ humano", hint: "Sai do automático; atendente humano assume",
+    prompt: "Mensagem de encerramento do bot?", paramLabel: (v) => `Handoff: "${v}"` },
   { id: "end",           label: "Encerrar fluxo",       hint: "Finaliza sem resposta", needsParam: false,
     prompt: "", paramLabel: () => "Encerrar" },
 ];
@@ -377,8 +381,17 @@ interface PickerState {
   anchor: PickerAnchor | null;
   followUp?: {
     prompt: string;
-    apply: (value: string) => Mention[] | null; // menções a inserir no submit
-    headerLabel: string;  // texto de título do follow-up (ex: "Gatilho: Palavra-chave no grupo")
+    // Menções a inserir "antes" da resposta do follow-up (ex: o chip do
+    // trigger quando ele exige uma keyword). Guardamos aqui em vez de
+    // inserir no DOM imediatamente pra não invalidar o anchor — tudo
+    // entra de uma vez no submitFollowUp.
+    pendingChips?: Mention[];
+    // Chip "preview" mostrado no header enquanto o usuário digita o valor
+    // — dá feedback de "o que já escolhi / o que falta responder".
+    previewChip?: Mention;
+    apply: (value: string) => Mention[] | null;
+    headerLabel: string;
+    allowEmpty?: boolean; // true = Enter com input vazio ainda insere (casos sem param)
   };
 }
 
@@ -648,17 +661,20 @@ export function MentionPicker({
       return;
     }
 
-    // Trigger que precisa de keyword: insere o chip do trigger e muda pra
-    // follow-up perguntando a palavra.
+    // Trigger que precisa de keyword: NÃO inserimos o chip do trigger agora
+    // (ia invalidar o anchor DOM e quebrar o segundo insert). Guardamos
+    // como pendingChip no followUp e inserimos TUDO junto no submit.
     if (picker.mode === "search" && picker.category === "trigger" && TRIGGER_NEEDS_KEYWORD.has(s.id)) {
-      insertMentionsAtAnchor([{ type: "trigger", id: s.id, label: s.label }]);
+      const triggerChip: Mention = { type: "trigger", id: s.id, label: s.label };
       setPicker((p) => ({
         ...p,
         mode: "followUp",
         query: "",
         followUp: {
-          prompt: "Qual palavra-chave? (Enter pra confirmar)",
+          prompt: "Qual palavra-chave? (Enter pra inserir)",
           headerLabel: `Gatilho: ${s.label}`,
+          pendingChips: [triggerChip],
+          previewChip: triggerChip,
           apply: (v) => {
             const raw = v.trim();
             if (!raw) return null;
@@ -667,7 +683,6 @@ export function MentionPicker({
           },
         },
       }));
-      // pequeno delay pra o popup re-renderizar e pegar o foco no search
       requestAnimationFrame(() => searchRef.current?.focus());
       return;
     }
@@ -682,20 +697,25 @@ export function MentionPicker({
         closePicker();
         return;
       }
+      // IA tem prompt opcional (pode responder sem um prompt explícito)
+      const allowEmpty = action.id === "ai_response";
+      const previewChip: Mention = { type: "action", id: action.id, label: action.label };
       setPicker((p) => ({
         ...p,
         mode: "followUp",
         query: "",
         followUp: {
-          prompt: action.prompt,
+          prompt: action.prompt + (allowEmpty ? " (opcional)" : ""),
           headerLabel: `Ação: ${action.label}`,
+          previewChip,
+          allowEmpty,
           apply: (v) => {
             const val = v.trim();
-            if (!val) return null;
+            if (!val && !allowEmpty) return null;
             return [{
               type: "action",
               id: action.id,
-              label: action.paramLabel(val),
+              label: val ? action.paramLabel(val) : action.label,
               meta: { value: val, action_type: action.id },
             }];
           },
@@ -710,12 +730,19 @@ export function MentionPicker({
     closePicker();
   }, [picker, insertMentionsAtAnchor]);
 
-  // Submit do follow-up — chamado via Enter no search
+  // Submit do follow-up — chamado via Enter no search. Junta eventuais
+  // pendingChips (inseridas antes do valor digitado) com o resultado do
+  // apply, inserindo TUDO numa única mutação DOM. Assim o anchor continua
+  // válido até o momento do insert final (evita bug de stale anchor).
   const submitFollowUp = useCallback(() => {
     if (picker.mode !== "followUp" || !picker.followUp) return;
-    const result = picker.followUp.apply(picker.query);
-    if (result && result.length > 0) {
-      insertMentionsAtAnchor(result);
+    const applyResult = picker.followUp.apply(picker.query) ?? [];
+    const pending = picker.followUp.pendingChips ?? [];
+    const all = [...pending, ...applyResult];
+    // Se o campo é opcional e ficou vazio, o apply pode retornar só o
+    // chip da ação (sem param). Ainda insere tudo.
+    if (all.length > 0) {
+      insertMentionsAtAnchor(all);
     }
     closePicker();
   }, [picker, insertMentionsAtAnchor]);
@@ -849,7 +876,24 @@ export function MentionPicker({
               {picker.mode === "followUp" ? (
                 <>
                   <Zap className="w-3 h-3" style={{ color: "#fbbf24" }} />
-                  {picker.followUp?.headerLabel || "Preencha o valor"}
+                  <span className="mr-1">{picker.followUp?.headerLabel || "Preencha o valor"}</span>
+                  {picker.followUp?.previewChip && (() => {
+                    const c = catMeta(picker.followUp.previewChip.type).color;
+                    return (
+                      <span className="normal-case tracking-normal"
+                        style={{
+                          fontSize: "10.5px",
+                          fontWeight: 600,
+                          padding: "1px 6px",
+                          borderRadius: 4,
+                          background: c + "22",
+                          color: c,
+                          border: `1px solid ${c}55`,
+                        }}>
+                        @{picker.followUp.previewChip.label}
+                      </span>
+                    );
+                  })()}
                   <button
                     onClick={closePicker}
                     className="ml-auto text-[10px] normal-case tracking-normal underline"
@@ -913,8 +957,18 @@ export function MentionPicker({
 
           {/* Lista — em follow-up só mostra um hint de ajuda, sem sugestões */}
           {picker.mode === "followUp" ? (
-            <div className="px-4 py-4 text-xs" style={{ color: "hsl(240 8% 60%)" }}>
-              <p>Digite o valor e pressione <b>Enter</b> para inserir a menção.</p>
+            <div className="px-4 py-4 text-xs space-y-1" style={{ color: "hsl(240 8% 60%)" }}>
+              <p>Digite o valor e pressione <b>Enter</b> para inserir.</p>
+              {picker.followUp?.allowEmpty && (
+                <p className="text-[10px]" style={{ color: "hsl(240 8% 46%)" }}>
+                  Campo opcional — Enter vazio insere só a ação.
+                </p>
+              )}
+              {picker.followUp?.pendingChips && picker.followUp.pendingChips.length > 0 && (
+                <p className="text-[10px]" style={{ color: "hsl(240 8% 46%)" }}>
+                  Isso vai criar {picker.followUp.pendingChips.length + 1} menções em sequência.
+                </p>
+              )}
             </div>
           ) : suggestions.length > 0 ? (
             <ul className="max-h-64 overflow-y-auto py-1">
