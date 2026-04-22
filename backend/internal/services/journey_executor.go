@@ -385,8 +385,37 @@ func flowHasSendStep(f *models.JourneyFlow) bool {
 
 // startNew inicia uma nova execução de jornada
 func (e *JourneyExecutor) startNew(journey *models.Journey, fromJID, fromName, groupJID, messageText string) {
+	// Recover pra evitar que panic num step (config inválida, etc) deixe
+	// o goroutine morrendo sem log. Loga o panic como erro pra
+	// diagnosticarmos qualquer crash silencioso.
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error().
+				Str("journey", journey.ID).
+				Interface("panic", r).
+				Msg("journey: PANIC em startNew — execução abortada")
+		}
+	}()
+
 	flow := journey.GetFlow()
+	flowSteps := 0
+	if flow != nil {
+		flowSteps = len(flow.Steps)
+	}
+	log.Info().
+		Str("journey", journey.ID).
+		Str("name", journey.Name).
+		Bool("flow_nil", flow == nil).
+		Int("flow_steps", flowSteps).
+		Bool("has_send_step", flowHasSendStep(flow)).
+		Int("msg_template_len", len(journey.MessageTemplate)).
+		Str("response_mode", journey.ResponseMode).
+		Str("from_jid", fromJID).
+		Str("group_jid", groupJID).
+		Msg("journey: startNew iniciado")
+
 	if flow == nil || len(flow.Steps) == 0 {
+		log.Info().Str("journey", journey.ID).Msg("journey: flow vazio/nulo → legacyFallback")
 		e.legacyFallback(journey, fromJID, fromName, groupJID, messageText)
 		return
 	}
@@ -394,8 +423,6 @@ func (e *JourneyExecutor) startNew(journey *models.Journey, fromJID, fromName, g
 	// (caso comum de FlowBuilder gerando só "end" ou step desconhecido
 	// que não dispara SendText), e mesmo assim temos messageTemplate
 	// definido, preferimos o legacyFallback — pelo menos o DM sai.
-	// Isso salva jornadas antigas que tinham flow quebrado mas já haviam
-	// capturado messageTemplate via action mention.
 	if !flowHasSendStep(flow) && strings.TrimSpace(journey.MessageTemplate) != "" {
 		log.Info().
 			Str("journey", journey.ID).
@@ -407,14 +434,25 @@ func (e *JourneyExecutor) startNew(journey *models.Journey, fromJID, fromName, g
 	// Sanitiza flow em runtime — jornadas antigas podem ter sido salvas
 	// com self-loops (next_step_id == id do próprio step) ou refs pra
 	// steps inexistentes. Isso é o que causava "manda 50x a mesma msg".
-	// Aqui só normalizamos IDs/configs/start; cap por visita no run()
-	// pega ciclos indiretos.
 	sanitizeFlowForExec(flow)
 
 	start := flow.FirstStep()
 	if start == nil {
+		log.Warn().
+			Str("journey", journey.ID).
+			Str("start_step_id", flow.StartStep).
+			Msg("journey: flow.FirstStep() retornou nil — nada a executar")
+		// Se temos messageTemplate, ao menos cai no fallback pra enviar
+		if strings.TrimSpace(journey.MessageTemplate) != "" {
+			e.legacyFallback(journey, fromJID, fromName, groupJID, messageText)
+		}
 		return
 	}
+	log.Info().
+		Str("journey", journey.ID).
+		Str("start_step", start.ID).
+		Str("start_type", string(start.Type)).
+		Msg("journey: entrando no run — primeiro step identificado")
 
 	vars := &models.ExecutionVars{
 		Contact: map[string]interface{}{
@@ -1091,6 +1129,11 @@ func (e *JourneyExecutor) complete(ctx *execCtx) {
 		"completed_count": ctx.journey.CompletedCount + 1,
 		"last_run_at":     now,
 	})
+	log.Info().
+		Str("journey", ctx.journey.ID).
+		Str("execution", ctx.execution.ID).
+		Int("steps_run", ctx.stepsRun).
+		Msg("journey: execução completa")
 }
 
 func (e *JourneyExecutor) fail(ctx *execCtx, errMsg string) {
