@@ -26,6 +26,40 @@ func NewInstanceHandler(db *gorm.DB, manager *whatsapp.Manager) *InstanceHandler
 	return h
 }
 
+// resolveLiveStatus unifica a regra de "qual é o status real" da instância
+// para List e Get. Antes, cada endpoint tinha uma lógica diferente e a UI
+// acabava mostrando status conflitantes no card da lista vs. no manager
+// (ex: lista "connecting" e detalhe "disconnected" pra mesma instância).
+//
+// Regra:
+//  - manager rodando + client conectado + logado → "connected"
+//  - manager rodando mas não totalmente logado   → "connecting"
+//  - manager não rodando                          → status do DB, com
+//      auto-correção: se DB ficou "connecting" sem client em memória,
+//      foi um reconnect que morreu — promove pra "disconnected" e
+//      persiste pra a UI poder oferecer "reconectar".
+//
+// Side effects: persiste correção "stuck connecting" no banco quando aplicável.
+func (h *InstanceHandler) resolveLiveStatus(inst *models.Instance) models.InstanceStatus {
+	id := inst.ID.String()
+	if h.manager.IsRunning(id) {
+		client := h.manager.GetInstance(id)
+		if client != nil && client.IsConnected() && client.IsLoggedIn() {
+			return models.StatusConnected
+		}
+		if client != nil {
+			return models.StatusConnecting
+		}
+	}
+	// Manager não tem client em memória — DB é a fonte da verdade. Se o
+	// DB ficou "connecting" mas não há client, é estado stale.
+	if inst.Status == models.StatusConnecting {
+		h.db.Model(inst).Update("status", models.StatusDisconnected)
+		return models.StatusDisconnected
+	}
+	return inst.Status
+}
+
 func (h *InstanceHandler) getConnectedWhatsAppClient(c *fiber.Ctx) (*models.Instance, *whatsapp.InstanceClient, error) {
 	instance, ok := c.Locals("instance").(*models.Instance)
 	if !ok {
@@ -78,30 +112,9 @@ func (h *InstanceHandler) List(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar instâncias"})
 	}
 
-	// Enrich with live status from the WhatsApp manager.
+	// Enrich with live status from the WhatsApp manager (mesma regra do GET).
 	for i := range instances {
-		id := instances[i].ID.String()
-		if h.manager.IsRunning(id) {
-			client := h.manager.GetInstance(id)
-			// IsConnected() reports only the WebSocket; a fresh instance
-			// showing a QR code also returns true. Require IsLoggedIn()
-			// to confirm an authenticated WhatsApp session.
-			if client != nil && client.IsConnected() && client.IsLoggedIn() {
-				instances[i].Status = models.StatusConnected
-			} else if client != nil {
-				// Running but not yet logged in → still pairing/connecting
-				instances[i].Status = models.StatusConnecting
-			}
-		} else {
-			// Manager is NOT running for this instance.
-			// If DB says "connecting", it's a stale state from a previous
-			// failed reconnect — reset to disconnected so the frontend
-			// can trigger a fresh reconnect.
-			if instances[i].Status == models.StatusConnecting {
-				instances[i].Status = models.StatusDisconnected
-				h.db.Model(&instances[i]).Update("status", models.StatusDisconnected)
-			}
-		}
+		instances[i].Status = h.resolveLiveStatus(&instances[i])
 	}
 
 	elapsed := time.Since(startedAt).Milliseconds()
@@ -244,13 +257,9 @@ func (h *InstanceHandler) Get(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
 	}
 
-	// Live status — only override DB when truly connected (authenticated)
-	if h.manager.IsRunning(instance.ID.String()) {
-		client := h.manager.GetInstance(instance.ID.String())
-		if client != nil && client.IsConnected() && client.IsLoggedIn() {
-			instance.Status = models.StatusConnected
-		}
-	}
+	// Live status usa a mesma regra do List — evita divergência entre card
+	// (/instances) e tela do manager (/instances/:id).
+	instance.Status = h.resolveLiveStatus(instance)
 
 	return c.JSON(instance)
 }
@@ -436,19 +445,10 @@ func (h *InstanceHandler) Status(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
 	}
 
-	status := string(instance.Status)
+	// Mesma regra de resolução que List/Get — mantém a UI consistente
+	// entre o card da lista e a tela do manager.
+	status := string(h.resolveLiveStatus(instance))
 	running := h.manager.IsRunning(instance.ID.String())
-
-	if running {
-		client := h.manager.GetInstance(instance.ID.String())
-		if client != nil {
-			if client.IsConnected() {
-				status = "connected"
-			} else {
-				status = "connecting"
-			}
-		}
-	}
 
 	return c.JSON(fiber.Map{
 		"id":           instance.ID,
