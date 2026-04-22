@@ -301,8 +301,15 @@ func (h *InboxHandler) GetChat(c *fiber.Ctx) error {
 	phone := extractPhoneFromJID(jid)
 	contact := h.findContactByPhone(c, phone)
 
-	// Auto-create contact if it doesn't exist
-	if contact == nil {
+	// Auto-cria contato APENAS pra JIDs de pessoa física (@s.whatsapp.net).
+	// Grupos (@g.us), newsletters, broadcasts etc. não geram entrada no CRM
+	// — antes criávamos contatos com phone="<groupid>-<timestamp>" que
+	// apareciam no mention picker e em outras listas como registros
+	// confusos, sem nome e nem telefone real.
+	isRealPerson := strings.HasSuffix(jid, "@s.whatsapp.net") ||
+		(!strings.Contains(jid, "@") && !strings.Contains(phone, "-"))
+
+	if contact == nil && isRealPerson {
 		userID, _ := c.Locals("user_id").(uuid.UUID)
 		workspaceID, _ := c.Locals("workspace_id").(uuid.UUID)
 

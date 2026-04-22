@@ -47,6 +47,11 @@ func (h *ContactHandler) ListContacts(c *fiber.Ctx) error {
 	offset := c.QueryInt("offset", 0)
 
 	query := h.db.Model(&models.Contact{}).Where("user_id = ?", userID).Preload("Tags")
+	// Exclui contatos "lixo" criados automaticamente a partir de JIDs de
+	// grupo antes do fix (phone no formato "<groupid>-<timestamp>"). Real
+	// phones nunca têm hífen; grupos sempre têm. Também filtra phones
+	// vazios (registros tortos sem nada).
+	query = query.Where("phone IS NOT NULL AND phone <> '' AND phone NOT LIKE '%-%'")
 	if workspaceID != "" {
 		if wid, err := uuid.Parse(workspaceID); err == nil {
 			query = query.Where("workspace_id = ?", wid)
