@@ -470,6 +470,20 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 		rulesBytes, _ := json.Marshal(parsedRules)
 		journey.ParsedRules = string(rulesBytes)
 
+		// Delay: menção /delay > regex no texto livre. Se há action
+		// explícita, geramos flow determinístico (com wait prefix se
+		// delay > 0). Senão deixa flow vazio — executor usa legacyFallback
+		// (que no momento não aplica delay; fica como enhancement futuro).
+		if hasExplicitAction {
+			delaySeconds := extractDelaySeconds(req.Mentions)
+			if delaySeconds == 0 {
+				delaySeconds = delayFromPromptText(promptText)
+			}
+			if flow := buildDeterministicFlow(messageTemplate, responseMode, delaySeconds); flow != nil {
+				_ = journey.SetFlow(flow)
+			}
+		}
+
 		if err := h.db.Create(&journey).Error; err != nil {
 			return c.JSON(fiber.Map{"response": "Entendi o pedido, mas ocorreu um erro ao salvar a jornada: " + err.Error()})
 		}

@@ -39,6 +39,7 @@ import {
 } from "@/lib/api";
 import {
   AtSign,
+  Clock,
   GitBranch,
   Hash,
   Layers,
@@ -65,7 +66,9 @@ export type MentionType =
   | "step"
   | "keyword"
   // ação composta (tipo de ação + parâmetro inline, ex: responder privado "X")
-  | "action";
+  | "action"
+  // atraso antes da ação (N segundos)
+  | "delay";
 
 export interface Mention {
   type: MentionType;
@@ -150,7 +153,7 @@ export function RichMentionText({ text, className }: { text: string; className?:
 }
 
 // ─── Token parse/serialize ───────────────────────────────────────────────────
-const TOKEN_RE = /@\[([^\]]+)\]\((instance|group|contact|tag|funnel|journey|trigger|step|keyword|action):([A-Za-z0-9_@.\-]+)\)/g;
+const TOKEN_RE = /@\[([^\]]+)\]\((instance|group|contact|tag|funnel|journey|trigger|step|keyword|action|delay):([A-Za-z0-9_@.\-]+)\)/g;
 
 export function parseMentions(text: string): { mentions: Mention[]; rendered: string } {
   const mentions: Mention[] = [];
@@ -179,6 +182,7 @@ const CATEGORIES: {
   // Conceitos do canvas (enum estático)
   { type: "trigger",  slash: "gatilho",   label: "Gatilho",            icon: Zap,        color: "#fbbf24" },
   { type: "action",   slash: "acao",      label: "Ação",               icon: Route,      color: "#10b981" },
+  { type: "delay",    slash: "delay",     label: "Atraso (delay)",     icon: Clock,      color: "#f97316" },
   { type: "step",     slash: "passo",     label: "Tipo de passo",      icon: Layers,     color: "#94a3b8" },
   { type: "keyword",  slash: "palavra",   label: "Palavra-chave",      icon: TypeIcon,   color: "#ef4444" },
 ];
@@ -545,6 +549,14 @@ export function MentionPicker({
     ],
     // keyword é dinâmico — tratado direto em `suggestions`
     keyword:  [] as { type: MentionType; id: string; label: string; meta?: Record<string, string> }[],
+    // delay tem presets comuns + opção de digitar valor customizado
+    delay: [
+      { type: "delay" as MentionType, id: "5",   label: "5 segundos",   meta: { seconds: "5" } },
+      { type: "delay" as MentionType, id: "10",  label: "10 segundos",  meta: { seconds: "10" } },
+      { type: "delay" as MentionType, id: "30",  label: "30 segundos",  meta: { seconds: "30" } },
+      { type: "delay" as MentionType, id: "60",  label: "1 minuto",     meta: { seconds: "60" } },
+      { type: "delay" as MentionType, id: "300", label: "5 minutos",    meta: { seconds: "300" } },
+    ],
   }), [instances, groupItems, contacts, tags, funnels, journeys, extraSteps]);
 
   // formatPhoneBR: converte "5511999998888" em "+55 11 99999-8888". Retorna
@@ -609,6 +621,25 @@ export function MentionPicker({
           icon: meta.icon,
           color: meta.color,
         }];
+      }
+      // Delay: aceita presets da lista OU valor customizado se o user
+      // digitar um número de segundos.
+      if (picker.category === "delay") {
+        const raw = picker.query.trim();
+        const custom = raw.match(/^\d+$/) ? parseInt(raw, 10) : 0;
+        const presets = (allItems.delay ?? []).filter(matchesRich);
+        const results: Suggestion[] = presets.map((i) => ({ ...i, icon: meta.icon, color: meta.color }));
+        if (custom > 0 && !presets.some((p) => p.id === String(custom))) {
+          results.unshift({
+            type: "delay" as MentionType,
+            id: String(custom),
+            label: `${custom} segundos`,
+            meta: { seconds: String(custom) },
+            icon: meta.icon,
+            color: meta.color,
+          });
+        }
+        return results.slice(0, 8);
       }
       const list = allItems[picker.category] ?? [];
       return list.filter(matchesRich).slice(0, 8).map<Suggestion>((i) => ({ ...i, icon: meta.icon, color: meta.color }));

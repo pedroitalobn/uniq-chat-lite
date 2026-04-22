@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -182,17 +184,23 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 		}
 	}
 
+	// Delay: menção /delay tem prioridade; fallback é regex no texto livre
+	// ("delay de 5s", "aguardar 2 min", etc).
+	delaySeconds := extractDelaySeconds(req.Mentions)
+	if delaySeconds == 0 {
+		delaySeconds = delayFromPromptText(promptText)
+	}
+
 	// Flow: dois caminhos.
-	//  1) Action mention explícita → monta flow 1-step determinístico com
-	//     messageTemplate + responseMode. Zero alucinação, visível no card
-	//     como "1 passo · Responder". Vai pelo stepMessage normal do
-	//     executor — sem depender de legacyFallback.
+	//  1) Action mention explícita → monta flow determinístico. Se houver
+	//     delay, o flow sai com wait → message. Sem delay, direto 1 step
+	//     de message. Zero alucinação, visível no card.
 	//  2) Prompt 100% livre (sem action mention) → LLM FlowBuilder gera
-	//     o flow. Pode produzir branching, condições, etc. Fallbacks do
-	//     executor pegam casos degenerados.
+	//     o flow. Se detectamos delay via regex mas a LLM não gerou um
+	//     wait step, envolvemos o flow original com wait no começo.
 	var flow *models.JourneyFlow
 	if hasExplicitAction {
-		flow = buildDeterministicFlow(messageTemplate, responseMode)
+		flow = buildDeterministicFlow(messageTemplate, responseMode, delaySeconds)
 	} else if h.builder != nil {
 		if f, fErr := h.builder.Build(ctx, integration, promptText); fErr == nil {
 			flow = f
@@ -1046,16 +1054,12 @@ func buildResponseFromJourney(journey *models.Journey, fromName string) string {
 // buildDeterministicFlow monta um JourneyFlow simples a partir de dados
 // estruturados — usado quando o usuário preencheu explicitamente a ação
 // via /ação (action mention). Evita chamar o FlowBuilder/LLM pra algo
-// que já sabemos: "quando trigger X, envie Y em modo Z".
+// que já sabemos: "quando trigger X, envie Y em modo Z [após N segundos]".
 //
-// O flow gerado sempre tem UM único step de message com IsStartStep=true,
-// mode private/group, e NextStepID vazio (fim do flow). Determinístico;
-// não sofre das alucinações que a LLM produzia (condition inalcançável,
-// literals de metadata como keyword, etc).
-//
+// Quando delaySeconds > 0 prepende um step de wait antes do message.
 // Retorna nil se messageTemplate estiver vazio — nesse caso o caller
 // deixa o flow = nil e o executor cai no legacyFallback.
-func buildDeterministicFlow(messageTemplate, responseMode string) *models.JourneyFlow {
+func buildDeterministicFlow(messageTemplate, responseMode string, delaySeconds int) *models.JourneyFlow {
 	if strings.TrimSpace(messageTemplate) == "" {
 		return nil
 	}
@@ -1063,11 +1067,34 @@ func buildDeterministicFlow(messageTemplate, responseMode string) *models.Journe
 	if mode == "" {
 		mode = "private"
 	}
-	cfg := map[string]string{
-		"message": messageTemplate,
-		"mode":    mode,
+	msgCfg, _ := json.Marshal(map[string]string{"message": messageTemplate, "mode": mode})
+
+	if delaySeconds > 0 {
+		// Cap sanity: nada passa de 1 dia.
+		if delaySeconds > 24*60*60 {
+			delaySeconds = 24 * 60 * 60
+		}
+		waitCfg, _ := json.Marshal(map[string]string{"duration": fmt.Sprintf("%ds", delaySeconds)})
+		return &models.JourneyFlow{
+			StartStep: "s_wait",
+			Steps: []models.FlowStep{
+				{
+					ID:          "s_wait",
+					Type:        models.StepTypeWait,
+					Label:       fmt.Sprintf("Aguardar %ds", delaySeconds),
+					IsStartStep: true,
+					NextStepID:  "s_msg",
+					Config:      json.RawMessage(waitCfg),
+				},
+				{
+					ID:     "s_msg",
+					Type:   models.StepTypeMessage,
+					Label:  "Responder",
+					Config: json.RawMessage(msgCfg),
+				},
+			},
+		}
 	}
-	cfgBytes, _ := json.Marshal(cfg)
 	return &models.JourneyFlow{
 		StartStep: "s1",
 		Steps: []models.FlowStep{
@@ -1076,9 +1103,61 @@ func buildDeterministicFlow(messageTemplate, responseMode string) *models.Journe
 				Type:        models.StepTypeMessage,
 				Label:       "Responder",
 				IsStartStep: true,
-				Config:      json.RawMessage(cfgBytes),
+				Config:      json.RawMessage(msgCfg),
 			},
 		},
+	}
+}
+
+// extractDelaySeconds lê o primeiro `delay` mention e retorna o número de
+// segundos (0 se não houver ou se inválido). O meta.seconds é o valor
+// canônico; fallback pro ID se o meta não veio.
+func extractDelaySeconds(mentions []Mention) int {
+	m := firstMention(mentions, "delay")
+	if m == nil {
+		return 0
+	}
+	raw := ""
+	if m.Meta != nil {
+		raw = m.Meta["seconds"]
+	}
+	if raw == "" {
+		raw = m.ID
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || n <= 0 {
+		return 0
+	}
+	return n
+}
+
+// delayFromPromptText extrai "delay de N segundos/s/minutos" do texto
+// renderizado como fallback pra quando o usuário digita em linguagem
+// natural sem usar o /delay. Retorna segundos (0 se não encontrar).
+func delayFromPromptText(s string) int {
+	// Aceita "delay de 5s", "delay 10 segundos", "aguardar 2 minutos",
+	// "com delay de 30s", etc. Case-insensitive. Pega o PRIMEIRO match.
+	re := regexp.MustCompile(`(?i)\b(?:delay|atraso|aguardar|esperar|após|depois de)\s*(?:de)?\s*(\d+)\s*(s|seg|segundos?|m|min|minutos?|h|hora|horas?)?\b`)
+	m := re.FindStringSubmatch(s)
+	if len(m) < 2 {
+		return 0
+	}
+	n, err := strconv.Atoi(m[1])
+	if err != nil || n <= 0 {
+		return 0
+	}
+	unit := strings.ToLower(m[2])
+	switch {
+	case strings.HasPrefix(unit, "m") && !strings.HasPrefix(unit, "mi"):
+		// Ambiguo entre "m" (minuto) e metros — assumimos minutos nesse
+		// contexto de "delay/aguardar".
+		fallthrough
+	case strings.HasPrefix(unit, "min") || unit == "m":
+		return n * 60
+	case strings.HasPrefix(unit, "h"):
+		return n * 3600
+	default:
+		return n // segundos (default)
 	}
 }
 
