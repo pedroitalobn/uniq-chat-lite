@@ -723,6 +723,10 @@ const TRIGGER_TYPES: { value: string; label: string; hint: string }[] = [
   { value: "contact_media_audio",    label: "Recebeu áudio",          hint: "Quando o contato envia áudio." },
   { value: "contact_media_video",    label: "Recebeu vídeo",          hint: "Quando o contato envia vídeo." },
   { value: "contact_media_document", label: "Recebeu documento",      hint: "Quando o contato envia documento." },
+  { value: "contact_location",       label: "Recebeu localização",    hint: "Quando o contato envia localização." },
+  { value: "contact_call",           label: "Ligação recebida",       hint: "Qualquer ligação entrante." },
+  { value: "contact_call_missed",    label: "Chamada perdida",        hint: "Ligou e ninguém atendeu." },
+  { value: "contact_call_rejected",  label: "Chamada rejeitada",      hint: "Ligação rejeitada manualmente." },
   { value: "user_command",           label: "Comando (/start, /menu)",hint: "Comandos reservados no início da msg." },
 ];
 

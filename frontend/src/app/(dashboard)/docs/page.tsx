@@ -766,11 +766,21 @@ const SECTIONS: Section[] = [
 
 // ─── Webhook Events Reference ─────────────────────────────────────────────────
 const WEBHOOK_EVENTS = [
-  { event: "message.received",  description: "Nova mensagem recebida na instância" },
+  { event: "message.received",  description: "Nova mensagem recebida (qualquer tipo)" },
   { event: "message.sent",      description: "Mensagem enviada com sucesso" },
+  { event: "message.location",  description: "Mensagem recebida contém localização" },
+  { event: "message.image",     description: "Mensagem recebida contém imagem" },
+  { event: "message.audio",     description: "Mensagem recebida contém áudio" },
+  { event: "message.video",     description: "Mensagem recebida contém vídeo" },
+  { event: "message.document",  description: "Mensagem recebida contém documento" },
+  { event: "message.reaction",  description: "Contato reagiu a uma mensagem" },
   { event: "status.changed",    description: "Status da instância mudou (connected/disconnected)" },
   { event: "qr.updated",        description: "QR Code atualizado — novo scan necessário" },
-  { event: "call.received",     description: "Chamada recebida (rejeitada se reject_calls=true)" },
+  { event: "call.incoming",     description: "Chamada recebida (ringing)" },
+  { event: "call.accepted",     description: "Chamada foi atendida" },
+  { event: "call.missed",       description: "Chamada perdida (ninguém atendeu)" },
+  { event: "call.rejected",     description: "Chamada rejeitada manualmente" },
+  { event: "call.terminate",    description: "Chamada encerrada (qualquer motivo)" },
   { event: "group.joined",      description: "Instância entrou em um grupo" },
   { event: "group.left",        description: "Instância saiu de um grupo" },
 ];

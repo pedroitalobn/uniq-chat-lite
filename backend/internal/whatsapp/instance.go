@@ -52,6 +52,11 @@ type InstanceClient struct {
 	// @s.whatsapp.net) pra evitar rate-limit 429 do usync do WhatsApp.
 	recipientCacheMu sync.RWMutex
 	recipientCache   map[string]types.JID
+
+	// Track de chamadas aceitas: quando CallTerminate chega e o call_id NÃO
+	// está aqui, consideramos "missed call" (ligou e ninguém atendeu). Chave:
+	// call_id → timestamp da aceitação. GC simples: deleta no CallTerminate.
+	acceptedCalls sync.Map
 }
 
 type ContactLookup struct {
@@ -1726,6 +1731,14 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 			msgType = "sticker"
 		case v.Message.GetLocationMessage() != nil:
 			msgType = "location"
+			loc := v.Message.GetLocationMessage()
+			if n := loc.GetName(); n != "" {
+				text = n
+			} else if a := loc.GetAddress(); a != "" {
+				text = a
+			} else {
+				text = fmt.Sprintf("%.6f,%.6f", loc.GetDegreesLatitude(), loc.GetDegreesLongitude())
+			}
 		case v.Message.GetReactionMessage() != nil:
 			msgType = "reaction"
 			text = v.Message.GetReactionMessage().GetText()
@@ -1782,6 +1795,14 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		}
 		ic.broadcastWS(evName, data)
 		ic.dispatchEvent(evName, data, ctx)
+
+		// Evento dedicado por tipo de mídia — facilita webhooks filtrarem
+		// sem ter que inspecionar o campo `type` do payload genérico.
+		if !isFromMe && !v.IsEdit && msgType != "text" && msgType != "reaction" {
+			typedEv := "message." + msgType // message.location, message.image, message.audio, …
+			ic.broadcastWS(typedEv, data)
+			ic.dispatchEvent(typedEv, data, ctx)
+		}
 
 		// Save message to database for inbox (including groups)
 		var direction models.MessageDirection
@@ -1941,6 +1962,7 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		ic.dispatchEvent("call.incoming", data, eventContext{})
 
 	case *events.CallAccept:
+		ic.acceptedCalls.Store(v.CallID, time.Now())
 		data := map[string]interface{}{
 			"call_id": v.CallID,
 			"from":    v.From.String(),
@@ -1950,21 +1972,54 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		ic.dispatchEvent("call.accepted", data, eventContext{})
 
 	case *events.CallTerminate:
+		// Se NÃO houve aceite pra esse call_id, é uma chamada perdida.
+		// Emitimos evento dedicado + disparamos jornada com messageType=call_missed.
+		_, accepted := ic.acceptedCalls.LoadAndDelete(v.CallID)
 		data := map[string]interface{}{
-			"call_id": v.CallID,
-			"from":    v.From.String(),
-			"reason":  v.Reason,
+			"call_id":  v.CallID,
+			"from":     v.From.String(),
+			"reason":   v.Reason,
+			"accepted": accepted,
 		}
 		ic.broadcastWS("call.terminate", data)
 		ic.dispatchEvent("call.terminate", data, eventContext{})
 
+		if !accepted && GlobalManager != nil {
+			missedData := map[string]interface{}{
+				"call_id": v.CallID,
+				"from":    v.From.String(),
+				"reason":  v.Reason,
+			}
+			ic.broadcastWS("call.missed", missedData)
+			ic.dispatchEvent("call.missed", missedData, eventContext{})
+			go GlobalManager.CheckJourneys(
+				ic.ID,
+				"call:"+v.CallID,   // messageID pra dedup
+				v.From.String(),    // fromJID
+				"",                 // fromName (não temos push name aqui)
+				"",                 // groupJID — ligações não são de grupo
+				"",                 // messageText vazio
+				"call_missed",      // messageType
+				false,              // isGroup
+			)
+		}
+
 	case *events.CallReject:
+		ic.acceptedCalls.Delete(v.CallID)
 		data := map[string]interface{}{
 			"call_id": v.CallID,
 			"from":    v.From.String(),
 		}
 		ic.broadcastWS("call.rejected", data)
 		ic.dispatchEvent("call.rejected", data, eventContext{})
+
+		if GlobalManager != nil {
+			go GlobalManager.CheckJourneys(
+				ic.ID,
+				"call-rejected:"+v.CallID,
+				v.From.String(), "", "", "", "call_rejected", false,
+			)
+		}
 
 	case *events.CallOfferNotice:
 		data := map[string]interface{}{

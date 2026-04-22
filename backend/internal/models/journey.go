@@ -84,6 +84,18 @@ func (j *Journey) ShouldTrigger(messageText, groupJID, messageType string, isGro
 		if messageType != "call" {
 			return false
 		}
+	case TriggerContactCallMissed:
+		if messageType != "call_missed" {
+			return false
+		}
+	case TriggerContactCallRejected:
+		if messageType != "call_rejected" {
+			return false
+		}
+	case TriggerContactLocation:
+		if messageType != "location" {
+			return false
+		}
 	case TriggerGroupJoin:
 		if messageType != "group_join" {
 			return false
@@ -224,11 +236,14 @@ const (
 	TriggerGroupMention    TriggerType = "group_mention"
 	TriggerPrivateMessage  TriggerType = "private_message"
 	TriggerPrivateKeyword  TriggerType = "private_keyword"
-	TriggerContactCall     TriggerType = "contact_call"
-	TriggerContactVideo    TriggerType = "contact_media_video"
-	TriggerContactAudio    TriggerType = "contact_media_audio"
-	TriggerContactDocument TriggerType = "contact_media_document"
-	TriggerContactImage    TriggerType = "contact_media_image"
+	TriggerContactCall         TriggerType = "contact_call"          // ligação recebida (offer)
+	TriggerContactCallMissed   TriggerType = "contact_call_missed"   // ringou e ninguém atendeu
+	TriggerContactCallRejected TriggerType = "contact_call_rejected" // usuário rejeitou explicitamente
+	TriggerContactVideo        TriggerType = "contact_media_video"
+	TriggerContactAudio        TriggerType = "contact_media_audio"
+	TriggerContactDocument     TriggerType = "contact_media_document"
+	TriggerContactImage        TriggerType = "contact_media_image"
+	TriggerContactLocation     TriggerType = "contact_location"      // contato enviou localização
 	TriggerAnyMessage      TriggerType = "any_message"
 	TriggerNoResponse      TriggerType = "no_response"
 	TriggerFirstMessage    TriggerType = "first_message"
