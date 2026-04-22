@@ -441,12 +441,20 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 		}
 
 		// User confirmed - create the journey
+		// kwList pode estar em formato legado (lista de strings) ou novo
+		// (objetos {word, op}). Tentamos os dois pra alimentar o nome.
 		var kwList []string
-		json.Unmarshal([]byte(keywords), &kwList)
-
-		journeyName := "Jornada " + time.Now().Format("02/01 15:04")
-		if len(kwList) > 0 {
-			journeyName = "Palavra: " + strings.Join(kwList, ", ")
+		var kwRules []models.KeywordRule
+		if err := json.Unmarshal([]byte(keywords), &kwRules); err == nil {
+			for _, r := range kwRules {
+				if r.Word != "" {
+					kwList = append(kwList, r.Word)
+				}
+			}
+		}
+		if len(kwList) == 0 {
+			// fallback formato antigo
+			_ = json.Unmarshal([]byte(keywords), &kwList)
 		}
 
 		// Ação explícita define o modo de resposta autoritativamente.
@@ -456,6 +464,10 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 		} else if actionID == "" && !isPrivateReply {
 			responseMode = "group"
 		}
+
+		// Nome descritivo baseado nos campos estruturados (trigger +
+		// keyword + ação). Usuário pode editar depois no card.
+		journeyName := buildJourneyName(promptText, triggerType, kwList, messageTemplate, responseMode)
 
 		journey := models.Journey{
 			UserID:          userID.String(),

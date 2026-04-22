@@ -289,9 +289,20 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 		_ = journey.SetFlow(flow)
 	}
 
-	// Gerar nome da jornada baseado no prompt
+	// Gerar nome da jornada baseado nos campos estruturados. Passa a lista
+	// efetiva de keywords + messageTemplate + mode pra ser descritivo:
+	// "kw 'arroz' em grupo → DM: feijão" em vez de "Resposta - Saudação".
 	if journey.Name == "" {
-		journey.Name = generateJourneyName(promptText, triggerType)
+		kwWords := []string{}
+		var rules []models.KeywordRule
+		if err := json.Unmarshal([]byte(keywords), &rules); err == nil {
+			for _, r := range rules {
+				if r.Word != "" {
+					kwWords = append(kwWords, r.Word)
+				}
+			}
+		}
+		journey.Name = buildJourneyName(promptText, triggerType, kwWords, messageTemplate, responseMode)
 	}
 
 	if err := h.db.Create(&journey).Error; err != nil {
@@ -319,37 +330,105 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 }
 
 // generateJourneyName gera um nome descritivo para a jornada
+// generateJourneyName monta um nome descritivo baseado nos campos
+// estruturados da jornada. Formato: "<trigger abreviado> → <ação>". Ex:
+//  - "keyword 'arroz' → DM: feijão"
+//  - "menção em grupo → grupo: o que foi?"
+//  - "1ª msg → IA"
+// Cai pra um fallback genérico quando não há dados suficientes.
 func generateJourneyName(prompt string, triggerType models.TriggerType) string {
-	lower := strings.ToLower(prompt)
+	return buildJourneyName(prompt, triggerType, nil, "", "")
+}
 
-	// Extrair contexto do prompt
-	name := ""
-	if strings.Contains(lower, "bom dia") || strings.Contains(lower, "good morning") {
-		name = "Saudação - Bom Dia"
-	} else if strings.Contains(lower, "oi") || strings.Contains(lower, "olá") || strings.Contains(lower, "hello") {
-		name = "Resposta - Saudação"
-	} else if strings.Contains(lower, "agradecer") || strings.Contains(lower, "obrigado") {
-		name = "Agradecimento"
-	} else if strings.Contains(lower, "suporte") || strings.Contains(lower, "ajuda") {
-		name = "Suporte Automático"
-	} else if strings.Contains(lower, "comprar") || strings.Contains(lower, "preço") || strings.Contains(lower, "valor") {
-		name = "Vendas - Informações"
-	} else if strings.Contains(lower, "agendar") || strings.Contains(lower, "horário") {
-		name = "Agendamento"
-	} else {
-		// Usar o trigger type como base
-		switch triggerType {
-		case models.TriggerGroupKeyword:
-			name = "Automação de Grupo"
-		case models.TriggerPrivateKeyword:
-			name = "Automação Privada"
-		case models.TriggerGroupJoin:
-			name = "Boas-Vindas"
-		default:
-			name = "Jornada Automática"
+// buildJourneyName é a versão "com contexto" — usada no CreateJourney
+// onde já temos keywords + messageTemplate + responseMode extraídos.
+// Produz nomes bem mais descritivos. Sempre truncado em 60 chars.
+func buildJourneyName(prompt string, triggerType models.TriggerType, keywords []string, messageTemplate, responseMode string) string {
+	// Trigger abreviado
+	var triggerPart string
+	switch triggerType {
+	case models.TriggerGroupKeyword:
+		if len(keywords) > 0 {
+			triggerPart = fmt.Sprintf("kw '%s' em grupo", keywords[0])
+		} else {
+			triggerPart = "kw em grupo"
+		}
+	case models.TriggerPrivateKeyword:
+		if len(keywords) > 0 {
+			triggerPart = fmt.Sprintf("kw '%s' em DM", keywords[0])
+		} else {
+			triggerPart = "kw em DM"
+		}
+	case models.TriggerGroupMention:
+		triggerPart = "menção em grupo"
+	case models.TriggerGroupMessage:
+		triggerPart = "msg em grupo"
+	case models.TriggerPrivateMessage:
+		triggerPart = "msg em DM"
+	case models.TriggerFirstMessage:
+		triggerPart = "1ª mensagem"
+	case models.TriggerContactCallMissed:
+		triggerPart = "chamada perdida"
+	case models.TriggerContactCallRejected:
+		triggerPart = "chamada rejeitada"
+	case models.TriggerContactCall:
+		triggerPart = "ligação"
+	case models.TriggerContactLocation:
+		triggerPart = "localização"
+	case models.TriggerContactImage:
+		triggerPart = "imagem"
+	case models.TriggerContactAudio:
+		triggerPart = "áudio"
+	case models.TriggerContactVideo:
+		triggerPart = "vídeo"
+	case models.TriggerContactDocument:
+		triggerPart = "documento"
+	case models.TriggerGroupJoin:
+		triggerPart = "entrou no grupo"
+	case models.TriggerGroupLeave:
+		triggerPart = "saiu do grupo"
+	case models.TriggerUserCommand:
+		triggerPart = "comando"
+	case models.TriggerAnyMessage:
+		triggerPart = "qualquer msg"
+	default:
+		triggerPart = string(triggerType)
+	}
+
+	// Ação abreviada
+	actionPart := ""
+	msg := strings.TrimSpace(messageTemplate)
+	if msg != "" {
+		short := msg
+		if len([]rune(short)) > 30 {
+			short = string([]rune(short)[:30]) + "…"
+		}
+		switch responseMode {
+		case "group":
+			actionPart = fmt.Sprintf("grupo: %s", short)
+		default: // private ou vazio
+			actionPart = fmt.Sprintf("DM: %s", short)
 		}
 	}
 
+	// Monta final
+	var name string
+	switch {
+	case triggerPart != "" && actionPart != "":
+		name = triggerPart + " → " + actionPart
+	case triggerPart != "":
+		name = triggerPart
+	case actionPart != "":
+		name = actionPart
+	default:
+		name = "Jornada Automática"
+	}
+
+	// Cap de 60 runes
+	if runes := []rune(name); len(runes) > 60 {
+		name = string(runes[:60]) + "…"
+	}
+	_ = prompt // reservado pra heurísticas baseadas no prompt (não usado no momento)
 	return name
 }
 

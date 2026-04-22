@@ -980,6 +980,75 @@ function TemplatesDialog({
   );
 }
 
+// EditableName — clique no título da jornada pra editar inline. Enter
+// confirma, Escape/blur sem alteração cancela. onSave só é chamado se o
+// valor realmente mudou e não ficou vazio.
+function EditableName({ value, onSave }: { value: string; onSave: (next: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!editing) setDraft(value);
+  }, [value, editing]);
+
+  useEffect(() => {
+    if (editing) {
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      });
+    }
+  }, [editing]);
+
+  const commit = () => {
+    setEditing(false);
+    const next = draft.trim();
+    if (next && next !== value) onSave(next);
+    else setDraft(value);
+  };
+  const cancel = () => {
+    setEditing(false);
+    setDraft(value);
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Enter") { e.preventDefault(); commit(); }
+          if (e.key === "Escape") { e.preventDefault(); cancel(); }
+        }}
+        onBlur={commit}
+        className="text-sm font-semibold bg-transparent outline-none border-b truncate min-w-0 flex-1"
+        style={{
+          color: "var(--text-1)",
+          borderColor: "var(--green)",
+        }}
+      />
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        setEditing(true);
+      }}
+      className="text-sm font-semibold truncate text-left hover:underline decoration-dotted underline-offset-2 min-w-0 flex-1"
+      style={{ color: "var(--text-1)" }}
+      title="Clique pra editar o nome"
+    >
+      {value}
+    </button>
+  );
+}
+
 function JourneysSection({ onEditJourney }: { onEditJourney?: (journey: any) => void }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [deleteConfirm, setDeleteConfirm] = useState<{id: string; name: string} | null>(null);
@@ -1035,6 +1104,29 @@ function JourneysSection({ onEditJourney }: { onEditJourney?: (journey: any) => 
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.error || err?.message || "Erro ao remover");
+    },
+  });
+
+  // Rename em background via PATCH /v1/journeys/:id/trigger (aceita `name`).
+  // Atualização otimista: a lista reflete o novo nome na hora; se o PATCH
+  // falhar, revalida pra voltar ao valor do banco.
+  const renameMutation = useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      journeysApi.updateTrigger(id, { name }),
+    onMutate: async ({ id, name }) => {
+      await queryClient.cancelQueries({ queryKey: ["journeys"] });
+      const prev = queryClient.getQueryData<any[]>(["journeys"]);
+      queryClient.setQueryData<any[]>(["journeys"], (old) =>
+        (old ?? []).map((j) => (j.id === id ? { ...j, name } : j)),
+      );
+      return { prev };
+    },
+    onError: (err: any, _v, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(["journeys"], ctx.prev);
+      toast.error(err?.response?.data?.error || "Falha ao renomear");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["journeys"] });
     },
   });
 
@@ -1111,7 +1203,15 @@ function JourneysSection({ onEditJourney }: { onEditJourney?: (journey: any) => 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: j.status === "active" ? "#00d46a" : "#6b7280" }} />
-                    <p className="text-sm font-semibold truncate" style={{ color: "var(--text-1)" }}>{j.name || j.prompt}</p>
+                    <EditableName
+                      value={j.name || j.prompt}
+                      onSave={(next) => {
+                        const trimmed = next.trim();
+                        if (trimmed && trimmed !== (j.name || "")) {
+                          renameMutation.mutate({ id: j.id, name: trimmed });
+                        }
+                      }}
+                    />
                     {j.instance_name && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-2)]" style={{ color: "var(--text-3)" }}>
                         {j.instance_name}
