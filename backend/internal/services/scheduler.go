@@ -11,6 +11,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/models"
 	"gorm.io/gorm"
@@ -22,6 +23,8 @@ const (
 	unsnoozerEvery         = 60 * time.Second
 	resolveSweepEvery      = 5 * time.Minute
 	slaSweepEvery          = 60 * time.Second
+	awayReassignEvery      = 2 * time.Minute
+	awayThreshold          = 15 * time.Minute
 )
 
 type TicketingScheduler struct {
@@ -41,6 +44,7 @@ func (s *TicketingScheduler) Start() {
 	go s.loop("pending-redispatch", pendingRedispatchEvery, s.runPendingRedispatch)
 	go s.loop("resolve-sweep", resolveSweepEvery, s.runAutoCloseResolved)
 	go s.loop("sla-sweep", slaSweepEvery, s.runSLABreachDetection)
+	go s.loop("away-reassign", awayReassignEvery, s.runAwayReassign)
 	log.Info().Msg("ticketing scheduler started")
 }
 
@@ -193,6 +197,60 @@ func (s *TicketingScheduler) runSLABreachDetection(ctx context.Context) {
 		`, r.ID, r.WorkspaceID, payload, now)
 	}
 	log.Debug().Int("count", len(rows)).Msg("sla-sweep: breaches detected")
+}
+
+// runAwayReassign finds conversations whose assignee has been in
+// presence=away (or offline) for longer than awayThreshold and hands them
+// back to the queue via DispatchService.UnassignAndReroute. Only affects
+// conversations with status=open — snoozed/resolved/closed stay put.
+func (s *TicketingScheduler) runAwayReassign(ctx context.Context) {
+	if s.dispatch == nil {
+		return
+	}
+	cutoff := time.Now().Add(-awayThreshold)
+	type row struct {
+		ID string
+	}
+	var rows []row
+	s.db.WithContext(ctx).Raw(`
+		SELECT c.id::text AS id
+		FROM conversations c
+		JOIN user_presences up
+		  ON up.user_id = c.assigned_user_id
+		 AND up.workspace_id = c.workspace_id
+		WHERE c.status = ?
+		  AND c.assigned_user_id IS NOT NULL
+		  AND up.status IN ('away','offline')
+		  AND up.last_seen_at < ?
+		LIMIT 200
+	`, models.ConversationStatusOpen, cutoff).Scan(&rows)
+	// SQLite fallback (dev): crude version without RAW casting
+	if len(rows) == 0 && s.db.Dialector.Name() != "postgres" {
+		s.db.WithContext(ctx).Raw(`
+			SELECT c.id AS id
+			FROM conversations c
+			JOIN user_presences up
+			  ON up.user_id = c.assigned_user_id
+			 AND up.workspace_id = c.workspace_id
+			WHERE c.status = ?
+			  AND c.assigned_user_id IS NOT NULL
+			  AND up.status IN ('away','offline')
+			  AND up.last_seen_at < ?
+			LIMIT 200
+		`, models.ConversationStatusOpen, cutoff).Scan(&rows)
+	}
+	for _, r := range rows {
+		id, err := uuid.Parse(r.ID)
+		if err != nil {
+			continue
+		}
+		if err := s.dispatch.UnassignAndReroute(ctx, id, "away_reassign"); err != nil {
+			log.Debug().Err(err).Str("conv_id", r.ID).Msg("away-reassign: failed")
+		}
+	}
+	if len(rows) > 0 {
+		log.Debug().Int("count", len(rows)).Msg("away-reassign: rerouted")
+	}
 }
 
 // runAutoCloseResolved closes resolved conversations that have been idle for

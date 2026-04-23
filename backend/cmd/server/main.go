@@ -257,6 +257,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.ConversationParticipant{},
 		&models.QuickReply{},
 		&models.UserPresence{},
+		&models.CSATSurvey{},
 	)
 }
 

@@ -13,6 +13,7 @@ import (
 	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/email"
 	"github.com/uniq-chat/backend/internal/models"
+	"github.com/uniq-chat/backend/internal/outbound"
 	"github.com/uniq-chat/backend/internal/services"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
@@ -147,12 +148,17 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	workspaceH := handlers.NewWorkspaceHandler(db)
 	roleH := handlers.NewRoleHandler(db)
 	inviteH := handlers.NewInviteHandler(db)
-	conversationH := handlers.NewConversationHandler(db, manager)
+	// Build outbound registry once and share across handlers.
+	igSvc := services.NewInstagramService(db)
+	outboundReg := outbound.NewRegistry(db, manager, igSvc, taktikSvc)
+	conversationH := handlers.NewConversationHandler(db, manager, outboundReg)
 	departmentH := handlers.NewDepartmentHandler(db)
 	teamH := handlers.NewTeamHandler(db)
 	queueH := handlers.NewQueueHandler(db)
 	presenceH := handlers.NewPresenceHandler(db)
 	quickReplyH := handlers.NewQuickReplyHandler(db)
+	csatH := handlers.NewCSATHandler(db, manager)
+	reportsH := handlers.NewReportsHandler(db)
 
 	// WABA
 	wabaH := handlers.NewWABAHandler(db)
@@ -195,6 +201,12 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Invite system (public)
 	v1Public.Get("/invites/status", inviteH.GetStatus)
 	v1Public.Post("/invites/validate", inviteH.Validate)
+
+	// CSAT public endpoints (no auth — customer answers via tokenized link)
+	app.Get("/csat/:token", csatH.GetPublic)
+	app.Post("/csat/:token", csatH.SubmitPublic)
+	app.Get("/v1/csat/:token", csatH.GetPublic)
+	app.Post("/v1/csat/:token", csatH.SubmitPublic)
 
 	// ─── Protected routes ─────────────────────────────────────────────────────
 	api := app.Group("/v1", middleware.RequireAuth(db), middleware.RateLimit(300))
@@ -437,6 +449,21 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	conversations.Post("/:id/bot/enable", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.EnableBot)
 	conversations.Post("/:id/bot/disable", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.DisableBot)
 
+	// Tags on conversations
+	conversations.Get("/:id/tags", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.ListTags)
+	conversations.Post("/:id/tags", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.AddTag)
+	conversations.Delete("/:id/tags/:tagId", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.RemoveTag)
+	// Participants (followers/collaborators)
+	conversations.Get("/:id/participants", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.ListParticipants)
+	conversations.Post("/:id/participants", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.AddParticipant)
+	conversations.Delete("/:id/participants/:userId", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.RemoveParticipant)
+	// Audit: assignment history + raw event feed
+	conversations.Get("/:id/assignments", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.ListAssignments)
+	conversations.Get("/:id/events", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.ListEvents)
+	// CSAT per conversation
+	conversations.Get("/:id/csat", middleware.RequireWorkspacePermission(db, models.PermTicketsView), csatH.ListForConversation)
+	conversations.Post("/:id/csat", middleware.RequireWorkspacePermission(db, models.PermTicketsClose), csatH.Send)
+
 	// Notes
 	conversations.Get("/:id/notes", middleware.RequireWorkspacePermission(db, models.PermNotesView), conversationH.ListNotes)
 	conversations.Post("/:id/notes", middleware.RequireWorkspacePermission(db, models.PermNotesCreate), conversationH.CreateNote)
@@ -487,6 +514,14 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	quickReplies.Patch("/:id", middleware.RequireWorkspacePermission(db, models.PermQuickRepliesManageOwn), quickReplyH.Patch)
 	quickReplies.Delete("/:id", middleware.RequireWorkspacePermission(db, models.PermQuickRepliesManageOwn), quickReplyH.Delete)
 	quickReplies.Post("/:id/use", middleware.RequireWorkspacePermission(db, models.PermQuickRepliesView), quickReplyH.Use)
+
+	// Reports
+	reports := api.Group("/reports")
+	reports.Get("/overview", middleware.RequireWorkspacePermission(db, models.PermReportsView), reportsH.Overview)
+	reports.Get("/by-queue", middleware.RequireWorkspacePermission(db, models.PermReportsView), reportsH.ByQueue)
+	reports.Get("/by-user", middleware.RequireWorkspacePermission(db, models.PermReportsView), reportsH.ByUser)
+	reports.Get("/csat", middleware.RequireWorkspacePermission(db, models.PermReportsView), reportsH.CSAT)
+	reports.Get("/sla", middleware.RequireWorkspacePermission(db, models.PermReportsView), reportsH.SLA)
 
 	// Presence / workload (me + supervisor view)
 	me := api.Group("/me")

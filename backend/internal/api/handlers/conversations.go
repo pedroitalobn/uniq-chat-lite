@@ -4,6 +4,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"strconv"
 	"strings"
@@ -13,17 +14,19 @@ import (
 	"github.com/google/uuid"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/models"
+	"github.com/uniq-chat/backend/internal/outbound"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
 )
 
 type ConversationHandler struct {
-	db      *gorm.DB
-	manager *whatsapp.Manager
+	db       *gorm.DB
+	manager  *whatsapp.Manager
+	outbound *outbound.Registry
 }
 
-func NewConversationHandler(db *gorm.DB, manager *whatsapp.Manager) *ConversationHandler {
-	return &ConversationHandler{db: db, manager: manager}
+func NewConversationHandler(db *gorm.DB, manager *whatsapp.Manager, outboundReg *outbound.Registry) *ConversationHandler {
+	return &ConversationHandler{db: db, manager: manager, outbound: outboundReg}
 }
 
 // -- list -------------------------------------------------------------------
@@ -339,17 +342,26 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// Deliver via channel-specific sender. Fase 3 MVP: WhatsApp/WABA only.
-	// Other channels (Instagram/TikTok) fall back to just persisting the
-	// MessageLog — they'll light up when the sender Registry lands.
+	// Deliver via the outbound Registry — routes per channel.
 	sendStatus := models.MessageStatusSent
 	sendErrStr := ""
-	if h.manager != nil {
-		if client := h.manager.GetInstance(conv.InstanceID.String()); client != nil && client.IsConnected() {
-			if _, sendErr := client.SendTextMessage(conv.ChannelKey, body.Body); sendErr != nil {
+	if h.outbound != nil {
+		var inst models.Instance
+		if err := h.db.First(&inst, "id = ?", conv.InstanceID).Error; err == nil {
+			ctx, cancel := context.WithTimeout(c.UserContext(), 30*time.Second)
+			defer cancel()
+			_, sendErr := h.outbound.Send(ctx, &inst, outbound.OutboundMessage{
+				To:   conv.ChannelKey,
+				Type: msgType,
+				Body: body.Body,
+			})
+			if sendErr != nil {
 				sendStatus = models.MessageStatusFailed
 				sendErrStr = sendErr.Error()
 			}
+		} else {
+			sendStatus = models.MessageStatusFailed
+			sendErrStr = "instância não encontrada"
 		}
 	}
 	updates := map[string]any{"status": sendStatus}
@@ -694,6 +706,225 @@ func (h *ConversationHandler) setBot(c *fiber.Ctx, active bool) error {
 		Payload:        jsonEncode(map[string]any{"bot_active": active}),
 	})
 	return c.JSON(fiber.Map{"ok": true, "is_bot_active": active})
+}
+
+// -- tags -------------------------------------------------------------------
+
+// AddTag POST /v1/conversations/:id/tags  { tag_id }
+// Attaches an existing Tag (models.Tag lives on contact_tags M2M today; for
+// conversations we reuse the same Tag table with a different join).
+// We implement the M2M ad-hoc via a `conversation_tags` table auto-migrated
+// through AddTag's raw SQL to avoid a schema change here.
+func (h *ConversationHandler) AddTag(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	if err := h.assertAccess(ws, id); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+	var body struct{ TagID string `json:"tag_id"` }
+	c.BodyParser(&body)
+	tagID, err := uuid.Parse(body.TagID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "tag_id inválido"})
+	}
+	// Ensure tag belongs to this workspace
+	var count int64
+	h.db.Model(&models.Tag{}).Where("id = ? AND (workspace_id = ? OR workspace_id IS NULL)", tagID, ws).Count(&count)
+	if count == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "tag não encontrada"})
+	}
+	h.ensureConversationTagsTable()
+	h.db.Exec(`INSERT INTO conversation_tags (conversation_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING`, id, tagID)
+	actor := middleware.GetCurrentUserID(c)
+	h.appendEvent(&models.Conversation{ID: id, WorkspaceID: ws}, models.ConvEventTagAdded, actor, map[string]any{"tag_id": tagID})
+	return c.JSON(fiber.Map{"ok": true})
+}
+
+// RemoveTag DELETE /v1/conversations/:id/tags/:tagId
+func (h *ConversationHandler) RemoveTag(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	tagID, err := uuid.Parse(c.Params("tagId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "tagId inválido"})
+	}
+	if err := h.assertAccess(ws, id); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+	h.ensureConversationTagsTable()
+	h.db.Exec(`DELETE FROM conversation_tags WHERE conversation_id = ? AND tag_id = ?`, id, tagID)
+	actor := middleware.GetCurrentUserID(c)
+	h.appendEvent(&models.Conversation{ID: id, WorkspaceID: ws}, models.ConvEventTagRemoved, actor, map[string]any{"tag_id": tagID})
+	return c.JSON(fiber.Map{"ok": true})
+}
+
+// ListTags GET /v1/conversations/:id/tags
+func (h *ConversationHandler) ListTags(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	if err := h.assertAccess(ws, id); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+	h.ensureConversationTagsTable()
+	var tags []models.Tag
+	h.db.Raw(`
+		SELECT t.* FROM tags t
+		JOIN conversation_tags ct ON ct.tag_id = t.id
+		WHERE ct.conversation_id = ?
+		ORDER BY t.name ASC
+	`, id).Scan(&tags)
+	return c.JSON(fiber.Map{"items": tags})
+}
+
+// ensureConversationTagsTable creates the join table if missing. Called
+// lazily so we don't need a fresh migration. Idempotent per-process.
+func (h *ConversationHandler) ensureConversationTagsTable() {
+	if h.db.Dialector.Name() == "postgres" {
+		h.db.Exec(`
+			CREATE TABLE IF NOT EXISTS conversation_tags (
+				conversation_id UUID NOT NULL,
+				tag_id UUID NOT NULL,
+				PRIMARY KEY (conversation_id, tag_id)
+			)
+		`)
+	} else {
+		h.db.Exec(`
+			CREATE TABLE IF NOT EXISTS conversation_tags (
+				conversation_id TEXT NOT NULL,
+				tag_id TEXT NOT NULL,
+				PRIMARY KEY (conversation_id, tag_id)
+			)
+		`)
+	}
+}
+
+// -- participants -----------------------------------------------------------
+
+// AddParticipant POST /v1/conversations/:id/participants  { user_id, role? }
+func (h *ConversationHandler) AddParticipant(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	if err := h.assertAccess(ws, id); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+	var body struct {
+		UserID string `json:"user_id"`
+		Role   string `json:"role"`
+	}
+	c.BodyParser(&body)
+	userID, err := uuid.Parse(body.UserID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "user_id inválido"})
+	}
+	if body.Role == "" {
+		body.Role = "follower"
+	}
+	p := models.ConversationParticipant{
+		ConversationID: id,
+		UserID:         userID,
+		Role:           body.Role,
+		AddedAt:        time.Now(),
+	}
+	if err := h.db.Create(&p).Error; err != nil {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
+	}
+	actor := middleware.GetCurrentUserID(c)
+	h.appendEvent(&models.Conversation{ID: id, WorkspaceID: ws}, models.ConvEventParticipantAdded, actor, map[string]any{"user_id": userID, "role": body.Role})
+	return c.Status(fiber.StatusCreated).JSON(p)
+}
+
+// RemoveParticipant DELETE /v1/conversations/:id/participants/:userId
+func (h *ConversationHandler) RemoveParticipant(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	userID, err := uuid.Parse(c.Params("userId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "userId inválido"})
+	}
+	if err := h.assertAccess(ws, id); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+	h.db.Where("conversation_id = ? AND user_id = ?", id, userID).Delete(&models.ConversationParticipant{})
+	actor := middleware.GetCurrentUserID(c)
+	h.appendEvent(&models.Conversation{ID: id, WorkspaceID: ws}, models.ConvEventParticipantRemoved, actor, map[string]any{"user_id": userID})
+	return c.JSON(fiber.Map{"ok": true})
+}
+
+// ListParticipants GET /v1/conversations/:id/participants
+func (h *ConversationHandler) ListParticipants(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	if err := h.assertAccess(ws, id); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+	type row struct {
+		models.ConversationParticipant
+		UserName  string `json:"user_name"`
+		UserEmail string `json:"user_email"`
+	}
+	var rows []row
+	h.db.Table("conversation_participants AS cp").
+		Select("cp.*, u.name AS user_name, u.email AS user_email").
+		Joins("LEFT JOIN users u ON u.id = cp.user_id").
+		Where("cp.conversation_id = ?", id).
+		Order("cp.added_at ASC").
+		Scan(&rows)
+	return c.JSON(fiber.Map{"items": rows})
+}
+
+// -- history accessors ------------------------------------------------------
+
+// ListAssignments GET /v1/conversations/:id/assignments
+func (h *ConversationHandler) ListAssignments(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	if err := h.assertAccess(ws, id); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+	var items []models.ConversationAssignment
+	h.db.Where("conversation_id = ?", id).Order("created_at DESC").Find(&items)
+	return c.JSON(fiber.Map{"items": items})
+}
+
+// ListEvents GET /v1/conversations/:id/events
+// Raw event stream (without messages/notes merged in) — useful for audit UIs.
+func (h *ConversationHandler) ListEvents(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	if err := h.assertAccess(ws, id); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+	var items []models.ConversationEvent
+	limit := atoiDefault(c.Query("limit"), 200)
+	if limit > 1000 {
+		limit = 1000
+	}
+	h.db.Where("conversation_id = ?", id).Order("created_at DESC").Limit(limit).Find(&items)
+	return c.JSON(fiber.Map{"items": items})
 }
 
 // -- notes ------------------------------------------------------------------
