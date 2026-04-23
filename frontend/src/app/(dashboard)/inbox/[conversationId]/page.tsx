@@ -1,17 +1,19 @@
 "use client";
 
-import { use, useEffect, useMemo, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ArrowLeft, Send, StickyNote, CheckCircle2, Clock3, RotateCcw,
   UserCheck, UserX, ArrowRightLeft, Bot, BotOff, Lock, AlertTriangle,
+  Smile, X, Star,
 } from "lucide-react";
-import { conversationsApi, queuesApi } from "@/lib/api";
+import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { relativeTime } from "@/components/atendimento/ConversationList";
+import { useConversationWS, type WSEvent } from "@/hooks/useConversationWS";
 
 interface Conversation {
   id: string;
@@ -105,6 +107,8 @@ export default function ConversationDetailPage({ params }: { params: Promise<{ c
   const canUpdate = hasPerm(PERM.ticketsUpdate);
   const canNote = hasPerm(PERM.notesCreate);
 
+  const [transferOpen, setTransferOpen] = useState(false);
+
   const convQ = useQuery({
     queryKey: ["conversation", wsId, conversationId],
     queryFn: () => conversationsApi.get(wsId as string, conversationId).then((r) => r.data as Conversation),
@@ -130,6 +134,21 @@ export default function ConversationDetailPage({ params }: { params: Promise<{ c
     if (!wsId || !canView) return;
     conversationsApi.markRead(wsId, conversationId).catch(() => {});
   }, [wsId, canView, conversationId]);
+
+  // Live updates — any server-side conversation event for this ticket
+  // invalidates the relevant queries. Payloads that embed `conversation_id`
+  // are filtered so we don't re-fetch for unrelated tickets.
+  useConversationWS({
+    prefixes: ["conversation."],
+    onEvent: (evt: WSEvent) => {
+      const payload = (evt.payload ?? {}) as { conversation_id?: string; conversation?: { id?: string } };
+      const eventConvID = payload.conversation_id ?? payload.conversation?.id;
+      if (eventConvID && eventConvID !== conversationId) return;
+      qc.invalidateQueries({ queryKey: ["conversation", wsId, conversationId] });
+      qc.invalidateQueries({ queryKey: ["conversation-timeline", wsId, conversationId] });
+    },
+  });
+
 
   const send = useMutation({
     mutationFn: (body: string) => conversationsApi.sendMessage(wsId as string, conversationId, { body }),
@@ -204,6 +223,30 @@ export default function ConversationDetailPage({ params }: { params: Promise<{ c
     onSuccess: () => refresh(),
   });
 
+  // Keyboard shortcuts — declared after all mutations to avoid TDZ refs.
+  const openSnoozePrompt = useCallback(() => {
+    const hours = Number(prompt("Em quantas horas desnoozear?", "4") || 4);
+    if (hours > 0) snooze.mutate(new Date(Date.now() + hours * 3600_000).toISOString());
+  }, [snooze]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+      const k = e.key.toLowerCase();
+      if (k === "t" && canTransfer) { e.preventDefault(); setTransferOpen(true); }
+      else if (k === "a" && canAssign && !convQ.data?.assigned_user_id) { e.preventDefault(); claim.mutate(); }
+      else if (k === "s" && canSnooze && convQ.data?.status === "open") { e.preventDefault(); openSnoozePrompt(); }
+      else if (k === "e" && canClose && convQ.data && convQ.data.status !== "resolved" && convQ.data.status !== "closed") {
+        e.preventDefault(); resolve.mutate();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [canTransfer, canAssign, canSnooze, canClose, convQ.data, claim, resolve, openSnoozePrompt]);
+
   if (!wsId || permsLoading) return <div className="p-6">Carregando…</div>;
   if (!canView) {
     return (
@@ -220,6 +263,13 @@ export default function ConversationDetailPage({ params }: { params: Promise<{ c
     [timelineQ.data]
   );
   const status = conv ? STATUS_LABELS[conv.status] ?? STATUS_LABELS.open : null;
+
+  // SLA breach indicator: scan the audit events for a sla_breached row; if
+  // present we show a red pill. Lightweight — no extra query.
+  const slaBreached = useMemo(() => {
+    const items = timelineQ.data?.items ?? [];
+    return items.some((e) => e.kind === "event" && (e.payload as EventPayload).event_type === "sla_breached");
+  }, [timelineQ.data]);
 
   return (
     <div className="flex h-full min-h-0">
@@ -253,6 +303,11 @@ export default function ConversationDetailPage({ params }: { params: Promise<{ c
                   reaberto {conv.reopen_count}×
                 </span>
               ) : null}
+              {slaBreached && (
+                <span className="flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
+                  <AlertTriangle className="h-3 w-3" /> SLA
+                </span>
+              )}
             </div>
             <p className="truncate text-xs text-zinc-500">
               {conv?.channel_type} · {conv?.channel_key}
@@ -285,6 +340,8 @@ export default function ConversationDetailPage({ params }: { params: Promise<{ c
         </div>
 
         <Composer
+          wsId={wsId}
+          conversationId={conversationId}
           canSend={canSend}
           canNote={canNote}
           onSendMessage={(body) => send.mutate(body)}
@@ -312,25 +369,19 @@ export default function ConversationDetailPage({ params }: { params: Promise<{ c
           {conv?.assigned_user_id && canAssign && (
             <ActionRow onClick={() => unassign.mutate()} icon={<UserX className="h-4 w-4" />} label="Remover atribuição" />
           )}
-          {canTransfer && queuesQ.data?.items && (
-            <details className="group">
-              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                <ArrowRightLeft className="h-4 w-4" />
-                Transferir para fila
-              </summary>
-              <ul className="mt-1 space-y-0.5 pl-6">
-                {queuesQ.data.items.map((q) => (
-                  <li key={q.id}>
-                    <button
-                      onClick={() => transfer.mutate(q.id)}
-                      className="block w-full rounded-md px-2 py-1 text-left text-xs text-zinc-600 hover:bg-blue-500/10 hover:text-blue-600 dark:text-zinc-300"
-                    >
-                      {q.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </details>
+          {canTransfer && (
+            <ActionRow
+              onClick={() => setTransferOpen(true)}
+              icon={<ArrowRightLeft className="h-4 w-4" />}
+              label="Transferir…"
+            />
+          )}
+          {canClose && conv?.status === "resolved" && (
+            <ActionRow
+              onClick={() => csatApi.send(wsId as string, conversationId).then(() => toast.success("CSAT enviado"))}
+              icon={<Star className="h-4 w-4" />}
+              label="Enviar pesquisa CSAT"
+            />
           )}
           {conv?.status !== "resolved" && conv?.status !== "closed" && canClose && (
             <ActionRow onClick={() => resolve.mutate()} icon={<CheckCircle2 className="h-4 w-4" />} label="Marcar como resolvido" />
@@ -372,8 +423,168 @@ export default function ConversationDetailPage({ params }: { params: Promise<{ c
             <DRow label="Canal" value={conv?.channel_type} />
             <DRow label="Fila" value={queuesQ.data?.items.find((q) => q.id === conv?.queue_id)?.name ?? "—"} />
           </dl>
+          <div className="mt-4 rounded-md border border-dashed border-zinc-300 p-3 text-[11px] dark:border-zinc-700">
+            <div className="font-semibold uppercase tracking-wide text-zinc-500">Atalhos</div>
+            <dl className="mt-1 space-y-0.5 text-zinc-500">
+              <div className="flex justify-between"><span>Atender</span><kbd className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">A</kbd></div>
+              <div className="flex justify-between"><span>Transferir</span><kbd className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">T</kbd></div>
+              <div className="flex justify-between"><span>Soneca</span><kbd className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">S</kbd></div>
+              <div className="flex justify-between"><span>Resolver</span><kbd className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">E</kbd></div>
+              <div className="flex justify-between"><span>Resposta rápida</span><kbd className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">/</kbd></div>
+            </dl>
+          </div>
         </div>
       </aside>
+
+      {transferOpen && wsId && (
+        <TransferDialog
+          wsId={wsId}
+          conversationId={conversationId}
+          onClose={() => setTransferOpen(false)}
+          onSuccess={refresh}
+        />
+      )}
+    </div>
+  );
+}
+
+// TransferDialog lets the agent transfer a conversation to a Queue, a Team,
+// or a specific User. Team/User variants fall back to POST /transfer with the
+// appropriate body since the backend handler accepts any combination.
+function TransferDialog({
+  wsId, conversationId, onClose, onSuccess,
+}: {
+  wsId: string;
+  conversationId: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [tab, setTab] = useState<"queue" | "team" | "user">("queue");
+  const [note, setNote] = useState("");
+  const [selected, setSelected] = useState<string>("");
+  const queuesQ = useQuery({
+    queryKey: ["queues-for-transfer", wsId],
+    queryFn: () => queuesApi.list(wsId).then((r) => r.data as { items: Array<{ id: string; name: string }> }),
+  });
+  const teamsQ = useQuery({
+    queryKey: ["teams-for-transfer", wsId],
+    queryFn: () => teamsApi.list(wsId).then((r) => r.data as { items: Array<{ id: string; name: string }> }),
+    enabled: tab === "team",
+  });
+  const membersQ = useQuery({
+    queryKey: ["workspace-members-for-transfer", wsId],
+    queryFn: () =>
+      workspacesApi.listMembers(wsId).then((r) => {
+        const raw = r.data as { members?: Array<{ user_id: string; user?: { name: string; email: string } }> } | Array<{ user_id: string; user?: { name: string; email: string } }>;
+        return Array.isArray(raw) ? raw : raw.members ?? [];
+      }),
+    enabled: tab === "user",
+  });
+
+  useEffect(() => setSelected(""), [tab]);
+
+  const submit = async () => {
+    if (!selected) return;
+    try {
+      if (tab === "queue") await conversationsApi.transfer(wsId, conversationId, { queue_id: selected, note });
+      else if (tab === "team") await conversationsApi.transfer(wsId, conversationId, { team_id: selected, note });
+      else await conversationsApi.transfer(wsId, conversationId, { user_id: selected, note });
+      toast.success("Transferido");
+      onSuccess();
+      onClose();
+    } catch {
+      toast.error("Falha ao transferir");
+    }
+  };
+
+  const options: Array<{ id: string; label: string; hint?: string }> =
+    tab === "queue"
+      ? (queuesQ.data?.items ?? []).map((q) => ({ id: q.id, label: q.name }))
+      : tab === "team"
+      ? (teamsQ.data?.items ?? []).map((t) => ({ id: t.id, label: t.name }))
+      : (membersQ.data ?? []).map((m) => ({
+          id: m.user_id,
+          label: m.user?.name || m.user?.email || m.user_id.slice(0, 8),
+          hint: m.user?.email,
+        }));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-lg rounded-lg bg-white shadow-xl dark:bg-zinc-950">
+        <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+          <h2 className="font-semibold">Transferir atendimento</h2>
+          <button
+            onClick={onClose}
+            className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex border-b border-zinc-200 dark:border-zinc-800">
+          {(["queue", "team", "user"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`flex-1 px-4 py-2 text-sm ${
+                tab === t
+                  ? "border-b-2 border-blue-500 font-medium text-blue-600 dark:text-blue-400"
+                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+              }`}
+            >
+              {t === "queue" ? "Fila" : t === "team" ? "Equipe" : "Agente"}
+            </button>
+          ))}
+        </div>
+        <div className="max-h-80 overflow-auto">
+          {options.length === 0 ? (
+            <div className="p-4 text-sm text-zinc-500">Sem opções disponíveis.</div>
+          ) : (
+            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              {options.map((o) => (
+                <li key={o.id}>
+                  <button
+                    onClick={() => setSelected(o.id)}
+                    className={`flex w-full items-center justify-between px-4 py-2 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900 ${
+                      selected === o.id ? "bg-blue-500/10" : ""
+                    }`}
+                  >
+                    <span>
+                      <span className="font-medium">{o.label}</span>
+                      {o.hint && <span className="ml-2 text-xs text-zinc-500">{o.hint}</span>}
+                    </span>
+                    {selected === o.id && <span className="text-xs text-blue-600 dark:text-blue-400">✓</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="border-t border-zinc-200 p-4 dark:border-zinc-800">
+          <label className="block text-xs font-medium text-zinc-500">Motivo (opcional)</label>
+          <textarea
+            className="mt-1 w-full resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            rows={2}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Contexto para quem receber"
+          />
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={submit}
+              disabled={!selected}
+              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              Transferir
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -460,8 +671,10 @@ function parseContent(raw: string): string {
 }
 
 function Composer({
-  canSend, canNote, onSendMessage, onSendNote, isSending, isNoting,
+  wsId, conversationId, canSend, canNote, onSendMessage, onSendNote, isSending, isNoting,
 }: {
+  wsId?: string;
+  conversationId: string;
   canSend: boolean;
   canNote: boolean;
   onSendMessage: (body: string) => void;
@@ -472,6 +685,69 @@ function Composer({
   const [mode, setMode] = useState<"message" | "note">("message");
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const draftKey = `inbox:draft:${conversationId}:${mode}`;
+
+  // Draft persistence — survive accidental reloads
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(draftKey);
+      if (saved) setText(saved);
+      else setText("");
+    } catch {
+      /* localStorage disabled */
+    }
+  }, [draftKey]);
+  useEffect(() => {
+    try {
+      if (text) localStorage.setItem(draftKey, text);
+      else localStorage.removeItem(draftKey);
+    } catch {
+      /* noop */
+    }
+  }, [text, draftKey]);
+
+  // Focus composer when `/` is pressed while idle
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "/") return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      e.preventDefault();
+      textareaRef.current?.focus();
+      setText((prev) => (prev.length ? prev : "/"));
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // Quick reply picker — when mode=message and text starts with `/xxx`, query the API.
+  const currentShortcut = useMemo(() => {
+    if (mode !== "message") return "";
+    const t = text.trimStart();
+    if (!t.startsWith("/")) return "";
+    // Only trigger while the user is still typing the shortcut (no spaces)
+    if (t.indexOf(" ") !== -1) return "";
+    return t;
+  }, [mode, text]);
+
+  const picker = useQuery({
+    queryKey: ["quick-replies-search", wsId, currentShortcut],
+    queryFn: () =>
+      quickRepliesApi.search(wsId as string, currentShortcut).then((r) =>
+        (r.data as { items: Array<{ id: string; shortcut: string; title?: string; body: string }> }).items ?? []
+      ),
+    enabled: !!wsId && currentShortcut.length >= 1 && mode === "message",
+    staleTime: 5_000,
+  });
+
+  const [pickerIndex, setPickerIndex] = useState(0);
+  useEffect(() => setPickerIndex(0), [currentShortcut]);
+
+  const applyQuickReply = (qr: { id: string; body: string }) => {
+    setText(qr.body);
+    if (wsId) quickRepliesApi.use(wsId, qr.id).catch(() => {});
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  };
 
   const disabled =
     (!canSend && mode === "message") || (!canNote && mode === "note") || text.trim() === "";
@@ -482,8 +758,12 @@ function Composer({
     if (mode === "message") onSendMessage(body);
     else onSendNote(body);
     setText("");
+    try { localStorage.removeItem(draftKey); } catch { /* noop */ }
     requestAnimationFrame(() => textareaRef.current?.focus());
   };
+
+  const pickerItems = picker.data ?? [];
+  const pickerOpen = mode === "message" && currentShortcut.length >= 1 && pickerItems.length > 0;
 
   return (
     <div
@@ -517,38 +797,98 @@ function Composer({
           Nota interna
         </button>
         <span className="ml-auto text-zinc-400">
-          {mode === "message" ? "Enter envia · Shift+Enter quebra linha" : "Nota visível só para a equipe"}
+          {mode === "message"
+            ? "Enter envia · Shift+Enter quebra linha · / resposta rápida"
+            : "Nota visível só para a equipe"}
         </span>
       </div>
-      <div className="flex items-end gap-2">
-        <textarea
-          ref={textareaRef}
-          className={`min-h-[44px] max-h-40 flex-1 resize-y rounded-md border px-3 py-2 text-sm outline-none ${
-            mode === "note"
-              ? "border-amber-300 bg-white focus:border-amber-500 dark:border-amber-500/30 dark:bg-zinc-900"
-              : "border-zinc-200 bg-white focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-900"
-          }`}
-          placeholder={mode === "message" ? "Digite sua mensagem…" : "Registre uma nota interna…"}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-        />
-        <button
-          onClick={submit}
-          disabled={disabled || isSending || isNoting}
-          className={`flex h-10 items-center gap-1.5 rounded-md px-3 text-sm font-medium text-white disabled:opacity-50 ${
-            mode === "note" ? "bg-amber-500 hover:bg-amber-600" : "bg-blue-600 hover:bg-blue-700"
-          }`}
-          type="button"
-        >
-          {mode === "note" ? <StickyNote className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-          {mode === "note" ? "Adicionar" : "Enviar"}
-        </button>
+
+      <div className="relative">
+        {pickerOpen && (
+          <div className="absolute bottom-full left-0 right-20 mb-2 max-h-60 overflow-auto rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+            <div className="flex items-center gap-2 border-b border-zinc-200 px-3 py-1.5 text-[11px] text-zinc-500 dark:border-zinc-800">
+              <Smile className="h-3.5 w-3.5" /> Respostas rápidas · {pickerItems.length}
+            </div>
+            <ul>
+              {pickerItems.map((qr, i) => (
+                <li key={qr.id}>
+                  <button
+                    type="button"
+                    onMouseEnter={() => setPickerIndex(i)}
+                    onClick={() => applyQuickReply(qr)}
+                    className={`flex w-full items-start gap-3 px-3 py-2 text-left ${
+                      i === pickerIndex ? "bg-blue-500/10" : "hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                    }`}
+                  >
+                    <span className="mt-0.5 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-mono text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                      {qr.shortcut || "—"}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      {qr.title && <div className="text-xs font-medium">{qr.title}</div>}
+                      <div className="line-clamp-2 text-xs text-zinc-500">{qr.body}</div>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="flex items-end gap-2">
+          <textarea
+            ref={textareaRef}
+            className={`min-h-[44px] max-h-40 flex-1 resize-y rounded-md border px-3 py-2 text-sm outline-none ${
+              mode === "note"
+                ? "border-amber-300 bg-white focus:border-amber-500 dark:border-amber-500/30 dark:bg-zinc-900"
+                : "border-zinc-200 bg-white focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-900"
+            }`}
+            placeholder={mode === "message" ? "Digite sua mensagem… (/ para respostas rápidas)" : "Registre uma nota interna…"}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (pickerOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+                e.preventDefault();
+                setPickerIndex((i) => {
+                  if (e.key === "ArrowDown") return Math.min(i + 1, pickerItems.length - 1);
+                  return Math.max(i - 1, 0);
+                });
+                return;
+              }
+              if (pickerOpen && e.key === "Tab") {
+                e.preventDefault();
+                const selected = pickerItems[pickerIndex];
+                if (selected) applyQuickReply(selected);
+                return;
+              }
+              if (e.key === "Escape" && pickerOpen) {
+                e.preventDefault();
+                setText("");
+                return;
+              }
+              if (e.key === "Enter" && !e.shiftKey) {
+                if (pickerOpen) {
+                  e.preventDefault();
+                  const selected = pickerItems[pickerIndex];
+                  if (selected) applyQuickReply(selected);
+                  return;
+                }
+                e.preventDefault();
+                submit();
+              }
+            }}
+          />
+          <button
+            onClick={submit}
+            disabled={disabled || isSending || isNoting}
+            className={`flex h-10 items-center gap-1.5 rounded-md px-3 text-sm font-medium text-white disabled:opacity-50 ${
+              mode === "note" ? "bg-amber-500 hover:bg-amber-600" : "bg-blue-600 hover:bg-blue-700"
+            }`}
+            type="button"
+          >
+            {mode === "note" ? <StickyNote className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+            {mode === "note" ? "Adicionar" : "Enviar"}
+          </button>
+        </div>
       </div>
     </div>
   );

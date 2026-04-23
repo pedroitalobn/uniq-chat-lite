@@ -1,11 +1,12 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Lock } from "lucide-react";
 import { conversationsApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { ConversationList, type ConversationRow } from "@/components/atendimento/ConversationList";
+import { useConversationWS } from "@/hooks/useConversationWS";
 
 export default function MyConversationsPage() {
   const { currentWorkspace } = useWorkspace();
@@ -13,6 +14,15 @@ export default function MyConversationsPage() {
 
   const canView = hasPerm(PERM.ticketsView);
   const wsId = currentWorkspace?.id;
+  const qc = useQueryClient();
+
+  useConversationWS({
+    prefixes: ["conversation.", "queue."],
+    onEvent: () => {
+      qc.invalidateQueries({ queryKey: ["conversations", wsId, "mine"] });
+      qc.invalidateQueries({ queryKey: ["conversations-count", wsId] });
+    },
+  });
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["conversations", wsId, "mine"],

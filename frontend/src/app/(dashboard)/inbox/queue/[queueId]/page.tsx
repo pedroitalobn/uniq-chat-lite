@@ -8,6 +8,7 @@ import { conversationsApi, queuesApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { ConversationList, type ConversationRow } from "@/components/atendimento/ConversationList";
+import { useConversationWS } from "@/hooks/useConversationWS";
 
 interface QueueDetails {
   id: string;
@@ -35,6 +36,14 @@ export default function QueuePage({ params }: { params: Promise<{ queueId: strin
   const canView = hasPerm(PERM.queuesView) || hasPerm(PERM.ticketsView);
   const canAssign = hasPerm(PERM.ticketsAssign);
   const wsId = currentWorkspace?.id;
+
+  useConversationWS({
+    prefixes: ["conversation.", "queue."],
+    onEvent: () => {
+      qc.invalidateQueries({ queryKey: ["conversations", wsId, "queue", queueId] });
+      qc.invalidateQueries({ queryKey: ["queue-stats", wsId, queueId] });
+    },
+  });
 
   const { data: queue } = useQuery({
     queryKey: ["queue", wsId, queueId],

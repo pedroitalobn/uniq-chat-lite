@@ -7,6 +7,7 @@ import { conversationsApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { ConversationList, type ConversationRow } from "@/components/atendimento/ConversationList";
+import { useConversationWS } from "@/hooks/useConversationWS";
 
 export default function UnassignedQueuePage() {
   const { currentWorkspace } = useWorkspace();
@@ -16,6 +17,11 @@ export default function UnassignedQueuePage() {
   const canView = hasPerm(PERM.queuesView) || hasPerm(PERM.ticketsViewAll);
   const canAssign = hasPerm(PERM.ticketsAssign);
   const wsId = currentWorkspace?.id;
+
+  useConversationWS({
+    prefixes: ["conversation.", "queue."],
+    onEvent: () => qc.invalidateQueries({ queryKey: ["conversations", wsId, "unassigned"] }),
+  });
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["conversations", wsId, "unassigned"],

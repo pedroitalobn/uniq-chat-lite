@@ -1017,6 +1017,70 @@ export const workspacePermissionsApi = {
   },
 };
 
+export const quickRepliesApi = {
+  list: (workspaceId: string, scope: "mine" | "workspace" | "all" = "all") =>
+    api.get("/v1/quick-replies", { headers: wsHeaders(workspaceId), params: { scope } }),
+  search: (workspaceId: string, q: string) =>
+    api.get("/v1/quick-replies/search", { headers: wsHeaders(workspaceId), params: { q } }),
+  create: (workspaceId: string, data: {
+    shortcut?: string; title?: string; body: string;
+    media_url?: string; media_type?: string; variables?: string[];
+    department_id?: string; queue_id?: string; shared?: boolean;
+  }) => api.post("/v1/quick-replies", data, { headers: wsHeaders(workspaceId) }),
+  patch: (workspaceId: string, id: string, data: Partial<{
+    shortcut: string; title: string; body: string;
+    media_url: string; media_type: string;
+    variables: string[]; is_active: boolean;
+  }>) => api.patch(`/v1/quick-replies/${id}`, data, { headers: wsHeaders(workspaceId) }),
+  delete: (workspaceId: string, id: string) =>
+    api.delete(`/v1/quick-replies/${id}`, { headers: wsHeaders(workspaceId) }),
+  use: (workspaceId: string, id: string) =>
+    api.post(`/v1/quick-replies/${id}/use`, {}, { headers: wsHeaders(workspaceId) }),
+};
+
+export const reportsApi = {
+  overview: (workspaceId: string, params?: { from?: string; to?: string }) =>
+    api.get("/v1/reports/overview", { headers: wsHeaders(workspaceId), params }),
+  byQueue: (workspaceId: string, params?: { from?: string; to?: string }) =>
+    api.get("/v1/reports/by-queue", { headers: wsHeaders(workspaceId), params }),
+  byUser: (workspaceId: string, params?: { from?: string; to?: string }) =>
+    api.get("/v1/reports/by-user", { headers: wsHeaders(workspaceId), params }),
+  csat: (workspaceId: string, params?: { from?: string; to?: string }) =>
+    api.get("/v1/reports/csat", { headers: wsHeaders(workspaceId), params }),
+  sla: (workspaceId: string, params?: { from?: string; to?: string }) =>
+    api.get("/v1/reports/sla", { headers: wsHeaders(workspaceId), params }),
+};
+
+export const csatApi = {
+  listForConversation: (workspaceId: string, conversationId: string) =>
+    api.get(`/v1/conversations/${conversationId}/csat`, { headers: wsHeaders(workspaceId) }),
+  send: (workspaceId: string, conversationId: string) =>
+    api.post(`/v1/conversations/${conversationId}/csat`, {}, { headers: wsHeaders(workspaceId) }),
+  // Public endpoints (no auth) — used by the customer-facing /csat/:token page.
+  getPublic: (token: string) => api.get(`/csat/${token}`),
+  submitPublic: (token: string, data: { rating: number; comment?: string }) =>
+    api.post(`/csat/${token}`, data),
+};
+
+export const conversationExtraApi = {
+  listTags: (workspaceId: string, conversationId: string) =>
+    api.get(`/v1/conversations/${conversationId}/tags`, { headers: wsHeaders(workspaceId) }),
+  addTag: (workspaceId: string, conversationId: string, tagId: string) =>
+    api.post(`/v1/conversations/${conversationId}/tags`, { tag_id: tagId }, { headers: wsHeaders(workspaceId) }),
+  removeTag: (workspaceId: string, conversationId: string, tagId: string) =>
+    api.delete(`/v1/conversations/${conversationId}/tags/${tagId}`, { headers: wsHeaders(workspaceId) }),
+  listParticipants: (workspaceId: string, conversationId: string) =>
+    api.get(`/v1/conversations/${conversationId}/participants`, { headers: wsHeaders(workspaceId) }),
+  addParticipant: (workspaceId: string, conversationId: string, userId: string, role = "follower") =>
+    api.post(`/v1/conversations/${conversationId}/participants`, { user_id: userId, role }, { headers: wsHeaders(workspaceId) }),
+  removeParticipant: (workspaceId: string, conversationId: string, userId: string) =>
+    api.delete(`/v1/conversations/${conversationId}/participants/${userId}`, { headers: wsHeaders(workspaceId) }),
+  listAssignments: (workspaceId: string, conversationId: string) =>
+    api.get(`/v1/conversations/${conversationId}/assignments`, { headers: wsHeaders(workspaceId) }),
+  listEvents: (workspaceId: string, conversationId: string, limit = 200) =>
+    api.get(`/v1/conversations/${conversationId}/events`, { headers: wsHeaders(workspaceId), params: { limit } }),
+};
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface ProxyConfig {

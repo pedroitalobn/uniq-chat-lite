@@ -10,7 +10,7 @@ import {
   Mail, MapPin, Megaphone, Menu, MessageSquare, Minus, MoreHorizontal,
   MoreVertical, Phone, Plug, Plus, Search, Send, Settings, Shield, Smartphone,
   Smile, Sparkles, Star, Tag, Trash2, Users, X, Zap, StickyNote,
-  Wrench, ExternalLink, Server
+  Wrench, ExternalLink, Server, Headset, BarChart3
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePreferences } from "@/lib/preferences";
@@ -33,7 +33,9 @@ export function Sidebar() {
     { href: "/agents",       label: "Agentes IA",          icon: Zap,             exact: false },
     { href: "/servers",     label: t("nav_servers"),      icon: Server,          exact: false },
     { href: "/instances",   label: t("nav_instances"),    icon: Smartphone,      exact: false },
-    { href: "/inbox",       label: "Inbox",               icon: MessageSquare,    exact: false },
+    { href: "/inbox",       label: "Inbox",               icon: MessageSquare,    exact: true  },
+    { href: "/inbox/mine",  label: "Atendimento",         icon: Headset,          exact: false },
+    { href: "/reports/overview", label: "Relatórios",     icon: BarChart3,        exact: false },
     { href: "/crm",         label: t("nav_crm"),          icon: Contact,         exact: false },
     { href: "/campaigns",   label: t("nav_campaigns"),    icon: Megaphone,       exact: false },
     { href: "/integrations", label: t("nav_integrations"), icon: Plug,            exact: false },
