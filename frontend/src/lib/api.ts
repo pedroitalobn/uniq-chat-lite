@@ -806,6 +806,217 @@ export const tiktokApi = {
     api.get("/v1/tiktok/dms", { params: accountId ? { account_id: accountId } : {} }),
 };
 
+// ─── Atendimento / Tickets ───────────────────────────────────────────────────
+// All routes live under /v1/conversations and require X-Workspace-ID.
+// Pass workspaceId as the first argument; it is sent in the header so RBAC
+// middleware can enforce workspace-scoped permissions.
+
+type HeaderMap = Record<string, string>;
+function wsHeaders(workspaceId: string, extra?: HeaderMap): HeaderMap {
+  return { "X-Workspace-ID": workspaceId, ...(extra || {}) };
+}
+
+export type ConversationStatus = "open" | "pending" | "resolved" | "closed" | "snoozed";
+export type ConversationPriority = "low" | "normal" | "high" | "urgent";
+
+export interface ConversationListParams {
+  status?: ConversationStatus | ConversationStatus[];
+  channel?: string;
+  queue_id?: string | "none";
+  assigned_user_id?: string | "me" | "none";
+  contact_id?: string;
+  priority?: ConversationPriority;
+  is_archived?: boolean;
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
+
+function buildListParams(p?: ConversationListParams): Record<string, string | number> {
+  if (!p) return {};
+  const out: Record<string, string | number> = {};
+  if (p.status) out.status = Array.isArray(p.status) ? p.status.join(",") : p.status;
+  if (p.channel) out.channel = p.channel;
+  if (p.queue_id) out.queue_id = p.queue_id;
+  if (p.assigned_user_id) out.assigned_user_id = p.assigned_user_id;
+  if (p.contact_id) out.contact_id = p.contact_id;
+  if (p.priority) out.priority = p.priority;
+  if (p.is_archived !== undefined) out.is_archived = String(p.is_archived);
+  if (p.q) out.q = p.q;
+  if (p.limit) out.limit = p.limit;
+  if (p.offset) out.offset = p.offset;
+  return out;
+}
+
+export const conversationsApi = {
+  list: (workspaceId: string, params?: ConversationListParams) =>
+    api.get("/v1/conversations", { headers: wsHeaders(workspaceId), params: buildListParams(params) }),
+  count: (workspaceId: string) =>
+    api.get("/v1/conversations/count", { headers: wsHeaders(workspaceId) }),
+  get: (workspaceId: string, id: string) =>
+    api.get(`/v1/conversations/${id}`, { headers: wsHeaders(workspaceId) }),
+  timeline: (workspaceId: string, id: string, opts?: { before?: string; limit?: number }) =>
+    api.get(`/v1/conversations/${id}/timeline`, { headers: wsHeaders(workspaceId), params: opts }),
+  patch: (workspaceId: string, id: string, data: {
+    subject?: string;
+    priority?: ConversationPriority;
+    sub_status?: string;
+    is_archived?: boolean;
+    funnel_id?: string | null;
+    stage_id?: string | null;
+  }) => api.patch(`/v1/conversations/${id}`, data, { headers: wsHeaders(workspaceId) }),
+  markRead: (workspaceId: string, id: string) =>
+    api.post(`/v1/conversations/${id}/read`, {}, { headers: wsHeaders(workspaceId) }),
+  sendMessage: (workspaceId: string, id: string, data: { body: string; type?: string }) =>
+    api.post(`/v1/conversations/${id}/messages`, data, { headers: wsHeaders(workspaceId) }),
+  assign: (workspaceId: string, id: string, userId?: string) =>
+    api.post(`/v1/conversations/${id}/assign`, userId ? { user_id: userId } : {}, { headers: wsHeaders(workspaceId) }),
+  unassign: (workspaceId: string, id: string) =>
+    api.post(`/v1/conversations/${id}/unassign`, {}, { headers: wsHeaders(workspaceId) }),
+  transfer: (workspaceId: string, id: string, data: { queue_id?: string; team_id?: string; user_id?: string; note?: string }) =>
+    api.post(`/v1/conversations/${id}/transfer`, data, { headers: wsHeaders(workspaceId) }),
+  resolve: (workspaceId: string, id: string) =>
+    api.post(`/v1/conversations/${id}/resolve`, {}, { headers: wsHeaders(workspaceId) }),
+  close: (workspaceId: string, id: string) =>
+    api.post(`/v1/conversations/${id}/close`, {}, { headers: wsHeaders(workspaceId) }),
+  reopen: (workspaceId: string, id: string) =>
+    api.post(`/v1/conversations/${id}/reopen`, {}, { headers: wsHeaders(workspaceId) }),
+  snooze: (workspaceId: string, id: string, until: string) =>
+    api.post(`/v1/conversations/${id}/snooze`, { until }, { headers: wsHeaders(workspaceId) }),
+  unsnooze: (workspaceId: string, id: string) =>
+    api.post(`/v1/conversations/${id}/unsnooze`, {}, { headers: wsHeaders(workspaceId) }),
+  enableBot: (workspaceId: string, id: string) =>
+    api.post(`/v1/conversations/${id}/bot/enable`, {}, { headers: wsHeaders(workspaceId) }),
+  disableBot: (workspaceId: string, id: string) =>
+    api.post(`/v1/conversations/${id}/bot/disable`, {}, { headers: wsHeaders(workspaceId) }),
+
+  // Notes
+  listNotes: (workspaceId: string, id: string) =>
+    api.get(`/v1/conversations/${id}/notes`, { headers: wsHeaders(workspaceId) }),
+  createNote: (workspaceId: string, id: string, data: { body: string; mentioned?: string[]; is_pinned?: boolean }) =>
+    api.post(`/v1/conversations/${id}/notes`, data, { headers: wsHeaders(workspaceId) }),
+  updateNote: (workspaceId: string, id: string, noteId: string, data: { body?: string; is_pinned?: boolean }) =>
+    api.patch(`/v1/conversations/${id}/notes/${noteId}`, data, { headers: wsHeaders(workspaceId) }),
+  deleteNote: (workspaceId: string, id: string, noteId: string) =>
+    api.delete(`/v1/conversations/${id}/notes/${noteId}`, { headers: wsHeaders(workspaceId) }),
+};
+
+export const departmentsApi = {
+  list: (workspaceId: string) =>
+    api.get("/v1/departments", { headers: wsHeaders(workspaceId) }),
+  create: (workspaceId: string, data: {
+    name: string; description?: string; color?: string; icon?: string; sort_order?: number;
+  }) => api.post("/v1/departments", data, { headers: wsHeaders(workspaceId) }),
+  patch: (workspaceId: string, id: string, data: Partial<{
+    name: string; description: string; color: string; icon: string; is_active: boolean; sort_order: number;
+  }>) => api.patch(`/v1/departments/${id}`, data, { headers: wsHeaders(workspaceId) }),
+  delete: (workspaceId: string, id: string) =>
+    api.delete(`/v1/departments/${id}`, { headers: wsHeaders(workspaceId) }),
+};
+
+export const teamsApi = {
+  list: (workspaceId: string, departmentId?: string) =>
+    api.get("/v1/teams", { headers: wsHeaders(workspaceId), params: departmentId ? { department_id: departmentId } : undefined }),
+  create: (workspaceId: string, data: {
+    name: string; description?: string; department_id?: string; leader_user_id?: string;
+  }) => api.post("/v1/teams", data, { headers: wsHeaders(workspaceId) }),
+  patch: (workspaceId: string, id: string, data: Partial<{
+    name: string; description: string; department_id: string | null; leader_user_id: string | null; is_active: boolean;
+  }>) => api.patch(`/v1/teams/${id}`, data, { headers: wsHeaders(workspaceId) }),
+  delete: (workspaceId: string, id: string) =>
+    api.delete(`/v1/teams/${id}`, { headers: wsHeaders(workspaceId) }),
+  listMembers: (workspaceId: string, id: string) =>
+    api.get(`/v1/teams/${id}/members`, { headers: wsHeaders(workspaceId) }),
+  addMember: (workspaceId: string, id: string, data: { user_id: string; role?: string }) =>
+    api.post(`/v1/teams/${id}/members`, data, { headers: wsHeaders(workspaceId) }),
+  removeMember: (workspaceId: string, id: string, userId: string) =>
+    api.delete(`/v1/teams/${id}/members/${userId}`, { headers: wsHeaders(workspaceId) }),
+};
+
+export type QueueAssignmentStrategy =
+  | "round_robin"
+  | "least_busy"
+  | "load_balanced"
+  | "manual"
+  | "sticky_owner";
+
+export const queuesApi = {
+  list: (workspaceId: string, filters?: { department_id?: string; team_id?: string }) =>
+    api.get("/v1/queues", { headers: wsHeaders(workspaceId), params: filters }),
+  get: (workspaceId: string, id: string) =>
+    api.get(`/v1/queues/${id}`, { headers: wsHeaders(workspaceId) }),
+  create: (workspaceId: string, data: {
+    name: string;
+    description?: string;
+    color?: string;
+    department_id?: string;
+    team_id?: string;
+    assignment_strategy?: QueueAssignmentStrategy;
+    max_concurrent_per_user?: number;
+    auto_assign_on_open?: boolean;
+    auto_close_after_hours?: number;
+    reopen_window_minutes?: number;
+    enable_chatbot?: boolean;
+    chatbot_agent_id?: string;
+    business_hours?: string;
+    timezone?: string;
+    off_hours_message?: string;
+    first_response_sla_minutes?: number;
+    resolution_sla_minutes?: number;
+    priority?: number;
+  }) => api.post("/v1/queues", data, { headers: wsHeaders(workspaceId) }),
+  patch: (workspaceId: string, id: string, data: Record<string, unknown>) =>
+    api.patch(`/v1/queues/${id}`, data, { headers: wsHeaders(workspaceId) }),
+  delete: (workspaceId: string, id: string) =>
+    api.delete(`/v1/queues/${id}`, { headers: wsHeaders(workspaceId) }),
+  stats: (workspaceId: string, id: string) =>
+    api.get(`/v1/queues/${id}/stats`, { headers: wsHeaders(workspaceId) }),
+  listMembers: (workspaceId: string, id: string) =>
+    api.get(`/v1/queues/${id}/members`, { headers: wsHeaders(workspaceId) }),
+  addMember: (workspaceId: string, id: string, data: { user_id: string; priority?: number }) =>
+    api.post(`/v1/queues/${id}/members`, data, { headers: wsHeaders(workspaceId) }),
+  updateMember: (workspaceId: string, id: string, userId: string, data: { can_receive?: boolean; priority?: number }) =>
+    api.patch(`/v1/queues/${id}/members/${userId}`, data, { headers: wsHeaders(workspaceId) }),
+  removeMember: (workspaceId: string, id: string, userId: string) =>
+    api.delete(`/v1/queues/${id}/members/${userId}`, { headers: wsHeaders(workspaceId) }),
+  listChannels: (workspaceId: string, id: string) =>
+    api.get(`/v1/queues/${id}/channels`, { headers: wsHeaders(workspaceId) }),
+  addChannel: (workspaceId: string, id: string, data: { instance_id: string; is_default?: boolean }) =>
+    api.post(`/v1/queues/${id}/channels`, data, { headers: wsHeaders(workspaceId) }),
+  removeChannel: (workspaceId: string, id: string, instanceId: string) =>
+    api.delete(`/v1/queues/${id}/channels/${instanceId}`, { headers: wsHeaders(workspaceId) }),
+};
+
+export type PresenceStatus = "online" | "away" | "busy" | "offline";
+
+export const presenceApi = {
+  getMine: (workspaceId: string) =>
+    api.get("/v1/me/presence", { headers: wsHeaders(workspaceId) }),
+  updateMine: (workspaceId: string, data: {
+    status?: PresenceStatus;
+    status_message?: string;
+    away_reason?: string;
+    max_load?: number;
+  }) => api.put("/v1/me/presence", data, { headers: wsHeaders(workspaceId) }),
+  myWorkload: (workspaceId: string) =>
+    api.get("/v1/me/workload", { headers: wsHeaders(workspaceId) }),
+  listWorkspace: (workspaceId: string) =>
+    api.get(`/v1/workspaces/${workspaceId}/presence`, { headers: wsHeaders(workspaceId) }),
+};
+
+// meApi returns info about the authenticated user for the active workspace
+// (permission keys, presence, workload). For Fase 1 only the workspace
+// membership and role.permissions slice from /workspaces/:id/members is
+// available — we synthesize a "perm keys" array from it until a dedicated
+// endpoint lands.
+export const workspacePermissionsApi = {
+  // Fetches the signed-in user's role + permissions inside a workspace.
+  mine: async (workspaceId: string) => {
+    const { data } = await api.get(`/v1/workspaces/${workspaceId}/members`);
+    return data;
+  },
+};
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface ProxyConfig {
