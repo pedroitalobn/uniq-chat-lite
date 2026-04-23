@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -330,6 +331,7 @@ type AuthHandler struct {
 //   - cria a linha em workspaces
 //   - cria um role Admin com todas as permissions
 //   - adiciona o usuário como owner do workspace
+//
 // Retorna o workspace criado. Se algo falhar, retorna nil (caller decide o
 // que fazer — no fluxo de registro a gente simplesmente não associa).
 func createDefaultWorkspace(db *gorm.DB, user *models.User, name string) *models.Workspace {
@@ -432,8 +434,13 @@ func (h *AuthHandler) loginWithCredentials(c *fiber.Ctx, identifier, password st
 	var user models.User
 	q := h.db.Preload("Plan")
 
-	lowerId := strings.ToLower(identifier)
-	if strings.Contains(identifier, "@") {
+	normalizedIdentifier := strings.TrimSpace(identifier)
+	lowerId := strings.ToLower(normalizedIdentifier)
+	if strings.HasPrefix(lowerId, "@") {
+		lowerId = strings.TrimPrefix(lowerId, "@")
+	}
+
+	if looksLikeEmail(lowerId) {
 		q = q.Where("LOWER(email) = ?", lowerId)
 	} else {
 		q = q.Where("LOWER(username) = ?", lowerId)
@@ -492,6 +499,14 @@ func (h *AuthHandler) loginWithCredentials(c *fiber.Ctx, identifier, password st
 			"plan":     user.Plan,
 		},
 	})
+}
+
+func looksLikeEmail(identifier string) bool {
+	if identifier == "" || strings.HasPrefix(identifier, "@") {
+		return false
+	}
+	_, err := mail.ParseAddress(identifier)
+	return err == nil
 }
 
 // Login godoc
