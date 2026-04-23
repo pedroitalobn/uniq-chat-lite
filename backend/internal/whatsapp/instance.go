@@ -1890,7 +1890,7 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 				}
 				isGroup := isGroupMsg
 				messageID := v.Info.ID // usado para dedup — evita loop em history-sync
-				go GlobalManager.CheckJourneys(ic.ID, messageID, journeySenderJID, pushName, journeyChatJID, text, msgType, isGroup)
+				go GlobalManager.HandleIncomingAutomation(ic.ID, messageID, journeySenderJID, pushName, journeyChatJID, text, msgType, isGroup)
 			}
 		} else if isFromMe && GlobalManager != nil {
 			// Log explícito: jornadas NUNCA disparam pra mensagens enviadas
@@ -2029,13 +2029,13 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 			ic.dispatchEvent("call.missed", missedData, eventContext{})
 			go GlobalManager.CheckJourneys(
 				ic.ID,
-				"call:"+v.CallID,   // messageID pra dedup
-				v.From.String(),    // fromJID
-				"",                 // fromName (não temos push name aqui)
-				"",                 // groupJID — ligações não são de grupo
-				"",                 // messageText vazio
-				"call_missed",      // messageType
-				false,              // isGroup
+				"call:"+v.CallID, // messageID pra dedup
+				v.From.String(),  // fromJID
+				"",               // fromName (não temos push name aqui)
+				"",               // groupJID — ligações não são de grupo
+				"",               // messageText vazio
+				"call_missed",    // messageType
+				false,            // isGroup
 			)
 		}
 

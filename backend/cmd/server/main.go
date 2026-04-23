@@ -140,7 +140,9 @@ func main() {
 	journeyLLM := services.NewLLMService()
 	journeySender := whatsapp.NewManagerSender(manager)
 	journeyExec := services.NewJourneyExecutor(db, journeySender, journeyLLM)
+	agentRuntime := services.NewAgentRuntime(db, manager, journeyLLM)
 	manager.SetJourneyExecutor(journeyExec)
+	manager.SetAgentRuntime(agentRuntime)
 
 	// Scheduled recovery snapshots (check every hour)
 	recoveryH := handlers.NewRecoveryHandler(db, manager)

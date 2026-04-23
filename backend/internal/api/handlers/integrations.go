@@ -502,7 +502,7 @@ func (h *IntegrationHandler) GetAgent(c *fiber.Ctx) error {
 		"webhook_secret":           agent.WebhookSecret,
 		"mcp_server_url":           agent.MCPServerURL,
 		"assets":                   agent.Assets,
-		"compiled_prompt":          buildCompiledAgentPrompt(&agent),
+		"compiled_prompt":          services.BuildAgentSystemPrompt(&agent, agent.Assets),
 		"created_at":               agent.CreatedAt,
 		"updated_at":               agent.UpdatedAt,
 	})
@@ -759,69 +759,6 @@ func safeJSONObject(v string) string {
 		return "{}"
 	}
 	return v
-}
-
-func buildCompiledAgentPrompt(agent *models.InstanceAgent) string {
-	if agent == nil {
-		return ""
-	}
-	sections := []string{}
-	appendSection := func(title, value string) {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			return
-		}
-		sections = append(sections, title+"\n"+value)
-	}
-
-	if agent.AgentName != "" {
-		sections = append(sections, fmt.Sprintf("IDENTIDADE PRINCIPAL\nVocê é %s.", strings.TrimSpace(agent.AgentName)))
-	}
-	appendSection("IDENTIDADE E POSICIONAMENTO", agent.Identity)
-	appendSection("OBJETIVO", agent.Objective)
-	appendSection("DIRETRIZES DE COMUNICAÇÃO", agent.CommunicationGuidelines)
-	appendSection("INSTRUÇÕES DE ATENDIMENTO", agent.ServiceInstructions)
-	appendSection("RESTRIÇÕES", agent.Restrictions)
-	appendSection("BASE DE CONHECIMENTO", agent.KnowledgeBase)
-
-	if faq := compactJSONLines(agent.FAQ, "FAQ"); faq != "" {
-		sections = append(sections, faq)
-	}
-	if variables := compactJSONLines(agent.Variables, "VARIÁVEIS DISPONÍVEIS"); variables != "" {
-		sections = append(sections, variables)
-	}
-	if voice := compactJSONLines(agent.Voice, "CONFIGURAÇÃO DE VOZ"); voice != "" {
-		sections = append(sections, voice)
-	}
-	if skills := compactJSONLines(agent.Skills, "SKILLS E CAPACIDADES"); skills != "" {
-		sections = append(sections, skills)
-	}
-	if apps := compactJSONLines(agent.AppAccess, "APPS E ACESSOS DISPONÍVEIS"); apps != "" {
-		sections = append(sections, apps)
-	}
-
-	if strings.TrimSpace(agent.SystemPrompt) != "" {
-		sections = append(sections, "PROMPT BASE ADICIONAL\n"+strings.TrimSpace(agent.SystemPrompt))
-	}
-
-	return strings.Join(sections, "\n\n")
-}
-
-func compactJSONLines(raw string, title string) string {
-	raw = strings.TrimSpace(raw)
-	if raw == "" || raw == "[]" || raw == "{}" || raw == "null" {
-		return ""
-	}
-
-	var parsed interface{}
-	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
-		return title + "\n" + raw
-	}
-	b, err := json.MarshalIndent(parsed, "", "  ")
-	if err != nil {
-		return title + "\n" + raw
-	}
-	return title + "\n" + string(b)
 }
 
 var xmlTagRegex = regexp.MustCompile(`<[^>]+>`)

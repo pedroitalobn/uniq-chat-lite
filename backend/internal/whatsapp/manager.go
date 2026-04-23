@@ -27,6 +27,10 @@ type JourneyExecutor interface {
 	HandleIncoming(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) bool
 }
 
+type AgentRuntime interface {
+	HandleIncoming(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) bool
+}
+
 // Manager manages all active WhatsApp instance clients.
 type Manager struct {
 	mu         sync.RWMutex
@@ -35,6 +39,7 @@ type Manager struct {
 	sessionDir string
 	db         *gorm.DB
 	executor   JourneyExecutor
+	agentRT    AgentRuntime
 }
 
 // SetJourneyExecutor injeta o executor (chamado no bootstrap do servidor)
@@ -44,10 +49,22 @@ func (m *Manager) SetJourneyExecutor(ex JourneyExecutor) {
 	m.mu.Unlock()
 }
 
+func (m *Manager) SetAgentRuntime(rt AgentRuntime) {
+	m.mu.Lock()
+	m.agentRT = rt
+	m.mu.Unlock()
+}
+
 func (m *Manager) JourneyExecutorRef() JourneyExecutor {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.executor
+}
+
+func (m *Manager) AgentRuntimeRef() AgentRuntime {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.agentRT
 }
 
 var GlobalManager *Manager
@@ -699,6 +716,23 @@ func (m *Manager) CheckJourneys(instanceID, messageID, fromJID, fromName, groupJ
 				log.Error().Err(err).Str("journey", j.ID).Msg("failed to execute journey")
 			}
 		}(journey)
+	}
+}
+
+// HandleIncomingAutomation runs journeys first and only falls back to the
+// instance agent when no journey consumed the incoming message.
+func (m *Manager) HandleIncomingAutomation(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) {
+	handledByJourney := false
+	if ex := m.JourneyExecutorRef(); ex != nil {
+		handledByJourney = ex.HandleIncoming(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType, isGroup)
+	} else {
+		m.CheckJourneys(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType, isGroup)
+	}
+	if handledByJourney {
+		return
+	}
+	if rt := m.AgentRuntimeRef(); rt != nil {
+		rt.HandleIncoming(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType, isGroup)
 	}
 }
 
