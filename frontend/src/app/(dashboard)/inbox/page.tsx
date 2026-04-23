@@ -648,8 +648,10 @@ export default function InboxPage() {
     }
   });
 
+  // Query keys alinhadas com as do CRM (frontend/src/app/(dashboard)/crm/page.tsx)
+  // para que invalidações cruzem os dois lados automaticamente.
   const { data: funnelsD } = useQuery({
-    queryKey: ["crmFunnels", currentWorkspace?.id],
+    queryKey: ["funnels", currentWorkspace?.id],
     enabled: !!currentWorkspace?.id,
     queryFn: async () => {
       try { return (await crmApi.listFunnels(currentWorkspace!.id)).data || []; }
@@ -658,23 +660,23 @@ export default function InboxPage() {
   });
 
   const { data: funnelOptionsD } = useQuery({
-    queryKey: ["crmFunnelOptions"],
+    queryKey: ["funnel-options", currentWorkspace?.id],
     queryFn: async () => {
-      try { return (await crmApi.listFunnelOptions()).data || []; }
+      try { return (await crmApi.listFunnelOptions(currentWorkspace?.id)).data || []; }
       catch { return []; }
     }
   });
 
   const { data: stageOptionsD } = useQuery({
-    queryKey: ["crmStageOptions"],
+    queryKey: ["stage-options", currentWorkspace?.id],
     queryFn: async () => {
-      try { return (await crmApi.listStageOptions()).data || []; }
+      try { return (await crmApi.listStageOptions(currentWorkspace?.id)).data || []; }
       catch { return []; }
     }
   });
 
   const { data: journeyOptionsD } = useQuery({
-    queryKey: ["crmJourneyOptions"],
+    queryKey: ["journey-options"],
     queryFn: async () => {
       try { return (await crmApi.listJourneyOptions()).data || []; }
       catch { return []; }
@@ -850,6 +852,11 @@ export default function InboxPage() {
     onSuccess: () => {
       toast.success("Contato atualizado!");
       qc.invalidateQueries({ queryKey: ["contact", instance, chat] });
+      // Propaga mudança para o CRM e para os dropdowns de segmentação.
+      qc.invalidateQueries({ queryKey: ["contacts"] });
+      qc.invalidateQueries({ queryKey: ["contacts-all"] });
+      qc.invalidateQueries({ queryKey: ["funnel-options"] });
+      qc.invalidateQueries({ queryKey: ["stage-options"] });
     },
     onError: (e: any) => toast.error(e.response?.data?.error || "Erro ao atualizar"),
   });
@@ -887,19 +894,19 @@ export default function InboxPage() {
     mutationFn: (data: { name: string; color?: string }) => crmApi.createFunnel({ ...data, workspace_id: currentWorkspace?.id }),
     onSuccess: () => {
       toast.success("Funil criado!");
-      qc.invalidateQueries({ queryKey: ["crmFunnels", currentWorkspace?.id] });
-      qc.invalidateQueries({ queryKey: ["crmFunnelOptions"] });
+      qc.invalidateQueries({ queryKey: ["funnels"] });
+      qc.invalidateQueries({ queryKey: ["funnel-options"] });
     },
     onError: (e: any) => toast.error(e.response?.data?.error || "Erro ao criar funil"),
   });
 
   const createStageMut = useMutation({
-    mutationFn: ({ funnelId, data }: { funnelId: string; data: { name: string; color?: string } }) => 
+    mutationFn: ({ funnelId, data }: { funnelId: string; data: { name: string; color?: string } }) =>
       crmApi.createFunnelStage(funnelId, data),
     onSuccess: () => {
       toast.success("Etapa criada!");
-      qc.invalidateQueries({ queryKey: ["crmFunnelStages"] });
-      qc.invalidateQueries({ queryKey: ["crmStageOptions"] });
+      qc.invalidateQueries({ queryKey: ["funnel-stages"] });
+      qc.invalidateQueries({ queryKey: ["stage-options"] });
     },
     onError: (e: any) => toast.error(e.response?.data?.error || "Erro ao criar etapa"),
   });

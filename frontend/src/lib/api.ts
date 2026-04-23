@@ -481,7 +481,7 @@ export const crmApi = {
   createContact: (data: { name: string; phone: string; email?: string; notes?: string; avatar_url?: string; workspace_id?: string }) =>
     api.post("/v1/crm/contacts", data),
   getContact: (id: string) => api.get(`/v1/crm/contacts/${id}`),
-  updateContact: (id: string, data: Partial<{ name: string; phone: string; email: string; notes: string; avatar_url: string }>) =>
+  updateContact: (id: string, data: Partial<{ name: string; phone: string; email: string; notes: string; avatar_url: string; funnel: string; stage: string; journey: string; external_id: string; owner_id: string }>) =>
     api.put(`/v1/crm/contacts/${id}`, data),
   deleteContact: (id: string) => api.delete(`/v1/crm/contacts/${id}`),
   assignTags: (id: string, tagIds: string[]) => api.put(`/v1/crm/contacts/${id}/tags`, { tag_ids: tagIds }),
@@ -495,8 +495,8 @@ export const crmApi = {
   createFunnelStage: (funnelId: string, data: { name: string; color?: string }) => api.post(`/v1/crm/funnels/${funnelId}/stages`, data),
   deleteFunnelStage: (funnelId: string, stageId: string) => api.delete(`/v1/crm/funnels/${funnelId}/stages/${stageId}`),
   listJourneyOptions: () => api.get("/v1/crm/journey-options"),
-  listStageOptions: () => api.get("/v1/crm/stage-options"),
-  listFunnelOptions: () => api.get("/v1/crm/funnel-options"),
+  listStageOptions: (workspaceId?: string) => api.get("/v1/crm/stage-options", { params: workspaceId ? { workspace_id: workspaceId } : undefined }),
+  listFunnelOptions: (workspaceId?: string) => api.get("/v1/crm/funnel-options", { params: workspaceId ? { workspace_id: workspaceId } : undefined }),
 };
 
 export const campaignsApi = {

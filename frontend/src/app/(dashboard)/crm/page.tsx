@@ -1226,7 +1226,14 @@ export default function CRMPage() {
           tags={tags}
           workspaceId={currentWorkspace?.id}
           onClose={() => { setCreateOpen(false); setEditContact(null); }}
-          onSaved={() => { queryClient.invalidateQueries({ queryKey: ["contacts"] }); queryClient.invalidateQueries({ queryKey: ["contacts-all"] }); }}
+          onSaved={() => {
+            queryClient.invalidateQueries({ queryKey: ["contacts"] });
+            queryClient.invalidateQueries({ queryKey: ["contacts-all"] });
+            // Mantém o painel do Inbox em sincronia com o contato editado.
+            queryClient.invalidateQueries({ queryKey: ["contact"] });
+            queryClient.invalidateQueries({ queryKey: ["funnel-options"] });
+            queryClient.invalidateQueries({ queryKey: ["stage-options"] });
+          }}
           onManageFunnels={() => setFunnelsOpen(true)}
           onManageJourneys={() => setJourneysOpen(true)}
         />

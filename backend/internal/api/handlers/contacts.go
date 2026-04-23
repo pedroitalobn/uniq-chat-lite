@@ -175,42 +175,59 @@ func (h *ContactHandler) UpdateContact(c *fiber.Ctx) error {
 	if err := h.db.Where("id = ? AND user_id = ?", contactID, userID).First(&contact).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "contato não encontrado"})
 	}
+	// Pointer fields para distinguir "não enviado" de "enviado vazio".
+	// Evita que atualizar um campo (ex.: funil pelo inbox) zere os demais.
 	var req struct {
-		Name       string `json:"name"`
-		Phone      string `json:"phone"`
-		Email      string `json:"email"`
-		Notes      string `json:"notes"`
-		AvatarURL  string `json:"avatar_url"`
-		Funnel     string `json:"funnel"`
-		Stage      string `json:"stage"`
-		Journey    string `json:"journey"`
-		ExternalID string `json:"external_id"`
-		OwnerID    string `json:"owner_id"`
+		Name       *string `json:"name"`
+		Phone      *string `json:"phone"`
+		Email      *string `json:"email"`
+		Notes      *string `json:"notes"`
+		AvatarURL  *string `json:"avatar_url"`
+		Funnel     *string `json:"funnel"`
+		Stage      *string `json:"stage"`
+		Journey    *string `json:"journey"`
+		ExternalID *string `json:"external_id"`
+		OwnerID    *string `json:"owner_id"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
 	}
-	updates := map[string]interface{}{
-		"email":       req.Email,
-		"notes":       req.Notes,
-		"avatar_url":  req.AvatarURL,
-		"funnel":      req.Funnel,
-		"stage":       req.Stage,
-		"journey":     req.Journey,
-		"external_id": req.ExternalID,
+	updates := map[string]interface{}{}
+	if req.Name != nil && *req.Name != "" {
+		updates["name"] = *req.Name
 	}
-	if req.Name != "" {
-		updates["name"] = req.Name
+	if req.Phone != nil && *req.Phone != "" {
+		updates["phone"] = *req.Phone
 	}
-	if req.Phone != "" {
-		updates["phone"] = req.Phone
+	if req.Email != nil {
+		updates["email"] = *req.Email
 	}
-	if req.OwnerID != "" {
-		if oid, err := uuid.Parse(req.OwnerID); err == nil {
+	if req.Notes != nil {
+		updates["notes"] = *req.Notes
+	}
+	if req.AvatarURL != nil {
+		updates["avatar_url"] = *req.AvatarURL
+	}
+	if req.Funnel != nil {
+		updates["funnel"] = *req.Funnel
+	}
+	if req.Stage != nil {
+		updates["stage"] = *req.Stage
+	}
+	if req.Journey != nil {
+		updates["journey"] = *req.Journey
+	}
+	if req.ExternalID != nil {
+		updates["external_id"] = *req.ExternalID
+	}
+	if req.OwnerID != nil && *req.OwnerID != "" {
+		if oid, err := uuid.Parse(*req.OwnerID); err == nil {
 			updates["owner_id"] = oid
 		}
 	}
-	h.db.Model(&contact).Updates(updates)
+	if len(updates) > 0 {
+		h.db.Model(&contact).Updates(updates)
+	}
 	h.db.Preload("Tags").First(&contact)
 	return c.JSON(contact)
 }
@@ -359,8 +376,10 @@ func (h *ContactHandler) CreateFunnel(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nome é obrigatório"})
 	}
 	funnel := models.Funnel{
-		UserID: userID,
-		Name:   req.Name,
+		UserID:      userID,
+		Name:        req.Name,
+		Description: req.Description,
+		Color:       req.Color,
 	}
 	if req.WorkspaceID != "" {
 		if wid, err := uuid.Parse(req.WorkspaceID); err == nil {
@@ -456,24 +475,91 @@ func (h *ContactHandler) ListJourneyOptions(c *fiber.Ctx) error {
 	return c.JSON(names)
 }
 
+// mergeUnique append b em a preservando ordem e sem duplicar.
+func mergeUnique(a, b []string) []string {
+	seen := make(map[string]bool, len(a)+len(b))
+	out := make([]string, 0, len(a)+len(b))
+	for _, v := range a {
+		if v == "" || seen[v] {
+			continue
+		}
+		seen[v] = true
+		out = append(out, v)
+	}
+	for _, v := range b {
+		if v == "" || seen[v] {
+			continue
+		}
+		seen[v] = true
+		out = append(out, v)
+	}
+	return out
+}
+
 // ListStageOptions GET /crm/stage-options
+// Retorna etapas de funis cadastrados (funnel_stages) + etapas legadas
+// derivadas de contacts.stage (retrocompat com dados anteriores ao CRUD de funis).
 func (h *ContactHandler) ListStageOptions(c *fiber.Ctx) error {
 	userID, err := h.currentUserID(c)
 	if err != nil {
 		return err
 	}
-	var stages []string
-	h.db.Model(&models.Contact{}).Where("user_id = ? AND stage IS NOT NULL AND stage != ''", userID).Distinct("stage").Pluck("stage", &stages)
-	return c.JSON(stages)
+	workspaceID := c.Query("workspace_id")
+
+	// Fonte da verdade: funnel_stages JOIN funnels (filtra por dono/workspace)
+	sq := h.db.Table("funnel_stages").
+		Joins("JOIN funnels ON funnels.id = funnel_stages.funnel_id").
+		Where("funnels.user_id = ?", userID)
+	if workspaceID != "" {
+		if wid, err := uuid.Parse(workspaceID); err == nil {
+			sq = sq.Where("funnels.workspace_id = ?", wid)
+		}
+	}
+	var stageNames []string
+	sq.Order("funnel_stages.\"order\" ASC").Distinct("funnel_stages.name").Pluck("funnel_stages.name", &stageNames)
+
+	// Legacy: valores distintos em contacts.stage
+	var legacy []string
+	cq := h.db.Model(&models.Contact{}).Where("user_id = ? AND stage IS NOT NULL AND stage != ''", userID)
+	if workspaceID != "" {
+		if wid, err := uuid.Parse(workspaceID); err == nil {
+			cq = cq.Where("workspace_id = ?", wid)
+		}
+	}
+	cq.Distinct("stage").Pluck("stage", &legacy)
+
+	return c.JSON(mergeUnique(stageNames, legacy))
 }
 
 // ListFunnelOptions GET /crm/funnel-options
+// Retorna funis cadastrados (funnels) + funis legados (distinct contacts.funnel),
+// para que um funil criado no CRM apareça no Inbox mesmo antes de ter atribuição.
 func (h *ContactHandler) ListFunnelOptions(c *fiber.Ctx) error {
 	userID, err := h.currentUserID(c)
 	if err != nil {
 		return err
 	}
-	var funnels []string
-	h.db.Model(&models.Contact{}).Where("user_id = ? AND funnel IS NOT NULL AND funnel != ''", userID).Distinct("funnel").Pluck("funnel", &funnels)
-	return c.JSON(funnels)
+	workspaceID := c.Query("workspace_id")
+
+	// Fonte da verdade: tabela funnels
+	fq := h.db.Model(&models.Funnel{}).Where("user_id = ?", userID)
+	if workspaceID != "" {
+		if wid, err := uuid.Parse(workspaceID); err == nil {
+			fq = fq.Where("workspace_id = ?", wid)
+		}
+	}
+	var funnelNames []string
+	fq.Order("name ASC").Pluck("name", &funnelNames)
+
+	// Legacy: valores distintos em contacts.funnel
+	var legacy []string
+	cq := h.db.Model(&models.Contact{}).Where("user_id = ? AND funnel IS NOT NULL AND funnel != ''", userID)
+	if workspaceID != "" {
+		if wid, err := uuid.Parse(workspaceID); err == nil {
+			cq = cq.Where("workspace_id = ?", wid)
+		}
+	}
+	cq.Distinct("funnel").Pluck("funnel", &legacy)
+
+	return c.JSON(mergeUnique(funnelNames, legacy))
 }
