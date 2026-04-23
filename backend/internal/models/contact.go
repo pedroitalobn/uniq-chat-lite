@@ -50,13 +50,18 @@ type Contact struct {
 	Source      ContactSource `gorm:"type:varchar(20);default:'manual'" json:"source,omitempty"`
 	InstanceID  *uuid.UUID    `gorm:"type:uuid;index" json:"instance_id,omitempty"`
 	// CRM pipeline fields
-	Funnel     string    `gorm:"type:varchar(120);index" json:"funnel,omitempty"`
-	Stage      string    `gorm:"type:varchar(120);index" json:"stage,omitempty"`
-	Journey    string    `gorm:"type:varchar(120)" json:"journey,omitempty"`
-	ExternalID string    `gorm:"type:varchar(255);index" json:"external_id,omitempty"`
-	Tags       []Tag     `gorm:"many2many:contact_tags;joinForeignKey:ContactID;joinReferences:TagID" json:"tags,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	Funnel     string `gorm:"type:varchar(120);index" json:"funnel,omitempty"`
+	Stage      string `gorm:"type:varchar(120);index" json:"stage,omitempty"`
+	Journey    string `gorm:"type:varchar(120)" json:"journey,omitempty"`
+	ExternalID string `gorm:"type:varchar(255);index" json:"external_id,omitempty"`
+	Tags       []Tag  `gorm:"many2many:contact_tags;joinForeignKey:ContactID;joinReferences:TagID" json:"tags,omitempty"`
+
+	// Ticketing defaults — used by DispatchService as sticky preferences
+	DefaultQueueID       *uuid.UUID `gorm:"type:uuid;index" json:"default_queue_id,omitempty"`
+	PreferredChannelType string     `gorm:"type:varchar(30)" json:"preferred_channel_type,omitempty"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 func (c *Contact) BeforeCreate(tx *gorm.DB) error {

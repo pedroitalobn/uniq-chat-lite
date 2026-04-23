@@ -59,10 +59,12 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		return false
 	}
 
-	var agent models.InstanceAgent
-	if err := r.db.Preload("Integration").Preload("Assets", func(tx *gorm.DB) *gorm.DB {
-		return tx.Where("is_active = ?", true).Order("created_at DESC")
-	}).Where("instance_id = ? AND is_active = ?", instUUID, true).First(&agent).Error; err != nil {
+	// Respect explicit human handoff: if a live Conversation exists for this
+	// (instance, channel_key) with is_bot_active=false, skip the bot entirely.
+	// Also: if the Queue attached to the conversation has its own chatbot,
+	// that agent takes precedence over the instance-level one.
+	agent, found := r.resolveAgent(instUUID, fromJID)
+	if !found {
 		return false
 	}
 	if agent.Integration == nil || agent.IntegrationID == nil {
@@ -84,7 +86,7 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		return false
 	}
 
-	systemPrompt := BuildAgentSystemPrompt(&agent, agent.Assets)
+	systemPrompt := BuildAgentSystemPrompt(agent, agent.Assets)
 	userPrompt := r.buildUserPrompt(instUUID, fromJID, fromName, text, messageType)
 	if strings.TrimSpace(systemPrompt) == "" {
 		systemPrompt = "Você é um assistente de atendimento útil, profissional e objetivo."
@@ -120,6 +122,60 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		Msg("agent-runtime: resposta enviada")
 
 	return true
+}
+
+// resolveAgent decides which InstanceAgent answers a given inbound message.
+//
+// Precedence (per user spec):
+//  1. If a live Conversation has is_bot_active=false → no bot at all.
+//  2. If that Conversation belongs to a Queue with EnableChatbot=true and
+//     ChatbotAgentID set → that queue agent wins.
+//  3. Otherwise, fall back to the instance-level InstanceAgent.
+//
+// A returned (nil, false) means "do not reply"; (agent, true) means "use this".
+func (r *AgentRuntime) resolveAgent(instanceID uuid.UUID, fromJID string) (*models.InstanceAgent, bool) {
+	// Load the active conversation for this instance + channel_key.
+	var conv models.Conversation
+	err := r.db.
+		Where("instance_id = ? AND channel_key = ?", instanceID, fromJID).
+		Where("status IN ?", []models.ConversationStatus{
+			models.ConversationStatusOpen,
+			models.ConversationStatusPending,
+			models.ConversationStatusSnoozed,
+		}).
+		Order("updated_at DESC").
+		First(&conv).Error
+
+	if err == nil && !conv.IsBotActive {
+		// Human handoff explicitly disabled the bot for this conversation.
+		return nil, false
+	}
+
+	// Try queue-level agent first
+	if err == nil && conv.QueueID != nil {
+		var q models.Queue
+		if qErr := r.db.First(&q, "id = ?", *conv.QueueID).Error; qErr == nil {
+			if q.EnableChatbot && q.ChatbotAgentID != nil {
+				var agent models.InstanceAgent
+				qa := r.db.Preload("Integration").Preload("Assets", func(tx *gorm.DB) *gorm.DB {
+					return tx.Where("is_active = ?", true).Order("created_at DESC")
+				}).Where("id = ? AND is_active = ?", *q.ChatbotAgentID, true).First(&agent)
+				if qa.Error == nil {
+					return &agent, true
+				}
+			}
+		}
+	}
+
+	// Fallback: instance-level agent
+	var agent models.InstanceAgent
+	fallback := r.db.Preload("Integration").Preload("Assets", func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("is_active = ?", true).Order("created_at DESC")
+	}).Where("instance_id = ? AND is_active = ?", instanceID, true).First(&agent)
+	if fallback.Error != nil {
+		return nil, false
+	}
+	return &agent, true
 }
 
 func (r *AgentRuntime) buildUserPrompt(instanceID uuid.UUID, fromJID, fromName, latestMessage, messageType string) string {

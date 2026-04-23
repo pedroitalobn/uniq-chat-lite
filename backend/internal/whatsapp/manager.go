@@ -31,6 +31,14 @@ type AgentRuntime interface {
 	HandleIncoming(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) bool
 }
 
+// InboundProcessor is the hook the Manager calls after persisting a received
+// WhatsApp message. It lets the ticketing pipeline (services.InboundPipeline)
+// resolve/create a Conversation and backfill MessageLog.conversation_id
+// without creating an import cycle with services/.
+type InboundProcessor interface {
+	ProcessSavedInbound(ctx context.Context, ml *models.MessageLog) error
+}
+
 // Manager manages all active WhatsApp instance clients.
 type Manager struct {
 	mu         sync.RWMutex
@@ -40,6 +48,7 @@ type Manager struct {
 	db         *gorm.DB
 	executor   JourneyExecutor
 	agentRT    AgentRuntime
+	inboundP   InboundProcessor
 }
 
 // SetJourneyExecutor injeta o executor (chamado no bootstrap do servidor)
@@ -65,6 +74,19 @@ func (m *Manager) AgentRuntimeRef() AgentRuntime {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.agentRT
+}
+
+// SetInboundProcessor injects the ticketing pipeline (called at bootstrap).
+func (m *Manager) SetInboundProcessor(p InboundProcessor) {
+	m.mu.Lock()
+	m.inboundP = p
+	m.mu.Unlock()
+}
+
+func (m *Manager) InboundProcessorRef() InboundProcessor {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.inboundP
 }
 
 var GlobalManager *Manager
@@ -293,7 +315,25 @@ func (m *Manager) SaveMessage(instanceID string, toJID string, content string, d
 		return nil
 	}
 
-	return m.db.Create(&logEntry).Error
+	if err := m.db.Create(&logEntry).Error; err != nil {
+		return err
+	}
+
+	// Fire ticketing pipeline for inbound messages (non-blocking).
+	// Outbound messages are attached to their Conversation at send time
+	// by the conversation handler itself.
+	if direction == models.DirectionIn && !isGroup {
+		if p := m.InboundProcessorRef(); p != nil {
+			entry := logEntry
+			go func() {
+				if err := p.ProcessSavedInbound(context.Background(), &entry); err != nil {
+					log.Warn().Err(err).Str("instance", instanceID).Msg("inbound pipeline: failed to process")
+				}
+			}()
+		}
+	}
+
+	return nil
 }
 
 func extractPhoneFromJID(jid string) string {

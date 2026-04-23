@@ -42,11 +42,21 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to run migrations")
 	}
 
+	// Apply raw-SQL ticketing indexes that AutoMigrate cannot express
+	// (Postgres only — SQLite dev mode skips them).
+	applyTicketingIndexes(db)
+
 	// Seed default plans
 	seedPlans(db)
 
 	// Seed default permissions
 	seedPermissions(db)
+
+	// Ensure Admin role in each workspace has every permission (picks up any new keys)
+	backfillAdminRolePermissions(db)
+
+	// Seed ticketing roles (agent, supervisor, agent_read_only) on every workspace
+	seedTicketingRoles(db)
 
 	// Seed super admin if configured via env vars
 	log.Info().Str("email", os.Getenv("SUPER_ADMIN_EMAIL")).Str("password_set", fmt.Sprintf("%v", os.Getenv("SUPER_ADMIN_PASSWORD") != "")).Msg("checking super admin env vars")
@@ -144,6 +154,17 @@ func main() {
 	manager.SetJourneyExecutor(journeyExec)
 	manager.SetAgentRuntime(agentRuntime)
 
+	// Ticketing inbound pipeline (converts raw inbound messages into
+	// Conversations for the new atendimento module). Wired into the same
+	// SaveMessage hook used by legacy Inbox — co-exists during migration.
+	inboundPipeline := services.NewInboundPipeline(db, whatsapp.GetHub())
+	manager.SetInboundProcessor(inboundPipeline)
+
+	// Ticketing periodic jobs: unsnoozer, presence sweep, pending redispatch,
+	// resolve auto-close.
+	ticketingScheduler := services.NewTicketingScheduler(db, services.NewDispatchService(db))
+	ticketingScheduler.Start()
+
 	// Scheduled recovery snapshots (check every hour)
 	recoveryH := handlers.NewRecoveryHandler(db, manager)
 	go func() {
@@ -222,6 +243,20 @@ func autoMigrate(db *gorm.DB) error {
 		&models.PaymentSettings{},
 		// WABA
 		&models.WABAInstance{},
+		// Ticketing / Atendimento
+		&models.Department{},
+		&models.Team{},
+		&models.TeamMember{},
+		&models.Queue{},
+		&models.QueueMember{},
+		&models.QueueChannel{},
+		&models.Conversation{},
+		&models.ConversationEvent{},
+		&models.ConversationAssignment{},
+		&models.ConversationNote{},
+		&models.ConversationParticipant{},
+		&models.QuickReply{},
+		&models.UserPresence{},
 	)
 }
 
@@ -355,6 +390,148 @@ func seedPlans(db *gorm.DB) {
 	}
 	setPriceID("Pro", "STRIPE_PRICE_PRO")
 	setPriceID("Business", "STRIPE_PRICE_BUSINESS")
+}
+
+// applyTicketingIndexes installs the partial unique index and hot-path
+// composite indexes for conversations. Postgres-only; skipped on SQLite (dev).
+func applyTicketingIndexes(db *gorm.DB) {
+	name := db.Dialector.Name()
+	if name != "postgres" {
+		return
+	}
+	statements := []string{
+		`DO $$
+		BEGIN
+		  IF NOT EXISTS (
+		    SELECT 1 FROM pg_indexes
+		    WHERE schemaname = 'public' AND indexname = 'uk_conv_live_per_channel'
+		  ) THEN
+		    CREATE UNIQUE INDEX uk_conv_live_per_channel
+		      ON conversations (workspace_id, instance_id, channel_key)
+		      WHERE status IN ('open','pending','snoozed')
+		        AND deleted_at IS NULL;
+		  END IF;
+		END $$;`,
+		`CREATE INDEX IF NOT EXISTS idx_conv_mine
+		   ON conversations (workspace_id, status, assigned_user_id, last_message_at DESC)
+		   WHERE deleted_at IS NULL;`,
+		`CREATE INDEX IF NOT EXISTS idx_conv_queue
+		   ON conversations (workspace_id, status, queue_id, last_message_at DESC)
+		   WHERE deleted_at IS NULL;`,
+		`CREATE INDEX IF NOT EXISTS idx_conv_contact_status
+		   ON conversations (workspace_id, contact_id, status)
+		   WHERE deleted_at IS NULL;`,
+	}
+	for _, stmt := range statements {
+		if err := db.Exec(stmt).Error; err != nil {
+			log.Warn().Err(err).Msg("ticketing index: failed to apply (non-fatal)")
+		}
+	}
+	log.Info().Msg("ticketing indexes applied")
+}
+
+// backfillAdminRolePermissions picks up any permission keys added after a
+// workspace was created and grants them to that workspace's Admin role.
+// Idempotent: skips existing (role, permission) pairs.
+func backfillAdminRolePermissions(db *gorm.DB) {
+	var admins []models.Role
+	db.Where("name = ? AND is_default = ?", "Admin", true).Find(&admins)
+	if len(admins) == 0 {
+		return
+	}
+	var perms []models.Permission
+	db.Find(&perms)
+	if len(perms) == 0 {
+		return
+	}
+	for _, role := range admins {
+		for _, p := range perms {
+			var exists int64
+			db.Model(&models.RolePermission{}).
+				Where("role_id = ? AND permission_id = ?", role.ID, p.ID).
+				Count(&exists)
+			if exists == 0 {
+				db.Create(&models.RolePermission{RoleID: role.ID, PermissionID: p.ID})
+			}
+		}
+	}
+	log.Info().Int("roles", len(admins)).Int("perms", len(perms)).Msg("admin role permissions backfilled")
+}
+
+// seedTicketingRoles ensures every workspace has the default ticketing roles
+// (agent, supervisor, agent_read_only). Idempotent: skips workspaces/roles
+// that already exist.
+func seedTicketingRoles(db *gorm.DB) {
+	type roleSpec struct {
+		name        string
+		description string
+		perms       []string
+	}
+	specs := []roleSpec{
+		{
+			name:        "Supervisor",
+			description: "Gestão da equipe: vê todos os atendimentos, filas, equipes, relatórios e presença",
+			perms: []string{
+				models.PermTicketsView, models.PermTicketsViewAll, models.PermTicketsViewTeam,
+				models.PermTicketsUpdate, models.PermTicketsAssign, models.PermTicketsTransfer,
+				models.PermTicketsClose, models.PermTicketsReopen, models.PermTicketsSnooze,
+				models.PermNotesView, models.PermNotesCreate, models.PermNotesUpdate,
+				models.PermQueuesView, models.PermTeamsView, models.PermDepartmentsView,
+				models.PermQuickRepliesView, models.PermQuickRepliesManageShared,
+				models.PermReportsView, models.PermReportsExport,
+				models.PermPresenceViewOthers,
+				models.PermInboxView, models.PermInboxSend, models.PermInboxAssign,
+			},
+		},
+		{
+			name:        "Agente",
+			description: "Atendente: trabalha seus atendimentos e filas em que participa",
+			perms: []string{
+				models.PermTicketsView, models.PermTicketsCreate, models.PermTicketsUpdate,
+				models.PermTicketsAssign, models.PermTicketsTransfer, models.PermTicketsClose,
+				models.PermTicketsReopen, models.PermTicketsSnooze,
+				models.PermNotesView, models.PermNotesCreate, models.PermNotesUpdate, models.PermNotesDelete,
+				models.PermQuickRepliesView, models.PermQuickRepliesManageOwn,
+				models.PermInboxView, models.PermInboxSend,
+				models.PermCRMView,
+			},
+		},
+		{
+			name:        "Agente (Somente Leitura)",
+			description: "Agente com acesso apenas de leitura a atendimentos e notas",
+			perms: []string{
+				models.PermTicketsView, models.PermNotesView,
+				models.PermQuickRepliesView, models.PermInboxView,
+			},
+		},
+	}
+
+	var workspaces []models.Workspace
+	db.Find(&workspaces)
+	for _, ws := range workspaces {
+		for _, spec := range specs {
+			var existing models.Role
+			if err := db.Where("workspace_id = ? AND name = ?", ws.ID, spec.name).First(&existing).Error; err == nil {
+				continue // already exists
+			}
+			role := models.Role{
+				WorkspaceID: ws.ID,
+				Name:        spec.name,
+				Description: spec.description,
+				IsDefault:   true,
+			}
+			if err := db.Create(&role).Error; err != nil {
+				log.Warn().Err(err).Str("workspace", ws.ID.String()).Str("role", spec.name).Msg("failed to create ticketing role")
+				continue
+			}
+			var perms []models.Permission
+			db.Where("key IN ?", spec.perms).Find(&perms)
+			for _, p := range perms {
+				db.Create(&models.RolePermission{RoleID: role.ID, PermissionID: p.ID})
+			}
+		}
+	}
+	log.Info().Int("workspaces", len(workspaces)).Msg("ticketing roles seeded")
 }
 
 func seedPermissions(db *gorm.DB) {

@@ -12,6 +12,7 @@ import (
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/email"
+	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/services"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
@@ -146,6 +147,12 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	workspaceH := handlers.NewWorkspaceHandler(db)
 	roleH := handlers.NewRoleHandler(db)
 	inviteH := handlers.NewInviteHandler(db)
+	conversationH := handlers.NewConversationHandler(db, manager)
+	departmentH := handlers.NewDepartmentHandler(db)
+	teamH := handlers.NewTeamHandler(db)
+	queueH := handlers.NewQueueHandler(db)
+	presenceH := handlers.NewPresenceHandler(db)
+	quickReplyH := handlers.NewQuickReplyHandler(db)
 
 	// WABA
 	wabaH := handlers.NewWABAHandler(db)
@@ -407,6 +414,88 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	crm.Get("/journey-options", contactH.ListJourneyOptions)
 	crm.Get("/stage-options", contactH.ListStageOptions)
 	crm.Get("/funnel-options", contactH.ListFunnelOptions)
+
+	// ─── Ticketing / Atendimento ──────────────────────────────────────────────
+	// All routes require an active workspace passed via X-Workspace-ID header
+	// (or ?workspace_id=). RequireWorkspacePermission enforces the RBAC key.
+	conversations := api.Group("/conversations")
+	conversations.Get("/", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.List)
+	conversations.Get("/count", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.Count)
+	conversations.Get("/:id", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.Get)
+	conversations.Get("/:id/timeline", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.Timeline)
+	conversations.Patch("/:id", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.Patch)
+	conversations.Post("/:id/messages", middleware.RequireWorkspacePermission(db, models.PermInboxSend), conversationH.SendMessage)
+	conversations.Post("/:id/read", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.MarkRead)
+	conversations.Post("/:id/assign", middleware.RequireWorkspacePermission(db, models.PermTicketsAssign), conversationH.Assign)
+	conversations.Post("/:id/unassign", middleware.RequireWorkspacePermission(db, models.PermTicketsAssign), conversationH.Unassign)
+	conversations.Post("/:id/transfer", middleware.RequireWorkspacePermission(db, models.PermTicketsTransfer), conversationH.Transfer)
+	conversations.Post("/:id/resolve", middleware.RequireWorkspacePermission(db, models.PermTicketsClose), conversationH.Resolve)
+	conversations.Post("/:id/close", middleware.RequireWorkspacePermission(db, models.PermTicketsClose), conversationH.Close)
+	conversations.Post("/:id/reopen", middleware.RequireWorkspacePermission(db, models.PermTicketsReopen), conversationH.Reopen)
+	conversations.Post("/:id/snooze", middleware.RequireWorkspacePermission(db, models.PermTicketsSnooze), conversationH.Snooze)
+	conversations.Post("/:id/unsnooze", middleware.RequireWorkspacePermission(db, models.PermTicketsSnooze), conversationH.Unsnooze)
+	conversations.Post("/:id/bot/enable", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.EnableBot)
+	conversations.Post("/:id/bot/disable", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.DisableBot)
+
+	// Notes
+	conversations.Get("/:id/notes", middleware.RequireWorkspacePermission(db, models.PermNotesView), conversationH.ListNotes)
+	conversations.Post("/:id/notes", middleware.RequireWorkspacePermission(db, models.PermNotesCreate), conversationH.CreateNote)
+	conversations.Patch("/:id/notes/:noteId", middleware.RequireWorkspacePermission(db, models.PermNotesUpdate), conversationH.UpdateNote)
+	conversations.Delete("/:id/notes/:noteId", middleware.RequireWorkspacePermission(db, models.PermNotesDelete), conversationH.DeleteNote)
+
+	// Departments
+	departments := api.Group("/departments")
+	departments.Get("/", middleware.RequireWorkspacePermission(db, models.PermDepartmentsView), departmentH.List)
+	departments.Post("/", middleware.RequireWorkspacePermission(db, models.PermDepartmentsManage), departmentH.Create)
+	departments.Patch("/:id", middleware.RequireWorkspacePermission(db, models.PermDepartmentsManage), departmentH.Patch)
+	departments.Delete("/:id", middleware.RequireWorkspacePermission(db, models.PermDepartmentsManage), departmentH.Delete)
+
+	// Teams
+	teams := api.Group("/teams")
+	teams.Get("/", middleware.RequireWorkspacePermission(db, models.PermTeamsView), teamH.List)
+	teams.Post("/", middleware.RequireWorkspacePermission(db, models.PermTeamsManage), teamH.Create)
+	teams.Patch("/:id", middleware.RequireWorkspacePermission(db, models.PermTeamsManage), teamH.Patch)
+	teams.Delete("/:id", middleware.RequireWorkspacePermission(db, models.PermTeamsManage), teamH.Delete)
+	teams.Get("/:id/members", middleware.RequireWorkspacePermission(db, models.PermTeamsView), teamH.ListMembers)
+	teams.Post("/:id/members", middleware.RequireWorkspacePermission(db, models.PermTeamsManage), teamH.AddMember)
+	teams.Delete("/:id/members/:userId", middleware.RequireWorkspacePermission(db, models.PermTeamsManage), teamH.RemoveMember)
+
+	// Queues
+	queues := api.Group("/queues")
+	queues.Get("/", middleware.RequireWorkspacePermission(db, models.PermQueuesView), queueH.List)
+	queues.Post("/", middleware.RequireWorkspacePermission(db, models.PermQueuesManage), queueH.Create)
+	queues.Get("/:id", middleware.RequireWorkspacePermission(db, models.PermQueuesView), queueH.Get)
+	queues.Patch("/:id", middleware.RequireWorkspacePermission(db, models.PermQueuesManage), queueH.Patch)
+	queues.Delete("/:id", middleware.RequireWorkspacePermission(db, models.PermQueuesManage), queueH.Delete)
+	queues.Get("/:id/stats", middleware.RequireWorkspacePermission(db, models.PermQueuesView), queueH.Stats)
+	queues.Get("/:id/members", middleware.RequireWorkspacePermission(db, models.PermQueuesView), queueH.ListMembers)
+	queues.Post("/:id/members", middleware.RequireWorkspacePermission(db, models.PermQueuesManage), queueH.AddMember)
+	queues.Patch("/:id/members/:userId", middleware.RequireWorkspacePermission(db, models.PermQueuesManage), queueH.UpdateMember)
+	queues.Delete("/:id/members/:userId", middleware.RequireWorkspacePermission(db, models.PermQueuesManage), queueH.RemoveMember)
+	queues.Get("/:id/channels", middleware.RequireWorkspacePermission(db, models.PermQueuesView), queueH.ListChannels)
+	queues.Post("/:id/channels", middleware.RequireWorkspacePermission(db, models.PermQueuesManage), queueH.AddChannel)
+	queues.Delete("/:id/channels/:instanceId", middleware.RequireWorkspacePermission(db, models.PermQueuesManage), queueH.RemoveChannel)
+
+	// Quick replies
+	quickReplies := api.Group("/quick-replies")
+	quickReplies.Get("/", middleware.RequireWorkspacePermission(db, models.PermQuickRepliesView), quickReplyH.List)
+	quickReplies.Get("/search", middleware.RequireWorkspacePermission(db, models.PermQuickRepliesView), quickReplyH.Search)
+	// Create falls back to personal when shared=false; when shared=true the route-level
+	// permission below would normally need to be manage_shared, but since body is parsed
+	// inside the handler we keep manage_own here and do a secondary check there.
+	quickReplies.Post("/", middleware.RequireWorkspacePermission(db, models.PermQuickRepliesManageOwn), quickReplyH.Create)
+	quickReplies.Patch("/:id", middleware.RequireWorkspacePermission(db, models.PermQuickRepliesManageOwn), quickReplyH.Patch)
+	quickReplies.Delete("/:id", middleware.RequireWorkspacePermission(db, models.PermQuickRepliesManageOwn), quickReplyH.Delete)
+	quickReplies.Post("/:id/use", middleware.RequireWorkspacePermission(db, models.PermQuickRepliesView), quickReplyH.Use)
+
+	// Presence / workload (me + supervisor view)
+	me := api.Group("/me")
+	// GetMine/UpdateMine require any of tickets:view — minimum atendente permission
+	me.Get("/presence", middleware.RequireWorkspacePermission(db, models.PermTicketsView), presenceH.GetMine)
+	me.Put("/presence", middleware.RequireWorkspacePermission(db, models.PermTicketsView), presenceH.UpdateMine)
+	me.Get("/workload", middleware.RequireWorkspacePermission(db, models.PermTicketsView), presenceH.MyWorkload)
+	// Supervisor view of all agents' presence
+	workspace.Get("/presence", middleware.RequireWorkspacePermission(db, models.PermPresenceViewOthers), presenceH.ListWorkspacePresence)
 
 	// ─── Campaign routes ───────────────────────────────────────────────────────
 	campaigns := api.Group("/campaigns")

@@ -162,6 +162,43 @@ var (
 	// Settings permissions
 	PermSettingsView = "settings:view"
 	PermSettingsEdit = "settings:edit"
+
+	// Ticket permissions (conversation/atendimento)
+	PermTicketsView     = "tickets:view"
+	PermTicketsViewAll  = "tickets:view_all"
+	PermTicketsViewTeam = "tickets:view_team"
+	PermTicketsCreate   = "tickets:create"
+	PermTicketsUpdate   = "tickets:update"
+	PermTicketsAssign   = "tickets:assign"
+	PermTicketsTransfer = "tickets:transfer"
+	PermTicketsClose    = "tickets:close"
+	PermTicketsReopen   = "tickets:reopen"
+	PermTicketsSnooze   = "tickets:snooze"
+	PermTicketsDelete   = "tickets:delete"
+
+	// Internal notes
+	PermNotesView   = "notes:view"
+	PermNotesCreate = "notes:create"
+	PermNotesUpdate = "notes:update"
+	PermNotesDelete = "notes:delete"
+
+	// Queues / Teams / Departments
+	PermQueuesView      = "queues:view"
+	PermQueuesManage    = "queues:manage"
+	PermTeamsView       = "teams:view"
+	PermTeamsManage     = "teams:manage"
+	PermDepartmentsView   = "departments:view"
+	PermDepartmentsManage = "departments:manage"
+
+	// Quick replies
+	PermQuickRepliesView         = "quickreplies:view"
+	PermQuickRepliesManageOwn    = "quickreplies:manage_own"
+	PermQuickRepliesManageShared = "quickreplies:manage_shared"
+
+	// Reports / Presence
+	PermReportsView      = "reports:view"
+	PermReportsExport    = "reports:export"
+	PermPresenceViewOthers = "presence:view_others"
 )
 
 // GetAllPermissions returns all default permissions that should be seeded.
@@ -206,5 +243,46 @@ func GetAllPermissions() []Permission {
 		// Settings
 		{Key: PermSettingsView, Name: "Visualizar Configurações", Category: "settings"},
 		{Key: PermSettingsEdit, Name: "Editar Configurações", Category: "settings"},
+
+		// Tickets (Atendimentos)
+		{Key: PermTicketsView, Name: "Visualizar Atendimentos (próprios + filas)", Category: "tickets"},
+		{Key: PermTicketsViewAll, Name: "Visualizar Todos os Atendimentos", Category: "tickets"},
+		{Key: PermTicketsViewTeam, Name: "Visualizar Atendimentos da Equipe", Category: "tickets"},
+		{Key: PermTicketsCreate, Name: "Criar Atendimento (outbound)", Category: "tickets"},
+		{Key: PermTicketsUpdate, Name: "Editar Atendimento", Category: "tickets"},
+		{Key: PermTicketsAssign, Name: "Atribuir Atendimento", Category: "tickets"},
+		{Key: PermTicketsTransfer, Name: "Transferir Atendimento", Category: "tickets"},
+		{Key: PermTicketsClose, Name: "Resolver / Encerrar Atendimento", Category: "tickets"},
+		{Key: PermTicketsReopen, Name: "Reabrir Atendimento", Category: "tickets"},
+		{Key: PermTicketsSnooze, Name: "Soneca de Atendimento", Category: "tickets"},
+		{Key: PermTicketsDelete, Name: "Excluir Atendimento", Category: "tickets"},
+
+		// Notes
+		{Key: PermNotesView, Name: "Visualizar Notas Internas", Category: "notes"},
+		{Key: PermNotesCreate, Name: "Criar Nota Interna", Category: "notes"},
+		{Key: PermNotesUpdate, Name: "Editar Nota Interna", Category: "notes"},
+		{Key: PermNotesDelete, Name: "Excluir Nota Interna", Category: "notes"},
+
+		// Queues
+		{Key: PermQueuesView, Name: "Visualizar Filas", Category: "queues"},
+		{Key: PermQueuesManage, Name: "Gerenciar Filas", Category: "queues"},
+
+		// Teams
+		{Key: PermTeamsView, Name: "Visualizar Equipes", Category: "teams"},
+		{Key: PermTeamsManage, Name: "Gerenciar Equipes", Category: "teams"},
+
+		// Departments
+		{Key: PermDepartmentsView, Name: "Visualizar Departamentos", Category: "departments"},
+		{Key: PermDepartmentsManage, Name: "Gerenciar Departamentos", Category: "departments"},
+
+		// Quick replies
+		{Key: PermQuickRepliesView, Name: "Visualizar Respostas Rápidas", Category: "quickreplies"},
+		{Key: PermQuickRepliesManageOwn, Name: "Gerenciar Respostas Rápidas Pessoais", Category: "quickreplies"},
+		{Key: PermQuickRepliesManageShared, Name: "Gerenciar Respostas Rápidas do Workspace", Category: "quickreplies"},
+
+		// Reports & Presence
+		{Key: PermReportsView, Name: "Visualizar Relatórios", Category: "reports"},
+		{Key: PermReportsExport, Name: "Exportar Relatórios", Category: "reports"},
+		{Key: PermPresenceViewOthers, Name: "Visualizar Presença de Outros Agentes", Category: "presence"},
 	}
 }
