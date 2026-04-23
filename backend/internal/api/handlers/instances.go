@@ -31,18 +31,18 @@ func NewInstanceHandler(db *gorm.DB, manager *whatsapp.Manager) *InstanceHandler
 //
 // Matriz de estados (client é o InstanceClient no manager):
 //
-//   IsConnected  IsLoggedIn   Status
-//   true         true         connected     — WS autenticado, tudo OK
-//   false        true         connecting    — sessão válida, whatsmeow
-//                                             tentando reconectar (auto
-//                                             reconnect em andamento)
-//   true         false        connecting    — acabou de abrir WS, ainda
-//                                             fazendo handshake/login
-//   false        false        disconnected  — sessão caiu sem ter
-//                                             autenticação guardada;
-//                                             o cliente está "vivo" no
-//                                             mapa mas sem conexão nem
-//                                             credencial válida
+//	IsConnected  IsLoggedIn   Status
+//	true         true         connected     — WS autenticado, tudo OK
+//	false        true         connecting    — sessão válida, whatsmeow
+//	                                          tentando reconectar (auto
+//	                                          reconnect em andamento)
+//	true         false        connecting    — acabou de abrir WS, ainda
+//	                                          fazendo handshake/login
+//	false        false        disconnected  — sessão caiu sem ter
+//	                                          autenticação guardada;
+//	                                          o cliente está "vivo" no
+//	                                          mapa mas sem conexão nem
+//	                                          credencial válida
 //
 // Com essa matriz NUNCA reportamos "connecting" pra um cliente totalmente
 // offline. O bug que estávamos vendo era: sessão expirava (QR/2FA), o
@@ -51,9 +51,9 @@ func NewInstanceHandler(db *gorm.DB, manager *whatsapp.Manager) *InstanceHandler
 // evidência de vida (socket up OU sessão autenticada guardada).
 //
 // Quando nem IsRunning:
-//  - DB "connecting" → stale (reconnect que morreu), promove pra
-//    disconnected e persiste pra a UI oferecer reconectar.
-//  - Caso contrário usa o status do DB.
+//   - DB "connecting" → stale (reconnect que morreu), promove pra
+//     disconnected e persiste pra a UI oferecer reconectar.
+//   - Caso contrário usa o status do DB.
 func (h *InstanceHandler) resolveLiveStatus(inst *models.Instance) models.InstanceStatus {
 	id := inst.ID.String()
 	if h.manager.IsRunning(id) {
@@ -332,8 +332,18 @@ func (h *InstanceHandler) Delete(c *fiber.Ctx) error {
 		"recoveries",
 		"otps",
 		"integrations",
+		"instance_agents",
 		"waba_instances",
 		"proxy_pool_assignments",
+	}
+	if err := h.db.Exec(`
+		DELETE FROM agent_assets
+		WHERE instance_agent_id IN (
+			SELECT id FROM instance_agents WHERE instance_id = ?
+		)
+	`, instanceID).Error; err != nil {
+		log.Warn().Err(err).Str("table", "agent_assets").Str("instance", instanceID.String()).
+			Msg("failed to cleanup instance child rows")
 	}
 	for _, t := range childTables {
 		if err := h.db.Exec("DELETE FROM "+t+" WHERE instance_id = ?", instanceID).Error; err != nil {

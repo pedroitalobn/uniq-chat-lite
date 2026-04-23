@@ -1,12 +1,19 @@
 package handlers
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -105,14 +112,14 @@ func (h *IntegrationHandler) CompleteClaudeOAuth(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"id":              integ.ID,
-		"provider":        integ.Provider,
-		"name":            integ.Name,
-		"auth_type":       integ.AuthType,
-		"oauth_account":   integ.OAuthAccount,
-		"oauth_scope":     integ.OAuthScope,
-		"expires_at":      integ.OAuthExpiresAt,
-		"is_active":       integ.IsActive,
+		"id":            integ.ID,
+		"provider":      integ.Provider,
+		"name":          integ.Name,
+		"auth_type":     integ.AuthType,
+		"oauth_account": integ.OAuthAccount,
+		"oauth_scope":   integ.OAuthScope,
+		"expires_at":    integ.OAuthExpiresAt,
+		"is_active":     integ.IsActive,
 	})
 }
 
@@ -451,14 +458,54 @@ func (h *IntegrationHandler) GetAgent(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instância não encontrada"})
 	}
 	var agent models.InstanceAgent
-	if err := h.db.Preload("Integration").Where("instance_id = ?", inst.ID).First(&agent).Error; err != nil {
-		return c.JSON(models.InstanceAgent{InstanceID: inst.ID})
+	if err := h.db.Preload("Integration").Preload("Assets", func(tx *gorm.DB) *gorm.DB {
+		return tx.Order("created_at DESC")
+	}).Where("instance_id = ?", inst.ID).First(&agent).Error; err != nil {
+		return c.JSON(fiber.Map{
+			"instance_id":     inst.ID,
+			"rag_enabled":     true,
+			"faq":             "[]",
+			"variables":       "[]",
+			"voice":           "{}",
+			"skills":          "[]",
+			"app_access":      "[]",
+			"assets":          []models.AgentAsset{},
+			"compiled_prompt": "",
+		})
 	}
 	if agent.Integration != nil {
 		agent.Integration.MaskedKey = models.MaskAPIKey(agent.Integration.APIKey)
 		agent.Integration.APIKey = ""
 	}
-	return c.JSON(agent)
+	return c.JSON(fiber.Map{
+		"id":                       agent.ID,
+		"instance_id":              agent.InstanceID,
+		"integration_id":           agent.IntegrationID,
+		"integration":              agent.Integration,
+		"model":                    agent.Model,
+		"system_prompt":            agent.SystemPrompt,
+		"agent_name":               agent.AgentName,
+		"identity":                 agent.Identity,
+		"objective":                agent.Objective,
+		"communication_guidelines": agent.CommunicationGuidelines,
+		"service_instructions":     agent.ServiceInstructions,
+		"restrictions":             agent.Restrictions,
+		"knowledge_base":           agent.KnowledgeBase,
+		"faq":                      safeJSONArray(agent.FAQ),
+		"variables":                safeJSONArray(agent.Variables),
+		"voice":                    safeJSONObject(agent.Voice),
+		"skills":                   safeJSONArray(agent.Skills),
+		"app_access":               safeJSONArray(agent.AppAccess),
+		"rag_enabled":              agent.RAGEnabled,
+		"is_active":                agent.IsActive,
+		"webhook_url":              agent.WebhookURL,
+		"webhook_secret":           agent.WebhookSecret,
+		"mcp_server_url":           agent.MCPServerURL,
+		"assets":                   agent.Assets,
+		"compiled_prompt":          buildCompiledAgentPrompt(&agent),
+		"created_at":               agent.CreatedAt,
+		"updated_at":               agent.UpdatedAt,
+	})
 }
 
 // PUT /instances/:id/agent
@@ -468,12 +515,26 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instância não encontrada"})
 	}
 	var req struct {
-		IntegrationID *string `json:"integration_id"`
-		SystemPrompt  *string `json:"system_prompt"`
-		IsActive      *bool   `json:"is_active"`
-		WebhookURL    *string `json:"webhook_url"`
-		WebhookSecret *string `json:"webhook_secret"`
-		MCPServerURL  *string `json:"mcp_server_url"`
+		IntegrationID           *string                   `json:"integration_id"`
+		Model                   *string                   `json:"model"`
+		SystemPrompt            *string                   `json:"system_prompt"`
+		AgentName               *string                   `json:"agent_name"`
+		Identity                *string                   `json:"identity"`
+		Objective               *string                   `json:"objective"`
+		CommunicationGuidelines *string                   `json:"communication_guidelines"`
+		ServiceInstructions     *string                   `json:"service_instructions"`
+		Restrictions            *string                   `json:"restrictions"`
+		KnowledgeBase           *string                   `json:"knowledge_base"`
+		FAQ                     *[]map[string]interface{} `json:"faq"`
+		Variables               *[]map[string]interface{} `json:"variables"`
+		Voice                   *map[string]interface{}   `json:"voice"`
+		Skills                  *[]map[string]interface{} `json:"skills"`
+		AppAccess               *[]map[string]interface{} `json:"app_access"`
+		RAGEnabled              *bool                     `json:"rag_enabled"`
+		IsActive                *bool                     `json:"is_active"`
+		WebhookURL              *string                   `json:"webhook_url"`
+		WebhookSecret           *string                   `json:"webhook_secret"`
+		MCPServerURL            *string                   `json:"mcp_server_url"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -481,19 +542,76 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 
 	var agent models.InstanceAgent
 	if err := h.db.Where("instance_id = ?", inst.ID).First(&agent).Error; err != nil {
-		agent = models.InstanceAgent{InstanceID: inst.ID}
+		agent = models.InstanceAgent{
+			InstanceID: inst.ID,
+			FAQ:        "[]",
+			Variables:  "[]",
+			Voice:      "{}",
+			Skills:     "[]",
+			AppAccess:  "[]",
+			RAGEnabled: true,
+		}
 	}
 
 	if req.IntegrationID != nil {
 		if *req.IntegrationID == "" {
 			agent.IntegrationID = nil
 		} else {
-			pid, _ := uuid.Parse(*req.IntegrationID)
+			pid, err := uuid.Parse(*req.IntegrationID)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "integration_id inválido"})
+			}
+			var integration models.UserIntegration
+			if err := h.db.Where("id = ? AND user_id = ? AND is_active = true", pid, inst.UserID).First(&integration).Error; err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "integração não encontrada ou inativa"})
+			}
 			agent.IntegrationID = &pid
 		}
 	}
+	if req.Model != nil {
+		agent.Model = *req.Model
+	}
 	if req.SystemPrompt != nil {
 		agent.SystemPrompt = *req.SystemPrompt
+	}
+	if req.AgentName != nil {
+		agent.AgentName = *req.AgentName
+	}
+	if req.Identity != nil {
+		agent.Identity = *req.Identity
+	}
+	if req.Objective != nil {
+		agent.Objective = *req.Objective
+	}
+	if req.CommunicationGuidelines != nil {
+		agent.CommunicationGuidelines = *req.CommunicationGuidelines
+	}
+	if req.ServiceInstructions != nil {
+		agent.ServiceInstructions = *req.ServiceInstructions
+	}
+	if req.Restrictions != nil {
+		agent.Restrictions = *req.Restrictions
+	}
+	if req.KnowledgeBase != nil {
+		agent.KnowledgeBase = *req.KnowledgeBase
+	}
+	if req.FAQ != nil {
+		agent.FAQ = marshalJSONString(*req.FAQ, "[]")
+	}
+	if req.Variables != nil {
+		agent.Variables = marshalJSONString(*req.Variables, "[]")
+	}
+	if req.Voice != nil {
+		agent.Voice = marshalJSONString(*req.Voice, "{}")
+	}
+	if req.Skills != nil {
+		agent.Skills = marshalJSONString(*req.Skills, "[]")
+	}
+	if req.AppAccess != nil {
+		agent.AppAccess = marshalJSONString(*req.AppAccess, "[]")
+	}
+	if req.RAGEnabled != nil {
+		agent.RAGEnabled = *req.RAGEnabled
 	}
 	if req.IsActive != nil {
 		agent.IsActive = *req.IsActive
@@ -508,8 +626,258 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		agent.MCPServerURL = *req.MCPServerURL
 	}
 
-	h.db.Save(&agent)
-	return c.JSON(agent)
+	if err := h.db.Save(&agent).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao salvar agente"})
+	}
+
+	return h.GetAgent(c)
+}
+
+// POST /instances/:id/agent/assets
+func (h *IntegrationHandler) UploadAgentAsset(c *fiber.Ctx) error {
+	inst := middleware.GetCurrentInstance(c)
+	if inst == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	category := strings.TrimSpace(c.FormValue("category"))
+	if category == "" {
+		category = string(models.AgentAssetKnowledge)
+	}
+	switch models.AgentAssetCategory(category) {
+	case models.AgentAssetKnowledge, models.AgentAssetFAQ, models.AgentAssetSkill:
+	default:
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "categoria inválida"})
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "arquivo é obrigatório"})
+	}
+	if file.Size > 8*1024*1024 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "arquivo excede o limite de 8MB"})
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "falha ao abrir arquivo"})
+	}
+	defer src.Close()
+
+	data, err := io.ReadAll(src)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "falha ao ler arquivo"})
+	}
+
+	var agent models.InstanceAgent
+	if err := h.db.Where("instance_id = ?", inst.ID).First(&agent).Error; err != nil {
+		agent = models.InstanceAgent{
+			InstanceID: inst.ID,
+			FAQ:        "[]",
+			Variables:  "[]",
+			Voice:      "{}",
+			Skills:     "[]",
+			AppAccess:  "[]",
+			RAGEnabled: true,
+		}
+		if err := h.db.Create(&agent).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao inicializar agente"})
+		}
+	}
+
+	contentType := file.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = http.DetectContentType(data)
+	}
+	asset := models.AgentAsset{
+		InstanceAgentID: agent.ID,
+		Category:        models.AgentAssetCategory(category),
+		Name:            strings.TrimSpace(c.FormValue("name")),
+		FileName:        file.Filename,
+		ContentType:     contentType,
+		SizeBytes:       file.Size,
+		ExtractedText:   extractAgentAssetText(file.Filename, data),
+		ContentBase64:   base64.StdEncoding.EncodeToString(data),
+		IsActive:        true,
+	}
+	if asset.Name == "" {
+		asset.Name = strings.TrimSuffix(file.Filename, filepath.Ext(file.Filename))
+	}
+
+	if err := h.db.Create(&asset).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao salvar arquivo"})
+	}
+	return c.Status(fiber.StatusCreated).JSON(asset)
+}
+
+// DELETE /instances/:id/agent/assets/:assetId
+func (h *IntegrationHandler) DeleteAgentAsset(c *fiber.Ctx) error {
+	inst := middleware.GetCurrentInstance(c)
+	if inst == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	assetID, err := uuid.Parse(c.Params("assetId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "assetId inválido"})
+	}
+
+	var asset models.AgentAsset
+	if err := h.db.Joins("JOIN instance_agents ON instance_agents.id = agent_assets.instance_agent_id").
+		Where("agent_assets.id = ? AND instance_agents.instance_id = ?", assetID, inst.ID).
+		First(&asset).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "arquivo não encontrado"})
+	}
+	if err := h.db.Delete(&asset).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao remover arquivo"})
+	}
+	return c.JSON(fiber.Map{"deleted": true, "id": assetID})
+}
+
+func marshalJSONString(v interface{}, fallback string) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return fallback
+	}
+	s := string(b)
+	if s == "" || s == "null" {
+		return fallback
+	}
+	return s
+}
+
+func safeJSONArray(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" || v == "null" {
+		return "[]"
+	}
+	return v
+}
+
+func safeJSONObject(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" || v == "null" {
+		return "{}"
+	}
+	return v
+}
+
+func buildCompiledAgentPrompt(agent *models.InstanceAgent) string {
+	if agent == nil {
+		return ""
+	}
+	sections := []string{}
+	appendSection := func(title, value string) {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return
+		}
+		sections = append(sections, title+"\n"+value)
+	}
+
+	if agent.AgentName != "" {
+		sections = append(sections, fmt.Sprintf("IDENTIDADE PRINCIPAL\nVocê é %s.", strings.TrimSpace(agent.AgentName)))
+	}
+	appendSection("IDENTIDADE E POSICIONAMENTO", agent.Identity)
+	appendSection("OBJETIVO", agent.Objective)
+	appendSection("DIRETRIZES DE COMUNICAÇÃO", agent.CommunicationGuidelines)
+	appendSection("INSTRUÇÕES DE ATENDIMENTO", agent.ServiceInstructions)
+	appendSection("RESTRIÇÕES", agent.Restrictions)
+	appendSection("BASE DE CONHECIMENTO", agent.KnowledgeBase)
+
+	if faq := compactJSONLines(agent.FAQ, "FAQ"); faq != "" {
+		sections = append(sections, faq)
+	}
+	if variables := compactJSONLines(agent.Variables, "VARIÁVEIS DISPONÍVEIS"); variables != "" {
+		sections = append(sections, variables)
+	}
+	if voice := compactJSONLines(agent.Voice, "CONFIGURAÇÃO DE VOZ"); voice != "" {
+		sections = append(sections, voice)
+	}
+	if skills := compactJSONLines(agent.Skills, "SKILLS E CAPACIDADES"); skills != "" {
+		sections = append(sections, skills)
+	}
+	if apps := compactJSONLines(agent.AppAccess, "APPS E ACESSOS DISPONÍVEIS"); apps != "" {
+		sections = append(sections, apps)
+	}
+
+	if strings.TrimSpace(agent.SystemPrompt) != "" {
+		sections = append(sections, "PROMPT BASE ADICIONAL\n"+strings.TrimSpace(agent.SystemPrompt))
+	}
+
+	return strings.Join(sections, "\n\n")
+}
+
+func compactJSONLines(raw string, title string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || raw == "[]" || raw == "{}" || raw == "null" {
+		return ""
+	}
+
+	var parsed interface{}
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		return title + "\n" + raw
+	}
+	b, err := json.MarshalIndent(parsed, "", "  ")
+	if err != nil {
+		return title + "\n" + raw
+	}
+	return title + "\n" + string(b)
+}
+
+var xmlTagRegex = regexp.MustCompile(`<[^>]+>`)
+
+func extractAgentAssetText(filename string, data []byte) string {
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch ext {
+	case ".txt", ".md", ".markdown", ".json", ".csv":
+		return string(data)
+	case ".docx":
+		return extractZipXMLText(data, func(name string) bool {
+			return name == "word/document.xml" || strings.HasPrefix(name, "word/header") || strings.HasPrefix(name, "word/footer")
+		})
+	case ".pptx":
+		return extractZipXMLText(data, func(name string) bool {
+			return strings.HasPrefix(name, "ppt/slides/slide") && strings.HasSuffix(name, ".xml")
+		})
+	default:
+		return ""
+	}
+}
+
+func extractZipXMLText(data []byte, include func(name string) bool) string {
+	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return ""
+	}
+
+	names := make([]string, 0)
+	byName := make(map[string]*zip.File)
+	for _, f := range reader.File {
+		if include(f.Name) {
+			names = append(names, f.Name)
+			byName[f.Name] = f
+		}
+	}
+	sort.Strings(names)
+
+	parts := make([]string, 0, len(names))
+	for _, name := range names {
+		rc, err := byName[name].Open()
+		if err != nil {
+			continue
+		}
+		b, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			continue
+		}
+		text := html.UnescapeString(xmlTagRegex.ReplaceAllString(string(b), " "))
+		text = strings.Join(strings.Fields(text), " ")
+		if text != "" {
+			parts = append(parts, text)
+		}
+	}
+	return strings.Join(parts, "\n")
 }
 
 // ─── LLM helpers ──────────────────────────────────────────────────────────────

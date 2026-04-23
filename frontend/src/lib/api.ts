@@ -569,12 +569,37 @@ export const integrationsApi = {
   getAgent: (instanceId: string) => api.get(`/v1/instances/${instanceId}/agent`),
   updateAgent: (instanceId: string, data: {
     integration_id?: string | null;
+    model?: string;
     system_prompt?: string;
+    agent_name?: string;
+    identity?: string;
+    objective?: string;
+    communication_guidelines?: string;
+    service_instructions?: string;
+    restrictions?: string;
+    knowledge_base?: string;
+    faq?: Array<Record<string, unknown>>;
+    variables?: Array<Record<string, unknown>>;
+    voice?: Record<string, unknown>;
+    skills?: Array<Record<string, unknown>>;
+    app_access?: Array<Record<string, unknown>>;
+    rag_enabled?: boolean;
     is_active?: boolean;
     webhook_url?: string;
     webhook_secret?: string;
     mcp_server_url?: string;
   }) => api.put(`/v1/instances/${instanceId}/agent`, data),
+  uploadAgentAsset: (instanceId: string, file: File, category: "knowledge" | "faq" | "skill", name?: string) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("category", category);
+    if (name) form.append("name", name);
+    return api.post(`/v1/instances/${instanceId}/agent/assets`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+  deleteAgentAsset: (instanceId: string, assetId: string) =>
+    api.delete(`/v1/instances/${instanceId}/agent/assets/${assetId}`),
 };
 
 export const agentsApi = {

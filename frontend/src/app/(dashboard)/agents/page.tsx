@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import ReactMarkdown from "react-markdown";
+import Link from "next/link";
 import type { ChannelType } from "@/types";
 import { MentionPicker, RichMentionText, type Mention, type MentionPickerHandles } from "@/components/MentionPicker";
 
@@ -1627,14 +1628,26 @@ function AgentsPageClient() {
     <div className="flex flex-col h-full min-h-0">
       {/* Page header */}
       <div className="mb-4 flex-shrink-0">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-3" style={{ color: "var(--text-1)" }}>
-          <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: "#8b5cf6" }} />
-          <span className="hidden sm:inline">Centro de Agentes</span>
-          <span className="sm:hidden">Agentes</span>
-        </h1>
-        <p className="text-sm mt-1 hidden sm:block" style={{ color: "var(--text-3)" }}>
-          Crie jornadas estilo ManyChat via comandos em linguagem natural.
-        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-3" style={{ color: "var(--text-1)" }}>
+              <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: "#8b5cf6" }} />
+              <span className="hidden sm:inline">Centro de Agentes</span>
+              <span className="sm:hidden">Agentes</span>
+            </h1>
+            <p className="text-sm mt-1 hidden sm:block" style={{ color: "var(--text-3)" }}>
+              Crie jornadas estilo ManyChat via comandos em linguagem natural.
+            </p>
+          </div>
+          <Link
+            href="/agents/personality"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium self-start"
+            style={{ background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.18)", color: "var(--green)" }}
+          >
+            <Bot className="w-4 h-4" />
+            Personality Builder
+          </Link>
+        </div>
       </div>
 
       <div className="flex gap-4 sm:gap-6 flex-1 min-h-0">

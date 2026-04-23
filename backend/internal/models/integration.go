@@ -38,28 +38,28 @@ const (
 
 // UserIntegration stores an account-level LLM/tool integration.
 type UserIntegration struct {
-	ID           uuid.UUID           `gorm:"type:uuid;primaryKey" json:"id"`
-	UserID       uuid.UUID           `gorm:"type:uuid;not null;index" json:"user_id"`
-	Provider     IntegrationProvider `gorm:"type:varchar(50);not null" json:"provider"`
-	Name         string              `gorm:"type:varchar(100);not null" json:"name"`
+	ID       uuid.UUID           `gorm:"type:uuid;primaryKey" json:"id"`
+	UserID   uuid.UUID           `gorm:"type:uuid;not null;index" json:"user_id"`
+	Provider IntegrationProvider `gorm:"type:varchar(50);not null" json:"provider"`
+	Name     string              `gorm:"type:varchar(100);not null" json:"name"`
 	// Autenticação: api_key (default, legado) ou oauth (Claude.ai, etc.)
-	AuthType     AuthType `gorm:"type:varchar(20);default:'api_key'" json:"auth_type"`
-	APIKey       string   `gorm:"type:text" json:"-"`            // never exposed in JSON
-	MaskedKey    string   `gorm:"-" json:"masked_key,omitempty"` // computed on read
+	AuthType  AuthType `gorm:"type:varchar(20);default:'api_key'" json:"auth_type"`
+	APIKey    string   `gorm:"type:text" json:"-"`            // never exposed in JSON
+	MaskedKey string   `gorm:"-" json:"masked_key,omitempty"` // computed on read
 	// OAuth tokens (criptografados no runtime; json:"-" para nunca sair na API)
 	OAuthAccessToken  string     `gorm:"type:text" json:"-"`
 	OAuthRefreshToken string     `gorm:"type:text" json:"-"`
 	OAuthExpiresAt    *time.Time `json:"oauth_expires_at,omitempty"`
 	OAuthAccount      string     `gorm:"type:varchar(255)" json:"oauth_account,omitempty"` // email/ID legível
 	OAuthScope        string     `gorm:"type:varchar(512)" json:"oauth_scope,omitempty"`
-	BaseURL      string     `gorm:"type:varchar(255)" json:"base_url,omitempty"`
-	Models       string     `gorm:"type:text" json:"models,omitempty"`              // JSON array of model names, e.g. ["gpt-4o","gpt-4o-mini"]
-	Config       string     `gorm:"type:text;default:'{}'" json:"config,omitempty"` // JSON extra config
-	IsActive     bool       `gorm:"default:true" json:"is_active"`
-	LastTestedAt *time.Time `json:"last_tested_at,omitempty"`
-	TestStatus   string     `gorm:"type:varchar(20)" json:"test_status,omitempty"` // "ok" | "failed" | ""
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	BaseURL           string     `gorm:"type:varchar(255)" json:"base_url,omitempty"`
+	Models            string     `gorm:"type:text" json:"models,omitempty"`              // JSON array of model names, e.g. ["gpt-4o","gpt-4o-mini"]
+	Config            string     `gorm:"type:text;default:'{}'" json:"config,omitempty"` // JSON extra config
+	IsActive          bool       `gorm:"default:true" json:"is_active"`
+	LastTestedAt      *time.Time `json:"last_tested_at,omitempty"`
+	TestStatus        string     `gorm:"type:varchar(20)" json:"test_status,omitempty"` // "ok" | "failed" | ""
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
 // HasOAuth retorna true se a integração tem tokens OAuth válidos.
@@ -113,19 +113,34 @@ func MaskAPIKey(key string) string {
 
 // InstanceAgent stores agent/LLM config attached to a specific instance.
 type InstanceAgent struct {
-	ID            uuid.UUID        `gorm:"type:uuid;primaryKey" json:"id"`
-	InstanceID    uuid.UUID        `gorm:"type:uuid;not null;uniqueIndex" json:"instance_id"`
-	IntegrationID *uuid.UUID       `gorm:"type:uuid" json:"integration_id,omitempty"`
-	Integration   *UserIntegration `gorm:"foreignKey:IntegrationID" json:"integration,omitempty"`
-	SystemPrompt  string           `gorm:"type:text" json:"system_prompt,omitempty"`
-	IsActive      bool             `gorm:"default:false" json:"is_active"`
+	ID                      uuid.UUID        `gorm:"type:uuid;primaryKey" json:"id"`
+	InstanceID              uuid.UUID        `gorm:"type:uuid;not null;uniqueIndex" json:"instance_id"`
+	IntegrationID           *uuid.UUID       `gorm:"type:uuid" json:"integration_id,omitempty"`
+	Integration             *UserIntegration `gorm:"foreignKey:IntegrationID" json:"integration,omitempty"`
+	Model                   string           `gorm:"type:varchar(120)" json:"model,omitempty"`
+	SystemPrompt            string           `gorm:"type:text" json:"system_prompt,omitempty"`
+	AgentName               string           `gorm:"type:varchar(120)" json:"agent_name,omitempty"`
+	Identity                string           `gorm:"type:text" json:"identity,omitempty"`
+	Objective               string           `gorm:"type:text" json:"objective,omitempty"`
+	CommunicationGuidelines string           `gorm:"type:text" json:"communication_guidelines,omitempty"`
+	ServiceInstructions     string           `gorm:"type:text" json:"service_instructions,omitempty"`
+	Restrictions            string           `gorm:"type:text" json:"restrictions,omitempty"`
+	KnowledgeBase           string           `gorm:"type:text" json:"knowledge_base,omitempty"`
+	FAQ                     string           `gorm:"type:text;default:'[]'" json:"faq,omitempty"`
+	Variables               string           `gorm:"type:text;default:'[]'" json:"variables,omitempty"`
+	Voice                   string           `gorm:"type:text;default:'{}'" json:"voice,omitempty"`
+	Skills                  string           `gorm:"type:text;default:'[]'" json:"skills,omitempty"`
+	AppAccess               string           `gorm:"type:text;default:'[]'" json:"app_access,omitempty"`
+	RAGEnabled              bool             `gorm:"default:true" json:"rag_enabled"`
+	IsActive                bool             `gorm:"default:false" json:"is_active"`
 	// n8n / webhook passthrough
 	WebhookURL    string `gorm:"type:varchar(255)" json:"webhook_url,omitempty"`
 	WebhookSecret string `gorm:"type:varchar(255)" json:"webhook_secret,omitempty"`
 	// MCP server URL (for MCP tool calling)
-	MCPServerURL string    `gorm:"type:varchar(255)" json:"mcp_server_url,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	MCPServerURL string       `gorm:"type:varchar(255)" json:"mcp_server_url,omitempty"`
+	Assets       []AgentAsset `gorm:"foreignKey:InstanceAgentID" json:"assets,omitempty"`
+	CreatedAt    time.Time    `json:"created_at"`
+	UpdatedAt    time.Time    `json:"updated_at"`
 }
 
 func (a *InstanceAgent) BeforeCreate(tx *gorm.DB) error {

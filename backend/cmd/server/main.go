@@ -195,6 +195,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.UserIntegration{},
 		&models.RecoverySnapshot{},
 		&models.InstanceAgent{},
+		&models.AgentAsset{},
 		&models.PasswordResetToken{},
 		&models.Proxy{},
 		&models.InstagramAccount{},

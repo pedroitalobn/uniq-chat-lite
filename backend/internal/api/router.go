@@ -488,6 +488,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Instance agent (AI agent config per instance)
 	instance.Get("/agent", integrationH.GetAgent)
 	instance.Put("/agent", integrationH.UpdateAgent)
+	instance.Post("/agent/assets", integrationH.UploadAgentAsset)
+	instance.Delete("/agent/assets/:assetId", integrationH.DeleteAgentAsset)
 
 	// Inbox (WhatsApp-style chat interface) - must be before /messages
 	inbox := instance.Group("/inbox")
@@ -514,12 +516,12 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// ─── Proxies (catálogo) ──────────────────────────────────────────────────
 	// Plataforma (is_platform=true, admin-managed) + custom do usuário.
 	proxies := api.Group("/proxies")
-	proxies.Get("/", proxyH.ListAvailable)       // platform + próprios, pra usar no server
-	proxies.Get("/mine", proxyH.ListMine)        // só os próprios (integrations)
-	proxies.Post("/", proxyH.Create)             // criar custom (plano pago)
-	proxies.Put("/:id", proxyH.Update)           // editar próprio
-	proxies.Delete("/:id", proxyH.Delete)        // deletar próprio
-	proxies.Post("/:id/test", proxyH.Test)       // testar qualquer visível
+	proxies.Get("/", proxyH.ListAvailable)          // platform + próprios, pra usar no server
+	proxies.Get("/mine", proxyH.ListMine)           // só os próprios (integrations)
+	proxies.Post("/", proxyH.Create)                // criar custom (plano pago)
+	proxies.Put("/:id", proxyH.Update)              // editar próprio
+	proxies.Delete("/:id", proxyH.Delete)           // deletar próprio
+	proxies.Post("/:id/test", proxyH.Test)          // testar qualquer visível
 	proxies.Post("/test-inline", proxyH.TestInline) // testar credenciais sem persistir
 	// Alias legado: /proxy/global (admin) continua funcionando pra UI antiga
 	api.Get("/proxy/global", middleware.RequireAdmin(), adminH.GetGlobalProxyConfig)
