@@ -41,10 +41,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             accessToken: access_token,
           };
         } catch (error: unknown) {
-          const msg = axios.isAxiosError(error)
-            ? error.response?.data?.error || "Credenciais inválidas"
-            : "Erro de conexão";
-          throw new Error(msg);
+          if (axios.isAxiosError(error)) {
+            const status = error.response?.status || 0;
+            if (status === 400 || status === 401) {
+              return null;
+            }
+            const msg = error.response?.data?.error || "Erro ao autenticar";
+            throw new Error(msg);
+          }
+          throw new Error("Erro de conexão");
         }
       },
     }),
@@ -74,10 +79,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             accessToken: access_token,
           };
         } catch (error: unknown) {
-          const msg = axios.isAxiosError(error)
-            ? error.response?.data?.error || "Falha ao autenticar"
-            : "Erro de conexão";
-          throw new Error(msg);
+          if (axios.isAxiosError(error)) {
+            const status = error.response?.status || 0;
+            if (status === 400 || status === 401) {
+              return null;
+            }
+            const msg = error.response?.data?.error || "Falha ao autenticar";
+            throw new Error(msg);
+          }
+          throw new Error("Erro de conexão");
         }
       },
     }),

@@ -25,7 +25,7 @@ type AgentAsset struct {
 	ContentType     string             `gorm:"type:varchar(120)" json:"content_type,omitempty"`
 	SizeBytes       int64              `json:"size_bytes"`
 	ExtractedText   string             `gorm:"type:text" json:"extracted_text,omitempty"`
-	ContentBase64   string             `gorm:"type:longtext" json:"-"`
+	ContentBase64   string             `gorm:"type:text" json:"-"`
 	IsActive        bool               `gorm:"default:true" json:"is_active"`
 	CreatedAt       time.Time          `json:"created_at"`
 	UpdatedAt       time.Time          `json:"updated_at"`
