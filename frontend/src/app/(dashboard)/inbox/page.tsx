@@ -683,6 +683,18 @@ export default function InboxPage() {
     }
   });
 
+  // Funil atual do contato → etapas daquele funil (cascata).
+  // Se o contato não tem funil atribuído, o dropdown de etapa fica bloqueado.
+  const currentFunnelObj = (funnelsD || []).find((f: any) => f.name === contactFunnel);
+  const { data: contactFunnelStagesD } = useQuery<any[]>({
+    queryKey: ["funnel-stages", currentFunnelObj?.id],
+    enabled: !!currentFunnelObj?.id,
+    queryFn: async () => {
+      try { return (await crmApi.listFunnelStages(currentFunnelObj!.id)).data || []; }
+      catch { return []; }
+    }
+  });
+
   // ── WebSocket for real-time ──
   useInboxWebSocket(instance, chat, qc, setWsStatus, () => {
     setIsSyncing(true);
@@ -1450,40 +1462,56 @@ export default function InboxPage() {
                     className="text-[10px] hover:opacity-70" style={{ color: curChannel.color }}>+ Novo</button>
                 </div>
                 <select value={contactFunnel} onChange={(e) => {
-                  setContactFunnel(e.target.value);
-                  ensureContactAndUpdate.mutate({ funnel: e.target.value });
+                  const newFunnel = e.target.value;
+                  setContactFunnel(newFunnel);
+                  // Trocou de funil → etapa antiga provavelmente não existe no novo funil.
+                  // Limpa stage pra evitar registro "órfão".
+                  setContactStage("");
+                  ensureContactAndUpdate.mutate({ funnel: newFunnel, stage: "" });
                 }}
                   disabled={ensureContactAndUpdate.isPending}
                   className="w-full p-2 rounded-lg text-xs outline-none"
                   style={{ background: "var(--surface-3)", color: "var(--text-1)", border: "1px solid var(--surface-border)" }}>
-                  <option value="">Todos</option>
+                  <option value="">Nenhum</option>
                   {(funnelsD || []).map((f: any) => (
                     <option key={f.id} value={f.name}>{f.name}</option>
                   ))}
                   {(funnelOptionsD || []).filter((n: string) => !(funnelsD || []).find((f: any) => f.name === n)).map((name: string) => (
-                    <option key={name} value={name}>{name}</option>
+                    <option key={name} value={name}>{name} (legado)</option>
                   ))}
                 </select>
               </div>
 
-              {/* Stage */}
+              {/* Stage — opções vêm do funil atualmente atribuído (cascata).
+                  Se o funil é "legado" (existe só como string em contacts, não tem ID),
+                  cai no fallback de stage-options global. */}
               <div className="p-3 rounded-xl" style={{ background: "var(--surface-1)" }}>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>Etapa</p>
-                  <button onClick={() => setShowNewStage(true)}
-                    className="text-[10px] hover:opacity-70" style={{ color: curChannel.color }}>+ Nova</button>
+                  <button
+                    onClick={() => setShowNewStage(true)}
+                    disabled={!currentFunnelObj}
+                    className="text-[10px] hover:opacity-70 disabled:opacity-30 disabled:cursor-not-allowed"
+                    style={{ color: curChannel.color }}
+                  >+ Nova</button>
                 </div>
                 <select value={contactStage} onChange={(e) => {
                   setContactStage(e.target.value);
                   ensureContactAndUpdate.mutate({ stage: e.target.value });
                 }}
-                  disabled={ensureContactAndUpdate.isPending}
-                  className="w-full p-2 rounded-lg text-xs outline-none"
+                  disabled={ensureContactAndUpdate.isPending || !contactFunnel}
+                  className="w-full p-2 rounded-lg text-xs outline-none disabled:opacity-50"
                   style={{ background: "var(--surface-3)", color: "var(--text-1)", border: "1px solid var(--surface-border)" }}>
-                  <option value="">Todas</option>
-                  {(stageOptionsD || []).map((s: string) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
+                  <option value="">
+                    {contactFunnel ? "Sem etapa" : "Escolha um funil primeiro"}
+                  </option>
+                  {currentFunnelObj
+                    ? (contactFunnelStagesD || []).map((s: any) => (
+                        <option key={s.id} value={s.name}>{s.name}</option>
+                      ))
+                    : (stageOptionsD || []).map((s: string) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
                 </select>
               </div>
 
@@ -1653,12 +1681,17 @@ export default function InboxPage() {
         </div>
       )}
 
-      {/* New Stage Modal */}
-      {showNewStage && (
+      {/* New Stage Modal — cria etapa SEMPRE no funil atualmente atribuído ao
+          contato, pra manter coerência. Se o contato não tem funil, o botão
+          "+ Nova" nem fica habilitado. */}
+      {showNewStage && currentFunnelObj && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNewStage(false)}>
           <div className="rounded-xl p-5 w-72" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
             onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-1)" }}>Nova Etapa</h3>
+            <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--text-1)" }}>Nova Etapa</h3>
+            <p className="text-[11px] mb-3" style={{ color: "var(--text-3)" }}>
+              no funil <span style={{ color: "var(--text-2)" }}>{currentFunnelObj.name}</span>
+            </p>
             <input
               type="text"
               value={newStageName}
@@ -1676,13 +1709,7 @@ export default function InboxPage() {
               </button>
               <button onClick={() => {
                 if (newStageName.trim()) {
-                  const firstFunnel = funnelsD?.[0];
-                  if (firstFunnel) {
-                    createStageMut.mutate({ funnelId: firstFunnel.id, data: { name: newStageName.trim() } });
-                  } else {
-                    createFunnelMut.mutate({ name: "Meu Funil" });
-                    toast.info("Funil criado! Agora adicione a etapa manualmente.");
-                  }
+                  createStageMut.mutate({ funnelId: currentFunnelObj.id, data: { name: newStageName.trim() } });
                   setShowNewStage(false);
                   setNewStageName("");
                 }

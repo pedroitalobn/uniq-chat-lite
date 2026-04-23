@@ -780,6 +780,23 @@ export default function CRMPage() {
   const [viewMode, setViewMode]           = useState<"list" | "kanban">("list");
   const [kanbanGroup, setKanbanGroup]     = useState<"stage" | "journey" | "funnel">("stage");
   const [columnOrder, setColumnOrder]    = useState<string[]>([]);
+  // Quando view="kanban" + agrupado por etapa, este é o funil que define
+  // quais colunas aparecem (stages do funil + "Sem etapa").
+  // Vazio = modo antigo (stages distintas agregadas de todos os contatos).
+  const [pipelineFunnelId, setPipelineFunnelId] = useState<string>("");
+
+  const { data: pipelineFunnels = [] } = useQuery<Funnel[]>({
+    queryKey: ["funnels", currentWorkspace?.id],
+    queryFn: () => crmApi.listFunnels(currentWorkspace?.id).then(r => r.data),
+  });
+
+  const selectedPipelineFunnel = pipelineFunnels.find(f => f.id === pipelineFunnelId);
+
+  const { data: pipelineStages = [] } = useQuery<FunnelStage[]>({
+    queryKey: ["funnel-stages", pipelineFunnelId],
+    enabled: !!pipelineFunnelId,
+    queryFn: () => crmApi.listFunnelStages(pipelineFunnelId).then(r => r.data),
+  });
 
   const updateContactMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Partial<Contact> }) => crmApi.updateContact(id, payload),
@@ -793,9 +810,10 @@ export default function CRMPage() {
     if (!result.destination) return;
     const contactId = result.draggableId;
     let newCol = result.destination.droppableId;
-    if (newCol === "Sem categoria") newCol = "";
-    
-    queryClient.setQueryData<Contact[]>(["contacts", currentWorkspace?.id, search, activeTagFilter, pipelineFilters], (old) => {
+    // Colunas "sem categoria" / "sem etapa" significam campo vazio no DB.
+    if (newCol === "Sem categoria" || newCol === "__no_stage__") newCol = "";
+
+    queryClient.setQueryData<Contact[]>(["contacts", currentWorkspace?.id, search, activeTagFilter, pipelineFilters, pipelineFunnelId], (old) => {
       if (!old) return old;
       return old.map(c => c.id === contactId ? { ...c, [kanbanGroup]: newCol } : c);
     });
@@ -805,15 +823,20 @@ export default function CRMPage() {
 
   const activeFilterCount = Object.values(pipelineFilters).filter(Boolean).length;
 
+  // Se o user está no modo pipeline-por-funil, força o filtro de funil
+  // pra puxar só os contatos daquele funil.
+  const effectiveFunnelFilter = selectedPipelineFunnel?.name || pipelineFilters.funnel;
+
   const queryParams = {
     search: search || undefined,
     tag_id: activeTagFilter || undefined,
     workspace_id: currentWorkspace?.id,
     ...Object.fromEntries(Object.entries(pipelineFilters).filter(([, v]) => v !== "")),
+    ...(effectiveFunnelFilter ? { funnel: effectiveFunnelFilter } : {}),
   };
 
   const { data: contacts = [], isLoading } = useQuery<Contact[]>({
-    queryKey: ["contacts", currentWorkspace?.id, search, activeTagFilter, pipelineFilters],
+    queryKey: ["contacts", currentWorkspace?.id, search, activeTagFilter, pipelineFilters, pipelineFunnelId],
     queryFn: () => crmApi.listContacts(queryParams).then((r) => r.data.data),
   });
 
@@ -961,20 +984,57 @@ export default function CRMPage() {
         )}
       </div>
 
-      {/* Kanban Group Selector */}
-      {viewMode === "kanban" && contacts.length > 0 && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold" style={{ color: "hsl(240 8% 46%)" }}>Agrupar colunas por:</span>
-          <select
-            value={kanbanGroup}
-            onChange={(e) => setKanbanGroup(e.target.value as any)}
-            className="text-sm rounded-xl px-3 py-1.5 outline-none font-medium transition-colors"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "white" }}
-          >
-            <option value="stage">Etapa / Fase</option>
-            <option value="journey">Jornada</option>
-            <option value="funnel">Funil</option>
-          </select>
+      {/* Kanban toolbar: seletor de funil (pipeline) + agrupamento */}
+      {viewMode === "kanban" && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold" style={{ color: "hsl(240 8% 46%)" }}>Funil:</span>
+            <select
+              value={pipelineFunnelId}
+              onChange={(e) => {
+                setPipelineFunnelId(e.target.value);
+                // Ao entrar num funil, força agrupar por etapa — que é o único
+                // agrupamento que faz sentido num pipeline de funil específico.
+                if (e.target.value) setKanbanGroup("stage");
+              }}
+              className="text-sm rounded-xl px-3 py-1.5 outline-none font-medium transition-colors"
+              style={{
+                background: pipelineFunnelId ? "rgba(167,139,250,0.1)" : "rgba(255,255,255,0.04)",
+                border: `1px solid ${pipelineFunnelId ? "rgba(167,139,250,0.3)" : "rgba(255,255,255,0.08)"}`,
+                color: pipelineFunnelId ? "#c4b5fd" : "white",
+              }}
+            >
+              <option value="">— todos os contatos —</option>
+              {pipelineFunnels.map(f => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+            {pipelineFunnels.length === 0 && (
+              <button
+                onClick={() => setFunnelsOpen(true)}
+                className="text-xs underline"
+                style={{ color: "var(--green)" }}
+              >Criar primeiro funil</button>
+            )}
+          </div>
+
+          {/* Agrupamento só faz sentido quando NÃO estamos num funil específico.
+              No modo pipeline de funil, as colunas são fixas = stages do funil. */}
+          {!pipelineFunnelId && contacts.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold" style={{ color: "hsl(240 8% 46%)" }}>Agrupar por:</span>
+              <select
+                value={kanbanGroup}
+                onChange={(e) => setKanbanGroup(e.target.value as any)}
+                className="text-sm rounded-xl px-3 py-1.5 outline-none font-medium transition-colors"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "white" }}
+              >
+                <option value="stage">Etapa / Fase</option>
+                <option value="journey">Jornada</option>
+                <option value="funnel">Funil</option>
+              </select>
+            </div>
+          )}
         </div>
       )}
 
@@ -1102,6 +1162,101 @@ export default function CRMPage() {
         <DragDropContext onDragEnd={onDragEnd}>
           <div className="flex gap-4 overflow-x-auto pb-4 snap-x">
             {(() => {
+              // Modo pipeline de funil: colunas = stages do funil selecionado
+              // (ordenadas pelo campo `order`) + "Sem etapa" no fim.
+              // No drop, o droppableId é o nome exato da stage (ou
+              // "__no_stage__" para a coluna sem etapa).
+              if (selectedPipelineFunnel) {
+                const orderedStages = [...pipelineStages].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+                const stageNames = new Set(orderedStages.map(s => s.name));
+                const cols: Array<{ key: string; label: string; color?: string; isNoStage?: boolean }> = [
+                  ...orderedStages.map(s => ({ key: s.name, label: s.name, color: s.color })),
+                  { key: "__no_stage__", label: "Sem etapa", isNoStage: true },
+                ];
+                return cols.map((col) => {
+                  const colContacts = col.isNoStage
+                    ? contacts.filter(c => !c.stage || !stageNames.has(c.stage))
+                    : contacts.filter(c => c.stage === col.key);
+                  return (
+                    <div
+                      key={col.key}
+                      className="flex-shrink-0 w-80 flex flex-col snap-start rounded-2xl"
+                      style={{
+                        background: "rgba(255,255,255,0.02)",
+                        border: `1px solid ${col.isNoStage ? "rgba(255,255,255,0.05)" : (col.color || "#60a5fa") + "33"}`,
+                      }}
+                    >
+                      <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-block w-2 h-2 rounded-full" style={{ background: col.isNoStage ? "#64748b" : (col.color || "#60a5fa") }} />
+                          <h3 className="text-sm font-semibold truncate" style={{ color: col.isNoStage ? "hsl(240 8% 62%)" : "hsl(240 15% 90%)" }}>
+                            {col.label}
+                          </h3>
+                        </div>
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full"
+                          style={{ background: "rgba(255,255,255,0.08)", color: "hsl(240 8% 62%)" }}>
+                          {colContacts.length}
+                        </span>
+                      </div>
+                      <Droppable droppableId={col.key}>
+                        {(provided, snapshot) => (
+                          <div
+                            {...provided.droppableProps}
+                            ref={provided.innerRef}
+                            className="flex-1 p-3 space-y-3 min-h-[150px] transition-colors"
+                            style={{ background: snapshot.isDraggingOver ? "rgba(255,255,255,0.02)" : "transparent" }}
+                          >
+                            {colContacts.map((contact, index) => (
+                              <Draggable key={contact.id} draggableId={contact.id} index={index}>
+                                {(provided, snapshot) => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    className="group rounded-xl p-3 shadow-xl transition-shadow"
+                                    style={{
+                                      ...provided.draggableProps.style,
+                                      background: "hsl(240 18% 8%)",
+                                      border: `1px solid ${snapshot.isDragging ? "var(--green)" : "hsl(240 12% 16%)"}`,
+                                      boxShadow: snapshot.isDragging ? "0 12px 24px rgba(0,0,0,0.5)" : "0 4px 12px rgba(0,0,0,0.2)",
+                                    }}
+                                    onClick={(e) => {
+                                      if (!(e.target as HTMLElement).closest("button")) setEditContact(contact);
+                                    }}
+                                  >
+                                    <div className="flex items-start justify-between gap-2 mb-2">
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold truncate" style={{ color: "hsl(240 15% 93%)" }}>{contact.name}</p>
+                                        <p className="text-xs font-mono truncate" style={{ color: "hsl(240 8% 46%)" }}>{contact.phone}</p>
+                                      </div>
+                                      <GripVertical className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 cursor-grab active:cursor-grabbing" style={{ color: "hsl(240 8% 38%)" }} />
+                                    </div>
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                      {contact.tags?.map((tag) => <TagBadge key={tag.id} tag={tag} />)}
+                                    </div>
+                                    <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                                      <div className="flex items-center gap-1">
+                                        {contact.owner && <span className="text-[10px]" style={{ color: "hsl(240 8% 42%)" }}>👤 {contact.owner}</span>}
+                                      </div>
+                                      <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={(e) => { e.stopPropagation(); setEditContact(contact); }} className="hover:text-white" style={{ color: "hsl(240 8% 42%)" }}><Edit2 className="w-3.5 h-3.5" /></button>
+                                        <button onClick={async (e) => { e.stopPropagation(); if (!await showConfirm(`Remover "${contact.name}"?`)) return; deleteContact.mutate(contact.id); }} className="hover:text-red-400" style={{ color: "hsl(240 8% 42%)" }}><Trash2 className="w-3.5 h-3.5" /></button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                          </div>
+                        )}
+                      </Droppable>
+                    </div>
+                  );
+                });
+              }
+
+              // Modo genérico (sem funil selecionado): agrupamento por kanbanGroup.
               const columnsInfo = Array.from(new Set(contacts.map(c => c[kanbanGroup] || "Sem categoria"))).sort();
               // Use saved order or default (Sem categoria last)
               let sortedCols: string[];
@@ -1110,7 +1265,7 @@ export default function CRMPage() {
               } else {
                 sortedCols = columnsInfo.filter(c => c !== "Sem categoria").concat(columnsInfo.includes("Sem categoria") ? ["Sem categoria"] : []);
               }
-              
+
               return sortedCols.map((colName) => {
                 const colContacts = contacts.filter(c => (c[kanbanGroup] || "Sem categoria") === colName);
                 const colIdx = sortedCols.indexOf(colName);
