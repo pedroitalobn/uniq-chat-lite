@@ -269,11 +269,27 @@ export default function InboxPage() {
   if (!canView) return <Forbidden />;
 
   const list = listQ.data?.items ?? [];
+
+  // Empty-state grande de backfill — só faz sentido na PRIMEIRA sincronização,
+  // quando o workspace ainda não tem nenhuma Conversation criada. Se já tem
+  // conversations mas a lista do filtro atual deu 0, usamos o empty state
+  // normal ("Nenhum atendimento neste filtro.") em vez da tela inteira.
   const showBackfillCTA =
     !!statsQ.data &&
     statsQ.data.pending_backfill > 0 &&
+    statsQ.data.conversations === 0 &&
     list.length === 0 &&
     !listQ.isLoading;
+
+  // Pill pequeno no topo. Aparece quando:
+  //  - não há nenhuma conversation ainda (primeira vez), ou
+  //  - restam ≥ 100 mensagens pendentes (vale a pena sincronizar).
+  // Pendentes em dígitos baixos (ex.: 14 de 2.149) costumam ser rejeitos
+  // irrecuperáveis (instance deletada, etc.) — não vale poluir o header.
+  const showBackfillPill =
+    !!statsQ.data &&
+    statsQ.data.pending_backfill > 0 &&
+    (statsQ.data.conversations === 0 || statsQ.data.pending_backfill >= 100);
 
   const agentLabel = (() => {
     if (agentScope === "me") return "Meus atendimentos";
@@ -424,7 +440,7 @@ export default function InboxPage() {
             </button>
           ))}
 
-          {statsQ.data && statsQ.data.pending_backfill > 0 && (
+          {showBackfillPill && statsQ.data && (
             <button
               onClick={() => backfill.mutate()}
               disabled={backfill.isPending}
@@ -821,12 +837,12 @@ function BackfillEmptyState({ stats, running, onBackfill }: {
       >
         <RefreshCw className={`mx-auto h-8 w-8 ${running ? "animate-spin" : ""}`} style={{ color: "#00d46a" }} />
         <h2 className="mt-3 text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>
-          Histórico disponível para sincronizar
+          Primeira sincronização
         </h2>
         <p className="mt-2 text-sm" style={{ color: "hsl(240 8% 52%)" }}>
           Seu workspace tem <b style={{ color: "hsl(240 15% 90%)" }}>{stats.message_logs.toLocaleString("pt-BR")}</b> mensagens
-          e <b style={{ color: "hsl(240 15% 90%)" }}>{stats.pending_backfill.toLocaleString("pt-BR")}</b> ainda não foram
-          convertidas em atendimentos. Sincronize para ver todos os chats aqui.
+          históricas mas nenhum atendimento ainda. Vamos converter as conversas em tickets pra
+          você operar daqui em diante.
         </p>
         <button
           onClick={onBackfill}
@@ -834,15 +850,15 @@ function BackfillEmptyState({ stats, running, onBackfill }: {
           className="mt-4 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
           style={{ background: "#00d46a", color: "#03170a" }}
         >
-          {running ? "Sincronizando…" : "Sincronizar histórico"}
+          {running ? "Sincronizando…" : "Iniciar sincronização"}
         </button>
         <p className="mt-4 text-[11px]" style={{ color: "hsl(240 8% 38%)" }}>
-          Processa em lotes de até 10k mensagens por clique. Chame de novo
-          até o contador zerar.
+          Processa em lotes de até 10k mensagens por clique. Se tiver
+          histórico extenso, pode precisar de mais de uma rodada.
           <br />
-          Os atendimentos criados ficam <b>sem atribuição</b> enquanto
-          você não configurar uma fila — eles aparecem em “Todos os agentes”
-          ou na aba <b>“Sem atribuição”</b>.
+          Os atendimentos criados ficam <b>sem atribuição</b> até você
+          configurar uma fila — eles aparecem em “Todos os agentes” ou na
+          aba <b>“Sem atribuição”</b>.
         </p>
       </div>
     </div>
