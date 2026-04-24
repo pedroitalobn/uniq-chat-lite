@@ -7,7 +7,8 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Send, StickyNote, CheckCircle2, Clock3, RotateCcw,
   UserCheck, UserX, ArrowRightLeft, Bot, BotOff, Lock, AlertTriangle,
-  Smile, X, Star,
+  Smile, X, Star, Mic, Image as ImageIcon, FileText, MapPin, Check,
+  CheckCheck, AlertCircle,
 } from "lucide-react";
 import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -317,9 +318,15 @@ export default function ConversationDetailPage({ params }: { params: Promise<{ c
           </div>
         </header>
 
-        <div className="flex-1 overflow-auto bg-zinc-50 px-5 py-6 dark:bg-zinc-950/50">
+        <div
+          className="flex-1 overflow-auto px-5 py-6"
+          style={{ background: "hsl(240 18% 5.5%)" }}
+        >
           {timeline.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-sm text-zinc-400">
+            <div
+              className="flex h-full items-center justify-center text-sm"
+              style={{ color: "hsl(240 8% 48%)" }}
+            >
               Sem mensagens ainda.
             </div>
           ) : (
@@ -591,25 +598,223 @@ function TransferDialog({
 
 function MessageBubble({ m }: { m: MessagePayload }) {
   const isOut = m.direction === "out";
-  const text = parseContent(m.content);
+  const parsed = parseMessageContent(m.content);
+  // Reaction — bolha compacta só com emoji grande
+  if (m.type === "reaction") {
+    return (
+      <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
+        <div
+          className="rounded-2xl px-3 py-1 text-2xl"
+          style={{
+            background: isOut ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.04)",
+            border: `1px solid ${isOut ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.08)"}`,
+          }}
+        >
+          {parsed.text || "👍"}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
+        className="max-w-[80%] rounded-2xl px-3 py-2 shadow-sm"
+        style={
           isOut
-            ? "rounded-br-sm bg-blue-600 text-white"
-            : "rounded-bl-sm bg-white text-zinc-800 dark:bg-zinc-900 dark:text-zinc-100"
-        }`}
+            ? {
+                background: "rgba(0,212,106,0.12)",
+                border: "1px solid rgba(0,212,106,0.25)",
+                color: "hsl(240 15% 92%)",
+                borderBottomRightRadius: 6,
+              }
+            : {
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "hsl(240 15% 90%)",
+                borderBottomLeftRadius: 6,
+              }
+        }
       >
-        {!isOut && m.sender_name && <div className="mb-0.5 text-xs font-medium opacity-70">{m.sender_name}</div>}
-        <p className="whitespace-pre-wrap">{text || "—"}</p>
-        <div className={`mt-1 text-[10px] ${isOut ? "text-blue-100" : "text-zinc-400"}`}>
-          {relativeTime(m.created_at)}
-          {isOut && m.status && m.status !== "sent" && ` · ${m.status}`}
+        {!isOut && m.sender_name && (
+          <div
+            className="mb-0.5 text-[11px] font-medium"
+            style={{ color: "#00d46a" }}
+          >
+            {m.sender_name}
+          </div>
+        )}
+
+        <MediaBody type={m.type} parsed={parsed} />
+
+        <div
+          className="mt-1 flex items-center justify-end gap-1 text-[10px]"
+          style={{ color: isOut ? "rgba(255,255,255,0.55)" : "hsl(240 8% 44%)" }}
+        >
+          <span>{relativeTime(m.created_at)}</span>
+          {isOut && <StatusTicks status={m.status} />}
         </div>
       </div>
     </div>
   );
+}
+
+// MediaBody — renderiza o conteúdo conforme msg.type. Aceita tanto o formato
+// legacy (content JSON-encoded string) quanto o novo ({url, mime_type,
+// filename, caption, error}). Mantém paridade total com o inbox clássico.
+function MediaBody({
+  type, parsed,
+}: {
+  type: string;
+  parsed: ParsedContent;
+}) {
+  const { text, url, filename, caption, error, latitude, longitude } = parsed;
+  const body = caption || text;
+
+  if (type === "image") {
+    if (url) {
+      return (
+        <div className="flex flex-col gap-1.5">
+          <a href={url} target="_blank" rel="noopener noreferrer">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={url}
+              alt={filename || "imagem"}
+              className="max-h-[280px] max-w-[280px] rounded-lg object-cover"
+            />
+          </a>
+          {body && <Text text={body} />}
+          {error && <ErrorLine text={error} />}
+        </div>
+      );
+    }
+    return <IconFallback icon={<ImageIcon className="h-4 w-4" />} label={body || "Imagem"} />;
+  }
+
+  if (type === "video") {
+    if (url) {
+      return (
+        <div className="flex flex-col gap-1.5">
+          <video src={url} controls className="max-w-[320px] rounded-lg" />
+          {body && <Text text={body} />}
+          {error && <ErrorLine text={error} />}
+        </div>
+      );
+    }
+    return <IconFallback icon={<ImageIcon className="h-4 w-4" />} label={body || "Vídeo"} />;
+  }
+
+  if (type === "audio") {
+    if (url) {
+      return (
+        <div className="flex flex-col gap-1.5">
+          <audio src={url} controls className="max-w-[260px]" />
+          {error && <ErrorLine text={error} />}
+        </div>
+      );
+    }
+    return <IconFallback icon={<Mic className="h-4 w-4" />} label={body || "Áudio"} />;
+  }
+
+  if (type === "document") {
+    if (url) {
+      return (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 rounded-lg p-2 transition-colors hover:bg-white/5"
+          style={{ background: "rgba(255,255,255,0.03)" }}
+        >
+          <FileText className="h-5 w-5 flex-shrink-0" style={{ color: "hsl(240 8% 70%)" }} />
+          <span className="truncate text-xs">{filename || "Documento"}</span>
+        </a>
+      );
+    }
+    return <IconFallback icon={<FileText className="h-4 w-4" />} label={body || "Documento"} />;
+  }
+
+  if (type === "location") {
+    if (latitude != null && longitude != null) {
+      const mapsURL = `https://www.google.com/maps?q=${latitude},${longitude}`;
+      return (
+        <a
+          href={mapsURL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 rounded-lg p-2 transition-colors hover:bg-white/5"
+          style={{ background: "rgba(255,255,255,0.03)" }}
+        >
+          <MapPin className="h-4 w-4" style={{ color: "#00d46a" }} />
+          <span className="text-xs">
+            {latitude.toFixed(4)}, {longitude.toFixed(4)}
+            {body ? ` · ${body}` : ""}
+          </span>
+        </a>
+      );
+    }
+    return <IconFallback icon={<MapPin className="h-4 w-4" />} label={body || "Localização"} />;
+  }
+
+  if (type === "revoke") {
+    return (
+      <span className="italic" style={{ color: "hsl(240 8% 50%)" }}>
+        Mensagem apagada
+      </span>
+    );
+  }
+
+  // text (default)
+  return <Text text={body || "—"} />;
+}
+
+function Text({ text }: { text: string }) {
+  return (
+    <p
+      className="text-sm"
+      style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+    >
+      {text}
+    </p>
+  );
+}
+
+function IconFallback({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5 text-sm opacity-80">
+      {icon}
+      <span>{label}</span>
+    </span>
+  );
+}
+
+function ErrorLine({ text }: { text: string }) {
+  return (
+    <span className="flex items-center gap-1 text-[10px]" style={{ color: "#ef4444" }}>
+      <AlertCircle className="h-3 w-3" />
+      {text}
+    </span>
+  );
+}
+
+function StatusTicks({ status }: { status?: string }) {
+  if (!status) return null;
+  if (status === "failed") {
+    return <AlertCircle className="h-3 w-3" style={{ color: "#ef4444" }} />;
+  }
+  if (status === "read") {
+    return <CheckCheck className="h-3 w-3" style={{ color: "#00d46a" }} />;
+  }
+  if (status === "delivered") {
+    return <CheckCheck className="h-3 w-3" />;
+  }
+  if (status === "sent") {
+    return <Check className="h-3 w-3" />;
+  }
+  if (status === "pending") {
+    return <Clock3 className="h-3 w-3" style={{ opacity: 0.7 }} />;
+  }
+  return null;
 }
 
 function NoteCard({ n }: { n: NotePayload }) {
@@ -655,19 +860,44 @@ const EVENT_LABELS: Record<string, string> = {
   note: "Nota interna registrada",
 };
 
-function parseContent(raw: string): string {
-  if (!raw) return "";
-  // Payloads often arrive as JSON-encoded strings ("texto") or {text,caption}
+interface ParsedContent {
+  text?: string;
+  url?: string;
+  filename?: string;
+  caption?: string;
+  error?: string;
+  mimeType?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+// parseMessageContent normaliza os diferentes formatos que MessageLog.Content
+// pode carregar, herdados do caminho legacy:
+//   "string simples"                 → texto puro
+//   "\"string json-encoded\""        → texto puro depois do unwrap
+//   {text, caption, url, mime_type,  → mídia estruturada
+//    filename, error, latitude, …}
+function parseMessageContent(raw: string): ParsedContent {
+  if (!raw) return {};
   try {
     const parsed = JSON.parse(raw);
-    if (typeof parsed === "string") return parsed;
-    if (parsed && typeof parsed === "object") {
-      return parsed.text || parsed.caption || parsed.body || raw;
+    if (typeof parsed === "string") return { text: parsed };
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return {
+        text: parsed.text ?? parsed.body,
+        url: parsed.url,
+        filename: parsed.filename,
+        caption: parsed.caption,
+        error: parsed.error,
+        mimeType: parsed.mime_type,
+        latitude: typeof parsed.latitude === "number" ? parsed.latitude : undefined,
+        longitude: typeof parsed.longitude === "number" ? parsed.longitude : undefined,
+      };
     }
   } catch {
-    /* not JSON — fall through */
+    /* not JSON — raw text */
   }
-  return raw;
+  return { text: raw };
 }
 
 function Composer({

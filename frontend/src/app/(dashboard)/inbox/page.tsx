@@ -181,7 +181,24 @@ export default function InboxPage() {
     mutationFn: () => conversationsApi.backfill(wsId as string, { limit: 500, max_batches: 20 }),
     onSuccess: (r) => {
       const data = r.data as { processed: number; remaining: number };
-      toast.success(`${data.processed} mensagens sincronizadas (${data.remaining} restantes)`);
+      if (data.remaining > 0) {
+        toast.success(
+          `${data.processed.toLocaleString("pt-BR")} mensagens sincronizadas — ainda faltam ${data.remaining.toLocaleString("pt-BR")}. Clique de novo pra continuar.`
+        );
+      } else {
+        toast.success(
+          `${data.processed.toLocaleString("pt-BR")} mensagens sincronizadas. Mostrando todos os atendimentos.`
+        );
+      }
+      // Mensagens backfilladas não têm assignee (não passam pelo
+      // DispatchService quando a instância não está em nenhuma fila), então
+      // o filtro default "Meus atendimentos" não mostra nada. Mudamos o
+      // escopo pra "Todos + Abertos" assim o user VÊ o resultado.
+      if (canViewAll) setAgentScope("all");
+      setStatusTab("open");
+      setQueueScope("all");
+      setChannelFilter([]);
+      setInstanceFilter([]);
       qc.invalidateQueries({ queryKey: ["conversations", wsId] });
       qc.invalidateQueries({ queryKey: ["inbox-stats", wsId] });
     },
@@ -699,8 +716,12 @@ function BackfillEmptyState({ stats, running, onBackfill }: {
           {running ? "Sincronizando…" : "Sincronizar histórico"}
         </button>
         <p className="mt-4 text-[11px]" style={{ color: "hsl(240 8% 38%)" }}>
-          Processa em lotes de até 10k mensagens. Chame novamente até o
-          contador zerar.
+          Processa em lotes de até 10k mensagens por clique. Chame de novo
+          até o contador zerar.
+          <br />
+          Os atendimentos criados ficam <b>sem atribuição</b> enquanto
+          você não configurar uma fila — eles aparecem em “Todos os agentes”
+          ou na aba <b>“Sem atribuição”</b>.
         </p>
       </div>
     </div>
