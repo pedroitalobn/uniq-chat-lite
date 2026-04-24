@@ -1062,6 +1062,113 @@ export const csatApi = {
     api.post(`/csat/${token}`, data),
 };
 
+// ─── CRM v2 ─────────────────────────────────────────────────────────────────
+// Companies, Deals, Funnel views and Contact groups. All send X-Workspace-ID.
+
+export type DealStatus = "open" | "won" | "lost" | "archived";
+export type FunnelViewKind = "kanban" | "list" | "table" | "forecast";
+
+export const companiesApi = {
+  list: (workspaceId: string, params?: { q?: string; owner_id?: string; limit?: number; offset?: number }) =>
+    api.get("/v1/crm/companies", { headers: wsHeaders(workspaceId), params }),
+  get: (workspaceId: string, id: string) =>
+    api.get(`/v1/crm/companies/${id}`, { headers: wsHeaders(workspaceId) }),
+  create: (workspaceId: string, data: Record<string, unknown>) =>
+    api.post("/v1/crm/companies", data, { headers: wsHeaders(workspaceId) }),
+  patch: (workspaceId: string, id: string, data: Record<string, unknown>) =>
+    api.patch(`/v1/crm/companies/${id}`, data, { headers: wsHeaders(workspaceId) }),
+  delete: (workspaceId: string, id: string) =>
+    api.delete(`/v1/crm/companies/${id}`, { headers: wsHeaders(workspaceId) }),
+  contacts: (workspaceId: string, id: string) =>
+    api.get(`/v1/crm/companies/${id}/contacts`, { headers: wsHeaders(workspaceId) }),
+  deals: (workspaceId: string, id: string) =>
+    api.get(`/v1/crm/companies/${id}/deals`, { headers: wsHeaders(workspaceId) }),
+};
+
+export interface DealListParams {
+  funnel_id?: string;
+  stage_id?: string;
+  status?: DealStatus | string;
+  owner_id?: string | "me";
+  contact_id?: string;
+  company_id?: string;
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export const dealsApi = {
+  list: (workspaceId: string, params?: DealListParams) =>
+    api.get("/v1/crm/deals", { headers: wsHeaders(workspaceId), params }),
+  summary: (workspaceId: string, funnelId: string) =>
+    api.get("/v1/crm/deals/summary", { headers: wsHeaders(workspaceId), params: { funnel_id: funnelId } }),
+  get: (workspaceId: string, id: string) =>
+    api.get(`/v1/crm/deals/${id}`, { headers: wsHeaders(workspaceId) }),
+  create: (workspaceId: string, data: {
+    title: string;
+    contact_id: string;
+    funnel_id: string;
+    stage_id: string;
+    company_id?: string;
+    value?: number;
+    currency?: string;
+    expected_close_date?: string;
+    description?: string;
+    owner_id?: string;
+    priority?: string;
+    source?: string;
+  }) => api.post("/v1/crm/deals", data, { headers: wsHeaders(workspaceId) }),
+  patch: (workspaceId: string, id: string, data: Record<string, unknown>) =>
+    api.patch(`/v1/crm/deals/${id}`, data, { headers: wsHeaders(workspaceId) }),
+  delete: (workspaceId: string, id: string) =>
+    api.delete(`/v1/crm/deals/${id}`, { headers: wsHeaders(workspaceId) }),
+  move: (workspaceId: string, id: string, stageId: string) =>
+    api.post(`/v1/crm/deals/${id}/move`, { stage_id: stageId }, { headers: wsHeaders(workspaceId) }),
+  win: (workspaceId: string, id: string) =>
+    api.post(`/v1/crm/deals/${id}/win`, {}, { headers: wsHeaders(workspaceId) }),
+  lose: (workspaceId: string, id: string, reason?: string) =>
+    api.post(`/v1/crm/deals/${id}/lose`, { reason: reason ?? "" }, { headers: wsHeaders(workspaceId) }),
+  reopen: (workspaceId: string, id: string) =>
+    api.post(`/v1/crm/deals/${id}/reopen`, {}, { headers: wsHeaders(workspaceId) }),
+  timeline: (workspaceId: string, id: string) =>
+    api.get(`/v1/crm/deals/${id}/timeline`, { headers: wsHeaders(workspaceId) }),
+  addNote: (workspaceId: string, id: string, body: string) =>
+    api.post(`/v1/crm/deals/${id}/notes`, { body }, { headers: wsHeaders(workspaceId) }),
+};
+
+export const funnelViewsApi = {
+  list: (workspaceId: string, funnelId: string) =>
+    api.get(`/v1/crm/funnels/${funnelId}/views`, { headers: wsHeaders(workspaceId) }),
+  create: (workspaceId: string, funnelId: string, data: {
+    name: string;
+    icon?: string;
+    kind: FunnelViewKind;
+    filter?: string;
+    sort?: string;
+    columns?: string;
+    extra?: string;
+    is_default?: boolean;
+    sort_order?: number;
+  }) => api.post(`/v1/crm/funnels/${funnelId}/views`, data, { headers: wsHeaders(workspaceId) }),
+  patch: (workspaceId: string, funnelId: string, viewId: string, data: Record<string, unknown>) =>
+    api.patch(`/v1/crm/funnels/${funnelId}/views/${viewId}`, data, { headers: wsHeaders(workspaceId) }),
+  delete: (workspaceId: string, funnelId: string, viewId: string) =>
+    api.delete(`/v1/crm/funnels/${funnelId}/views/${viewId}`, { headers: wsHeaders(workspaceId) }),
+};
+
+export const contactGroupsApi = {
+  list: (workspaceId: string, params?: { instance_id?: string; q?: string }) =>
+    api.get("/v1/crm/groups", { headers: wsHeaders(workspaceId), params }),
+  get: (workspaceId: string, id: string) =>
+    api.get(`/v1/crm/groups/${id}`, { headers: wsHeaders(workspaceId) }),
+  members: (workspaceId: string, id: string) =>
+    api.get(`/v1/crm/groups/${id}/members`, { headers: wsHeaders(workspaceId) }),
+  contactGroups: (workspaceId: string, contactId: string) =>
+    api.get(`/v1/crm/contacts/${contactId}/groups`, { headers: wsHeaders(workspaceId) }),
+  sync: (workspaceId: string, instanceId: string) =>
+    api.post("/v1/crm/groups/sync", { instance_id: instanceId }, { headers: wsHeaders(workspaceId) }),
+};
+
 export const conversationExtraApi = {
   listTags: (workspaceId: string, conversationId: string) =>
     api.get(`/v1/conversations/${conversationId}/tags`, { headers: wsHeaders(workspaceId) }),
