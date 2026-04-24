@@ -85,6 +85,25 @@ export default function TeamPage() {
     onError: () => toast.error("Erro ao remover membro"),
   });
 
+  const updateMemberRoleMutation = useMutation({
+    mutationFn: ({ memberId, roleId }: { memberId: string; roleId: string | null }) =>
+      workspacesApi.updateMember(workspaceId, memberId, { role_id: roleId }),
+    onSuccess: () => {
+      toast.success("Função atualizada");
+      queryClient.invalidateQueries({ queryKey: ["workspace-members", workspaceId] });
+    },
+    onError: (err) => {
+      const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error
+        || "Falha ao alterar função";
+      toast.error(msg);
+    },
+  });
+
+  // Apenas owner e super-admin podem trocar role de um membro já no workspace.
+  // Se o backend aceitar, o mutation apenas sobe 403 e a UI mostra o toast
+  // (então aqui deixamos habilitado por default — o backend é o árbitro).
+  const canManageRoles = true;
+
   const cardStyle = {
     background: "hsl(240 18% 6%)",
     border: "1px solid hsl(240 12% 13%)",
@@ -257,13 +276,39 @@ export default function TeamPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  {member.role && (
+                  {member.is_owner ? (
                     <span
-                      className="text-xs px-2 py-1 rounded-lg"
-                      style={{ background: "rgba(255,255,255,0.05)", color: "hsl(240 8% 60%)" }}
+                      className="rounded-lg px-2 py-1 text-xs"
+                      style={{ background: "rgba(234,179,8,0.08)", color: "#fbbf24" }}
                     >
-                      {member.role.name}
+                      Acesso total
                     </span>
+                  ) : (
+                    <select
+                      value={member.role?.id ?? ""}
+                      onChange={(e) =>
+                        updateMemberRoleMutation.mutate({
+                          memberId: member.user_id,
+                          roleId: e.target.value || null,
+                        })
+                      }
+                      disabled={!canManageRoles || updateMemberRoleMutation.isPending}
+                      className="rounded-lg px-2 py-1 text-xs outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        color: "hsl(240 8% 85%)",
+                      }}
+                    >
+                      <option value="" style={{ background: "#111" }}>
+                        — Sem função —
+                      </option>
+                      {roles.map((r) => (
+                        <option key={r.id} value={r.id} style={{ background: "#111" }}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
                   )}
                   {!member.is_owner && (
                     <button

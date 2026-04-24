@@ -229,6 +229,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	workspace.Put("/", workspaceH.Update)
 	workspace.Delete("/", workspaceH.Delete)
 	workspace.Get("/members", workspaceH.ListMembers)
+	workspace.Patch("/members/:member_id", workspaceH.UpdateMember)
 	workspace.Delete("/members/:member_id", workspaceH.RemoveMember)
 	workspace.Post("/invites", workspaceH.CreateInvite)
 	workspace.Get("/invites", workspaceH.ListInvites)

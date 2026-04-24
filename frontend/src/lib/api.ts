@@ -434,6 +434,8 @@ export const workspacesApi = {
   delete: (id: string) => api.delete(`/v1/workspaces/${id}`),
   // Members
   listMembers: (id: string) => api.get(`/v1/workspaces/${id}/members`),
+  updateMember: (id: string, memberId: string, data: { role_id: string | null }) =>
+    api.patch(`/v1/workspaces/${id}/members/${memberId}`, data),
   removeMember: (id: string, memberId: string) => api.delete(`/v1/workspaces/${id}/members/${memberId}`),
   // Invites
   createInvite: (id: string, data: { email: string; role_id: string }) => api.post(`/v1/workspaces/${id}/invites`, data),

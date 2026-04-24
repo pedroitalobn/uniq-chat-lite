@@ -222,6 +222,72 @@ func (h *WorkspaceHandler) RemoveMember(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
+// UpdateMember PATCH /v1/workspaces/:id/members/:member_id
+// Body: { role_id: string }
+// Troca a role de um membro já existente no workspace. Só owner ou
+// super-admin podem executar — evita escalação onde um membro se auto-
+// promove. O owner não pode ter a role removida (ficaria sem permissions
+// efetivas mesmo com IsOwner=true, que é OK, mas é confuso).
+func (h *WorkspaceHandler) UpdateMember(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	if user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+	}
+	workspaceID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	memberID, err := uuid.Parse(c.Params("member_id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "member_id inválido"})
+	}
+
+	// Checa se o caller é super-admin OU owner do workspace
+	var callerUW models.UserWorkspace
+	isCallerOwnerOrAdmin := user.Role == models.RoleSuperAdmin
+	if !isCallerOwnerOrAdmin {
+		if err := h.db.Where("user_id = ? AND workspace_id = ?", user.ID, workspaceID).
+			First(&callerUW).Error; err != nil {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado"})
+		}
+		isCallerOwnerOrAdmin = callerUW.IsOwner
+	}
+	if !isCallerOwnerOrAdmin {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "apenas proprietário ou super-admin pode alterar funções"})
+	}
+
+	var req struct {
+		RoleID string `json:"role_id"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "dados inválidos"})
+	}
+	var roleID *uuid.UUID
+	if req.RoleID != "" {
+		id, err := uuid.Parse(req.RoleID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "role_id inválido"})
+		}
+		// Valida que a role pertence a esse workspace
+		var cnt int64
+		h.db.Model(&models.Role{}).Where("id = ? AND workspace_id = ?", id, workspaceID).Count(&cnt)
+		if cnt == 0 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "função não pertence a esse workspace"})
+		}
+		roleID = &id
+	}
+
+	// Atualiza o membro
+	var member models.UserWorkspace
+	if err := h.db.Where("user_id = ? AND workspace_id = ?", memberID, workspaceID).
+		First(&member).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "membro não encontrado"})
+	}
+	h.db.Model(&member).Update("role_id", roleID)
+	h.db.Preload("Role.Permissions").First(&member, member.ID)
+	return c.JSON(fiber.Map{"member": member})
+}
+
 // generateToken creates a random token for invites
 func generateToken(prefix string) string {
 	b := make([]byte, 32)

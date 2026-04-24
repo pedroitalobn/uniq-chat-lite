@@ -236,16 +236,60 @@ export default function RolesPage() {
           <div>
             <label className="text-xs mb-3 block" style={{ color: "hsl(240 8% 50%)" }}>Permissões</label>
             <div className="space-y-4">
-              {Object.entries(groupedPerms).map(([category, perms]) => (
+              {Object.entries(groupedPerms).map(([category, perms]) => {
+                const permIds = perms.map((p) => p.id);
+                const selectedInCat = permIds.filter((id) => selectedPerms.includes(id)).length;
+                const allSelected = selectedInCat === perms.length && perms.length > 0;
+                const someSelected = selectedInCat > 0 && selectedInCat < perms.length;
+                const toggleAllCat = () => {
+                  if (allSelected) {
+                    // remove todas da categoria
+                    setSelectedPerms((prev) => prev.filter((id) => !permIds.includes(id)));
+                  } else {
+                    // adiciona as que faltam
+                    setSelectedPerms((prev) => Array.from(new Set([...prev, ...permIds])));
+                  }
+                };
+                return (
                 <div key={category}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span
-                      className="w-2 h-2 rounded-full"
-                      style={{ background: getCategoryColor(category) }}
-                    />
-                    <span className="text-xs font-medium" style={{ color: "hsl(240 8% 60%)" }}>
-                      {getCategoryLabel(category)}
-                    </span>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-2 h-2 rounded-full"
+                        style={{ background: getCategoryColor(category) }}
+                      />
+                      <span className="text-xs font-medium" style={{ color: "hsl(240 8% 60%)" }}>
+                        {getCategoryLabel(category)}
+                      </span>
+                      <span className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>
+                        {selectedInCat}/{perms.length}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleAllCat}
+                      className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] transition-colors hover:bg-white/5"
+                      style={{
+                        color: allSelected ? "#00d46a" : someSelected ? "#f59e0b" : "hsl(240 8% 52%)",
+                        border: `1px solid ${allSelected ? "rgba(0,212,106,0.3)" : "rgba(255,255,255,0.08)"}`,
+                      }}
+                      title={allSelected ? "Desmarcar todas do módulo" : "Selecionar todas do módulo"}
+                    >
+                      <span
+                        className="flex h-3 w-3 items-center justify-center rounded-[3px]"
+                        style={{
+                          background: allSelected
+                            ? "var(--green)"
+                            : someSelected
+                            ? "rgba(245,158,11,0.4)"
+                            : "rgba(255,255,255,0.06)",
+                        }}
+                      >
+                        {allSelected && <Check className="h-2 w-2" style={{ color: "#03170a" }} />}
+                        {someSelected && <span className="h-[2px] w-2 rounded-full bg-white/70" />}
+                      </span>
+                      {allSelected ? "Todas" : someSelected ? "Parcial" : "Selecionar módulo"}
+                    </button>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {perms.map((perm) => {
@@ -280,7 +324,8 @@ export default function RolesPage() {
                     })}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
