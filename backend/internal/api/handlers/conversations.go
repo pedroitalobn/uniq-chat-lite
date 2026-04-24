@@ -12,9 +12,11 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/outbound"
+	"github.com/uniq-chat/backend/internal/services"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
 )
@@ -23,10 +25,16 @@ type ConversationHandler struct {
 	db       *gorm.DB
 	manager  *whatsapp.Manager
 	outbound *outbound.Registry
+	pipeline *services.InboundPipeline
 }
 
-func NewConversationHandler(db *gorm.DB, manager *whatsapp.Manager, outboundReg *outbound.Registry) *ConversationHandler {
-	return &ConversationHandler{db: db, manager: manager, outbound: outboundReg}
+func NewConversationHandler(
+	db *gorm.DB,
+	manager *whatsapp.Manager,
+	outboundReg *outbound.Registry,
+	pipeline *services.InboundPipeline,
+) *ConversationHandler {
+	return &ConversationHandler{db: db, manager: manager, outbound: outboundReg, pipeline: pipeline}
 }
 
 // -- list -------------------------------------------------------------------
@@ -44,7 +52,39 @@ func (h *ConversationHandler) List(c *fiber.Ctx) error {
 		q = q.Where("status IN ?", strings.Split(s, ","))
 	}
 	if ch := c.Query("channel"); ch != "" {
-		q = q.Where("channel_type = ?", ch)
+		// comma-separated multi-select: ?channel=whatsapp,instagram
+		channels := strings.Split(ch, ",")
+		cleaned := make([]string, 0, len(channels))
+		for _, v := range channels {
+			v = strings.TrimSpace(v)
+			if v != "" {
+				cleaned = append(cleaned, v)
+			}
+		}
+		if len(cleaned) == 1 {
+			q = q.Where("channel_type = ?", cleaned[0])
+		} else if len(cleaned) > 1 {
+			q = q.Where("channel_type IN ?", cleaned)
+		}
+	}
+	if iid := c.Query("instance_id"); iid != "" {
+		// comma-separated multi-select: ?instance_id=uuid1,uuid2
+		raw := strings.Split(iid, ",")
+		ids := make([]uuid.UUID, 0, len(raw))
+		for _, v := range raw {
+			v = strings.TrimSpace(v)
+			if v == "" {
+				continue
+			}
+			if id, err := uuid.Parse(v); err == nil {
+				ids = append(ids, id)
+			}
+		}
+		if len(ids) == 1 {
+			q = q.Where("instance_id = ?", ids[0])
+		} else if len(ids) > 1 {
+			q = q.Where("instance_id IN ?", ids)
+		}
 	}
 	if qid := c.Query("queue_id"); qid != "" {
 		if qid == "none" {
@@ -706,6 +746,176 @@ func (h *ConversationHandler) setBot(c *fiber.Ctx, active bool) error {
 		Payload:        jsonEncode(map[string]any{"bot_active": active}),
 	})
 	return c.JSON(fiber.Map{"ok": true, "is_bot_active": active})
+}
+
+// -- backfill + diagnostics -------------------------------------------------
+
+// InboxStats GET /v1/conversations/inbox-stats
+// Diagnostic endpoint: conta MessageLogs, Conversations e MessageLogs
+// pendentes de backfill (conversation_id NULL). Usado pelo front para
+// mostrar CTA de "Sincronizar histórico" quando faz sentido.
+func (h *ConversationHandler) InboxStats(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	var messageLogs, conversations, pendingBackfill, openConvs, mineOpen int64
+	h.db.Model(&models.MessageLog{}).Where("workspace_id = ?", ws).Count(&messageLogs)
+	h.db.Model(&models.Conversation{}).Where("workspace_id = ?", ws).Count(&conversations)
+	h.db.Model(&models.MessageLog{}).
+		Where("workspace_id = ? AND conversation_id IS NULL AND direction = ? AND to_jid <> ''",
+			ws, models.DirectionIn).
+		Count(&pendingBackfill)
+	h.db.Model(&models.Conversation{}).
+		Where("workspace_id = ? AND status IN ?", ws,
+			[]models.ConversationStatus{models.ConversationStatusOpen, models.ConversationStatusPending}).
+		Count(&openConvs)
+	userID := middleware.GetCurrentUserID(c)
+	h.db.Model(&models.Conversation{}).
+		Where("workspace_id = ? AND assigned_user_id = ? AND status = ?", ws, userID, models.ConversationStatusOpen).
+		Count(&mineOpen)
+
+	return c.JSON(fiber.Map{
+		"message_logs":     messageLogs,
+		"conversations":    conversations,
+		"pending_backfill": pendingBackfill,
+		"open":             openConvs,
+		"mine_open":        mineOpen,
+	})
+}
+
+// Backfill POST /v1/conversations/backfill  { limit?: int, max_batches?: int }
+// Executa o InboundPipeline para MessageLogs do workspace que ainda não têm
+// conversation_id atribuído. Processado em lotes síncronos (padrão 500
+// rows × 20 lotes = 10k msgs por chamada). Clientes podem chamar múltiplas
+// vezes até pending_backfill chegar a 0.
+//
+// Race-safe: se outra chamada concorrente estiver rodando, ambas convergem
+// porque ProcessSavedInbound é idempotente (skips MessageLogs que já têm
+// conversation_id preenchido).
+func (h *ConversationHandler) Backfill(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	if h.pipeline == nil {
+		return c.Status(fiber.StatusServiceUnavailable).
+			JSON(fiber.Map{"error": "pipeline indisponível"})
+	}
+
+	var body struct {
+		Limit      int `json:"limit"`
+		MaxBatches int `json:"max_batches"`
+	}
+	c.BodyParser(&body)
+	limit := body.Limit
+	if limit <= 0 || limit > 2000 {
+		limit = 500
+	}
+	maxBatches := body.MaxBatches
+	if maxBatches <= 0 || maxBatches > 100 {
+		maxBatches = 20
+	}
+
+	ctx := c.UserContext()
+	processed := 0
+	inbound := 0
+	outbound := 0
+	batches := 0
+	start := time.Now()
+
+	// Inbound pass — through the pipeline so it creates/reuses Conversations.
+	for batches < maxBatches {
+		var rows []models.MessageLog
+		if err := h.db.WithContext(ctx).
+			Where("workspace_id = ? AND conversation_id IS NULL AND direction = ? AND to_jid <> ''",
+				ws, models.DirectionIn).
+			Order("created_at ASC").
+			Limit(limit).
+			Find(&rows).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		if len(rows) == 0 {
+			break
+		}
+		for i := range rows {
+			if err := h.pipeline.ProcessSavedInbound(ctx, &rows[i]); err != nil {
+				log.Debug().Err(err).Str("ml_id", rows[i].ID.String()).Msg("backfill: skip")
+				continue
+			}
+			inbound++
+			processed++
+		}
+		batches++
+	}
+
+	// Outbound pass — attach to the existing live Conversation if we can find
+	// one matching (workspace, instance, channel_key) + created_at window.
+	obBatches := 0
+	for obBatches < maxBatches {
+		var rows []models.MessageLog
+		if err := h.db.WithContext(ctx).
+			Where("workspace_id = ? AND conversation_id IS NULL AND direction = ? AND to_jid <> ''",
+				ws, models.DirectionOut).
+			Order("created_at ASC").
+			Limit(limit).
+			Find(&rows).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		if len(rows) == 0 {
+			break
+		}
+		for i := range rows {
+			ml := &rows[i]
+			convID := h.findConversationForOutbound(ctx, ws, ml)
+			if convID == nil {
+				continue
+			}
+			h.db.WithContext(ctx).Model(&models.MessageLog{}).
+				Where("id = ?", ml.ID).
+				Update("conversation_id", *convID)
+			outbound++
+			processed++
+		}
+		obBatches++
+	}
+
+	// Report how much is left so the UI can keep calling.
+	var remaining int64
+	h.db.Model(&models.MessageLog{}).
+		Where("workspace_id = ? AND conversation_id IS NULL AND direction IN ?",
+			ws, []models.MessageDirection{models.DirectionIn, models.DirectionOut}).
+		Count(&remaining)
+
+	return c.JSON(fiber.Map{
+		"processed": processed,
+		"inbound":   inbound,
+		"outbound":  outbound,
+		"batches":   batches + obBatches,
+		"remaining": remaining,
+		"elapsed_ms": time.Since(start).Milliseconds(),
+	})
+}
+
+// findConversationForOutbound locates a Conversation that covers an outbound
+// MessageLog. Prefers the one alive at ml.created_at; falls back to the most
+// recent for (workspace, instance, channel_key).
+func (h *ConversationHandler) findConversationForOutbound(ctx context.Context, ws uuid.UUID, ml *models.MessageLog) *uuid.UUID {
+	if ml.ToJID == "" || ml.InstanceID == uuid.Nil {
+		return nil
+	}
+	var conv models.Conversation
+	err := h.db.WithContext(ctx).
+		Where("workspace_id = ? AND instance_id = ? AND channel_key = ?", ws, ml.InstanceID, ml.ToJID).
+		Where("created_at <= ?", ml.CreatedAt).
+		Where("(closed_at IS NULL OR closed_at >= ?)", ml.CreatedAt).
+		Order("created_at DESC").
+		First(&conv).Error
+	if err == nil {
+		return &conv.ID
+	}
+	err = h.db.WithContext(ctx).
+		Where("workspace_id = ? AND instance_id = ? AND channel_key = ?", ws, ml.InstanceID, ml.ToJID).
+		Order("created_at DESC").
+		First(&conv).Error
+	if err != nil {
+		return nil
+	}
+	return &conv.ID
 }
 
 // -- tags -------------------------------------------------------------------

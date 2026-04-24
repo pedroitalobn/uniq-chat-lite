@@ -853,6 +853,10 @@ export const conversationsApi = {
     api.get("/v1/conversations", { headers: wsHeaders(workspaceId), params: buildListParams(params) }),
   count: (workspaceId: string) =>
     api.get("/v1/conversations/count", { headers: wsHeaders(workspaceId) }),
+  inboxStats: (workspaceId: string) =>
+    api.get("/v1/conversations/inbox-stats", { headers: wsHeaders(workspaceId) }),
+  backfill: (workspaceId: string, data?: { limit?: number; max_batches?: number }) =>
+    api.post("/v1/conversations/backfill", data ?? {}, { headers: wsHeaders(workspaceId) }),
   get: (workspaceId: string, id: string) =>
     api.get(`/v1/conversations/${id}`, { headers: wsHeaders(workspaceId) }),
   timeline: (workspaceId: string, id: string, opts?: { before?: string; limit?: number }) =>

@@ -6,30 +6,29 @@ import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import Link from "next/link";
 import {
-  Users, Lock, Search, ChevronDown, User as UserIcon, MessageSquare,
-  Layers,
+  Lock, Search, ChevronDown, User as UserIcon, MessageSquare,
+  Layers, Smartphone, Radio, RefreshCw, ExternalLink, Check,
 } from "lucide-react";
-import { conversationsApi, queuesApi, workspacesApi } from "@/lib/api";
+import {
+  conversationsApi, queuesApi, workspacesApi, channelsApi, instancesApi,
+} from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { ConversationList, type ConversationRow } from "@/components/atendimento/ConversationList";
 import { useConversationWS } from "@/hooks/useConversationWS";
+import type { ChannelInfo, Instance } from "@/types";
 
-// A consolidated /inbox page replaces the previous per-view routes
-// (/mine, /unassigned, /team, /all). Instead of multiple sidebar entries,
-// the admin/supervisor switches the scope from this header:
+// Consolidated inbox:
+//   [ Agente ▾ ] [ Canais ▾ ] [ Instâncias ▾ ] [ Fila ▾ ]  🔍  Tabs
+// - "Agente": single-select. Admin/supervisor → full roster; agente comum →
+//   travado em "Meus".
+// - "Canais" e "Instâncias": multi-select (checkboxes). Preservam a UX do
+//   inbox clássico onde o usuário escolhia o canal/linha antes de ver chats.
+// - "Fila": single-select. "Todas", "Sem fila" ou cada fila.
 //
-//   [ Agente ▾ ]  [ Fila ▾ ]   Todos · Meus · Sem atrib. · …   [ 🔍 ]
-//
-// Permission rules:
-//   - tickets:view_all  → full agent dropdown + "Todos agentes" + "Sem atribuição"
-//   - tickets:view_team → agent dropdown limited to teammates (fase 4); for
-//                         now same as view_all but scoped by workspace
-//   - tickets:view only → dropdown is locked to the current user
-//
-// The previous standalone pages (/inbox/mine, /unassigned, /team, /all) were
-// removed; /inbox/queue/[id] and /inbox/[conversationId] still exist for
-// deep linking.
+// Empty state oferece: botão "Sincronizar histórico" (chama backfill) e
+// link para /inbox/classic, mantendo a porta aberta para a visualização
+// legacy style WhatsApp.
 
 type StatusTab = "all" | "open" | "pending" | "snoozed" | "unassigned" | "resolved" | "closed";
 
@@ -42,6 +41,14 @@ interface WorkspaceMember {
 interface Queue {
   id: string;
   name: string;
+}
+
+interface InboxStats {
+  message_logs: number;
+  conversations: number;
+  pending_backfill: number;
+  open: number;
+  mine_open: number;
 }
 
 const TABS: { id: StatusTab; label: string }[] = [
@@ -66,15 +73,14 @@ export default function InboxPage() {
   const canViewAll = hasPerm(PERM.ticketsViewAll) || hasPerm(PERM.ticketsViewTeam) || isOwner;
   const canAssign = hasPerm(PERM.ticketsAssign);
 
-  // "me" | "<uuid>" | "all"
-  const [agentScope, setAgentScope] = useState<string>("me");
+  const [agentScope, setAgentScope] = useState<string>("me"); // "me" | "<uuid>" | "all"
   const [queueScope, setQueueScope] = useState<string>("all"); // "all" | "none" | uuid
+  const [channelFilter, setChannelFilter] = useState<string[]>([]); // multi-select
+  const [instanceFilter, setInstanceFilter] = useState<string[]>([]); // multi-select
   const [statusTab, setStatusTab] = useState<StatusTab>("open");
   const [q, setQ] = useState("");
-  const [agentOpen, setAgentOpen] = useState(false);
-  const [queueOpen, setQueueOpen] = useState(false);
 
-  // Only fetch the agent roster when the viewer can switch scopes.
+  // Rosters — only fetch when viewer can actually switch scopes.
   const membersQ = useQuery({
     queryKey: ["workspace-members", wsId],
     queryFn: () =>
@@ -91,30 +97,52 @@ export default function InboxPage() {
     enabled: !!wsId && canView,
   });
 
-  // Derive list filters from the UI state.
+  const channelsQ = useQuery({
+    queryKey: ["channels-catalog"],
+    queryFn: () => channelsApi.list().then((r) => r.data as ChannelInfo[]),
+    staleTime: 5 * 60_000,
+  });
+
+  const instancesQ = useQuery({
+    queryKey: ["instances-for-inbox", wsId],
+    queryFn: () =>
+      instancesApi.list(undefined, wsId).then((r) => {
+        const raw = r.data as Instance[] | { items: Instance[] };
+        return Array.isArray(raw) ? raw : raw.items ?? [];
+      }),
+    enabled: !!wsId && canView,
+  });
+
+  const statsQ = useQuery({
+    queryKey: ["inbox-stats", wsId],
+    queryFn: () => conversationsApi.inboxStats(wsId as string).then((r) => r.data as InboxStats),
+    enabled: !!wsId && canView,
+    refetchInterval: 60_000,
+  });
+
   const listParams = useMemo(() => {
     const p: Record<string, string | string[]> = {};
-    // Agent scope
     if (agentScope === "me") p.assigned_user_id = "me";
     else if (agentScope !== "all") p.assigned_user_id = agentScope;
-    // Status tab
     if (statusTab === "unassigned") {
       p.assigned_user_id = "none";
       p.status = ["open", "pending"];
     } else if (statusTab !== "all") {
       p.status = statusTab;
     }
-    // Queue scope
     if (queueScope !== "all") p.queue_id = queueScope;
+    if (channelFilter.length > 0) p.channel = channelFilter.join(",");
+    if (instanceFilter.length > 0) p.instance_id = instanceFilter.join(",");
     if (q) p.q = q;
     return p;
-  }, [agentScope, statusTab, queueScope, q]);
+  }, [agentScope, statusTab, queueScope, channelFilter, instanceFilter, q]);
 
   useConversationWS({
     prefixes: ["conversation.", "queue."],
     onEvent: () => {
       qc.invalidateQueries({ queryKey: ["conversations", wsId, "unified"] });
       qc.invalidateQueries({ queryKey: ["conversations-count", wsId] });
+      qc.invalidateQueries({ queryKey: ["inbox-stats", wsId] });
     },
   });
 
@@ -150,8 +178,26 @@ export default function InboxPage() {
     },
   });
 
+  const backfill = useMutation({
+    mutationFn: () => conversationsApi.backfill(wsId as string, { limit: 500, max_batches: 20 }),
+    onSuccess: (r) => {
+      const data = r.data as { processed: number; remaining: number };
+      toast.success(`${data.processed} mensagens sincronizadas (${data.remaining} restantes)`);
+      qc.invalidateQueries({ queryKey: ["conversations", wsId] });
+      qc.invalidateQueries({ queryKey: ["inbox-stats", wsId] });
+    },
+    onError: () => toast.error("Falha ao sincronizar — tente novamente"),
+  });
+
   if (!wsId || permsLoading) return <PageSkeleton />;
   if (!canView) return <Forbidden />;
+
+  const list = listQ.data?.items ?? [];
+  const showBackfillCTA =
+    !!statsQ.data &&
+    statsQ.data.pending_backfill > 0 &&
+    list.length === 0 &&
+    !listQ.isLoading;
 
   const agentLabel = (() => {
     if (agentScope === "me") return "Meus atendimentos";
@@ -165,11 +211,22 @@ export default function InboxPage() {
     : queueScope === "none" ? "Sem fila"
     : queuesQ.data?.items.find((q) => q.id === queueScope)?.name ?? "Fila";
 
-  const list = listQ.data?.items ?? [];
+  const availableChannels = (channelsQ.data ?? []).filter((c) => c.available);
+  const channelLabel =
+    channelFilter.length === 0 ? "Todos os canais"
+    : channelFilter.length === 1
+      ? availableChannels.find((c) => c.id === channelFilter[0])?.label ?? channelFilter[0]
+      : `${channelFilter.length} canais`;
+
+  const connectedInstances = instancesQ.data ?? [];
+  const instanceLabel =
+    instanceFilter.length === 0 ? "Todas as instâncias"
+    : instanceFilter.length === 1
+      ? connectedInstances.find((i) => i.id === instanceFilter[0])?.name ?? "Instância"
+      : `${instanceFilter.length} instâncias`;
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header — scope selectors + search + tabs */}
       <header
         className="border-b px-6 py-4"
         style={{ borderColor: "hsl(240 12% 16%)" }}
@@ -180,128 +237,71 @@ export default function InboxPage() {
               Inbox
             </h1>
             <p className="text-xs" style={{ color: "hsl(240 8% 48%)" }}>
-              {agentLabel} · {queueLabel}
+              {agentLabel} · {channelLabel} · {instanceLabel} · {queueLabel}
             </p>
           </div>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            {/* Agent dropdown — locked when you can't view others */}
-            <Dropdown
-              open={agentOpen}
-              onClose={() => setAgentOpen(false)}
-              trigger={
-                <button
-                  onClick={() => setAgentOpen((o) => !o)}
-                  disabled={!canViewAll}
-                  className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
-                  style={{
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    color: "hsl(240 15% 90%)",
-                    opacity: canViewAll ? 1 : 0.6,
-                  }}
-                >
-                  <UserIcon className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />
-                  {agentLabel}
-                  <ChevronDown className="h-3 w-3" />
-                </button>
-              }
-            >
-              <DropdownItem
-                active={agentScope === "me"}
-                onClick={() => { setAgentScope("me"); setAgentOpen(false); }}
-              >
-                Meus atendimentos
-              </DropdownItem>
-              {canViewAll && (
-                <DropdownItem
-                  active={agentScope === "all"}
-                  onClick={() => { setAgentScope("all"); setAgentOpen(false); }}
-                >
-                  Todos os agentes
-                </DropdownItem>
-              )}
-              {canViewAll && membersQ.data && membersQ.data.length > 0 && (
-                <>
-                  <DropdownDivider label="Agentes" />
-                  {membersQ.data
-                    .filter((m) => m.user_id !== myUserID)
-                    .map((m) => (
-                      <DropdownItem
-                        key={m.user_id}
-                        active={agentScope === m.user_id}
-                        onClick={() => { setAgentScope(m.user_id); setAgentOpen(false); }}
-                      >
-                        <span className="truncate">{m.user?.name || m.user?.email}</span>
-                        {m.is_owner && (
-                          <span
-                            className="ml-auto rounded-full px-1.5 py-0.5 text-[9px]"
-                            style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a" }}
-                          >
-                            owner
-                          </span>
-                        )}
-                      </DropdownItem>
-                    ))}
-                </>
-              )}
-            </Dropdown>
+            {/* Agent */}
+            <AgentDropdown
+              agentScope={agentScope}
+              setAgentScope={setAgentScope}
+              canViewAll={canViewAll}
+              myUserID={myUserID}
+              members={membersQ.data ?? []}
+              currentLabel={agentLabel}
+            />
 
-            {/* Queue dropdown */}
-            <Dropdown
-              open={queueOpen}
-              onClose={() => setQueueOpen(false)}
-              trigger={
-                <button
-                  onClick={() => setQueueOpen((o) => !o)}
-                  className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
-                  style={{
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    color: "hsl(240 15% 90%)",
-                  }}
+            {/* Channels (multi) */}
+            <MultiSelectDropdown
+              icon={<Radio className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />}
+              label={channelLabel}
+              items={availableChannels.map((c) => ({
+                id: c.id,
+                label: c.label,
+                hint: c.color,
+              }))}
+              selected={channelFilter}
+              onChange={setChannelFilter}
+              emptyMsg="Nenhum canal disponível"
+            />
+
+            {/* Instances (multi) */}
+            <MultiSelectDropdown
+              icon={<Smartphone className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />}
+              label={instanceLabel}
+              items={connectedInstances.map((inst) => ({
+                id: inst.id,
+                label: inst.name,
+                hint: inst.phone_number || inst.channel,
+                sub: inst.channel,
+              }))}
+              selected={instanceFilter}
+              onChange={setInstanceFilter}
+              emptyMsg="Nenhuma instância conectada"
+            />
+
+            {/* Queue */}
+            <SingleSelectDropdown
+              icon={<Layers className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />}
+              label={queueLabel}
+              items={[
+                { id: "all", label: "Todas as filas" },
+                { id: "none", label: "Sem fila" },
+                ...(queuesQ.data?.items.map((q) => ({ id: q.id, label: q.name })) ?? []),
+              ]}
+              selected={queueScope}
+              onChange={setQueueScope}
+              footer={
+                <Link
+                  href="/inbox/queues"
+                  className="block border-t px-3 py-2 text-xs"
+                  style={{ color: "hsl(240 8% 52%)", borderColor: "hsl(240 12% 16%)" }}
                 >
-                  <Layers className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />
-                  {queueLabel}
-                  <ChevronDown className="h-3 w-3" />
-                </button>
+                  Gerenciar filas →
+                </Link>
               }
-            >
-              <DropdownItem
-                active={queueScope === "all"}
-                onClick={() => { setQueueScope("all"); setQueueOpen(false); }}
-              >
-                Todas as filas
-              </DropdownItem>
-              <DropdownItem
-                active={queueScope === "none"}
-                onClick={() => { setQueueScope("none"); setQueueOpen(false); }}
-              >
-                Sem fila
-              </DropdownItem>
-              {queuesQ.data?.items.length ? (
-                <>
-                  <DropdownDivider label="Filas" />
-                  {queuesQ.data.items.map((q) => (
-                    <DropdownItem
-                      key={q.id}
-                      active={queueScope === q.id}
-                      onClick={() => { setQueueScope(q.id); setQueueOpen(false); }}
-                    >
-                      {q.name}
-                    </DropdownItem>
-                  ))}
-                </>
-              ) : null}
-              <DropdownDivider />
-              <Link
-                href="/inbox/queues"
-                className="block px-3 py-2 text-xs"
-                style={{ color: "hsl(240 8% 52%)" }}
-              >
-                Gerenciar filas →
-              </Link>
-            </Dropdown>
+            />
 
             {/* Search */}
             <div className="relative">
@@ -313,7 +313,7 @@ export default function InboxPage() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Buscar…"
-                className="w-48 rounded-lg py-1.5 pl-8 pr-3 text-xs outline-none"
+                className="w-44 rounded-lg py-1.5 pl-8 pr-3 text-xs outline-none"
                 style={{
                   background: "rgba(255,255,255,0.03)",
                   border: "1px solid hsl(240 12% 16%)",
@@ -321,10 +321,24 @@ export default function InboxPage() {
                 }}
               />
             </div>
+
+            <Link
+              href="/inbox/classic"
+              title="Visualização clássica estilo WhatsApp"
+              className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium"
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "hsl(240 8% 48%)",
+              }}
+            >
+              <ExternalLink className="h-3 w-3" />
+              Clássico
+            </Link>
           </div>
         </div>
 
-        {/* Status tabs + counters */}
+        {/* Status tabs */}
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
           {TABS.map((t) => (
             <button
@@ -346,14 +360,33 @@ export default function InboxPage() {
               ) : null}
             </button>
           ))}
+
+          {statsQ.data && statsQ.data.pending_backfill > 0 && (
+            <button
+              onClick={() => backfill.mutate()}
+              disabled={backfill.isPending}
+              className="ml-auto flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium disabled:opacity-50"
+              style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.25)" }}
+              title={`${statsQ.data.pending_backfill} mensagens antigas sem ticket`}
+            >
+              <RefreshCw className={`h-3 w-3 ${backfill.isPending ? "animate-spin" : ""}`} />
+              Sincronizar histórico · {statsQ.data.pending_backfill}
+            </button>
+          )}
         </div>
       </header>
 
       <div className="flex-1 overflow-auto">
         {listQ.isError ? (
-          <div className="p-8 text-sm" style={{ color: "#ef4444" }}>
-            Erro ao carregar atendimentos.
-          </div>
+          <ErrorState
+            onRetry={() => listQ.refetch()}
+          />
+        ) : showBackfillCTA ? (
+          <BackfillEmptyState
+            stats={statsQ.data!}
+            running={backfill.isPending}
+            onBackfill={() => backfill.mutate()}
+          />
         ) : list.length === 0 && !listQ.isLoading ? (
           <EmptyState agentScope={agentScope} statusTab={statusTab} />
         ) : (
@@ -369,6 +402,216 @@ export default function InboxPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function AgentDropdown({
+  agentScope, setAgentScope, canViewAll, myUserID, members, currentLabel,
+}: {
+  agentScope: string;
+  setAgentScope: (v: string) => void;
+  canViewAll: boolean;
+  myUserID?: string;
+  members: WorkspaceMember[];
+  currentLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Dropdown
+      open={open}
+      onClose={() => setOpen(false)}
+      trigger={
+        <button
+          onClick={() => setOpen((o) => !o)}
+          disabled={!canViewAll}
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
+          style={{
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            color: "hsl(240 15% 90%)",
+            opacity: canViewAll ? 1 : 0.6,
+          }}
+        >
+          <UserIcon className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />
+          {currentLabel}
+          <ChevronDown className="h-3 w-3" />
+        </button>
+      }
+    >
+      <DropdownItem
+        active={agentScope === "me"}
+        onClick={() => { setAgentScope("me"); setOpen(false); }}
+      >
+        Meus atendimentos
+      </DropdownItem>
+      {canViewAll && (
+        <DropdownItem
+          active={agentScope === "all"}
+          onClick={() => { setAgentScope("all"); setOpen(false); }}
+        >
+          Todos os agentes
+        </DropdownItem>
+      )}
+      {canViewAll && members.length > 0 && (
+        <>
+          <DropdownDivider label="Agentes" />
+          {members
+            .filter((m) => m.user_id !== myUserID)
+            .map((m) => (
+              <DropdownItem
+                key={m.user_id}
+                active={agentScope === m.user_id}
+                onClick={() => { setAgentScope(m.user_id); setOpen(false); }}
+              >
+                <span className="truncate">{m.user?.name || m.user?.email}</span>
+                {m.is_owner && (
+                  <span
+                    className="ml-auto rounded-full px-1.5 py-0.5 text-[9px]"
+                    style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a" }}
+                  >
+                    owner
+                  </span>
+                )}
+              </DropdownItem>
+            ))}
+        </>
+      )}
+    </Dropdown>
+  );
+}
+
+function SingleSelectDropdown({
+  icon, label, items, selected, onChange, footer,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  items: { id: string; label: string; hint?: string }[];
+  selected: string;
+  onChange: (id: string) => void;
+  footer?: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Dropdown
+      open={open}
+      onClose={() => setOpen(false)}
+      trigger={
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
+          style={{
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            color: "hsl(240 15% 90%)",
+          }}
+        >
+          {icon}
+          {label}
+          <ChevronDown className="h-3 w-3" />
+        </button>
+      }
+    >
+      {items.map((it) => (
+        <DropdownItem
+          key={it.id}
+          active={selected === it.id}
+          onClick={() => { onChange(it.id); setOpen(false); }}
+        >
+          <span className="truncate">{it.label}</span>
+          {it.hint && <span className="ml-auto text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>{it.hint}</span>}
+        </DropdownItem>
+      ))}
+      {footer}
+    </Dropdown>
+  );
+}
+
+function MultiSelectDropdown({
+  icon, label, items, selected, onChange, emptyMsg,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  items: { id: string; label: string; hint?: string; sub?: string }[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+  emptyMsg?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const toggle = (id: string) => {
+    if (selected.includes(id)) {
+      onChange(selected.filter((x) => x !== id));
+    } else {
+      onChange([...selected, id]);
+    }
+  };
+  return (
+    <Dropdown
+      open={open}
+      onClose={() => setOpen(false)}
+      trigger={
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
+          style={{
+            background: selected.length > 0 ? "rgba(0,212,106,0.05)" : "rgba(255,255,255,0.04)",
+            border: `1px solid ${selected.length > 0 ? "rgba(0,212,106,0.2)" : "rgba(255,255,255,0.08)"}`,
+            color: "hsl(240 15% 90%)",
+          }}
+        >
+          {icon}
+          {label}
+          <ChevronDown className="h-3 w-3" />
+        </button>
+      }
+    >
+      {selected.length > 0 && (
+        <button
+          onClick={() => onChange([])}
+          className="w-full border-b px-3 py-2 text-left text-[10px] uppercase tracking-widest"
+          style={{
+            borderColor: "hsl(240 12% 16%)",
+            color: "hsl(240 8% 52%)",
+          }}
+        >
+          Limpar seleção ({selected.length})
+        </button>
+      )}
+      {items.length === 0 && emptyMsg && (
+        <div className="px-3 py-3 text-xs" style={{ color: "hsl(240 8% 48%)" }}>
+          {emptyMsg}
+        </div>
+      )}
+      {items.map((it) => {
+        const isSelected = selected.includes(it.id);
+        return (
+          <button
+            key={it.id}
+            onClick={() => toggle(it.id)}
+            className="flex w-full items-start gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-white/5"
+            style={{ color: "hsl(240 15% 90%)" }}
+          >
+            <span
+              className="mt-0.5 flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded"
+              style={{
+                background: isSelected ? "#00d46a" : "transparent",
+                border: `1px solid ${isSelected ? "#00d46a" : "hsl(240 12% 24%)"}`,
+              }}
+            >
+              {isSelected && <Check className="h-2.5 w-2.5" style={{ color: "#03170a" }} />}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate">{it.label}</span>
+              {(it.hint || it.sub) && (
+                <span className="block truncate text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>
+                  {it.sub && <span className="mr-1">{it.sub}</span>}
+                  {it.hint}
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </Dropdown>
   );
 }
 
@@ -391,7 +634,7 @@ function Dropdown({
             style={{
               background: "hsl(240 18% 6%)",
               border: "1px solid hsl(240 12% 14%)",
-              maxHeight: "50vh",
+              maxHeight: "60vh",
             }}
           >
             {children}
@@ -427,9 +670,49 @@ function DropdownDivider({ label }: { label?: string }) {
   return (
     <div
       className="px-3 pb-1 pt-3 text-[9px] font-semibold uppercase tracking-widest"
-      style={{ color: "hsl(240 8% 38%)", borderTop: label ? "none" : "1px solid hsl(240 12% 16%)" }}
+      style={{ color: "hsl(240 8% 38%)" }}
     >
       {label ?? ""}
+    </div>
+  );
+}
+
+function BackfillEmptyState({ stats, running, onBackfill }: {
+  stats: InboxStats;
+  running: boolean;
+  onBackfill: () => void;
+}) {
+  return (
+    <div className="flex h-full items-center justify-center p-12">
+      <div
+        className="max-w-md rounded-2xl p-6 text-center"
+        style={{
+          background: "rgba(0,212,106,0.05)",
+          border: "1px solid rgba(0,212,106,0.25)",
+        }}
+      >
+        <RefreshCw className={`mx-auto h-8 w-8 ${running ? "animate-spin" : ""}`} style={{ color: "#00d46a" }} />
+        <h2 className="mt-3 text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>
+          Histórico disponível para sincronizar
+        </h2>
+        <p className="mt-2 text-sm" style={{ color: "hsl(240 8% 52%)" }}>
+          Seu workspace tem <b style={{ color: "hsl(240 15% 90%)" }}>{stats.message_logs.toLocaleString("pt-BR")}</b> mensagens
+          e <b style={{ color: "hsl(240 15% 90%)" }}>{stats.pending_backfill.toLocaleString("pt-BR")}</b> ainda não foram
+          convertidas em atendimentos. Sincronize para ver todos os chats aqui.
+        </p>
+        <button
+          onClick={onBackfill}
+          disabled={running}
+          className="mt-4 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+          style={{ background: "#00d46a", color: "#03170a" }}
+        >
+          {running ? "Sincronizando…" : "Sincronizar histórico"}
+        </button>
+        <p className="mt-4 text-[11px]" style={{ color: "hsl(240 8% 38%)" }}>
+          Ou abra a <Link href="/inbox/classic" className="underline">visualização clássica</Link> para conversar
+          diretamente com os contatos existentes.
+        </p>
+      </div>
     </div>
   );
 }
@@ -448,6 +731,44 @@ function EmptyState({ agentScope, statusTab }: { agentScope: string; statusTab: 
     >
       <MessageSquare className="h-10 w-10 opacity-30" />
       <p className="text-sm">{message}</p>
+      <Link
+        href="/inbox/classic"
+        className="mt-2 text-xs underline"
+        style={{ color: "hsl(240 8% 52%)" }}
+      >
+        Abrir visualização clássica →
+      </Link>
+    </div>
+  );
+}
+
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-12 text-center">
+      <MessageSquare className="h-10 w-10" style={{ color: "hsl(240 8% 38%)" }} />
+      <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 90%)" }}>
+        Não foi possível carregar seus atendimentos
+      </h2>
+      <p className="max-w-md text-sm" style={{ color: "hsl(240 8% 52%)" }}>
+        O backend pode estar sem as migrations novas ou em atualização.
+        Enquanto isso, você pode seguir usando a visualização clássica.
+      </p>
+      <div className="flex gap-2">
+        <button
+          onClick={onRetry}
+          className="rounded-lg px-3 py-1.5 text-xs font-medium"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 15% 90%)" }}
+        >
+          Tentar de novo
+        </button>
+        <Link
+          href="/inbox/classic"
+          className="rounded-lg px-3 py-1.5 text-xs font-semibold"
+          style={{ background: "#00d46a", color: "#03170a" }}
+        >
+          Abrir inbox clássico
+        </Link>
+      </div>
     </div>
   );
 }
@@ -463,7 +784,7 @@ function Forbidden() {
         Sem acesso ao módulo de atendimento
       </h2>
       <p className="max-w-md text-sm">
-        Peça ao administrador do workspace a permissão{" "}
+        Peça ao administrador a permissão{" "}
         <code
           className="rounded px-1 text-xs"
           style={{ background: "rgba(255,255,255,0.05)", color: "hsl(240 15% 85%)" }}

@@ -151,7 +151,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Build outbound registry once and share across handlers.
 	igSvc := services.NewInstagramService(db)
 	outboundReg := outbound.NewRegistry(db, manager, igSvc, taktikSvc)
-	conversationH := handlers.NewConversationHandler(db, manager, outboundReg)
+	// Shared pipeline reference so the backfill endpoint can run it on demand.
+	conversationPipeline := services.NewInboundPipeline(db, whatsapp.GetHub())
+	conversationH := handlers.NewConversationHandler(db, manager, outboundReg, conversationPipeline)
 	departmentH := handlers.NewDepartmentHandler(db)
 	teamH := handlers.NewTeamHandler(db)
 	queueH := handlers.NewQueueHandler(db)
@@ -478,6 +480,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	conversations := api.Group("/conversations")
 	conversations.Get("/", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.List)
 	conversations.Get("/count", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.Count)
+	conversations.Get("/inbox-stats", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.InboxStats)
+	conversations.Post("/backfill", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.Backfill)
 	conversations.Get("/:id", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.Get)
 	conversations.Get("/:id/timeline", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.Timeline)
 	conversations.Patch("/:id", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.Patch)
