@@ -212,6 +212,19 @@ var (
 	PermDealsDelete     = "deals:delete"
 	PermDealsMoveStage  = "deals:move_stage"
 	PermFunnelsManage   = "funnels:manage"
+
+	// Módulos de infra/config — cada um tem seu perm pra a UI gatear os
+	// itens da sidebar. Admin que cria role custom ("dev", etc.) escolhe
+	// quais desses o papel enxerga.
+	PermDashboardView    = "dashboard:view"
+	PermServersView      = "servers:view"
+	PermServersManage    = "servers:manage"
+	PermAgentsView       = "agents:view"
+	PermAgentsManage     = "agents:manage"
+	PermIntegrationsView = "integrations:view"
+	PermIntegrationsManage = "integrations:manage"
+	PermBillingView      = "billing:view"
+	PermBillingManage    = "billing:manage"
 )
 
 // GetAllPermissions returns all default permissions that should be seeded.
@@ -309,5 +322,16 @@ func GetAllPermissions() []Permission {
 		{Key: PermDealsDelete, Name: "Excluir Deals", Category: "crm"},
 		{Key: PermDealsMoveStage, Name: "Mover Deal entre Estágios", Category: "crm"},
 		{Key: PermFunnelsManage, Name: "Gerenciar Funis e Views", Category: "crm"},
+
+		// Módulos de infra/config — gateiam a visibilidade na sidebar.
+		{Key: PermDashboardView, Name: "Visualizar Dashboard", Category: "dashboard"},
+		{Key: PermServersView, Name: "Visualizar Servidores", Category: "servers"},
+		{Key: PermServersManage, Name: "Gerenciar Servidores", Category: "servers"},
+		{Key: PermAgentsView, Name: "Visualizar Agentes IA", Category: "agents"},
+		{Key: PermAgentsManage, Name: "Gerenciar Agentes IA", Category: "agents"},
+		{Key: PermIntegrationsView, Name: "Visualizar Integrações", Category: "integrations"},
+		{Key: PermIntegrationsManage, Name: "Gerenciar Integrações", Category: "integrations"},
+		{Key: PermBillingView, Name: "Visualizar Plano/Billing", Category: "billing"},
+		{Key: PermBillingManage, Name: "Gerenciar Plano/Billing", Category: "billing"},
 	}
 }

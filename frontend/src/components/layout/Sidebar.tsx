@@ -41,27 +41,29 @@ export function Sidebar() {
     show: boolean;
   };
 
-  // Módulos de "gestão" (servers, instances, agentes, integrações, campanhas
-  // e plano/billing) só aparecem pro dono do workspace ou super-admin —
-  // agentes convidados não veem essas configurações de infraestrutura.
-  // Inbox/CRM/Relatórios são gated por permissão explícita.
-  const canSeeBilling = isOwner || isSuperAdmin;
-  const canSeeInfra = isOwner || isSuperAdmin;
-  const canSeeInbox = hasPerm(PERM.ticketsView) || hasPerm(PERM.inboxView);
+  // Cada módulo é gateado por uma permission key. `hasPerm` retorna true
+  // automaticamente pra owner e super-admin (lógica no provider), então
+  // quem é dono vê tudo sem precisar ter permission explícita, enquanto
+  // agentes comuns só veem o que foi liberado na role deles.
+  const canSeeInbox = hasAnyPerm([PERM.ticketsView, PERM.inboxView]);
   const canSeeCRM = hasAnyPerm([PERM.crmView, PERM.companiesView, PERM.dealsView]);
-  const canSeeAgents = isOwner || isSuperAdmin; // agentes IA / personalidades = config de dono
-  const canSeeCampaigns = isOwner || isSuperAdmin;
-  const canSeeDashboard = isOwner || isSuperAdmin || canSeeInbox;
+  const canSeeDashboard = hasPerm(PERM.dashboardView) || canSeeInbox; // dashboard = métricas gerais
+  const canSeeAgents = hasAnyPerm([PERM.agentsView, PERM.agentsManage]);
+  const canSeeServers = hasAnyPerm([PERM.serversView, PERM.serversManage]);
+  const canSeeInstances = hasAnyPerm([PERM.instancesView, PERM.instancesCreate, PERM.instancesEdit]);
+  const canSeeCampaigns = hasPerm(PERM.campaignsView);
+  const canSeeIntegrations = hasAnyPerm([PERM.integrationsView, PERM.integrationsManage]);
+  const canSeeBilling = hasAnyPerm([PERM.billingView, PERM.billingManage]);
 
   const navItems: NavItem[] = [
     { href: "/dashboard",    label: t("nav_dashboard"),    icon: LayoutDashboard, exact: true,  show: canSeeDashboard },
     { href: "/agents",       label: "Agentes IA",          icon: Zap,             exact: false, show: canSeeAgents },
-    { href: "/servers",      label: t("nav_servers"),      icon: Server,          exact: false, show: canSeeInfra },
-    { href: "/instances",    label: t("nav_instances"),    icon: Smartphone,      exact: false, show: canSeeInfra },
+    { href: "/servers",      label: t("nav_servers"),      icon: Server,          exact: false, show: canSeeServers },
+    { href: "/instances",    label: t("nav_instances"),    icon: Smartphone,      exact: false, show: canSeeInstances },
     { href: "/inbox",        label: "Inbox",               icon: Headset,         exact: false, show: canSeeInbox },
     { href: "/crm",          label: t("nav_crm"),          icon: Contact,         exact: false, show: canSeeCRM },
     { href: "/campaigns",    label: t("nav_campaigns"),    icon: Megaphone,       exact: false, show: canSeeCampaigns },
-    { href: "/integrations", label: t("nav_integrations"), icon: Plug,            exact: false, show: canSeeInfra },
+    { href: "/integrations", label: t("nav_integrations"), icon: Plug,            exact: false, show: canSeeIntegrations },
     { href: "/settings",     label: "Conta",               icon: Settings,        exact: false, show: true },
   ];
   const visibleNavItems = navItems.filter((n) => n.show);
