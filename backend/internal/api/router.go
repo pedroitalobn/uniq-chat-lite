@@ -232,6 +232,17 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// destinatário pra /login ou /register.
 	v1Public.Get("/workspaces/invites/preview/:token", workspaceH.PreviewInvite)
 
+	// Auth aliases em /v1/auth/* — o frontend chama com o prefixo /v1.
+	// Mantemos os originais em /auth/* também (retrocompat com SDKs).
+	v1PublicAuth := v1Public.Group("/auth")
+	v1PublicAuth.Post("/login", authH.Login)
+	v1PublicAuth.Post("/register", authH.Register)
+	v1PublicAuth.Post("/validate-key", authH.ValidateKey)
+	v1PublicAuth.Post("/refresh", authH.Refresh)
+	v1PublicAuth.Post("/logout", authH.Logout)
+	v1PublicAuth.Post("/forgot-password", authH.ForgotPassword)
+	v1PublicAuth.Post("/reset-password", authH.ResetPassword)
+
 	// CSAT public endpoints (no auth — customer answers via tokenized link)
 	app.Get("/csat/:token", csatH.GetPublic)
 	app.Post("/csat/:token", csatH.SubmitPublic)
