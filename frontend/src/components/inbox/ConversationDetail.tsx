@@ -8,9 +8,9 @@ import {
   ArrowLeft, Send, StickyNote, CheckCircle2, Clock3, RotateCcw,
   UserCheck, UserX, ArrowRightLeft, Bot, BotOff, Lock, AlertTriangle,
   Smile, X, Star, Mic, Image as ImageIcon, FileText, MapPin, Check,
-  CheckCheck, AlertCircle,
+  CheckCheck, AlertCircle, Paperclip,
 } from "lucide-react";
-import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi } from "@/lib/api";
+import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { relativeTime } from "@/components/atendimento/ConversationList";
@@ -369,6 +369,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
         <Composer
           wsId={wsId}
           conversationId={conversationId}
+          instanceId={conv?.instance_id}
           canSend={canSend}
           canNote={canNote}
           onSendMessage={(body) => send.mutate(body)}
@@ -921,10 +922,11 @@ function parseMessageContent(raw: string): ParsedContent {
 }
 
 function Composer({
-  wsId, conversationId, canSend, canNote, onSendMessage, onSendNote, isSending, isNoting,
+  wsId, conversationId, instanceId, canSend, canNote, onSendMessage, onSendNote, isSending, isNoting,
 }: {
   wsId?: string;
   conversationId: string;
+  instanceId?: string;
   canSend: boolean;
   canNote: boolean;
   onSendMessage: (body: string) => void;
@@ -1015,20 +1017,130 @@ function Composer({
   const pickerItems = picker.data ?? [];
   const pickerOpen = mode === "message" && currentShortcut.length >= 1 && pickerItems.length > 0;
 
+  // ── Anexos (imagem, áudio, vídeo, documento) ─────────────────────────────
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState<{ file: File; preview?: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const onPickFile = () => fileInputRef.current?.click();
+
+  const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite re-selecionar o mesmo arquivo
+    if (!file) return;
+    if (!instanceId) {
+      toast.error("Anexar requer instância conectada");
+      return;
+    }
+    // Preview só para imagens; outros tipos usam ícone no bubble de preview
+    const preview = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+    setPending({ file, preview });
+  };
+
+  const clearPending = () => {
+    if (pending?.preview) URL.revokeObjectURL(pending.preview);
+    setPending(null);
+  };
+
+  const sendAttachment = async () => {
+    if (!pending || !wsId || !instanceId) return;
+    const { file } = pending;
+    const caption = text.trim();
+    setUploading(true);
+    try {
+      const up = await mediaUploadApi.upload(instanceId, file);
+      const data = up.data as { url: string; mime_type?: string };
+      const url = data.url;
+      const mime = data.mime_type || file.type || "application/octet-stream";
+      const type = inferMediaType(file, mime);
+      await conversationsApi.sendMessage(wsId, conversationId, {
+        type,
+        media_url: url,
+        media_mime: mime,
+        caption: caption || undefined,
+        filename: type === "document" ? file.name : undefined,
+      });
+      setText("");
+      try { localStorage.removeItem(draftKey); } catch { /* noop */ }
+      clearPending();
+    } catch {
+      toast.error("Falha ao enviar anexo");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // ── Typing indicator ─────────────────────────────────────────────────────
+  // Enquanto o agente digita no modo "message", envia typing=true ao canal
+  // a cada 3s. Quando o composer zera ou o usuário para de digitar por >3s,
+  // dispara um único typing=false.
+  const typingActiveRef = useRef(false);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const pushTyping = (active: boolean) => {
+    if (!wsId) return;
+    typingActiveRef.current = active;
+    conversationsApi.sendTyping(wsId, conversationId, active).catch(() => {});
+  };
+
+  useEffect(() => {
+    if (mode !== "message") {
+      if (typingActiveRef.current) pushTyping(false);
+      return;
+    }
+    if (text.trim() === "") {
+      if (typingActiveRef.current) pushTyping(false);
+      return;
+    }
+    if (!typingActiveRef.current) pushTyping(true);
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => pushTyping(false), 3500);
+    return () => {
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, mode, wsId, conversationId]);
+
+  useEffect(() => {
+    // cleanup on unmount — garante que não deixa o "digitando..." preso
+    return () => {
+      if (typingActiveRef.current) pushTyping(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const accentBg = mode === "note" ? "#f59e0b" : "#00d46a";
+  const accentFg = mode === "note" ? "#1f1300" : "#03170a";
+  const composerBg = mode === "note" ? "rgba(245,158,11,0.06)" : "hsl(240 18% 6.5%)";
+
+  const hasAttachment = !!pending;
+
   return (
     <div
-      className={`border-t border-zinc-200 p-3 dark:border-zinc-800 ${
-        mode === "note" ? "bg-amber-50/60 dark:bg-amber-950/20" : "bg-white dark:bg-zinc-950"
-      }`}
+      className="p-3"
+      style={{
+        background: composerBg,
+        borderTop: "1px solid hsl(240 12% 16%)",
+      }}
     >
-      <div className="mb-2 flex items-center gap-2 text-xs">
+      <input
+        ref={fileInputRef}
+        type="file"
+        hidden
+        accept="image/*,video/*,audio/*,application/pdf,application/*"
+        onChange={onFileSelected}
+      />
+
+      {/* Mode tabs */}
+      <div className="mb-2 flex items-center gap-1.5 text-xs">
         <button
           onClick={() => setMode("message")}
-          className={`rounded-md px-2 py-1 font-medium ${
+          className="rounded-md px-2 py-1 font-medium transition-colors"
+          style={
             mode === "message"
-              ? "bg-blue-600 text-white"
-              : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-          }`}
+              ? { background: "#00d46a", color: "#03170a" }
+              : { color: "hsl(240 8% 52%)" }
+          }
           disabled={!canSend}
           type="button"
         >
@@ -1036,27 +1148,95 @@ function Composer({
         </button>
         <button
           onClick={() => setMode("note")}
-          className={`rounded-md px-2 py-1 font-medium ${
+          className="rounded-md px-2 py-1 font-medium transition-colors"
+          style={
             mode === "note"
-              ? "bg-amber-500 text-white"
-              : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-          }`}
+              ? { background: "#f59e0b", color: "#1f1300" }
+              : { color: "hsl(240 8% 52%)" }
+          }
           disabled={!canNote}
           type="button"
         >
           Nota interna
         </button>
-        <span className="ml-auto text-zinc-400">
+        <span className="ml-auto text-[11px]" style={{ color: "hsl(240 8% 38%)" }}>
           {mode === "message"
             ? "Enter envia · Shift+Enter quebra linha · / resposta rápida"
             : "Nota visível só para a equipe"}
         </span>
       </div>
 
+      {/* Pending attachment preview */}
+      {hasAttachment && pending && (
+        <div
+          className="mb-2 flex items-center gap-3 rounded-lg p-2"
+          style={{
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}
+        >
+          {pending.preview ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={pending.preview} alt="" className="h-12 w-12 rounded object-cover" />
+          ) : (
+            <div
+              className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded"
+              style={{ background: "rgba(0,212,106,0.08)" }}
+            >
+              {pending.file.type.startsWith("audio/") ? (
+                <Mic className="h-5 w-5" style={{ color: "#00d46a" }} />
+              ) : pending.file.type.startsWith("video/") ? (
+                <ImageIcon className="h-5 w-5" style={{ color: "#00d46a" }} />
+              ) : (
+                <FileText className="h-5 w-5" style={{ color: "#00d46a" }} />
+              )}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm" style={{ color: "hsl(240 15% 90%)" }}>
+              {pending.file.name}
+            </div>
+            <div className="text-[10px]" style={{ color: "hsl(240 8% 44%)" }}>
+              {humanSize(pending.file.size)} · {pending.file.type || "desconhecido"}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={clearPending}
+            disabled={uploading}
+            className="rounded-md p-1.5 disabled:opacity-40 hover:bg-white/5"
+            style={{ color: "hsl(240 8% 48%)" }}
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={sendAttachment}
+            disabled={uploading}
+            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
+            style={{ background: accentBg, color: accentFg }}
+          >
+            {uploading ? "Enviando…" : "Enviar anexo"}
+          </button>
+        </div>
+      )}
+
       <div className="relative">
         {pickerOpen && (
-          <div className="absolute bottom-full left-0 right-20 mb-2 max-h-60 overflow-auto rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-            <div className="flex items-center gap-2 border-b border-zinc-200 px-3 py-1.5 text-[11px] text-zinc-500 dark:border-zinc-800">
+          <div
+            className="absolute bottom-full left-0 right-20 mb-2 max-h-60 overflow-auto rounded-lg shadow-xl"
+            style={{
+              background: "hsl(240 18% 6%)",
+              border: "1px solid hsl(240 12% 14%)",
+            }}
+          >
+            <div
+              className="flex items-center gap-2 border-b px-3 py-1.5 text-[11px]"
+              style={{
+                borderColor: "hsl(240 12% 16%)",
+                color: "hsl(240 8% 52%)",
+              }}
+            >
               <Smile className="h-3.5 w-3.5" /> Respostas rápidas · {pickerItems.length}
             </div>
             <ul>
@@ -1066,16 +1246,29 @@ function Composer({
                     type="button"
                     onMouseEnter={() => setPickerIndex(i)}
                     onClick={() => applyQuickReply(qr)}
-                    className={`flex w-full items-start gap-3 px-3 py-2 text-left ${
-                      i === pickerIndex ? "bg-blue-500/10" : "hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                    }`}
+                    className="flex w-full items-start gap-3 px-3 py-2 text-left"
+                    style={{
+                      background: i === pickerIndex ? "rgba(0,212,106,0.08)" : "transparent",
+                    }}
                   >
-                    <span className="mt-0.5 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-mono text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                    <span
+                      className="mt-0.5 rounded px-1.5 py-0.5 font-mono text-[10px]"
+                      style={{
+                        background: "rgba(255,255,255,0.06)",
+                        color: "hsl(240 15% 85%)",
+                      }}
+                    >
                       {qr.shortcut || "—"}
                     </span>
                     <span className="min-w-0 flex-1">
-                      {qr.title && <div className="text-xs font-medium">{qr.title}</div>}
-                      <div className="line-clamp-2 text-xs text-zinc-500">{qr.body}</div>
+                      {qr.title && (
+                        <div className="text-xs font-medium" style={{ color: "hsl(240 15% 90%)" }}>
+                          {qr.title}
+                        </div>
+                      )}
+                      <div className="line-clamp-2 text-xs" style={{ color: "hsl(240 8% 52%)" }}>
+                        {qr.body}
+                      </div>
                     </span>
                   </button>
                 </li>
@@ -1085,14 +1278,32 @@ function Composer({
         )}
 
         <div className="flex items-end gap-2">
+          <button
+            type="button"
+            onClick={onPickFile}
+            disabled={!canSend || mode !== "message" || !instanceId || uploading}
+            title={instanceId ? "Anexar arquivo" : "Instância não disponível"}
+            className="flex h-10 w-10 items-center justify-center rounded-md transition-colors disabled:opacity-40"
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              color: "hsl(240 8% 52%)",
+            }}
+          >
+            <Paperclip className="h-4 w-4" />
+          </button>
+
           <textarea
             ref={textareaRef}
-            className={`min-h-[44px] max-h-40 flex-1 resize-y rounded-md border px-3 py-2 text-sm outline-none ${
-              mode === "note"
-                ? "border-amber-300 bg-white focus:border-amber-500 dark:border-amber-500/30 dark:bg-zinc-900"
-                : "border-zinc-200 bg-white focus:border-blue-500 dark:border-zinc-700 dark:bg-zinc-900"
-            }`}
-            placeholder={mode === "message" ? "Digite sua mensagem… (/ para respostas rápidas)" : "Registre uma nota interna…"}
+            className="min-h-[44px] max-h-40 flex-1 resize-y rounded-md px-3 py-2 text-sm outline-none"
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              border: `1px solid ${mode === "note" ? "rgba(245,158,11,0.35)" : "hsl(240 12% 16%)"}`,
+              color: "hsl(240 15% 90%)",
+            }}
+            placeholder={mode === "message"
+              ? (hasAttachment ? "Legenda do anexo (opcional)…" : "Digite sua mensagem… (/ para respostas rápidas)")
+              : "Registre uma nota interna…"}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
@@ -1123,25 +1334,44 @@ function Composer({
                   return;
                 }
                 e.preventDefault();
-                submit();
+                if (hasAttachment) sendAttachment();
+                else submit();
               }
             }}
           />
           <button
-            onClick={submit}
-            disabled={disabled || isSending || isNoting}
-            className={`flex h-10 items-center gap-1.5 rounded-md px-3 text-sm font-medium text-white disabled:opacity-50 ${
-              mode === "note" ? "bg-amber-500 hover:bg-amber-600" : "bg-blue-600 hover:bg-blue-700"
-            }`}
+            onClick={hasAttachment ? sendAttachment : submit}
+            disabled={
+              hasAttachment
+                ? uploading
+                : disabled || isSending || isNoting
+            }
+            className="flex h-10 items-center gap-1.5 rounded-md px-3 text-sm font-semibold disabled:opacity-50"
+            style={{ background: accentBg, color: accentFg }}
             type="button"
           >
             {mode === "note" ? <StickyNote className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-            {mode === "note" ? "Adicionar" : "Enviar"}
+            {hasAttachment ? (uploading ? "Enviando…" : "Enviar") : (mode === "note" ? "Adicionar" : "Enviar")}
           </button>
         </div>
       </div>
     </div>
   );
+}
+
+function inferMediaType(file: File, mime: string): "image" | "audio" | "video" | "document" {
+  if (mime.startsWith("image/") || file.type.startsWith("image/")) return "image";
+  if (mime.startsWith("audio/") || file.type.startsWith("audio/")) return "audio";
+  if (mime.startsWith("video/") || file.type.startsWith("video/")) return "video";
+  return "document";
+}
+
+function humanSize(bytes: number): string {
+  if (!bytes) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+  const v = bytes / Math.pow(1024, i);
+  return `${v.toFixed(v >= 10 ? 0 : 1)} ${units[i]}`;
 }
 
 function ActionRow({

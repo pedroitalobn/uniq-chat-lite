@@ -348,9 +348,14 @@ func (h *ConversationHandler) Patch(c *fiber.Ctx) error {
 	return c.JSON(conv)
 }
 
-// SendMessage POST /v1/conversations/:id/messages  { body, type? }
-// For Fase 1-3 only text is supported; the outbound sender registry (Fase 5)
-// will expand this to media/templates across channels.
+// SendMessage POST /v1/conversations/:id/messages
+// Body: { body?, type?, media_url?, media_mime?, caption?, filename? }
+//
+//   - text:     { body: "olá" }
+//   - image:    { type: "image", media_url, media_mime, caption? }
+//   - audio:    { type: "audio", media_url, media_mime }
+//   - video:    { type: "video", media_url, media_mime, caption? }
+//   - document: { type: "document", media_url, media_mime, filename? }
 func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
 	id, err := uuid.Parse(c.Params("id"))
@@ -358,15 +363,26 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
 	}
 	var body struct {
-		Body string `json:"body"`
-		Type string `json:"type"`
+		Body      string `json:"body"`
+		Type      string `json:"type"`
+		MediaURL  string `json:"media_url"`
+		MediaMime string `json:"media_mime"`
+		Caption   string `json:"caption"`
+		Filename  string `json:"filename"`
 	}
-	if err := c.BodyParser(&body); err != nil || strings.TrimSpace(body.Body) == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body é obrigatório"})
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
 	}
 	msgType := body.Type
 	if msgType == "" {
 		msgType = "text"
+	}
+	isMedia := msgType == "image" || msgType == "audio" || msgType == "video" || msgType == "document"
+	if isMedia && strings.TrimSpace(body.MediaURL) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "media_url é obrigatório para " + msgType})
+	}
+	if !isMedia && strings.TrimSpace(body.Body) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body é obrigatório"})
 	}
 
 	var conv models.Conversation
@@ -391,9 +407,31 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 
 	userID := middleware.GetCurrentUserID(c)
 	wsCopy := ws
-	// Persist outbound MessageLog (status=pending; manager will mark sent on ack)
-	contentJSON, _ := json.Marshal(body.Body)
-	log := models.MessageLog{
+	// Persist outbound MessageLog. Para texto o content é o body em JSON
+	// string. Para mídia serializamos { url, mime_type, filename, caption }
+	// para o MessageBubble do frontend renderizar exatamente igual ao
+	// formato recebido do inbound (parseMessageContent aceita os dois).
+	var contentStr string
+	if isMedia {
+		payload := map[string]any{
+			"url":       body.MediaURL,
+			"mime_type": body.MediaMime,
+		}
+		if body.Filename != "" {
+			payload["filename"] = body.Filename
+		}
+		if body.Caption != "" {
+			payload["caption"] = body.Caption
+		} else if body.Body != "" {
+			payload["caption"] = body.Body
+		}
+		b, _ := json.Marshal(payload)
+		contentStr = string(b)
+	} else {
+		b, _ := json.Marshal(body.Body)
+		contentStr = string(b)
+	}
+	logRow := models.MessageLog{
 		InstanceID:     conv.InstanceID,
 		WorkspaceID:    &wsCopy,
 		UserID:         &userID,
@@ -401,10 +439,10 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		Direction:      models.DirectionOut,
 		Type:           msgType,
 		ToJID:          conv.ChannelKey,
-		Content:        string(contentJSON),
+		Content:        contentStr,
 		Status:         models.MessageStatusPending,
 	}
-	if err := h.db.Create(&log).Error; err != nil {
+	if err := h.db.Create(&logRow).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
@@ -414,12 +452,16 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 	if h.outbound != nil {
 		var inst models.Instance
 		if err := h.db.First(&inst, "id = ?", conv.InstanceID).Error; err == nil {
-			ctx, cancel := context.WithTimeout(c.UserContext(), 30*time.Second)
+			ctx, cancel := context.WithTimeout(c.UserContext(), 60*time.Second)
 			defer cancel()
 			_, sendErr := h.outbound.Send(ctx, &inst, outbound.OutboundMessage{
-				To:   conv.ChannelKey,
-				Type: msgType,
-				Body: body.Body,
+				To:        conv.ChannelKey,
+				Type:      msgType,
+				Body:      body.Body,
+				MediaURL:  body.MediaURL,
+				MediaMime: body.MediaMime,
+				Caption:   body.Caption,
+				Filename:  body.Filename,
 			})
 			if sendErr != nil {
 				sendStatus = models.MessageStatusFailed
@@ -432,15 +474,35 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 	}
 	updates := map[string]any{"status": sendStatus}
 	if sendErrStr != "" {
-		// Append error details into content alongside the original text so the
-		// agent UI can show why it failed without touching schema.
-		updates["content"] = string(contentJSON) + " /* err: " + truncate(sendErrStr, 200) + " */"
+		// Append error details into content alongside the original payload so
+		// the agent UI can show why it failed without touching schema.
+		updates["content"] = contentStr + " /* err: " + truncate(sendErrStr, 200) + " */"
 	}
-	h.db.Model(&log).Updates(updates)
+	h.db.Model(&logRow).Updates(updates)
 
-	// Denormalizations: the conversation's last-message fields
+	// Denormalizations: preview do último envio. Texto mostra o body; mídia
+	// mostra um label legível consistente com o render do front.
 	now := time.Now()
 	preview := body.Body
+	if isMedia {
+		switch msgType {
+		case "image":
+			preview = "📷 Imagem"
+		case "video":
+			preview = "🎬 Vídeo"
+		case "audio":
+			preview = "🎤 Áudio"
+		case "document":
+			if body.Filename != "" {
+				preview = "📎 " + body.Filename
+			} else {
+				preview = "📎 Documento"
+			}
+		}
+		if body.Caption != "" {
+			preview = preview + " · " + body.Caption
+		}
+	}
 	if len(preview) > 280 {
 		preview = preview[:280]
 	}
@@ -463,12 +525,38 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		ActorType:      models.ActorUser,
 		ActorUserID:    &userID,
 		EventType:      models.ConvEventMessage,
-		MessageLogID:   &log.ID,
+		MessageLogID:   &logRow.ID,
 		Payload:        `{"direction":"out","type":"` + msgType + `"}`,
 	})
 
-	h.broadcast(&conv, "conversation.message", map[string]any{"message": log})
-	return c.Status(fiber.StatusCreated).JSON(log)
+	h.broadcast(&conv, "conversation.message", map[string]any{"message": logRow})
+	return c.Status(fiber.StatusCreated).JSON(logRow)
+}
+
+// Typing POST /v1/conversations/:id/typing  { typing: bool }
+// Emite indicador de digitação pelo canal (hoje apenas WhatsApp whatsmeow
+// implementa; outros canais viram no-op silencioso).
+func (h *ConversationHandler) Typing(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var body struct {
+		Typing bool `json:"typing"`
+	}
+	c.BodyParser(&body)
+	var conv models.Conversation
+	if err := h.db.Select("instance_id, channel_key").
+		Where("workspace_id = ? AND id = ?", ws, id).First(&conv).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
+	}
+	if h.manager != nil {
+		if client := h.manager.GetInstance(conv.InstanceID.String()); client != nil && client.IsConnected() {
+			_ = client.SendTyping(conv.ChannelKey, body.Typing)
+		}
+	}
+	return c.JSON(fiber.Map{"ok": true})
 }
 
 func truncate(s string, n int) string {

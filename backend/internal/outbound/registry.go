@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/uniq-chat/backend/internal/models"
@@ -31,6 +32,7 @@ type OutboundMessage struct {
 	MediaURL  string
 	MediaMime string
 	Caption   string
+	Filename  string // document only
 }
 
 // SendResult is what every adapter returns on success.
@@ -105,6 +107,7 @@ func (r *Registry) sendWhatsApp(inst *models.Instance, msg OutboundMessage) (*Se
 	if client == nil || !client.IsConnected() {
 		return nil, errors.New("instância desconectada")
 	}
+
 	switch msg.Type {
 	case "", "text":
 		id, err := client.SendTextMessage(msg.To, msg.Body)
@@ -112,13 +115,108 @@ func (r *Registry) sendWhatsApp(inst *models.Instance, msg OutboundMessage) (*Se
 			return nil, err
 		}
 		return &SendResult{ExternalID: id, Status: models.MessageStatusSent}, nil
+
+	case "image", "audio", "video", "document":
+		if msg.MediaURL == "" {
+			return nil, fmt.Errorf("%s requer media_url", msg.Type)
+		}
+		data, mime, err := r.fetchMedia(msg.MediaURL, msg.MediaMime)
+		if err != nil {
+			return nil, err
+		}
+		caption := msg.Caption
+		if caption == "" {
+			caption = msg.Body
+		}
+		switch msg.Type {
+		case "image":
+			id, err := client.SendImageMessage(msg.To, data, mime, caption)
+			if err != nil {
+				return nil, err
+			}
+			return &SendResult{ExternalID: id, Status: models.MessageStatusSent}, nil
+		case "audio":
+			// ptt flag: se mime explicita "ogg" / caption marcada como "ptt",
+			// envia como Push-To-Talk. Caso contrário áudio normal.
+			isPTT := strings.Contains(strings.ToLower(mime), "ogg")
+			id, err := client.SendAudioMessage(msg.To, data, mime, isPTT)
+			if err != nil {
+				return nil, err
+			}
+			return &SendResult{ExternalID: id, Status: models.MessageStatusSent}, nil
+		case "video":
+			id, err := client.SendVideoMessage(msg.To, data, mime, caption)
+			if err != nil {
+				return nil, err
+			}
+			return &SendResult{ExternalID: id, Status: models.MessageStatusSent}, nil
+		case "document":
+			filename := msg.Filename
+			if filename == "" {
+				filename = filenameFromURL(msg.MediaURL)
+			}
+			id, err := client.SendDocumentMessage(msg.To, data, mime, filename)
+			if err != nil {
+				return nil, err
+			}
+			return &SendResult{ExternalID: id, Status: models.MessageStatusSent}, nil
+		}
 	}
-	// Fallback for types not wired up on this path: send as text.
+
+	// Fallback — tipos ainda não mapeados caem como texto para não perder
+	// a mensagem inteira; o agente recebe warn e pode reenviar manualmente.
 	id, err := client.SendTextMessage(msg.To, msg.Body)
 	if err != nil {
 		return nil, err
 	}
 	return &SendResult{ExternalID: id, Status: models.MessageStatusSent}, nil
+}
+
+// fetchMedia baixa o bytes do storage (MinIO) e devolve o mime real quando
+// o content-type do response for mais confiável que o que veio do request.
+func (r *Registry) fetchMedia(url, declaredMime string) ([]byte, string, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	resp, err := r.http.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("download %s: %w", url, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return nil, "", fmt.Errorf("download %s: HTTP %d", url, resp.StatusCode)
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", err
+	}
+	mime := declaredMime
+	if mime == "" {
+		mime = resp.Header.Get("Content-Type")
+	}
+	if mime == "" {
+		mime = "application/octet-stream"
+	}
+	return data, mime, nil
+}
+
+// filenameFromURL extrai o "arquivo.ext" do final da URL quando o client
+// não mandou um filename explícito.
+func filenameFromURL(url string) string {
+	idx := strings.LastIndex(url, "/")
+	if idx < 0 || idx == len(url)-1 {
+		return "documento"
+	}
+	name := url[idx+1:]
+	// strip query/fragment
+	if q := strings.IndexAny(name, "?#"); q > 0 {
+		name = name[:q]
+	}
+	if name == "" {
+		return "documento"
+	}
+	return name
 }
 
 // -- WABA (Meta Graph API) -------------------------------------------------
@@ -137,8 +235,38 @@ func (r *Registry) sendWABA(ctx context.Context, inst *models.Instance, msg Outb
 		"to":                msg.To,
 		"type":              msgType,
 	}
-	if msgType == "text" {
+	switch msgType {
+	case "text":
 		payload["text"] = map[string]string{"body": msg.Body}
+	case "image":
+		img := map[string]string{"link": msg.MediaURL}
+		if msg.Caption != "" || msg.Body != "" {
+			if msg.Caption != "" {
+				img["caption"] = msg.Caption
+			} else {
+				img["caption"] = msg.Body
+			}
+		}
+		payload["image"] = img
+	case "video":
+		vid := map[string]string{"link": msg.MediaURL}
+		if msg.Caption != "" {
+			vid["caption"] = msg.Caption
+		} else if msg.Body != "" {
+			vid["caption"] = msg.Body
+		}
+		payload["video"] = vid
+	case "audio":
+		payload["audio"] = map[string]string{"link": msg.MediaURL}
+	case "document":
+		doc := map[string]string{"link": msg.MediaURL}
+		if msg.Filename != "" {
+			doc["filename"] = msg.Filename
+		}
+		if msg.Caption != "" {
+			doc["caption"] = msg.Caption
+		}
+		payload["document"] = doc
 	}
 	body, _ := json.Marshal(payload)
 

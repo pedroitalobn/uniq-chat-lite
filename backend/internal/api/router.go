@@ -489,6 +489,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	conversations.Get("/:id/timeline", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.Timeline)
 	conversations.Patch("/:id", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.Patch)
 	conversations.Post("/:id/messages", middleware.RequireWorkspacePermission(db, models.PermInboxSend), conversationH.SendMessage)
+	conversations.Post("/:id/typing", middleware.RequireWorkspacePermission(db, models.PermInboxSend), conversationH.Typing)
 	conversations.Post("/:id/read", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.MarkRead)
 	conversations.Post("/:id/assign", middleware.RequireWorkspacePermission(db, models.PermTicketsAssign), conversationH.Assign)
 	conversations.Post("/:id/unassign", middleware.RequireWorkspacePermission(db, models.PermTicketsAssign), conversationH.Unassign)

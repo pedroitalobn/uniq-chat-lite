@@ -872,8 +872,20 @@ export const conversationsApi = {
   }) => api.patch(`/v1/conversations/${id}`, data, { headers: wsHeaders(workspaceId) }),
   markRead: (workspaceId: string, id: string) =>
     api.post(`/v1/conversations/${id}/read`, {}, { headers: wsHeaders(workspaceId) }),
-  sendMessage: (workspaceId: string, id: string, data: { body: string; type?: string }) =>
-    api.post(`/v1/conversations/${id}/messages`, data, { headers: wsHeaders(workspaceId) }),
+  sendMessage: (
+    workspaceId: string,
+    id: string,
+    data: {
+      body?: string;
+      type?: string;
+      media_url?: string;
+      media_mime?: string;
+      caption?: string;
+      filename?: string;
+    },
+  ) => api.post(`/v1/conversations/${id}/messages`, data, { headers: wsHeaders(workspaceId) }),
+  sendTyping: (workspaceId: string, id: string, typing: boolean) =>
+    api.post(`/v1/conversations/${id}/typing`, { typing }, { headers: wsHeaders(workspaceId) }),
   assign: (workspaceId: string, id: string, userId?: string) =>
     api.post(`/v1/conversations/${id}/assign`, userId ? { user_id: userId } : {}, { headers: wsHeaders(workspaceId) }),
   unassign: (workspaceId: string, id: string) =>
