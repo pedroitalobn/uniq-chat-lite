@@ -2,121 +2,180 @@ package email
 
 import "fmt"
 
-// Brand colors
+// Uniq.chat brand — tema escuro da aplicação, accent verde.
+// HSL da UI convertido pra hex pq vários clientes de email ignoram hsl().
 const (
-	BrandPrimary   = "#6366f1" // Indigo
-	BrandSecondary = "#818cf8" // Light indigo
-	BrandAccent    = "#22c55e" // Green for success
-	BrandWarning   = "#f59e0b" // Orange for warning
-	BrandDanger    = "#ef4444" // Red for danger
-	BrandDark      = "#1e293b" // Dark text
-	BrandGray      = "#64748b" // Gray text
-	BrandLight     = "#f8fafc" // Light background
+	BrandPrimary   = "#00d46a" // Uniq green
+	BrandSecondary = "#00b85c" // Green darker (hover)
+	BrandAccent    = "#00d46a" // Same as primary
+	BrandWarning   = "#fb923c" // Orange
+	BrandDanger    = "#ef4444" // Red
+	BrandDark      = "#e8e9ed" // hsl(240 15% 92%) — texto primário no escuro
+	BrandGray      = "#85868f" // hsl(240 8% 55%) — texto secundário
+	BrandMuted     = "#5a5b63" // hsl(240 8% 40%) — texto terciário
+	BrandBg        = "#0a0a0f" // body background
+	BrandCard      = "#0d0e14" // hsl(240 18% 6%) — card principal
+	BrandCardAlt   = "#13141b" // card secundário (levemente mais claro)
+	BrandBorder    = "#1e2028" // hsl(240 12% 13%) — borda
 )
 
-// Modern base template with professional SaaS styling
-func baseTemplate(appName, appURL, headerColor, content string) string {
+// Base template dark. Inline styles pq clientes de email (Gmail, Outlook)
+// podem ignorar <style> ou regras complexas. Table-based layout pra
+// compatibilidade com Outlook/Apple Mail.
+func baseTemplate(appName, appURL, accentColor, content string) string {
 	year := "2026"
 	return fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <meta name="supported-color-schemes" content="dark">
   <title>%s</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <table width="100%%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 0;">
+<body style="margin:0;padding:0;background-color:%s;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:%s;">
+  <table width="100%%" cellpadding="0" cellspacing="0" role="presentation" style="background:%s;padding:40px 0;">
     <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1),0 2px 4px -1px rgba(0,0,0,0.06);">
-        <!-- Header with brand -->
-        <tr><td style="background:%s;padding:32px 40px;text-align:center;">
-          <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">%s</h1>
-        </td></tr>
-        <!-- Content -->
-        <tr><td style="padding:40px;">
-          %s
-        </td></tr>
-        <!-- Footer -->
-        <tr><td style="background:#f8fafc;padding:24px 40px;border-top:1px solid #e2e8f0;">
-          <table width="100%%" cellpadding="0" cellspacing="0">
+      <table width="560" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%%;background:%s;border:1px solid %s;border-radius:16px;overflow:hidden;">
+        <!-- Header: logomark + wordmark -->
+        <tr><td style="padding:28px 32px 0;">
+          <table cellpadding="0" cellspacing="0" role="presentation">
             <tr>
-              <td align="center">
-                <p style="margin:0 0 8px;font-size:12px;color:#64748b;">&copy; %s %s. Todos os direitos reservados.</p>
-                <p style="margin:0;">
-                  <a href="%s/unsubscribe" style="font-size:12px;color:#6366f1;text-decoration:underline;">Gerenciar preferências</a>
-                  <span style="color:#cbd5e1;margin:0 8px;">|</span>
-                  <a href="%s" style="font-size:12px;color:#6366f1;text-decoration:underline;">Visitar site</a>
-                </p>
+              <td style="vertical-align:middle;">
+                <div style="display:inline-block;width:32px;height:32px;background:%s;border-radius:8px;text-align:center;line-height:32px;font-size:16px;font-weight:700;color:#0a0a0f;">U</div>
+              </td>
+              <td style="padding-left:10px;vertical-align:middle;">
+                <span style="font-size:15px;font-weight:600;color:%s;letter-spacing:-0.2px;">%s</span>
               </td>
             </tr>
           </table>
         </td></tr>
+        <!-- Accent line -->
+        <tr><td style="padding:20px 32px 0;">
+          <div style="height:1px;background:%s;"></div>
+        </td></tr>
+        <!-- Content -->
+        <tr><td style="padding:28px 32px 36px;">
+          %s
+        </td></tr>
+        <!-- Footer -->
+        <tr><td style="background:%s;padding:20px 32px;border-top:1px solid %s;">
+          <table width="100%%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr><td align="center">
+              <p style="margin:0 0 6px;font-size:12px;color:%s;">&copy; %s %s — todos os direitos reservados.</p>
+              <p style="margin:0;font-size:12px;color:%s;">
+                <a href="%s" style="color:%s;text-decoration:none;">%s</a>
+                <span style="color:%s;margin:0 6px;">·</span>
+                <a href="%s/unsubscribe" style="color:%s;text-decoration:none;">Preferências de email</a>
+              </p>
+            </td></tr>
+          </table>
+        </td></tr>
       </table>
+      <p style="margin:16px 0 0;font-size:11px;color:%s;text-align:center;max-width:560px;">
+        Você está recebendo este email porque sua conta está vinculada ao %s.
+      </p>
     </td></tr>
   </table>
 </body>
-</html>`, appName, headerColor, appName, content, year, appName, appURL, appURL)
+</html>`,
+		appName,
+		BrandBg, BrandDark,
+		BrandBg,
+		BrandCard, BrandBorder,
+		accentColor, BrandDark, appName,
+		BrandBorder,
+		content,
+		BrandCardAlt, BrandBorder,
+		BrandGray, year, appName,
+		BrandGray,
+		appURL, BrandPrimary, appURL,
+		BrandMuted,
+		appURL, BrandGray,
+		BrandMuted, appName,
+	)
 }
 
-// Helper functions for consistent styling
+// Helper functions — todos com estilos inline no tema escuro.
 func h1(text string) string {
-	return fmt.Sprintf(`<h1 style="margin:0 0 16px;color:#1e293b;font-size:28px;font-weight:700;line-height:1.2;">%s</h1>`, text)
+	return fmt.Sprintf(`<h1 style="margin:0 0 14px;color:%s;font-size:24px;font-weight:700;line-height:1.25;letter-spacing:-0.3px;">%s</h1>`, BrandDark, text)
 }
 
 func h2(text string) string {
-	return fmt.Sprintf(`<h2 style="margin:0 0 16px;color:#1e293b;font-size:22px;font-weight:600;line-height:1.3;">%s</h2>`, text)
+	return fmt.Sprintf(`<h2 style="margin:0 0 12px;color:%s;font-size:18px;font-weight:600;line-height:1.3;">%s</h2>`, BrandDark, text)
 }
 
 func h3(text string) string {
-	return fmt.Sprintf(`<h3 style="margin:0 0 12px;color:#1e293b;font-size:18px;font-weight:600;">%s</h3>`, text)
+	return fmt.Sprintf(`<h3 style="margin:0 0 10px;color:%s;font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">%s</h3>`, BrandGray, text)
 }
 
 func p(text string) string {
-	return fmt.Sprintf(`<p style="margin:0 0 16px;color:#475569;font-size:15px;line-height:1.6;">%s</p>`, text)
+	return fmt.Sprintf(`<p style="margin:0 0 14px;color:%s;font-size:15px;line-height:1.6;">%s</p>`, BrandDark, text)
 }
 
 func pSmall(text string) string {
-	return fmt.Sprintf(`<p style="margin:0 0 8px;color:#64748b;font-size:13px;line-height:1.5;">%s</p>`, text)
+	return fmt.Sprintf(`<p style="margin:0 0 8px;color:%s;font-size:13px;line-height:1.55;">%s</p>`, BrandGray, text)
 }
 
+// btn — CTA arredondado (rounded-xl = 12px) matching o tema da app.
+// bgColor pode ser sobrescrito por template (ex: vermelho pra ações destrutivas).
+// Quando é verde Uniq, forçamos texto preto (contrast ratio).
 func btn(label, href, bgColor string) string {
-	return fmt.Sprintf(`<table cellpadding="0" cellspacing="0" style="margin:24px 0;"><tr><td align="center">
-    <a href="%s" style="display:inline-block;background:%s;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 32px;border-radius:10px;">%s</a>
-  </td></tr></table>`, href, bgColor, label)
+	textColor := "#ffffff"
+	if bgColor == BrandPrimary || bgColor == BrandSecondary {
+		textColor = "#0a0a0f"
+	}
+	return fmt.Sprintf(`<table cellpadding="0" cellspacing="0" role="presentation" style="margin:20px 0;"><tr><td align="left">
+    <a href="%s" style="display:inline-block;background:%s;color:%s;text-decoration:none;font-size:14px;font-weight:600;padding:12px 24px;border-radius:12px;letter-spacing:-0.1px;">%s</a>
+  </td></tr></table>`, href, bgColor, textColor, label)
 }
 
+// card — bloco secundário com fundo levemente mais claro + borda sutil.
 func card(content string) string {
-	return fmt.Sprintf(`<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:24px;margin:16px 0;">%s</div>`, content)
+	return fmt.Sprintf(`<div style="background:%s;border:1px solid %s;border-radius:12px;padding:18px 20px;margin:14px 0;">%s</div>`, BrandCardAlt, BrandBorder, content)
 }
 
 func infoItem(label, value string) string {
-	return fmt.Sprintf(`<p style="margin:8px 0;color:#475569;font-size:14px;"><span style="color:#64748b;font-weight:500;">%s:</span> %s</p>`, label, value)
+	return fmt.Sprintf(`<p style="margin:6px 0;color:%s;font-size:14px;line-height:1.5;"><span style="color:%s;font-weight:500;">%s:</span> %s</p>`, BrandDark, BrandGray, label, value)
 }
 
+// highlightBox — caixa de atenção/aviso. Usa bgColor semi-transparente.
+// No tema escuro, bg claro demais fica ruim — usa um tint da cor over dark.
 func highlightBox(content string, bgColor string) string {
-	return fmt.Sprintf(`<div style="background:%s;border-radius:12px;padding:20px;margin:16px 0;">%s</div>`, bgColor, content)
+	// Para manter legibilidade no escuro, usamos a cor de borda (não fundo)
+	// e mantemos background do card secundário.
+	return fmt.Sprintf(`<div style="background:%s;border-left:3px solid %s;border-radius:8px;padding:14px 16px;margin:14px 0;">%s</div>`, BrandCardAlt, bgColor, content)
 }
 
 func iconEmoji(emoji string) string {
-	return fmt.Sprintf(`<span style="font-size:32px;display:block;margin-bottom:16px;">%s</span>`, emoji)
+	return fmt.Sprintf(`<div style="font-size:28px;line-height:1;margin:0 0 14px;">%s</div>`, emoji)
 }
 
 func divider() string {
-	return `<div style="margin:24px 0;border-top:1px solid #e2e8f0;"></div>`
+	return fmt.Sprintf(`<div style="margin:20px 0;height:1px;background:%s;"></div>`, BrandBorder)
 }
 
 func listItem(text string) string {
-	return fmt.Sprintf(`<p style="margin:8px 0;padding-left:20px;position:relative;color:#475569;font-size:14px;line-height:1.5;">%s</p>`, text)
+	return fmt.Sprintf(`<p style="margin:6px 0;padding-left:16px;position:relative;color:%s;font-size:14px;line-height:1.55;">• %s</p>`, BrandDark, text)
+}
+
+// Helper para inline text em highlightBox — cor e tamanho padronizados no escuro.
+func inlineP(text string) string {
+	return fmt.Sprintf(`<p style="margin:0;color:%s;font-size:14px;line-height:1.55;">%s</p>`, BrandDark, text)
+}
+
+// codeBlock — valor monoespaçado (senha, código).
+func codeBlock(value string) string {
+	return fmt.Sprintf(`<code style="background:%s;padding:4px 10px;border-radius:6px;font-family:SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-weight:600;color:%s;border:1px solid %s;">%s</code>`, BrandBg, BrandPrimary, BrandBorder, value)
 }
 
 // ── Welcome ───────────────────────────────────────────────────────────────────
 
 func welcomeHTML(appName, name, appURL string) string {
 	content := iconEmoji("🎉") +
-		h1("Bem-vindo ao "+appName+"!") +
-		p("Olá, <strong>"+name+"</strong>! Estamos muito felizes em ter você conosco.") +
-		p("Você acaba de dar o primeiro passo para transformar a comunicação do seu negócio. Com o "+appName+" você pode:") +
+		h1("Bem-vindo ao "+appName) +
+		p("Olá, <strong>"+name+"</strong>. Estamos felizes em ter você por aqui.") +
+		p("Você acaba de dar o primeiro passo pra transformar a comunicação do seu negócio. Com o "+appName+" você pode:") +
 		card(
 			listItem("Gerenciar múltiplos números de WhatsApp em um só lugar")+
 				listItem("Automatizar respostas e campanhas de mensagens")+
@@ -124,23 +183,23 @@ func welcomeHTML(appName, name, appURL string) string {
 				listItem("Centralizar todas as conversas com seus clientes"),
 		) +
 		btn("Começar agora", appURL, BrandPrimary) +
-		pSmall("💡 Dica: Explore o painel de configurações para personalizar sua experiência.")
-	return baseTemplate(appName, appURL, "linear-gradient(135deg,"+BrandPrimary+","+BrandSecondary+")", content)
+		pSmall("💡 Dica: explore o painel de configurações para personalizar sua experiência.")
+	return baseTemplate(appName, appURL, BrandPrimary, content)
 }
 
 // ── Password Changed ──────────────────────────────────────────────────────────
 
 func passwordChangedHTML(appName, name, appURL string) string {
 	content := iconEmoji("🔐") +
-		h1("Senha alterada com sucesso") +
-		p("Olá, <strong>"+name+"</strong>!") +
-		p("Sua senha foi alterada recentemente. Se você realizou essa alteração, pode ignorar este e-mail com tranquilidade.") +
+		h1("Senha alterada") +
+		p("Olá, <strong>"+name+"</strong>.") +
+		p("Sua senha foi alterada recentemente. Se você fez essa alteração, pode ignorar este email.") +
 		highlightBox(
-			"<p style='margin:0;color:#475569;font-size:14px;'>⚠️ <strong>Se você não reconhece essa alteração</strong>, entre em contato com nosso suporte imediatamente. Recomendamos também alterar sua senha para uma nova imediatamente.</p>",
-			"#fef3c7",
+			inlineP("⚠️ <strong>Se você não reconhece essa alteração</strong>, entre em contato com nosso suporte imediatamente e troque sua senha."),
+			BrandWarning,
 		) +
-		pSmall("Para sua segurança, recomendamos usar uma senha forte com pelo menos 8 caracteres, incluindo letras maiúsculas, minúsculas, números e símbolos.")
-	return baseTemplate(appName, appURL, "linear-gradient(135deg,"+BrandWarning+",#d97706)", content)
+		pSmall("Para sua segurança, use uma senha forte com pelo menos 8 caracteres, incluindo letras maiúsculas, minúsculas, números e símbolos.")
+	return baseTemplate(appName, appURL, BrandWarning, content)
 }
 
 // ── Forgot Password ───────────────────────────────────────────────────────────
@@ -148,16 +207,16 @@ func passwordChangedHTML(appName, name, appURL string) string {
 func forgotPasswordHTML(appName, name, appURL, resetLink string) string {
 	content := iconEmoji("🔑") +
 		h1("Redefinir sua senha") +
-		p("Olá, <strong>"+name+"</strong>!") +
-		p("Recebemos uma solicitação para redefinir a senha da sua conta. Clique no botão abaixo para criar uma nova senha:") +
+		p("Olá, <strong>"+name+"</strong>.") +
+		p("Recebemos uma solicitação pra redefinir a senha da sua conta. Clique no botão abaixo pra criar uma nova senha:") +
 		btn("Redefinir senha", resetLink, BrandPrimary) +
 		highlightBox(
-			"<p style='margin:0;color:#475569;font-size:14px;'>⏰ Este link expira em <strong>1 hora</strong>.</p>",
-			"#fef3c7",
+			inlineP("⏰ Este link expira em <strong>1 hora</strong>."),
+			BrandWarning,
 		) +
 		divider() +
-		pSmall("Se você não solicitou a redefinição de senha, pode ignorar este e-mail com segurança. Sua conta permanece protegida.")
-	return baseTemplate(appName, appURL, "linear-gradient(135deg,"+BrandPrimary+","+BrandSecondary+")", content)
+		pSmall("Se você não solicitou a redefinição, pode ignorar este email com segurança. Sua conta permanece protegida.")
+	return baseTemplate(appName, appURL, BrandPrimary, content)
 }
 
 // ── Payment Confirmed ─────────────────────────────────────────────────────────
@@ -165,33 +224,33 @@ func forgotPasswordHTML(appName, name, appURL, resetLink string) string {
 func paymentConfirmedHTML(appName, name, appURL, planName string, amount float64) string {
 	amountStr := fmt.Sprintf("R$ %.2f", amount)
 	content := iconEmoji("🎊") +
-		h1("Pagamento confirmado!") +
-		p("Olá, <strong>"+name+"</strong>! Obrigado por escolher o "+appName+"!") +
+		h1("Pagamento confirmado") +
+		p("Olá, <strong>"+name+"</strong>. Obrigado por escolher o "+appName+".") +
 		card(
 			h3("Resumo do pagamento")+
 				infoItem("Plano", planName)+
 				infoItem("Valor", amountStr)+
-				infoItem("Status", "<span style='color:#22c55e;font-weight:600;'>✓ Confirmado</span>"),
+				infoItem("Status", "<span style=\"color:"+BrandPrimary+";font-weight:600;\">✓ Confirmado</span>"),
 		) +
-		p("Todos os recursos do plano <strong>"+planName+"</strong> já estão disponíveis na sua conta. Aproveite ao máximo!") +
+		p("Todos os recursos do plano <strong>"+planName+"</strong> já estão disponíveis na sua conta.") +
 		btn("Acessar painel", appURL+"/dashboard", BrandPrimary)
-	return baseTemplate(appName, appURL, "linear-gradient(135deg,"+BrandAccent+",#16a34a)", content)
+	return baseTemplate(appName, appURL, BrandPrimary, content)
 }
 
 // ── Plan Changed ──────────────────────────────────────────────────────────────
 
 func planChangedHTML(appName, name, appURL, oldPlan, newPlan string) string {
 	content := iconEmoji("⬆️") +
-		h1("Seu plano foi atualizado") +
-		p("Olá, <strong>"+name+"</strong>!") +
+		h1("Plano atualizado") +
+		p("Olá, <strong>"+name+"</strong>.") +
 		card(
 			h3("Alteração de plano")+
 				infoItem("De", oldPlan)+
 				infoItem("Para", newPlan),
 		) +
-		p("Seu plano foi atualizado com sucesso. As novas funcionalidades e recursos já estão disponíveis na sua conta.") +
+		p("As novas funcionalidades e recursos já estão disponíveis na sua conta.") +
 		btn("Ver novos recursos", appURL+"/settings", BrandPrimary)
-	return baseTemplate(appName, appURL, "linear-gradient(135deg,#8b5cf6,#a855f7)", content)
+	return baseTemplate(appName, appURL, BrandPrimary, content)
 }
 
 // ── Payment Failed ────────────────────────────────────────────────────────────
@@ -199,37 +258,37 @@ func planChangedHTML(appName, name, appURL, oldPlan, newPlan string) string {
 func paymentFailedHTML(appName, name, appURL, billingURL string) string {
 	content := iconEmoji("⚠️") +
 		h1("Pagamento não processado") +
-		p("Olá, <strong>"+name+"</strong>!") +
-		p("Não conseguimos processar o pagamento da sua assinatura. Isso pode ter acontecido por:") +
+		p("Olá, <strong>"+name+"</strong>.") +
+		p("Não conseguimos processar o pagamento da sua assinatura. Pode ter acontecido por:") +
 		card(
 			listItem("Cartão de crédito expirado ou bloqueado")+
 				listItem("Saldo insuficiente")+
 				listItem("Limite do cartão excedido")+
 				listItem("Dados do cartão incorretos"),
 		) +
-		p("Por favor, atualize seus dados de pagamento para manter o acesso a todos os recursos do seu plano:") +
+		p("Por favor, atualize seus dados de pagamento pra manter o acesso aos recursos do seu plano:") +
 		btn("Atualizar pagamento", billingURL, BrandDanger) +
 		divider() +
-		pSmall("Se você acredita que houve um erro, entre em contato com nosso suporte respondendo este e-mail.")
-	return baseTemplate(appName, appURL, "linear-gradient(135deg,"+BrandDanger+",#dc2626)", content)
+		pSmall("Se você acredita que houve um erro, responda este email e nosso suporte ajuda.")
+	return baseTemplate(appName, appURL, BrandDanger, content)
 }
 
 // ── Subscription Canceled ─────────────────────────────────────────────────────
 
 func subscriptionCanceledHTML(appName, name, appURL, plansURL string) string {
-	content := iconEmoji("😢") +
+	content := iconEmoji("👋") +
 		h1("Assinatura cancelada") +
-		p("Olá, <strong>"+name+"</strong>!") +
-		p("Sua assinatura do "+appName+" foi cancelada. Sentimos muito ver você partir!") +
+		p("Olá, <strong>"+name+"</strong>.") +
+		p("Sua assinatura do "+appName+" foi cancelada. Sentimos muito ver você partir.") +
 		highlightBox(
-			"<p style='margin:0;color:#475569;font-size:14px;'>Você continuará tendo acesso aos recursos do seu plano até o final do período pago.</p>",
-			"#f1f5f9",
+			inlineP("Você continuará tendo acesso aos recursos do seu plano até o final do período já pago."),
+			BrandGray,
 		) +
-		p("Se mudou de ideia ou quiser reativar sua assinatura no futuro, estamos aqui!") +
+		p("Se mudou de ideia ou quiser reativar no futuro, estamos aqui.") +
 		btn("Ver planos disponíveis", plansURL, BrandPrimary) +
 		divider() +
-		pSmall("Se cancelou por engano ou precisa de ajuda, responda este e-mail que retornaremos em até 24h.")
-	return baseTemplate(appName, appURL, "linear-gradient(135deg,#64748b,#475569)", content)
+		pSmall("Cancelou por engano ou precisa de ajuda? Responda este email — retornamos em até 24h.")
+	return baseTemplate(appName, appURL, BrandGray, content)
 }
 
 // ── Instance Banned ───────────────────────────────────────────────────────────
@@ -237,37 +296,37 @@ func subscriptionCanceledHTML(appName, name, appURL, plansURL string) string {
 func instanceBannedHTML(appName, name, appURL, instanceName, phone string) string {
 	content := iconEmoji("🚫") +
 		h1("Instância banida") +
-		p("Olá, <strong>"+name+"</strong>!") +
+		p("Olá, <strong>"+name+"</strong>.") +
 		p("Uma das suas instâncias foi banida pela plataforma de mensagens. Isso geralmente acontece por violação dos termos de uso.") +
 		card(
 			h3("Detalhes da instância")+
 				infoItem("Nome", instanceName)+
 				infoItem("Número", phone),
 		) +
-		p("Para entender o motivo específico e discutir os próximos passos, entre em contato com nosso suporte.") +
+		p("Pra entender o motivo específico e próximos passos, fale com nosso suporte.") +
 		btn("Falar com suporte", appURL+"/support", BrandPrimary) +
 		divider() +
-		pSmall("Recomendamos revisar nossas políticas de uso para evitar novos banimentos. Você pode encontrar as diretrizes em nosso site.")
-	return baseTemplate(appName, appURL, "linear-gradient(135deg,"+BrandDanger+",#dc2626)", content)
+		pSmall("Recomendamos revisar nossas políticas de uso pra evitar novos banimentos.")
+	return baseTemplate(appName, appURL, BrandDanger, content)
 }
 
 // ── Admin Created Account ─────────────────────────────────────────────────────
 
 func adminCreatedAccountHTML(appName, name, appURL, email, tempPassword string) string {
 	content := iconEmoji("👋") +
-		h1("Sua conta foi criada!") +
-		p("Olá, <strong>"+name+"</strong>! Um administrador criou uma conta para você no "+appName+".") +
+		h1("Sua conta foi criada") +
+		p("Olá, <strong>"+name+"</strong>. Um administrador criou uma conta pra você no "+appName+".") +
 		card(
-			h3("Suas credenciais de acesso")+
-				infoItem("E-mail", email)+
-				infoItem("Senha temporária", "<code style='background:#f1f5f9;padding:4px 8px;border-radius:4px;font-family:monospace;font-weight:600;'>"+tempPassword+"</code>"),
+			h3("Credenciais de acesso")+
+				infoItem("Email", email)+
+				infoItem("Senha temporária", codeBlock(tempPassword)),
 		) +
 		btn("Acessar minha conta", appURL, BrandPrimary) +
 		highlightBox(
-			"<p style='margin:0;color:#475569;font-size:14px;'>⚠️ Por segurança, recomendamos alterar sua senha imediatamente após o primeiro acesso.</p>",
-			"#fef3c7",
+			inlineP("⚠️ Por segurança, altere sua senha imediatamente após o primeiro acesso."),
+			BrandWarning,
 		)
-	return baseTemplate(appName, appURL, "linear-gradient(135deg,"+BrandPrimary+","+BrandSecondary+")", content)
+	return baseTemplate(appName, appURL, BrandPrimary, content)
 }
 
 // ── Admin Reset Password ──────────────────────────────────────────────────────
@@ -275,47 +334,47 @@ func adminCreatedAccountHTML(appName, name, appURL, email, tempPassword string) 
 func adminResetPasswordHTML(appName, name, appURL, newPassword string) string {
 	content := iconEmoji("🔐") +
 		h1("Senha redefinida") +
-		p("Olá, <strong>"+name+"</strong>!") +
+		p("Olá, <strong>"+name+"</strong>.") +
 		p("Um administrador redefiniu a senha da sua conta no "+appName+". Sua nova senha temporária é:") +
 		card(
-			"<p style='margin:0;text-align:center;font-size:24px;font-weight:700;letter-spacing:2px;color:#1e293b;padding:8px;'>"+newPassword+"</p>",
+			fmt.Sprintf(`<p style="margin:0;text-align:center;font-size:22px;font-weight:700;letter-spacing:2px;color:%s;padding:8px 0;font-family:SFMono-Regular,Menlo,Monaco,Consolas,monospace;">%s</p>`, BrandPrimary, newPassword),
 		) +
 		highlightBox(
-			"<p style='margin:0;color:#475569;font-size:14px;'>⚠️ Por segurança, altere sua senha assim que fizer login.</p>",
-			"#fef3c7",
+			inlineP("⚠️ Por segurança, altere sua senha assim que fizer login."),
+			BrandWarning,
 		)
-	return baseTemplate(appName, appURL, "linear-gradient(135deg,"+BrandWarning+",#d97706)", content)
+	return baseTemplate(appName, appURL, BrandWarning, content)
 }
 
 // ── Workspace Invite ──────────────────────────────────────────────────────────
 
 func workspaceInviteHTML(appName, appURL, workspaceName, inviterName, roleName, acceptURL string) string {
 	content := iconEmoji("🎉") +
-		h1("Você foi convidado!") +
-		p("<strong>"+inviterName+"</strong> convidou você para colaborar no workspace <strong>"+workspaceName+"</strong> no "+appName+".") +
+		h1("Você foi convidado") +
+		p("<strong>"+inviterName+"</strong> convidou você pra colaborar no workspace <strong>"+workspaceName+"</strong> no "+appName+".") +
 		card(
 			h3("Detalhes do convite")+
 				infoItem("Workspace", workspaceName)+
 				infoItem("Função", roleName)+
 				infoItem("Convidado por", inviterName),
 		) +
-		p("Clique no botão abaixo para aceitar o convite e começar a colaborar:") +
+		p("Clique no botão abaixo pra aceitar o convite e começar a colaborar:") +
 		btn("Aceitar convite", acceptURL, BrandPrimary) +
 		highlightBox(
-			"<p style='margin:0;color:#475569;font-size:14px;'>⏰ Este convite expira em <strong>7 dias</strong>.</p>",
-			"#fef3c7",
+			inlineP("⏰ Este convite expira em <strong>7 dias</strong>."),
+			BrandWarning,
 		) +
 		divider() +
-		pSmall("Se você não esperava este convite ou não reconhece quem enviou, pode ignorar este e-mail com segurança.") +
-		pSmall("Se o botão acima não funcionar, copie e cole este link no seu navegador: <br><span style='color:#6366f1;word-break:break-all;'>"+acceptURL+"</span>")
-	return baseTemplate(appName, appURL, "linear-gradient(135deg,"+BrandPrimary+","+BrandSecondary+")", content)
+		pSmall("Se você não esperava este convite, pode ignorar este email com segurança.") +
+		fmt.Sprintf(`<p style="margin:12px 0 0;color:%s;font-size:12px;line-height:1.5;">Se o botão não funcionar, copie este link no navegador:<br><span style="color:%s;word-break:break-all;">%s</span></p>`, BrandMuted, BrandPrimary, acceptURL)
+	return baseTemplate(appName, appURL, BrandPrimary, content)
 }
 
-// Test email - simple branded template
+// Test email — template mínimo pra validar config Maileroo.
 func TestHTML(appName string) string {
 	content := iconEmoji("✉️") +
-		h1("E-mail de teste") +
-		p("Este é um e-mail de teste do "+appName+". Se você recebeu, a configuração está funcionando corretamente!") +
-		p("Para personalizar os templates de e-mail, vá para Configurações → E-mail no painel de administração.")
-	return baseTemplate(appName, "https://uniq.chat", "linear-gradient(135deg,"+BrandPrimary+","+BrandSecondary+")", content)
+		h1("Email de teste") +
+		p("Este é um email de teste do <strong>"+appName+"</strong>. Se você recebeu, a configuração está funcionando.") +
+		p("Pra personalizar os templates, vá em Configurações → Email no painel de administração.")
+	return baseTemplate(appName, "https://uniq.chat", BrandPrimary, content)
 }
