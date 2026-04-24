@@ -241,3 +241,82 @@
 .ring-pulse {
   animation: pulse-ring 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
+
+/* ─── UX transitions: suavização padrão da Uniq ─────────────────────────── */
+
+/* Modal / drawer entrada */
+@keyframes uniq-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes uniq-scale-in {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+@keyframes uniq-slide-down {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes uniq-slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes uniq-slide-right {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.uniq-fade-in    { animation: uniq-fade-in    180ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.uniq-scale-in   { animation: uniq-scale-in   220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.uniq-slide-down { animation: uniq-slide-down 180ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.uniq-slide-up   { animation: uniq-slide-up   180ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.uniq-slide-right{ animation: uniq-slide-right 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Press feedback global — ao clicar um botão/linha, encolhe ligeiramente
+   e retorna quando solta. Evita UI "dura".                        */
+button, a, [role="button"] {
+  transition: transform 120ms cubic-bezier(0.22, 1, 0.36, 1),
+              background-color 140ms ease,
+              color 140ms ease,
+              border-color 140ms ease,
+              opacity 140ms ease,
+              box-shadow 160ms ease;
+}
+button:active:not(:disabled),
+a:active:not([aria-disabled="true"]),
+[role="button"]:active:not([aria-disabled="true"]) {
+  transform: scale(0.97);
+}
+
+/* Hover lift genérico para cards clicáveis — use .uniq-lift na classe */
+.uniq-lift {
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 200ms ease,
+              border-color 160ms ease;
+}
+.uniq-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px -8px rgba(0, 0, 0, 0.35);
+}
+
+/* Focus ring padronizado em verde Uniq */
+*:focus-visible {
+  outline: 2px solid rgba(0, 212, 106, 0.6);
+  outline-offset: 1px;
+  border-radius: 6px;
+}
+
+/* Scrollbar discreto e na paleta Uniq */
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: hsl(240 12% 16%);
+  border-radius: 99px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: hsl(240 12% 22%);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(240 12% 16%) transparent;
+}

@@ -363,12 +363,15 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
 	}
 	var body struct {
-		Body      string `json:"body"`
-		Type      string `json:"type"`
-		MediaURL  string `json:"media_url"`
-		MediaMime string `json:"media_mime"`
-		Caption   string `json:"caption"`
-		Filename  string `json:"filename"`
+		Body               string           `json:"body"`
+		Type               string           `json:"type"`
+		MediaURL           string           `json:"media_url"`
+		MediaMime          string           `json:"media_mime"`
+		Caption            string           `json:"caption"`
+		Filename           string           `json:"filename"`
+		TemplateName       string           `json:"template_name"`
+		TemplateLanguage   string           `json:"template_language"`
+		TemplateComponents []map[string]any `json:"template_components"`
 	}
 	if err := c.BodyParser(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -378,10 +381,14 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		msgType = "text"
 	}
 	isMedia := msgType == "image" || msgType == "audio" || msgType == "video" || msgType == "document"
+	isTemplate := msgType == "template"
 	if isMedia && strings.TrimSpace(body.MediaURL) == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "media_url é obrigatório para " + msgType})
 	}
-	if !isMedia && strings.TrimSpace(body.Body) == "" {
+	if isTemplate && strings.TrimSpace(body.TemplateName) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "template_name é obrigatório para type=template"})
+	}
+	if !isMedia && !isTemplate && strings.TrimSpace(body.Body) == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body é obrigatório"})
 	}
 
@@ -412,7 +419,8 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 	// para o MessageBubble do frontend renderizar exatamente igual ao
 	// formato recebido do inbound (parseMessageContent aceita os dois).
 	var contentStr string
-	if isMedia {
+	switch {
+	case isMedia:
 		payload := map[string]any{
 			"url":       body.MediaURL,
 			"mime_type": body.MediaMime,
@@ -427,7 +435,15 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		}
 		b, _ := json.Marshal(payload)
 		contentStr = string(b)
-	} else {
+	case isTemplate:
+		payload := map[string]any{
+			"template_name":     body.TemplateName,
+			"template_language": body.TemplateLanguage,
+			"components":        body.TemplateComponents,
+		}
+		b, _ := json.Marshal(payload)
+		contentStr = string(b)
+	default:
 		b, _ := json.Marshal(body.Body)
 		contentStr = string(b)
 	}
@@ -455,13 +471,16 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 			ctx, cancel := context.WithTimeout(c.UserContext(), 60*time.Second)
 			defer cancel()
 			_, sendErr := h.outbound.Send(ctx, &inst, outbound.OutboundMessage{
-				To:        conv.ChannelKey,
-				Type:      msgType,
-				Body:      body.Body,
-				MediaURL:  body.MediaURL,
-				MediaMime: body.MediaMime,
-				Caption:   body.Caption,
-				Filename:  body.Filename,
+				To:                 conv.ChannelKey,
+				Type:               msgType,
+				Body:               body.Body,
+				MediaURL:           body.MediaURL,
+				MediaMime:          body.MediaMime,
+				Caption:            body.Caption,
+				Filename:           body.Filename,
+				TemplateName:       body.TemplateName,
+				TemplateLanguage:   body.TemplateLanguage,
+				TemplateComponents: body.TemplateComponents,
 			})
 			if sendErr != nil {
 				sendStatus = models.MessageStatusFailed
@@ -502,6 +521,8 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		if body.Caption != "" {
 			preview = preview + " · " + body.Caption
 		}
+	} else if isTemplate {
+		preview = "📨 Template · " + body.TemplateName
 	}
 	if len(preview) > 280 {
 		preview = preview[:280]
@@ -531,6 +552,63 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 
 	h.broadcast(&conv, "conversation.message", map[string]any{"message": logRow})
 	return c.Status(fiber.StatusCreated).JSON(logRow)
+}
+
+// PatchMessage PATCH /v1/conversations/:id/messages/:msgId
+// Body: { is_pinned?, is_favorite?, is_archived?, is_deleted? }
+// Permite fixar, favoritar, arquivar mensagens individuais. Os flags
+// existem no MessageLog desde a fase legacy — aqui só expomos um endpoint
+// integrado ao novo fluxo de Conversation.
+func (h *ConversationHandler) PatchMessage(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	convID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	msgID, err := uuid.Parse(c.Params("msgId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "msgId inválido"})
+	}
+	// Verificar que a mensagem pertence a uma conversation desse workspace.
+	var cnt int64
+	h.db.Model(&models.MessageLog{}).
+		Joins("JOIN conversations c ON c.id = message_logs.conversation_id").
+		Where("message_logs.id = ? AND c.workspace_id = ? AND c.id = ?", msgID, ws, convID).
+		Count(&cnt)
+	if cnt == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "mensagem não encontrada"})
+	}
+
+	var body struct {
+		IsPinned   *bool `json:"is_pinned"`
+		IsFavorite *bool `json:"is_favorite"`
+		IsArchived *bool `json:"is_archived"`
+		IsDeleted  *bool `json:"is_deleted"`
+	}
+	c.BodyParser(&body)
+	updates := map[string]any{}
+	if body.IsPinned != nil {
+		updates["is_pinned"] = *body.IsPinned
+	}
+	if body.IsFavorite != nil {
+		updates["is_favorite"] = *body.IsFavorite
+	}
+	if body.IsArchived != nil {
+		updates["is_archived"] = *body.IsArchived
+	}
+	if body.IsDeleted != nil {
+		updates["is_deleted"] = *body.IsDeleted
+	}
+	if len(updates) == 0 {
+		return c.JSON(fiber.Map{"ok": true, "changed": 0})
+	}
+	h.db.Model(&models.MessageLog{}).Where("id = ?", msgID).Updates(updates)
+	var updated models.MessageLog
+	h.db.First(&updated, "id = ?", msgID)
+	h.broadcast(&models.Conversation{ID: convID, WorkspaceID: ws}, "conversation.message_updated", map[string]any{
+		"message": updated,
+	})
+	return c.JSON(updated)
 }
 
 // Typing POST /v1/conversations/:id/typing  { typing: bool }

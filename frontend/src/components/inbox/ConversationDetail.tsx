@@ -2,15 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ArrowLeft, Send, StickyNote, CheckCircle2, Clock3, RotateCcw,
   UserCheck, UserX, ArrowRightLeft, Bot, BotOff, Lock, AlertTriangle,
   Smile, X, Star, Mic, Image as ImageIcon, FileText, MapPin, Check,
-  CheckCheck, AlertCircle, Paperclip,
+  CheckCheck, AlertCircle, Paperclip, Pin, Sparkles,
 } from "lucide-react";
 import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi } from "@/lib/api";
+import { TemplatePicker } from "@/components/inbox/TemplatePicker";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { relativeTime } from "@/components/atendimento/ConversationList";
@@ -64,6 +65,8 @@ interface MessagePayload {
   created_at: string;
   status?: string;
   is_internal_note?: boolean;
+  is_pinned?: boolean;
+  is_favorite?: boolean;
 }
 
 interface NotePayload {
@@ -116,6 +119,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   const canNote = hasPerm(PERM.notesCreate);
 
   const [transferOpen, setTransferOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
 
   const convQ = useQuery({
     queryKey: ["conversation", wsId, conversationId],
@@ -124,9 +128,27 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     refetchInterval: 10_000,
   });
 
-  const timelineQ = useQuery({
+  // Infinite scroll pela timeline: a primeira página traz as 100 mensagens
+  // mais recentes; conforme o agente rola pro topo, fetchNextPage puxa
+  // outras 100 mais antigas via `?before=<createdAt>`. O refetchInterval
+  // mantém a primeira página viva (ex.: nova mensagem recebida aparece).
+  const TIMELINE_PAGE = 100;
+  const timelineQ = useInfiniteQuery({
     queryKey: ["conversation-timeline", wsId, conversationId],
-    queryFn: () => conversationsApi.timeline(wsId as string, conversationId).then((r) => r.data as TimelinePayload),
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) => {
+      const r = await conversationsApi.timeline(wsId as string, conversationId, {
+        before: pageParam as string | undefined,
+        limit: TIMELINE_PAGE,
+      });
+      return r.data as TimelinePayload;
+    },
+    getNextPageParam: (last) => {
+      const items = last.items ?? [];
+      if (items.length < TIMELINE_PAGE) return undefined; // sem mais antigas
+      // `items` chegam DESC (mais novo primeiro); a mais antiga é a última.
+      return items[items.length - 1]?.at;
+    },
     enabled: !!wsId && canView,
     refetchInterval: 5_000,
   });
@@ -231,6 +253,15 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     onSuccess: () => refresh(),
   });
 
+  const patchMsg = useMutation({
+    mutationFn: ({ msgId, patch }: { msgId: string; patch: { is_pinned?: boolean; is_favorite?: boolean } }) =>
+      conversationsApi.patchMessage(wsId as string, conversationId, msgId, patch),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["conversation-timeline", wsId, conversationId] });
+    },
+    onError: () => toast.error("Falha ao atualizar mensagem"),
+  });
+
   // Keyboard shortcuts — declared after all mutations to avoid TDZ refs.
   const openSnoozePrompt = useCallback(() => {
     const hours = Number(prompt("Em quantas horas desnoozear?", "4") || 4);
@@ -266,18 +297,66 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   }
 
   const conv = convQ.data;
-  const timeline = useMemo(
-    () => timelineQ.data?.items?.slice().sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime()) ?? [],
-    [timelineQ.data]
-  );
+  // Achata todas as páginas da infinite query (desc → asc) e remove
+  // duplicatas caso backend reemita um item na borda entre pages.
+  const timelineAll = useMemo(() => {
+    const pages = timelineQ.data?.pages ?? [];
+    const seen = new Set<string>();
+    const out: TimelinePayload["items"] = [];
+    for (const p of pages) {
+      for (const it of p.items ?? []) {
+        const key = `${it.kind}-${it.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(it);
+      }
+    }
+    return out.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+  }, [timelineQ.data]);
+  const timeline = timelineAll;
   const status = conv ? STATUS_LABELS[conv.status] ?? STATUS_LABELS.open : null;
 
   // SLA breach indicator: scan the audit events for a sla_breached row; if
   // present we show a red pill. Lightweight — no extra query.
-  const slaBreached = useMemo(() => {
-    const items = timelineQ.data?.items ?? [];
-    return items.some((e) => e.kind === "event" && (e.payload as EventPayload).event_type === "sla_breached");
-  }, [timelineQ.data]);
+  const slaBreached = useMemo(
+    () => timeline.some((e) => e.kind === "event" && (e.payload as EventPayload).event_type === "sla_breached"),
+    [timeline],
+  );
+
+  // IntersectionObserver no topo: quando o sentinel fica visível, carrega
+  // a próxima página mais antiga. Preserva scroll position com
+  // scrollTop anchor — sem o jump feio de "pulou 1k pixels".
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const topSentinelRef = useRef<HTMLDivElement | null>(null);
+  const preserveRef = useRef<{ height: number; top: number } | null>(null);
+
+  useEffect(() => {
+    const sentinel = topSentinelRef.current;
+    const scroller = scrollRef.current;
+    if (!sentinel || !scroller) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting && timelineQ.hasNextPage && !timelineQ.isFetchingNextPage) {
+          preserveRef.current = { height: scroller.scrollHeight, top: scroller.scrollTop };
+          timelineQ.fetchNextPage();
+        }
+      },
+      { root: scroller, rootMargin: "120px", threshold: 0 },
+    );
+    obs.observe(sentinel);
+    return () => obs.disconnect();
+  }, [timelineQ, conversationId]);
+
+  // Após chegar uma nova página no topo, reposiciona o scroll para o
+  // mesmo ponto visual (scrollHeight cresceu no topo → precisa compensar).
+  useEffect(() => {
+    if (!preserveRef.current || !scrollRef.current) return;
+    const scroller = scrollRef.current;
+    const delta = scroller.scrollHeight - preserveRef.current.height;
+    if (delta > 0) scroller.scrollTop = preserveRef.current.top + delta;
+    preserveRef.current = null;
+  }, [timeline.length]);
 
   return (
     <div className="flex h-full min-h-0">
@@ -339,6 +418,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
         </header>
 
         <div
+          ref={scrollRef}
           className="flex-1 overflow-auto px-5 py-6"
           style={{ background: "hsl(240 18% 5.5%)" }}
         >
@@ -351,10 +431,36 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             </div>
           ) : (
             <ol className="mx-auto flex max-w-3xl flex-col gap-3">
+              <div ref={topSentinelRef} />
+              {timelineQ.isFetchingNextPage && (
+                <div
+                  className="mx-auto my-1 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px]"
+                  style={{
+                    background: "rgba(255,255,255,0.04)",
+                    color: "hsl(240 8% 52%)",
+                  }}
+                >
+                  <span className="inline-block h-2.5 w-2.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Carregando mensagens antigas…
+                </div>
+              )}
+              {!timelineQ.hasNextPage && timeline.length >= TIMELINE_PAGE && (
+                <div
+                  className="mx-auto my-1 text-[10px]"
+                  style={{ color: "hsl(240 8% 38%)" }}
+                >
+                  Início da conversa
+                </div>
+              )}
               {timeline.map((e) => (
                 <li key={`${e.kind}-${e.id}`}>
                   {e.kind === "message" ? (
-                    <MessageBubble m={e.payload as MessagePayload} />
+                    <MessageBubble
+                      m={e.payload as MessagePayload}
+                      onPatch={(patch) =>
+                        patchMsg.mutate({ msgId: (e.payload as MessagePayload).id, patch })
+                      }
+                    />
                   ) : e.kind === "note" ? (
                     <NoteCard n={e.payload as NotePayload} />
                   ) : (
@@ -402,6 +508,13 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               onClick={() => setTransferOpen(true)}
               icon={<ArrowRightLeft className="h-4 w-4" />}
               label="Transferir…"
+            />
+          )}
+          {canSend && conv?.channel_type === "waba" && conv?.instance_id && (
+            <ActionRow
+              onClick={() => setTemplateOpen(true)}
+              icon={<Sparkles className="h-4 w-4" />}
+              label="Enviar template aprovado"
             />
           )}
           {canClose && conv?.status === "resolved" && (
@@ -472,6 +585,16 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           onSuccess={refresh}
         />
       )}
+
+      {templateOpen && wsId && conv?.instance_id && (
+        <TemplatePicker
+          wsId={wsId}
+          conversationId={conversationId}
+          instanceId={conv.instance_id}
+          onClose={() => setTemplateOpen(false)}
+          onSent={refresh}
+        />
+      )}
     </div>
   );
 }
@@ -537,27 +660,53 @@ function TransferDialog({
         }));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-lg bg-white shadow-xl dark:bg-zinc-950">
-        <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-          <h2 className="font-semibold">Transferir atendimento</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 uniq-fade-in"
+        style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
+        onClick={onClose}
+      />
+      <div
+        className="relative w-full max-w-lg overflow-hidden rounded-2xl shadow-2xl uniq-scale-in"
+        style={{
+          background: "hsl(240 18% 6%)",
+          border: "1px solid hsl(240 12% 14%)",
+        }}
+      >
+        <div
+          className="flex items-center justify-between px-4 py-3"
+          style={{ borderBottom: "1px solid hsl(240 12% 16%)" }}
+        >
+          <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 93%)" }}>
+            Transferir atendimento
+          </h2>
           <button
             onClick={onClose}
-            className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            className="rounded-md p-1.5 hover:bg-white/5"
+            style={{ color: "hsl(240 8% 48%)" }}
           >
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="flex border-b border-zinc-200 dark:border-zinc-800">
+        <div className="flex" style={{ borderBottom: "1px solid hsl(240 12% 16%)" }}>
           {(["queue", "team", "user"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 px-4 py-2 text-sm ${
+              className="flex-1 px-4 py-2 text-xs font-medium"
+              style={
                 tab === t
-                  ? "border-b-2 border-blue-500 font-medium text-blue-600 dark:text-blue-400"
-                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-              }`}
+                  ? {
+                      color: "#00d46a",
+                      borderBottom: "2px solid #00d46a",
+                      marginBottom: "-1px",
+                    }
+                  : {
+                      color: "hsl(240 8% 52%)",
+                      borderBottom: "2px solid transparent",
+                      marginBottom: "-1px",
+                    }
+              }
             >
               {t === "queue" ? "Fila" : t === "team" ? "Equipe" : "Agente"}
             </button>
@@ -617,7 +766,12 @@ function TransferDialog({
   );
 }
 
-function MessageBubble({ m }: { m: MessagePayload }) {
+function MessageBubble({
+  m, onPatch,
+}: {
+  m: MessagePayload;
+  onPatch?: (patch: { is_pinned?: boolean; is_favorite?: boolean }) => void;
+}) {
   const isOut = m.direction === "out";
   const parsed = parseMessageContent(m.content);
   // Reaction — bolha compacta só com emoji grande
@@ -625,7 +779,7 @@ function MessageBubble({ m }: { m: MessagePayload }) {
     return (
       <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
         <div
-          className="rounded-2xl px-3 py-1 text-2xl"
+          className="rounded-2xl px-3 py-1 text-2xl uniq-slide-up"
           style={{
             background: isOut ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.04)",
             border: `1px solid ${isOut ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.08)"}`,
@@ -638,25 +792,44 @@ function MessageBubble({ m }: { m: MessagePayload }) {
   }
 
   return (
-    <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
+    <div className={`group relative flex ${isOut ? "justify-end" : "justify-start"}`}>
       <div
-        className="max-w-[80%] rounded-2xl px-3 py-2 shadow-sm"
+        className="relative max-w-[80%] rounded-2xl px-3 py-2 shadow-sm uniq-slide-up"
         style={
           isOut
             ? {
                 background: "rgba(0,212,106,0.12)",
-                border: "1px solid rgba(0,212,106,0.25)",
+                border: `1px solid ${m.is_pinned ? "#00d46a" : "rgba(0,212,106,0.25)"}`,
                 color: "hsl(240 15% 92%)",
                 borderBottomRightRadius: 6,
               }
             : {
                 background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                border: `1px solid ${m.is_pinned ? "#00d46a" : "rgba(255,255,255,0.08)"}`,
                 color: "hsl(240 15% 90%)",
                 borderBottomLeftRadius: 6,
               }
         }
       >
+        {m.is_pinned && (
+          <span
+            className="absolute -top-2 left-2 flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium"
+            style={{ background: "#00d46a", color: "#03170a" }}
+            title="Fixada"
+          >
+            <Pin className="h-2.5 w-2.5" /> fixada
+          </span>
+        )}
+        {m.is_favorite && !m.is_pinned && (
+          <span
+            className="absolute -top-2 right-2 flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px]"
+            style={{ background: "#f59e0b", color: "#1f1300" }}
+            title="Favoritada"
+          >
+            <Star className="h-2.5 w-2.5" /> favorita
+          </span>
+        )}
+
         {!isOut && m.sender_name && (
           <div
             className="mb-0.5 text-[11px] font-medium"
@@ -675,6 +848,37 @@ function MessageBubble({ m }: { m: MessagePayload }) {
           <span>{relativeTime(m.created_at)}</span>
           {isOut && <StatusTicks status={m.status} />}
         </div>
+
+        {onPatch && (
+          <div
+            className={`pointer-events-none absolute -top-3 flex gap-0.5 rounded-full px-1 py-0.5 opacity-0 shadow-lg transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 ${
+              isOut ? "right-2" : "left-2"
+            }`}
+            style={{
+              background: "hsl(240 18% 6%)",
+              border: "1px solid hsl(240 12% 16%)",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => onPatch({ is_pinned: !m.is_pinned })}
+              className="rounded-full p-1 hover:bg-white/10"
+              title={m.is_pinned ? "Desfixar" : "Fixar"}
+              style={{ color: m.is_pinned ? "#00d46a" : "hsl(240 8% 62%)" }}
+            >
+              <Pin className="h-3 w-3" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onPatch({ is_favorite: !m.is_favorite })}
+              className="rounded-full p-1 hover:bg-white/10"
+              title={m.is_favorite ? "Remover favorito" : "Favoritar"}
+              style={{ color: m.is_favorite ? "#f59e0b" : "hsl(240 8% 62%)" }}
+            >
+              <Star className="h-3 w-3" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

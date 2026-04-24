@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -76,6 +76,47 @@ export default function InboxPage() {
   const canView = hasPerm(PERM.ticketsView);
   const canViewAll = hasPerm(PERM.ticketsViewAll) || hasPerm(PERM.ticketsViewTeam) || isOwner;
   const canAssign = hasPerm(PERM.ticketsAssign);
+
+  // Resize da coluna da lista — largura persistida em localStorage entre
+  // sessões. Clamp em [260, 560] pra não ficar minúsculo nem maior que
+  // o painel de chat.
+  const LIST_WIDTH_KEY = "inbox:list:width";
+  const LIST_MIN = 260;
+  const LIST_MAX = 560;
+  const [listWidth, setListWidth] = useState<number>(() => {
+    if (typeof window === "undefined") return 340;
+    const raw = window.localStorage.getItem(LIST_WIDTH_KEY);
+    const n = raw ? parseInt(raw, 10) : 340;
+    return Number.isFinite(n) && n >= LIST_MIN && n <= LIST_MAX ? n : 340;
+  });
+  const resizingRef = useRef(false);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(LIST_WIDTH_KEY, String(listWidth));
+    }
+  }, [listWidth]);
+
+  const startResize = (startClientX: number) => {
+    resizingRef.current = true;
+    const startWidth = listWidth;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    const onMove = (ev: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const delta = ev.clientX - startClientX;
+      const next = Math.min(LIST_MAX, Math.max(LIST_MIN, startWidth + delta));
+      setListWidth(next);
+    };
+    const onUp = () => {
+      resizingRef.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   const [agentScope, setAgentScope] = useState<string>("me"); // "me" | "<uuid>" | "all"
   const [queueScope, setQueueScope] = useState<string>("all"); // "all" | "none" | uuid
@@ -398,13 +439,12 @@ export default function InboxPage() {
         </div>
       </header>
 
-      {/* Split messenger-style: list left · chat right */}
+      {/* Split messenger-style: list left · drag handle · chat right */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <aside
           className="flex flex-shrink-0 flex-col overflow-hidden"
           style={{
-            width: 340,
-            borderRight: "1px solid hsl(240 12% 16%)",
+            width: listWidth,
             background: "hsl(240 18% 5%)",
           }}
         >
@@ -441,6 +481,22 @@ export default function InboxPage() {
             )}
           </div>
         </aside>
+
+        {/* Drag handle: 4px de trilho + cursor col-resize + double-click
+            volta pra largura default 340px */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          onMouseDown={(e) => startResize(e.clientX)}
+          onDoubleClick={() => setListWidth(340)}
+          className="group relative flex-shrink-0 cursor-col-resize"
+          style={{ width: 4, background: "hsl(240 12% 14%)" }}
+          title="Arraste para redimensionar · duplo-clique restaura"
+        >
+          <div
+            className="absolute inset-y-0 -left-1 -right-1 transition-colors group-hover:bg-[rgba(0,212,106,0.15)]"
+          />
+        </div>
 
         <main className="flex flex-1 min-w-0 flex-col overflow-hidden">
           {selectedId ? (

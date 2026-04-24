@@ -470,6 +470,55 @@ func (h *WABAHandler) SendMessage(c *fiber.Ctx) error {
 	})
 }
 
+// ListTemplates GET /v1/instances/:id/waba/templates
+// Retorna os templates aprovados pelo Meta pro WABA dessa instance.
+// A Meta API retorna { data: [{ name, language, status, category,
+// components: [{ type, text, buttons, example, ... }] }] }.
+// Aqui propagamos o payload bruto — o front já sabe interpretar.
+func (h *WABAHandler) ListTemplates(c *fiber.Ctx) error {
+	instanceID := c.Params("id")
+	var waba models.WABAInstance
+	if err := h.db.Where("instance_id = ?", instanceID).First(&waba).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "WABA instance not found"})
+	}
+	if waba.AccessToken == "" || waba.WABABusinessID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "waba sem credenciais"})
+	}
+
+	graphURL := fmt.Sprintf(
+		"https://graph.facebook.com/v18.0/%s/message_templates?limit=100&access_token=%s",
+		waba.WABABusinessID, url.QueryEscape(waba.AccessToken),
+	)
+	req, _ := http.NewRequest("GET", graphURL, nil)
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+			"error":  "Meta API error",
+			"status": resp.StatusCode,
+			"body":   string(body),
+		})
+	}
+	var meta struct {
+		Data []map[string]any `json:"data"`
+	}
+	_ = json.Unmarshal(body, &meta)
+	// Só expomos APPROVED — evita UI oferecer template que Meta vai rejeitar.
+	approved := make([]map[string]any, 0, len(meta.Data))
+	for _, t := range meta.Data {
+		status, _ := t["status"].(string)
+		if strings.EqualFold(status, "APPROVED") {
+			approved = append(approved, t)
+		}
+	}
+	return c.JSON(fiber.Map{"items": approved})
+}
+
 func init() {
 	// Note: Cannot access config.AppConfig here as it's not initialized yet
 }

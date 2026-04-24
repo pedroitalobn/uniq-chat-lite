@@ -359,6 +359,14 @@ export const mediaUploadApi = {
   },
 };
 
+// WABA (Meta WhatsApp Cloud API) — templates aprovados para o
+// business. Usados quando a janela de 24h de atendimento humano fechou e
+// o operador precisa iniciar conversa via HSM.
+export const wabaApi = {
+  templates: (instanceId: string) =>
+    api.get(`/v1/instances/${instanceId}/waba/templates`),
+};
+
 export interface WebhookPayload {
   name?: string;
   url?: string;
@@ -861,7 +869,10 @@ export const conversationsApi = {
   get: (workspaceId: string, id: string) =>
     api.get(`/v1/conversations/${id}`, { headers: wsHeaders(workspaceId) }),
   timeline: (workspaceId: string, id: string, opts?: { before?: string; limit?: number }) =>
-    api.get(`/v1/conversations/${id}/timeline`, { headers: wsHeaders(workspaceId), params: opts }),
+    api.get(`/v1/conversations/${id}/timeline`, {
+      headers: wsHeaders(workspaceId),
+      params: opts,
+    }),
   patch: (workspaceId: string, id: string, data: {
     subject?: string;
     priority?: ConversationPriority;
@@ -882,10 +893,19 @@ export const conversationsApi = {
       media_mime?: string;
       caption?: string;
       filename?: string;
+      template_name?: string;
+      template_language?: string;
+      template_components?: Array<Record<string, unknown>>;
     },
   ) => api.post(`/v1/conversations/${id}/messages`, data, { headers: wsHeaders(workspaceId) }),
   sendTyping: (workspaceId: string, id: string, typing: boolean) =>
     api.post(`/v1/conversations/${id}/typing`, { typing }, { headers: wsHeaders(workspaceId) }),
+  patchMessage: (
+    workspaceId: string,
+    id: string,
+    msgId: string,
+    data: { is_pinned?: boolean; is_favorite?: boolean; is_archived?: boolean; is_deleted?: boolean },
+  ) => api.patch(`/v1/conversations/${id}/messages/${msgId}`, data, { headers: wsHeaders(workspaceId) }),
   assign: (workspaceId: string, id: string, userId?: string) =>
     api.post(`/v1/conversations/${id}/assign`, userId ? { user_id: userId } : {}, { headers: wsHeaders(workspaceId) }),
   unassign: (workspaceId: string, id: string) =>

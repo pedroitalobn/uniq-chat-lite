@@ -33,6 +33,12 @@ type OutboundMessage struct {
 	MediaMime string
 	Caption   string
 	Filename  string // document only
+
+	// Template (WABA somente): Meta exige nome do template aprovado,
+	// linguagem (ex.: pt_BR) e componentes opcionais com variáveis.
+	TemplateName       string
+	TemplateLanguage   string
+	TemplateComponents []map[string]any
 }
 
 // SendResult is what every adapter returns on success.
@@ -267,6 +273,22 @@ func (r *Registry) sendWABA(ctx context.Context, inst *models.Instance, msg Outb
 			doc["caption"] = msg.Caption
 		}
 		payload["document"] = doc
+	case "template":
+		if msg.TemplateName == "" {
+			return nil, errors.New("template requer template_name")
+		}
+		lang := msg.TemplateLanguage
+		if lang == "" {
+			lang = "pt_BR"
+		}
+		tpl := map[string]any{
+			"name":     msg.TemplateName,
+			"language": map[string]string{"code": lang},
+		}
+		if len(msg.TemplateComponents) > 0 {
+			tpl["components"] = msg.TemplateComponents
+		}
+		payload["template"] = tpl
 	}
 	body, _ := json.Marshal(payload)
 
