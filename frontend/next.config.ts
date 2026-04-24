@@ -22,6 +22,14 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // /reports/* foi movido pra dentro do inbox — redirect pra não quebrar
+  // bookmarks e o link do menu antigo.
+  async redirects() {
+    return [
+      { source: "/reports", destination: "/inbox?view=reports", permanent: false },
+      { source: "/reports/:path*", destination: "/inbox?view=reports", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

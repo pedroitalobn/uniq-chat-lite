@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import {
   Lock, Search, ChevronDown, User as UserIcon, MessageSquare,
-  Layers, Smartphone, Radio, RefreshCw, Check,
+  Layers, Smartphone, Radio, RefreshCw, Check, BarChart3,
 } from "lucide-react";
 import {
   conversationsApi, queuesApi, workspacesApi, channelsApi, instancesApi,
@@ -17,6 +17,7 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { ConversationList, type ConversationRow } from "@/components/atendimento/ConversationList";
 import { ConversationDetail } from "@/components/inbox/ConversationDetail";
+import { InboxReports } from "@/components/inbox/InboxReports";
 import { useConversationWS } from "@/hooks/useConversationWS";
 import type { ChannelInfo, Instance } from "@/types";
 
@@ -124,6 +125,17 @@ export default function InboxPage() {
   const [instanceFilter, setInstanceFilter] = useState<string[]>([]); // multi-select
   const [statusTab, setStatusTab] = useState<StatusTab>("open");
   const [q, setQ] = useState("");
+
+  // View mode: "conversations" (padrão) | "reports". Persistido via URL
+  // ?view=reports pra ser compartilhável e sobreviver a F5.
+  const viewParam = searchParams.get("view");
+  const viewMode: "conversations" | "reports" = viewParam === "reports" ? "reports" : "conversations";
+  const setViewMode = (next: "conversations" | "reports") => {
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    if (next === "reports") params.set("view", "reports");
+    else params.delete("view");
+    router.replace(`/inbox${params.toString() ? `?${params.toString()}` : ""}`);
+  };
 
   // Rosters — only fetch when viewer can actually switch scopes.
   const membersQ = useQuery({
@@ -329,10 +341,42 @@ export default function InboxPage() {
               Inbox
             </h1>
             <p className="text-xs" style={{ color: "hsl(240 8% 48%)" }}>
-              {agentLabel} · {channelLabel} · {instanceLabel} · {queueLabel}
+              {viewMode === "reports"
+                ? "Relatórios e métricas do atendimento"
+                : `${agentLabel} · ${channelLabel} · ${instanceLabel} · ${queueLabel}`}
             </p>
           </div>
 
+          {/* View mode toggle: conversas ↔ relatórios */}
+          <div
+            className="ml-4 flex items-center gap-0.5 rounded-xl p-1 text-xs"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 16%)" }}
+          >
+            <button
+              onClick={() => setViewMode("conversations")}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors"
+              style={{
+                background: viewMode === "conversations" ? "rgba(0,212,106,0.12)" : "transparent",
+                color: viewMode === "conversations" ? "#00d46a" : "hsl(240 8% 55%)",
+              }}
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              Conversas
+            </button>
+            <button
+              onClick={() => setViewMode("reports")}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors"
+              style={{
+                background: viewMode === "reports" ? "rgba(0,212,106,0.12)" : "transparent",
+                color: viewMode === "reports" ? "#00d46a" : "hsl(240 8% 55%)",
+              }}
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+              Relatórios
+            </button>
+          </div>
+
+          {viewMode === "conversations" && (
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {/* Agent */}
             <AgentDropdown
@@ -415,9 +459,11 @@ export default function InboxPage() {
             </div>
 
           </div>
+          )}
         </div>
 
-        {/* Status tabs */}
+        {/* Status tabs — só quando visualizando conversas */}
+        {viewMode === "conversations" && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
           {TABS.map((t) => (
             <button
@@ -453,9 +499,13 @@ export default function InboxPage() {
             </button>
           )}
         </div>
+        )}
       </header>
 
-      {/* Split messenger-style: list left · drag handle · chat right */}
+      {viewMode === "reports" ? (
+        <InboxReports workspaceId={wsId as string} />
+      ) : (
+      /* Split messenger-style: list left · drag handle · chat right */
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <aside
           className="flex flex-shrink-0 flex-col overflow-hidden"
@@ -526,6 +576,7 @@ export default function InboxPage() {
           )}
         </main>
       </div>
+      )}
     </div>
   );
 }
