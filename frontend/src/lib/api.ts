@@ -332,34 +332,31 @@ export const messagesApi = {
     api.post(`/v1/instances/${id}/messages/menu`, data),
 };
 
-export const inboxApi = {
-  getChats: (instanceId: string, search?: string, filter?: string) =>
-    api.get(`/v1/instances/${instanceId}/inbox/chats`, { params: { search, filter } }),
-  getChat: (instanceId: string, jid: string) =>
-    api.get(`/v1/instances/${instanceId}/inbox/chats/${jid}`),
-  getMessages: (instanceId: string, jid: string, params?: { limit?: number; offset?: number; before?: string }) =>
-    api.get(`/v1/instances/${instanceId}/inbox/chats/${jid}/messages`, { params }),
-  sendMessage: (instanceId: string, jid: string, data: { content: string; type?: string }) =>
-    api.post(`/v1/instances/${instanceId}/inbox/chats/${jid}/messages`, data),
-  sendMedia: (instanceId: string, jid: string, data: { url: string; mime_type: string; filename?: string; caption?: string; ptt?: boolean }) =>
-    api.post(`/v1/instances/${instanceId}/inbox/chats/${jid}/messages/media`, data),
-  uploadMedia: (instanceId: string, file: File) => {
+// inboxApi foi removido da aplicação. As rotas /v1/instances/:id/inbox/*
+// continuam registradas no backend para clientes externos via API key, mas
+// nenhuma página do dashboard consome essas URLs diretamente — tudo passa
+// pelo fluxo de Conversations (conversationsApi).
+//
+// Se você vier da documentação antiga, as equivalências são:
+//   inboxApi.getChats/getChat/getMessages  →  conversationsApi.list/get/timeline
+//   inboxApi.sendMessage                   →  conversationsApi.sendMessage
+//   inboxApi.markRead                      →  conversationsApi.markRead
+//   inboxApi.updateContact                 →  crmApi.updateContact
+//   inboxApi.updateMessage                 →  (sem substituto — usar PATCH direto)
+
+/**
+ * Legacy media upload — usado pelo composer quando for adicionado suporte
+ * a mídia na página unificada. A rota /v1/instances/:id/media/upload
+ * continua válida e genérica (não é parte do legacy inbox handler).
+ */
+export const mediaUploadApi = {
+  upload: (instanceId: string, file: File) => {
     const form = new FormData();
     form.append("file", file);
     return api.post(`/v1/instances/${instanceId}/media/upload`, form, {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
-  markRead: (instanceId: string, jid: string) =>
-    api.post(`/v1/instances/${instanceId}/inbox/chats/${jid}/read`),
-  resendMessage: (instanceId: string, msgId: string) =>
-    api.post(`/v1/instances/${instanceId}/inbox/messages/${msgId}/resend`),
-  sendTyping: (instanceId: string, jid: string, typing: boolean) =>
-    api.post(`/v1/instances/${instanceId}/inbox/chats/${jid}/typing`, { typing }),
-  updateContact: (instanceId: string, contactId: string, data: { name?: string; phone?: string; email?: string; notes?: string; funnel?: string; stage?: string; journey?: string; owner?: string; tag_ids?: string[] }) =>
-    api.put(`/v1/instances/${instanceId}/inbox/contacts/${contactId}`, data),
-  updateMessage: (instanceId: string, messageId: string, data: { is_pinned?: boolean; is_favorite?: boolean; is_archived?: boolean; is_deleted?: boolean }) =>
-    api.patch(`/v1/instances/${instanceId}/inbox/messages/${messageId}`, data),
 };
 
 export interface WebhookPayload {

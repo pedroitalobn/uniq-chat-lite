@@ -664,6 +664,10 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	instance.Post("/agent/assets", integrationH.UploadAgentAsset)
 	instance.Delete("/agent/assets/:assetId", integrationH.DeleteAgentAsset)
 
+	// DEPRECATED legacy inbox routes (WhatsApp-style per-instance chat).
+	// Mantidas para clientes externos via API key — o dashboard já migrou
+	// 100% para /v1/conversations. Não adicionar nada novo aqui; novas
+	// features de atendimento pertencem ao ConversationHandler.
 	// Inbox (WhatsApp-style chat interface) - must be before /messages
 	inbox := instance.Group("/inbox")
 	inbox.Get("/chats", inboxH.GetChats)

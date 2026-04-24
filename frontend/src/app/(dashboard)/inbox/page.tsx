@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import {
   Lock, Search, ChevronDown, User as UserIcon, MessageSquare,
-  Layers, Smartphone, Radio, RefreshCw, ExternalLink, Check,
+  Layers, Smartphone, Radio, RefreshCw, Check,
 } from "lucide-react";
 import {
   conversationsApi, queuesApi, workspacesApi, channelsApi, instancesApi,
@@ -22,13 +22,12 @@ import type { ChannelInfo, Instance } from "@/types";
 //   [ Agente ▾ ] [ Canais ▾ ] [ Instâncias ▾ ] [ Fila ▾ ]  🔍  Tabs
 // - "Agente": single-select. Admin/supervisor → full roster; agente comum →
 //   travado em "Meus".
-// - "Canais" e "Instâncias": multi-select (checkboxes). Preservam a UX do
-//   inbox clássico onde o usuário escolhia o canal/linha antes de ver chats.
+// - "Canais" e "Instâncias": multi-select (checkboxes). Recuperam a
+//   seleção por linha/canal que existia na UI antiga.
 // - "Fila": single-select. "Todas", "Sem fila" ou cada fila.
 //
-// Empty state oferece: botão "Sincronizar histórico" (chama backfill) e
-// link para /inbox/classic, mantendo a porta aberta para a visualização
-// legacy style WhatsApp.
+// Quando existem MessageLogs antigos sem conversation_id (pré-migração), o
+// header mostra um CTA "Sincronizar histórico" que chama o backfill.
 
 type StatusTab = "all" | "open" | "pending" | "snoozed" | "unassigned" | "resolved" | "closed";
 
@@ -322,19 +321,6 @@ export default function InboxPage() {
               />
             </div>
 
-            <Link
-              href="/inbox/classic"
-              title="Visualização clássica estilo WhatsApp"
-              className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                color: "hsl(240 8% 48%)",
-              }}
-            >
-              <ExternalLink className="h-3 w-3" />
-              Clássico
-            </Link>
           </div>
         </div>
 
@@ -709,8 +695,8 @@ function BackfillEmptyState({ stats, running, onBackfill }: {
           {running ? "Sincronizando…" : "Sincronizar histórico"}
         </button>
         <p className="mt-4 text-[11px]" style={{ color: "hsl(240 8% 38%)" }}>
-          Ou abra a <Link href="/inbox/classic" className="underline">visualização clássica</Link> para conversar
-          diretamente com os contatos existentes.
+          Processa em lotes de até 10k mensagens. Chame novamente até o
+          contador zerar.
         </p>
       </div>
     </div>
@@ -731,13 +717,6 @@ function EmptyState({ agentScope, statusTab }: { agentScope: string; statusTab: 
     >
       <MessageSquare className="h-10 w-10 opacity-30" />
       <p className="text-sm">{message}</p>
-      <Link
-        href="/inbox/classic"
-        className="mt-2 text-xs underline"
-        style={{ color: "hsl(240 8% 52%)" }}
-      >
-        Abrir visualização clássica →
-      </Link>
     </div>
   );
 }
@@ -751,24 +730,15 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
       </h2>
       <p className="max-w-md text-sm" style={{ color: "hsl(240 8% 52%)" }}>
         O backend pode estar sem as migrations novas ou em atualização.
-        Enquanto isso, você pode seguir usando a visualização clássica.
+        Tente novamente em alguns instantes.
       </p>
-      <div className="flex gap-2">
-        <button
-          onClick={onRetry}
-          className="rounded-lg px-3 py-1.5 text-xs font-medium"
-          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 15% 90%)" }}
-        >
-          Tentar de novo
-        </button>
-        <Link
-          href="/inbox/classic"
-          className="rounded-lg px-3 py-1.5 text-xs font-semibold"
-          style={{ background: "#00d46a", color: "#03170a" }}
-        >
-          Abrir inbox clássico
-        </Link>
-      </div>
+      <button
+        onClick={onRetry}
+        className="rounded-lg px-3 py-1.5 text-xs font-medium"
+        style={{ background: "#00d46a", color: "#03170a" }}
+      >
+        Tentar de novo
+      </button>
     </div>
   );
 }
