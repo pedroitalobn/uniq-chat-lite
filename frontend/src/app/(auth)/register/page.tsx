@@ -97,7 +97,11 @@ function RegisterForm() {
   const emailFromInvite = params.get("email") || "";
   const isPaidPlan = planPrice > 0 && !workspaceInviteToken;
 
-  const meta = getPlanMeta(planPrice > 0 ? { name: planName, price: planPrice } : { name: "Free", price: 0 });
+  // Quando é convite de workspace, ignora o plan badge e força o accent
+  // verde da Uniq (#00d46a) em toda a UI (glow, botão, foco).
+  const meta = workspaceInviteToken
+    ? { icon: <Building2 className="w-3.5 h-3.5" />, color: "#00d46a", label: "Convite" }
+    : getPlanMeta(planPrice > 0 ? { name: planName, price: planPrice } : { name: "Free", price: 0 });
 
   const [name, setName]         = useState("");
   const [email, setEmail]       = useState(emailFromInvite);
@@ -407,13 +411,24 @@ function RegisterForm() {
               type="submit"
               disabled={loading}
               className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] disabled:opacity-40 mt-1"
-              style={{ background: meta.color, color: !isPaidPlan ? "hsl(240 15% 90%)" : "#03170a" }}
+              style={{
+                background: meta.color,
+                // Fundo verde/colorido = texto escuro pra contraste. Cinza
+                // claro só quando o meta.color é um tom escuro/muted.
+                color: "#0a0a0f",
+              }}
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <>
-                  <span>{!isPaidPlan ? "Criar conta grátis" : "Criar conta e pagar"}</span>
+                  <span>
+                    {workspaceInviteToken
+                      ? "Criar conta e entrar no workspace"
+                      : !isPaidPlan
+                        ? "Criar conta grátis"
+                        : "Criar conta e pagar"}
+                  </span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -423,8 +438,21 @@ function RegisterForm() {
 
         <p className="text-[11px] text-center mt-4" style={{ color: "hsl(240 8% 30%)" }}>
           Já tem conta?{" "}
-          <span className="underline cursor-pointer" style={{ color: "hsl(240 8% 50%)" }}
-            onClick={() => router.push("/login")}>
+          <span
+            className="underline cursor-pointer"
+            style={{ color: "hsl(240 8% 50%)" }}
+            onClick={() => {
+              // Mantém o callback do convite pra não perder o fluxo.
+              if (workspaceInviteToken) {
+                const cb = `/invite/${workspaceInviteToken}`;
+                router.push(
+                  `/login?callbackUrl=${encodeURIComponent(cb)}${email ? `&email=${encodeURIComponent(email)}` : ""}`,
+                );
+              } else {
+                router.push("/login");
+              }
+            }}
+          >
             Entrar
           </span>
         </p>
