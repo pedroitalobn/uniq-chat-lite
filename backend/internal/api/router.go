@@ -228,6 +228,10 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	v1Public.Get("/invites/status", inviteH.GetStatus)
 	v1Public.Post("/invites/validate", inviteH.Validate)
 
+	// Workspace invite preview — público pra decidir se mandamos o
+	// destinatário pra /login ou /register.
+	v1Public.Get("/workspaces/invites/preview/:token", workspaceH.PreviewInvite)
+
 	// CSAT public endpoints (no auth — customer answers via tokenized link)
 	app.Get("/csat/:token", csatH.GetPublic)
 	app.Post("/csat/:token", csatH.SubmitPublic)

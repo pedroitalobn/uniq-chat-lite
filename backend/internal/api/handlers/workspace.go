@@ -529,6 +529,52 @@ func (h *WorkspaceHandler) ResendInvite(c *fiber.Ctx) error {
 	})
 }
 
+// PreviewInvite é o endpoint PÚBLICO (sem auth) que a página /invite/:token
+// usa pra decidir se o destinatário vai pra /login (conta existe) ou /register
+// (conta não existe). Retorna só dados seguros pra exibir: nome do workspace,
+// do convidante, da role e se o email já está cadastrado.
+func (h *WorkspaceHandler) PreviewInvite(c *fiber.Ctx) error {
+	token := c.Params("token")
+	if token == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "token ausente"})
+	}
+
+	var invite models.Invite
+	if err := h.db.Preload("Role").
+		Where("token = ? AND status = 'pending'", token).
+		First(&invite).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "convite não encontrado ou já utilizado"})
+	}
+
+	if time.Now().After(invite.ExpiresAt) {
+		h.db.Model(&invite).Update("status", "expired")
+		return c.Status(fiber.StatusGone).JSON(fiber.Map{"error": "convite expirado"})
+	}
+
+	var workspace models.Workspace
+	h.db.Select("id, name").First(&workspace, "id = ?", invite.WorkspaceID)
+
+	var inviter models.User
+	h.db.Select("id, name, email").First(&inviter, "id = ?", invite.InvitedBy)
+	inviterName := inviter.Name
+	if inviterName == "" {
+		inviterName = inviter.Email
+	}
+
+	// Existe conta com esse email?
+	var existing models.User
+	userExists := h.db.Select("id").Where("email = ?", invite.Email).First(&existing).Error == nil
+
+	return c.JSON(fiber.Map{
+		"email":          invite.Email,
+		"workspace_name": workspace.Name,
+		"inviter_name":   inviterName,
+		"role_name":      invite.Role.Name,
+		"user_exists":    userExists,
+		"expires_at":     invite.ExpiresAt,
+	})
+}
+
 // AcceptInvite accepts an invitation
 func (h *WorkspaceHandler) AcceptInvite(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)

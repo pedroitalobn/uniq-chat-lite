@@ -52,13 +52,14 @@ func getStripeCheckoutType(db *gorm.DB) string {
 // Body: { "name": "...", "email": "...", "username": "...", "password": "...", "workspace_name": "...", "invite_code": "...", "plan_id": "..." }
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	var req struct {
-		Name          string `json:"name"`
-		Email         string `json:"email"`
-		Username      string `json:"username"`
-		Password      string `json:"password"`
-		WorkspaceName string `json:"workspace_name"`
-		InviteCode    string `json:"invite_code"`
-		PlanID        string `json:"plan_id"`
+		Name                 string `json:"name"`
+		Email                string `json:"email"`
+		Username             string `json:"username"`
+		Password             string `json:"password"`
+		WorkspaceName        string `json:"workspace_name"`
+		InviteCode           string `json:"invite_code"`
+		PlanID               string `json:"plan_id"`
+		WorkspaceInviteToken string `json:"workspace_invite_token"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
@@ -70,6 +71,31 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	req.WorkspaceName = strings.TrimSpace(req.WorkspaceName)
 	req.InviteCode = strings.TrimSpace(req.InviteCode)
 	req.PlanID = strings.TrimSpace(req.PlanID)
+	req.WorkspaceInviteToken = strings.TrimSpace(req.WorkspaceInviteToken)
+
+	// Se veio um workspace_invite_token, validamos aqui ANTES de criar
+	// a conta e travamos o email pra bater com o do convite. Evita
+	// cenário em que alguém com o link aceita com outro email.
+	var workspaceInvite *models.Invite
+	if req.WorkspaceInviteToken != "" {
+		var inv models.Invite
+		if err := h.db.Where("token = ? AND status = 'pending'",
+			req.WorkspaceInviteToken).First(&inv).Error; err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "convite inválido ou já utilizado",
+			})
+		}
+		if time.Now().After(inv.ExpiresAt) {
+			h.db.Model(&inv).Update("status", "expired")
+			return c.Status(fiber.StatusGone).JSON(fiber.Map{"error": "convite expirado"})
+		}
+		if inv.Email != req.Email {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "o email do cadastro deve ser igual ao do convite",
+			})
+		}
+		workspaceInvite = &inv
+	}
 
 	if req.Name == "" || req.Email == "" || req.Password == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name, email e password são obrigatórios"})
@@ -170,20 +196,38 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		MarkInviteCodeUsed(h.db, req.InviteCode, user.ID)
 	}
 
-	// Todo usuário ganha um workspace default, usando o nome fornecido ou
-	// "<primeiro nome>'s Workspace" como fallback. Assim servers/instâncias
-	// criados pelo usuário ficam sempre vinculados a um workspace, evitando
-	// o cenário em que um workspace novo "esconde" os recursos órfãos.
-	workspaceName := req.WorkspaceName
-	if workspaceName == "" {
-		firstName := strings.Fields(user.Name)
-		if len(firstName) > 0 {
-			workspaceName = firstName[0] + "'s Workspace"
-		} else {
-			workspaceName = "Meu Workspace"
+	// Fluxo 1: usuário convidado via workspace_invite_token — NÃO cria
+	// workspace próprio, apenas entra no workspace do convite. Assim o
+	// usuário convidado fica com acesso só àquele workspace, com a role
+	// definida pelo admin que convidou.
+	var workspace *models.Workspace
+	if workspaceInvite != nil {
+		var ws models.Workspace
+		if err := h.db.First(&ws, "id = ?", workspaceInvite.WorkspaceID).Error; err == nil {
+			uw := models.UserWorkspace{
+				UserID:      user.ID,
+				WorkspaceID: ws.ID,
+				RoleID:      &workspaceInvite.RoleID,
+				IsOwner:     false,
+			}
+			h.db.Create(&uw)
+			h.db.Model(workspaceInvite).Update("status", "accepted")
+			workspace = &ws
 		}
+	} else {
+		// Fluxo 2: cadastro normal — todo usuário ganha um workspace default.
+		// Usa o nome fornecido ou "<primeiro nome>'s Workspace" como fallback.
+		workspaceName := req.WorkspaceName
+		if workspaceName == "" {
+			firstName := strings.Fields(user.Name)
+			if len(firstName) > 0 {
+				workspaceName = firstName[0] + "'s Workspace"
+			} else {
+				workspaceName = "Meu Workspace"
+			}
+		}
+		workspace = createDefaultWorkspace(h.db, &user, workspaceName)
 	}
-	workspace := createDefaultWorkspace(h.db, &user, workspaceName)
 
 	// If paid plan, create payment session and return payment URL
 	if isPaidPlan && plan != nil {

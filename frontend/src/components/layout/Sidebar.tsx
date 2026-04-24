@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { usePreferences } from "@/lib/preferences";
 import { Logo } from "@/components/Logo";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -24,21 +25,46 @@ export function Sidebar() {
   const { t } = usePreferences();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { currentWorkspace, setCurrentWorkspace, workspaces } = useWorkspace();
-  const isAdmin = session?.user?.role === "super_admin";
+  const { hasPerm, hasAnyPerm, isOwner, isSuperAdmin } = useWorkspacePermissions();
+  const isAdmin = isSuperAdmin;
   const planName = (session?.user?.plan as { name?: string } | undefined)?.name ?? session?.user?.role;
   const initials = session?.user?.name?.[0]?.toUpperCase() || "U";
 
-  const navItems = [
-    { href: "/dashboard",    label: t("nav_dashboard"),    icon: LayoutDashboard, exact: true },
-    { href: "/agents",       label: "Agentes IA",          icon: Zap,             exact: false },
-    { href: "/servers",     label: t("nav_servers"),      icon: Server,          exact: false },
-    { href: "/instances",   label: t("nav_instances"),    icon: Smartphone,      exact: false },
-    { href: "/inbox",       label: "Inbox",               icon: Headset,         exact: false },
-    { href: "/crm",         label: t("nav_crm"),          icon: Contact,         exact: false },
-    { href: "/campaigns",   label: t("nav_campaigns"),    icon: Megaphone,       exact: false },
-    { href: "/integrations", label: t("nav_integrations"), icon: Plug,            exact: false },
-    { href: "/settings",     label: "Conta",               icon: Settings,        exact: false },
+  // Itens ficam todos listados com a regra `show` — `true` = sempre visível;
+  // função = visível quando a condição bate. Dono do workspace e super-admin
+  // bypassam qualquer regra (via hasPerm retornando true no isOwner).
+  type NavItem = {
+    href: string;
+    label: string;
+    icon: typeof LayoutDashboard;
+    exact: boolean;
+    show: boolean;
+  };
+
+  // Módulos de "gestão" (servers, instances, agentes, integrações, campanhas
+  // e plano/billing) só aparecem pro dono do workspace ou super-admin —
+  // agentes convidados não veem essas configurações de infraestrutura.
+  // Inbox/CRM/Relatórios são gated por permissão explícita.
+  const canSeeBilling = isOwner || isSuperAdmin;
+  const canSeeInfra = isOwner || isSuperAdmin;
+  const canSeeInbox = hasPerm(PERM.ticketsView) || hasPerm(PERM.inboxView);
+  const canSeeCRM = hasAnyPerm([PERM.crmView, PERM.companiesView, PERM.dealsView]);
+  const canSeeAgents = isOwner || isSuperAdmin; // agentes IA / personalidades = config de dono
+  const canSeeCampaigns = isOwner || isSuperAdmin;
+  const canSeeDashboard = isOwner || isSuperAdmin || canSeeInbox;
+
+  const navItems: NavItem[] = [
+    { href: "/dashboard",    label: t("nav_dashboard"),    icon: LayoutDashboard, exact: true,  show: canSeeDashboard },
+    { href: "/agents",       label: "Agentes IA",          icon: Zap,             exact: false, show: canSeeAgents },
+    { href: "/servers",      label: t("nav_servers"),      icon: Server,          exact: false, show: canSeeInfra },
+    { href: "/instances",    label: t("nav_instances"),    icon: Smartphone,      exact: false, show: canSeeInfra },
+    { href: "/inbox",        label: "Inbox",               icon: Headset,         exact: false, show: canSeeInbox },
+    { href: "/crm",          label: t("nav_crm"),          icon: Contact,         exact: false, show: canSeeCRM },
+    { href: "/campaigns",    label: t("nav_campaigns"),    icon: Megaphone,       exact: false, show: canSeeCampaigns },
+    { href: "/integrations", label: t("nav_integrations"), icon: Plug,            exact: false, show: canSeeInfra },
+    { href: "/settings",     label: "Conta",               icon: Settings,        exact: false, show: true },
   ];
+  const visibleNavItems = navItems.filter((n) => n.show);
 
   const adminItems = [
     { href: "/admin/inspect", label: "Inspect", icon: Server },
@@ -117,7 +143,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-2.5 py-3 space-y-0.5 overflow-y-auto">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const active = item.exact
             ? pathname === item.href
             : pathname === item.href || pathname.startsWith(item.href + "/");
@@ -174,8 +200,8 @@ export function Sidebar() {
         )}
       </nav>
 
-      {/* Upgrade prompt for free plan */}
-      {planName?.toLowerCase() === "free" && (
+      {/* Upgrade prompt for free plan — só pro dono do workspace */}
+      {canSeeBilling && planName?.toLowerCase() === "free" && (
         <div className="px-2.5 pb-2 space-y-2">
           <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
             <div className="flex items-center justify-between mb-2">
@@ -196,7 +222,7 @@ export function Sidebar() {
           </Link>
         </div>
       )}
-      {planName?.toLowerCase() !== "free" && !isAdmin && (
+      {canSeeBilling && planName?.toLowerCase() !== "free" && !isAdmin && (
         <div className="px-2.5 pb-2">
           <Link href="/settings" onClick={closeMobile}
             className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-xs font-medium transition-all"

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import {
   Eye, EyeOff, AlertCircle, ArrowRight,
   Loader2, Lock, AtSign,
@@ -183,7 +184,9 @@ function Field({
 
 // ─── Login Form ───────────────────────────────────────────────────────────────
 function LoginForm({ onSuccess, tr }: { onSuccess: () => void; tr: (typeof LOGIN_TR)[Lang] }) {
-  const [identifier, setIdentifier] = useState("");
+  const params = useSearchParams();
+  const emailFromUrl = params.get("email") || "";
+  const [identifier, setIdentifier] = useState(emailFromUrl);
   const [password, setPassword]     = useState("");
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState("");
@@ -272,6 +275,17 @@ export default function LoginPage() {
   }, []);
 
   const onSuccess = () => {
+    // Respeita ?callbackUrl= (usado pelo fluxo de convite, por exemplo
+    // /invite/<token> volta aqui depois do login). Só aceita paths internos
+    // — nunca confia no parâmetro pra redirect off-site.
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      const cb = url.searchParams.get("callbackUrl");
+      if (cb && cb.startsWith("/") && !cb.startsWith("//")) {
+        window.location.href = cb;
+        return;
+      }
+    }
     window.location.href = "/dashboard";
   };
 
@@ -343,7 +357,9 @@ export default function LoginPage() {
             <Divider label={tr.divider_login} />
 
             {/* Form */}
-            <LoginForm onSuccess={onSuccess} tr={tr} />
+            <Suspense fallback={<div className="h-40" />}>
+              <LoginForm onSuccess={onSuccess} tr={tr} />
+            </Suspense>
           </div>
         </div>
 

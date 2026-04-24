@@ -25,11 +25,11 @@ function getPlanMeta(plan: { name: string; price: number } | null) {
 }
 
 function Field({
-  label, value, onChange, type = "text", placeholder, icon, error, autoFocus, autoComplete,
+  label, value, onChange, type = "text", placeholder, icon, error, autoFocus, autoComplete, disabled,
 }: {
   label: string; value: string; onChange: (v: string) => void;
   type?: string; placeholder?: string; icon?: React.ReactNode;
-  error?: string; autoFocus?: boolean; autoComplete?: string;
+  error?: string; autoFocus?: boolean; autoComplete?: string; disabled?: boolean;
 }) {
   const [show, setShow] = useState(false);
   const isPassword = type === "password";
@@ -50,18 +50,21 @@ function Field({
           placeholder={placeholder}
           autoFocus={autoFocus}
           autoComplete={autoComplete}
+          disabled={disabled}
+          readOnly={disabled}
           className={cn(
             "w-full rounded-xl py-2.5 text-sm outline-none transition-all duration-150",
             icon ? "pl-9 pr-10" : "px-3.5",
             !icon && isPassword ? "pl-3.5 pr-10" : "",
-            error ? "ring-1 ring-red-500/30" : "focus:ring-1 focus:ring-white/10"
+            error ? "ring-1 ring-red-500/30" : "focus:ring-1 focus:ring-white/10",
+            disabled ? "cursor-not-allowed opacity-80" : "",
           )}
           style={{
-            background: "hsl(240 12% 8%)",
+            background: disabled ? "hsl(240 12% 6%)" : "hsl(240 12% 8%)",
             border: error ? "1px solid rgba(239,68,68,0.35)" : "1px solid hsl(240 12% 13%)",
             color: "hsl(240 15% 90%)",
           }}
-          onFocus={e => !error && (e.currentTarget.style.borderColor = "hsl(240 12% 22%)")}
+          onFocus={e => !error && !disabled && (e.currentTarget.style.borderColor = "hsl(240 12% 22%)")}
           onBlur={e => !error && (e.currentTarget.style.borderColor = "hsl(240 12% 13%)")}
         />
         {isPassword && (
@@ -88,12 +91,16 @@ function RegisterForm() {
   const planId   = params.get("plan_id") || "";
   const planPrice = parseFloat(params.get("price") || "0");
   const inviteFromUrl = params.get("invite") || "";
-  const isPaidPlan = planPrice > 0;
+  // workspace_invite — token vindo do email de convite. Quando presente,
+  // o cadastro entra direto no workspace convidado (sem criar novo).
+  const workspaceInviteToken = params.get("workspace_invite") || "";
+  const emailFromInvite = params.get("email") || "";
+  const isPaidPlan = planPrice > 0 && !workspaceInviteToken;
 
   const meta = getPlanMeta(planPrice > 0 ? { name: planName, price: planPrice } : { name: "Free", price: 0 });
 
   const [name, setName]         = useState("");
-  const [email, setEmail]       = useState("");
+  const [email, setEmail]       = useState(emailFromInvite);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm]   = useState("");
@@ -103,6 +110,29 @@ function RegisterForm() {
   const [errors, setErrors]     = useState<Record<string, string>>({});
   const [inviteEnabled, setInviteEnabled] = useState(false);
   const [inviteValid, setInviteValid] = useState<boolean | null>(null);
+
+  // Preview do convite pra mostrar "você foi convidado pra X por Y" no topo.
+  const [wsInvitePreview, setWsInvitePreview] = useState<{
+    workspace_name: string;
+    inviter_name: string;
+    role_name: string;
+  } | null>(null);
+  useEffect(() => {
+    if (!workspaceInviteToken) return;
+    fetch(`${API_BASE}/workspaces/invites/preview/${encodeURIComponent(workspaceInviteToken)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.workspace_name) {
+          setWsInvitePreview({
+            workspace_name: d.workspace_name,
+            inviter_name: d.inviter_name,
+            role_name: d.role_name,
+          });
+          if (d.email) setEmail(d.email);
+        }
+      })
+      .catch(() => {});
+  }, [workspaceInviteToken]);
 
   useEffect(() => {
     fetch(`${API_BASE}/invites/status`)
@@ -154,9 +184,10 @@ function RegisterForm() {
           email: email.trim(),
           username: username.trim() || undefined,
           password,
-          workspace_name: workspaceName.trim() || undefined,
+          workspace_name: workspaceInviteToken ? undefined : workspaceName.trim() || undefined,
           invite_code: inviteCode.trim() || undefined,
-          plan_id: planId || undefined,
+          plan_id: workspaceInviteToken ? undefined : planId || undefined,
+          workspace_invite_token: workspaceInviteToken || undefined,
         }),
       });
       const data = await res.json();
@@ -189,8 +220,17 @@ function RegisterForm() {
         return;
       }
 
-      toast.success("Conta criada! Bem-vindo à Uniq.chat!");
-      router.push("/instances");
+      if (workspaceInviteToken) {
+        toast.success(
+          wsInvitePreview
+            ? `Conta criada! Você já faz parte de ${wsInvitePreview.workspace_name}.`
+            : "Conta criada! Você já faz parte do workspace.",
+        );
+        router.push("/inbox");
+      } else {
+        toast.success("Conta criada! Bem-vindo à Uniq.chat!");
+        router.push("/instances");
+      }
       router.refresh();
     } catch {
       setErrors({ global: "Erro de conexão" });
@@ -207,29 +247,57 @@ function RegisterForm() {
         style={{ background: `radial-gradient(ellipse at bottom, ${meta.color}08 0%, transparent 70%)` }} />
 
       <div className="w-full max-w-sm relative animate-fade-in-up">
-        {/* Back */}
-        <button onClick={() => router.push("/plans")}
-          className="flex items-center gap-1.5 text-xs mb-6 transition-colors"
-          style={{ color: "hsl(240 8% 42%)" }}
-          onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 15% 75%)")}
-          onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 42%)")}>
-          <ChevronLeft className="w-3.5 h-3.5" />
-          Voltar aos planos
-        </button>
+        {/* Back — só mostra quando NÃO veio de um workspace invite */}
+        {!workspaceInviteToken && (
+          <button onClick={() => router.push("/plans")}
+            className="flex items-center gap-1.5 text-xs mb-6 transition-colors"
+            style={{ color: "hsl(240 8% 42%)" }}
+            onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 15% 75%)")}
+            onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 42%)")}>
+            <ChevronLeft className="w-3.5 h-3.5" />
+            Voltar aos planos
+          </button>
+        )}
 
         {/* Logo */}
         <div className="flex flex-col items-center mb-6">
           <Logo height={40} className="mb-3" />
         </div>
 
-        {/* Plan badge */}
-        <div className="flex items-center justify-center mb-5">
-          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold"
-            style={{ background: `${meta.color}14`, color: meta.color, border: `1px solid ${meta.color}30` }}>
-            <span style={{ color: meta.color }}>{meta.icon}</span>
-            Plano {planName} — {meta.label}
+        {/* Workspace invite banner — substitui o plan badge quando aceita convite */}
+        {workspaceInviteToken ? (
+          <div
+            className="mb-5 rounded-2xl p-4"
+            style={{ background: "rgba(0,212,106,0.05)", border: "1px solid rgba(0,212,106,0.2)" }}
+          >
+            <div className="flex items-center gap-2 mb-1.5">
+              <Building2 className="w-3.5 h-3.5" style={{ color: "#00d46a" }} />
+              <span className="text-xs font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+                {wsInvitePreview?.workspace_name || "Convite para workspace"}
+              </span>
+            </div>
+            <p className="text-[11px] leading-relaxed" style={{ color: "hsl(240 8% 58%)" }}>
+              {wsInvitePreview ? (
+                <>
+                  <strong style={{ color: "hsl(240 15% 82%)" }}>{wsInvitePreview.inviter_name}</strong> convidou
+                  você como{" "}
+                  <span style={{ color: "#a5b4fc" }}>{wsInvitePreview.role_name}</span>.
+                  Conclua o cadastro pra entrar.
+                </>
+              ) : (
+                "Conclua o cadastro pra entrar no workspace."
+              )}
+            </p>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-center justify-center mb-5">
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold"
+              style={{ background: `${meta.color}14`, color: meta.color, border: `1px solid ${meta.color}30` }}>
+              <span style={{ color: meta.color }}>{meta.icon}</span>
+              Plano {planName} — {meta.label}
+            </div>
+          </div>
+        )}
 
         {/* Card */}
         <div className="rounded-2xl overflow-hidden"
@@ -238,9 +306,13 @@ function RegisterForm() {
             boxShadow: "0 0 0 1px hsl(240 12% 13%), 0 24px 64px rgba(0,0,0,0.5)",
           }}>
           <div className="px-5 pt-5 pb-1">
-            <h2 className="text-base font-bold" style={{ color: "hsl(240 15% 90%)" }}>Criar sua conta</h2>
+            <h2 className="text-base font-bold" style={{ color: "hsl(240 15% 90%)" }}>
+              {workspaceInviteToken ? "Crie sua conta para entrar" : "Criar sua conta"}
+            </h2>
             <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 44%)" }}>
-              Preencha os dados abaixo para começar
+              {workspaceInviteToken
+                ? "Seu email já foi preenchido a partir do convite."
+                : "Preencha os dados abaixo para começar"}
             </p>
           </div>
 
@@ -258,10 +330,16 @@ function RegisterForm() {
               placeholder="João Silva" icon={<User className="w-3.5 h-3.5" />}
               autoFocus autoComplete="name" error={errors.name} />
 
-            <Field label="E-mail" value={email}
+            <Field
+              label={workspaceInviteToken ? "E-mail (do convite)" : "E-mail"}
+              value={email}
               onChange={v => { setEmail(v); setErrors(p => ({ ...p, email: "" })); }}
-              placeholder="seu@email.com" icon={<Mail className="w-3.5 h-3.5" />}
-              autoComplete="email" error={errors.email} />
+              placeholder="seu@email.com"
+              icon={<Mail className="w-3.5 h-3.5" />}
+              autoComplete="email"
+              error={errors.email}
+              disabled={!!workspaceInviteToken}
+            />
 
             <Field label="Username (opcional)" value={username} onChange={setUsername}
               placeholder="@joaosilva" icon={<AtSign className="w-3.5 h-3.5" />}
@@ -279,11 +357,13 @@ function RegisterForm() {
               icon={<Lock className="w-3.5 h-3.5" />}
               autoComplete="new-password" error={errors.confirm} />
 
-            <Field label="Nome da empresa (opcional)" value={workspaceName}
-              onChange={v => { setWorkspaceName(v); setErrors(p => ({ ...p, workspace: "" })); }}
-              placeholder="Minha Empresa"
-              icon={<Building2 className="w-3.5 h-3.5" />}
-              autoComplete="organization" />
+            {!workspaceInviteToken && (
+              <Field label="Nome da empresa (opcional)" value={workspaceName}
+                onChange={v => { setWorkspaceName(v); setErrors(p => ({ ...p, workspace: "" })); }}
+                placeholder="Minha Empresa"
+                icon={<Building2 className="w-3.5 h-3.5" />}
+                autoComplete="organization" />
+            )}
 
             {inviteEnabled && (
               <div className="space-y-1.5">
