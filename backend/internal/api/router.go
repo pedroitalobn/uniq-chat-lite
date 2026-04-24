@@ -159,6 +159,10 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	quickReplyH := handlers.NewQuickReplyHandler(db)
 	csatH := handlers.NewCSATHandler(db, manager)
 	reportsH := handlers.NewReportsHandler(db)
+	companyH := handlers.NewCompanyHandler(db)
+	dealH := handlers.NewDealHandler(db)
+	funnelViewH := handlers.NewFunnelViewHandler(db)
+	contactGroupH := handlers.NewContactGroupHandler(db, manager)
 
 	// WABA
 	wabaH := handlers.NewWABAHandler(db)
@@ -426,6 +430,47 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	crm.Get("/journey-options", contactH.ListJourneyOptions)
 	crm.Get("/stage-options", contactH.ListStageOptions)
 	crm.Get("/funnel-options", contactH.ListFunnelOptions)
+
+	// ─── CRM v2 — Companies, Deals, Views, Groups ─────────────────────────────
+	// Each resource under /v1/crm/* requires workspace_id via X-Workspace-ID.
+	// Permissions are new (companies:*, deals:*, funnels:manage); legacy
+	// crm:* keys stay in the seed as a fallback during migration.
+	companies := crm.Group("/companies")
+	companies.Get("/", middleware.RequireWorkspacePermission(db, models.PermCompaniesView), companyH.List)
+	companies.Post("/", middleware.RequireWorkspacePermission(db, models.PermCompaniesCreate), companyH.Create)
+	companies.Get("/:id", middleware.RequireWorkspacePermission(db, models.PermCompaniesView), companyH.Get)
+	companies.Patch("/:id", middleware.RequireWorkspacePermission(db, models.PermCompaniesEdit), companyH.Patch)
+	companies.Delete("/:id", middleware.RequireWorkspacePermission(db, models.PermCompaniesDelete), companyH.Delete)
+	companies.Get("/:id/contacts", middleware.RequireWorkspacePermission(db, models.PermCompaniesView), companyH.Contacts)
+	companies.Get("/:id/deals", middleware.RequireWorkspacePermission(db, models.PermCompaniesView), companyH.Deals)
+
+	deals := crm.Group("/deals")
+	deals.Get("/", middleware.RequireWorkspacePermission(db, models.PermDealsView), dealH.List)
+	deals.Get("/summary", middleware.RequireWorkspacePermission(db, models.PermDealsView), dealH.Summary)
+	deals.Post("/", middleware.RequireWorkspacePermission(db, models.PermDealsCreate), dealH.Create)
+	deals.Get("/:id", middleware.RequireWorkspacePermission(db, models.PermDealsView), dealH.Get)
+	deals.Patch("/:id", middleware.RequireWorkspacePermission(db, models.PermDealsEdit), dealH.Patch)
+	deals.Delete("/:id", middleware.RequireWorkspacePermission(db, models.PermDealsDelete), dealH.Delete)
+	deals.Post("/:id/move", middleware.RequireWorkspacePermission(db, models.PermDealsMoveStage), dealH.Move)
+	deals.Post("/:id/win", middleware.RequireWorkspacePermission(db, models.PermDealsEdit), dealH.Win)
+	deals.Post("/:id/lose", middleware.RequireWorkspacePermission(db, models.PermDealsEdit), dealH.Lose)
+	deals.Post("/:id/reopen", middleware.RequireWorkspacePermission(db, models.PermDealsEdit), dealH.Reopen)
+	deals.Get("/:id/timeline", middleware.RequireWorkspacePermission(db, models.PermDealsView), dealH.Timeline)
+	deals.Post("/:id/notes", middleware.RequireWorkspacePermission(db, models.PermDealsEdit), dealH.AddNote)
+
+	// Saved views per funnel
+	funnels.Get("/:id/views", middleware.RequireWorkspacePermission(db, models.PermFunnelsManage), funnelViewH.List)
+	funnels.Post("/:id/views", middleware.RequireWorkspacePermission(db, models.PermFunnelsManage), funnelViewH.Create)
+	funnels.Patch("/:id/views/:vid", middleware.RequireWorkspacePermission(db, models.PermFunnelsManage), funnelViewH.Patch)
+	funnels.Delete("/:id/views/:vid", middleware.RequireWorkspacePermission(db, models.PermFunnelsManage), funnelViewH.Delete)
+
+	// Contact groups (WhatsApp groups persisted for CRM enrichment)
+	crmGroups := crm.Group("/groups")
+	crmGroups.Get("/", middleware.RequireWorkspacePermission(db, models.PermCRMView), contactGroupH.List)
+	crmGroups.Post("/sync", middleware.RequireWorkspacePermission(db, models.PermCRMEdit), contactGroupH.Sync)
+	crmGroups.Get("/:id", middleware.RequireWorkspacePermission(db, models.PermCRMView), contactGroupH.Get)
+	crmGroups.Get("/:id/members", middleware.RequireWorkspacePermission(db, models.PermCRMView), contactGroupH.Members)
+	crm.Get("/contacts/:id/groups", middleware.RequireWorkspacePermission(db, models.PermCRMView), contactGroupH.ContactGroups)
 
 	// ─── Ticketing / Atendimento ──────────────────────────────────────────────
 	// All routes require an active workspace passed via X-Workspace-ID header

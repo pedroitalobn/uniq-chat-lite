@@ -258,6 +258,13 @@ func autoMigrate(db *gorm.DB) error {
 		&models.QuickReply{},
 		&models.UserPresence{},
 		&models.CSATSurvey{},
+		// CRM enhanced
+		&models.Company{},
+		&models.Deal{},
+		&models.DealActivity{},
+		&models.FunnelView{},
+		&models.ContactGroup{},
+		&models.ContactGroupMembership{},
 	)
 }
 

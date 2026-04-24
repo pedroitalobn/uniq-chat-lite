@@ -199,6 +199,19 @@ var (
 	PermReportsView      = "reports:view"
 	PermReportsExport    = "reports:export"
 	PermPresenceViewOthers = "presence:view_others"
+
+	// CRM v2 — granular por entidade (os flags antigos crm:view|create|edit|
+	// delete continuam respeitados como fallback/compat)
+	PermCompaniesView   = "companies:view"
+	PermCompaniesCreate = "companies:create"
+	PermCompaniesEdit   = "companies:edit"
+	PermCompaniesDelete = "companies:delete"
+	PermDealsView       = "deals:view"
+	PermDealsCreate     = "deals:create"
+	PermDealsEdit       = "deals:edit"
+	PermDealsDelete     = "deals:delete"
+	PermDealsMoveStage  = "deals:move_stage"
+	PermFunnelsManage   = "funnels:manage"
 )
 
 // GetAllPermissions returns all default permissions that should be seeded.
@@ -284,5 +297,17 @@ func GetAllPermissions() []Permission {
 		{Key: PermReportsView, Name: "Visualizar Relatórios", Category: "reports"},
 		{Key: PermReportsExport, Name: "Exportar Relatórios", Category: "reports"},
 		{Key: PermPresenceViewOthers, Name: "Visualizar Presença de Outros Agentes", Category: "presence"},
+
+		// CRM v2 — granular
+		{Key: PermCompaniesView, Name: "Visualizar Empresas", Category: "crm"},
+		{Key: PermCompaniesCreate, Name: "Criar Empresas", Category: "crm"},
+		{Key: PermCompaniesEdit, Name: "Editar Empresas", Category: "crm"},
+		{Key: PermCompaniesDelete, Name: "Excluir Empresas", Category: "crm"},
+		{Key: PermDealsView, Name: "Visualizar Deals", Category: "crm"},
+		{Key: PermDealsCreate, Name: "Criar Deals", Category: "crm"},
+		{Key: PermDealsEdit, Name: "Editar Deals", Category: "crm"},
+		{Key: PermDealsDelete, Name: "Excluir Deals", Category: "crm"},
+		{Key: PermDealsMoveStage, Name: "Mover Deal entre Estágios", Category: "crm"},
+		{Key: PermFunnelsManage, Name: "Gerenciar Funis e Views", Category: "crm"},
 	}
 }
