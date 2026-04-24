@@ -157,6 +157,10 @@ export const authApi = {
     api.post("/auth/register", data),
   validateKey: (anthropicApiKey: string) =>
     api.post("/auth/validate-key", { anthropic_api_key: anthropicApiKey }),
+  forgotPassword: (email: string) =>
+    api.post("/auth/forgot-password", { email }),
+  resetPassword: (token: string, password: string) =>
+    api.post("/auth/reset-password", { token, password }),
   me: () => api.get("/auth/me"),
   updateMe: (data: { name?: string; username?: string }) => api.put("/auth/me", data),
   changePassword: (current_password: string, new_password: string) =>

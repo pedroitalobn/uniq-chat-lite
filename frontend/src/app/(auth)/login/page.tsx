@@ -248,6 +248,17 @@ function LoginForm({ onSuccess, tr }: { onSuccess: () => void; tr: (typeof LOGIN
         icon={<Lock className="w-3.5 h-3.5" />}
         autoComplete="current-password"
       />
+      <div className="flex items-center justify-end -mt-1">
+        <a
+          href="/forgot-password"
+          className="text-[11px] transition-colors"
+          style={{ color: "hsl(240 8% 50%)" }}
+          onMouseEnter={e => (e.currentTarget.style.color = "var(--green, #00d46a)")}
+          onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 50%)")}
+        >
+          Esqueceu a senha?
+        </a>
+      </div>
       <button
         type="submit"
         disabled={loading || !identifier.trim() || !password.trim()}
