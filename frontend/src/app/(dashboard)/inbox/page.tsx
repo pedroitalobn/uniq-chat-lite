@@ -775,70 +775,27 @@ function ErrorState({ error, probe, onRetry }: { error: unknown; probe?: HealthP
   const probeRouteMissing = probe?.ok === false && probe.status === 404;
   const probeTableMissing = probe?.ok === false && probe.status === 500;
 
-  const { title, explanation, cta } = (() => {
-    if (isNetwork) {
-      return {
-        title: "Sem conexão com o backend",
-        explanation:
-          "O frontend não conseguiu alcançar api.uniq.chat. Pode ser rede, CORS ou o serviço fora do ar.",
-        cta: "Tentar de novo",
-      };
-    }
-    if (probeRouteMissing || status === 404) {
-      return {
-        title: "Backend está numa versão antiga",
-        explanation:
-          "A rota /v1/conversations não existe no servidor atual de api.uniq.chat. Faça o redeploy com o código da branch main (AutoMigrate criará a tabela conversations no boot).",
-        cta: "Verificar após o deploy",
-      };
-    }
-    if (probeTableMissing) {
-      return {
-        title: "Tabela conversations inacessível",
-        explanation:
-          "A rota existe, mas o handler falhou ao tocar a tabela. Provavelmente AutoMigrate não rodou ou a pool do banco não tem permissão de leitura. Olhe os logs do container pra confirmar.",
-        cta: "Tentar de novo",
-      };
-    }
+  const { title, explanation } = (() => {
     if (status === 401 || status === 403) {
       return {
-        title: "Sem permissão para este workspace",
-        explanation:
-          "Seu token é válido, mas a função atual não tem tickets:view nesse workspace. Troque de workspace ou peça acesso.",
-        cta: "Tentar de novo",
+        title: "Sem acesso ao atendimento",
+        explanation: "Você não tem permissão de visualização neste workspace.",
       };
     }
-    if (status === 400 && typeof backendMsg === "string" && backendMsg.toLowerCase().includes("workspace")) {
+    if (isNetwork || probeRouteMissing || status === 404 || probeTableMissing || (status && status >= 500) || probeOK) {
+      // Qualquer cenário "técnico" cai aqui — a UI diz o óbvio pro atendente
+      // (não carregou, tentar de novo) e guarda o ruído no details.
       return {
-        title: "Falta X-Workspace-ID no request",
-        explanation:
-          "O frontend não enviou o header X-Workspace-ID. Troque de workspace na barra lateral e tente de novo.",
-        cta: "Tentar de novo",
-      };
-    }
-    if (probeOK) {
-      return {
-        title: "Rota existe, mas essa query específica falhou",
-        explanation:
-          "/v1/conversations/health respondeu OK — a base está acessível. O erro está em alguma combinação de filtros ou permissões desta consulta.",
-        cta: "Tentar de novo",
-      };
-    }
-    if (status && status >= 500) {
-      return {
-        title: "Erro no servidor ao listar atendimentos",
-        explanation:
-          "O backend retornou " + status + ". Causa comum: tabela conversations não criada (AutoMigrate falhou) ou deploy parcial. Cheque os logs do container.",
-        cta: "Tentar de novo",
+        title: "Não foi possível carregar seus atendimentos agora",
+        explanation: "O serviço está temporariamente indisponível. Tente novamente em instantes.",
       };
     }
     return {
-      title: "Não foi possível carregar seus atendimentos",
-      explanation:
-        "O backend retornou um erro inesperado. Se persistir, verifique os logs de api.uniq.chat.",
-      cta: "Tentar de novo",
+      title: "Não foi possível carregar seus atendimentos agora",
+      explanation: "Tente novamente em instantes.",
     };
   })();
+  const cta = "Tentar de novo";
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-12 text-center">

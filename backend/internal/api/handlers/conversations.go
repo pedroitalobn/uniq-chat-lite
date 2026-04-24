@@ -41,15 +41,15 @@ func NewConversationHandler(
 
 // Health GET /v1/conversations/health
 // Cheap sanity check the frontend uses to distinguish "route missing / old
-// deploy" (404) from "route exists but handler blew up" (500). No DB
-// queries — just confirms the Conversation table is addressable.
+// deploy" (404) from "route exists but handler blew up" (500). Uses the
+// GORM Migrator — não faz COUNT/SELECT complexo (evita o famoso SQLSTATE
+// 42703 quando alguém escreve .Select("1")...).
 func (h *ConversationHandler) Health(c *fiber.Ctx) error {
-	var exists int64
-	if err := h.db.Model(&models.Conversation{}).Select("1").Limit(1).Count(&exists).Error; err != nil {
+	if !h.db.Migrator().HasTable(&models.Conversation{}) {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"ok":    false,
 			"stage": "conversations_table",
-			"error": err.Error(),
+			"error": "tabela conversations ausente — rode AutoMigrate",
 		})
 	}
 	return c.JSON(fiber.Map{"ok": true, "handler": "conversations", "v": 2})

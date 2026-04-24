@@ -47,7 +47,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 				strings.HasPrefix(origin, "http://127.0.0.1:")
 		},
 		AllowCredentials: true,
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, apikey, X-API-Key, X-Instance-Token, Upgrade, Sec-WebSocket-Key, Sec-WebSocket-Version, Sec-WebSocket-Extensions",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, apikey, X-API-Key, X-Instance-Token, X-Workspace-ID, Upgrade, Sec-WebSocket-Key, Sec-WebSocket-Version, Sec-WebSocket-Extensions",
 		AllowMethods:     "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD",
 	}))
 
