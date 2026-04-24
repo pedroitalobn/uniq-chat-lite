@@ -854,6 +854,10 @@ export const conversationsApi = {
     api.get("/v1/conversations/inbox-stats", { headers: wsHeaders(workspaceId) }),
   backfill: (workspaceId: string, data?: { limit?: number; max_batches?: number }) =>
     api.post("/v1/conversations/backfill", data ?? {}, { headers: wsHeaders(workspaceId) }),
+  /** Health probe — rota pública (sem permission), usada pelo UI pra
+   *  diferenciar "backend antigo sem /v1/conversations" de "rota OK mas
+   *  erro de tabela / permissão". */
+  health: () => api.get("/v1/conversations/health"),
   get: (workspaceId: string, id: string) =>
     api.get(`/v1/conversations/${id}`, { headers: wsHeaders(workspaceId) }),
   timeline: (workspaceId: string, id: string, opts?: { before?: string; limit?: number }) =>

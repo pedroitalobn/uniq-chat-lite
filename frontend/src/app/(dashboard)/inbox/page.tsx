@@ -364,8 +364,12 @@ export default function InboxPage() {
 
       <div className="flex-1 overflow-auto">
         {listQ.isError ? (
-          <ErrorState
-            onRetry={() => listQ.refetch()}
+          <ErrorStateWithProbe
+            error={listQ.error}
+            onRetry={() => {
+              listQ.refetch();
+              statsQ.refetch();
+            }}
           />
         ) : showBackfillCTA ? (
           <BackfillEmptyState
@@ -721,23 +725,178 @@ function EmptyState({ agentScope, statusTab }: { agentScope: string; statusTab: 
   );
 }
 
-function ErrorState({ onRetry }: { onRetry: () => void }) {
+function ErrorStateWithProbe({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  // Probes /v1/conversations/health to distinguish the two common failure
+  // modes the admin sees in prod:
+  //   A) backend sem a rota (deploy antigo) → probe também dá 404
+  //   B) rota OK mas algo quebrou (tabela / permission / crash) → probe 200
+  //      mas list continua erro → problema na request específica
+  const probe = useQuery<HealthProbe>({
+    queryKey: ["conversations-health"],
+    queryFn: async (): Promise<HealthProbe> => {
+      try {
+        const r = await conversationsApi.health();
+        return { ok: true, data: r.data as unknown };
+      } catch (e) {
+        const ax = e as { response?: { status?: number; data?: unknown } };
+        return { ok: false, status: ax.response?.status, body: ax.response?.data };
+      }
+    },
+    staleTime: 5_000,
+  });
+  return <ErrorState error={error} probe={probe.data} onRetry={onRetry} />;
+}
+
+type HealthProbe =
+  | { ok: true; data: unknown }
+  | { ok: false; status?: number; body?: unknown };
+
+function ErrorState({ error, probe, onRetry }: { error: unknown; probe?: HealthProbe; onRetry: () => void }) {
+  // Try to extract the actual HTTP status + body from the axios error so
+  // the admin can tell whether the route is missing (404 → redeploy), the
+  // server crashed (500 → inspect logs) or the table is missing (500 with
+  // a PG error string).
+  type ApiErr = {
+    response?: { status?: number; data?: { error?: string } | string };
+    message?: string;
+    code?: string;
+  };
+  const e = (error ?? {}) as ApiErr;
+  const status = e.response?.status;
+  const responseBody = e.response?.data;
+  const backendMsg =
+    typeof responseBody === "string"
+      ? responseBody
+      : (responseBody as { error?: string } | undefined)?.error;
+  const isNetwork = !status && (e.code === "ERR_NETWORK" || e.code === "ECONNABORTED");
+
+  // Probe disambiguates "route missing" vs "route OK but list failed"
+  const probeOK = probe?.ok === true;
+  const probeRouteMissing = probe?.ok === false && probe.status === 404;
+  const probeTableMissing = probe?.ok === false && probe.status === 500;
+
+  const { title, explanation, cta } = (() => {
+    if (isNetwork) {
+      return {
+        title: "Sem conexão com o backend",
+        explanation:
+          "O frontend não conseguiu alcançar api.uniq.chat. Pode ser rede, CORS ou o serviço fora do ar.",
+        cta: "Tentar de novo",
+      };
+    }
+    if (probeRouteMissing || status === 404) {
+      return {
+        title: "Backend está numa versão antiga",
+        explanation:
+          "A rota /v1/conversations não existe no servidor atual de api.uniq.chat. Faça o redeploy com o código da branch main (AutoMigrate criará a tabela conversations no boot).",
+        cta: "Verificar após o deploy",
+      };
+    }
+    if (probeTableMissing) {
+      return {
+        title: "Tabela conversations inacessível",
+        explanation:
+          "A rota existe, mas o handler falhou ao tocar a tabela. Provavelmente AutoMigrate não rodou ou a pool do banco não tem permissão de leitura. Olhe os logs do container pra confirmar.",
+        cta: "Tentar de novo",
+      };
+    }
+    if (status === 401 || status === 403) {
+      return {
+        title: "Sem permissão para este workspace",
+        explanation:
+          "Seu token é válido, mas a função atual não tem tickets:view nesse workspace. Troque de workspace ou peça acesso.",
+        cta: "Tentar de novo",
+      };
+    }
+    if (status === 400 && typeof backendMsg === "string" && backendMsg.toLowerCase().includes("workspace")) {
+      return {
+        title: "Falta X-Workspace-ID no request",
+        explanation:
+          "O frontend não enviou o header X-Workspace-ID. Troque de workspace na barra lateral e tente de novo.",
+        cta: "Tentar de novo",
+      };
+    }
+    if (probeOK) {
+      return {
+        title: "Rota existe, mas essa query específica falhou",
+        explanation:
+          "/v1/conversations/health respondeu OK — a base está acessível. O erro está em alguma combinação de filtros ou permissões desta consulta.",
+        cta: "Tentar de novo",
+      };
+    }
+    if (status && status >= 500) {
+      return {
+        title: "Erro no servidor ao listar atendimentos",
+        explanation:
+          "O backend retornou " + status + ". Causa comum: tabela conversations não criada (AutoMigrate falhou) ou deploy parcial. Cheque os logs do container.",
+        cta: "Tentar de novo",
+      };
+    }
+    return {
+      title: "Não foi possível carregar seus atendimentos",
+      explanation:
+        "O backend retornou um erro inesperado. Se persistir, verifique os logs de api.uniq.chat.",
+      cta: "Tentar de novo",
+    };
+  })();
+
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-12 text-center">
       <MessageSquare className="h-10 w-10" style={{ color: "hsl(240 8% 38%)" }} />
       <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 90%)" }}>
-        Não foi possível carregar seus atendimentos
+        {title}
       </h2>
       <p className="max-w-md text-sm" style={{ color: "hsl(240 8% 52%)" }}>
-        O backend pode estar sem as migrations novas ou em atualização.
-        Tente novamente em alguns instantes.
+        {explanation}
       </p>
+
+      {/* Raw details — lets you copy/paste the backend error into an issue */}
+      {(status || backendMsg || e.message || probe) && (
+        <details
+          className="mt-1 w-full max-w-md rounded-lg p-3 text-left text-[11px]"
+          style={{
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid hsl(240 12% 16%)",
+            color: "hsl(240 8% 48%)",
+          }}
+        >
+          <summary className="cursor-pointer select-none">Detalhes técnicos</summary>
+          <div className="mt-2 space-y-2 font-mono">
+            <div>
+              <div className="font-semibold" style={{ color: "hsl(240 8% 60%)" }}>
+                GET /v1/conversations
+              </div>
+              {status ? <div>status: {status}</div> : <div>sem resposta HTTP</div>}
+              {backendMsg && <div className="whitespace-pre-wrap break-words">body: {backendMsg}</div>}
+              {!backendMsg && e.message && <div>msg: {e.message}</div>}
+            </div>
+            {probe && (
+              <div>
+                <div className="font-semibold" style={{ color: "hsl(240 8% 60%)" }}>
+                  GET /v1/conversations/health (probe)
+                </div>
+                {probe.ok === true ? (
+                  <div style={{ color: "#00d46a" }}>200 — rota responde</div>
+                ) : (
+                  <div>
+                    <div>status: {probe.status ?? "network"}</div>
+                    <div className="whitespace-pre-wrap break-words">
+                      {probe.body ? JSON.stringify(probe.body) : "(sem corpo)"}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+
       <button
         onClick={onRetry}
-        className="rounded-lg px-3 py-1.5 text-xs font-medium"
+        className="mt-2 rounded-lg px-3 py-1.5 text-xs font-medium"
         style={{ background: "#00d46a", color: "#03170a" }}
       >
-        Tentar de novo
+        {cta}
       </button>
     </div>
   );

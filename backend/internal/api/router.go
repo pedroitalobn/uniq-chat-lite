@@ -478,6 +478,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// All routes require an active workspace passed via X-Workspace-ID header
 	// (or ?workspace_id=). RequireWorkspacePermission enforces the RBAC key.
 	conversations := api.Group("/conversations")
+	// Health — deliberately NO workspace permission so the UI can distinguish
+	// "route missing / old deploy" from "route exists, something else broken".
+	conversations.Get("/health", conversationH.Health)
 	conversations.Get("/", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.List)
 	conversations.Get("/count", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.Count)
 	conversations.Get("/inbox-stats", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.InboxStats)

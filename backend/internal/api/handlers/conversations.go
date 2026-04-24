@@ -39,12 +39,38 @@ func NewConversationHandler(
 
 // -- list -------------------------------------------------------------------
 
+// Health GET /v1/conversations/health
+// Cheap sanity check the frontend uses to distinguish "route missing / old
+// deploy" (404) from "route exists but handler blew up" (500). No DB
+// queries — just confirms the Conversation table is addressable.
+func (h *ConversationHandler) Health(c *fiber.Ctx) error {
+	var exists int64
+	if err := h.db.Model(&models.Conversation{}).Select("1").Limit(1).Count(&exists).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"ok":    false,
+			"stage": "conversations_table",
+			"error": err.Error(),
+		})
+	}
+	return c.JSON(fiber.Map{"ok": true, "handler": "conversations", "v": 2})
+}
+
 // List GET /v1/conversations
 // Query: status, channel, queue_id, assigned_user_id=me|<uuid>, contact_id,
 //        priority, is_archived, q (search in subject/preview), cursor, limit
 func (h *ConversationHandler) List(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
 	userID := middleware.GetCurrentUserID(c)
+
+	// Defensive: workspace_id is required; RequireWorkspacePermission should
+	// have set it, but super-admin bypass may leave it empty if the client
+	// forgot the X-Workspace-ID header. Return an explicit 400 instead of
+	// silently matching everything.
+	if ws == uuid.Nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "X-Workspace-ID é obrigatório (ou ?workspace_id= na query)",
+		})
+	}
 
 	q := h.db.Model(&models.Conversation{}).Where("workspace_id = ?", ws)
 
