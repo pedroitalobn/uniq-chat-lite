@@ -4,21 +4,26 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/api/middleware"
+	"github.com/uniq-chat/backend/internal/config"
+	"github.com/uniq-chat/backend/internal/email"
 	"github.com/uniq-chat/backend/internal/models"
 	"gorm.io/gorm"
 )
 
 type WorkspaceHandler struct {
-	db *gorm.DB
+	db       *gorm.DB
+	emailSvc *email.Service
 }
 
-func NewWorkspaceHandler(db *gorm.DB) *WorkspaceHandler {
-	return &WorkspaceHandler{db: db}
+func NewWorkspaceHandler(db *gorm.DB, emailSvc *email.Service) *WorkspaceHandler {
+	return &WorkspaceHandler{db: db, emailSvc: emailSvc}
 }
 
 // List returns all workspaces for the current user
@@ -346,9 +351,54 @@ func (h *WorkspaceHandler) CreateInvite(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar convite"})
 	}
 
+	// Monta URL de aceite (frontend). Se FRONTEND_URL não estiver configurada,
+	// usa o appURL do email service como fallback.
+	frontendURL := ""
+	if config.AppConfig != nil {
+		frontendURL = strings.TrimRight(config.AppConfig.FrontendURL, "/")
+	}
+	if frontendURL == "" {
+		_, _, _ = h.emailSvc.GetConfig()
+		frontendURL = "https://app.uniq.chat"
+	}
+	acceptURL := frontendURL + "/invite/" + invite.Token
+
+	// Preload dados pro email — workspace name, inviter name, role name.
+	var workspace models.Workspace
+	h.db.Select("id, name").First(&workspace, "id = ?", workspaceID)
+	var inviter models.User
+	h.db.Select("id, name, email").First(&inviter, "id = ?", userID)
+	var role models.Role
+	h.db.Select("id, name").First(&role, "id = ?", req.RoleID)
+
+	inviterName := inviter.Name
+	if inviterName == "" {
+		inviterName = inviter.Email
+	}
+	workspaceName := workspace.Name
+	if workspaceName == "" {
+		workspaceName = "seu workspace"
+	}
+	roleName := role.Name
+	if roleName == "" {
+		roleName = "Membro"
+	}
+
+	// Envio assíncrono — se Maileroo cair, o convite ainda é válido pelo link.
+	go func(to, ws, inv, rl, url string) {
+		if h.emailSvc == nil {
+			return
+		}
+		if err := h.emailSvc.SendWorkspaceInvite(to, ws, inv, rl, url); err != nil {
+			log.Error().Err(err).Str("to", to).Str("workspace", ws).
+				Msg("workspace: failed to send invite email")
+		}
+	}(invite.Email, workspaceName, inviterName, roleName, acceptURL)
+
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"invite": invite,
-		"link":   "/invite/" + invite.Token,
+		"invite":     invite,
+		"link":       "/invite/" + invite.Token,
+		"accept_url": acceptURL,
 	})
 }
 
@@ -363,16 +413,25 @@ func (h *WorkspaceHandler) ListInvites(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado"})
 	}
 
+	// Filtra só convites ativos (pending). Aceitos viram UserWorkspace e
+	// não precisam aparecer aqui; revogados foram deletados; expired são
+	// lixo — limpamos na marra antes de listar.
+	h.db.Model(&models.Invite{}).
+		Where("workspace_id = ? AND status = 'pending' AND expires_at < ?", workspaceID, time.Now()).
+		Update("status", "expired")
+
 	var invites []models.Invite
 	h.db.Preload("Role").Preload("Inviter").
-		Where("workspace_id = ?", workspaceID).
+		Where("workspace_id = ? AND status = 'pending'", workspaceID).
 		Order("created_at DESC").
 		Find(&invites)
 
 	return c.JSON(fiber.Map{"invites": invites})
 }
 
-// RevokeInvite revokes a pending invite
+// RevokeInvite marca o convite como revoked. Mantém a linha no DB pra
+// auditoria; a UI filtra só pending, então a linha "some" do usuário
+// mesmo sem hard delete. Quem tenta aceitar o token depois recebe 404.
 func (h *WorkspaceHandler) RevokeInvite(c *fiber.Ctx) error {
 	userID := middleware.GetCurrentUserID(c)
 	workspaceID := c.Params("id")
@@ -384,11 +443,90 @@ func (h *WorkspaceHandler) RevokeInvite(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado"})
 	}
 
-	h.db.Model(&models.Invite{}).
+	if err := h.db.Model(&models.Invite{}).
 		Where("id = ? AND workspace_id = ?", inviteID, workspaceID).
-		Update("status", "revoked")
+		Update("status", "revoked").Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao revogar convite"})
+	}
 
 	return c.JSON(fiber.Map{"success": true})
+}
+
+// ResendInvite reenvia o email de convite usando o token existente
+// (novo token invalidaria links já copiados). Atualiza expires_at pra
+// +7 dias contando de agora — faz sentido: se o gestor reenviou, é
+// porque quer dar mais tempo.
+func (h *WorkspaceHandler) ResendInvite(c *fiber.Ctx) error {
+	userID := middleware.GetCurrentUserID(c)
+	workspaceID := c.Params("id")
+	inviteID := c.Params("invite_id")
+
+	// Check access
+	var uw models.UserWorkspace
+	if err := h.db.Where("user_id = ? AND workspace_id = ?", userID, workspaceID).First(&uw).Error; err != nil {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado"})
+	}
+
+	var invite models.Invite
+	if err := h.db.Preload("Role").
+		Where("id = ? AND workspace_id = ?", inviteID, workspaceID).
+		First(&invite).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "convite não encontrado"})
+	}
+
+	// Estende expiração + volta pra pending (caso tenha virado expired).
+	invite.ExpiresAt = time.Now().Add(7 * 24 * time.Hour)
+	invite.Status = "pending"
+	h.db.Save(&invite)
+
+	// Monta URL de aceite.
+	frontendURL := ""
+	if config.AppConfig != nil {
+		frontendURL = strings.TrimRight(config.AppConfig.FrontendURL, "/")
+	}
+	if frontendURL == "" {
+		frontendURL = "https://app.uniq.chat"
+	}
+	acceptURL := frontendURL + "/invite/" + invite.Token
+
+	// Preload nomes pro email.
+	var workspace models.Workspace
+	h.db.Select("id, name").First(&workspace, "id = ?", workspaceID)
+	var inviter models.User
+	h.db.Select("id, name, email").First(&inviter, "id = ?", userID)
+
+	inviterName := inviter.Name
+	if inviterName == "" {
+		inviterName = inviter.Email
+	}
+	workspaceName := workspace.Name
+	if workspaceName == "" {
+		workspaceName = "seu workspace"
+	}
+	roleName := ""
+	if invite.Role.Name != "" {
+		roleName = invite.Role.Name
+	} else {
+		roleName = "Membro"
+	}
+
+	// Envio síncrono aqui — usuário clicou "Reenviar" e quer feedback
+	// (sucesso/erro) antes de fechar. 15s timeout no HTTP client.
+	if h.emailSvc != nil {
+		if err := h.emailSvc.SendWorkspaceInvite(invite.Email, workspaceName, inviterName, roleName, acceptURL); err != nil {
+			log.Error().Err(err).Str("to", invite.Email).Msg("workspace: failed to resend invite email")
+			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+				"error":      "email não pôde ser enviado — compartilhe o link manualmente",
+				"accept_url": acceptURL,
+			})
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"success":    true,
+		"invite":     invite,
+		"accept_url": acceptURL,
+	})
 }
 
 // AcceptInvite accepts an invitation

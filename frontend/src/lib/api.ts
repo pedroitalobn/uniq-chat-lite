@@ -441,6 +441,7 @@ export const workspacesApi = {
   createInvite: (id: string, data: { email: string; role_id: string }) => api.post(`/v1/workspaces/${id}/invites`, data),
   listInvites: (id: string) => api.get(`/v1/workspaces/${id}/invites`),
   revokeInvite: (id: string, inviteId: string) => api.delete(`/v1/workspaces/${id}/invites/${inviteId}`),
+  resendInvite: (id: string, inviteId: string) => api.post(`/v1/workspaces/${id}/invites/${inviteId}/resend`),
   acceptInvite: (token: string) => api.post(`/v1/workspaces/accept-invite/${token}`),
 };
 

@@ -100,11 +100,31 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	app.Get("/channels", channelsHandler)
 	app.Get("/v1/channels", channelsHandler)
 
-	// Email service
+	// Email service — Maileroo. Prioridade: DB (admin atualiza via UI) > env.
+	// Se nenhum estiver configurado, `send()` retorna erro cedo e os handlers
+	// só logam o erro (convite ainda é criado e o link é retornado pro usuário
+	// compartilhar manualmente).
+	emailAPIKey := config.AppConfig.MailerooAPIKey
+	emailFrom := config.AppConfig.MailerooSenderEmail
+	emailFromName := config.AppConfig.MailerooSenderName
+
+	var dbEmailSettings models.EmailSettings
+	if err := db.Order("updated_at DESC").First(&dbEmailSettings).Error; err == nil && dbEmailSettings.IsEnabled {
+		if dbEmailSettings.APIKey != "" {
+			emailAPIKey = dbEmailSettings.APIKey
+		}
+		if dbEmailSettings.SenderEmail != "" {
+			emailFrom = dbEmailSettings.SenderEmail
+		}
+		if dbEmailSettings.SenderName != "" {
+			emailFromName = dbEmailSettings.SenderName
+		}
+	}
+
 	emailSvc := email.New(
-		config.AppConfig.ResendAPIKey,
-		config.AppConfig.FromEmail,
-		config.AppConfig.MailerooSenderName,
+		emailAPIKey,
+		emailFrom,
+		emailFromName,
 		config.AppConfig.AppName,
 		config.AppConfig.AppURL,
 	)
@@ -145,7 +165,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	journeyH := handlers.NewJourneyHandler(db, llmService, manager)
 	agentH := handlers.NewAgentHandler(db)
 	inboxH := handlers.NewInboxHandler(db, manager)
-	workspaceH := handlers.NewWorkspaceHandler(db)
+	workspaceH := handlers.NewWorkspaceHandler(db, emailSvc)
 	roleH := handlers.NewRoleHandler(db)
 	inviteH := handlers.NewInviteHandler(db)
 	// Build outbound registry once and share across handlers.
@@ -234,6 +254,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	workspace.Post("/invites", workspaceH.CreateInvite)
 	workspace.Get("/invites", workspaceH.ListInvites)
 	workspace.Delete("/invites/:invite_id", workspaceH.RevokeInvite)
+	workspace.Post("/invites/:invite_id/resend", workspaceH.ResendInvite)
 
 	// Roles (nested under workspace)
 	roles := workspace.Group("/roles")

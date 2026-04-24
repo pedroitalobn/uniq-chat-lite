@@ -206,3 +206,11 @@ func (s *Service) SendAdminResetPassword(to, name, newPassword string) {
 		log.Error().Err(err).Str("to", to).Msg("email: failed to send admin reset password")
 	}
 }
+
+// SendWorkspaceInvite envia o convite para entrar num workspace. `acceptURL`
+// já inclui o token — o backend gera via FrontendAppURL + "/invite/" + token.
+func (s *Service) SendWorkspaceInvite(to, workspaceName, inviterName, roleName, acceptURL string) error {
+	subject := inviterName + " convidou você para " + workspaceName + " no " + s.appName
+	html := workspaceInviteHTML(s.appName, s.appURL, workspaceName, inviterName, roleName, acceptURL)
+	return s.send(to, subject, html, "workspace_invite")
+}

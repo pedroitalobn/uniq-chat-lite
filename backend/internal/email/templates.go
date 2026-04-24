@@ -287,6 +287,30 @@ func adminResetPasswordHTML(appName, name, appURL, newPassword string) string {
 	return baseTemplate(appName, appURL, "linear-gradient(135deg,"+BrandWarning+",#d97706)", content)
 }
 
+// ── Workspace Invite ──────────────────────────────────────────────────────────
+
+func workspaceInviteHTML(appName, appURL, workspaceName, inviterName, roleName, acceptURL string) string {
+	content := iconEmoji("🎉") +
+		h1("Você foi convidado!") +
+		p("<strong>"+inviterName+"</strong> convidou você para colaborar no workspace <strong>"+workspaceName+"</strong> no "+appName+".") +
+		card(
+			h3("Detalhes do convite")+
+				infoItem("Workspace", workspaceName)+
+				infoItem("Função", roleName)+
+				infoItem("Convidado por", inviterName),
+		) +
+		p("Clique no botão abaixo para aceitar o convite e começar a colaborar:") +
+		btn("Aceitar convite", acceptURL, BrandPrimary) +
+		highlightBox(
+			"<p style='margin:0;color:#475569;font-size:14px;'>⏰ Este convite expira em <strong>7 dias</strong>.</p>",
+			"#fef3c7",
+		) +
+		divider() +
+		pSmall("Se você não esperava este convite ou não reconhece quem enviou, pode ignorar este e-mail com segurança.") +
+		pSmall("Se o botão acima não funcionar, copie e cole este link no seu navegador: <br><span style='color:#6366f1;word-break:break-all;'>"+acceptURL+"</span>")
+	return baseTemplate(appName, appURL, "linear-gradient(135deg,"+BrandPrimary+","+BrandSecondary+")", content)
+}
+
 // Test email - simple branded template
 func TestHTML(appName string) string {
 	content := iconEmoji("✉️") +

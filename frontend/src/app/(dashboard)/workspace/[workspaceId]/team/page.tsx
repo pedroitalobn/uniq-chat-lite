@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useParams } from "next/navigation";
 import { workspacesApi, rolesApi } from "@/lib/api";
-import { Users, Plus, Mail, Loader2, Crown, X, Copy, Check, UserMinus, ChevronLeft } from "lucide-react";
+import { Users, Plus, Mail, Loader2, Crown, X, Copy, Check, UserMinus, ChevronLeft, Send } from "lucide-react";
 import { toast } from "sonner";
 import { showConfirm } from "@/lib/confirm";
 import type { Workspace, UserWorkspace, Role, Invite } from "@/types";
@@ -19,7 +19,22 @@ export default function TeamPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRoleId, setInviteRoleId] = useState("");
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
+  const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
   const [showInvite, setShowInvite] = useState(false);
+
+  const inviteLink = (token: string) => `${typeof window !== "undefined" ? window.location.origin : ""}/invite/${token}`;
+
+  const copyInviteLink = async (invite: Invite) => {
+    try {
+      const link = inviteLink(invite.token);
+      await navigator.clipboard.writeText(link);
+      setCopiedInviteId(invite.id);
+      toast.success("Link de convite copiado");
+      setTimeout(() => setCopiedInviteId((v) => (v === invite.id ? null : v)), 2500);
+    } catch {
+      toast.error("Não foi possível copiar o link");
+    }
+  };
 
   const { data: workspace } = useQuery<Workspace>({
     queryKey: ["workspace", workspaceId],
@@ -50,17 +65,17 @@ export default function TeamPage() {
     mutationFn: (data: { email: string; role_id: string }) =>
       workspacesApi.createInvite(workspaceId, data),
     onSuccess: (res) => {
-      toast.success("Convite enviado");
+      toast.success("Convite criado — email enviado e link copiado");
       queryClient.invalidateQueries({ queryKey: ["workspace-invites", workspaceId] });
       setInviteEmail("");
       setInviteRoleId("");
-      setShowInvite(false);
+      // Mantém o form aberto pra exibir o link copiável — o usuário fecha manualmente.
       const invite = res.data.invite;
       if (invite) {
         const link = `${window.location.origin}/invite/${invite.token}`;
-        navigator.clipboard.writeText(link);
+        navigator.clipboard.writeText(link).catch(() => {});
         setCopiedLink(link);
-        setTimeout(() => setCopiedLink(null), 5000);
+        setTimeout(() => setCopiedLink(null), 30000);
       }
     },
     onError: (err: unknown) => {
@@ -69,13 +84,50 @@ export default function TeamPage() {
     },
   });
 
-  const removeInviteMutation = useMutation({
-    mutationFn: (inviteId: string) => workspacesApi.revokeInvite(workspaceId, inviteId),
+  const resendInviteMutation = useMutation({
+    mutationFn: (inviteId: string) => workspacesApi.resendInvite(workspaceId, inviteId),
     onSuccess: () => {
-      toast.success("Convite revogado");
+      toast.success("Email de convite reenviado");
       queryClient.invalidateQueries({ queryKey: ["workspace-invites", workspaceId] });
     },
-    onError: () => toast.error("Erro ao revogar convite"),
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { error?: string; accept_url?: string } } };
+      const msg = e?.response?.data?.error || "Erro ao reenviar email";
+      const acceptURL = e?.response?.data?.accept_url;
+      if (acceptURL) {
+        navigator.clipboard.writeText(acceptURL).catch(() => {});
+        toast.error(`${msg} — link copiado pra área de transferência`);
+      } else {
+        toast.error(msg);
+      }
+    },
+  });
+
+  const removeInviteMutation = useMutation({
+    mutationFn: (inviteId: string) => workspacesApi.revokeInvite(workspaceId, inviteId),
+    onMutate: async (inviteId: string) => {
+      // Remove a linha da UI imediatamente — sensação de resposta instantânea.
+      await queryClient.cancelQueries({ queryKey: ["workspace-invites", workspaceId] });
+      const prev = queryClient.getQueryData<Invite[]>(["workspace-invites", workspaceId]);
+      queryClient.setQueryData<Invite[]>(
+        ["workspace-invites", workspaceId],
+        (old = []) => old.filter((i) => i.id !== inviteId),
+      );
+      return { prev };
+    },
+    onError: (_err, _inviteId, ctx) => {
+      // Rollback se o backend rejeitar.
+      if (ctx?.prev) {
+        queryClient.setQueryData(["workspace-invites", workspaceId], ctx.prev);
+      }
+      toast.error("Erro ao revogar convite");
+    },
+    onSuccess: () => {
+      toast.success("Convite revogado");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspace-invites", workspaceId] });
+    },
   });
 
   const removeMemberMutation = useMutation({
@@ -237,13 +289,43 @@ export default function TeamPage() {
 
           {copiedLink && (
             <div
-              className="rounded-xl p-3 flex items-center gap-2 animate-fade-in-up"
-              style={{ background: "rgba(0,212,106,0.05)", border: "1px solid rgba(0,212,106,0.15)" }}
+              className="rounded-xl p-4 space-y-3 animate-fade-in-up"
+              style={{ background: "rgba(0,212,106,0.05)", border: "1px solid rgba(0,212,106,0.2)" }}
             >
-              <Check className="w-4 h-4" style={{ color: "var(--green)" }} />
-              <span className="text-sm" style={{ color: "#86efac" }}>
-                Link copiado para a área de transferência!
-              </span>
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4" style={{ color: "var(--green, #00d46a)" }} />
+                <span className="text-sm font-medium" style={{ color: "#86efac" }}>
+                  Convite criado. Link copiado — envie também por onde quiser.
+                </span>
+              </div>
+              <div
+                className="flex items-center gap-2 rounded-lg px-3 py-2"
+                style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.06)" }}
+              >
+                <code className="flex-1 text-xs truncate" style={{ color: "hsl(240 15% 80%)" }}>
+                  {copiedLink}
+                </code>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(copiedLink).then(() => {
+                      toast.success("Link copiado");
+                    });
+                  }}
+                  className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md transition-colors"
+                  style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 15% 80%)" }}
+                >
+                  <Copy className="w-3.5 h-3.5" /> Copiar
+                </button>
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(`Você foi convidado para o workspace ${workspace?.name || ""}: ${copiedLink}`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md transition-colors"
+                  style={{ background: "rgba(0,212,106,0.1)", color: "#4ade80" }}
+                >
+                  WhatsApp
+                </a>
+              </div>
             </div>
           )}
         </div>
@@ -413,20 +495,59 @@ export default function TeamPage() {
                   >
                     {invite.status}
                   </span>
-                  {invite.status === "pending" && (
-                    <button
-                      onClick={async () => {
-                        if (!await showConfirm(`Revogar convite para ${invite.email}?`, { title: "Revogar convite", confirmLabel: "Revogar" })) return;
-                        removeInviteMutation.mutate(invite.id);
-                      }}
-                      className="p-2 rounded-lg transition-colors"
-                      style={{ color: "hsl(240 8% 32%)" }}
-                      onMouseEnter={e => (e.currentTarget.style.color = "#ef4444")}
-                      onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 32%)")}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => copyInviteLink(invite)}
+                    title="Copiar link de convite"
+                    className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors"
+                    style={{
+                      background: copiedInviteId === invite.id ? "rgba(0,212,106,0.1)" : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${copiedInviteId === invite.id ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.08)"}`,
+                      color: copiedInviteId === invite.id ? "#4ade80" : "hsl(240 8% 65%)",
+                    }}
+                  >
+                    {copiedInviteId === invite.id ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        Copiado
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        Copiar link
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => resendInviteMutation.mutate(invite.id)}
+                    disabled={resendInviteMutation.isPending}
+                    title="Reenviar email de convite"
+                    className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                    style={{
+                      background: "rgba(99,102,241,0.08)",
+                      border: "1px solid rgba(99,102,241,0.2)",
+                      color: "#a5b4fc",
+                    }}
+                  >
+                    {resendInviteMutation.isPending && resendInviteMutation.variables === invite.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5" />
+                    )}
+                    Reenviar
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!await showConfirm(`Revogar convite para ${invite.email}?`, { title: "Revogar convite", confirmLabel: "Revogar" })) return;
+                      removeInviteMutation.mutate(invite.id);
+                    }}
+                    title="Revogar convite"
+                    className="p-2 rounded-lg transition-colors"
+                    style={{ color: "hsl(240 8% 32%)" }}
+                    onMouseEnter={e => (e.currentTarget.style.color = "#ef4444")}
+                    onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 32%)")}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               );
             })}
