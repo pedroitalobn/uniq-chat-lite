@@ -116,6 +116,11 @@ func (h *WorkspaceHandler) Create(c *fiber.Ctx) error {
 		h.db.Model(&models.User{}).Where("id = ?", userID).Update("role", models.RoleCustomer)
 	}
 
+	// Seed as roles padrão (Supervisor / Agente / Agente RO) pro owner
+	// já poder convidar gente e atribuir funções sem precisar montar
+	// permissões do zero. Idempotente.
+	models.SeedDefaultRolesForWorkspace(h.db, &workspace)
+
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"workspace": workspace,
 		"role":      adminRole,

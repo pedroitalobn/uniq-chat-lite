@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useParams } from "next/navigation";
 import { workspacesApi, rolesApi } from "@/lib/api";
@@ -38,11 +39,12 @@ export default function TeamPage() {
     enabled: !!workspaceId,
   });
 
-  const { data: roles = [] } = useQuery<Role[]>({
+  const rolesQuery = useQuery<Role[]>({
     queryKey: ["workspace-roles", workspaceId],
-    queryFn: () => rolesApi.list(workspaceId).then((r) => r.data.roles || r.data),
+    queryFn: () => rolesApi.list(workspaceId).then((r) => (r.data.roles ?? r.data ?? []) as Role[]),
     enabled: !!workspaceId,
   });
+  const roles = rolesQuery.data ?? [];
 
   const createInviteMutation = useMutation({
     mutationFn: (data: { email: string; role_id: string }) =>
@@ -185,13 +187,39 @@ export default function TeamPage() {
               value={inviteRoleId}
               onChange={(e) => setInviteRoleId(e.target.value)}
               className="input-field"
+              disabled={rolesQuery.isLoading || rolesQuery.isError || roles.length === 0}
             >
-              <option value="">Selecione uma função</option>
+              <option value="">
+                {rolesQuery.isLoading
+                  ? "Carregando funções…"
+                  : rolesQuery.isError
+                    ? "Erro ao carregar funções"
+                    : roles.length === 0
+                      ? "Nenhuma função disponível"
+                      : "Selecione uma função"}
+              </option>
               {roles.map((role) => (
                 <option key={role.id} value={role.id}>{role.name}</option>
               ))}
             </select>
           </div>
+          {!rolesQuery.isLoading && !rolesQuery.isError && roles.length === 0 && (
+            <p className="-mt-2 text-xs" style={{ color: "hsl(240 8% 52%)" }}>
+              Nenhuma função criada neste workspace.{" "}
+              <Link
+                href={`/workspace/${workspaceId}/roles`}
+                className="underline"
+                style={{ color: "#00d46a" }}
+              >
+                Criar a primeira função →
+              </Link>
+            </p>
+          )}
+          {rolesQuery.isError && (
+            <p className="-mt-2 text-xs" style={{ color: "#ef4444" }}>
+              Não consegui carregar as funções. Verifique se você tem acesso a este workspace.
+            </p>
+          )}
 
           <div className="flex gap-3">
             <button

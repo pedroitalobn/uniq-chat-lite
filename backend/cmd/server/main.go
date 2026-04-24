@@ -466,80 +466,12 @@ func backfillAdminRolePermissions(db *gorm.DB) {
 	log.Info().Int("roles", len(admins)).Int("perms", len(perms)).Msg("admin role permissions backfilled")
 }
 
-// seedTicketingRoles ensures every workspace has the default ticketing roles
-// (agent, supervisor, agent_read_only). Idempotent: skips workspaces/roles
-// that already exist.
+// seedTicketingRoles is a thin wrapper over the reusable helper in
+// models — moved there so WorkspaceHandler.Create can seed a new
+// workspace's default roles in-line (sem depender de boot).
 func seedTicketingRoles(db *gorm.DB) {
-	type roleSpec struct {
-		name        string
-		description string
-		perms       []string
-	}
-	specs := []roleSpec{
-		{
-			name:        "Supervisor",
-			description: "Gestão da equipe: vê todos os atendimentos, filas, equipes, relatórios e presença",
-			perms: []string{
-				models.PermTicketsView, models.PermTicketsViewAll, models.PermTicketsViewTeam,
-				models.PermTicketsUpdate, models.PermTicketsAssign, models.PermTicketsTransfer,
-				models.PermTicketsClose, models.PermTicketsReopen, models.PermTicketsSnooze,
-				models.PermNotesView, models.PermNotesCreate, models.PermNotesUpdate,
-				models.PermQueuesView, models.PermTeamsView, models.PermDepartmentsView,
-				models.PermQuickRepliesView, models.PermQuickRepliesManageShared,
-				models.PermReportsView, models.PermReportsExport,
-				models.PermPresenceViewOthers,
-				models.PermInboxView, models.PermInboxSend, models.PermInboxAssign,
-			},
-		},
-		{
-			name:        "Agente",
-			description: "Atendente: trabalha seus atendimentos e filas em que participa",
-			perms: []string{
-				models.PermTicketsView, models.PermTicketsCreate, models.PermTicketsUpdate,
-				models.PermTicketsAssign, models.PermTicketsTransfer, models.PermTicketsClose,
-				models.PermTicketsReopen, models.PermTicketsSnooze,
-				models.PermNotesView, models.PermNotesCreate, models.PermNotesUpdate, models.PermNotesDelete,
-				models.PermQuickRepliesView, models.PermQuickRepliesManageOwn,
-				models.PermInboxView, models.PermInboxSend,
-				models.PermCRMView,
-			},
-		},
-		{
-			name:        "Agente (Somente Leitura)",
-			description: "Agente com acesso apenas de leitura a atendimentos e notas",
-			perms: []string{
-				models.PermTicketsView, models.PermNotesView,
-				models.PermQuickRepliesView, models.PermInboxView,
-			},
-		},
-	}
-
-	var workspaces []models.Workspace
-	db.Find(&workspaces)
-	for _, ws := range workspaces {
-		for _, spec := range specs {
-			var existing models.Role
-			if err := db.Where("workspace_id = ? AND name = ?", ws.ID, spec.name).First(&existing).Error; err == nil {
-				continue // already exists
-			}
-			role := models.Role{
-				WorkspaceID: ws.ID,
-				Name:        spec.name,
-				Description: spec.description,
-				IsDefault:   true,
-			}
-			if err := db.Create(&role).Error; err != nil {
-				log.Warn().Err(err).Str("workspace", ws.ID.String()).Str("role", spec.name).Msg("failed to create ticketing role")
-				continue
-			}
-			var perms []models.Permission
-			db.Where("key IN ?", spec.perms).Find(&perms)
-			for _, p := range perms {
-				db.Create(&models.RolePermission{RoleID: role.ID, PermissionID: p.ID})
-			}
-		}
-	}
-	log.Info().Int("workspaces", len(workspaces)).Msg("ticketing roles seeded")
+	n := models.SeedDefaultRolesForAllWorkspaces(db)
+	log.Info().Int("workspaces", n).Msg("ticketing roles seeded")
 }
 
 func seedPermissions(db *gorm.DB) {
