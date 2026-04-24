@@ -907,13 +907,31 @@ func (h *ConversationHandler) Backfill(c *fiber.Ctx) error {
 			ws, []models.MessageDirection{models.DirectionIn, models.DirectionOut}).
 		Count(&remaining)
 
+	// Totals pro client saber onde estão os tickets — às vezes o user
+	// processa 1600 message_logs e cria só 80 conversations porque o mesmo
+	// contato recebeu muitas mensagens.
+	var totalConvs, openConvs, pendingConvs, unassignedOpen int64
+	h.db.Model(&models.Conversation{}).Where("workspace_id = ?", ws).Count(&totalConvs)
+	h.db.Model(&models.Conversation{}).
+		Where("workspace_id = ? AND status = ?", ws, models.ConversationStatusOpen).Count(&openConvs)
+	h.db.Model(&models.Conversation{}).
+		Where("workspace_id = ? AND status = ?", ws, models.ConversationStatusPending).Count(&pendingConvs)
+	h.db.Model(&models.Conversation{}).
+		Where("workspace_id = ? AND status IN ? AND assigned_user_id IS NULL", ws,
+			[]models.ConversationStatus{models.ConversationStatusOpen, models.ConversationStatusPending}).
+		Count(&unassignedOpen)
+
 	return c.JSON(fiber.Map{
-		"processed": processed,
-		"inbound":   inbound,
-		"outbound":  outbound,
-		"batches":   batches + obBatches,
-		"remaining": remaining,
-		"elapsed_ms": time.Since(start).Milliseconds(),
+		"processed":         processed,
+		"inbound":           inbound,
+		"outbound":          outbound,
+		"batches":           batches + obBatches,
+		"remaining":         remaining,
+		"total_conversations":     totalConvs,
+		"open_conversations":      openConvs,
+		"pending_conversations":   pendingConvs,
+		"unassigned_open":         unassignedOpen,
+		"elapsed_ms":        time.Since(start).Milliseconds(),
 	})
 }
 

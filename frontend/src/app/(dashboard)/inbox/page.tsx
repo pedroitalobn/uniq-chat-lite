@@ -180,22 +180,36 @@ export default function InboxPage() {
   const backfill = useMutation({
     mutationFn: () => conversationsApi.backfill(wsId as string, { limit: 500, max_batches: 20 }),
     onSuccess: (r) => {
-      const data = r.data as { processed: number; remaining: number };
-      if (data.remaining > 0) {
-        toast.success(
-          `${data.processed.toLocaleString("pt-BR")} mensagens sincronizadas — ainda faltam ${data.remaining.toLocaleString("pt-BR")}. Clique de novo pra continuar.`
-        );
-      } else {
-        toast.success(
-          `${data.processed.toLocaleString("pt-BR")} mensagens sincronizadas. Mostrando todos os atendimentos.`
-        );
+      const data = r.data as {
+        processed: number;
+        remaining: number;
+        total_conversations?: number;
+        open_conversations?: number;
+        pending_conversations?: number;
+        unassigned_open?: number;
+      };
+      const bits: string[] = [];
+      bits.push(`${data.processed.toLocaleString("pt-BR")} mensagens`);
+      if (data.total_conversations != null) {
+        bits.push(`${data.total_conversations.toLocaleString("pt-BR")} atendimentos no total`);
       }
-      // Mensagens backfilladas não têm assignee (não passam pelo
-      // DispatchService quando a instância não está em nenhuma fila), então
-      // o filtro default "Meus atendimentos" não mostra nada. Mudamos o
-      // escopo pra "Todos + Abertos" assim o user VÊ o resultado.
+      if (data.pending_conversations) {
+        bits.push(`${data.pending_conversations.toLocaleString("pt-BR")} em pendente`);
+      }
+      if (data.remaining > 0) {
+        bits.push(`${data.remaining.toLocaleString("pt-BR")} ainda por processar`);
+      }
+      toast.success(bits.join(" · "));
+      // Mensagens backfilladas podem cair em três estados diferentes:
+      //   - open + sem assignee  (nenhuma fila para a instância)
+      //   - open + assignee      (fila com agente online)
+      //   - pending              (fila existe mas fora de horário OU
+      //                           ninguém online no momento do backfill)
+      // O default do header era "Meus + Abertos", que ignora os dois
+      // primeiros casos e os pendings. Forçamos "Todos agentes + Todos
+      // status" para o user ver tudo que foi criado, sem surpresa.
       if (canViewAll) setAgentScope("all");
-      setStatusTab("open");
+      setStatusTab("all");
       setQueueScope("all");
       setChannelFilter([]);
       setInstanceFilter([]);
