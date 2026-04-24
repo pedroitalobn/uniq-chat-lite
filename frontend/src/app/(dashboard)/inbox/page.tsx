@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -15,6 +16,7 @@ import {
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { ConversationList, type ConversationRow } from "@/components/atendimento/ConversationList";
+import { ConversationDetail } from "@/components/inbox/ConversationDetail";
 import { useConversationWS } from "@/hooks/useConversationWS";
 import type { ChannelInfo, Instance } from "@/types";
 
@@ -65,8 +67,11 @@ export default function InboxPage() {
   const { hasPerm, isLoading: permsLoading, isOwner } = useWorkspacePermissions();
   const { data: session } = useSession();
   const qc = useQueryClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const wsId = currentWorkspace?.id;
   const myUserID = session?.user?.id as string | undefined;
+  const selectedId = searchParams.get("c") ?? undefined;
 
   const canView = hasPerm(PERM.ticketsView);
   const canViewAll = hasPerm(PERM.ticketsViewAll) || hasPerm(PERM.ticketsViewTeam) || isOwner;
@@ -393,35 +398,81 @@ export default function InboxPage() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto">
-        {listQ.isError ? (
-          <ErrorStateWithProbe
-            error={listQ.error}
-            onRetry={() => {
-              listQ.refetch();
-              statsQ.refetch();
-            }}
-          />
-        ) : showBackfillCTA ? (
-          <BackfillEmptyState
-            stats={statsQ.data!}
-            running={backfill.isPending}
-            onBackfill={() => backfill.mutate()}
-          />
-        ) : list.length === 0 && !listQ.isLoading ? (
-          <EmptyState agentScope={agentScope} statusTab={statusTab} />
-        ) : (
-          <ConversationList
-            items={list}
-            isLoading={listQ.isLoading}
-            emptyLabel="Nenhum atendimento neste filtro."
-            actionLabel={canAssign && statusTab === "unassigned" ? "Atender" : undefined}
-            onAction={canAssign && statusTab === "unassigned"
-              ? (conv) => claim.mutate(conv.id)
-              : undefined}
-          />
-        )}
+      {/* Split messenger-style: list left · chat right */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <aside
+          className="flex flex-shrink-0 flex-col overflow-hidden"
+          style={{
+            width: 340,
+            borderRight: "1px solid hsl(240 12% 16%)",
+            background: "hsl(240 18% 5%)",
+          }}
+        >
+          <div className="flex-1 overflow-y-auto">
+            {listQ.isError ? (
+              <ErrorStateWithProbe
+                error={listQ.error}
+                onRetry={() => {
+                  listQ.refetch();
+                  statsQ.refetch();
+                }}
+              />
+            ) : showBackfillCTA ? (
+              <BackfillEmptyState
+                stats={statsQ.data!}
+                running={backfill.isPending}
+                onBackfill={() => backfill.mutate()}
+              />
+            ) : list.length === 0 && !listQ.isLoading ? (
+              <EmptyState agentScope={agentScope} statusTab={statusTab} />
+            ) : (
+              <ConversationList
+                items={list}
+                isLoading={listQ.isLoading}
+                emptyLabel="Nenhum atendimento neste filtro."
+                density="compact"
+                selectedId={selectedId}
+                getHref={(conv) => `/inbox?c=${conv.id}`}
+                actionLabel={canAssign && statusTab === "unassigned" ? "Atender" : undefined}
+                onAction={canAssign && statusTab === "unassigned"
+                  ? (conv) => claim.mutate(conv.id)
+                  : undefined}
+              />
+            )}
+          </div>
+        </aside>
+
+        <main className="flex flex-1 min-w-0 flex-col overflow-hidden">
+          {selectedId ? (
+            <ConversationDetail
+              key={selectedId}
+              conversationId={selectedId}
+              onClose={() => router.replace("/inbox", { scroll: false })}
+            />
+          ) : (
+            <NoneSelected count={list.length} />
+          )}
+        </main>
       </div>
+    </div>
+  );
+}
+
+function NoneSelected({ count }: { count: number }) {
+  return (
+    <div
+      className="flex h-full flex-col items-center justify-center gap-2 p-12 text-center"
+      style={{ color: "hsl(240 8% 48%)" }}
+    >
+      <MessageSquare className="h-12 w-12" style={{ color: "hsl(240 8% 24%)" }} />
+      <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 80%)" }}>
+        Selecione um atendimento
+      </h2>
+      <p className="max-w-sm text-xs">
+        {count > 0
+          ? `${count} conversa${count > 1 ? "s" : ""} na lista à esquerda. Clique em uma para abrir aqui.`
+          : "Quando você clicar em um atendimento, ele abre aqui sem perder os filtros do topo."}
+      </p>
     </div>
   );
 }
