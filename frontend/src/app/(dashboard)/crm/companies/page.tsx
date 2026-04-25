@@ -9,6 +9,7 @@ import { companiesApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { formatCurrency, uniq, cardStyle } from "@/components/crm/tokens";
+import { CRMTabs } from "@/components/crm/CRMTabs";
 
 interface Company {
   id: string;
@@ -55,17 +56,20 @@ export default function CompaniesPage() {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between border-b px-6 py-4" style={{ borderColor: uniq.borderSoft }}>
-        <div>
-          <h1 className="text-xl font-semibold" style={{ color: uniq.textStrong }}>
-            Empresas
-          </h1>
-          <p className="text-xs" style={{ color: uniq.textFaint }}>
-            {listQ.data?.total ?? 0} empresas cadastradas
-          </p>
+    <div className="flex h-full flex-col uniq-page">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b px-4 sm:px-6 py-3 sm:py-4" style={{ borderColor: uniq.borderSoft }}>
+        <div className="flex items-center gap-4 flex-wrap">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: uniq.textStrong }}>
+              Empresas
+            </h1>
+            <p className="text-xs" style={{ color: uniq.textFaint }}>
+              {listQ.data?.total ?? 0} empresas cadastradas
+            </p>
+          </div>
+          <CRMTabs />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5" style={{ color: uniq.textFaint }} />
             <input
