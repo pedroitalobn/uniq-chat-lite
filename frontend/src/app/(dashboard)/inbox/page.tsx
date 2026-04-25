@@ -20,6 +20,7 @@ import { ConversationList, type ConversationRow } from "@/components/atendimento
 import { ConversationDetail } from "@/components/inbox/ConversationDetail";
 import { InboxReports } from "@/components/inbox/InboxReports";
 import { useConversationWS } from "@/hooks/useConversationWS";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 import type { ChannelInfo, Instance } from "@/types";
 
 // Consolidated inbox:
@@ -74,6 +75,9 @@ export default function InboxPage() {
   const wsId = currentWorkspace?.id;
   const myUserID = session?.user?.id as string | undefined;
   const selectedId = searchParams.get("c") ?? undefined;
+  // Mobile = single-pane: ou lista, ou conversa, com botão "voltar".
+  // Desktop = split fixo (lista + drag handle + conversa).
+  const isMobile = useIsMobile();
 
   // Gate da página = inbox:view. Sem inbox:view → Forbidden, mesmo que o
   // user tenha tickets:view (admin pode tirar acesso ao módulo todo).
@@ -333,9 +337,9 @@ export default function InboxPage() {
       : `${instanceFilter.length} instâncias`;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col uniq-page">
       <header
-        className="border-b px-6 py-4"
+        className="border-b px-4 sm:px-6 py-3 sm:py-4"
         style={{ borderColor: "hsl(240 12% 16%)" }}
       >
         <div className="flex flex-wrap items-center gap-3">
@@ -485,16 +489,19 @@ export default function InboxPage() {
       {viewMode === "reports" ? (
         <InboxReports workspaceId={wsId as string} />
       ) : (
-      /* Split messenger-style: list left · drag handle · chat right */
+      /* Split messenger-style desktop · stack mobile (uma view por vez).
+         Em mobile: lista visível só sem selectedId; chat fullscreen com
+         selectedId. Desktop: ambos sempre visíveis com drag handle. */
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <aside
-          className="flex flex-shrink-0 flex-col overflow-hidden"
+          className="flex flex-col overflow-hidden flex-shrink-0"
           style={{
-            width: listWidth,
+            width: isMobile ? "100%" : listWidth,
+            display: isMobile && selectedId ? "none" : "flex",
             background: "hsl(240 18% 5%)",
           }}
         >
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto uniq-no-bounce">
             {listQ.isError ? (
               <ErrorStateWithProbe
                 error={listQ.error}
@@ -532,23 +539,28 @@ export default function InboxPage() {
           </div>
         </aside>
 
-        {/* Drag handle: 4px de trilho + cursor col-resize + double-click
-            volta pra largura default 340px */}
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          onMouseDown={(e) => startResize(e.clientX)}
-          onDoubleClick={() => setListWidth(340)}
-          className="group relative flex-shrink-0 cursor-col-resize"
-          style={{ width: 4, background: "hsl(240 12% 14%)" }}
-          title="Arraste para redimensionar · duplo-clique restaura"
-        >
+        {/* Drag handle: só desktop. Em mobile o painel principal não
+            convive com a lista, então não faz sentido redimensionar. */}
+        {!isMobile && (
           <div
-            className="absolute inset-y-0 -left-1 -right-1 transition-colors group-hover:bg-[rgba(0,212,106,0.15)]"
-          />
-        </div>
+            role="separator"
+            aria-orientation="vertical"
+            onMouseDown={(e) => startResize(e.clientX)}
+            onDoubleClick={() => setListWidth(340)}
+            className="group relative flex-shrink-0 cursor-col-resize"
+            style={{ width: 4, background: "hsl(240 12% 14%)" }}
+            title="Arraste para redimensionar · duplo-clique restaura"
+          >
+            <div
+              className="absolute inset-y-0 -left-1 -right-1 transition-colors group-hover:bg-[rgba(0,212,106,0.15)]"
+            />
+          </div>
+        )}
 
-        <main className="flex flex-1 min-w-0 flex-col overflow-hidden">
+        <main
+          className="flex flex-1 min-w-0 flex-col overflow-hidden"
+          style={{ display: isMobile && !selectedId ? "none" : "flex" }}
+        >
           {selectedId ? (
             <ConversationDetail
               key={selectedId}

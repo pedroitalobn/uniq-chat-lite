@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { crmApi, journeysApi } from "@/lib/api";
@@ -9,7 +9,7 @@ import {
   Plus, Search, Tag as TagIcon, Trash2, Phone, Mail, Edit2,
   X, Check, User, StickyNote, GitBranch, Layers, Route,
   Hash, UserCheck, ChevronDown, Filter, List as ListIcon, KanbanSquare, GripVertical,
-  Pause, Play, ExternalLink,
+  Pause, Play, ExternalLink, MoreVertical,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { showConfirm } from "@/lib/confirm";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1219,9 +1220,98 @@ function FilterPanel({
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
+// SecondaryButton — usado no header do CRM em desktop pra Tags/Funis/Jornadas
+function SecondaryButton({
+  onClick,
+  icon,
+  label,
+}: {
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-2 text-sm font-medium px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl transition-all"
+      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 8% 62%)" }}
+      onMouseEnter={(e) => (e.currentTarget.style.color = "hsl(240 15% 93%)")}
+      onMouseLeave={(e) => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
+    >
+      {icon}
+      <span className="hidden sm:inline">{label}</span>
+    </button>
+  );
+}
+
+// CRMOverflowMenu — kebab que consolida Tags / Funis / Jornadas em mobile.
+// Mantém o header limpo sem perder funcionalidade.
+function CRMOverflowMenu({
+  onTags,
+  onFunnels,
+  onJourneys,
+}: {
+  onTags: () => void;
+  onFunnels: () => void;
+  onJourneys: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const Item = ({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) => (
+    <button
+      onClick={() => {
+        setOpen(false);
+        onClick();
+      }}
+      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm transition-colors hover:bg-white/[0.04] text-left"
+      style={{ color: "hsl(240 15% 85%)" }}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center justify-center p-2 rounded-xl transition-colors"
+        style={{
+          background: open ? "rgba(0,212,106,0.08)" : "rgba(255,255,255,0.04)",
+          border: "1px solid " + (open ? "rgba(0,212,106,0.2)" : "rgba(255,255,255,0.08)"),
+          color: open ? "#00d46a" : "hsl(240 8% 62%)",
+        }}
+        aria-label="Mais opções"
+      >
+        <MoreVertical className="w-4 h-4" />
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 top-full z-40 mt-1 w-48 rounded-xl shadow-2xl overflow-hidden uniq-scale-in"
+          style={{ background: "hsl(240 18% 7%)", border: "1px solid hsl(240 12% 14%)" }}
+        >
+          <Item icon={<TagIcon className="w-3.5 h-3.5" style={{ color: "#a78bfa" }} />} label="Tags" onClick={onTags} />
+          <Item icon={<GitBranch className="w-3.5 h-3.5" style={{ color: "#60a5fa" }} />} label="Funis" onClick={onFunnels} />
+          <Item icon={<Route className="w-3.5 h-3.5" style={{ color: "#fbbf24" }} />} label="Jornadas" onClick={onJourneys} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CRMPage() {
   const queryClient = useQueryClient();
   const { currentWorkspace } = useWorkspace();
+  const isMobile = useIsMobile();
   const [search, setSearch]               = useState("");
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   const [pipelineFilters, setPipelineFilters] = useState<Record<string, string>>({});
@@ -1315,25 +1405,26 @@ export default function CRMPage() {
     setPipelineFilters((prev) => ({ ...prev, [k]: v }));
 
   return (
-    <div className="space-y-7">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>CRM</h1>
-          <p className="text-sm mt-1.5" style={{ color: "hsl(240 8% 46%)" }}>
+    <div className="space-y-5 uniq-page">
+      {/* Header — em mobile vira coluna; secondary actions colapsam num kebab */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate" style={{ color: "hsl(240 15% 93%)" }}>CRM</h1>
+          <p className="text-xs sm:text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
             {contacts.length} contato{contacts.length !== 1 ? "s" : ""}
             {activeFilterCount > 0 && (
               <span style={{ color: "var(--green)" }}> · {activeFilterCount} filtro{activeFilterCount > 1 ? "s" : ""} ativo{activeFilterCount > 1 ? "s" : ""}</span>
             )}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {/* View toggle */}
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* View toggle — sempre visível */}
           <div className="flex bg-white/5 p-1 rounded-xl items-center" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
             <button
               onClick={() => setViewMode("list")}
               className="p-1.5 rounded-lg transition-colors"
               style={{ background: viewMode === "list" ? "rgba(255,255,255,0.1)" : "transparent", color: viewMode === "list" ? "white" : "hsl(240 8% 62%)" }}
+              aria-label="Vista em lista"
             >
               <ListIcon className="w-4 h-4" />
             </button>
@@ -1341,46 +1432,22 @@ export default function CRMPage() {
               onClick={() => setViewMode("kanban")}
               className="p-1.5 rounded-lg transition-colors"
               style={{ background: viewMode === "kanban" ? "rgba(255,255,255,0.1)" : "transparent", color: viewMode === "kanban" ? "white" : "hsl(240 8% 62%)" }}
+              aria-label="Vista em kanban"
             >
               <KanbanSquare className="w-4 h-4" />
             </button>
           </div>
 
-          <button
-            onClick={() => setTagsOpen(true)}
-            className="flex items-center gap-2 text-sm font-medium px-3.5 py-2.5 rounded-xl transition-all"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 8% 62%)" }}
-            onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 15% 93%)")}
-            onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
-          >
-            <TagIcon className="w-4 h-4" /> <span className="hidden sm:inline">Tags</span>
-          </button>
-          <button
-            onClick={() => setFunnelsOpen(true)}
-            className="flex items-center gap-2 text-sm font-medium px-3.5 py-2.5 rounded-xl transition-all"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 8% 62%)" }}
-            onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 15% 93%)")}
-            onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
-          >
-            <GitBranch className="w-4 h-4" /> <span className="hidden sm:inline">Funis</span>
-          </button>
-          <button
-            onClick={() => setJourneysOpen(true)}
-            className="flex items-center gap-2 text-sm font-medium px-3.5 py-2.5 rounded-xl transition-all"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 8% 62%)" }}
-            onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 15% 93%)")}
-            onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
-          >
-            <Route className="w-4 h-4" /> <span className="hidden sm:inline">Jornadas</span>
-          </button>
+          {/* Pipeline filter — sempre visível (tem badge de count) */}
           <button
             onClick={() => setFilterOpen(true)}
-            className="relative flex items-center gap-2 text-sm font-medium px-3.5 py-2.5 rounded-xl transition-all"
+            className="relative flex items-center gap-2 text-sm font-medium px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl transition-all"
             style={{
               background: activeFilterCount > 0 ? "rgba(0,212,106,0.08)" : "rgba(255,255,255,0.04)",
               border: `1px solid ${activeFilterCount > 0 ? "rgba(0,212,106,0.2)" : "rgba(255,255,255,0.08)"}`,
               color: activeFilterCount > 0 ? "var(--green)" : "hsl(240 8% 62%)",
             }}
+            aria-label="Filtros do pipeline"
           >
             <Filter className="w-4 h-4" />
             <span className="hidden sm:inline">Pipeline</span>
@@ -1391,9 +1458,25 @@ export default function CRMPage() {
               </span>
             )}
           </button>
+
+          {/* Desktop: 3 botões inline; Mobile: tudo num kebab pra economizar largura */}
+          {!isMobile ? (
+            <>
+              <SecondaryButton onClick={() => setTagsOpen(true)} icon={<TagIcon className="w-4 h-4" />} label="Tags" />
+              <SecondaryButton onClick={() => setFunnelsOpen(true)} icon={<GitBranch className="w-4 h-4" />} label="Funis" />
+              <SecondaryButton onClick={() => setJourneysOpen(true)} icon={<Route className="w-4 h-4" />} label="Jornadas" />
+            </>
+          ) : (
+            <CRMOverflowMenu
+              onTags={() => setTagsOpen(true)}
+              onFunnels={() => setFunnelsOpen(true)}
+              onJourneys={() => setJourneysOpen(true)}
+            />
+          )}
+
           <button onClick={() => setCreateOpen(true)} className="btn-primary">
             <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novo Contato</span>
-            <span className="sm:hidden">+ Novo</span>
+            <span className="sm:hidden">Novo</span>
           </button>
         </div>
       </div>
