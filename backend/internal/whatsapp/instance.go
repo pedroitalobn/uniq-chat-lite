@@ -3,6 +3,7 @@ package whatsapp
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/queue"
+	"github.com/uniq-chat/backend/internal/storage"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waCompanionReg"
@@ -1836,7 +1838,21 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		} else {
 			direction = models.DirectionIn
 		}
+
+		// Mídia inbound: tentar baixar do servidor WhatsApp e subir pro
+		// MinIO. Quando há mídia (image/video/audio/document/sticker), o
+		// helper retorna SEMPRE um JSON: com `url` se baixou, com `error`
+		// se falhou. UI usa esse JSON pra renderizar <img>/<audio>/<video>
+		// (ou IconFallback no caso de erro). Tipos sem mídia (text/reaction
+		// /protocol/location) ignoram e mantém msgText = text original.
 		msgText := text
+		isMediaType := msgType == "image" || msgType == "video" ||
+			msgType == "audio" || msgType == "document" || msgType == "sticker"
+		if isMediaType && !v.IsEdit {
+			// `ctx` neste escopo é eventContext, não context.Context — uso
+			// background com timeout próprio dentro do helper.
+			msgText = ic.downloadAndStoreInboundMedia(context.Background(), v, msgType, text)
+		}
 		if msgText == "" {
 			switch msgType {
 			case "audio":
@@ -2208,4 +2224,112 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 	case *events.KeepAliveTimeout:
 		log.Warn().Str("instance", ic.ID).Int("error_count", v.ErrorCount).Msg("WhatsApp keep-alive timeout")
 	}
+}
+
+// downloadAndStoreInboundMedia baixa mídia inbound do servidor WhatsApp
+// e sobe pro MinIO/S3. Retorna SEMPRE um JSON serializado pro
+// MessageLog.Content — com `url` quando deu certo, com `error` quando
+// falhou. A UI parseia e renderiza adequadamente. `caption` é o texto
+// que vem junto da mídia (image/video têm caption, audio/sticker não).
+func (ic *InstanceClient) downloadAndStoreInboundMedia(
+	ctx context.Context, v *events.Message, msgType, caption string,
+) string {
+	out := map[string]interface{}{}
+	if caption != "" {
+		out["caption"] = caption
+	}
+
+	// Sem MinIO configurado, retorna JSON com error pra a UI mostrar
+	// IconFallback ao invés de tentar carregar URL inexistente.
+	if !storage.IsConfigured() {
+		out["error"] = "armazenamento de mídia não configurado"
+		out["type"] = msgType
+		b, _ := json.Marshal(out)
+		return string(b)
+	}
+
+	if ic.client == nil {
+		out["error"] = "cliente desconectado"
+		out["type"] = msgType
+		b, _ := json.Marshal(out)
+		return string(b)
+	}
+
+	// Pega o mime type e filename do tipo específico de mensagem.
+	var mime, filename string
+	switch msgType {
+	case "image":
+		if m := v.Message.GetImageMessage(); m != nil {
+			mime = m.GetMimetype()
+		}
+	case "video":
+		if m := v.Message.GetVideoMessage(); m != nil {
+			mime = m.GetMimetype()
+		}
+	case "audio":
+		if m := v.Message.GetAudioMessage(); m != nil {
+			mime = m.GetMimetype()
+			if m.GetPTT() {
+				out["ptt"] = true
+			}
+			if d := m.GetSeconds(); d > 0 {
+				out["duration_sec"] = int(d)
+			}
+		}
+	case "document":
+		if m := v.Message.GetDocumentMessage(); m != nil {
+			mime = m.GetMimetype()
+			filename = m.GetFileName()
+		}
+	case "sticker":
+		if m := v.Message.GetStickerMessage(); m != nil {
+			mime = m.GetMimetype()
+		}
+	}
+	if mime == "" {
+		mime = "application/octet-stream"
+	}
+
+	// DownloadAny lida com qualquer tipo de mídia inbound.
+	dlCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	data, err := ic.client.DownloadAny(dlCtx, v.Message)
+	if err != nil {
+		log.Warn().Err(err).Str("instance", ic.ID).Str("type", msgType).
+			Msg("media download failed")
+		out["error"] = "falha ao baixar mídia: " + err.Error()
+		out["mime_type"] = mime
+		if filename != "" {
+			out["filename"] = filename
+		}
+		b, _ := json.Marshal(out)
+		return string(b)
+	}
+
+	// Sobe pro MinIO/S3 — retorna URL pública.
+	ext := storage.MimeToExt(mime)
+	objectName := storage.MediaObjectName(ic.ID, ext)
+	url, err := storage.GlobalStorage.UploadBytes(dlCtx, objectName, data, mime)
+	if err != nil {
+		log.Warn().Err(err).Str("instance", ic.ID).Str("type", msgType).
+			Msg("media upload failed")
+		out["error"] = "falha ao salvar mídia: " + err.Error()
+		out["mime_type"] = mime
+		if filename != "" {
+			out["filename"] = filename
+		}
+		b, _ := json.Marshal(out)
+		return string(b)
+	}
+
+	out["url"] = url
+	out["mime_type"] = mime
+	out["size_bytes"] = len(data)
+	if filename != "" {
+		out["filename"] = filename
+	}
+	out["type"] = msgType
+
+	b, _ := json.Marshal(out)
+	return string(b)
 }
