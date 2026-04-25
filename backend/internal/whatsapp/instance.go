@@ -1759,22 +1759,84 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		case v.Message.GetLocationMessage() != nil:
 			msgType = "location"
 			loc := v.Message.GetLocationMessage()
+			// Salva JSON estruturado: front renderiza mapa preview + link.
+			payload := map[string]any{
+				"latitude":  loc.GetDegreesLatitude(),
+				"longitude": loc.GetDegreesLongitude(),
+			}
 			if n := loc.GetName(); n != "" {
-				text = n
-			} else if a := loc.GetAddress(); a != "" {
-				text = a
-			} else {
-				text = fmt.Sprintf("%.6f,%.6f", loc.GetDegreesLatitude(), loc.GetDegreesLongitude())
+				payload["name"] = n
+			}
+			if a := loc.GetAddress(); a != "" {
+				payload["address"] = a
+			}
+			if b, err := json.Marshal(payload); err == nil {
+				text = string(b)
+			}
+		case v.Message.GetLiveLocationMessage() != nil:
+			msgType = "live_location"
+			ll := v.Message.GetLiveLocationMessage()
+			payload := map[string]any{
+				"latitude":  ll.GetDegreesLatitude(),
+				"longitude": ll.GetDegreesLongitude(),
+				"is_live":   true,
+			}
+			if dur := ll.GetTimeOffset(); dur > 0 {
+				payload["duration_sec"] = int(dur)
+			}
+			if cap := ll.GetCaption(); cap != "" {
+				payload["caption"] = cap
+			}
+			if b, err := json.Marshal(payload); err == nil {
+				text = string(b)
 			}
 		case v.Message.GetReactionMessage() != nil:
 			msgType = "reaction"
 			text = v.Message.GetReactionMessage().GetText()
 		case v.Message.GetPollCreationMessage() != nil:
 			msgType = "poll"
-			text = v.Message.GetPollCreationMessage().GetName()
+			poll := v.Message.GetPollCreationMessage()
+			options := make([]map[string]string, 0, len(poll.GetOptions()))
+			for _, opt := range poll.GetOptions() {
+				options = append(options, map[string]string{"name": opt.GetOptionName()})
+			}
+			payload := map[string]any{
+				"question": poll.GetName(),
+				"options":  options,
+				"multi":    poll.GetSelectableOptionsCount() != 1,
+			}
+			if b, err := json.Marshal(payload); err == nil {
+				text = string(b)
+			}
 		case v.Message.GetContactMessage() != nil:
 			msgType = "contact"
-			text = v.Message.GetContactMessage().GetDisplayName()
+			ct := v.Message.GetContactMessage()
+			// Parse vCard pra extrair nome + telefones (FN, TEL).
+			payload := map[string]any{
+				"display_name": ct.GetDisplayName(),
+				"vcard":        ct.GetVcard(),
+				"phones":       parseVCardPhones(ct.GetVcard()),
+			}
+			if b, err := json.Marshal(payload); err == nil {
+				text = string(b)
+			}
+		case v.Message.GetContactsArrayMessage() != nil:
+			msgType = "contacts"
+			arr := v.Message.GetContactsArrayMessage()
+			contacts := make([]map[string]any, 0, len(arr.GetContacts()))
+			for _, ct := range arr.GetContacts() {
+				contacts = append(contacts, map[string]any{
+					"display_name": ct.GetDisplayName(),
+					"phones":       parseVCardPhones(ct.GetVcard()),
+				})
+			}
+			payload := map[string]any{
+				"contacts": contacts,
+				"label":    arr.GetDisplayName(),
+			}
+			if b, err := json.Marshal(payload); err == nil {
+				text = string(b)
+			}
 		case v.Message.GetInteractiveMessage() != nil:
 			msgType = "interactive"
 			text = "Mensagem interativa"
@@ -2334,4 +2396,49 @@ func (ic *InstanceClient) downloadAndStoreInboundMedia(
 
 	b, _ := json.Marshal(out)
 	return string(b)
+}
+
+// parseVCardPhones extrai todos os telefones de um vCard (formato RFC 6350).
+// Aceita TEL com ou sem types (TYPE=CELL, TYPE=WORK, etc). Útil pra cartões
+// de contato compartilhados via WhatsApp — o front renderiza cada telefone
+// com seu type pra agente reconhecer pessoal/trabalho/celular.
+func parseVCardPhones(vcard string) []map[string]string {
+	if vcard == "" {
+		return nil
+	}
+	var phones []map[string]string
+	for _, raw := range strings.Split(vcard, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		upper := strings.ToUpper(line)
+		if !strings.HasPrefix(upper, "TEL") {
+			continue
+		}
+		colonIdx := strings.Index(line, ":")
+		if colonIdx < 0 {
+			continue
+		}
+		header := line[:colonIdx]
+		number := strings.TrimSpace(line[colonIdx+1:])
+		if number == "" {
+			continue
+		}
+		// Tipo (se presente): TEL;TYPE=CELL → "cell"
+		phType := ""
+		for _, part := range strings.Split(header, ";") {
+			if strings.HasPrefix(strings.ToUpper(part), "TYPE=") {
+				phType = strings.ToLower(strings.TrimPrefix(part, "TYPE="))
+				phType = strings.TrimPrefix(phType, "type=")
+				break
+			}
+		}
+		entry := map[string]string{"number": number}
+		if phType != "" {
+			entry["type"] = phType
+		}
+		phones = append(phones, entry)
+	}
+	return phones
 }

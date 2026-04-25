@@ -115,18 +115,29 @@ export function MediaViewer({
   const isPDF = source.type === "document" && (source.mimeType?.includes("pdf") || source.filename?.toLowerCase().endsWith(".pdf"));
 
   const content = (
-    <div
-      className="fixed inset-0 z-[200] flex flex-col uniq-fade-in"
-      style={{ background: "rgba(0,0,0,0.92)", backdropFilter: "blur(8px)" }}
-      onClick={(e) => {
-        // Fecha clicando no backdrop (fora do conteúdo)
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+    <div className="fixed inset-0 z-[200] uniq-fade-in">
+      {/* Backdrop — full-screen click target. Toda área que NÃO é a mídia
+          em si fecha o viewer. Mais natural que ter que mirar no X. */}
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Fechar"
+        className="absolute inset-0"
+        style={{
+          background: "rgba(0,0,0,0.92)",
+          backdropFilter: "blur(8px)",
+          cursor: "zoom-out",
+        }}
+      />
+
+      {/* Container do conteúdo — relative stack acima do backdrop. Cada
+          filho usa stopPropagation pra capturar cliques sem fechar. */}
+      <div className="relative z-10 flex h-full w-full flex-col pointer-events-none">
       {/* Header com toolbar */}
       <header
-        className="flex items-center justify-between px-4 sm:px-6 py-3 flex-shrink-0"
+        className="flex items-center justify-between px-4 sm:px-6 py-3 flex-shrink-0 pointer-events-auto"
         style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {source.filename && (
@@ -177,7 +188,8 @@ export function MediaViewer({
         </div>
       </header>
 
-      {/* Body */}
+      {/* Body — pointer-events:none deixa cliques na área "vazia" passarem
+          pro backdrop. Apenas a mídia em si tem pointer-events:auto. */}
       <div
         className="flex-1 flex items-center justify-center overflow-hidden p-4 sm:p-8"
         onWheel={onWheel}
@@ -187,6 +199,7 @@ export function MediaViewer({
         onMouseLeave={onMouseUp}
         style={{ cursor: source.type === "image" && zoom > 1 ? (dragging ? "grabbing" : "grab") : "default" }}
       >
+      <div className="pointer-events-auto" onClick={(e) => e.stopPropagation()}>
         {source.type === "image" && (
           <img
             src={source.url}
@@ -297,20 +310,23 @@ export function MediaViewer({
           </>
         )}
       </div>
+      </div>
 
       {/* Caption (rodapé) */}
       {source.caption && (
         <footer
-          className="flex-shrink-0 px-4 sm:px-6 py-3 text-center text-sm"
+          className="flex-shrink-0 px-4 sm:px-6 py-3 text-center text-sm pointer-events-auto"
           style={{
             color: "hsl(240 15% 80%)",
             borderTop: "1px solid rgba(255,255,255,0.06)",
             background: "rgba(0,0,0,0.4)",
           }}
+          onClick={(e) => e.stopPropagation()}
         >
           {source.caption}
         </footer>
       )}
+      </div>
     </div>
   );
 

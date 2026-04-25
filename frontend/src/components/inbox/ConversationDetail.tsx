@@ -913,14 +913,16 @@ function MessageBubble({
     );
   }
 
-  // Mídia pura (image/video/audio sem caption) → render SEM bubble.
+  // Mídia pura (image/video/audio/sticker sem caption) → render SEM bubble.
   // Bordas finas com cor da direção indicam emissor (verde Uniq) vs
   // receptor (cinza). Mais limpo, dá destaque visual à mídia.
-  // Documentos sempre vão pra dentro do bubble (são cards verticais).
+  // Documentos, location, contact, poll sempre vão pra dentro do bubble
+  // (cards verticais com layout próprio). Sticker fica isolado pra dar
+  // a sensação flutuante característica do WhatsApp.
   const isPureMedia =
-    (m.type === "image" || m.type === "video" || m.type === "audio") &&
-    !!parsed.url &&
-    !body;
+    ((m.type === "image" || m.type === "video" || m.type === "audio") &&
+      !!parsed.url && !body) ||
+    (m.type === "sticker" && !!parsed.url);
 
   if (isPureMedia) {
     return (
@@ -1224,6 +1226,80 @@ function MediaBody({
 
   if (type === "document") {
     if (url) {
+      // Detecção de mime: documentos enviados como arquivo mas que são
+      // imagem/vídeo/áudio renderizam com preview do tipo real, não como
+      // ícone genérico de doc. WhatsApp permite "enviar como documento" e
+      // mantém mime em image/jpeg, application/pdf, etc.
+      if (mimeType?.startsWith("image/")) {
+        return (
+          <div className="flex flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={() =>
+                onOpenViewer({ type: "image", url, filename, mimeType, caption: body })
+              }
+              className="block rounded-lg overflow-hidden transition-opacity hover:opacity-90"
+              aria-label={filename || "imagem"}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={url}
+                alt={filename || "imagem"}
+                className="max-h-[280px] max-w-[280px] rounded-lg object-cover cursor-zoom-in"
+              />
+            </button>
+            {filename && (
+              <span className="text-[10px] truncate" style={{ color: "hsl(240 8% 50%)" }}>
+                📎 {filename}
+              </span>
+            )}
+            {body && <Text text={body} />}
+          </div>
+        );
+      }
+      if (mimeType?.startsWith("video/")) {
+        return (
+          <div className="flex flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={() =>
+                onOpenViewer({ type: "video", url, filename, mimeType, caption: body })
+              }
+              className="relative block group"
+              aria-label="Abrir vídeo"
+            >
+              <video src={url} className="max-w-[320px] rounded-lg" preload="metadata" muted />
+              <span className="absolute inset-0 flex items-center justify-center rounded-lg group-hover:bg-black/30" style={{ background: "rgba(0,0,0,0.2)" }}>
+                <span className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: "rgba(0,0,0,0.6)" }}>
+                  <svg className="h-6 w-6 ml-1" viewBox="0 0 24 24" fill="white">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </span>
+              </span>
+            </button>
+            {filename && (
+              <span className="text-[10px] truncate" style={{ color: "hsl(240 8% 50%)" }}>
+                📎 {filename}
+              </span>
+            )}
+            {body && <Text text={body} />}
+          </div>
+        );
+      }
+      if (mimeType?.startsWith("audio/")) {
+        return (
+          <div className="flex flex-col gap-1.5">
+            <audio src={url} controls className="max-w-[260px]" />
+            {filename && (
+              <span className="text-[10px] truncate" style={{ color: "hsl(240 8% 50%)" }}>
+                📎 {filename}
+              </span>
+            )}
+          </div>
+        );
+      }
+      // Documento "real" — PDF/Word/Excel/etc. Vai pro lightbox em PDF
+      // ou só botão download nos outros.
       return (
         <button
           type="button"
@@ -1242,26 +1318,202 @@ function MediaBody({
     return <IconFallback icon={<FileText className="h-4 w-4" />} label={body || "Documento"} />;
   }
 
-  if (type === "location") {
+  // Sticker — renderiza como imagem pequena (max ~120px), sem zoom-in
+  // forçado. WhatsApp animated stickers (.webp animado) tocam direto no
+  // <img>. Não passa por lightbox por design (são gestuais, fluem na conversa).
+  if (type === "sticker") {
+    if (url) {
+      return (
+        <div className="flex flex-col gap-1">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={url}
+            alt={filename || "sticker"}
+            className="max-h-[120px] max-w-[120px] object-contain"
+            style={{ background: "transparent" }}
+          />
+          {error && <ErrorLine text={error} />}
+        </div>
+      );
+    }
+    return <IconFallback icon={<ImageIcon className="h-4 w-4" />} label="Sticker" />;
+  }
+
+  if (type === "location" || type === "live_location") {
     if (latitude != null && longitude != null) {
       const mapsURL = `https://www.google.com/maps?q=${latitude},${longitude}`;
+      // Mini-map preview via OpenStreetMap (sem chave). Mostra um quadrado
+      // com pin centrado nas coords. Click abre Google Maps em nova aba.
+      const bbox = [longitude - 0.005, latitude - 0.005, longitude + 0.005, latitude + 0.005].join(",");
+      const mapEmbed = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${latitude},${longitude}`;
+      const isLive = type === "live_location" || parsed.isLive;
       return (
-        <a
-          href={mapsURL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 rounded-lg p-2 transition-colors hover:bg-white/5"
-          style={{ background: "rgba(255,255,255,0.03)" }}
-        >
-          <MapPin className="h-4 w-4" style={{ color: "#00d46a" }} />
-          <span className="text-xs">
-            {latitude.toFixed(4)}, {longitude.toFixed(4)}
-            {body ? ` · ${body}` : ""}
-          </span>
-        </a>
+        <div className="flex flex-col gap-1.5 max-w-[280px]">
+          <a
+            href={mapsURL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block rounded-lg overflow-hidden border transition-opacity hover:opacity-95"
+            style={{ borderColor: "rgba(255,255,255,0.08)" }}
+            title="Abrir no Google Maps"
+          >
+            <iframe
+              src={mapEmbed}
+              className="w-full pointer-events-none"
+              style={{ height: 160, background: "#1a1d29", border: 0 }}
+              title="Mapa"
+              loading="lazy"
+            />
+            <div
+              className="flex items-start gap-2 px-2.5 py-2"
+              style={{ background: "rgba(0,0,0,0.4)" }}
+            >
+              <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: isLive ? "#ef4444" : "#00d46a" }} />
+              <div className="min-w-0 flex-1">
+                {isLive && (
+                  <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: "#ef4444" }}>
+                    <span className="inline-block h-1.5 w-1.5 rounded-full ring-pulse" style={{ background: "#ef4444" }} />
+                    AO VIVO
+                  </div>
+                )}
+                {parsed.name && (
+                  <div className="text-xs font-medium truncate" style={{ color: "hsl(240 15% 90%)" }}>
+                    {parsed.name}
+                  </div>
+                )}
+                {parsed.address && (
+                  <div className="text-[10px] truncate" style={{ color: "hsl(240 8% 60%)" }}>
+                    {parsed.address}
+                  </div>
+                )}
+                <div className="text-[10px] tabular-nums" style={{ color: "hsl(240 8% 50%)" }}>
+                  {latitude.toFixed(5)}, {longitude.toFixed(5)}
+                </div>
+              </div>
+            </div>
+          </a>
+        </div>
       );
     }
     return <IconFallback icon={<MapPin className="h-4 w-4" />} label={body || "Localização"} />;
+  }
+
+  // Contact — vCard único. Mostra nome, telefones com tipo, copia/abre WA.
+  if (type === "contact") {
+    const name = parsed.displayName || body || "Contato";
+    return (
+      <div
+        className="flex flex-col gap-2 rounded-lg p-3 max-w-[280px]"
+        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        <div className="flex items-center gap-2.5">
+          <div
+            className="flex h-10 w-10 items-center justify-center rounded-full font-semibold flex-shrink-0"
+            style={{
+              background: "rgba(0,212,106,0.1)",
+              color: "#00d46a",
+              border: "1px solid rgba(0,212,106,0.25)",
+            }}
+          >
+            {name.split(/\s+/).slice(0, 2).map(p => p[0] || "").join("").toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 92%)" }}>
+              {name}
+            </div>
+            {parsed.phones && parsed.phones.length > 0 && (
+              <div className="text-[10px]" style={{ color: "hsl(240 8% 55%)" }}>
+                {parsed.phones.length} {parsed.phones.length === 1 ? "telefone" : "telefones"}
+              </div>
+            )}
+          </div>
+        </div>
+        {parsed.phones && parsed.phones.length > 0 && (
+          <div className="space-y-1">
+            {parsed.phones.map((p, i) => (
+              <a
+                key={i}
+                href={`https://wa.me/${p.number.replace(/[^\d]/g, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between gap-2 rounded px-2 py-1 text-xs transition-colors hover:bg-white/5"
+                style={{ color: "hsl(240 15% 88%)" }}
+              >
+                <span className="font-mono">{p.number}</span>
+                {p.type && (
+                  <span className="text-[9px] uppercase tracking-wider opacity-70">{p.type}</span>
+                )}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Múltiplos contatos (ContactsArrayMessage)
+  if (type === "contacts") {
+    const list = parsed.contacts || [];
+    return (
+      <div
+        className="flex flex-col gap-1.5 rounded-lg p-3 max-w-[300px]"
+        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        <div className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
+          {list.length} contatos
+        </div>
+        {list.map((c, i) => (
+          <div key={i} className="text-xs flex items-center justify-between gap-2 py-0.5" style={{ color: "hsl(240 15% 88%)" }}>
+            <span className="truncate">{c.display_name || "Sem nome"}</span>
+            {c.phones && c.phones[0] && (
+              <span className="font-mono text-[10px] flex-shrink-0" style={{ color: "hsl(240 8% 60%)" }}>
+                {c.phones[0].number}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Poll — pergunta + opções (visualização read-only — agente não pode votar)
+  if (type === "poll") {
+    return (
+      <div
+        className="flex flex-col gap-2 rounded-lg p-3 max-w-[300px]"
+        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
+          📊 Enquete{parsed.multi ? " · múltipla escolha" : ""}
+        </div>
+        {parsed.question && (
+          <div className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+            {parsed.question}
+          </div>
+        )}
+        {parsed.pollOptions && parsed.pollOptions.length > 0 && (
+          <div className="space-y-1 mt-1">
+            {parsed.pollOptions.map((opt, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2 rounded px-2 py-1.5 text-xs"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  color: "hsl(240 15% 88%)",
+                }}
+              >
+                <span
+                  className="inline-block h-3 w-3 rounded flex-shrink-0"
+                  style={{ border: "1.5px solid hsl(240 8% 40%)", borderRadius: parsed.multi ? 3 : "50%" }}
+                />
+                <span className="truncate">{opt.name}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   }
 
   if (type === "revoke") {
@@ -1377,6 +1629,22 @@ interface ParsedContent {
   mimeType?: string;
   latitude?: number;
   longitude?: number;
+  // Location ao vivo
+  isLive?: boolean;
+  durationSec?: number;
+  // Poll
+  question?: string;
+  pollOptions?: { name: string }[];
+  multi?: boolean;
+  // Contact
+  displayName?: string;
+  vcard?: string;
+  phones?: { number: string; type?: string }[];
+  // Contacts array
+  contacts?: { display_name?: string; phones?: { number: string; type?: string }[] }[];
+  // Address (location)
+  name?: string;
+  address?: string;
 }
 
 // parseMessageContent normaliza os diferentes formatos que MessageLog.Content
@@ -1400,6 +1668,17 @@ function parseMessageContent(raw: string): ParsedContent {
         mimeType: parsed.mime_type,
         latitude: typeof parsed.latitude === "number" ? parsed.latitude : undefined,
         longitude: typeof parsed.longitude === "number" ? parsed.longitude : undefined,
+        isLive: parsed.is_live === true,
+        durationSec: typeof parsed.duration_sec === "number" ? parsed.duration_sec : undefined,
+        question: parsed.question,
+        pollOptions: Array.isArray(parsed.options) ? parsed.options : undefined,
+        multi: parsed.multi === true,
+        displayName: parsed.display_name,
+        vcard: parsed.vcard,
+        phones: Array.isArray(parsed.phones) ? parsed.phones : undefined,
+        contacts: Array.isArray(parsed.contacts) ? parsed.contacts : undefined,
+        name: parsed.name,
+        address: parsed.address,
       };
     }
   } catch {
