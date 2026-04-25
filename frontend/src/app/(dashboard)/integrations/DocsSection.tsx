@@ -768,6 +768,247 @@ const WEBHOOK_EVENTS = [
   { event: "group.left",        description: "Instância saiu de um grupo" },
 ];
 
+// CopyBtn — botão pequeno que copia texto pra clipboard com feedback visual.
+// Usa toast.sonner se disponível; fallback pra ícone Check temporário.
+function CopyBtn({
+  value,
+  label,
+  size = "sm",
+  variant = "default",
+}: {
+  value: string;
+  label?: string;
+  size?: "xs" | "sm";
+  variant?: "default" | "primary";
+}) {
+  const [copied, setCopied] = useState(false);
+  const onClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // ignore
+    }
+  };
+  const isPrimary = variant === "primary";
+  const sizeCls = size === "xs" ? "text-[10px] px-2 py-1" : "text-[11px] px-2.5 py-1.5";
+  const iconSize = size === "xs" ? "w-3 h-3" : "w-3.5 h-3.5";
+  return (
+    <button
+      onClick={onClick}
+      title={label ? `Copiar ${label.toLowerCase()}` : "Copiar"}
+      className={cn(
+        "flex items-center gap-1.5 rounded-md font-medium transition-all",
+        sizeCls,
+      )}
+      style={{
+        background: copied
+          ? "rgba(0,212,106,0.15)"
+          : isPrimary
+            ? "rgba(0,212,106,0.08)"
+            : "rgba(255,255,255,0.04)",
+        border: copied
+          ? "1px solid rgba(0,212,106,0.3)"
+          : isPrimary
+            ? "1px solid rgba(0,212,106,0.2)"
+            : "1px solid rgba(255,255,255,0.06)",
+        color: copied || isPrimary ? "#00d46a" : "hsl(240 8% 60%)",
+      }}
+    >
+      {copied ? <Check className={iconSize} /> : <Copy className={iconSize} />}
+      {label && <span>{copied ? "Copiado!" : label}</span>}
+    </button>
+  );
+}
+
+// Substitui {placeholders} no path por valores reais do user (instance id,
+// api base, etc) pra que o copy gere uma URL pronta pra colar no n8n/curl.
+function expandPath(path: string, instanceId?: string): string {
+  let out = path;
+  if (instanceId) out = out.replace(/\{id\}/g, instanceId);
+  // Outros placeholders (campaignId, contactId…) ficam como estão pro user
+  // saber que precisa preencher manualmente.
+  return out;
+}
+
+// Constrói body JSON cru a partir do schema com os valores `example` dos
+// próprios docs. Campos opcionais sem example viram comentários inline.
+function buildExampleBody(body?: Endpoint["body"]): string {
+  if (!body) return "";
+  const obj: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(body)) {
+    if (v.example !== undefined && v.example !== "") {
+      // Tenta inferir o tipo: number/boolean ficam crus, resto é string.
+      const ex = v.example;
+      if (v.type === "boolean") obj[k] = ex === "true";
+      else if (v.type === "number") {
+        const n = Number(ex);
+        obj[k] = Number.isFinite(n) ? n : ex;
+      } else obj[k] = ex;
+    } else if (v.required) {
+      // Pra requireds sem example, deixa um placeholder explícito.
+      obj[k] = `<${v.type}>`;
+    }
+  }
+  return JSON.stringify(obj, null, 2);
+}
+
+// cURL completo pra colar no terminal — auth + content-type + body se POST/PUT.
+function buildCurl(
+  endpoint: Endpoint,
+  fullUrl: string,
+  apiKey: string,
+  body: string,
+): string {
+  const lines: string[] = [`curl -X ${endpoint.method} "${fullUrl}" \\`];
+  if (apiKey) lines.push(`  -H "apikey: ${apiKey}" \\`);
+  if (body) {
+    lines.push(`  -H "Content-Type: application/json" \\`);
+    lines.push(`  -d '${body.replace(/'/g, "'\\''")}'`);
+  } else {
+    // Remove o último \ pra não ficar pendurado.
+    lines[lines.length - 1] = lines[lines.length - 1]!.replace(/ \\$/, "");
+  }
+  return lines.join("\n");
+}
+
+function EndpointCard({
+  endpoint,
+  apiKey,
+  instanceId,
+}: {
+  endpoint: Endpoint;
+  apiKey: string;
+  instanceId: string;
+}) {
+  const [paramsOpen, setParamsOpen] = useState(false);
+  const [showRaw, setShowRaw] = useState(false);
+  const style = METHOD_STYLE[endpoint.method];
+
+  const expandedPath = expandPath(endpoint.path, instanceId);
+  const fullUrl = `${API_BASE}${expandedPath}`;
+  const exampleBody = buildExampleBody(endpoint.body);
+  const curl = buildCurl(endpoint, fullUrl, apiKey, exampleBody);
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+      <div className="p-3">
+        <div className="flex items-start gap-2">
+          <span
+            className="text-[10px] font-bold px-1.5 py-0.5 rounded mt-0.5 flex-shrink-0"
+            style={{ background: style?.bg, color: style?.color }}
+          >
+            {endpoint.method}
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <code className="text-xs font-mono break-all" style={{ color: "hsl(240 15% 80%)" }}>
+                {expandedPath}
+              </code>
+              <CopyBtn value={fullUrl} label="URL" size="xs" />
+              <CopyBtn value={curl} label="cURL" size="xs" />
+            </div>
+            <p className="text-xs mt-1" style={{ color: "hsl(240 8% 55%)" }}>{endpoint.summary}</p>
+          </div>
+        </div>
+
+        {endpoint.body && (
+          <div className="mt-3" style={{ borderTop: "1px solid hsl(240 12% 11%)", paddingTop: 10 }}>
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setParamsOpen((o) => !o)}
+                className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest transition-colors"
+                style={{ color: "hsl(240 8% 50%)" }}
+              >
+                {paramsOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                Parâmetros ({Object.keys(endpoint.body).length})
+              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setShowRaw((v) => !v)}
+                  className="text-[10px] font-medium px-2 py-1 rounded-md transition-colors"
+                  style={{
+                    background: showRaw ? "rgba(0,212,106,0.08)" : "rgba(255,255,255,0.04)",
+                    border: "1px solid " + (showRaw ? "rgba(0,212,106,0.2)" : "rgba(255,255,255,0.06)"),
+                    color: showRaw ? "#00d46a" : "hsl(240 8% 60%)",
+                  }}
+                >
+                  {showRaw ? "Tabela" : "JSON cru"}
+                </button>
+                <CopyBtn value={exampleBody} label="JSON" size="xs" variant="primary" />
+              </div>
+            </div>
+
+            {paramsOpen && !showRaw && (
+              <div className="mt-2 space-y-1.5">
+                {Object.entries(endpoint.body).map(([k, v]) => (
+                  <div
+                    key={k}
+                    className="flex items-start gap-2 text-[11px] rounded-lg px-2.5 py-1.5"
+                    style={{ background: "rgba(255,255,255,0.02)" }}
+                  >
+                    <code className="font-mono font-semibold flex-shrink-0" style={{ color: v.required ? "#f87171" : "hsl(240 15% 80%)" }}>
+                      {k}
+                    </code>
+                    <span className="font-mono text-[10px] flex-shrink-0 px-1.5 py-0.5 rounded" style={{ background: "rgba(96,165,250,0.08)", color: "#60a5fa" }}>
+                      {v.type}
+                    </span>
+                    {v.required && (
+                      <span className="text-[10px] flex-shrink-0 px-1.5 py-0.5 rounded" style={{ background: "rgba(239,68,68,0.08)", color: "#f87171" }}>
+                        obrigatório
+                      </span>
+                    )}
+                    <span className="flex-1 min-w-0" style={{ color: "hsl(240 8% 55%)" }}>{v.description || "—"}</span>
+                    {v.example !== undefined && (
+                      <CopyBtn value={String(v.example)} label="" size="xs" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {paramsOpen && showRaw && (
+              <div className="mt-2 relative group">
+                <pre
+                  className="text-[11px] font-mono rounded-lg px-3 py-2.5 overflow-x-auto"
+                  style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)", color: "hsl(240 15% 85%)" }}
+                >
+                  {exampleBody || "// nenhum exemplo disponível"}
+                </pre>
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <CopyBtn value={exampleBody} label="" size="xs" variant="primary" />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {endpoint.response && (
+          <div className="mt-3" style={{ borderTop: "1px solid hsl(240 12% 11%)", paddingTop: 10 }}>
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
+                Resposta de exemplo
+              </span>
+              <CopyBtn value={endpoint.response} label="" size="xs" />
+            </div>
+            <pre
+              className="text-[11px] font-mono rounded-lg px-3 py-2 overflow-x-auto"
+              style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)", color: "hsl(240 15% 85%)" }}
+            >
+              {endpoint.response}
+            </pre>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function DocsSection() {
   const [activeSection, setActiveSection] = useState("instances");
   const [selectedKey, setSelectedKey] = useState("");
@@ -869,31 +1110,14 @@ export function DocsSection() {
                 <span className="text-xs" style={{ color: "hsl(240 8% 42%)" }}>({section.endpoints.length} endpoints)</span>
               </div>
               <div className="space-y-2">
-                {section.endpoints.map((ep, i) => {
-                  const style = METHOD_STYLE[ep.method];
-                  return (
-                    <div key={i} className="rounded-xl p-3" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: style.bg, color: style.color }}>{ep.method}</span>
-                        <code className="text-xs font-mono" style={{ color: "hsl(240 15% 80%)" }}>{ep.path}</code>
-                      </div>
-                      <p className="text-xs" style={{ color: "hsl(240 8% 55%)" }}>{ep.summary}</p>
-                      {ep.body && (
-                        <details className="mt-2">
-                          <summary className="text-[10px] cursor-pointer" style={{ color: "hsl(240 8% 42%)" }}>Parâmetros</summary>
-                          <div className="mt-1 space-y-1">
-                            {Object.entries(ep.body).map(([k, v]) => (
-                              <div key={k} className="flex gap-2 text-[10px] font-mono" style={{ color: "hsl(240 8% 55%)" }}>
-                                <span style={{ color: v.required ? "#f87171" : "hsl(240 8% 55%)" }}>{k}</span>
-                                <span style={{ color: "hsl(240 8% 38%)" }}>: {v.type}{v.required ? " (obrigatório)" : ""} — {v.description}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </details>
-                      )}
-                    </div>
-                  );
-                })}
+                {section.endpoints.map((ep, i) => (
+                  <EndpointCard
+                    key={i}
+                    endpoint={ep}
+                    apiKey={selectedKey}
+                    instanceId={selectedInstance}
+                  />
+                ))}
               </div>
             </>
           ) : null}
