@@ -9,7 +9,15 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const qc = useQueryClient();
-  const isFullWidth = pathname === "/inbox";
+  // Full-width: rotas que precisam do espaço todo (inbox messenger-style,
+  // CRM com kanban/laterais, etc). Demais páginas seguem o padding padrão
+  // mas sem o cap de max-w-6xl — laterais ganham espaço pra reorganizar
+  // conteúdo ao invés de ficar tudo empilhado verticalmente.
+  const isFullWidth =
+    pathname === "/inbox" ||
+    pathname.startsWith("/inbox/") ||
+    pathname === "/crm" ||
+    pathname.startsWith("/crm/");
 
   // Fetch session and load instances on mount
   const { data: sessionData, isLoading: sessionLoading } = useQuery({
@@ -105,9 +113,12 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // Default — sem max-w cap, mas com padding consistente em todos os
+  // breakpoints. Laterais ganham espaço; conteúdo que precisa de leitura
+  // confortável usa max-w no próprio componente (ex: settings forms).
   return (
     <main className="flex-1 overflow-hidden bg-dot-grid">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 lg:py-8 pt-16 lg:pt-8 h-full overflow-y-auto">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pt-16 lg:pt-8 h-full overflow-y-auto">
         {children}
       </div>
     </main>

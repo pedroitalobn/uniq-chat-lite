@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { crmApi, journeysApi } from "@/lib/api";
@@ -413,20 +413,9 @@ function FunnelManager({ onClose, workspaceId }: { onClose: () => void; workspac
     queryKey: ["funnels", workspaceId],
     queryFn: () => crmApi.listFunnels(workspaceId).then(r => r.data),
   });
-  const [name, setName] = useState("");
-  const [color, setColor] = useState(PRESET_COLORS[0]);
-  const [expanded, setExpanded] = useState<string | null>(null);
-
-  const createFunnel = useMutation({
-    mutationFn: () => crmApi.createFunnel({ name: name.trim(), color, workspace_id: workspaceId }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["funnels"] });
-      qc.invalidateQueries({ queryKey: ["funnel-options"] });
-      setName("");
-      toast.success("Funil criado");
-    },
-    onError: () => toast.error("Erro ao criar funil"),
-  });
+  // Modo: lista de funis OU formulário de criar/editar.
+  const [mode, setMode] = useState<"list" | "create">("list");
+  const [editingFunnel, setEditingFunnel] = useState<Funnel | null>(null);
 
   const deleteFunnel = useMutation({
     mutationFn: (id: string) => crmApi.deleteFunnel(id),
@@ -438,136 +427,585 @@ function FunnelManager({ onClose, workspaceId }: { onClose: () => void; workspac
     onError: () => toast.error("Erro ao remover funil"),
   });
 
+  const onCreate = () => {
+    setEditingFunnel(null);
+    setMode("create");
+  };
+  const onEdit = (f: Funnel) => {
+    setEditingFunnel(f);
+    setMode("create");
+  };
+  const back = () => {
+    setEditingFunnel(null);
+    setMode("list");
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-2xl p-6 shadow-2xl animate-fade-in-up"
-        style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Gerenciar Funis</h2>
-          <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }} className="hover:opacity-70 transition-opacity"><X className="w-5 h-5" /></button>
-        </div>
-        <div className="space-y-3 mb-4">
-          <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 16%)" }}>
-            <GitBranch className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }} />
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome do funil (ex: Vendas B2B)"
-              className="flex-1 bg-transparent text-sm outline-none" style={{ color: "hsl(240 15% 90%)" }}
-              onKeyDown={(e) => e.key === "Enter" && name.trim() && createFunnel.mutate()} />
+      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose} />
+      <div
+        className="relative w-full max-w-2xl rounded-2xl shadow-2xl animate-fade-in-up overflow-hidden flex flex-col"
+        style={{
+          background: "hsl(240 18% 6%)",
+          border: "1px solid hsl(240 12% 14%)",
+          maxHeight: "min(90vh, 720px)",
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid hsl(240 12% 11%)" }}>
+          <div className="flex items-center gap-3">
+            {mode === "create" && (
+              <button onClick={back} className="p-1 rounded-lg transition-colors hover:bg-white/5" style={{ color: "hsl(240 8% 50%)" }}>
+                <ChevronDown className="w-4 h-4 rotate-90" />
+              </button>
+            )}
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center"
+              style={{ background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)" }}
+            >
+              <GitBranch className="w-4 h-4" style={{ color: "#a78bfa" }} />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 93%)" }}>
+                {mode === "list" ? "Funis e Etapas" : editingFunnel ? `Editar ${editingFunnel.name}` : "Novo funil"}
+              </h2>
+              <p className="text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
+                {mode === "list"
+                  ? "Pipelines de vendas configuráveis por workspace"
+                  : "Defina o nome, cor e as etapas do pipeline"}
+              </p>
+            </div>
           </div>
-          <div className="flex gap-1.5 flex-wrap">
-            {PRESET_COLORS.map((c) => (
-              <button key={c} onClick={() => setColor(c)} className="w-6 h-6 rounded-full transition-all"
-                style={{ background: c, boxShadow: color === c ? `0 0 0 2px hsl(240 18% 6%), 0 0 0 4px ${c}` : "none" }} />
-            ))}
-          </div>
-          <button onClick={() => name.trim() && createFunnel.mutate()} disabled={!name.trim() || createFunnel.isPending}
-            className="w-full text-sm font-semibold py-2 rounded-xl transition-all disabled:opacity-40"
-            style={{ background: "var(--green)", color: "#03170a" }}>
-            Criar Funil
+          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-white/5" style={{ color: "hsl(240 8% 38%)" }}>
+            <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="space-y-1.5 max-h-80 overflow-y-auto">
-          {funnels.map((f) => (
-            <FunnelRow
-              key={f.id}
-              funnel={f}
-              expanded={expanded === f.id}
-              onToggle={() => setExpanded(expanded === f.id ? null : f.id)}
-              onDelete={() => deleteFunnel.mutate(f.id)}
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {mode === "list" ? (
+            <FunnelList
+              funnels={funnels}
+              onCreate={onCreate}
+              onEdit={onEdit}
+              onDelete={(id) => deleteFunnel.mutate(id)}
             />
-          ))}
-          {funnels.length === 0 && <p className="text-center text-xs py-4" style={{ color: "hsl(240 8% 38%)" }}>Nenhum funil ainda</p>}
+          ) : (
+            <FunnelForm
+              funnel={editingFunnel}
+              workspaceId={workspaceId}
+              onDone={back}
+            />
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function FunnelRow({ funnel, expanded, onToggle, onDelete }: {
-  funnel: Funnel; expanded: boolean; onToggle: () => void; onDelete: () => void;
+function FunnelList({
+  funnels,
+  onCreate,
+  onEdit,
+  onDelete,
+}: {
+  funnels: Funnel[];
+  onCreate: () => void;
+  onEdit: (f: Funnel) => void;
+  onDelete: (id: string) => void;
 }) {
-  const qc = useQueryClient();
-  const { data: stages = [] } = useQuery<FunnelStage[]>({
-    queryKey: ["funnel-stages", funnel.id],
-    queryFn: () => crmApi.listFunnelStages(funnel.id).then(r => r.data),
-    enabled: expanded,
-  });
-  const [stageName, setStageName] = useState("");
-  const [stageColor, setStageColor] = useState(PRESET_COLORS[1]);
-
-  const createStage = useMutation({
-    mutationFn: () => crmApi.createFunnelStage(funnel.id, { name: stageName.trim(), color: stageColor }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["funnel-stages", funnel.id] });
-      qc.invalidateQueries({ queryKey: ["stage-options"] });
-      setStageName("");
-      toast.success("Etapa criada");
-    },
-    onError: () => toast.error("Erro ao criar etapa"),
-  });
-
-  const deleteStage = useMutation({
-    mutationFn: (stageId: string) => crmApi.deleteFunnelStage(funnel.id, stageId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["funnel-stages", funnel.id] });
-      qc.invalidateQueries({ queryKey: ["stage-options"] });
-    },
-    onError: () => toast.error("Erro ao remover etapa"),
-  });
-
   return (
-    <div className="rounded-xl" style={{ background: "rgba(255,255,255,0.02)" }}>
-      <div className="flex items-center justify-between p-2 gap-2">
-        <button onClick={onToggle} className="flex items-center gap-2 flex-1 min-w-0 text-left">
-          <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 transition-transform" style={{
-            color: "hsl(240 8% 46%)",
-            transform: expanded ? "rotate(0deg)" : "rotate(-90deg)",
-          }} />
-          <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ background: funnel.color || "#a78bfa" }} />
-          <span className="text-sm truncate" style={{ color: "hsl(240 15% 90%)" }}>{funnel.name}</span>
-        </button>
-        <button onClick={onDelete} className="p-1 rounded-lg transition-colors hover:text-red-400" style={{ color: "hsl(240 8% 38%)" }}>
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
-      {expanded && (
-        <div className="px-2 pb-2 space-y-1.5">
-          {stages.map((s) => (
-            <div key={s.id} className="flex items-center justify-between pl-6 pr-2 py-1 rounded-lg" style={{ background: "rgba(255,255,255,0.02)" }}>
-              <span className="inline-flex items-center gap-2 text-xs" style={{ color: "hsl(240 15% 88%)" }}>
-                <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: s.color || "#60a5fa" }} />
-                {s.name}
-              </span>
-              <button onClick={() => deleteStage.mutate(s.id)} className="p-0.5 rounded transition-colors hover:text-red-400" style={{ color: "hsl(240 8% 38%)" }}>
-                <X className="w-3 h-3" />
-              </button>
-            </div>
+    <div className="space-y-3">
+      <button
+        onClick={onCreate}
+        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+        style={{ background: "var(--green, #00d46a)", color: "#0a0a0f" }}
+      >
+        <Plus className="w-4 h-4" />
+        Criar novo funil
+      </button>
+
+      {funnels.length === 0 ? (
+        <div
+          className="rounded-xl p-8 text-center"
+          style={{ background: "rgba(255,255,255,0.02)", border: "1px dashed hsl(240 12% 16%)" }}
+        >
+          <GitBranch className="w-8 h-8 mx-auto mb-2" style={{ color: "hsl(240 8% 30%)" }} />
+          <p className="text-sm font-medium" style={{ color: "hsl(240 8% 60%)" }}>Nenhum funil ainda</p>
+          <p className="text-xs mt-1" style={{ color: "hsl(240 8% 42%)" }}>
+            Crie seu primeiro pipeline de vendas pra organizar leads
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {funnels.map((f) => (
+            <FunnelListItem key={f.id} funnel={f} onEdit={() => onEdit(f)} onDelete={() => onDelete(f.id)} />
           ))}
-          <div className="flex items-center gap-1.5 pl-6">
-            <div className="flex items-center gap-2 rounded-lg px-2 py-1.5 flex-1 min-w-0"
-              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 14%)" }}>
-              <Layers className="w-3 h-3 flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }} />
-              <input value={stageName} onChange={(e) => setStageName(e.target.value)} placeholder="Nova etapa"
-                className="flex-1 bg-transparent text-xs outline-none min-w-0" style={{ color: "hsl(240 15% 90%)" }}
-                onKeyDown={(e) => e.key === "Enter" && stageName.trim() && createStage.mutate()} />
-            </div>
-            <select value={stageColor} onChange={(e) => setStageColor(e.target.value)}
-              className="rounded-lg px-2 py-1.5 text-xs outline-none"
-              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 14%)", color: stageColor }}>
-              {PRESET_COLORS.map((c) => <option key={c} value={c} style={{ background: "#111" }}>{c}</option>)}
-            </select>
-            <button onClick={() => stageName.trim() && createStage.mutate()} disabled={!stageName.trim() || createStage.isPending}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
-              style={{ background: "var(--green)", color: "#03170a" }}>
-              <Plus className="w-3 h-3" />
-            </button>
-          </div>
         </div>
       )}
     </div>
   );
 }
+
+function FunnelListItem({
+  funnel,
+  onEdit,
+  onDelete,
+}: {
+  funnel: Funnel;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { data: stages = [] } = useQuery<FunnelStage[]>({
+    queryKey: ["funnel-stages", funnel.id],
+    queryFn: () => crmApi.listFunnelStages(funnel.id).then((r) => r.data),
+  });
+  return (
+    <div
+      className="rounded-xl p-3 flex items-center gap-3 transition-colors hover:bg-white/[0.02]"
+      style={{ background: "rgba(255,255,255,0.02)", border: "1px solid hsl(240 12% 13%)" }}
+    >
+      <span className="inline-block w-3 h-3 rounded-full flex-shrink-0" style={{ background: funnel.color || "#a78bfa" }} />
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 90%)" }}>{funnel.name}</div>
+        <div className="text-[11px] mt-0.5" style={{ color: "hsl(240 8% 50%)" }}>
+          {stages.length} {stages.length === 1 ? "etapa" : "etapas"}
+          {stages.length > 0 && (
+            <span className="ml-2 opacity-70">
+              · {stages.slice(0, 4).map((s) => s.name).join(" → ")}
+              {stages.length > 4 && " → …"}
+            </span>
+          )}
+        </div>
+      </div>
+      <button
+        onClick={onEdit}
+        className="p-1.5 rounded-lg transition-colors hover:bg-white/5"
+        style={{ color: "hsl(240 8% 50%)" }}
+        title="Editar funil e etapas"
+      >
+        <Edit2 className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={async () => {
+          if (!(await showConfirm(`Excluir funil "${funnel.name}"?`, { title: "Excluir funil", confirmLabel: "Excluir" }))) return;
+          onDelete();
+        }}
+        className="p-1.5 rounded-lg transition-colors hover:bg-red-500/10"
+        style={{ color: "hsl(240 8% 38%)" }}
+        title="Excluir"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
+// FunnelForm — cria ou edita um funil completo (nome, descrição, cor, stages
+// reordenáveis). Em modo create, cria o funil + cada stage sequencialmente
+// pra que o usuário monte o pipeline em uma única tela.
+function FunnelForm({
+  funnel,
+  workspaceId,
+  onDone,
+}: {
+  funnel: Funnel | null;
+  workspaceId?: string;
+  onDone: () => void;
+}) {
+  const qc = useQueryClient();
+  const editing = !!funnel;
+
+  const [name, setName] = useState(funnel?.name ?? "");
+  const [description, setDescription] = useState(funnel?.description ?? "");
+  const [color, setColor] = useState(funnel?.color ?? PRESET_COLORS[0]);
+
+  // Stages locais (id pode ser temporário ou real). Em modo create, criamos
+  // tudo no save; em modo edit, modificações de stage existente vão direto.
+  type LocalStage = { id: string; name: string; color: string; persisted: boolean };
+  const { data: existingStages = [] } = useQuery<FunnelStage[]>({
+    queryKey: ["funnel-stages", funnel?.id],
+    queryFn: () => (funnel ? crmApi.listFunnelStages(funnel.id).then((r) => r.data) : Promise.resolve([])),
+    enabled: editing,
+  });
+
+  const [stages, setStages] = useState<LocalStage[]>([]);
+  // Sincroniza stages locais com as do servidor (apenas em edit).
+  useEffect(() => {
+    if (editing && existingStages.length > 0 && stages.length === 0) {
+      setStages(
+        existingStages.map((s) => ({ id: s.id, name: s.name, color: s.color || PRESET_COLORS[1], persisted: true })),
+      );
+    } else if (!editing && stages.length === 0) {
+      // Defaults úteis pra começar — user pode editar/excluir.
+      setStages([
+        { id: "tmp-1", name: "Novo Lead", color: "#60a5fa", persisted: false },
+        { id: "tmp-2", name: "Qualificação", color: "#fbbf24", persisted: false },
+        { id: "tmp-3", name: "Proposta", color: "#a78bfa", persisted: false },
+        { id: "tmp-4", name: "Negociação", color: "#fb923c", persisted: false },
+        { id: "tmp-5", name: "Fechado", color: "#00d46a", persisted: false },
+      ]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingStages, editing]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      let funnelId = funnel?.id;
+      if (!funnelId) {
+        const r = await crmApi.createFunnel({
+          name: name.trim(),
+          description: description.trim() || undefined,
+          color,
+          workspace_id: workspaceId,
+        });
+        funnelId = r.data.id;
+      } else {
+        await crmApi.updateFunnel(funnelId, {
+          name: name.trim(),
+          description: description.trim() || undefined,
+          color,
+        });
+      }
+      // Cria stages que ainda não existem; atualiza/remove conforme.
+      // Stage existente removido localmente → delete no servidor.
+      const existingIds = new Set(existingStages.map((s) => s.id));
+      const localPersistedIds = new Set(stages.filter((s) => s.persisted).map((s) => s.id));
+      for (const exId of existingIds) {
+        if (!localPersistedIds.has(exId)) {
+          await crmApi.deleteFunnelStage(funnelId!, exId);
+        }
+      }
+      // Cria novas / atualiza existentes preservando ordem.
+      for (let i = 0; i < stages.length; i++) {
+        const s = stages[i]!;
+        if (!s.persisted) {
+          await crmApi.createFunnelStage(funnelId!, { name: s.name, color: s.color, order: i });
+        } else {
+          await crmApi.updateFunnelStage(funnelId!, s.id, { name: s.name, color: s.color, order: i });
+        }
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["funnels"] });
+      qc.invalidateQueries({ queryKey: ["funnel-options"] });
+      qc.invalidateQueries({ queryKey: ["funnel-stages"] });
+      qc.invalidateQueries({ queryKey: ["stage-options"] });
+      toast.success(editing ? "Funil atualizado" : "Funil criado");
+      onDone();
+    },
+    onError: () => toast.error("Erro ao salvar funil"),
+  });
+
+  const addStage = () => {
+    setStages((prev) => [
+      ...prev,
+      { id: `tmp-${Date.now()}`, name: "", color: PRESET_COLORS[prev.length % PRESET_COLORS.length] || "#60a5fa", persisted: false },
+    ]);
+  };
+  const updateStage = (idx: number, patch: Partial<LocalStage>) => {
+    setStages((prev) => prev.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
+  };
+  const removeStage = (idx: number) => {
+    setStages((prev) => prev.filter((_, i) => i !== idx));
+  };
+  const moveStage = (idx: number, dir: -1 | 1) => {
+    setStages((prev) => {
+      const next = [...prev];
+      const target = idx + dir;
+      if (target < 0 || target >= next.length) return prev;
+      [next[idx], next[target]] = [next[target]!, next[idx]!];
+      return next;
+    });
+  };
+
+  const canSave = name.trim().length > 0 && stages.every((s) => s.name.trim().length > 0);
+
+  return (
+    <div className="space-y-5">
+      {/* Identidade */}
+      <section className="space-y-3">
+        <SectionHeading icon={GitBranch}>Identidade do funil</SectionHeading>
+        <FieldInput icon={GitBranch} label="Nome" value={name} onChange={setName} placeholder="Ex: Vendas B2B" required />
+        <div>
+          <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 48%)" }}>
+            Descrição (opcional)
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Para que serve esse funil? Quem usa?"
+            rows={2}
+            className="w-full bg-transparent rounded-xl px-3 py-2 text-sm outline-none resize-none"
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid hsl(240 12% 16%)",
+              color: "hsl(240 15% 90%)",
+            }}
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium block mb-2" style={{ color: "hsl(240 8% 48%)" }}>Cor</label>
+          <div className="flex gap-1.5 flex-wrap">
+            {PRESET_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setColor(c)}
+                className="w-7 h-7 rounded-full transition-all"
+                style={{
+                  background: c,
+                  boxShadow: color === c ? `0 0 0 2px hsl(240 18% 6%), 0 0 0 4px ${c}` : "none",
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Stages */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <SectionHeading icon={Layers}>Etapas do pipeline</SectionHeading>
+          <button
+            type="button"
+            onClick={addStage}
+            className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors"
+            style={{ background: "rgba(0,212,106,0.08)", color: "var(--green, #00d46a)", border: "1px solid rgba(0,212,106,0.2)" }}
+          >
+            <Plus className="w-3 h-3" />
+            Adicionar etapa
+          </button>
+        </div>
+        <p className="text-[11px]" style={{ color: "hsl(240 8% 48%)" }}>
+          Os contatos vão se mover por essas etapas no kanban. Ordem importa.
+        </p>
+        <div className="space-y-1.5">
+          {stages.map((s, idx) => (
+            <div
+              key={s.id}
+              className="flex items-center gap-2 rounded-xl p-2"
+              style={{ background: "rgba(255,255,255,0.02)", border: "1px solid hsl(240 12% 13%)" }}
+            >
+              <div className="flex flex-col">
+                <button
+                  type="button"
+                  onClick={() => moveStage(idx, -1)}
+                  disabled={idx === 0}
+                  className="p-0.5 rounded hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  style={{ color: "hsl(240 8% 50%)" }}
+                >
+                  <ChevronDown className="w-3 h-3 rotate-180" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveStage(idx, 1)}
+                  disabled={idx === stages.length - 1}
+                  className="p-0.5 rounded hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  style={{ color: "hsl(240 8% 50%)" }}
+                >
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+              </div>
+              <span className="text-xs tabular-nums w-5 text-center" style={{ color: "hsl(240 8% 38%)" }}>{idx + 1}</span>
+              <input
+                value={s.name}
+                onChange={(e) => updateStage(idx, { name: e.target.value })}
+                placeholder="Nome da etapa"
+                className="flex-1 bg-transparent text-sm outline-none"
+                style={{ color: "hsl(240 15% 90%)" }}
+              />
+              <select
+                value={s.color}
+                onChange={(e) => updateStage(idx, { color: e.target.value })}
+                className="rounded-lg px-2 py-1 text-xs outline-none"
+                style={{
+                  background: s.color + "22",
+                  color: s.color,
+                  border: `1px solid ${s.color}44`,
+                  fontWeight: 500,
+                }}
+                title="Cor da etapa"
+              >
+                {PRESET_COLORS.map((c) => (
+                  <option key={c} value={c} style={{ background: "#111", color: c }}>{c}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => removeStage(idx)}
+                className="p-1.5 rounded-lg transition-colors hover:bg-red-500/10"
+                style={{ color: "hsl(240 8% 38%)" }}
+                title="Remover"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+          {stages.length === 0 && (
+            <div className="text-center text-xs py-4" style={{ color: "hsl(240 8% 38%)" }}>
+              Nenhuma etapa — adicione ao menos uma.
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Save */}
+      <div className="pt-2 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={onDone}
+          className="text-sm px-4 py-2 rounded-xl transition-colors"
+          style={{ color: "hsl(240 8% 60%)" }}
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={() => saveMutation.mutate()}
+          disabled={!canSave || saveMutation.isPending}
+          className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl transition-all disabled:opacity-40"
+          style={{ background: "var(--green, #00d46a)", color: "#0a0a0f" }}
+        >
+          <Check className="w-4 h-4" />
+          {editing ? "Salvar alterações" : "Criar funil"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// FunnelSwitcher — dropdown estilizado pra trocar de pipeline. Mostra nome
+// do funil + dot da cor + descrição opcional. Clica fora pra fechar.
+function FunnelSwitcher({
+  funnels,
+  selectedId,
+  onSelect,
+  onManage,
+}: {
+  funnels: Funnel[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  onManage: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = funnels.find((f) => f.id === selectedId);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors min-w-[200px]"
+        style={{
+          background: selectedId ? "rgba(167,139,250,0.1)" : "rgba(255,255,255,0.04)",
+          border: `1px solid ${selectedId ? "rgba(167,139,250,0.3)" : "rgba(255,255,255,0.08)"}`,
+          color: selectedId ? "#c4b5fd" : "hsl(240 15% 90%)",
+        }}
+      >
+        <GitBranch className="w-3.5 h-3.5 flex-shrink-0" />
+        {selected ? (
+          <>
+            <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ background: selected.color || "#a78bfa" }} />
+            <span className="truncate flex-1 text-left">{selected.name}</span>
+          </>
+        ) : (
+          <span className="truncate flex-1 text-left">Todos os contatos</span>
+        )}
+        <ChevronDown className="w-3 h-3 flex-shrink-0 transition-transform" style={{ transform: open ? "rotate(180deg)" : "rotate(0)" }} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div
+            className="absolute left-0 top-full z-40 mt-1 w-72 rounded-xl shadow-2xl overflow-hidden animate-fade-in-up"
+            style={{ background: "hsl(240 18% 7%)", border: "1px solid hsl(240 12% 14%)" }}
+          >
+            <div
+              className="px-3 py-2 text-[10px] font-semibold uppercase tracking-widest"
+              style={{ color: "hsl(240 8% 42%)", borderBottom: "1px solid hsl(240 12% 11%)" }}
+            >
+              Selecionar funil
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                onSelect("");
+                setOpen(false);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-white/[0.03]"
+              style={{
+                color: !selectedId ? "#00d46a" : "hsl(240 8% 70%)",
+                background: !selectedId ? "rgba(0,212,106,0.05)" : "transparent",
+              }}
+            >
+              <ListIcon className="w-3.5 h-3.5" />
+              Todos os contatos
+              {!selectedId && <Check className="w-3.5 h-3.5 ml-auto" />}
+            </button>
+            <div className="max-h-72 overflow-y-auto">
+              {funnels.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => {
+                    onSelect(f.id);
+                    setOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-white/[0.03] text-left"
+                  style={{
+                    color: f.id === selectedId ? "#00d46a" : "hsl(240 8% 80%)",
+                    background: f.id === selectedId ? "rgba(0,212,106,0.05)" : "transparent",
+                  }}
+                >
+                  <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ background: f.color || "#a78bfa" }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate font-medium">{f.name}</div>
+                    {f.description && (
+                      <div className="truncate text-[10px]" style={{ color: "hsl(240 8% 45%)" }}>
+                        {f.description}
+                      </div>
+                    )}
+                  </div>
+                  {f.id === selectedId && <Check className="w-3.5 h-3.5" />}
+                </button>
+              ))}
+              {funnels.length === 0 && (
+                <div className="px-3 py-4 text-center text-xs" style={{ color: "hsl(240 8% 42%)" }}>
+                  Nenhum funil ainda
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onManage();
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold transition-colors hover:bg-white/[0.03]"
+              style={{ color: "var(--green, #00d46a)", borderTop: "1px solid hsl(240 12% 11%)" }}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Gerenciar funis e etapas
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function SectionHeading({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
+  return (
+    <h3 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
+      <Icon className="w-3 h-3" />
+      {children}
+    </h3>
+  );
+}
+
+// FunnelRow legado removido — substituído por FunnelListItem dentro do
+// novo FunnelManager.
 
 // ─── Journey Manager ──────────────────────────────────────────────────────────
 
@@ -986,53 +1424,51 @@ export default function CRMPage() {
 
       {/* Kanban toolbar: seletor de funil (pipeline) + agrupamento */}
       {viewMode === "kanban" && (
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold" style={{ color: "hsl(240 8% 46%)" }}>Funil:</span>
-            <select
-              value={pipelineFunnelId}
-              onChange={(e) => {
-                setPipelineFunnelId(e.target.value);
-                // Ao entrar num funil, força agrupar por etapa — que é o único
-                // agrupamento que faz sentido num pipeline de funil específico.
-                if (e.target.value) setKanbanGroup("stage");
+        <div
+          className="flex items-center justify-between gap-3 flex-wrap rounded-2xl px-4 py-3"
+          style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}
+        >
+          <div className="flex items-center gap-3 flex-wrap">
+            <FunnelSwitcher
+              funnels={pipelineFunnels}
+              selectedId={pipelineFunnelId}
+              onSelect={(id) => {
+                setPipelineFunnelId(id);
+                if (id) setKanbanGroup("stage");
               }}
-              className="text-sm rounded-xl px-3 py-1.5 outline-none font-medium transition-colors"
-              style={{
-                background: pipelineFunnelId ? "rgba(167,139,250,0.1)" : "rgba(255,255,255,0.04)",
-                border: `1px solid ${pipelineFunnelId ? "rgba(167,139,250,0.3)" : "rgba(255,255,255,0.08)"}`,
-                color: pipelineFunnelId ? "#c4b5fd" : "white",
-              }}
-            >
-              <option value="">— todos os contatos —</option>
-              {pipelineFunnels.map(f => (
-                <option key={f.id} value={f.id}>{f.name}</option>
-              ))}
-            </select>
-            {pipelineFunnels.length === 0 && (
-              <button
-                onClick={() => setFunnelsOpen(true)}
-                className="text-xs underline"
-                style={{ color: "var(--green)" }}
-              >Criar primeiro funil</button>
+              onManage={() => setFunnelsOpen(true)}
+            />
+
+            {/* Agrupamento só faz sentido quando NÃO estamos num funil específico.
+                No modo pipeline de funil, as colunas são fixas = stages do funil. */}
+            {!pipelineFunnelId && contacts.length > 0 && (
+              <>
+                <span className="h-4 w-px" style={{ background: "hsl(240 12% 16%)" }} />
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold" style={{ color: "hsl(240 8% 46%)" }}>
+                    Agrupar por
+                  </span>
+                  <select
+                    value={kanbanGroup}
+                    onChange={(e) => setKanbanGroup(e.target.value as any)}
+                    className="text-xs rounded-lg px-2.5 py-1.5 outline-none font-medium transition-colors cursor-pointer"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 15% 90%)" }}
+                  >
+                    <option value="stage" style={{ background: "#111" }}>Etapa</option>
+                    <option value="journey" style={{ background: "#111" }}>Jornada</option>
+                    <option value="funnel" style={{ background: "#111" }}>Funil</option>
+                  </select>
+                </div>
+              </>
             )}
           </div>
 
-          {/* Agrupamento só faz sentido quando NÃO estamos num funil específico.
-              No modo pipeline de funil, as colunas são fixas = stages do funil. */}
-          {!pipelineFunnelId && contacts.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold" style={{ color: "hsl(240 8% 46%)" }}>Agrupar por:</span>
-              <select
-                value={kanbanGroup}
-                onChange={(e) => setKanbanGroup(e.target.value as any)}
-                className="text-sm rounded-xl px-3 py-1.5 outline-none font-medium transition-colors"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "white" }}
-              >
-                <option value="stage">Etapa / Fase</option>
-                <option value="journey">Jornada</option>
-                <option value="funnel">Funil</option>
-              </select>
+          {selectedPipelineFunnel && (
+            <div className="text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
+              {pipelineStages.length} {pipelineStages.length === 1 ? "etapa" : "etapas"}
+              {pipelineStages.length > 0 && (
+                <> · {pipelineStages.slice(0, 4).map((s) => s.name).join(" → ")}{pipelineStages.length > 4 && " → …"}</>
+              )}
             </div>
           )}
         </div>

@@ -525,9 +525,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	funnels := crm.Group("/funnels")
 	funnels.Get("/", contactH.ListFunnels)
 	funnels.Post("/", contactH.CreateFunnel)
+	funnels.Put("/:id", contactH.UpdateFunnel)
 	funnels.Delete("/:id", contactH.DeleteFunnel)
 	funnels.Get("/:id/stages", contactH.ListFunnelStages)
 	funnels.Post("/:id/stages", contactH.CreateFunnelStage)
+	funnels.Put("/:id/stages/:stageId", contactH.UpdateFunnelStage)
 	funnels.Delete("/:id/stages/:stageId", contactH.DeleteFunnelStage)
 
 	crm.Get("/journey-options", contactH.ListJourneyOptions)

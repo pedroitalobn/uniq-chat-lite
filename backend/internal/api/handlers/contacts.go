@@ -392,6 +392,43 @@ func (h *ContactHandler) CreateFunnel(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(funnel)
 }
 
+// UpdateFunnel PUT /crm/funnels/:id
+func (h *ContactHandler) UpdateFunnel(c *fiber.Ctx) error {
+	userID, err := h.currentUserID(c)
+	if err != nil {
+		return err
+	}
+	funnelID := c.Params("id")
+	var funnel models.Funnel
+	if err := h.db.Where("id = ? AND user_id = ?", funnelID, userID).First(&funnel).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "funil não encontrado"})
+	}
+	var req struct {
+		Name        *string `json:"name"`
+		Description *string `json:"description"`
+		Color       *string `json:"color"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "dados inválidos"})
+	}
+	updates := map[string]interface{}{}
+	if req.Name != nil && *req.Name != "" {
+		updates["name"] = *req.Name
+	}
+	if req.Description != nil {
+		updates["description"] = *req.Description
+	}
+	if req.Color != nil {
+		updates["color"] = *req.Color
+	}
+	if len(updates) > 0 {
+		if err := h.db.Model(&funnel).Updates(updates).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao atualizar funil"})
+		}
+	}
+	return c.JSON(funnel)
+}
+
 // DeleteFunnel DELETE /crm/funnels/:id
 func (h *ContactHandler) DeleteFunnel(c *fiber.Ctx) error {
 	userID, err := h.currentUserID(c)
@@ -431,22 +468,62 @@ func (h *ContactHandler) CreateFunnelStage(c *fiber.Ctx) error {
 	var req struct {
 		Name  string `json:"name"`
 		Color string `json:"color"`
+		Order *int   `json:"order"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.Name == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nome é obrigatório"})
 	}
-	var maxOrder int
-	h.db.Model(&models.FunnelStage{}).Where("funnel_id = ?", funnelID).Select("COALESCE(MAX(\"order\"), 0)").Scan(&maxOrder)
+	order := 0
+	if req.Order != nil {
+		order = *req.Order
+	} else {
+		var maxOrder int
+		h.db.Model(&models.FunnelStage{}).Where("funnel_id = ?", funnelID).Select("COALESCE(MAX(\"order\"), 0)").Scan(&maxOrder)
+		order = maxOrder + 1
+	}
 	stage := models.FunnelStage{
 		FunnelID: funnel.ID,
 		Name:     req.Name,
-		Order:    maxOrder + 1,
+		Order:    order,
 		Color:    req.Color,
 	}
 	if err := h.db.Create(&stage).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar etapa"})
 	}
 	return c.Status(fiber.StatusCreated).JSON(stage)
+}
+
+// UpdateFunnelStage PUT /crm/funnels/:id/stages/:stageId
+func (h *ContactHandler) UpdateFunnelStage(c *fiber.Ctx) error {
+	stageID := c.Params("stageId")
+	var stage models.FunnelStage
+	if err := h.db.First(&stage, "id = ?", stageID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "etapa não encontrada"})
+	}
+	var req struct {
+		Name  *string `json:"name"`
+		Color *string `json:"color"`
+		Order *int    `json:"order"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "dados inválidos"})
+	}
+	updates := map[string]interface{}{}
+	if req.Name != nil && *req.Name != "" {
+		updates["name"] = *req.Name
+	}
+	if req.Color != nil {
+		updates["color"] = *req.Color
+	}
+	if req.Order != nil {
+		updates["order"] = *req.Order
+	}
+	if len(updates) > 0 {
+		if err := h.db.Model(&stage).Updates(updates).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao atualizar etapa"})
+		}
+	}
+	return c.JSON(stage)
 }
 
 // DeleteFunnelStage DELETE /crm/funnels/:id/stages/:stageId
