@@ -249,6 +249,69 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	app.Get("/v1/csat/:token", csatH.GetPublic)
 	app.Post("/v1/csat/:token", csatH.SubmitPublic)
 
+	// ─── Public v1 API: /v1/:server_slug/:instance_slug/* ─────────────────────
+	// Auth: apikey / X-Instance-Token / Authorization: Bearer <instance_token>.
+	// IMPORTANT: registered BEFORE the protected /v1 group because Fiber's
+	// Group middlewares only apply to routes registered AFTER them — declaring
+	// this first keeps instance-token auth from being short-circuited by
+	// RequireAuth (which would misread the instance token as an API key).
+	v1inst := app.Group("/v1/:server_slug/:instance_slug", middleware.ResolveV1Instance(db), middleware.RateLimit(300))
+
+	// Messages
+	v1msgs := v1inst.Group("/messages")
+	v1msgs.Get("/", msgH.GetMessages)
+	v1msgs.Post("/text", msgH.SendText)
+	v1msgs.Post("/image", msgH.SendImage)
+	v1msgs.Post("/document", msgH.SendDocument)
+	v1msgs.Post("/audio", msgH.SendAudio)
+	v1msgs.Post("/video", msgH.SendVideo)
+	v1msgs.Post("/location", msgH.SendLocation)
+	v1msgs.Post("/contact", msgH.SendContact)
+	v1msgs.Post("/reaction", msgH.SendReaction)
+	v1msgs.Post("/poll", msgH.SendPoll)
+	v1msgs.Post("/buttons", msgH.SendButtons)
+	v1msgs.Post("/template", msgH.SendTemplate)
+	v1msgs.Post("/list", msgH.SendList)
+	v1msgs.Post("/menu", msgH.SendMenu)
+	v1msgs.Post("/sticker", msgH.SendSticker)
+	v1msgs.Post("/status", msgH.SendStatus)
+	v1msgs.Post("/presence", msgH.SendPresence)
+	v1msgs.Post("/payment-request", msgH.RequestPayment)
+	v1msgs.Post("/revoke", msgH.RevokeMessage)
+	v1msgs.Post("/typing", msgH.SendTyping)
+	v1msgs.Post("/read", msgH.MarkRead)
+
+	v1inst.Post("/media/upload", msgH.UploadMedia)
+	v1inst.Get("/chats", msgH.GetChats)
+	v1inst.Get("/contacts", msgH.GetContacts)
+	v1inst.Post("/check-number", msgH.CheckNumber)
+	v1inst.Post("/bulk-check", msgH.BulkCheckNumbers)
+
+	// Instance state
+	v1inst.Get("/status", instanceH.Status)
+	v1inst.Get("/profile", instanceH.Profile)
+	v1inst.Get("/qr", instanceH.GetQR)
+	v1inst.Post("/pairing-code", instanceH.GetPairingCode)
+	v1inst.Post("/contact/info", instanceH.ContactInfo)
+	v1inst.Post("/contact/avatar", instanceH.ContactAvatar)
+
+	// OTP
+	v1otp := v1inst.Group("/otp")
+	v1otp.Post("/send", otpH.Send)
+	v1otp.Post("/verify", otpH.Verify)
+	v1otp.Post("/resend", otpH.Resend)
+	v1otp.Get("/sessions", otpH.Sessions)
+
+	// Groups
+	v1groups := v1inst.Group("/groups")
+	v1groups.Get("/", groupH.List)
+	v1groups.Post("/", groupH.Create)
+	v1groups.Get("/:jid", groupH.Get)
+	v1groups.Put("/:jid", groupH.Update)
+	v1groups.Post("/:jid/participants", groupH.UpdateParticipants)
+	v1groups.Get("/:jid/invite", groupH.InviteLink)
+	v1groups.Post("/:jid/leave", groupH.Leave)
+
 	// ─── Protected routes ─────────────────────────────────────────────────────
 	api := app.Group("/v1", middleware.RequireAuth(db), middleware.RateLimit(300))
 
@@ -797,65 +860,6 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	admin.Put("/plans/:id", adminH.UpdatePlan)
 	admin.Post("/invites/toggle", inviteH.ToggleSystem)
 	admin.Get("/invites", inviteH.AdminList)
-
-	// ─── Public v1 API: /v1/:server_slug/:instance_slug/* ─────────────────────
-	// Auth: Authorization: Bearer <instance_token>  OR  X-Instance-Token: <token>
-	v1inst := app.Group("/v1/:server_slug/:instance_slug", middleware.ResolveV1Instance(db), middleware.RateLimit(300))
-
-	// Messages
-	v1msgs := v1inst.Group("/messages")
-	v1msgs.Get("/", msgH.GetMessages)
-	v1msgs.Post("/text", msgH.SendText)
-	v1msgs.Post("/image", msgH.SendImage)
-	v1msgs.Post("/document", msgH.SendDocument)
-	v1msgs.Post("/audio", msgH.SendAudio)
-	v1msgs.Post("/video", msgH.SendVideo)
-	v1msgs.Post("/location", msgH.SendLocation)
-	v1msgs.Post("/contact", msgH.SendContact)
-	v1msgs.Post("/reaction", msgH.SendReaction)
-	v1msgs.Post("/poll", msgH.SendPoll)
-	v1msgs.Post("/buttons", msgH.SendButtons)
-	v1msgs.Post("/template", msgH.SendTemplate)
-	v1msgs.Post("/list", msgH.SendList)
-	v1msgs.Post("/menu", msgH.SendMenu)
-	v1msgs.Post("/sticker", msgH.SendSticker)
-	v1msgs.Post("/status", msgH.SendStatus)
-	v1msgs.Post("/presence", msgH.SendPresence)
-	v1msgs.Post("/payment-request", msgH.RequestPayment)
-	v1msgs.Post("/revoke", msgH.RevokeMessage)
-	v1msgs.Post("/typing", msgH.SendTyping)
-	v1msgs.Post("/read", msgH.MarkRead)
-
-	v1inst.Post("/media/upload", msgH.UploadMedia)
-	v1inst.Get("/chats", msgH.GetChats)
-	v1inst.Get("/contacts", msgH.GetContacts)
-	v1inst.Post("/check-number", msgH.CheckNumber)
-	v1inst.Post("/bulk-check", msgH.BulkCheckNumbers)
-
-	// Instance state
-	v1inst.Get("/status", instanceH.Status)
-	v1inst.Get("/profile", instanceH.Profile)
-	v1inst.Get("/qr", instanceH.GetQR)
-	v1inst.Post("/pairing-code", instanceH.GetPairingCode)
-	v1inst.Post("/contact/info", instanceH.ContactInfo)
-	v1inst.Post("/contact/avatar", instanceH.ContactAvatar)
-
-	// OTP
-	v1otp := v1inst.Group("/otp")
-	v1otp.Post("/send", otpH.Send)
-	v1otp.Post("/verify", otpH.Verify)
-	v1otp.Post("/resend", otpH.Resend)
-	v1otp.Get("/sessions", otpH.Sessions)
-
-	// Groups
-	v1groups := v1inst.Group("/groups")
-	v1groups.Get("/", groupH.List)
-	v1groups.Post("/", groupH.Create)
-	v1groups.Get("/:jid", groupH.Get)
-	v1groups.Put("/:jid", groupH.Update)
-	v1groups.Post("/:jid/participants", groupH.UpdateParticipants)
-	v1groups.Get("/:jid/invite", groupH.InviteLink)
-	v1groups.Post("/:jid/leave", groupH.Leave)
 
 	return app
 }
