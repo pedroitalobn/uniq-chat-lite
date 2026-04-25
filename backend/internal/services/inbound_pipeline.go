@@ -127,12 +127,15 @@ func (p *InboundPipeline) Process(ctx context.Context, in InboundMessage) (*mode
 // Safe to call concurrently. Idempotent: calling it twice for the same
 // MessageLog produces no additional events after the first success (unless
 // the conversation_id is nil).
+//
+// Despacha pra ProcessSavedOutbound quando direction=out — chamadas que
+// não distinguem (caminho legacy SaveMessage) podem usar este como entry.
 func (p *InboundPipeline) ProcessSavedInbound(ctx context.Context, ml *models.MessageLog) error {
 	if ml == nil || ml.ID == uuid.Nil {
 		return errors.New("inbound: message log is required")
 	}
-	if ml.Direction != models.DirectionIn {
-		return nil
+	if ml.Direction == models.DirectionOut {
+		return p.ProcessSavedOutbound(ctx, ml)
 	}
 	if ml.ConversationID != nil {
 		return nil // already attached
@@ -193,6 +196,79 @@ func (p *InboundPipeline) ProcessSavedInbound(ctx context.Context, ml *models.Me
 
 	p.appendEvent(ctx, conv, models.ConvEventMessage, models.ActorCustomer, nil, &ml.ID, map[string]any{"type": ml.Type})
 	p.updateDenorm(ctx, conv, in, ml, false)
+	p.broadcastConversation(conv, ml, created, reopened)
+	return nil
+}
+
+// ProcessSavedOutbound liga ao Conversation uma mensagem outbound já
+// persistida — caso típico: dono da instância manda mensagem pelo
+// WhatsApp Mobile/Desktop. O whatsmeow recebe events.Message com
+// IsFromMe=true, o handler chama Manager.SaveMessage que cria
+// MessageLog com direction=out, mas SEM conversation_id. Sem essa rota
+// a mensagem ficava órfã (não aparecia no inbox da plataforma).
+//
+// Comportamento:
+//   - Resolve/cria Conversation pra (workspace, instance, channel_key)
+//     usando o `to_jid` como key (destino da mensagem)
+//   - Atualiza denorm com fromAgent=true (last_agent_msg_at, zera
+//     agent_unread_count — o "agente" mandou, leu)
+//   - Emite WS pro frontend mostrar imediatamente
+//   - NÃO dispara journey/dispatch (operações são pra inbound)
+//   - NÃO incrementa unread_count (foi nóis que mandou)
+func (p *InboundPipeline) ProcessSavedOutbound(ctx context.Context, ml *models.MessageLog) error {
+	if ml == nil || ml.ID == uuid.Nil {
+		return errors.New("outbound: message log is required")
+	}
+	if ml.ConversationID != nil {
+		return nil // já tem conversation_id (mandado via API direto, OK)
+	}
+
+	var inst models.Instance
+	if err := p.db.WithContext(ctx).First(&inst, "id = ?", ml.InstanceID).Error; err != nil {
+		return err
+	}
+	ws := uuid.Nil
+	if inst.WorkspaceID != nil {
+		ws = *inst.WorkspaceID
+	}
+
+	in := InboundMessage{
+		InstanceID:  ml.InstanceID,
+		WorkspaceID: ws,
+		ChannelType: string(inst.Channel),
+		ChannelKey:  ml.ToJID,
+		FromName:    ml.ContactName,
+		FromAvatar:  ml.ContactAvatar,
+		SenderJID:   ml.SenderJID,
+		SenderName:  ml.SenderName,
+		Type:        ml.Type,
+		Content:     ml.Content,
+		ReplyToID:   ml.ReplyToID,
+		OccurredAt:  ml.CreatedAt,
+	}
+
+	contact, err := p.resolveContact(ctx, in)
+	if err != nil {
+		log.Warn().Err(err).Str("ml_id", ml.ID.String()).Msg("outbound: resolveContact failed")
+	}
+	conv, created, reopened, err := p.resolveOrCreateConversation(ctx, in, contact)
+	if err != nil {
+		return err
+	}
+
+	updates := map[string]any{"conversation_id": conv.ID}
+	if ml.WorkspaceID == nil && ws != uuid.Nil {
+		updates["workspace_id"] = ws
+	}
+	p.db.WithContext(ctx).Model(&models.MessageLog{}).Where("id = ?", ml.ID).Updates(updates)
+	ml.ConversationID = &conv.ID
+	if ml.WorkspaceID == nil && ws != uuid.Nil {
+		wsCopy := ws
+		ml.WorkspaceID = &wsCopy
+	}
+
+	p.appendEvent(ctx, conv, models.ConvEventMessage, models.ActorUser, nil, &ml.ID, map[string]any{"type": ml.Type, "source": "external"})
+	p.updateDenorm(ctx, conv, in, ml, true) // fromAgent=true
 	p.broadcastConversation(conv, ml, created, reopened)
 	return nil
 }

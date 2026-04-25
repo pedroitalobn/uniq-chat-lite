@@ -894,6 +894,8 @@ function MessageBubble({
 }) {
   const isOut = m.direction === "out";
   const parsed = parseMessageContent(m.content);
+  const body = parsed.caption || parsed.text;
+
   // Reaction — bolha compacta só com emoji grande
   if (m.type === "reaction") {
     return (
@@ -906,6 +908,109 @@ function MessageBubble({
           }}
         >
           {parsed.text || "👍"}
+        </div>
+      </div>
+    );
+  }
+
+  // Mídia pura (image/video/audio sem caption) → render SEM bubble.
+  // Bordas finas com cor da direção indicam emissor (verde Uniq) vs
+  // receptor (cinza). Mais limpo, dá destaque visual à mídia.
+  // Documentos sempre vão pra dentro do bubble (são cards verticais).
+  const isPureMedia =
+    (m.type === "image" || m.type === "video" || m.type === "audio") &&
+    !!parsed.url &&
+    !body;
+
+  if (isPureMedia) {
+    return (
+      <div className={`group relative flex ${isOut ? "justify-end" : "justify-start"}`}>
+        <div
+          className="relative max-w-[80%] uniq-slide-up"
+          style={{
+            // Borda colorida fina indica direção sem precisar do bubble inteiro
+            borderRadius: 14,
+            padding: 3,
+            background: isOut
+              ? "linear-gradient(135deg, rgba(0,212,106,0.35), rgba(0,212,106,0.15))"
+              : "linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04))",
+          }}
+        >
+          <div
+            className="overflow-hidden"
+            style={{
+              borderRadius: 12,
+              background: "hsl(240 18% 5%)",
+            }}
+          >
+            <MediaBody type={m.type} parsed={parsed} onOpenViewer={onOpenViewer} />
+          </div>
+
+          {/* Pin / favorite badges — abs positioned mantém limpo */}
+          {m.is_pinned && (
+            <span
+              className="absolute -top-2 left-2 flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium"
+              style={{ background: "#00d46a", color: "#03170a" }}
+              title="Fixada"
+            >
+              <Pin className="h-2.5 w-2.5" /> fixada
+            </span>
+          )}
+          {m.is_favorite && !m.is_pinned && (
+            <span
+              className="absolute -top-2 right-2 flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px]"
+              style={{ background: "#f59e0b", color: "#1f1300" }}
+              title="Favoritada"
+            >
+              <Star className="h-2.5 w-2.5" /> favorita
+            </span>
+          )}
+
+          {/* Sender name (grupo) + timestamp em rodapé compacto */}
+          <div
+            className="flex items-center justify-between gap-2 mt-1.5 px-1 text-[10px]"
+            style={{ color: "hsl(240 8% 50%)" }}
+          >
+            {!isOut && m.sender_name ? (
+              <span style={{ color: "#00d46a", fontWeight: 500 }}>{m.sender_name}</span>
+            ) : <span />}
+            <span className="flex items-center gap-1">
+              {relativeTime(m.created_at)}
+              {isOut && <StatusTicks status={m.status} />}
+            </span>
+          </div>
+
+          {/* Hover actions */}
+          {onPatch && (
+            <div
+              className={`pointer-events-none absolute -top-3 flex gap-0.5 rounded-full px-1 py-0.5 opacity-0 shadow-lg transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 ${
+                isOut ? "right-2" : "left-2"
+              }`}
+              style={{
+                background: "hsl(240 18% 6%)",
+                border: "1px solid hsl(240 12% 16%)",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => onPatch({ is_pinned: !m.is_pinned })}
+                className="rounded-full p-1 hover:bg-white/10"
+                title={m.is_pinned ? "Desfixar" : "Fixar"}
+                style={{ color: m.is_pinned ? "#00d46a" : "hsl(240 8% 62%)" }}
+              >
+                <Pin className="h-3 w-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onPatch({ is_favorite: !m.is_favorite })}
+                className="rounded-full p-1 hover:bg-white/10"
+                title={m.is_favorite ? "Remover favorito" : "Favoritar"}
+                style={{ color: m.is_favorite ? "#f59e0b" : "hsl(240 8% 62%)" }}
+              >
+                <Star className="h-3 w-3" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );

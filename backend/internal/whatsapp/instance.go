@@ -1908,17 +1908,12 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 				messageID := v.Info.ID // usado para dedup — evita loop em history-sync
 				go GlobalManager.HandleIncomingAutomation(ic.ID, messageID, journeySenderJID, pushName, journeyChatJID, text, msgType, isGroup)
 			}
-		} else if isFromMe && GlobalManager != nil {
-			// Log explícito: jornadas NUNCA disparam pra mensagens enviadas
-			// pela própria instância. Se o usuário está testando mandando
-			// a keyword do próprio número da instância, nada acontece. Esse
-			// log ajuda a diagnosticar — peça pra outra pessoa enviar.
-			log.Info().
-				Str("instance", ic.ID).
-				Str("chat", chatJID).
-				Bool("is_group", isGroupMsg).
-				Msg("journey: mensagem saiu da própria instância (isFromMe) — não dispara jornada")
 		}
+		// isFromMe (mensagem enviada do celular/desktop direto pelo WhatsApp,
+		// fora da plataforma) é tratado dentro do SaveMessage agora — ele
+		// dispara o ProcessSavedOutbound automaticamente pra ligar à
+		// Conversation correta. Não dispara journey (não faz sentido o owner
+		// triggerar a própria automação).
 
 	// ── Read receipts / delivery ─────────────────────────────────────────────
 	case *events.Receipt:

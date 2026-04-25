@@ -325,15 +325,22 @@ func (m *Manager) SaveMessage(instanceID string, toJID string, content string, d
 		return err
 	}
 
-	// Fire ticketing pipeline for inbound messages (non-blocking).
-	// Outbound messages are attached to their Conversation at send time
-	// by the conversation handler itself.
-	if direction == models.DirectionIn && !isGroup {
+	// Fire ticketing pipeline (non-blocking).
+	//   - Inbound: cria/abre Conversation pro contato.
+	//   - Outbound do whatsmeow (isFromMe=true sem ConversationID): dono
+	//     respondeu pelo celular/desktop — linka à Conversation correta
+	//     pra aparecer no inbox dos agentes em tempo real. Outbound
+	//     enviado via API da plataforma já vem com ConversationID setado
+	//     e o ProcessSavedOutbound retorna no-op.
+	if !isGroup {
 		if p := m.InboundProcessorRef(); p != nil {
 			entry := logEntry
 			go func() {
 				if err := p.ProcessSavedInbound(context.Background(), &entry); err != nil {
-					log.Warn().Err(err).Str("instance", instanceID).Msg("inbound pipeline: failed to process")
+					log.Warn().Err(err).
+						Str("instance", instanceID).
+						Str("direction", string(entry.Direction)).
+						Msg("ticketing pipeline: failed to process")
 				}
 			}()
 		}
