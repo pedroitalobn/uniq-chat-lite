@@ -519,9 +519,13 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Health — deliberately NO workspace permission so the UI can distinguish
 	// "route missing / old deploy" from "route exists, something else broken".
 	conversations.Get("/health", conversationH.Health)
-	conversations.Get("/", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.List)
-	conversations.Get("/count", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.Count)
-	conversations.Get("/inbox-stats", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.InboxStats)
+	// Listagem/leitura aceita tickets:view OU inbox:view_conversations.
+	// Permite que admins criem roles tipo "operador inbox" sem precisar
+	// liberar o módulo inteiro de tickets.
+	convoViewPerms := []string{models.PermTicketsView, models.PermInboxViewConversations}
+	conversations.Get("/", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.List)
+	conversations.Get("/count", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.Count)
+	conversations.Get("/inbox-stats", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.InboxStats)
 	conversations.Post("/backfill", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.Backfill)
 	conversations.Get("/:id", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.Get)
 	conversations.Get("/:id/timeline", middleware.RequireWorkspacePermission(db, models.PermTicketsView), conversationH.Timeline)

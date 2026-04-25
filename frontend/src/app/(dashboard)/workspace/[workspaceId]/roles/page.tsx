@@ -100,7 +100,10 @@ export default function RolesPage() {
     setEditingRole(role);
     setCreateName(role.name);
     setCreateDesc(role.description || "");
-    setSelectedPerms(role.permissions.map(p => p.id));
+    // role.permissions pode vir null/undefined dependendo do preload do
+    // backend — fallback pra array vazio evita crash silencioso (form
+    // abria sem checkboxes marcados antes).
+    setSelectedPerms((role.permissions ?? []).map((p) => p.id));
     setShowCreate(false);
   };
 
@@ -129,11 +132,28 @@ export default function RolesPage() {
 
   const getCategoryLabel = (cat: string) => {
     const labels: Record<string, string> = {
-      instances: "Instâncias",
+      // Inbox/atendimento
       inbox: "Inbox",
+      tickets: "Atendimentos",
+      notes: "Notas Internas",
+      queues: "Filas",
+      teams: "Equipes",
+      departments: "Departamentos",
+      quickreplies: "Respostas Rápidas",
+      reports: "Relatórios",
+      presence: "Presença",
+      // Infra / módulos
+      instances: "Instâncias",
+      servers: "Servidores",
+      agents: "Agentes IA",
+      integrations: "Integrações",
       campaigns: "Campanhas",
+      dashboard: "Dashboard",
+      billing: "Plano / Billing",
+      // CRM
       crm: "CRM",
-      team: "Equipe",
+      // Workspace
+      team: "Membros do Workspace",
       roles: "Funções",
       settings: "Configurações",
     };
@@ -142,10 +162,27 @@ export default function RolesPage() {
 
   const getCategoryColor = (cat: string) => {
     const colors: Record<string, string> = {
+      // Inbox/atendimento — verde Uniq
+      inbox: "#00d46a",
+      tickets: "#4ade80",
+      notes: "#a3e635",
+      queues: "#34d399",
+      teams: "#06b6d4",
+      departments: "#0ea5e9",
+      quickreplies: "#10b981",
+      reports: "#22d3ee",
+      presence: "#67e8f9",
+      // Infra — azul/ciano
       instances: "#60a5fa",
-      inbox: "#4ade80",
+      servers: "#3b82f6",
+      agents: "#818cf8",
+      integrations: "#6366f1",
       campaigns: "#f472b6",
+      dashboard: "#38bdf8",
+      billing: "#facc15",
+      // CRM — amarelo
       crm: "#fbbf24",
+      // Workspace — roxo
       team: "#a78bfa",
       roles: "#fb923c",
       settings: "#94a3b8",
@@ -396,7 +433,7 @@ export default function RolesPage() {
                       <p className="text-xs mb-2" style={{ color: "hsl(240 8% 38%)" }}>{role.description}</p>
                     )}
                     <div className="flex flex-wrap gap-1.5">
-                      {role.permissions.slice(0, 6).map((perm) => (
+                      {(role.permissions ?? []).slice(0, 6).map((perm) => (
                         <span
                           key={perm.id}
                           className="text-xs px-2 py-0.5 rounded"
@@ -405,12 +442,12 @@ export default function RolesPage() {
                           {perm.name}
                         </span>
                       ))}
-                      {role.permissions.length > 6 && (
+                      {(role.permissions ?? []).length > 6 && (
                         <span
                           className="text-xs px-2 py-0.5 rounded"
                           style={{ background: "rgba(255,255,255,0.04)", color: "hsl(240 8% 40%)" }}
                         >
-                          +{role.permissions.length - 6} mais
+                          +{(role.permissions ?? []).length - 6} mais
                         </span>
                       )}
                     </div>

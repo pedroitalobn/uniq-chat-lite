@@ -74,7 +74,9 @@ export default function InboxPage() {
   const myUserID = session?.user?.id as string | undefined;
   const selectedId = searchParams.get("c") ?? undefined;
 
-  const canView = hasPerm(PERM.ticketsView);
+  // Gate da página = inbox:view. Sem inbox:view → Forbidden, mesmo que o
+  // user tenha tickets:view (admin pode tirar acesso ao módulo todo).
+  const canView = hasPerm(PERM.inboxView);
   const canViewAll = hasPerm(PERM.ticketsViewAll) || hasPerm(PERM.ticketsViewTeam) || isOwner;
   const canAssign = hasPerm(PERM.ticketsAssign);
 

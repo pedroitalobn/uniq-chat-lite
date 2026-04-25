@@ -52,7 +52,10 @@ export function Sidebar() {
   // automaticamente pra owner e super-admin (lógica no provider), então
   // quem é dono vê tudo sem precisar ter permission explícita, enquanto
   // agentes comuns só veem o que foi liberado na role deles.
-  const canSeeInbox = optimistic || hasAnyPerm([PERM.ticketsView, PERM.inboxView]);
+  // Inbox: gate só por inbox:view. Tickets:view é sub-perm pra carregar
+  // conversas — quando admin tira inbox:view, o módulo some da sidebar
+  // independente do que o user tenha em tickets.
+  const canSeeInbox = optimistic || hasPerm(PERM.inboxView);
   const canSeeCRM = optimistic || hasAnyPerm([PERM.crmView, PERM.companiesView, PERM.dealsView]);
   const canSeeDashboard = optimistic || hasPerm(PERM.dashboardView) || hasAnyPerm([PERM.ticketsView, PERM.inboxView]);
   const canSeeAgents = optimistic || hasAnyPerm([PERM.agentsView, PERM.agentsManage]);

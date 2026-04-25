@@ -130,9 +130,10 @@ var (
 	PermInstancesDelete = "instances:delete"
 
 	// Inbox permissions
-	PermInboxView   = "inbox:view"
-	PermInboxSend   = "inbox:send"
-	PermInboxAssign = "inbox:assign"
+	PermInboxView              = "inbox:view"               // acesso à tela do inbox (layout, filtros)
+	PermInboxViewConversations = "inbox:view_conversations" // ver/carregar lista de conversas
+	PermInboxSend              = "inbox:send"               // enviar mensagens
+	PermInboxAssign            = "inbox:assign"             // atribuir conversas
 
 	// Campaign permissions
 	PermCampaignsView   = "campaigns:view"
@@ -237,7 +238,8 @@ func GetAllPermissions() []Permission {
 		{Key: PermInstancesDelete, Name: "Excluir Instâncias", Category: "instances"},
 
 		// Inbox
-		{Key: PermInboxView, Name: "Visualizar Inbox", Category: "inbox"},
+		{Key: PermInboxView, Name: "Acessar Inbox (layout)", Category: "inbox"},
+		{Key: PermInboxViewConversations, Name: "Ver Conversas", Category: "inbox"},
 		{Key: PermInboxSend, Name: "Enviar Mensagens", Category: "inbox"},
 		{Key: PermInboxAssign, Name: "Atribuir Conversas", Category: "inbox"},
 
