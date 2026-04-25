@@ -156,7 +156,13 @@ func (h *ConversationHandler) List(c *fiber.Ctx) error {
 	q.Count(&total)
 
 	var items []models.Conversation
+	// Preload Instance pra que o front mostre o nome da instância no card
+	// e no header sem precisar de query extra. Select só campos seguros
+	// (não vaza Token de instance).
 	err := q.Preload("Contact").Preload("AssignedUser").
+		Preload("Instance", func(tx *gorm.DB) *gorm.DB {
+			return tx.Select("id, name, channel, phone_number")
+		}).
 		Order("COALESCE(last_message_at, updated_at) DESC").
 		Limit(limit + 1).
 		Offset(atoiDefault(c.Query("offset"), 0)).
@@ -222,6 +228,9 @@ func (h *ConversationHandler) Get(c *fiber.Ctx) error {
 	}
 	var conv models.Conversation
 	if err := h.db.Preload("Contact").Preload("AssignedUser").
+		Preload("Instance", func(tx *gorm.DB) *gorm.DB {
+			return tx.Select("id, name, channel, phone_number")
+		}).
 		Where("workspace_id = ? AND id = ?", ws, id).
 		First(&conv).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})

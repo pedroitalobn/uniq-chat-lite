@@ -8,7 +8,7 @@ import {
   ArrowLeft, Send, StickyNote, CheckCircle2, Clock3, RotateCcw,
   UserCheck, UserX, ArrowRightLeft, Bot, BotOff, Lock, AlertTriangle,
   Smile, X, Star, Mic, Image as ImageIcon, FileText, MapPin, Check,
-  CheckCheck, AlertCircle, Paperclip, Pin, Sparkles,
+  CheckCheck, AlertCircle, Paperclip, Pin, Sparkles, Users as UsersIcon,
 } from "lucide-react";
 import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi } from "@/lib/api";
 import { TemplatePicker } from "@/components/inbox/TemplatePicker";
@@ -21,6 +21,8 @@ interface Conversation {
   id: string;
   workspace_id: string;
   instance_id: string;
+  /** Backend faz Preload("Instance") quando disponível */
+  instance?: { id: string; name: string; channel?: string; phone_number?: string } | null;
   contact_id?: string | null;
   channel_type: string;
   channel_key: string;
@@ -39,6 +41,22 @@ interface Conversation {
   reopen_count: number;
   first_response_at?: string | null;
   created_at: string;
+}
+
+// Cor + label por canal — visual hint pra que o atendente saiba de onde
+// veio a mensagem sem ler texto.
+function channelChipStyle(channel?: string): { label: string; bg: string; color: string; border: string } {
+  switch ((channel || "").toLowerCase()) {
+    case "whatsapp":  return { label: "WhatsApp",  bg: "rgba(37,211,102,0.08)", color: "#25d366", border: "rgba(37,211,102,0.2)" };
+    case "waba":      return { label: "WhatsApp Business", bg: "rgba(37,211,102,0.06)", color: "#25d366", border: "rgba(37,211,102,0.18)" };
+    case "instagram": return { label: "Instagram", bg: "rgba(225,48,108,0.08)", color: "#e1306c", border: "rgba(225,48,108,0.2)" };
+    case "facebook":  return { label: "Facebook",  bg: "rgba(24,119,242,0.08)", color: "#1877f2", border: "rgba(24,119,242,0.2)" };
+    case "telegram":  return { label: "Telegram",  bg: "rgba(34,158,217,0.08)", color: "#229ed9", border: "rgba(34,158,217,0.2)" };
+    case "linkedin":  return { label: "LinkedIn",  bg: "rgba(10,102,194,0.08)", color: "#0a66c2", border: "rgba(10,102,194,0.2)" };
+    case "tiktok":    return { label: "TikTok",    bg: "rgba(255,0,80,0.08)",   color: "#ff0050", border: "rgba(255,0,80,0.2)" };
+    case "kwai":      return { label: "Kwai",      bg: "rgba(255,102,0,0.08)",  color: "#ff6600", border: "rgba(255,102,0,0.2)" };
+    default:          return { label: channel || "Canal", bg: "rgba(255,255,255,0.04)", color: "hsl(240 8% 60%)", border: "rgba(255,255,255,0.08)" };
+  }
 }
 
 interface Queue {
@@ -159,11 +177,23 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     enabled: !!wsId && canView,
   });
 
-  // Mark read on open
+  // Mark read on open + refresh list so o badge de não-lidas some na hora.
+  // Antes só zerava no backend mas o front continuava mostrando contagem
+  // antiga até a próxima invalidação por WS.
   useEffect(() => {
     if (!wsId || !canView) return;
-    conversationsApi.markRead(wsId, conversationId).catch(() => {});
-  }, [wsId, canView, conversationId]);
+    conversationsApi
+      .markRead(wsId, conversationId)
+      .then(() => {
+        // Invalida lista de conversas (todas as views) e contadores.
+        qc.invalidateQueries({ queryKey: ["conversations", wsId] });
+        qc.invalidateQueries({ queryKey: ["conversations-count", wsId] });
+        qc.invalidateQueries({ queryKey: ["inbox-stats", wsId] });
+      })
+      .catch(() => {
+        /* não é crítico — o badge atualiza no próximo refetch */
+      });
+  }, [wsId, canView, conversationId, qc]);
 
   // Live updates — any server-side conversation event for this ticket
   // invalidates the relevant queries. Payloads that embed `conversation_id`
@@ -383,8 +413,58 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               <ArrowLeft className="h-4 w-4" />
             </Link>
           )}
+          {/* Avatar do contato/grupo — quem clica logo identifica visualmente */}
+          {(() => {
+            const isGroup = (conv?.channel_key || "").toLowerCase().endsWith("@g.us");
+            const avatarUrl = conv?.contact?.avatar_url;
+            const name = conv?.contact?.name || conv?.subject || conv?.channel_key || "?";
+            if (avatarUrl) {
+              return (
+                <img
+                  src={avatarUrl}
+                  alt={name}
+                  className="h-9 w-9 rounded-full object-cover flex-shrink-0"
+                  style={{ background: "rgba(255,255,255,0.04)" }}
+                />
+              );
+            }
+            if (isGroup) {
+              return (
+                <div
+                  className="flex h-9 w-9 items-center justify-center rounded-full flex-shrink-0"
+                  style={{
+                    background: "rgba(167,139,250,0.12)",
+                    border: "1px solid rgba(167,139,250,0.25)",
+                    color: "#c4b5fd",
+                  }}
+                >
+                  <UsersIcon className="h-4 w-4" />
+                </div>
+              );
+            }
+            const text = name;
+            let hash = 0;
+            for (let i = 0; i < text.length; i++) hash = (hash * 31 + text.charCodeAt(i)) | 0;
+            const hue = Math.abs(hash) % 360;
+            const initials = (text.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0] || "").join("") || "?").toUpperCase();
+            return (
+              <div
+                className="flex h-9 w-9 items-center justify-center rounded-full font-semibold flex-shrink-0"
+                style={{
+                  background: `hsl(${hue} 50% 22%)`,
+                  color: `hsl(${hue} 70% 75%)`,
+                  fontSize: 14,
+                }}
+              >
+                {initials}
+              </div>
+            );
+          })()}
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {(conv?.channel_key || "").toLowerCase().endsWith("@g.us") && (
+                <UsersIcon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#a78bfa" }} aria-label="Grupo" />
+              )}
               <h1 className="truncate text-base font-semibold">
                 {conv?.contact?.name || conv?.subject || "Atendimento"}
               </h1>
@@ -409,11 +489,40 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                 </span>
               )}
             </div>
-            <p className="truncate text-xs text-zinc-500">
-              {conv?.channel_type} · {conv?.channel_key}
-              {conv?.assigned_user?.name && ` · responsável ${conv.assigned_user.name}`}
-              {!conv?.assigned_user && " · sem responsável"}
-            </p>
+            <div className="flex items-center gap-2 text-xs flex-wrap" style={{ color: "hsl(240 8% 50%)" }}>
+              {/* Chip do canal — ícone + cor por tipo */}
+              <span
+                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium"
+                style={{
+                  background: channelChipStyle(conv?.channel_type).bg,
+                  color: channelChipStyle(conv?.channel_type).color,
+                  border: `1px solid ${channelChipStyle(conv?.channel_type).border}`,
+                }}
+              >
+                {channelChipStyle(conv?.channel_type).label}
+              </span>
+              {/* Chip da instância — ajuda quando "todas as instâncias" */}
+              {conv?.instance?.name && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium truncate max-w-[160px]"
+                  style={{
+                    background: "rgba(0,212,106,0.06)",
+                    color: "#00d46a",
+                    border: "1px solid rgba(0,212,106,0.18)",
+                  }}
+                  title={`Instância: ${conv.instance.name}`}
+                >
+                  {conv.instance.name}
+                </span>
+              )}
+              <span className="truncate" title={conv?.channel_key}>{conv?.channel_key}</span>
+              <span style={{ color: "hsl(240 8% 35%)" }}>·</span>
+              {conv?.assigned_user?.name ? (
+                <span>responsável {conv.assigned_user.name}</span>
+              ) : (
+                <span style={{ color: "hsl(240 8% 42%)" }}>sem responsável</span>
+              )}
+            </div>
           </div>
         </header>
 

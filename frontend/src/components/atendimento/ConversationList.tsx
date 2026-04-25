@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Users as UsersIcon } from "lucide-react";
 
 export interface ConversationRow {
   id: string;
@@ -18,6 +18,97 @@ export interface ConversationRow {
   agent_unread_count: number;
   assigned_user_id?: string | null;
   contact?: { name: string; avatar_url?: string; phone?: string } | null;
+  last_message_from_me?: boolean;
+}
+
+// isGroupChannelKey — true quando o channel_key parece um grupo do WhatsApp
+// (sufixos @g.us / -g.us / "group:" etc). Detecta sem precisar de coluna
+// extra no DB.
+function isGroupChannelKey(key?: string): boolean {
+  if (!key) return false;
+  const k = key.toLowerCase();
+  return (
+    k.endsWith("@g.us") ||
+    k.endsWith("-g.us") ||
+    k.startsWith("group:") ||
+    /^\d+-\d+@/.test(k) // padrão típico: 123-456789@s.whatsapp.net (grupos legacy)
+  );
+}
+
+// initialsOf — pega 1-2 letras pro avatar fallback
+function initialsOf(name?: string, channelKey?: string): string {
+  const source = (name || channelKey || "?").trim();
+  const parts = source.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return "?";
+}
+
+// Avatar — round image se contact.avatar_url existe; senão fallback letra(s)
+// com cor estável a partir do nome (hash → hue). Grupos viram um ícone
+// específico pra deixar claro que não é 1:1.
+function Avatar({
+  src,
+  name,
+  channelKey,
+  isGroup,
+  size = 40,
+}: {
+  src?: string;
+  name?: string;
+  channelKey?: string;
+  isGroup?: boolean;
+  size?: number;
+}) {
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={name || "avatar"}
+        className="rounded-full object-cover flex-shrink-0"
+        style={{ width: size, height: size, background: "rgba(255,255,255,0.04)" }}
+        onError={(e) => {
+          // Fallback se imagem 404 — esconde e deixa o sibling render
+          (e.target as HTMLImageElement).style.display = "none";
+        }}
+      />
+    );
+  }
+  if (isGroup) {
+    return (
+      <div
+        className="flex items-center justify-center rounded-full flex-shrink-0"
+        style={{
+          width: size,
+          height: size,
+          background: "rgba(167,139,250,0.12)",
+          border: "1px solid rgba(167,139,250,0.25)",
+          color: "#c4b5fd",
+        }}
+      >
+        <UsersIcon style={{ width: size * 0.45, height: size * 0.45 }} />
+      </div>
+    );
+  }
+  // Hue determinística (hash do nome) → cor consistente entre renders
+  const text = (name || channelKey || "?");
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) hash = (hash * 31 + text.charCodeAt(i)) | 0;
+  const hue = Math.abs(hash) % 360;
+  return (
+    <div
+      className="flex items-center justify-center rounded-full font-semibold flex-shrink-0"
+      style={{
+        width: size,
+        height: size,
+        background: `hsl(${hue} 50% 22%)`,
+        color: `hsl(${hue} 70% 75%)`,
+        fontSize: size * 0.4,
+      }}
+    >
+      {initialsOf(name, channelKey)}
+    </div>
+  );
 }
 
 const STATUS_STYLES: Record<string, { label: string; cls: string }> = {
@@ -103,13 +194,17 @@ export function ConversationList({
 
   const isCompact = density === "compact";
   const pad = isCompact ? "px-3 py-2.5" : "px-6 py-4";
+  const avatarSize = isCompact ? 38 : 44;
 
   return (
     <ul>
       {items.map((conv) => {
         const status = STATUS_STYLES[conv.status] ?? STATUS_STYLES.open;
         const isSelected = selectedId === conv.id;
+        const isGroup = isGroupChannelKey(conv.channel_key);
         const href = getHref ? getHref(conv) : `/inbox/${conv.id}`;
+        const displayName = conv.contact?.name || conv.subject || conv.channel_key || "Contato";
+        const hasUnread = conv.agent_unread_count > 0;
         const rowInner = (
           <div
             className={`flex items-start gap-3 transition ${pad}`}
@@ -125,21 +220,58 @@ export function ConversationList({
                   }
             }
           >
-            <div
-              className={`mt-1 h-2 w-2 flex-shrink-0 rounded-full ${
-                PRIORITY_DOT[conv.priority] ?? PRIORITY_DOT.normal
-              }`}
-            />
+            {/* Avatar + priority dot sobreposto */}
+            <div className="relative flex-shrink-0">
+              <Avatar
+                src={conv.contact?.avatar_url}
+                name={conv.contact?.name}
+                channelKey={conv.channel_key}
+                isGroup={isGroup}
+                size={avatarSize}
+              />
+              {/* priority dot só pra prioridades acima de normal */}
+              {conv.priority && conv.priority !== "normal" && conv.priority !== "low" && (
+                <span
+                  className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-[hsl(240_18%_5%)] ${
+                    PRIORITY_DOT[conv.priority] ?? PRIORITY_DOT.normal
+                  }`}
+                />
+              )}
+            </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-sm font-medium" style={{ color: "hsl(240 15% 90%)" }}>
-                  {conv.contact?.name || conv.subject || conv.channel_key || "Contato"}
+                <span
+                  className="truncate text-sm flex items-center gap-1.5"
+                  style={{
+                    color: hasUnread ? "hsl(240 15% 95%)" : "hsl(240 15% 90%)",
+                    fontWeight: hasUnread ? 600 : 500,
+                  }}
+                >
+                  {isGroup && (
+                    <UsersIcon className="h-3 w-3 flex-shrink-0" style={{ color: "#a78bfa" }} />
+                  )}
+                  <span className="truncate">{displayName}</span>
                 </span>
-                <time className="flex-shrink-0 text-[10px]" style={{ color: "hsl(240 8% 44%)" }}>
+                <time
+                  className="flex-shrink-0 text-[10px]"
+                  style={{
+                    color: hasUnread ? "#00d46a" : "hsl(240 8% 44%)",
+                    fontWeight: hasUnread ? 600 : 400,
+                  }}
+                >
                   {relativeTime(conv.last_message_at)}
                 </time>
               </div>
-              <p className="mt-0.5 line-clamp-1 text-xs" style={{ color: "hsl(240 8% 52%)" }}>
+              <p
+                className="mt-0.5 line-clamp-1 text-xs"
+                style={{
+                  color: hasUnread ? "hsl(240 15% 75%)" : "hsl(240 8% 52%)",
+                  fontWeight: hasUnread ? 500 : 400,
+                }}
+              >
+                {conv.last_message_from_me && (
+                  <span style={{ color: "hsl(240 8% 42%)" }}>Você: </span>
+                )}
                 {conv.last_message_preview || "—"}
               </p>
               <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">

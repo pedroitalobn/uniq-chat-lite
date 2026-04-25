@@ -287,7 +287,31 @@ export default function InboxPage() {
   if (!wsId || permsLoading) return <PageSkeleton />;
   if (!canView) return <Forbidden />;
 
-  const list = listQ.data?.items ?? [];
+  // Dedupe defensivo: na aba "Todos" (e em qualquer cenário onde múltiplos
+  // tickets do MESMO contato aparecem por histórico), o usuário relatou
+  // ver "conversas duplicadas". O DB tem partial unique index em
+  // (workspace, instance, channel_key) WHERE status IN open/pending/snoozed,
+  // mas tickets fechados/resolvidos do mesmo channel_key aparecem juntos.
+  // Aqui ficamos com o mais recente por (instance_id + channel_key) — quem
+  // quer ver histórico abre o detalhe e vê "Reaberto N vezes" + timeline.
+  const rawList = listQ.data?.items ?? [];
+  const list = (() => {
+    const seen = new Map<string, ConversationRow>();
+    for (const conv of rawList) {
+      const key = `${conv.instance_id ?? ""}:${conv.channel_key ?? conv.id}`;
+      const prev = seen.get(key);
+      if (!prev) {
+        seen.set(key, conv);
+        continue;
+      }
+      // Mantém o mais recente. Compara last_message_at (fallback id pra
+      // estabilidade quando ambos sem timestamp).
+      const a = prev.last_message_at ?? "";
+      const b = conv.last_message_at ?? "";
+      if (b > a) seen.set(key, conv);
+    }
+    return Array.from(seen.values());
+  })();
 
   // Empty-state grande de backfill — só faz sentido na PRIMEIRA sincronização,
   // quando o workspace ainda não tem nenhuma Conversation criada. Se já tem
