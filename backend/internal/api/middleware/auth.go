@@ -89,6 +89,18 @@ func ParseRefreshToken(tokenStr string) (*RefreshClaims, error) {
 // RequireAuth validates JWT from Bearer header or cookie
 func RequireAuth(db *gorm.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		// ResolveV1Instance roda antes em /v1/:server/:instance/* e já
+		// preenche c.Locals("instance") + c.Locals("user"). Nessa rota,
+		// RequireAuth está sobrepondo (Fiber dispara o middleware do
+		// app.Group("/v1") em qualquer path /v1/*), e a tentativa de
+		// validar o instance token como JWT falha → "token inválido".
+		// Se já autenticamos via instance token, é seguro pular.
+		if instance := c.Locals("instance"); instance != nil {
+			if user := c.Locals("user"); user != nil {
+				return c.Next()
+			}
+		}
+
 		tokenStr := extractToken(c)
 		if tokenStr == "" {
 			// Try API Key
