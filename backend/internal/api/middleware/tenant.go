@@ -31,7 +31,18 @@ func OwnsInstance(db *gorm.DB) fiber.Handler {
 
 		var instance models.Instance
 		if err := db.Preload("Server").First(&instance, "id = ?", instanceID).Error; err != nil {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+			// Distingue "não existe" de outros erros pra ajudar a debugar
+			// quando o usuário vê a instância na lista mas o GET 404a.
+			if err == gorm.ErrRecordNotFound {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+					"error":       "instância não encontrada",
+					"instance_id": instanceID.String(),
+					"hint":        "ID não existe no DB — pode ter sido deletada por outra sessão. Recarregue a lista de instâncias.",
+				})
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "erro ao buscar instância: " + err.Error(),
+			})
 		}
 
 		// SuperAdmins can access any instance
