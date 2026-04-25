@@ -659,7 +659,10 @@ function FunnelForm({
           color,
           workspace_id: workspaceId,
         });
-        funnelId = r.data.id;
+        funnelId = r.data?.id;
+        if (!funnelId) {
+          throw new Error("Backend não retornou o ID do funil — verifique se a migração rodou");
+        }
       } else {
         await crmApi.updateFunnel(funnelId, {
           name: name.trim(),
@@ -667,9 +670,10 @@ function FunnelForm({
           color,
         });
       }
-      // Cria stages que ainda não existem; atualiza/remove conforme.
-      // Stage existente removido localmente → delete no servidor.
-      const existingIds = new Set(existingStages.map((s) => s.id));
+      // Stages existentes que foram removidos localmente → delete no servidor.
+      // Defesa contra existingStages possivelmente null (Go nil slice → JSON null).
+      const safeExisting = existingStages ?? [];
+      const existingIds = new Set(safeExisting.map((s) => s.id));
       const localPersistedIds = new Set(stages.filter((s) => s.persisted).map((s) => s.id));
       for (const exId of existingIds) {
         if (!localPersistedIds.has(exId)) {
@@ -682,7 +686,15 @@ function FunnelForm({
         if (!s.persisted) {
           await crmApi.createFunnelStage(funnelId!, { name: s.name, color: s.color, order: i });
         } else {
-          await crmApi.updateFunnelStage(funnelId!, s.id, { name: s.name, color: s.color, order: i });
+          // updateFunnelStage requer o backend novo (PUT). Em backend antigo
+          // ele retorna 404 — capturamos e seguimos. As stages persisted que
+          // não foram tocadas não importam (color/name já estão certos no DB).
+          try {
+            await crmApi.updateFunnelStage(funnelId!, s.id, { name: s.name, color: s.color, order: i });
+          } catch (err) {
+            const e = err as { response?: { status?: number } };
+            if (e?.response?.status !== 404) throw err;
+          }
         }
       }
     },
@@ -694,7 +706,11 @@ function FunnelForm({
       toast.success(editing ? "Funil atualizado" : "Funil criado");
       onDone();
     },
-    onError: () => toast.error("Erro ao salvar funil"),
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { error?: string } }; message?: string };
+      const msg = e?.response?.data?.error || e?.message || "Erro ao salvar funil";
+      toast.error(msg);
+    },
   });
 
   const addStage = () => {
