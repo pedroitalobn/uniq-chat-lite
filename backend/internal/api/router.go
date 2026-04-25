@@ -607,13 +607,16 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	quickReplies.Delete("/:id", middleware.RequireWorkspacePermission(db, models.PermQuickRepliesManageOwn), quickReplyH.Delete)
 	quickReplies.Post("/:id/use", middleware.RequireWorkspacePermission(db, models.PermQuickRepliesView), quickReplyH.Use)
 
-	// Reports
+	// Reports — métricas do inbox. Aceita reports:view (perm específica) OU
+	// tickets:view / inbox:view (qualquer atendente vê os números do próprio
+	// trabalho). Owner/super-admin bypassam.
+	reportsPerms := []string{models.PermReportsView, models.PermTicketsView, models.PermInboxView}
 	reports := api.Group("/reports")
-	reports.Get("/overview", middleware.RequireWorkspacePermission(db, models.PermReportsView), reportsH.Overview)
-	reports.Get("/by-queue", middleware.RequireWorkspacePermission(db, models.PermReportsView), reportsH.ByQueue)
-	reports.Get("/by-user", middleware.RequireWorkspacePermission(db, models.PermReportsView), reportsH.ByUser)
-	reports.Get("/csat", middleware.RequireWorkspacePermission(db, models.PermReportsView), reportsH.CSAT)
-	reports.Get("/sla", middleware.RequireWorkspacePermission(db, models.PermReportsView), reportsH.SLA)
+	reports.Get("/overview", middleware.RequireAnyWorkspacePermission(db, reportsPerms...), reportsH.Overview)
+	reports.Get("/by-queue", middleware.RequireAnyWorkspacePermission(db, reportsPerms...), reportsH.ByQueue)
+	reports.Get("/by-user", middleware.RequireAnyWorkspacePermission(db, reportsPerms...), reportsH.ByUser)
+	reports.Get("/csat", middleware.RequireAnyWorkspacePermission(db, reportsPerms...), reportsH.CSAT)
+	reports.Get("/sla", middleware.RequireAnyWorkspacePermission(db, reportsPerms...), reportsH.SLA)
 
 	// Presence / workload (me + supervisor view)
 	me := api.Group("/me")

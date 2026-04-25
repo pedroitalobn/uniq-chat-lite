@@ -86,6 +86,59 @@ func RequireWorkspacePermission(db *gorm.DB, permissionKey string) fiber.Handler
 	}
 }
 
+// RequireAnyWorkspacePermission é a variante OR de RequireWorkspacePermission:
+// passa se o user tiver QUALQUER uma das permissions listadas. Útil pra rotas
+// que servem múltiplos perfis (ex: relatórios — qualquer um com tickets:view
+// pode ver as métricas do próprio inbox, não só quem tem reports:view).
+// Owner e super-admin sempre passam.
+func RequireAnyWorkspacePermission(db *gorm.DB, permissionKeys ...string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		user := GetCurrentUser(c)
+		if user == nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+		}
+
+		if user.Role == models.RoleSuperAdmin {
+			wsID := ResolveWorkspaceID(c)
+			if wsID != uuid.Nil {
+				c.Locals("workspace_id", wsID)
+			}
+			return c.Next()
+		}
+
+		wsID := ResolveWorkspaceID(c)
+		if wsID == uuid.Nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "workspace_id é obrigatório (X-Workspace-ID, query ?workspace_id=, ou path)"})
+		}
+
+		var uw models.UserWorkspace
+		if err := db.Where("user_id = ? AND workspace_id = ?", user.ID, wsID).First(&uw).Error; err != nil {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado ao workspace"})
+		}
+
+		c.Locals("workspace_id", wsID)
+		c.Locals("user_workspace", &uw)
+
+		if uw.IsOwner {
+			return c.Next()
+		}
+		if uw.RoleID == nil || len(permissionKeys) == 0 {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "sem função definida"})
+		}
+
+		var count int64
+		db.Model(&models.RolePermission{}).
+			Joins("JOIN permissions ON permissions.id = role_permissions.permission_id").
+			Where("role_permissions.role_id = ? AND permissions.key IN ?", uw.RoleID, permissionKeys).
+			Count(&count)
+
+		if count == 0 {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "permissão insuficiente"})
+		}
+		return c.Next()
+	}
+}
+
 // GetWorkspaceID reads workspace_id from c.Locals (set by RequireWorkspacePermission).
 func GetWorkspaceID(c *fiber.Ctx) uuid.UUID {
 	if id, ok := c.Locals("workspace_id").(uuid.UUID); ok {
