@@ -159,6 +159,16 @@ func tryAPIKey(c *fiber.Ctx, db *gorm.DB) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "autenticação necessária"})
 	}
 
+	// Instance tokens (prefixo `it_`) são escopados à rota
+	// /v1/:server_slug/:instance_slug/* (ResolveV1Instance). Rejeitamos
+	// cedo aqui — sem tocar no DB de api_keys — pra deixar explícito que
+	// a credencial não foi feita pra autenticar outros recursos.
+	if strings.HasPrefix(key, "it_") {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "instance token só é aceito em /v1/:server_slug/:instance_slug/*",
+		})
+	}
+
 	hash := models.HashAPIKey(key)
 	var apiKey models.APIKey
 	if err := db.Preload("User.Plan").First(&apiKey, "key_hash = ? AND is_active = true", hash).Error; err != nil {
