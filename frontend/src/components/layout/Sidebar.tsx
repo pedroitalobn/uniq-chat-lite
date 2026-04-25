@@ -25,7 +25,7 @@ export function Sidebar() {
   const { t } = usePreferences();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { currentWorkspace, setCurrentWorkspace, workspaces } = useWorkspace();
-  const { hasPerm, hasAnyPerm, isOwner, isSuperAdmin } = useWorkspacePermissions();
+  const { hasPerm, hasAnyPerm, isOwner, isSuperAdmin, isLoading: permsLoading } = useWorkspacePermissions();
   const isAdmin = isSuperAdmin;
   const planName = (session?.user?.plan as { name?: string } | undefined)?.name ?? session?.user?.role;
   const initials = session?.user?.name?.[0]?.toUpperCase() || "U";
@@ -41,19 +41,26 @@ export function Sidebar() {
     show: boolean;
   };
 
+  // ENQUANTO as permissions estão carregando OU não temos workspace ainda,
+  // mostramos TODOS os itens (otimista). Sem isso, o sidebar nasce vazio
+  // pro owner também — `isOwner` só vira true depois que a query do role
+  // resolve. Cada página alvo já valida perm individualmente, então o
+  // flash visual é aceitável.
+  const optimistic = permsLoading || !currentWorkspace;
+
   // Cada módulo é gateado por uma permission key. `hasPerm` retorna true
   // automaticamente pra owner e super-admin (lógica no provider), então
   // quem é dono vê tudo sem precisar ter permission explícita, enquanto
   // agentes comuns só veem o que foi liberado na role deles.
-  const canSeeInbox = hasAnyPerm([PERM.ticketsView, PERM.inboxView]);
-  const canSeeCRM = hasAnyPerm([PERM.crmView, PERM.companiesView, PERM.dealsView]);
-  const canSeeDashboard = hasPerm(PERM.dashboardView) || canSeeInbox; // dashboard = métricas gerais
-  const canSeeAgents = hasAnyPerm([PERM.agentsView, PERM.agentsManage]);
-  const canSeeServers = hasAnyPerm([PERM.serversView, PERM.serversManage]);
-  const canSeeInstances = hasAnyPerm([PERM.instancesView, PERM.instancesCreate, PERM.instancesEdit]);
-  const canSeeCampaigns = hasPerm(PERM.campaignsView);
-  const canSeeIntegrations = hasAnyPerm([PERM.integrationsView, PERM.integrationsManage]);
-  const canSeeBilling = hasAnyPerm([PERM.billingView, PERM.billingManage]);
+  const canSeeInbox = optimistic || hasAnyPerm([PERM.ticketsView, PERM.inboxView]);
+  const canSeeCRM = optimistic || hasAnyPerm([PERM.crmView, PERM.companiesView, PERM.dealsView]);
+  const canSeeDashboard = optimistic || hasPerm(PERM.dashboardView) || hasAnyPerm([PERM.ticketsView, PERM.inboxView]);
+  const canSeeAgents = optimistic || hasAnyPerm([PERM.agentsView, PERM.agentsManage]);
+  const canSeeServers = optimistic || hasAnyPerm([PERM.serversView, PERM.serversManage]);
+  const canSeeInstances = optimistic || hasAnyPerm([PERM.instancesView, PERM.instancesCreate, PERM.instancesEdit]);
+  const canSeeCampaigns = optimistic || hasPerm(PERM.campaignsView);
+  const canSeeIntegrations = optimistic || hasAnyPerm([PERM.integrationsView, PERM.integrationsManage]);
+  const canSeeBilling = optimistic || hasAnyPerm([PERM.billingView, PERM.billingManage]);
 
   const navItems: NavItem[] = [
     { href: "/dashboard",    label: t("nav_dashboard"),    icon: LayoutDashboard, exact: true,  show: canSeeDashboard },

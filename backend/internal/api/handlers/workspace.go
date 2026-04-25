@@ -201,8 +201,11 @@ func (h *WorkspaceHandler) ListMembers(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado"})
 	}
 
+	// Preload Role.Permissions também — o frontend usa essa lista pra
+	// gatear módulos no sidebar (sem isso, role chega sem perms e a UI
+	// trata como "user sem acesso", escondendo tudo).
 	var members []models.UserWorkspace
-	h.db.Preload("User").Preload("Role").
+	h.db.Preload("User").Preload("Role.Permissions").
 		Where("workspace_id = ?", workspaceID).
 		Find(&members)
 
