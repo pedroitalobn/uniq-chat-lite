@@ -544,9 +544,19 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 
 // GetGlobalProxyConfig godoc
 // GET /admin/proxy-config  — lista proxies da plataforma
+//
+// Inclui também proxies "órfãos" (owner_id IS NULL) sem o flag is_platform —
+// são relíquias do refactor de proxies (commit 583de31) que nunca foram
+// migradas. O backfillOrphanPlatformProxies no boot promove esses, mas
+// o OR garante que aparecem mesmo se o backfill falhou (cenários de read-
+// only DB, race no boot, etc.). Servers que apontam pra esses proxies
+// continuam funcionando — o painel só não os listava.
 func (h *AdminHandler) GetGlobalProxyConfig(c *fiber.Ctx) error {
 	var proxies []models.Proxy
-	if err := h.db.Where("is_platform = ?", true).Order("created_at DESC").Find(&proxies).Error; err != nil {
+	if err := h.db.
+		Where("is_platform = ? OR owner_id IS NULL", true).
+		Order("created_at DESC").
+		Find(&proxies).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar proxies"})
 	}
 

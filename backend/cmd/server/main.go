@@ -58,6 +58,11 @@ func main() {
 	// Seed ticketing roles (agent, supervisor, agent_read_only) on every workspace
 	seedTicketingRoles(db)
 
+	// Backfill: proxies sem owner_id que ficaram com is_platform=false são
+	// relíquias da migração legada (global_proxy_configs → proxies). Promove
+	// pra is_platform=true pra reaparecerem em /admin/proxy. Idempotente.
+	backfillOrphanPlatformProxies(db)
+
 	// Seed super admin if configured via env vars
 	log.Info().Str("email", os.Getenv("SUPER_ADMIN_EMAIL")).Str("password_set", fmt.Sprintf("%v", os.Getenv("SUPER_ADMIN_PASSWORD") != "")).Msg("checking super admin env vars")
 	if os.Getenv("SUPER_ADMIN_EMAIL") != "" && os.Getenv("SUPER_ADMIN_PASSWORD") != "" {
@@ -472,6 +477,25 @@ func backfillAdminRolePermissions(db *gorm.DB) {
 func seedTicketingRoles(db *gorm.DB) {
 	n := models.SeedDefaultRolesForAllWorkspaces(db)
 	log.Info().Int("workspaces", n).Msg("ticketing roles seeded")
+}
+
+// backfillOrphanPlatformProxies promove pra is_platform=true qualquer Proxy
+// sem owner_id que ficou com is_platform=false. Caso típico: ambiente que
+// existia antes do refactor de proxies (commit 583de31) e migrou pelo
+// AutoMigrate sem rodar proxies_refactor.sql — os globals ficaram na tabela
+// `proxies` mas sem o flag, sumindo do /admin/proxy embora os servers
+// ainda os referenciem normalmente.
+func backfillOrphanPlatformProxies(db *gorm.DB) {
+	res := db.Model(&models.Proxy{}).
+		Where("owner_id IS NULL AND is_platform = ?", false).
+		Update("is_platform", true)
+	if res.Error != nil {
+		log.Warn().Err(res.Error).Msg("backfill proxies: skipped (table missing or older schema)")
+		return
+	}
+	if res.RowsAffected > 0 {
+		log.Info().Int64("rows", res.RowsAffected).Msg("backfilled orphan proxies → is_platform=true")
+	}
 }
 
 func seedPermissions(db *gorm.DB) {
