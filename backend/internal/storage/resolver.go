@@ -26,7 +26,11 @@ const PresignTTL = 24 * time.Hour
 // inbound pipeline antes do WS broadcast — todo lugar que retorna mídia
 // pro front converge na mesma função.
 func ResolveMediaURLs(ctx context.Context, content string) string {
-	if content == "" || GlobalStorage == nil {
+	if content == "" {
+		return content
+	}
+	if GlobalStorage == nil {
+		log.Debug().Msg("storage resolver: GlobalStorage nil — pulando")
 		return content
 	}
 	trimmed := strings.TrimSpace(content)
@@ -40,11 +44,16 @@ func ResolveMediaURLs(ctx context.Context, content string) string {
 
 	// Path preferido: media_key explícito (mídia nova, salva como key).
 	key, _ := parsed["media_key"].(string)
+	source := "media_key"
 
 	// Fallback compat: URL antiga apontando pro bucket público — extrai o key.
 	if key == "" {
 		if oldURL, ok := parsed["url"].(string); ok {
-			key = GlobalStorage.KeyFromURL(oldURL)
+			extracted := GlobalStorage.KeyFromURL(oldURL)
+			if extracted != "" {
+				key = extracted
+				source = "url-fallback"
+			}
 		}
 	}
 	if key == "" {
@@ -53,9 +62,14 @@ func ResolveMediaURLs(ctx context.Context, content string) string {
 
 	signed, err := GlobalStorage.PresignURL(ctx, key, PresignTTL)
 	if err != nil {
-		log.Warn().Err(err).Str("key", key).Msg("storage: presign falhou — mantendo URL original")
+		log.Warn().Err(err).Str("key", key).Msg("storage resolver: presign FALHOU — mantendo URL original")
 		return content
 	}
+	log.Info().
+		Str("key", key).
+		Str("source", source).
+		Int("signed_url_len", len(signed)).
+		Msg("storage resolver: signed URL OK")
 	parsed["url"] = signed
 	out, err := json.Marshal(parsed)
 	if err != nil {

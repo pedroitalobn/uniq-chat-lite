@@ -837,6 +837,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 
 	// ─── Admin routes ─────────────────────────────────────────────────────────
 	admin := api.Group("/admin", middleware.RequireAdmin())
+	// Diagnostic: media storage health check (upload+presign+fetch)
+	admin.Get("/media/health", handlers.NewMediaHealthHandler().Check)
 	// Rotas específicas primeiro (sem parâmetros)
 	admin.Get("/stats", adminH.Stats)
 	admin.Get("/users", adminH.ListUsers)
