@@ -113,7 +113,27 @@ func MimeToExt(mime string) string {
 // PublicURL returns the full public URL for an object.
 // Use only for buckets configurados como public-read; pra buckets
 // private (recomendado em produção) use PresignURL.
+//
+// Robusto contra duplicação de bucket: se publicURL já contém o nome do
+// bucket (virtual-hosted style, ex: https://uniq-chat-media.fsn1.your-
+// objectstorage.com), gera URL com bucket UMA vez:
+//   https://uniq-chat-media.fsn1.your-objectstorage.com/{key}
+// Path-style (publicURL = https://fsn1.your-objectstorage.com) inclui:
+//   https://fsn1.your-objectstorage.com/{bucket}/{key}
 func (c *Client) PublicURL(objectName string) string {
+	// Detecta virtual-hosted: bucket no host (depois do //, antes do primeiro /)
+	host := c.publicURL
+	if idx := strings.Index(host, "://"); idx >= 0 {
+		host = host[idx+3:]
+	}
+	if slash := strings.Index(host, "/"); slash >= 0 {
+		host = host[:slash]
+	}
+	if strings.HasPrefix(host, c.bucket+".") {
+		// virtual-hosted: bucket já no subdomain
+		return fmt.Sprintf("%s/%s", c.publicURL, objectName)
+	}
+	// path-style: bucket vai no path
 	return fmt.Sprintf("%s/%s/%s", c.publicURL, c.bucket, objectName)
 }
 
@@ -136,8 +156,28 @@ func (c *Client) PresignURL(ctx context.Context, objectName string, ttl time.Dur
 // Retorna "" se a URL não pertence ao bucket configurado. Usado pra
 // migrar storage de modo público pra privado: detecta URLs antigas
 // salvas no MessageLog.Content e substitui pelo key extraído.
+//
+// Aceita ambos formatos:
+//   path-style:        https://host/bucket/key
+//   virtual-hosted:    https://bucket.host/key
 func (c *Client) KeyFromURL(url string) string {
-	prefix := c.publicURL + "/" + c.bucket + "/"
+	// Tenta virtual-hosted primeiro (publicURL já tem bucket no host)
+	prefix := c.publicURL + "/"
+	host := c.publicURL
+	if idx := strings.Index(host, "://"); idx >= 0 {
+		host = host[idx+3:]
+	}
+	if slash := strings.Index(host, "/"); slash >= 0 {
+		host = host[:slash]
+	}
+	if strings.HasPrefix(host, c.bucket+".") {
+		if strings.HasPrefix(url, prefix) {
+			return strings.TrimPrefix(url, prefix)
+		}
+		return ""
+	}
+	// Path-style
+	prefix = c.publicURL + "/" + c.bucket + "/"
 	if !strings.HasPrefix(url, prefix) {
 		return ""
 	}
