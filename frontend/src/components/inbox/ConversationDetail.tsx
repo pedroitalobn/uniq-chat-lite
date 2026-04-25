@@ -9,7 +9,9 @@ import {
   UserCheck, UserX, ArrowRightLeft, Bot, BotOff, Lock, AlertTriangle,
   Smile, X, Star, Mic, Image as ImageIcon, FileText, MapPin, Check,
   CheckCheck, AlertCircle, Paperclip, Pin, Sparkles, Users as UsersIcon,
+  Maximize2 as Maximize2Icon,
 } from "lucide-react";
+import { MediaViewer, type MediaViewerSource } from "@/components/inbox/MediaViewer";
 import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi } from "@/lib/api";
 import { TemplatePicker } from "@/components/inbox/TemplatePicker";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -130,6 +132,9 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   const canSend = hasPerm(PERM.inboxSend);
   const canAssign = hasPerm(PERM.ticketsAssign);
   const canTransfer = hasPerm(PERM.ticketsTransfer);
+
+  // Lightbox state — abre quando agente clica em mídia. null = fechado.
+  const [viewerSource, setViewerSource] = useState<MediaViewerSource | null>(null);
   const canClose = hasPerm(PERM.ticketsClose);
   const canReopen = hasPerm(PERM.ticketsReopen);
   const canSnooze = hasPerm(PERM.ticketsSnooze);
@@ -569,6 +574,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                       onPatch={(patch) =>
                         patchMsg.mutate({ msgId: (e.payload as MessagePayload).id, patch })
                       }
+                      onOpenViewer={setViewerSource}
                     />
                   ) : e.kind === "note" ? (
                     <NoteCard n={e.payload as NotePayload} />
@@ -704,6 +710,10 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           onSent={refresh}
         />
       )}
+
+      {/* Lightbox de mídia — abre quando agente clica em foto/vídeo/audio/doc.
+          Renderizado via portal pra ficar fora do split layout. */}
+      <MediaViewer source={viewerSource} onClose={() => setViewerSource(null)} />
     </div>
   );
 }
@@ -876,10 +886,11 @@ function TransferDialog({
 }
 
 function MessageBubble({
-  m, onPatch,
+  m, onPatch, onOpenViewer,
 }: {
   m: MessagePayload;
   onPatch?: (patch: { is_pinned?: boolean; is_favorite?: boolean }) => void;
+  onOpenViewer: (source: MediaViewerSource) => void;
 }) {
   const isOut = m.direction === "out";
   const parsed = parseMessageContent(m.content);
@@ -948,7 +959,7 @@ function MessageBubble({
           </div>
         )}
 
-        <MediaBody type={m.type} parsed={parsed} />
+        <MediaBody type={m.type} parsed={parsed} onOpenViewer={onOpenViewer} />
 
         <div
           className="mt-1 flex items-center justify-end gap-1 text-[10px]"
@@ -996,27 +1007,39 @@ function MessageBubble({
 // MediaBody — renderiza o conteúdo conforme msg.type. Aceita tanto o formato
 // legacy (content JSON-encoded string) quanto o novo ({url, mime_type,
 // filename, caption, error}). Mantém paridade total com o inbox clássico.
+//
+// Imagens, vídeos e documentos abrem no MediaViewer (lightbox in-app) em vez
+// de nova aba. Áudios renderizam inline (pequeno) E também ganham um botão
+// de "expandir" que abre o viewer com player maior.
 function MediaBody({
-  type, parsed,
+  type, parsed, onOpenViewer,
 }: {
   type: string;
   parsed: ParsedContent;
+  onOpenViewer: (source: MediaViewerSource) => void;
 }) {
-  const { text, url, filename, caption, error, latitude, longitude } = parsed;
+  const { text, url, filename, caption, error, latitude, longitude, mimeType } = parsed;
   const body = caption || text;
 
   if (type === "image") {
     if (url) {
       return (
         <div className="flex flex-col gap-1.5">
-          <a href={url} target="_blank" rel="noopener noreferrer">
+          <button
+            type="button"
+            onClick={() =>
+              onOpenViewer({ type: "image", url, filename, mimeType, caption: body })
+            }
+            className="block rounded-lg overflow-hidden transition-opacity hover:opacity-90 focus-visible:opacity-90"
+            aria-label="Abrir imagem"
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={url}
               alt={filename || "imagem"}
-              className="max-h-[280px] max-w-[280px] rounded-lg object-cover"
+              className="max-h-[280px] max-w-[280px] rounded-lg object-cover cursor-zoom-in"
             />
-          </a>
+          </button>
           {body && <Text text={body} />}
           {error && <ErrorLine text={error} />}
         </div>
@@ -1029,7 +1052,36 @@ function MediaBody({
     if (url) {
       return (
         <div className="flex flex-col gap-1.5">
-          <video src={url} controls className="max-w-[320px] rounded-lg" />
+          {/* Preview clicável — overlay com play. Click abre lightbox.
+              Mantém native controls inline também caso o user prefira. */}
+          <button
+            type="button"
+            onClick={() =>
+              onOpenViewer({ type: "video", url, filename, mimeType, caption: body })
+            }
+            className="relative block group"
+            aria-label="Abrir vídeo"
+          >
+            <video
+              src={url}
+              className="max-w-[320px] rounded-lg"
+              preload="metadata"
+              muted
+            />
+            <span
+              className="absolute inset-0 flex items-center justify-center rounded-lg transition-colors group-hover:bg-black/30"
+              style={{ background: "rgba(0,0,0,0.2)" }}
+            >
+              <span
+                className="flex h-14 w-14 items-center justify-center rounded-full"
+                style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+              >
+                <svg className="h-6 w-6 ml-1" viewBox="0 0 24 24" fill="white">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </span>
+            </span>
+          </button>
           {body && <Text text={body} />}
           {error && <ErrorLine text={error} />}
         </div>
@@ -1040,9 +1092,24 @@ function MediaBody({
 
   if (type === "audio") {
     if (url) {
+      // Áudio fica inline (player nativo é compacto e funcional).
+      // Botão pequeno expande pro lightbox quem quiser.
       return (
         <div className="flex flex-col gap-1.5">
-          <audio src={url} controls className="max-w-[260px]" />
+          <div className="flex items-center gap-2">
+            <audio src={url} controls className="max-w-[260px]" />
+            <button
+              type="button"
+              onClick={() =>
+                onOpenViewer({ type: "audio", url, filename, mimeType, caption: body })
+              }
+              title="Abrir em tela cheia"
+              className="rounded-md p-1 transition-colors hover:bg-white/5"
+              style={{ color: "hsl(240 8% 50%)" }}
+            >
+              <Maximize2Icon className="h-3.5 w-3.5" />
+            </button>
+          </div>
           {error && <ErrorLine text={error} />}
         </div>
       );
@@ -1053,16 +1120,18 @@ function MediaBody({
   if (type === "document") {
     if (url) {
       return (
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 rounded-lg p-2 transition-colors hover:bg-white/5"
+        <button
+          type="button"
+          onClick={() =>
+            onOpenViewer({ type: "document", url, filename, mimeType, caption: body })
+          }
+          className="flex items-center gap-2 rounded-lg p-2 transition-colors hover:bg-white/5 text-left w-full"
           style={{ background: "rgba(255,255,255,0.03)" }}
         >
           <FileText className="h-5 w-5 flex-shrink-0" style={{ color: "hsl(240 8% 70%)" }} />
-          <span className="truncate text-xs">{filename || "Documento"}</span>
-        </a>
+          <span className="truncate text-xs flex-1">{filename || "Documento"}</span>
+          <Maximize2Icon className="h-3 w-3 flex-shrink-0" style={{ color: "hsl(240 8% 50%)" }} />
+        </button>
       );
     }
     return <IconFallback icon={<FileText className="h-4 w-4" />} label={body || "Documento"} />;
