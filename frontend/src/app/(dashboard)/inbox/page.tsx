@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -201,12 +201,25 @@ export default function InboxPage() {
     return p;
   }, [agentScope, statusTab, queueScope, channelFilter, instanceFilter, q]);
 
-  useConversationWS({
-    prefixes: ["conversation.", "queue."],
-    onEvent: () => {
+  // Dedupe WS invalidations: várias mensagens chegando em rajada (campanha,
+  // sync de history) disparariam N invalidações em < 1s = N refetches
+  // simultâneos. Throttle de 800ms agrupa eventos numa janela e dispara
+  // 1 refetch — mantém UI fresh sem queimar rate limit.
+  const invalidateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const scheduleInvalidate = useCallback(() => {
+    if (invalidateTimerRef.current) return;
+    invalidateTimerRef.current = setTimeout(() => {
+      invalidateTimerRef.current = null;
       qc.invalidateQueries({ queryKey: ["conversations", wsId, "unified"] });
       qc.invalidateQueries({ queryKey: ["conversations-count", wsId] });
       qc.invalidateQueries({ queryKey: ["inbox-stats", wsId] });
+    }, 800);
+  }, [qc, wsId]);
+
+  useConversationWS({
+    prefixes: ["conversation.", "queue."],
+    onEvent: () => {
+      scheduleInvalidate();
     },
   });
 

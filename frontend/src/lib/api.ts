@@ -97,6 +97,26 @@ api.interceptors.response.use(
       }
     }
 
+    // 429 Too Many Requests: respeita Retry-After (segundos) ou
+    // x-ratelimit-reset (RFC3339), default 5s. Faz 1 retry automático
+    // depois do delay — UI não vê erro a menos que persista.
+    if (error.response?.status === 429 && !originalRequest._retry429) {
+      originalRequest._retry429 = true;
+      const retryAfter = error.response.headers["retry-after"];
+      const reset = error.response.data?.retry_after;
+      let waitMs = 5000;
+      if (retryAfter) {
+        const n = Number(retryAfter);
+        if (Number.isFinite(n)) waitMs = Math.max(500, n * 1000);
+      } else if (reset) {
+        const resetMs = new Date(reset).getTime() - Date.now();
+        if (resetMs > 0 && resetMs < 60_000) waitMs = resetMs + 200;
+      }
+      console.warn(`[api] 429 received — retrying after ${waitMs}ms`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      return api(originalRequest);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 

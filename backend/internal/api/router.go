@@ -255,7 +255,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Group middlewares only apply to routes registered AFTER them — declaring
 	// this first keeps instance-token auth from being short-circuited by
 	// RequireAuth (which would misread the instance token as an API key).
-	v1inst := app.Group("/v1/:server_slug/:instance_slug", middleware.ResolveV1Instance(db), middleware.RateLimit(300))
+	// 600/min pra n8n/SDK externos — outbound massivo é o caso de uso
+	// (envio de mensagens em campanha). Por instance token = um cliente.
+	v1inst := app.Group("/v1/:server_slug/:instance_slug", middleware.ResolveV1Instance(db), middleware.RateLimit(600))
 
 	// Messages
 	v1msgs := v1inst.Group("/messages")
@@ -313,7 +315,10 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	v1groups.Post("/:jid/leave", groupH.Leave)
 
 	// ─── Protected routes ─────────────────────────────────────────────────────
-	api := app.Group("/v1", middleware.RequireAuth(db), middleware.RateLimit(300))
+	// 1500/min pra UI da plataforma — inbox tem várias queries
+	// concorrentes (list + count + stats + timeline + WS invalidations
+	// + media presign), 300/min era apertado e quebrava UX.
+	api := app.Group("/v1", middleware.RequireAuth(db), middleware.RateLimit(1500))
 
 	// Workspaces
 	workspaces := api.Group("/workspaces")
