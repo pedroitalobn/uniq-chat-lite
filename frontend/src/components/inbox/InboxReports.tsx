@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Lock, TrendingUp, AlertTriangle, Star, Users, Inbox } from "lucide-react";
+import { Lock, TrendingUp, AlertTriangle, Star, Users, Inbox, RefreshCw, AlertCircle } from "lucide-react";
 import { reportsApi } from "@/lib/api";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 
-// Relatórios de inbox — mesma API do antigo /reports/overview mas agora
-// renderizado dentro do /inbox e no tema escuro da Uniq.chat.
+// Relatórios do inbox — métricas de atendimento (volume, SLA, CSAT, fila/agente).
+// Mesmo backend do antigo /reports/overview, agora dentro de /inbox?view=reports
+// no tema escuro da Uniq.chat (hsl(240 18% 6%) + accent #00d46a).
 
 interface Overview {
   counts: { created: number; resolved: number; closed: number; open_now: number; backlog: number };
@@ -31,65 +32,151 @@ interface SLAReport {
   resolution_breaches: number;
 }
 
+const CARD_BG = "hsl(240 18% 6%)";
+const CARD_BORDER = "1px solid hsl(240 12% 13%)";
+
 export function InboxReports({ workspaceId }: { workspaceId: string }) {
-  const { hasPerm, isLoading: permsLoading } = useWorkspacePermissions();
-  const canView = hasPerm(PERM.reportsView);
+  const { hasPerm, hasAnyPerm, isLoading: permsLoading, isOwner } = useWorkspacePermissions();
+  // Reports é métrica de atendimento — qualquer um com tickets:view ou inbox:view
+  // deveria conseguir ver pelo menos os números do que está atendendo. Usamos
+  // reports:view como primary mas caímos pra ticketsView/inboxView como fallback
+  // pra não bloquear quem tem acesso ao inbox de ver os números do próprio
+  // trabalho. Owner/super-admin sempre passa via hasPerm.
+  const canView =
+    isOwner ||
+    hasPerm(PERM.reportsView) ||
+    hasAnyPerm([PERM.ticketsView, PERM.inboxView]);
 
   const [range, setRange] = useState<"7d" | "30d" | "90d">("7d");
   const { from, to } = buildRange(range);
 
+  const enabled = !!workspaceId && canView;
+
   const overview = useQuery({
     queryKey: ["reports-overview", workspaceId, range],
     queryFn: () => reportsApi.overview(workspaceId, { from, to }).then((r) => r.data as Overview),
-    enabled: !!workspaceId && canView,
+    enabled,
+    retry: 1,
   });
   const byQueue = useQuery({
     queryKey: ["reports-by-queue", workspaceId, range],
     queryFn: () => reportsApi.byQueue(workspaceId, { from, to }).then((r) => r.data as QueueReport),
-    enabled: !!workspaceId && canView,
+    enabled,
+    retry: 1,
   });
   const byUser = useQuery({
     queryKey: ["reports-by-user", workspaceId, range],
     queryFn: () => reportsApi.byUser(workspaceId, { from, to }).then((r) => r.data as UserReport),
-    enabled: !!workspaceId && canView,
+    enabled,
+    retry: 1,
   });
   const csat = useQuery({
     queryKey: ["reports-csat", workspaceId, range],
     queryFn: () => reportsApi.csat(workspaceId, { from, to }).then((r) => r.data as CSATReport),
-    enabled: !!workspaceId && canView,
+    enabled,
+    retry: 1,
   });
   const sla = useQuery({
     queryKey: ["reports-sla", workspaceId, range],
     queryFn: () => reportsApi.sla(workspaceId, { from, to }).then((r) => r.data as SLAReport),
-    enabled: !!workspaceId && canView,
+    enabled,
+    retry: 1,
   });
 
-  if (permsLoading) {
+  // Loading: inclui carregamento de permissões + workspace + a primeira query.
+  // Mostra skeleton ao invés de "Carregando…" pra não parecer travado.
+  const initialLoading = permsLoading || !workspaceId || (overview.isLoading && !overview.data);
+
+  // Erro persistente em qualquer query (após retry). Só mostra full-screen
+  // se for o overview que falhou — outros são erros parciais que viram
+  // empty state local.
+  const fatalError =
+    overview.isError &&
+    !overview.isPending &&
+    !overview.data;
+
+  // Permission lock — fica DEPOIS de checar permsLoading pra não piscar.
+  if (!permsLoading && !canView) {
     return (
-      <div className="flex h-full items-center justify-center" style={{ color: "hsl(240 8% 50%)" }}>
-        Carregando…
+      <div
+        className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center"
+        style={{ background: "hsl(240 20% 4%)" }}
+      >
+        <div
+          className="flex h-16 w-16 items-center justify-center rounded-2xl"
+          style={{ background: "rgba(251,146,60,0.08)", border: "1px solid rgba(251,146,60,0.2)" }}
+        >
+          <Lock className="h-7 w-7" style={{ color: "#fb923c" }} />
+        </div>
+        <div className="space-y-1.5 max-w-sm">
+          <h3 className="text-base font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
+            Sem acesso aos relatórios
+          </h3>
+          <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 55%)" }}>
+            Peça pro administrador do workspace marcar a permissão{" "}
+            <code
+              className="rounded px-1.5 py-0.5 text-[11px]"
+              style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 15% 85%)" }}
+            >
+              reports:view
+            </code>{" "}
+            na sua função.
+          </p>
+        </div>
       </div>
     );
   }
-  if (!canView) {
+
+  // Estado: carregando inicial → skeleton.
+  if (initialLoading) {
+    return <InboxReportsSkeleton range={range} setRange={setRange} />;
+  }
+
+  // Estado: erro fatal no overview (rota não responde, 401, 500…).
+  if (fatalError) {
+    const status = (overview.error as { response?: { status?: number } })?.response?.status;
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-        <div
-          className="flex h-14 w-14 items-center justify-center rounded-2xl"
-          style={{ background: "rgba(251,146,60,0.1)", border: "1px solid rgba(251,146,60,0.2)" }}
-        >
-          <Lock className="h-6 w-6" style={{ color: "#fb923c" }} />
-        </div>
-        <p className="text-sm" style={{ color: "hsl(240 8% 55%)" }}>
-          Você precisa da permissão{" "}
-          <code
-            className="rounded px-1.5 py-0.5 text-xs"
-            style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 15% 85%)" }}
+      <div className="h-full overflow-y-auto">
+        <div className="mx-auto max-w-6xl p-6 space-y-4">
+          <ReportsHeader range={range} setRange={setRange} />
+          <div
+            className="rounded-2xl p-6 flex flex-col items-center text-center gap-3"
+            style={{ background: CARD_BG, border: CARD_BORDER }}
           >
-            reports:view
-          </code>{" "}
-          pra ver os relatórios.
-        </p>
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-2xl"
+              style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}
+            >
+              <AlertCircle className="h-6 w-6" style={{ color: "#f87171" }} />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 88%)" }}>
+                Não foi possível carregar os relatórios
+              </h3>
+              <p className="text-xs" style={{ color: "hsl(240 8% 55%)" }}>
+                {status === 403
+                  ? "Permissão insuficiente — fale com o admin do workspace."
+                  : status === 401
+                    ? "Sua sessão expirou. Recarregue a página."
+                    : "A API de relatórios não respondeu. Tente novamente."}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                overview.refetch();
+                byQueue.refetch();
+                byUser.refetch();
+                csat.refetch();
+                sla.refetch();
+              }}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl transition-colors"
+              style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.25)" }}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Tentar novamente
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -100,49 +187,14 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-6xl space-y-5 p-6">
-        <header className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div
-              className="flex h-9 w-9 items-center justify-center rounded-xl"
-              style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}
-            >
-              <Inbox className="h-4 w-4" style={{ color: "#00d46a" }} />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
-                Relatórios do atendimento
-              </h2>
-              <p className="text-xs" style={{ color: "hsl(240 8% 50%)" }}>
-                Volume, SLA, CSAT e desempenho por fila/agente.
-              </p>
-            </div>
-          </div>
-          <div
-            className="flex items-center gap-1 rounded-xl p-1 text-xs"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 16%)" }}
-          >
-            {(["7d", "30d", "90d"] as const).map((r) => (
-              <button
-                key={r}
-                onClick={() => setRange(r)}
-                className="rounded-lg px-3 py-1 transition-colors"
-                style={{
-                  background: range === r ? "rgba(0,212,106,0.12)" : "transparent",
-                  color: range === r ? "#00d46a" : "hsl(240 8% 55%)",
-                }}
-              >
-                {r === "7d" ? "7 dias" : r === "30d" ? "30 dias" : "90 dias"}
-              </button>
-            ))}
-          </div>
-        </header>
+        <ReportsHeader range={range} setRange={setRange} />
 
         <section className="grid gap-3 md:grid-cols-5">
-          <KPI label="Criados" value={c?.created ?? 0} tone="blue" icon={<TrendingUp className="h-3.5 w-3.5" />} />
-          <KPI label="Resolvidos" value={c?.resolved ?? 0} tone="emerald" icon={<TrendingUp className="h-3.5 w-3.5" />} />
-          <KPI label="Encerrados" value={c?.closed ?? 0} tone="zinc" />
-          <KPI label="Abertos agora" value={c?.open_now ?? 0} tone="amber" />
-          <KPI label="Backlog" value={c?.backlog ?? 0} tone="red" icon={<AlertTriangle className="h-3.5 w-3.5" />} />
+          <KPI label="Criados" value={c?.created ?? 0} tone="blue" icon={<TrendingUp className="h-3.5 w-3.5" />} loading={overview.isFetching} />
+          <KPI label="Resolvidos" value={c?.resolved ?? 0} tone="emerald" icon={<TrendingUp className="h-3.5 w-3.5" />} loading={overview.isFetching} />
+          <KPI label="Encerrados" value={c?.closed ?? 0} tone="zinc" loading={overview.isFetching} />
+          <KPI label="Abertos agora" value={c?.open_now ?? 0} tone="amber" loading={overview.isFetching} />
+          <KPI label="Backlog" value={c?.backlog ?? 0} tone="red" icon={<AlertTriangle className="h-3.5 w-3.5" />} loading={overview.isFetching} />
         </section>
 
         <Card>
@@ -171,7 +223,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
                 <div key={d.day} className="flex flex-1 flex-col items-center gap-1">
                   <div className="flex w-full items-end gap-0.5" style={{ height: 110 }}>
                     <div
-                      className="flex-1 rounded-sm"
+                      className="flex-1 rounded-sm transition-all"
                       style={{
                         height: `${(d.created / maxSeries) * 100}%`,
                         background: "rgba(96,165,250,0.6)",
@@ -180,7 +232,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
                       title={`${d.created} criados`}
                     />
                     <div
-                      className="flex-1 rounded-sm"
+                      className="flex-1 rounded-sm transition-all"
                       style={{
                         height: `${(d.resolved / maxSeries) * 100}%`,
                         background: "rgba(0,212,106,0.7)",
@@ -199,12 +251,17 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
         </Card>
 
         <section className="grid gap-3 md:grid-cols-2">
-          <SLAPanel sla={sla.data} />
-          <CSATPanel csat={csat.data} />
+          <SLAPanel sla={sla.data} loading={sla.isFetching} error={sla.isError} />
+          <CSATPanel csat={csat.data} loading={csat.isFetching} error={csat.isError} />
         </section>
 
         <section className="grid gap-3 md:grid-cols-2">
-          <TableCard title="Por fila" empty="Sem filas configuradas.">
+          <TableCard
+            title="Por fila"
+            empty="Sem filas configuradas."
+            loading={byQueue.isLoading}
+            error={byQueue.isError}
+          >
             {byQueue.data?.items.map((q) => (
               <Row key={q.queue_id} left={q.name}>
                 <span style={{ color: "#60a5fa" }}>{q.created} criados</span>
@@ -213,7 +270,13 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
               </Row>
             ))}
           </TableCard>
-          <TableCard title="Por agente" icon={<Users className="h-3.5 w-3.5" />} empty="Ainda sem atividade.">
+          <TableCard
+            title="Por agente"
+            icon={<Users className="h-3.5 w-3.5" />}
+            empty="Ainda sem atividade."
+            loading={byUser.isLoading}
+            error={byUser.isError}
+          >
             {byUser.data?.items.slice(0, 20).map((u) => (
               <Row key={u.user_id} left={u.name || u.email}>
                 <span>{u.assigned} atribuídos</span>
@@ -228,11 +291,147 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
   );
 }
 
+// ─── Header (compartilhado entre estados) ─────────────────────────────────────
+
+function ReportsHeader({
+  range,
+  setRange,
+}: {
+  range: "7d" | "30d" | "90d";
+  setRange: (r: "7d" | "30d" | "90d") => void;
+}) {
+  return (
+    <header className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div
+          className="flex h-9 w-9 items-center justify-center rounded-xl"
+          style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}
+        >
+          <Inbox className="h-4 w-4" style={{ color: "#00d46a" }} />
+        </div>
+        <div>
+          <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+            Relatórios do atendimento
+          </h2>
+          <p className="text-xs" style={{ color: "hsl(240 8% 50%)" }}>
+            Volume, SLA, CSAT e desempenho por fila/agente.
+          </p>
+        </div>
+      </div>
+      <div
+        className="flex items-center gap-1 rounded-xl p-1 text-xs"
+        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 16%)" }}
+      >
+        {(["7d", "30d", "90d"] as const).map((r) => (
+          <button
+            key={r}
+            onClick={() => setRange(r)}
+            className="rounded-lg px-3 py-1 transition-colors"
+            style={{
+              background: range === r ? "rgba(0,212,106,0.12)" : "transparent",
+              color: range === r ? "#00d46a" : "hsl(240 8% 55%)",
+            }}
+          >
+            {r === "7d" ? "7 dias" : r === "30d" ? "30 dias" : "90 dias"}
+          </button>
+        ))}
+      </div>
+    </header>
+  );
+}
+
+// ─── Skeleton (loading inicial) ───────────────────────────────────────────────
+
+function InboxReportsSkeleton({
+  range,
+  setRange,
+}: {
+  range: "7d" | "30d" | "90d";
+  setRange: (r: "7d" | "30d" | "90d") => void;
+}) {
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto max-w-6xl space-y-5 p-6">
+        <ReportsHeader range={range} setRange={setRange} />
+
+        <section className="grid gap-3 md:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-xl p-3"
+              style={{ background: CARD_BG, border: CARD_BORDER }}
+            >
+              <div className="h-3 w-16 rounded mb-2" style={{ background: "rgba(255,255,255,0.04)" }} />
+              <div className="h-7 w-12 rounded" style={{ background: "rgba(255,255,255,0.06)" }} />
+            </div>
+          ))}
+        </section>
+
+        <Card>
+          <div className="h-3 w-44 rounded mb-3" style={{ background: "rgba(255,255,255,0.04)" }} />
+          <div className="flex items-end gap-1.5" style={{ height: 110 }}>
+            {Array.from({ length: 14 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex-1 rounded-sm animate-pulse"
+                style={{
+                  height: `${30 + ((i * 13) % 70)}%`,
+                  background: "rgba(255,255,255,0.04)",
+                }}
+              />
+            ))}
+          </div>
+        </Card>
+
+        <section className="grid gap-3 md:grid-cols-2">
+          <Card>
+            <div className="h-3 w-12 rounded mb-3" style={{ background: "rgba(255,255,255,0.04)" }} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="h-14 rounded" style={{ background: "rgba(255,255,255,0.03)" }} />
+              <div className="h-14 rounded" style={{ background: "rgba(255,255,255,0.03)" }} />
+            </div>
+          </Card>
+          <Card>
+            <div className="h-3 w-14 rounded mb-3" style={{ background: "rgba(255,255,255,0.04)" }} />
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-2 w-full rounded animate-pulse" style={{ background: "rgba(255,255,255,0.03)" }} />
+              ))}
+            </div>
+          </Card>
+        </section>
+
+        <section className="grid gap-3 md:grid-cols-2">
+          {[0, 1].map((i) => (
+            <div
+              key={i}
+              className="rounded-2xl overflow-hidden"
+              style={{ background: CARD_BG, border: CARD_BORDER }}
+            >
+              <div className="px-4 py-3" style={{ borderBottom: "1px solid hsl(240 12% 11%)" }}>
+                <div className="h-3 w-20 rounded" style={{ background: "rgba(255,255,255,0.04)" }} />
+              </div>
+              {Array.from({ length: 3 }).map((_, j) => (
+                <div key={j} className="px-4 py-2.5 flex justify-between" style={{ borderTop: "1px solid rgba(255,255,255,0.03)" }}>
+                  <div className="h-3 w-32 rounded animate-pulse" style={{ background: "rgba(255,255,255,0.04)" }} />
+                  <div className="h-3 w-16 rounded animate-pulse" style={{ background: "rgba(255,255,255,0.03)" }} />
+                </div>
+              ))}
+            </div>
+          ))}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+// ─── Componentes ──────────────────────────────────────────────────────────────
+
 function Card({ children }: { children: React.ReactNode }) {
   return (
     <div
       className="rounded-2xl p-4"
-      style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}
+      style={{ background: CARD_BG, border: CARD_BORDER }}
     >
       {children}
     </div>
@@ -244,11 +443,13 @@ function KPI({
   value,
   tone,
   icon,
+  loading,
 }: {
   label: string;
   value: number;
   tone: "blue" | "emerald" | "amber" | "red" | "zinc";
   icon?: React.ReactNode;
+  loading?: boolean;
 }) {
   const color = {
     blue: "#60a5fa",
@@ -260,7 +461,7 @@ function KPI({
   return (
     <div
       className="rounded-xl p-3"
-      style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}
+      style={{ background: CARD_BG, border: CARD_BORDER }}
     >
       <div
         className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest"
@@ -269,14 +470,25 @@ function KPI({
         {icon}
         <span>{label}</span>
       </div>
-      <div className="mt-1.5 text-2xl font-semibold tabular-nums" style={{ color }}>
+      <div
+        className={`mt-1.5 text-2xl font-semibold tabular-nums transition-opacity ${loading ? "opacity-50" : ""}`}
+        style={{ color }}
+      >
         {value}
       </div>
     </div>
   );
 }
 
-function SLAPanel({ sla }: { sla?: SLAReport }) {
+function SLAPanel({
+  sla,
+  loading,
+  error,
+}: {
+  sla?: SLAReport;
+  loading?: boolean;
+  error?: boolean;
+}) {
   return (
     <Card>
       <div
@@ -285,29 +497,43 @@ function SLAPanel({ sla }: { sla?: SLAReport }) {
       >
         <AlertTriangle className="h-3.5 w-3.5" /> SLA
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 text-center">
-        <div>
-          <div className="text-2xl font-semibold tabular-nums" style={{ color: "#f87171" }}>
-            {sla?.first_response_breaches ?? 0}
+      {error ? (
+        <div className="py-6 text-center text-xs" style={{ color: "hsl(240 8% 40%)" }}>
+          Falha ao carregar SLA.
+        </div>
+      ) : (
+        <div className={`mt-3 grid grid-cols-2 gap-3 text-center transition-opacity ${loading ? "opacity-50" : ""}`}>
+          <div>
+            <div className="text-2xl font-semibold tabular-nums" style={{ color: "#f87171" }}>
+              {sla?.first_response_breaches ?? 0}
+            </div>
+            <div className="mt-0.5 text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
+              1ª resposta rompida
+            </div>
           </div>
-          <div className="mt-0.5 text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
-            1ª resposta rompida
+          <div>
+            <div className="text-2xl font-semibold tabular-nums" style={{ color: "#f87171" }}>
+              {sla?.resolution_breaches ?? 0}
+            </div>
+            <div className="mt-0.5 text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
+              Resolução rompida
+            </div>
           </div>
         </div>
-        <div>
-          <div className="text-2xl font-semibold tabular-nums" style={{ color: "#f87171" }}>
-            {sla?.resolution_breaches ?? 0}
-          </div>
-          <div className="mt-0.5 text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
-            Resolução rompida
-          </div>
-        </div>
-      </div>
+      )}
     </Card>
   );
 }
 
-function CSATPanel({ csat }: { csat?: CSATReport }) {
+function CSATPanel({
+  csat,
+  loading,
+  error,
+}: {
+  csat?: CSATReport;
+  loading?: boolean;
+  error?: boolean;
+}) {
   const max = Math.max(1, ...(csat?.distribution?.map((d) => d.count) ?? [1]));
   return (
     <Card>
@@ -317,33 +543,39 @@ function CSATPanel({ csat }: { csat?: CSATReport }) {
       >
         <Star className="h-3.5 w-3.5" /> CSAT
       </div>
-      <div className="mt-3 flex items-end gap-4">
-        <div>
-          <div className="text-2xl font-semibold tabular-nums" style={{ color: "#fbbf24" }}>
-            {(csat?.avg_rating ?? 0).toFixed(2)}
-          </div>
-          <div className="mt-0.5 text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
-            nota média · {(((csat?.response_rate ?? 0) * 100) | 0)}% respondeu
-          </div>
+      {error ? (
+        <div className="py-6 text-center text-xs" style={{ color: "hsl(240 8% 40%)" }}>
+          Falha ao carregar CSAT.
         </div>
-        <div className="flex-1">
-          {[1, 2, 3, 4, 5].map((r) => {
-            const count = csat?.distribution?.find((d) => d.rating === r)?.count ?? 0;
-            return (
-              <div key={r} className="flex items-center gap-2 text-[10px]" style={{ color: "hsl(240 8% 50%)" }}>
-                <span className="w-3">{r}</span>
-                <div className="h-1.5 flex-1 rounded" style={{ background: "rgba(255,255,255,0.06)" }}>
-                  <div
-                    className="h-full rounded transition-all"
-                    style={{ width: `${(count / max) * 100}%`, background: "#fbbf24" }}
-                  />
+      ) : (
+        <div className={`mt-3 flex items-end gap-4 transition-opacity ${loading ? "opacity-50" : ""}`}>
+          <div>
+            <div className="text-2xl font-semibold tabular-nums" style={{ color: "#fbbf24" }}>
+              {(csat?.avg_rating ?? 0).toFixed(2)}
+            </div>
+            <div className="mt-0.5 text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
+              nota média · {(((csat?.response_rate ?? 0) * 100) | 0)}% respondeu
+            </div>
+          </div>
+          <div className="flex-1">
+            {[1, 2, 3, 4, 5].map((r) => {
+              const count = csat?.distribution?.find((d) => d.rating === r)?.count ?? 0;
+              return (
+                <div key={r} className="flex items-center gap-2 text-[10px]" style={{ color: "hsl(240 8% 50%)" }}>
+                  <span className="w-3">{r}</span>
+                  <div className="h-1.5 flex-1 rounded" style={{ background: "rgba(255,255,255,0.06)" }}>
+                    <div
+                      className="h-full rounded transition-all"
+                      style={{ width: `${(count / max) * 100}%`, background: "#fbbf24" }}
+                    />
+                  </div>
+                  <span className="w-6 text-right">{count}</span>
                 </div>
-                <span className="w-6 text-right">{count}</span>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </Card>
   );
 }
@@ -353,17 +585,21 @@ function TableCard({
   icon,
   empty,
   children,
+  loading,
+  error,
 }: {
   title: string;
   icon?: React.ReactNode;
   empty: string;
   children?: React.ReactNode;
+  loading?: boolean;
+  error?: boolean;
 }) {
   const hasChildren = children && (Array.isArray(children) ? children.length > 0 : true);
   return (
     <div
       className="rounded-2xl overflow-hidden"
-      style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}
+      style={{ background: CARD_BG, border: CARD_BORDER }}
     >
       <div
         className="flex items-center gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-widest"
@@ -372,7 +608,17 @@ function TableCard({
         {icon}
         {title}
       </div>
-      {hasChildren ? (
+      {error ? (
+        <div className="p-4 text-xs" style={{ color: "hsl(240 8% 45%)" }}>
+          Falha ao carregar.
+        </div>
+      ) : loading ? (
+        <div className="p-3 space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-8 rounded animate-pulse" style={{ background: "rgba(255,255,255,0.03)" }} />
+          ))}
+        </div>
+      ) : hasChildren ? (
         <ul>{children}</ul>
       ) : (
         <div className="p-4 text-xs" style={{ color: "hsl(240 8% 40%)" }}>
