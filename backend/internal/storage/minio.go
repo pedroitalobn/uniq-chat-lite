@@ -43,30 +43,20 @@ func NewClient(endpoint, accessKey, secretKey, bucket, publicURL string, useSSL 
 	return c, nil
 }
 
-// EnsureBucket creates the bucket with a public-read policy if it doesn't exist.
+// EnsureBucket verifica se o bucket existe. NÃO cria automaticamente —
+// em produção (Hetzner Object Storage, R2, etc.) o admin cria manualmente
+// pra escolher visibilidade (private), region e nome. Se não existir, só
+// loga warning — uploads vão falhar com mensagem clara depois.
+//
+// NÃO aplica policy pública. Use bucket private + PresignURL.
 func (c *Client) EnsureBucket(ctx context.Context) error {
 	exists, err := c.mc.BucketExists(ctx, c.bucket)
 	if err != nil {
 		return fmt.Errorf("minio: bucket exists check: %w", err)
 	}
 	if !exists {
-		if err := c.mc.MakeBucket(ctx, c.bucket, minio.MakeBucketOptions{}); err != nil {
-			return fmt.Errorf("minio: make bucket: %w", err)
-		}
-		// Apply public-read policy so media URLs work without auth
-		policy := fmt.Sprintf(`{
-			"Version":"2012-10-17",
-			"Statement":[{
-				"Effect":"Allow",
-				"Principal":{"AWS":["*"]},
-				"Action":["s3:GetObject"],
-				"Resource":["arn:aws:s3:::%s/*"]
-			}]
-		}`, c.bucket)
-		if err := c.mc.SetBucketPolicy(ctx, c.bucket, policy); err != nil {
-			log.Warn().Err(err).Msg("minio: failed to set public policy (non-fatal)")
-		}
-		log.Info().Str("bucket", c.bucket).Msg("minio: bucket created")
+		log.Warn().Str("bucket", c.bucket).
+			Msg("storage bucket não encontrado — crie manualmente no painel do provedor")
 	}
 	return nil
 }
@@ -121,8 +111,37 @@ func MimeToExt(mime string) string {
 }
 
 // PublicURL returns the full public URL for an object.
+// Use only for buckets configurados como public-read; pra buckets
+// private (recomendado em produção) use PresignURL.
 func (c *Client) PublicURL(objectName string) string {
 	return fmt.Sprintf("%s/%s/%s", c.publicURL, c.bucket, objectName)
+}
+
+// PresignURL gera uma URL assinada (signed URL) com TTL pra um objeto
+// privado. Bucket private + signed URL é o padrão pra produção: agentes
+// veem a mídia normalmente, mas a URL expira em algumas horas, evitando
+// que vazamentos (logs, screenshots, history) deem acesso permanente.
+//
+// `objectName` é o key dentro do bucket (sem prefixo URL). TTL típico:
+// 24h pra mídia de inbox (cobre o uso normal sem precisar refresh).
+func (c *Client) PresignURL(ctx context.Context, objectName string, ttl time.Duration) (string, error) {
+	u, err := c.mc.PresignedGetObject(ctx, c.bucket, objectName, ttl, nil)
+	if err != nil {
+		return "", fmt.Errorf("minio: presign %s: %w", objectName, err)
+	}
+	return u.String(), nil
+}
+
+// KeyFromURL extrai o objectName de uma URL gerada por PublicURL().
+// Retorna "" se a URL não pertence ao bucket configurado. Usado pra
+// migrar storage de modo público pra privado: detecta URLs antigas
+// salvas no MessageLog.Content e substitui pelo key extraído.
+func (c *Client) KeyFromURL(url string) string {
+	prefix := c.publicURL + "/" + c.bucket + "/"
+	if !strings.HasPrefix(url, prefix) {
+		return ""
+	}
+	return strings.TrimPrefix(url, prefix)
 }
 
 // IsConfigured returns true if GlobalStorage is ready.

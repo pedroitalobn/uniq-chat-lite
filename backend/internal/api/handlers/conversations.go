@@ -17,6 +17,7 @@ import (
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/outbound"
 	"github.com/uniq-chat/backend/internal/services"
+	"github.com/uniq-chat/backend/internal/storage"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
 )
@@ -274,6 +275,13 @@ func (h *ConversationHandler) Timeline(c *fiber.Ctx) error {
 	var events []models.ConversationEvent
 	h.db.Where("conversation_id = ? AND event_type <> ?", id, models.ConvEventMessage).
 		Order("created_at DESC").Limit(limit).Find(&events)
+
+	// Resolve signed URLs pra mídias antes de retornar. Bucket private
+	// (Hetzner Object Storage / R2 com private) precisa de URL assinada
+	// pra renderizar <img>/<audio>/<video>. Pública seria 403.
+	for i := range messages {
+		messages[i].Content = resolveMediaURLs(c.Context(), messages[i].Content)
+	}
 
 	out := make([]entry, 0, len(messages)+len(notes)+len(events))
 	for i := range messages {
@@ -1579,4 +1587,57 @@ func sortEntriesDesc(entries []timelineEntry) {
 			j--
 		}
 	}
+}
+
+// resolveMediaURLs lê o JSON do MessageLog.Content, e se houver
+// `media_key` (ou uma `url` apontando pro bucket configurado), troca
+// pelo signed URL com TTL 24h. Operação no-op pra:
+//   - storage não configurado
+//   - content que não é JSON (texto puro)
+//   - content sem media_key e sem url do nosso bucket
+//
+// 24h cobre o uso normal — agente abre conversa, fica vendo por horas,
+// e quando refresca a timeline vem com URL nova. WS push notifica a
+// chegada de novas mídias e o front refetcha.
+const presignTTL = 24 * time.Hour
+
+func resolveMediaURLs(ctx context.Context, content string) string {
+	if content == "" || !storage.IsConfigured() {
+		return content
+	}
+	// Fast path: se não começa com `{`, não é JSON, ignora.
+	trimmed := strings.TrimSpace(content)
+	if len(trimmed) == 0 || trimmed[0] != '{' {
+		return content
+	}
+	var parsed map[string]interface{}
+	if err := json.Unmarshal([]byte(content), &parsed); err != nil {
+		return content
+	}
+
+	// 1) Path preferido: campo media_key explícito.
+	key, _ := parsed["media_key"].(string)
+
+	// 2) Fallback: URL salva no formato público antigo. Extrai o key.
+	if key == "" {
+		if oldURL, ok := parsed["url"].(string); ok {
+			key = storage.GlobalStorage.KeyFromURL(oldURL)
+		}
+	}
+	if key == "" {
+		return content // não é mídia desse bucket; deixa intacto
+	}
+
+	signed, err := storage.GlobalStorage.PresignURL(ctx, key, presignTTL)
+	if err != nil {
+		log.Warn().Err(err).Str("key", key).Msg("presign falhou; mantendo URL original")
+		return content
+	}
+	parsed["url"] = signed
+
+	out, err := json.Marshal(parsed)
+	if err != nil {
+		return content
+	}
+	return string(out)
 }

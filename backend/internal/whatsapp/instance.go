@@ -2306,10 +2306,12 @@ func (ic *InstanceClient) downloadAndStoreInboundMedia(
 		return string(b)
 	}
 
-	// Sobe pro MinIO/S3 — retorna URL pública.
+	// Sobe pro MinIO/S3. UploadBytes retorna a URL pública (se bucket
+	// for público) — guardamos o objectName (key) pro caso de bucket
+	// private com signed URLs. Resolver de URL roda no Timeline handler.
 	ext := storage.MimeToExt(mime)
 	objectName := storage.MediaObjectName(ic.ID, ext)
-	url, err := storage.GlobalStorage.UploadBytes(dlCtx, objectName, data, mime)
+	_, err = storage.GlobalStorage.UploadBytes(dlCtx, objectName, data, mime)
 	if err != nil {
 		log.Warn().Err(err).Str("instance", ic.ID).Str("type", msgType).
 			Msg("media upload failed")
@@ -2322,7 +2324,12 @@ func (ic *InstanceClient) downloadAndStoreInboundMedia(
 		return string(b)
 	}
 
-	out["url"] = url
+	// `media_key` é a chave no bucket — Timeline handler converte pra
+	// URL assinada na hora de servir pro front. `url` (pública) é só
+	// fallback pra buckets configurados como public — em private retorna
+	// 403, então o front nunca usa direto.
+	out["media_key"] = objectName
+	out["url"] = storage.GlobalStorage.PublicURL(objectName)
 	out["mime_type"] = mime
 	out["size_bytes"] = len(data)
 	if filename != "" {
