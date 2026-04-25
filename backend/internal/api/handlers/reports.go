@@ -114,7 +114,7 @@ func (h *ReportsHandler) ByQueue(c *fiber.Ctx) error {
 		Resolved int64  `json:"resolved"`
 		Backlog  int64  `json:"backlog"`
 	}
-	var rows []row
+	rows := []row{}
 	h.db.Raw(`
 		SELECT q.id AS queue_id, q.name,
 		       COUNT(c.id) FILTER (WHERE c.created_at BETWEEN ? AND ?) AS created,
@@ -142,7 +142,7 @@ func (h *ReportsHandler) ByUser(c *fiber.Ctx) error {
 		Resolved   int64   `json:"resolved"`
 		AvgFirstResponseSec float64 `json:"avg_first_response_sec"`
 	}
-	var rows []row
+	rows := []row{}
 	h.db.Raw(`
 		SELECT u.id AS user_id, u.name, u.email,
 		       COUNT(c.id) FILTER (WHERE c.assigned_user_id = u.id) AS assigned,
@@ -182,7 +182,7 @@ func (h *ReportsHandler) CSAT(c *fiber.Ctx) error {
 		Rating int   `json:"rating"`
 		Count  int64 `json:"count"`
 	}
-	var dist []ratingRow
+	dist := []ratingRow{}
 	h.db.Raw(`
 		SELECT rating, COUNT(*) AS count
 		FROM csat_surveys

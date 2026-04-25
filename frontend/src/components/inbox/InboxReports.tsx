@@ -262,7 +262,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
             loading={byQueue.isLoading}
             error={byQueue.isError}
           >
-            {byQueue.data?.items.map((q) => (
+            {byQueue.data?.items?.map((q) => (
               <Row key={q.queue_id} left={q.name}>
                 <span style={{ color: "#60a5fa" }}>{q.created} criados</span>
                 <span style={{ color: "#00d46a" }}>{q.resolved} resolvidos</span>
@@ -277,7 +277,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
             loading={byUser.isLoading}
             error={byUser.isError}
           >
-            {byUser.data?.items.slice(0, 20).map((u) => (
+            {byUser.data?.items?.slice(0, 20).map((u) => (
               <Row key={u.user_id} left={u.name || u.email}>
                 <span>{u.assigned} atribuídos</span>
                 <span style={{ color: "#00d46a" }}>{u.resolved} resolvidos</span>
