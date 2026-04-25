@@ -9,7 +9,7 @@ import Link from "next/link";
 import {
   Lock, Search, ChevronDown, User as UserIcon, MessageSquare,
   Layers, Smartphone, Radio, RefreshCw, Check, BarChart3,
-  MoreVertical,
+  MoreVertical, Users, Building2, Zap,
 } from "lucide-react";
 import {
   conversationsApi, queuesApi, workspacesApi, channelsApi, instancesApi,
@@ -1052,9 +1052,10 @@ function ErrorState({ error, probe, onRetry }: { error: unknown; probe?: HealthP
   );
 }
 
-// Menu kebab/sanduíche que abre dropdown com mais ações do inbox.
-// Hoje só tem "Conversas / Relatórios" mas o slot já está pronto pra
-// SLA dashboard, exportar lista, atalhos de teclado, etc.
+// Menu kebab/sanduíche que abre dropdown com ações + atalhos do inbox.
+// Visualização (Conversas/Relatórios) + Gestão (filas, equipes, depts,
+// respostas rápidas). Cada item de gestão é gateado por permissão —
+// owner/super-admin veem tudo via bypass do hasPerm.
 function InboxMenu({
   viewMode,
   setViewMode,
@@ -1062,7 +1063,26 @@ function InboxMenu({
   viewMode: "conversations" | "reports";
   setViewMode: (v: "conversations" | "reports") => void;
 }) {
+  const router = useRouter();
+  const { hasPerm, hasAnyPerm } = useWorkspacePermissions();
   const [open, setOpen] = useState(false);
+
+  const canManageQueues = hasAnyPerm([PERM.queuesView, PERM.queuesManage]);
+  const canManageTeams = hasAnyPerm([PERM.teamsView, PERM.teamsManage]);
+  const canManageDepartments = hasAnyPerm([PERM.departmentsView, PERM.departmentsManage]);
+  const canManageQuickReplies = hasAnyPerm([
+    PERM.quickRepliesView,
+    PERM.quickRepliesManageOwn,
+    PERM.quickRepliesManageShared,
+  ]);
+  const showManagementSection =
+    canManageQueues || canManageTeams || canManageDepartments || canManageQuickReplies;
+
+  const go = (href: string) => {
+    setOpen(false);
+    router.push(href);
+  };
+
   return (
     <Dropdown
       open={open}
@@ -1083,12 +1103,7 @@ function InboxMenu({
         </button>
       }
     >
-      <div
-        className="px-3 py-2 text-[10px] font-semibold uppercase tracking-widest"
-        style={{ color: "hsl(240 8% 42%)", borderBottom: "1px solid hsl(240 12% 11%)" }}
-      >
-        Visualização
-      </div>
+      <SectionLabel>Visualização</SectionLabel>
       <DropdownItem
         active={viewMode === "conversations"}
         onClick={() => {
@@ -1113,7 +1128,56 @@ function InboxMenu({
           Relatórios
         </span>
       </DropdownItem>
+
+      {showManagementSection && (
+        <>
+          <SectionLabel>Gestão</SectionLabel>
+          {canManageQueues && (
+            <DropdownItem onClick={() => go("/settings/queues")}>
+              <span className="flex items-center gap-2">
+                <Layers className="h-3.5 w-3.5" />
+                Gerenciar filas
+              </span>
+            </DropdownItem>
+          )}
+          {canManageTeams && (
+            <DropdownItem onClick={() => go("/settings/teams")}>
+              <span className="flex items-center gap-2">
+                <Users className="h-3.5 w-3.5" />
+                Gerenciar equipes
+              </span>
+            </DropdownItem>
+          )}
+          {canManageDepartments && (
+            <DropdownItem onClick={() => go("/settings/departments")}>
+              <span className="flex items-center gap-2">
+                <Building2 className="h-3.5 w-3.5" />
+                Departamentos
+              </span>
+            </DropdownItem>
+          )}
+          {canManageQuickReplies && (
+            <DropdownItem onClick={() => go("/settings/quick-replies")}>
+              <span className="flex items-center gap-2">
+                <Zap className="h-3.5 w-3.5" />
+                Respostas rápidas
+              </span>
+            </DropdownItem>
+          )}
+        </>
+      )}
     </Dropdown>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="px-3 py-2 text-[10px] font-semibold uppercase tracking-widest"
+      style={{ color: "hsl(240 8% 42%)", borderBottom: "1px solid hsl(240 12% 11%)" }}
+    >
+      {children}
+    </div>
   );
 }
 
