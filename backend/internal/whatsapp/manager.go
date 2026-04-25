@@ -208,7 +208,13 @@ func (m *Manager) SaveMessage(instanceID string, toJID string, content string, d
 		return err
 	}
 
-	contentJSON, _ := json.Marshal(content)
+	// Salva content como veio. Pro caminho legacy (texto puro), o front
+	// trata strings raw e strings JSON-encoded ("oi") via parseMessage
+	// Content. Pro caminho novo de mídia (JSON com media_key/url),
+	// PRECISA ficar como objeto JSON cru — fazer Marshal aqui escapava o
+	// JSON (`{"media_key":...}` virava `"{\"media_key\":...}"`) e o
+	// resolver pulava porque o conteúdo não começava com `{`.
+	contentJSON := []byte(content)
 
 	// Extract phone from JID (for non-groups)
 	phone := extractPhoneFromJID(toJID)

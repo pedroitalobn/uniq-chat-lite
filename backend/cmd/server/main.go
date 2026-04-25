@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -62,6 +63,11 @@ func main() {
 	// relíquias da migração legada (global_proxy_configs → proxies). Promove
 	// pra is_platform=true pra reaparecerem em /admin/proxy. Idempotente.
 	backfillOrphanPlatformProxies(db)
+
+	// Backfill: MessageLog.Content que ficou double-encoded pelo bug da
+	// Manager.SaveMessage (json.Marshal de string já-JSON). Roda 1x no
+	// boot — corrigido no source, mídias novas já chegam corretas.
+	backfillDoubleEncodedMediaContent(db)
 
 	// Seed super admin if configured via env vars
 	log.Info().Str("email", os.Getenv("SUPER_ADMIN_EMAIL")).Str("password_set", fmt.Sprintf("%v", os.Getenv("SUPER_ADMIN_PASSWORD") != "")).Msg("checking super admin env vars")
@@ -477,6 +483,50 @@ func backfillAdminRolePermissions(db *gorm.DB) {
 func seedTicketingRoles(db *gorm.DB) {
 	n := models.SeedDefaultRolesForAllWorkspaces(db)
 	log.Info().Int("workspaces", n).Msg("ticketing roles seeded")
+}
+
+// backfillDoubleEncodedMediaContent corrige MessageLog.Content que ficou
+// JSON-encoded duas vezes pelo bug da Manager.SaveMessage (json.Marshal
+// numa string que já era JSON). Detecta padrão `"{\"media_key\":...}"` e
+// desembrulha pra `{"media_key":...}`. Idempotente (depois de corrigido,
+// o conteúdo não bate o filtro de novo). Roda 1x no boot — depois desse
+// fix esse cenário não acontece mais pra mensagens novas.
+func backfillDoubleEncodedMediaContent(db *gorm.DB) {
+	var rows []models.MessageLog
+	// Limita o escopo aos prováveis afetados: começam com `"` e contém
+	// `media_key`. Texto puro (`"oi"`) começa com `"` mas não tem
+	// media_key, então passa batido.
+	if err := db.Where(`content LIKE '"%media_key%' AND type IN ?`,
+		[]string{"image", "video", "audio", "document", "sticker"}).
+		Find(&rows).Error; err != nil {
+		log.Warn().Err(err).Msg("backfill media: query falhou (não fatal)")
+		return
+	}
+	if len(rows) == 0 {
+		return
+	}
+	fixed := 0
+	for _, row := range rows {
+		var unwrapped string
+		if err := json.Unmarshal([]byte(row.Content), &unwrapped); err != nil {
+			continue // não é string JSON-encoded, deixa intacto
+		}
+		if !strings.HasPrefix(strings.TrimSpace(unwrapped), "{") {
+			continue
+		}
+		if err := db.Model(&models.MessageLog{}).
+			Where("id = ?", row.ID).
+			Update("content", unwrapped).Error; err != nil {
+			log.Warn().Err(err).Str("id", row.ID.String()).
+				Msg("backfill media: update falhou")
+			continue
+		}
+		fixed++
+	}
+	if fixed > 0 {
+		log.Info().Int("fixed", fixed).Int("scanned", len(rows)).
+			Msg("backfill media: conteúdo double-encoded desembrulhado")
+	}
 }
 
 // backfillOrphanPlatformProxies promove pra is_platform=true qualquer Proxy
