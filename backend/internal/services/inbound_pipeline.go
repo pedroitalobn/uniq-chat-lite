@@ -19,6 +19,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/models"
+	"github.com/uniq-chat/backend/internal/storage"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
 )
@@ -407,13 +408,21 @@ func (p *InboundPipeline) broadcastConversation(conv *models.Conversation, msg *
 	} else if reopened {
 		topic = "conversation.reopened"
 	}
+	// Resolve signed URL no payload do WS push antes de enviar pro front.
+	// Sem isso, mensagens recém-chegadas via push trazem URL pública (403
+	// em bucket private) — só funcionariam após o front refetchar o
+	// timeline. Cópia local da msg pra não mexer no objeto que vai pro DB.
+	msgCopy := *msg
+	msgCopy.Content = storage.ResolveMediaURLs(context.Background(), msgCopy.Content)
+	convCopy := *conv
+	convCopy.LastMessagePreview = storage.ResolveMediaURLs(context.Background(), convCopy.LastMessagePreview)
 	p.hub.Broadcast(&whatsapp.Event{
 		Type:      topic,
 		Instance:  conv.InstanceID.String(),
 		Workspace: conv.WorkspaceID.String(),
 		Payload: map[string]any{
-			"conversation": conv,
-			"message":      msg,
+			"conversation": &convCopy,
+			"message":      &msgCopy,
 		},
 	})
 }
