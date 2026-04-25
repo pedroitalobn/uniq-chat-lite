@@ -9,6 +9,47 @@ import (
 	"gorm.io/gorm"
 )
 
+// reservedV1Namespaces — primeiros segmentos depois de /v1/ que pertencem
+// ao API tradicional (não ao layout /v1/:server/:instance). ResolveV1Instance
+// é registrado como Use middleware em /v1/:server_slug/:instance_slug, então
+// o Fiber dispara ele em QUALQUER URL /v1/X/Y — incluindo /v1/me/presence,
+// /v1/instances/:id, /v1/workspaces/:id/members, etc. Sem esse bypass, todos
+// caem em "server not found" 404.
+var reservedV1Namespaces = map[string]bool{
+	"admin":          true,
+	"agent":          true,
+	"agents":         true,
+	"asaas":          true,
+	"auth":           true,
+	"campaigns":      true,
+	"channels":       true,
+	"conversations":  true,
+	"crm":            true,
+	"csat":           true,
+	"departments":    true,
+	"instances":      true,
+	"integrations":   true,
+	"invites":        true,
+	"me":             true,
+	"messages":       true,
+	"payments":       true,
+	"permissions":    true,
+	"presence":       true,
+	"proxies":        true,
+	"queues":         true,
+	"quick-replies":  true,
+	"reports":        true,
+	"roles":          true,
+	"servers":        true,
+	"stripe":         true,
+	"tags":           true,
+	"teams":          true,
+	"webhook-config": true,
+	"webhooks":       true,
+	"workspaces":     true,
+	"ws":             true,
+}
+
 // ResolveV1Instance resolves a request for /v1/:server_slug/:instance_slug/*
 // and authorizes it. Aceita dois formatos de token:
 //   1. Instance token (`instances.token`) — acesso escopado a UMA instância
@@ -19,6 +60,12 @@ func ResolveV1Instance(db *gorm.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		serverSlug := c.Params("server_slug")
 		instanceSlug := c.Params("instance_slug")
+
+		// Bypass: prefixo é namespace reservado da API tradicional. Deixa
+		// os handlers do api.Group("/v1") cuidarem da request.
+		if reservedV1Namespaces[serverSlug] {
+			return c.Next()
+		}
 
 		// Resolve server
 		var server models.Server
