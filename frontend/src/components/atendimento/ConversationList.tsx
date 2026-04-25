@@ -9,6 +9,8 @@ export interface ConversationRow {
   priority: string;
   channel_type: string;
   channel_key?: string;
+  /** Instance UUID — usada pra resolver o nome da instância no chip da lista. */
+  instance_id?: string;
   subject?: string;
   last_message_preview?: string;
   last_message_at?: string;
@@ -54,6 +56,8 @@ export function ConversationList({
   selectedId,
   getHref,
   density = "comfortable",
+  instanceLabel,
+  showInstanceChip,
 }: {
   items: ConversationRow[];
   isLoading?: boolean;
@@ -67,6 +71,11 @@ export function ConversationList({
   getHref?: (conv: ConversationRow) => string;
   /** `compact` reduz o padding quando a lista fica na coluna estreita do split. */
   density?: "comfortable" | "compact";
+  /** Map de instance_id → label amigável pra resolver o nome da instância no chip. */
+  instanceLabel?: (instanceId?: string) => string | undefined;
+  /** Mostra o chip da instância em cada linha — usado quando o filtro inclui
+   *  mais de uma instância (ou nenhuma seleção, "todas"). */
+  showInstanceChip?: boolean;
 }) {
   if (isLoading) {
     return (
@@ -133,7 +142,7 @@ export function ConversationList({
               <p className="mt-0.5 line-clamp-1 text-xs" style={{ color: "hsl(240 8% 52%)" }}>
                 {conv.last_message_preview || "—"}
               </p>
-              <div className="mt-1.5 flex items-center gap-1.5">
+              <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
                 <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${status.cls}`}>
                   {status.label}
                 </span>
@@ -146,6 +155,19 @@ export function ConversationList({
                 >
                   {conv.channel_type}
                 </span>
+                {showInstanceChip && instanceLabel && instanceLabel(conv.instance_id) && (
+                  <span
+                    className="rounded-full px-1.5 py-0.5 text-[10px] font-medium truncate max-w-[120px]"
+                    style={{
+                      background: "rgba(0,212,106,0.08)",
+                      color: "#00d46a",
+                      border: "1px solid rgba(0,212,106,0.18)",
+                    }}
+                    title={instanceLabel(conv.instance_id)}
+                  >
+                    {instanceLabel(conv.instance_id)}
+                  </span>
+                )}
                 {conv.agent_unread_count > 0 && (
                   <span
                     className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"

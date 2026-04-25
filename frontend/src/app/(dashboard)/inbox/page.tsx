@@ -9,6 +9,7 @@ import Link from "next/link";
 import {
   Lock, Search, ChevronDown, User as UserIcon, MessageSquare,
   Layers, Smartphone, Radio, RefreshCw, Check, BarChart3,
+  MoreVertical,
 } from "lucide-react";
 import {
   conversationsApi, queuesApi, workspacesApi, channelsApi, instancesApi,
@@ -349,35 +350,6 @@ export default function InboxPage() {
             </p>
           </div>
 
-          {/* View mode toggle: conversas ↔ relatórios */}
-          <div
-            className="ml-4 flex items-center gap-0.5 rounded-xl p-1 text-xs"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 16%)" }}
-          >
-            <button
-              onClick={() => setViewMode("conversations")}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors"
-              style={{
-                background: viewMode === "conversations" ? "rgba(0,212,106,0.12)" : "transparent",
-                color: viewMode === "conversations" ? "#00d46a" : "hsl(240 8% 55%)",
-              }}
-            >
-              <MessageSquare className="h-3.5 w-3.5" />
-              Conversas
-            </button>
-            <button
-              onClick={() => setViewMode("reports")}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors"
-              style={{
-                background: viewMode === "reports" ? "rgba(0,212,106,0.12)" : "transparent",
-                color: viewMode === "reports" ? "#00d46a" : "hsl(240 8% 55%)",
-              }}
-            >
-              <BarChart3 className="h-3.5 w-3.5" />
-              Relatórios
-            </button>
-          </div>
-
           {viewMode === "conversations" && (
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {/* Agent */}
@@ -460,7 +432,13 @@ export default function InboxPage() {
               />
             </div>
 
+            <InboxMenu viewMode={viewMode} setViewMode={setViewMode} />
           </div>
+          )}
+          {viewMode === "reports" && (
+            <div className="ml-auto">
+              <InboxMenu viewMode={viewMode} setViewMode={setViewMode} />
+            </div>
           )}
         </div>
 
@@ -545,6 +523,10 @@ export default function InboxPage() {
                 onAction={canAssign && statusTab === "unassigned"
                   ? (conv) => claim.mutate(conv.id)
                   : undefined}
+                showInstanceChip={instanceFilter.length !== 1}
+                instanceLabel={(id) =>
+                  id ? connectedInstances.find((i) => i.id === id)?.name : undefined
+                }
               />
             )}
           </div>
@@ -1067,6 +1049,71 @@ function ErrorState({ error, probe, onRetry }: { error: unknown; probe?: HealthP
         {cta}
       </button>
     </div>
+  );
+}
+
+// Menu kebab/sanduíche que abre dropdown com mais ações do inbox.
+// Hoje só tem "Conversas / Relatórios" mas o slot já está pronto pra
+// SLA dashboard, exportar lista, atalhos de teclado, etc.
+function InboxMenu({
+  viewMode,
+  setViewMode,
+}: {
+  viewMode: "conversations" | "reports";
+  setViewMode: (v: "conversations" | "reports") => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Dropdown
+      open={open}
+      onClose={() => setOpen(false)}
+      trigger={
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="flex items-center justify-center rounded-lg p-1.5 transition-colors"
+          style={{
+            background: open ? "rgba(0,212,106,0.08)" : "rgba(255,255,255,0.03)",
+            border: "1px solid hsl(240 12% 16%)",
+            color: open ? "#00d46a" : "hsl(240 8% 60%)",
+          }}
+          title="Mais opções do inbox"
+          aria-label="Menu do inbox"
+        >
+          <MoreVertical className="h-3.5 w-3.5" />
+        </button>
+      }
+    >
+      <div
+        className="px-3 py-2 text-[10px] font-semibold uppercase tracking-widest"
+        style={{ color: "hsl(240 8% 42%)", borderBottom: "1px solid hsl(240 12% 11%)" }}
+      >
+        Visualização
+      </div>
+      <DropdownItem
+        active={viewMode === "conversations"}
+        onClick={() => {
+          setViewMode("conversations");
+          setOpen(false);
+        }}
+      >
+        <span className="flex items-center gap-2">
+          <MessageSquare className="h-3.5 w-3.5" />
+          Conversas
+        </span>
+      </DropdownItem>
+      <DropdownItem
+        active={viewMode === "reports"}
+        onClick={() => {
+          setViewMode("reports");
+          setOpen(false);
+        }}
+      >
+        <span className="flex items-center gap-2">
+          <BarChart3 className="h-3.5 w-3.5" />
+          Relatórios
+        </span>
+      </DropdownItem>
+    </Dropdown>
   );
 }
 

@@ -835,6 +835,8 @@ export type ConversationPriority = "low" | "normal" | "high" | "urgent";
 export interface ConversationListParams {
   status?: ConversationStatus | ConversationStatus[];
   channel?: string;
+  /** Comma-separated instance UUIDs ou um único id */
+  instance_id?: string;
   queue_id?: string | "none";
   assigned_user_id?: string | "me" | "none";
   contact_id?: string;
@@ -850,6 +852,7 @@ function buildListParams(p?: ConversationListParams): Record<string, string | nu
   const out: Record<string, string | number> = {};
   if (p.status) out.status = Array.isArray(p.status) ? p.status.join(",") : p.status;
   if (p.channel) out.channel = p.channel;
+  if (p.instance_id) out.instance_id = p.instance_id;
   if (p.queue_id) out.queue_id = p.queue_id;
   if (p.assigned_user_id) out.assigned_user_id = p.assigned_user_id;
   if (p.contact_id) out.contact_id = p.contact_id;
