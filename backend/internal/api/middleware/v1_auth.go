@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/uniq-chat/backend/internal/models"
@@ -9,8 +10,11 @@ import (
 )
 
 // ResolveV1Instance resolves a request for /v1/:server_slug/:instance_slug/*
-// It looks up the server and instance by their slugs and validates the instance
-// token from the Authorization header (Bearer <token>) or X-Instance-Token header.
+// and authorizes it. Aceita dois formatos de token:
+//   1. Instance token (`instances.token`) — acesso escopado a UMA instância
+//   2. Global API key (`sk_...`) do dono da instância — destrava todas as
+//      instâncias daquele user, útil pra n8n/integrações que gerenciam
+//      várias instâncias com uma credencial só.
 func ResolveV1Instance(db *gorm.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		serverSlug := c.Params("server_slug")
@@ -28,12 +32,25 @@ func ResolveV1Instance(db *gorm.DB) fiber.Handler {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instance not found"})
 		}
 
-		// Verify token
 		token := extractInstanceToken(c)
 		if token == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "instance token required (apikey: <token> or Authorization: Bearer <token>)"})
 		}
-		if token != instance.Token {
+
+		authorized := token == instance.Token
+		// Fallback: global API key (sk_*) pertencente ao dono da instância.
+		if !authorized && strings.HasPrefix(token, "sk_") {
+			hash := models.HashAPIKey(token)
+			var apiKey models.APIKey
+			if err := db.First(&apiKey, "key_hash = ? AND is_active = true", hash).Error; err == nil {
+				if apiKey.UserID == instance.UserID {
+					authorized = true
+					now := time.Now()
+					db.Model(&apiKey).Update("last_used_at", now)
+				}
+			}
+		}
+		if !authorized {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid instance token"})
 		}
 
