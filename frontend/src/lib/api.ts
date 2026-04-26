@@ -346,12 +346,48 @@ export const messagesApi = {
     api.post(`/v1/instances/${id}/messages/poll`, data),
   sendSticker: (id: string, data: { to: string; url?: string; base64?: string }) =>
     api.post(`/v1/instances/${id}/messages/sticker`, data),
-  sendButtons: (id: string, data: { to: string; body: string; footer?: string; buttons: { id?: string; text: string; type?: "reply" | "url" | "call"; url?: string; phone?: string }[] }) =>
+  sendButtons: (
+    id: string,
+    data: {
+      to: string;
+      body: string;
+      footer?: string;
+      // Backend aceita até 3 botões. Tipos:
+      //   reply → quick reply (retorna o id ao clicar)
+      //   url   → abre URL externa
+      //   call  → disca número (phone)
+      //   copy  → copia código pra clipboard (copy_code)
+      buttons: {
+        id?: string;
+        text: string;
+        type?: "reply" | "url" | "call" | "copy";
+        url?: string;
+        phone?: string;
+        copy_code?: string;
+      }[];
+    },
+  ) =>
     api.post(`/v1/instances/${id}/messages/buttons`, data),
   sendTemplate: (id: string, data: { to: string; content: string; footer?: string; buttons: { display_text: string; type: "quickreply" | "url" | "call"; id?: string; url?: string; phone_number?: string }[] }) =>
     api.post(`/v1/instances/${id}/messages/template`, data),
   sendList: (id: string, data: { to: string; title?: string; description?: string; button_text: string; footer?: string; sections: { title: string; rows: { id: string; title: string; description?: string }[] }[] }) =>
     api.post(`/v1/instances/${id}/messages/list`, data),
+  // PIX (review_and_pay) — card de cobrança interativo. KeyType aceita
+  // CPF, CNPJ, EMAIL, PHONE, EVP. Valor é o exibido pelo recipient antes
+  // de confirmar; o protocolo atual aceita 0,01 default e o user ajusta no app.
+  sendPix: (
+    id: string,
+    data: {
+      to: string;
+      header_title: string;
+      body_text: string;
+      footer_text?: string;
+      merchant_name: string;
+      pix_key: string;
+      key_type: "CPF" | "CNPJ" | "EMAIL" | "PHONE" | "EVP";
+    },
+  ) =>
+    api.post(`/v1/instances/${id}/messages/pix`, data),
   sendMenu: (id: string, data: { number: string; type: "button"|"list"|"poll"|"carousel"; text: string; choices: string[]; footerText?: string; listButton?: string; selectableCount?: number; imageButton?: string }) =>
     api.post(`/v1/instances/${id}/messages/menu`, data),
 };

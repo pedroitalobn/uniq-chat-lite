@@ -11,13 +11,14 @@ import {
   RefreshCw, Bot, ChevronDown, ChevronUp, Image, FileText, Music,
   Video, MapPin, User, Smile, BarChart2, Sticker, MessageSquareText,
   MousePointerClick, ShieldAlert, Camera, Users, Phone, RotateCcw, Download,
-  Eye, EyeOff, Lock, LogIn, List, LayoutGrid,
+  Eye, EyeOff, Lock, LogIn, List, LayoutGrid, Banknote,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { showConfirm } from "@/lib/confirm";
 import type { Instance, InstanceSettings, MessageLog, InstanceProfile, InstanceContactLookup, Webhook } from "@/types";
 import Link from "next/link";
+import { MessageButtonsBuilder, type MessageButton, validateButtons } from "@/components/messages/MessageButtonsBuilder";
 import { QRCodeModal } from "@/components/instances/QRCodeModal";
 import ProxyConfigForm from "@/components/instances/ProxyConfigForm";
 
@@ -624,7 +625,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
   const [igChallengeCode, setIgChallengeCode] = useState("");
   const [igChallengeMethod, setIgChallengeMethod] = useState<"email" | "phone">("phone");
   const [igChallengeLoading, setIgChallengeLoading] = useState(false);
-  const [msgType, setMsgType] = useState<"text"|"image"|"document"|"audio"|"video"|"location"|"contact"|"reaction"|"poll"|"sticker"|"buttons"|"template"|"list"|"carousel">("text");
+  const [msgType, setMsgType] = useState<"text"|"image"|"document"|"audio"|"video"|"location"|"contact"|"reaction"|"poll"|"sticker"|"buttons"|"template"|"list"|"carousel"|"pix">("text");
   const [recipient, setRecipient] = useState("");
   const [sending, setSending] = useState(false);
   // per-type fields
@@ -644,7 +645,19 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
   // buttons
   const [btnBody, setBtnBody] = useState("");
   const [btnFooter, setBtnFooter] = useState("");
-  const [btnItems, setBtnItems] = useState("Sim|sim\nNão|não\nTalvez|talvez");
+  // Builder visual substituiu o textarea legado (formato `texto|tipo:valor`).
+  // Default: 2 botões de quick reply pra dar onboarding visual ao novo usuário.
+  const [btnButtons, setBtnButtons] = useState<MessageButton[]>([
+    { id: crypto.randomUUID(), text: "Sim", type: "reply" },
+    { id: crypto.randomUUID(), text: "Não", type: "reply" },
+  ]);
+  // pix (review_and_pay)
+  const [pixHeader, setPixHeader] = useState("Pagamento via PIX");
+  const [pixBody, setPixBody] = useState("");
+  const [pixFooter, setPixFooter] = useState("");
+  const [pixMerchant, setPixMerchant] = useState("");
+  const [pixKey, setPixKey] = useState("");
+  const [pixKeyType, setPixKeyType] = useState<"CPF" | "CNPJ" | "EMAIL" | "PHONE" | "EVP">("CPF");
   // template
   const [templateContent, setTemplateContent] = useState("");
   const [templateFooter, setTemplateFooter] = useState("");
@@ -813,7 +826,8 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
       case "contact":  return !!contactName.trim() && !!contactPhone.trim();
       case "reaction": return !!reactionMsgId.trim() && !!emoji.trim();
       case "poll":     return !!pollQuestion.trim() && pollOptions.split("\n").filter(Boolean).length >= 2;
-      case "buttons":  return !!btnBody.trim() && btnItems.split("\n").filter(Boolean).length >= 1;
+      case "buttons":  return !!btnBody.trim() && btnButtons.length >= 1 && validateButtons(btnButtons) === null;
+      case "pix":      return !!pixHeader.trim() && !!pixBody.trim() && !!pixMerchant.trim() && !!pixKey.trim();
       case "template": return !!templateContent.trim() && templateButtons.split("\n").filter(Boolean).length >= 1;
       case "list":     return !!listText.trim() && listChoices.split("\n").filter(Boolean).length >= 1;
       case "carousel": return !!carouselText.trim() && carouselChoices.split("\n").filter(Boolean).length >= 1;
@@ -857,26 +871,34 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
           await messagesApi.sendSticker(instanceId, { to: recipient, url: mediaUrl });
           break;
         case "buttons": {
-          const buttons = btnItems
-            .split("\n")
-            .map((line) => line.trim())
-            .filter(Boolean)
-            .slice(0, 3)
-            .map((line, i) => {
-              const [textPart, actionPart] = line.split("|");
-              const textValue = (textPart || "").trim();
-              const actionValue = (actionPart || "").trim();
-              if (!textValue) return null;
-              if (actionValue.startsWith("url:")) {
-                return { text: textValue, type: "url" as const, url: actionValue.slice(4).trim() };
-              }
-              if (actionValue.startsWith("call:")) {
-                return { text: textValue, type: "call" as const, phone: actionValue.slice(5).trim() };
-              }
-              return { id: actionValue || `btn_${i}`, text: textValue, type: "reply" as const };
-            })
-            .filter((button): button is NonNullable<typeof button> => Boolean(button?.text));
+          const validationError = validateButtons(btnButtons);
+          if (validationError) {
+            toast.error(validationError);
+            return;
+          }
+          // Serializa do builder visual pro payload aceito pelo backend.
+          // Mantém o id interno do builder só pra React keys, não envia.
+          const buttons = btnButtons.slice(0, 3).map((b, i) => ({
+            id: b.type === "reply" ? (b.id || `btn_${i}`) : undefined,
+            text: b.text.trim(),
+            type: b.type,
+            url: b.type === "url" ? b.url?.trim() : undefined,
+            phone: b.type === "call" ? b.phone?.trim() : undefined,
+            copy_code: b.type === "copy" ? b.copy_code?.trim() : undefined,
+          }));
           await messagesApi.sendButtons(instanceId, { to: recipient, body: btnBody, footer: btnFooter || undefined, buttons });
+          break;
+        }
+        case "pix": {
+          await messagesApi.sendPix(instanceId, {
+            to: recipient,
+            header_title: pixHeader,
+            body_text: pixBody,
+            footer_text: pixFooter || undefined,
+            merchant_name: pixMerchant,
+            pix_key: pixKey,
+            key_type: pixKeyType,
+          });
           break;
         }
         case "template": {
@@ -1375,6 +1397,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                 { id: "poll",     label: "Enquete",    icon: BarChart2 },
                 { id: "sticker",  label: "Sticker",    icon: Sticker },
                 { id: "buttons",  label: "Botões",     icon: MousePointerClick },
+                { id: "pix",      label: "PIX",        icon: Banknote },
                 { id: "template", label: "Template",   icon: MousePointerClick },
                 { id: "list",     label: "Lista",      icon: List },
                 { id: "carousel", label: "Carrossel",  icon: LayoutGrid },
@@ -1453,16 +1476,39 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
             </div>
           )}
           {msgType === "buttons" && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <textarea value={btnBody} onChange={e => setBtnBody(e.target.value)}
                 rows={2} placeholder="Texto da mensagem" className="input-field w-full resize-none" />
               <input value={btnFooter} onChange={e => setBtnFooter(e.target.value)}
                 placeholder="Rodapé (opcional)" className="input-field w-full" />
-              <textarea value={btnItems} onChange={e => setBtnItems(e.target.value)}
-                rows={4} placeholder={"Sim|sim\nVisitar site|url:https://uniq.chat\nLigar agora|call:+5511999999999"} className="input-field w-full resize-none font-mono text-xs" />
-              <div className="rounded-lg p-2.5" style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)" }}>
+              <MessageButtonsBuilder buttons={btnButtons} onChange={setBtnButtons} />
+            </div>
+          )}
+          {msgType === "pix" && (
+            <div className="space-y-2">
+              <input value={pixHeader} onChange={e => setPixHeader(e.target.value)}
+                placeholder="Título do card (ex: Pagamento)" className="input-field w-full" />
+              <textarea value={pixBody} onChange={e => setPixBody(e.target.value)}
+                rows={2} placeholder="Descrição do pagamento" className="input-field w-full resize-none" />
+              <input value={pixFooter} onChange={e => setPixFooter(e.target.value)}
+                placeholder="Rodapé (opcional)" className="input-field w-full" />
+              <input value={pixMerchant} onChange={e => setPixMerchant(e.target.value)}
+                placeholder="Nome do beneficiário" className="input-field w-full" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <select value={pixKeyType} onChange={e => setPixKeyType(e.target.value as typeof pixKeyType)}
+                  className="input-field">
+                  <option value="CPF">CPF</option>
+                  <option value="CNPJ">CNPJ</option>
+                  <option value="EMAIL">E-mail</option>
+                  <option value="PHONE">Telefone</option>
+                  <option value="EVP">Aleatória (EVP)</option>
+                </select>
+                <input value={pixKey} onChange={e => setPixKey(e.target.value)}
+                  placeholder="Chave PIX" className="input-field sm:col-span-2" />
+              </div>
+              <div className="rounded-lg p-2.5" style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.2)" }}>
                 <p className="text-[10px]" style={{ color: "rgb(110 231 183)" }}>
-                  Formatos: <span className="font-mono">texto|id</span> para resposta rápida, <span className="font-mono">texto|url:https://...</span> para link, <span className="font-mono">texto|call:+5511...</span> para ligação. Máximo 3 botões.
+                  Card "Pagar" interativo — o cliente confirma o valor no app. Default exibido: R$ 0,01 (limitação atual do protocolo).
                 </p>
               </div>
             </div>

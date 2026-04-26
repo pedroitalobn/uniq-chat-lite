@@ -2,6 +2,7 @@ package whatsapp
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"github.com/uniq-chat/backend/internal/queue"
 	"github.com/uniq-chat/backend/internal/storage"
 	"go.mau.fi/whatsmeow"
+	waBinary "go.mau.fi/whatsmeow/binary"
 	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waCompanionReg"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -988,13 +990,20 @@ func (ic *InstanceClient) SendPollMessage(to, question string, options []string,
 	return res.ID, nil
 }
 
-// ButtonItem represents a quick-reply button.
+// ButtonItem representa um botão interativo do WhatsApp.
+//
+// Tipos suportados (Type):
+//   - "reply" (default) — quick reply, retorna o ID quando clicado
+//   - "url"             — abre URL externa (campo URL)
+//   - "call"            — disca número (campo Phone)
+//   - "copy"            — copia código pra área de transferência (campo CopyCode)
 type ButtonItem struct {
-	ID    string `json:"id"`
-	Text  string `json:"text"`
-	Type  string `json:"type"`
-	URL   string `json:"url"`
-	Phone string `json:"phone"`
+	ID       string `json:"id"`
+	Text     string `json:"text"`
+	Type     string `json:"type"`
+	URL      string `json:"url"`
+	Phone    string `json:"phone"`
+	CopyCode string `json:"copy_code"`
 }
 
 type TemplateButtonItem struct {
@@ -1086,11 +1095,25 @@ func (ic *InstanceClient) SendListFallbackMessage(to, title, description, button
 	return ic.SendTextMessage(to, buildListTextFallback(title, description, buttonText, footer, sections))
 }
 
-// SendButtonsMessage sends a button message.
-// First attempts hydrated template buttons.
-// If WhatsApp returns 405 (deprecated on some accounts), falls back to a
-// formatted text message with emoji-numbered options.
+// SendButtonsMessage envia uma mensagem com botões interativos.
+//
+// Implementa o protocolo atual do WhatsApp (Apr/26) descoberto no PR
+// EvolutionAPI/evolution-go#40 — o método antigo via HydratedTemplate
+// (que estava aqui antes) parou de renderizar em iOS recente e Android
+// atualizado, então mudamos pra:
+//
+//  1. Reply-only → ButtonsMessage envolto em DocumentWithCaptionMessage
+//  2. URL/CALL/COPY → InteractiveMessage (NativeFlowMessage) envolto
+//     em DocumentWithCaptionMessage
+//  3. MessageSecret aleatório de 32 bytes — required pra iOS renderizar
+//  4. AdditionalNodes biz/bot — required pelo protocolo de stanza atual
+//
+// Em caso de erro, faz fallback pro texto formatado com emojis numerados
+// (mantém UX coerente em accounts onde botões não funcionam).
 func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []ButtonItem) (string, error) {
+	if len(buttons) == 0 {
+		return "", fmt.Errorf("no buttons provided")
+	}
 	if len(buttons) > 3 {
 		buttons = buttons[:3]
 	}
@@ -1100,80 +1123,358 @@ func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []
 		return "", fmt.Errorf("invalid JID: %w", err)
 	}
 
-	hydratedButtons := make([]*waE2E.HydratedTemplateButton, 0, len(buttons))
-	for i, button := range buttons {
-		text := strings.TrimSpace(button.Text)
+	// Decide o estilo da mensagem: se TODOS os botões são reply, usa
+	// ButtonsMessage nativo (renderiza melhor). Se há qualquer URL/CALL/
+	// COPY, troca pra InteractiveMessage que aceita os 4 tipos.
+	hasNonReply := false
+	for _, b := range buttons {
+		t := strings.ToLower(strings.TrimSpace(b.Type))
+		if t == "url" || strings.TrimSpace(b.URL) != "" ||
+			t == "call" || strings.TrimSpace(b.Phone) != "" ||
+			t == "copy" || strings.TrimSpace(b.CopyCode) != "" {
+			hasNonReply = true
+			break
+		}
+	}
+
+	// MessageSecret 32 bytes — required pra iOS. Se randomização falhar
+	// (cenário super improvável), seguimos sem o secret e o iOS pode não
+	// renderizar — mas Android ainda vê.
+	secret := make([]byte, 32)
+	_, _ = cryptorand.Read(secret)
+
+	var inner *waE2E.Message
+	if !hasNonReply {
+		inner = buildReplyButtonsInner(body, footer, buttons, secret)
+	} else {
+		inner = buildInteractiveButtonsInner(body, footer, buttons, secret)
+	}
+
+	// Wrap in DocumentWithCaptionMessage (FutureProofMessage) — required
+	// pelo protocolo atual pra que botões apareçam in-chat.
+	msg := &waE2E.Message{
+		DocumentWithCaptionMessage: &waE2E.FutureProofMessage{
+			Message: inner,
+		},
+	}
+
+	// AdditionalNodes biz: <biz><interactive type="native_flow" v="1">...
+	bizNodes := buildButtonsBizNodes(hasNonReply)
+
+	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
+		AdditionalNodes: &bizNodes,
+	})
+	if err != nil {
+		log.Warn().Str("instance", ic.ID).Err(err).Msg("interactive button send failed, falling back to text")
+		return ic.SendButtonsFallbackMessage(to, body, footer, buttons)
+	}
+	return res.ID, nil
+}
+
+// buildReplyButtonsInner monta o waE2E.Message interno (sem o wrapping
+// DocumentWithCaptionMessage) usando ButtonsMessage nativo — caminho ideal
+// quando todos os botões são tipo "reply" (quick reply). É o que renderiza
+// como botões "limpos" na UI do app sem o card cinza.
+func buildReplyButtonsInner(body, footer string, buttons []ButtonItem, secret []byte) *waE2E.Message {
+	replyButtons := make([]*waE2E.ButtonsMessage_Button, 0, len(buttons))
+	for i, b := range buttons {
+		id := strings.TrimSpace(b.ID)
+		if id == "" {
+			id = fmt.Sprintf("btn_%d", i)
+		}
+		replyButtons = append(replyButtons, &waE2E.ButtonsMessage_Button{
+			ButtonID: proto.String(id),
+			ButtonText: &waE2E.ButtonsMessage_Button_ButtonText{
+				DisplayText: proto.String(strings.TrimSpace(b.Text)),
+			},
+			Type: waE2E.ButtonsMessage_Button_RESPONSE.Enum(),
+		})
+	}
+	return &waE2E.Message{
+		ButtonsMessage: &waE2E.ButtonsMessage{
+			ContentText: proto.String(body),
+			FooterText:  proto.String(footer),
+			HeaderType:  waE2E.ButtonsMessage_EMPTY.Enum(),
+			Buttons:     replyButtons,
+		},
+		MessageContextInfo: &waE2E.MessageContextInfo{
+			MessageSecret: secret,
+		},
+	}
+}
+
+// buildInteractiveButtonsInner monta o waE2E.Message interno usando
+// InteractiveMessage (NativeFlowMessage) — necessário quando há botões
+// de URL, CALL ou COPY. Renderiza como o card cinza estilo "Business",
+// mas é o ÚNICO caminho que aceita esses tipos no WhatsApp atual.
+func buildInteractiveButtonsInner(body, footer string, buttons []ButtonItem, secret []byte) *waE2E.Message {
+	nfButtons := make([]*waE2E.InteractiveMessage_NativeFlowMessage_NativeFlowButton, 0, len(buttons))
+	for i, b := range buttons {
+		text := strings.TrimSpace(b.Text)
 		if text == "" {
 			continue
 		}
+		var name *string
+		var paramsJSON *string
 
-		index := uint32(i)
-		switch {
-		case strings.EqualFold(button.Type, "url") || strings.TrimSpace(button.URL) != "":
-			url := strings.TrimSpace(button.URL)
+		typ := strings.ToLower(strings.TrimSpace(b.Type))
+		// Inferência por preenchimento: se não vier Type explícito mas
+		// veio URL/Phone/CopyCode, decide pelo campo dominante. Mantém
+		// retrocompat com clients que não enviam Type.
+		if typ == "" {
+			switch {
+			case strings.TrimSpace(b.URL) != "":
+				typ = "url"
+			case strings.TrimSpace(b.Phone) != "":
+				typ = "call"
+			case strings.TrimSpace(b.CopyCode) != "":
+				typ = "copy"
+			default:
+				typ = "reply"
+			}
+		}
+
+		switch typ {
+		case "url":
+			url := strings.TrimSpace(b.URL)
 			if url == "" {
 				continue
 			}
-			hydratedButtons = append(hydratedButtons, &waE2E.HydratedTemplateButton{
-				Index: &index,
-				HydratedButton: &waE2E.HydratedTemplateButton_UrlButton{
-					UrlButton: &waE2E.HydratedTemplateButton_HydratedURLButton{
-						DisplayText: proto.String(text),
-						URL:         proto.String(url),
-					},
-				},
-			})
-		case strings.EqualFold(button.Type, "call") || strings.TrimSpace(button.Phone) != "":
-			phone := strings.TrimSpace(button.Phone)
+			name = proto.String("cta_url")
+			j, _ := json.Marshal(map[string]string{"display_text": text, "url": url, "merchant_url": url})
+			paramsJSON = proto.String(string(j))
+		case "call":
+			phone := strings.TrimSpace(b.Phone)
 			if phone == "" {
 				continue
 			}
-			hydratedButtons = append(hydratedButtons, &waE2E.HydratedTemplateButton{
-				Index: &index,
-				HydratedButton: &waE2E.HydratedTemplateButton_CallButton{
-					CallButton: &waE2E.HydratedTemplateButton_HydratedCallButton{
-						DisplayText: proto.String(text),
-						PhoneNumber: proto.String(phone),
-					},
-				},
-			})
-		default:
-			id := strings.TrimSpace(button.ID)
+			name = proto.String("cta_call")
+			j, _ := json.Marshal(map[string]string{"display_text": text, "phone_number": phone})
+			paramsJSON = proto.String(string(j))
+		case "copy":
+			code := strings.TrimSpace(b.CopyCode)
+			if code == "" {
+				code = strings.TrimSpace(b.ID)
+			}
+			id := strings.TrimSpace(b.ID)
+			if id == "" {
+				id = fmt.Sprintf("copy_%d", i)
+			}
+			name = proto.String("cta_copy")
+			j, _ := json.Marshal(map[string]string{"display_text": text, "id": id, "copy_code": code})
+			paramsJSON = proto.String(string(j))
+		default: // reply
+			id := strings.TrimSpace(b.ID)
 			if id == "" {
 				id = fmt.Sprintf("btn_%d", i)
 			}
-			hydratedButtons = append(hydratedButtons, &waE2E.HydratedTemplateButton{
-				Index: &index,
-				HydratedButton: &waE2E.HydratedTemplateButton_QuickReplyButton{
-					QuickReplyButton: &waE2E.HydratedTemplateButton_HydratedQuickReplyButton{
-						DisplayText: proto.String(text),
-						ID:          proto.String(id),
-					},
-				},
-			})
+			name = proto.String("quick_reply")
+			j, _ := json.Marshal(map[string]string{"display_text": text, "id": id})
+			paramsJSON = proto.String(string(j))
 		}
+
+		nfButtons = append(nfButtons, &waE2E.InteractiveMessage_NativeFlowMessage_NativeFlowButton{
+			Name:             name,
+			ButtonParamsJSON: paramsJSON,
+		})
 	}
 
-	if len(hydratedButtons) == 0 {
-		return "", fmt.Errorf("no valid buttons provided")
+	return &waE2E.Message{
+		InteractiveMessage: &waE2E.InteractiveMessage{
+			Body: &waE2E.InteractiveMessage_Body{Text: proto.String(body)},
+			Footer: func() *waE2E.InteractiveMessage_Footer {
+				if footer == "" {
+					return nil
+				}
+				return &waE2E.InteractiveMessage_Footer{Text: proto.String(footer)}
+			}(),
+			InteractiveMessage: &waE2E.InteractiveMessage_NativeFlowMessage_{
+				NativeFlowMessage: &waE2E.InteractiveMessage_NativeFlowMessage{
+					Buttons:           nfButtons,
+					MessageParamsJSON: proto.String(""),
+					MessageVersion:    proto.Int32(1),
+				},
+			},
+		},
+		MessageContextInfo: &waE2E.MessageContextInfo{
+			MessageSecret:             secret,
+			DeviceListMetadataVersion: proto.Int32(2),
+			DeviceListMetadata:        &waE2E.DeviceListMetadata{},
+		},
+	}
+}
+
+// buildButtonsBizNodes monta os nós XML <biz> + <bot> que precisam
+// acompanhar a stanza pra que o WhatsApp renderize os botões. Sem isso,
+// no protocolo atual a mensagem chega como texto puro (sem cards).
+func buildButtonsBizNodes(interactive bool) []waBinary.Node {
+	flowType := "quick_reply"
+	if interactive {
+		flowType = "mixed"
+	}
+	return []waBinary.Node{
+		{
+			Tag: "biz",
+			Content: []waBinary.Node{{
+				Tag: "interactive",
+				Attrs: waBinary.Attrs{
+					"type": "native_flow",
+					"v":    "1",
+				},
+				Content: []waBinary.Node{{
+					Tag:   "native_flow",
+					Attrs: waBinary.Attrs{"v": "9", "name": flowType},
+				}},
+			}},
+		},
+	}
+}
+
+// PixData carrega os campos pra montar uma mensagem de cobrança PIX
+// (review_and_pay) — botão interativo com chave PIX que o cliente vê
+// como um card "Pagar" no WhatsApp e confirma direto no app.
+//
+// KeyType aceita: CPF, CNPJ, EMAIL, PHONE, EVP (case-insensitive).
+type PixData struct {
+	HeaderTitle  string // Título do card (ex: "Pagamento")
+	BodyText     string // Texto descritivo
+	FooterText   string // Rodapé opcional
+	MerchantName string // Nome do beneficiário
+	PixKey       string // Chave PIX
+	KeyType      string // Tipo da chave
+}
+
+// SendPixMessage envia uma cobrança PIX interativa via mensagem
+// review_and_pay. Replica o protocolo descoberto no PR
+// EvolutionAPI/evolution-go#40 (Apr/26): NativeFlowMessage com
+// payment_info button + biz/bot AdditionalNodes + DeviceListMetadata v2.
+//
+// Em caso de erro envia um fallback texto com a chave PIX legível
+// (mantém UX coerente em accounts onde o card não renderiza).
+func (ic *InstanceClient) SendPixMessage(to string, data PixData) (string, error) {
+	if strings.TrimSpace(data.MerchantName) == "" {
+		return "", fmt.Errorf("merchantName is required")
+	}
+	if strings.TrimSpace(data.PixKey) == "" {
+		return "", fmt.Errorf("pixKey is required")
+	}
+	keyType := strings.ToUpper(strings.TrimSpace(data.KeyType))
+	switch keyType {
+	case "CPF", "CNPJ", "EMAIL", "PHONE", "EVP":
+	default:
+		return "", fmt.Errorf("keyType inválido (use CPF, CNPJ, EMAIL, PHONE, EVP)")
 	}
 
-	msg := &waE2E.Message{
-		TemplateMessage: &waE2E.TemplateMessage{
-			Format: &waE2E.TemplateMessage_HydratedFourRowTemplate_{
-				HydratedFourRowTemplate: &waE2E.TemplateMessage_HydratedFourRowTemplate{
-					HydratedContentText: proto.String(body),
-					HydratedFooterText:  proto.String(footer),
-					HydratedButtons:     hydratedButtons,
+	recipient, err := types.ParseJID(normalizeJID(to))
+	if err != nil {
+		return "", fmt.Errorf("invalid JID: %w", err)
+	}
+
+	// Payload review_and_pay — formato esperado pelo WhatsApp 2.x.
+	// Valor default é 1 centavo (offset=100 → "0,01") porque o protocolo
+	// exige um valor não-zero pra processar a stanza. O recipient confirma
+	// o valor real ao finalizar o pagamento no app.
+	defaultAmount := map[string]int{"value": 100, "offset": 100}
+	referenceID := fmt.Sprintf("%011d", time.Now().UnixNano()%1e11)
+	payload := map[string]any{
+		"currency":     "BRL",
+		"reference_id": referenceID,
+		"type":         "physical-goods",
+		"total_amount": defaultAmount,
+		"order": map[string]any{
+			"status":     "pending",
+			"order_type": "ORDER",
+			"subtotal":   defaultAmount,
+			"items": []map[string]any{
+				{
+					"name":        "Pix",
+					"amount":      defaultAmount,
+					"quantity":    1,
+					"sale_amount": defaultAmount,
+				},
+			},
+		},
+		"payment_settings": []map[string]any{
+			{
+				"type": "pix_static_code",
+				"pix_static_code": map[string]string{
+					"merchant_name": data.MerchantName,
+					"key":           data.PixKey,
+					"key_type":      keyType,
 				},
 			},
 		},
 	}
 
-	res, err := ic.sendMessage(context.Background(), recipient, msg)
+	paymentJSON, err := json.Marshal(payload)
 	if err != nil {
-		log.Warn().Str("instance", ic.ID).Err(err).Msg("hydrated template button failed, using text fallback")
-		return ic.SendButtonsFallbackMessage(to, body, footer, buttons)
+		return "", fmt.Errorf("falha ao serializar payload pix: %w", err)
+	}
+
+	secret := make([]byte, 32)
+	_, _ = cryptorand.Read(secret)
+
+	interactive := &waE2E.InteractiveMessage{
+		Header: &waE2E.InteractiveMessage_Header{
+			Title:              proto.String(data.HeaderTitle),
+			HasMediaAttachment: proto.Bool(false),
+		},
+		Body: &waE2E.InteractiveMessage_Body{Text: proto.String(data.BodyText)},
+		InteractiveMessage: &waE2E.InteractiveMessage_NativeFlowMessage_{
+			NativeFlowMessage: &waE2E.InteractiveMessage_NativeFlowMessage{
+				Buttons: []*waE2E.InteractiveMessage_NativeFlowMessage_NativeFlowButton{{
+					Name:             proto.String("payment_info"),
+					ButtonParamsJSON: proto.String(string(paymentJSON)),
+				}},
+				MessageParamsJSON: proto.String(""),
+				MessageVersion:    proto.Int32(1),
+			},
+		},
+	}
+	if footer := strings.TrimSpace(data.FooterText); footer != "" {
+		interactive.Footer = &waE2E.InteractiveMessage_Footer{Text: proto.String(footer)}
+	}
+
+	msg := &waE2E.Message{
+		InteractiveMessage: interactive,
+		MessageContextInfo: &waE2E.MessageContextInfo{
+			MessageSecret:             secret,
+			DeviceListMetadataVersion: proto.Int32(2),
+			DeviceListMetadata:        &waE2E.DeviceListMetadata{},
+		},
+	}
+
+	// AdditionalNodes específicos pra fluxo de pagamento — biz com tipo
+	// review_and_pay + bot ack. O WhatsApp espera o stanza nessa forma
+	// pra renderizar o card "Pagar" no recipient.
+	pixNodes := []waBinary.Node{
+		{
+			Tag: "biz",
+			Content: []waBinary.Node{{
+				Tag: "interactive",
+				Attrs: waBinary.Attrs{
+					"type": "native_flow",
+					"v":    "1",
+				},
+				Content: []waBinary.Node{{
+					Tag:   "native_flow",
+					Attrs: waBinary.Attrs{"v": "9", "name": "review_and_pay"},
+				}},
+			}},
+		},
+	}
+
+	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
+		AdditionalNodes: &pixNodes,
+	})
+	if err != nil {
+		log.Warn().Str("instance", ic.ID).Err(err).Msg("PIX send failed, falling back to text")
+		fallback := fmt.Sprintf("*%s*\n\n%s\n\n💳 *Pagamento PIX*\nFavor: %s\nChave (%s): `%s`",
+			data.HeaderTitle, data.BodyText, data.MerchantName, keyType, data.PixKey)
+		if footer := strings.TrimSpace(data.FooterText); footer != "" {
+			fallback += "\n\n_" + footer + "_"
+		}
+		return ic.SendTextMessage(to, fallback)
 	}
 	return res.ID, nil
 }

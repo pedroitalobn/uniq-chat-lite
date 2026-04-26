@@ -502,6 +502,56 @@ func (h *MessageHandler) SendButtons(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message_id": msgID, "status": "sent"})
 }
 
+// SendPix godoc
+// POST /instances/:id/messages/pix
+//
+// Envia uma cobrança PIX interativa (review_and_pay) — card "Pagar"
+// no WhatsApp com chave PIX que o cliente pode confirmar direto.
+func (h *MessageHandler) SendPix(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	instance := c.Locals("instance").(*models.Instance)
+
+	var req struct {
+		To           string `json:"to"`
+		HeaderTitle  string `json:"header_title"`
+		BodyText     string `json:"body_text"`
+		FooterText   string `json:"footer_text"`
+		MerchantName string `json:"merchant_name"`
+		PixKey       string `json:"pix_key"`
+		KeyType      string `json:"key_type"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.To == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'to' é obrigatório"})
+	}
+	if req.HeaderTitle == "" || req.BodyText == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "header_title e body_text são obrigatórios"})
+	}
+	if req.MerchantName == "" || req.PixKey == "" || req.KeyType == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "merchant_name, pix_key e key_type são obrigatórios"})
+	}
+
+	msgID, err := client.SendPixMessage(req.To, whatsapp.PixData{
+		HeaderTitle:  req.HeaderTitle,
+		BodyText:     req.BodyText,
+		FooterText:   req.FooterText,
+		MerchantName: req.MerchantName,
+		PixKey:       req.PixKey,
+		KeyType:      req.KeyType,
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	go h.logMessage(instance.ID.String(), "out", "pix", req.To, msgID, map[string]interface{}{
+		"merchant_name": req.MerchantName,
+		"key_type":      req.KeyType,
+	})
+	return c.JSON(fiber.Map{"message_id": msgID, "status": "sent"})
+}
+
 // SendTemplate godoc
 // POST /instances/:id/messages/template
 func (h *MessageHandler) SendTemplate(c *fiber.Ctx) error {

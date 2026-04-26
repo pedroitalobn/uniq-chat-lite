@@ -274,6 +274,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	v1msgs.Post("/buttons", msgH.SendButtons)
 	v1msgs.Post("/template", msgH.SendTemplate)
 	v1msgs.Post("/list", msgH.SendList)
+	v1msgs.Post("/pix", msgH.SendPix)
 	v1msgs.Post("/menu", msgH.SendMenu)
 	v1msgs.Post("/sticker", msgH.SendSticker)
 	v1msgs.Post("/status", msgH.SendStatus)
