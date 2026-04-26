@@ -9,7 +9,7 @@ import Link from "next/link";
 import {
   Lock, Search, ChevronDown, User as UserIcon, MessageSquare,
   Layers, Smartphone, Radio, RefreshCw, Check, BarChart3,
-  MoreVertical, Users, Building2, Zap,
+  MoreVertical, Users, Building2, Zap, Bell,
 } from "lucide-react";
 import {
   conversationsApi, queuesApi, workspacesApi, channelsApi, instancesApi,
@@ -398,6 +398,24 @@ export default function InboxPage() {
           {viewMode === "conversations" && (
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <GlobalSearchButton wsId={wsId} />
+            <button
+              type="button"
+              onClick={() => {
+                qc.invalidateQueries({ queryKey: ["conversations", wsId] });
+                qc.invalidateQueries({ queryKey: ["inbox-stats", wsId] });
+                qc.invalidateQueries({ queryKey: ["conversations-count", wsId] });
+              }}
+              title="Atualizar"
+              aria-label="Atualizar lista"
+              className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid hsl(240 12% 16%)",
+                color: "hsl(240 8% 65%)",
+              }}
+            >
+              <RefreshCw className="h-3 w-3" />
+            </button>
             {notifPerm === "default" && (
               <button
                 type="button"
@@ -410,7 +428,7 @@ export default function InboxPage() {
                   color: "#00d46a",
                 }}
               >
-                🔔 Ativar notificações
+                <Bell className="h-3 w-3" /> Ativar notificações
               </button>
             )}
             {/* Agent */}

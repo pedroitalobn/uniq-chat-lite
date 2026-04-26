@@ -7,6 +7,7 @@ import { Plus, Trash2, Lock } from "lucide-react";
 import { departmentsApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface Department {
   id: string;
@@ -29,6 +30,7 @@ export default function DepartmentsPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState("#64748b");
+  const [confirmDel, setConfirmDel] = useState<{ id: string; name: string } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["departments", wsId],
@@ -131,9 +133,7 @@ export default function DepartmentsPage() {
             </div>
             {canManage && (
               <button
-                onClick={() => {
-                  if (confirm(`Excluir "${d.name}"?`)) remove.mutate(d.id);
-                }}
+                onClick={() => setConfirmDel({ id: d.id, name: d.name })}
                 className="rounded-md p-1.5 text-zinc-500 hover:bg-red-500/10 hover:text-red-500"
                 aria-label="Excluir"
               >
@@ -143,6 +143,20 @@ export default function DepartmentsPage() {
           </li>
         ))}
       </ul>
+      {confirmDel && (
+        <ConfirmDialog
+          title="Excluir departamento"
+          body={<>O departamento <span style={{ color: "hsl(240 15% 92%)" }}>&quot;{confirmDel.name}&quot;</span> será removido. Times e filas vinculados ficarão sem departamento.</>}
+          confirmLabel="Excluir"
+          variant="danger"
+          onConfirm={() => {
+            remove.mutate(confirmDel.id);
+            setConfirmDel(null);
+          }}
+          onCancel={() => setConfirmDel(null)}
+          isPending={remove.isPending}
+        />
+      )}
     </div>
   );
 }

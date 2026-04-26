@@ -7,6 +7,7 @@ import { Plus, Trash2, Lock, UserPlus, X } from "lucide-react";
 import { teamsApi, departmentsApi, workspacesApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface Team {
   id: string;
@@ -48,6 +49,7 @@ export default function TeamsPage() {
   const [name, setName] = useState("");
   const [departmentId, setDepartmentId] = useState("");
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [confirmDel, setConfirmDel] = useState<{ id: string; name: string } | null>(null);
 
   const { data: teams, isLoading } = useQuery({
     queryKey: ["teams", wsId],
@@ -162,7 +164,7 @@ export default function TeamsPage() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (confirm(`Excluir "${t.name}"?`)) remove.mutate(t.id);
+                      setConfirmDel({ id: t.id, name: t.name });
                     }}
                     className="rounded-md p-1.5 text-zinc-500 hover:bg-red-500/10 hover:text-red-500"
                     aria-label="Excluir"
@@ -179,6 +181,20 @@ export default function TeamsPage() {
           <TeamMembers teamId={selectedTeamId} canManage={canManage} wsId={wsId} />
         )}
       </div>
+      {confirmDel && (
+        <ConfirmDialog
+          title="Excluir equipe"
+          body={<>A equipe <span style={{ color: "hsl(240 15% 92%)" }}>&quot;{confirmDel.name}&quot;</span> será removida. Membros mantém seus tickets em curso.</>}
+          confirmLabel="Excluir"
+          variant="danger"
+          onConfirm={() => {
+            remove.mutate(confirmDel.id);
+            setConfirmDel(null);
+          }}
+          onCancel={() => setConfirmDel(null)}
+          isPending={remove.isPending}
+        />
+      )}
     </div>
   );
 }

@@ -267,27 +267,34 @@ func (m *Manager) SaveMessageEx(in SaveMessageInput) error {
 	var contactAvatar string
 
 	if isGroup {
-		// For groups, get the group name from WhatsApp
-		log.Printf("DEBUG: Processing group message, JID: %s", toJID)
-		if client := m.GetInstance(instanceID); client != nil && client.IsConnected() {
-			log.Printf("DEBUG: Instance connected, fetching group info for: %s", toJID)
-			groupInfo, err := client.GetGroupInfo(toJID)
-			if err == nil {
-				log.Printf("DEBUG: Got group info: %+v", groupInfo)
-				if name, ok := groupInfo["name"].(string); ok && name != "" {
-					contactName = name
-					log.Printf("DEBUG: Set group name to: %s", name)
+		// For groups, get the group name from WhatsApp.
+		// Cache em memória por JID — algumas chamadas falham por rate limit
+		// ou timeout transitório; reusar resultado anterior evita ficar com
+		// "Grupo 5511..." pra sempre quando o primeiro fetch falhou.
+		if cached, ok := groupNameCache.Load(toJID); ok {
+			if name, ok := cached.(string); ok && name != "" {
+				contactName = name
+			}
+		}
+		if contactName == "" {
+			if client := m.GetInstance(instanceID); client != nil && client.IsConnected() {
+				groupInfo, err := client.GetGroupInfo(toJID)
+				if err == nil {
+					if name, ok := groupInfo["name"].(string); ok && name != "" {
+						contactName = name
+						groupNameCache.Store(toJID, name)
+					}
+				} else {
+					log.Printf("DEBUG: Error getting group info: %v", err)
 				}
-			} else {
-				log.Printf("DEBUG: Error getting group info: %v", err)
 			}
-			// Fallback to group JID if name not found
-			if contactName == "" {
-				contactName = "Grupo " + phone
-			}
-		} else {
-			log.Printf("DEBUG: Instance not connected, using fallback")
+		}
+		if contactName == "" {
 			contactName = "Grupo " + phone
+			// Tentativa async: depois de 5s, refetch e atualiza Conversation/MessageLog
+			// caso o nome do grupo agora esteja disponível. Evita ficar travado
+			// no fallback quando o primeiro GetGroupInfo deu timeout.
+			go m.refetchGroupNameLater(instanceID, toJID)
 		}
 	} else {
 		// For individual chats
@@ -550,6 +557,48 @@ func messageIDs(msgs []models.MessageLog) []uuid.UUID {
 		out[i] = msgs[i].ID
 	}
 	return out
+}
+
+// groupNameCache evita ficar com "Grupo 5511..." quando GetGroupInfo
+// falhar transitoriamente (rate limit, timeout). Map[jid]name.
+var groupNameCache sync.Map
+
+// refetchGroupNameLater tenta de novo após 5s. Se conseguir o nome, atualiza
+// MessageLogs+Conversation desse grupo na instância. Idempotente — não faz
+// nada se o cache já tem o nome ou se o fetch falhar de novo.
+func (m *Manager) refetchGroupNameLater(instanceID, groupJID string) {
+	time.Sleep(5 * time.Second)
+	if _, ok := groupNameCache.Load(groupJID); ok {
+		return // outro caller já cacheou
+	}
+	client := m.GetInstance(instanceID)
+	if client == nil || !client.IsConnected() {
+		return
+	}
+	info, err := client.GetGroupInfo(groupJID)
+	if err != nil {
+		return
+	}
+	name, ok := info["name"].(string)
+	if !ok || name == "" {
+		return
+	}
+	groupNameCache.Store(groupJID, name)
+	if m.db == nil {
+		return
+	}
+	instUUID, err := uuid.Parse(instanceID)
+	if err != nil {
+		return
+	}
+	// Atualiza MessageLogs desse grupo nessa instance que ainda têm fallback
+	m.db.Model(&models.MessageLog{}).
+		Where("instance_id = ? AND to_jid = ? AND contact_name LIKE ?", instUUID, groupJID, "Grupo %").
+		Update("contact_name", name)
+	// Conversation: se contato é nil ou subject vazio, define subject = nome
+	m.db.Model(&models.Conversation{}).
+		Where("instance_id = ? AND channel_key = ? AND (subject = '' OR subject IS NULL)", instUUID, groupJID).
+		Update("subject", name)
 }
 
 func extractPhoneFromJID(jid string) string {

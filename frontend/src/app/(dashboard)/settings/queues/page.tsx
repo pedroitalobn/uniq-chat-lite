@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface Queue {
   id: string;
@@ -83,6 +84,7 @@ export default function QueuesPage() {
   const [depId, setDepId] = useState("");
   const [teamId, setTeamId] = useState("");
   const [editing, setEditing] = useState<Queue | null>(null);
+  const [confirmDel, setConfirmDel] = useState<{ id: string; name: string } | null>(null);
 
   const { data: queues, isLoading } = useQuery({
     queryKey: ["queues", wsId],
@@ -247,9 +249,7 @@ export default function QueuesPage() {
                     <Settings2 className="h-3.5 w-3.5" /> Configurar
                   </button>
                   <button
-                    onClick={() => {
-                      if (confirm(`Excluir "${q.name}"?`)) remove.mutate(q.id);
-                    }}
+                    onClick={() => setConfirmDel({ id: q.id, name: q.name })}
                     className="rounded-md p-1.5 text-zinc-500 hover:bg-red-500/10 hover:text-red-500"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -267,6 +267,20 @@ export default function QueuesPage() {
           wsId={wsId}
           canManage={canManage}
           onClose={() => setEditing(null)}
+        />
+      )}
+      {confirmDel && (
+        <ConfirmDialog
+          title="Excluir fila"
+          body={<>A fila <span style={{ color: "hsl(240 15% 92%)" }}>&quot;{confirmDel.name}&quot;</span> será removida. Atendimentos em curso permanecem mas não recebem novos.</>}
+          confirmLabel="Excluir"
+          variant="danger"
+          onConfirm={() => {
+            remove.mutate(confirmDel.id);
+            setConfirmDel(null);
+          }}
+          onCancel={() => setConfirmDel(null)}
+          isPending={remove.isPending}
         />
       )}
     </div>

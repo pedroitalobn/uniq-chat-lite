@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MessageCircle, Users as UsersIcon } from "lucide-react";
+import { MessageCircle, Users as UsersIcon, UserCheck } from "lucide-react";
 
 export interface ConversationRow {
   id: string;
@@ -369,10 +369,22 @@ export function ConversationList({
                   e.stopPropagation();
                   onAction(conv);
                 }}
-                className="rounded-md px-2.5 py-1 text-[10px] font-semibold"
-                style={{ background: "#00d46a", color: "#03170a" }}
+                title={actionLabel}
+                aria-label={actionLabel}
+                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md transition-colors"
+                style={{
+                  background: "transparent",
+                  color: "#00d46a",
+                  border: "1px solid rgba(0,212,106,0.3)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(0,212,106,0.12)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
               >
-                {actionLabel}
+                <UserCheck className="h-3.5 w-3.5" />
               </button>
             )}
           </div>

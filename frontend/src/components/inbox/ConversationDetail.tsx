@@ -11,10 +11,11 @@ import {
   CheckCheck, AlertCircle, Paperclip, Pin, Sparkles, Users as UsersIcon,
   Maximize2 as Maximize2Icon, Phone, Video as VideoIcon, PhoneMissed,
   UserPlus, MessageSquare, ListChecks, CornerUpLeft, CornerUpRight,
-  Pencil, Trash2, Search, Info,
+  Pencil, Trash2, Search, Info, Bell, BellOff,
 } from "lucide-react";
 import { MediaViewer, type MediaViewerSource } from "@/components/inbox/MediaViewer";
 import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi, crmContactsApi, linkPreviewApi } from "@/lib/api";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TemplatePicker } from "@/components/inbox/TemplatePicker";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
@@ -158,6 +159,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   const [forwardMsg, setForwardMsg] = useState<MessagePayload | null>(null);
   const [editingMsg, setEditingMsg] = useState<MessagePayload | null>(null);
   const [infoMsg, setInfoMsg] = useState<MessagePayload | null>(null);
+  const [confirmRevokeMsg, setConfirmRevokeMsg] = useState<MessagePayload | null>(null);
   // Presence state — preenchido quando WS emite presence.update / chat.presence
   // pra channel_key desta conversation. typing reseta após 5s de silêncio.
   const [presence, setPresence] = useState<{ online?: boolean; lastSeen?: string; typing?: boolean }>({});
@@ -413,11 +415,9 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     onError: () => toast.error("Falha ao encaminhar"),
   });
 
-  // Keyboard shortcuts — declared after all mutations to avoid TDZ refs.
-  const openSnoozePrompt = useCallback(() => {
-    const hours = Number(prompt("Em quantas horas desnoozear?", "4") || 4);
-    if (hours > 0) snooze.mutate(new Date(Date.now() + hours * 3600_000).toISOString());
-  }, [snooze]);
+  // Snooze dialog state — substitui prompt() nativo do browser.
+  const [snoozeOpen, setSnoozeOpen] = useState(false);
+  const openSnoozePrompt = useCallback(() => setSnoozeOpen(true), []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -536,6 +536,48 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     if (delta > 0) scroller.scrollTop = preserveRef.current.top + delta;
     preserveRef.current = null;
   }, [timeline.length]);
+
+  // Scroll inicial pra mensagem mais recente quando conversation abre.
+  // didInitialScrollRef garante que só rola na PRIMEIRA carga; depois disso,
+  // o user controla o scroll. Reseta quando troca de conversation.
+  const didInitialScrollRef = useRef(false);
+  useEffect(() => {
+    didInitialScrollRef.current = false;
+  }, [conversationId]);
+  useEffect(() => {
+    if (didInitialScrollRef.current) return;
+    if (timeline.length === 0) return;
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    // Próximo frame pra garantir que o DOM já mediu altura final.
+    requestAnimationFrame(() => {
+      scroller.scrollTop = scroller.scrollHeight;
+      didInitialScrollRef.current = true;
+    });
+  }, [timeline.length, conversationId]);
+
+  // Auto-scroll quando chega msg nova SE o user já está perto do fim.
+  // Se ele rolou pra cima pra ler histórico antigo, não puxamos pro fim
+  // — respeita a leitura. Threshold: 120px do bottom.
+  const lastMessageIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (timeline.length === 0) return;
+    const last = timeline[timeline.length - 1];
+    if (!last || last.id === lastMessageIdRef.current) return;
+    const scroller = scrollRef.current;
+    if (!scroller) {
+      lastMessageIdRef.current = last.id;
+      return;
+    }
+    const distanceFromBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+    const isNearBottom = distanceFromBottom < 120;
+    if (isNearBottom && didInitialScrollRef.current) {
+      requestAnimationFrame(() => {
+        scroller.scrollTop = scroller.scrollHeight;
+      });
+    }
+    lastMessageIdRef.current = last.id;
+  }, [timeline]);
 
   return (
     <div className="flex h-full min-h-0">
@@ -736,7 +778,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                       }
                       onOpenViewer={setViewerSource}
                       onReply={(msg) => setReplyTo(msg)}
-                      onRevoke={(msg) => revokeMsg.mutate(msg.id)}
+                      onRevoke={(msg) => setConfirmRevokeMsg(msg)}
                       onForward={(msg) => setForwardMsg(msg)}
                       onReact={(msg, emoji) => reactMsg.mutate({ msgId: msg.id, emoji })}
                       onEdit={(msg) => setEditingMsg(msg)}
@@ -774,10 +816,60 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
       <aside className="hidden w-80 flex-col border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 lg:flex">
         <div className="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Contato</h2>
-          <div className="mt-2">
-            <div className="font-medium">{conv?.contact?.name || "—"}</div>
-            <div className="text-sm text-zinc-500">{conv?.contact?.phone || conv?.channel_key}</div>
-            {conv?.contact?.email && <div className="text-sm text-zinc-500">{conv.contact.email}</div>}
+          <div className="mt-2 flex items-center gap-3">
+            {(() => {
+              const isGroup = (conv?.channel_key || "").toLowerCase().endsWith("@g.us");
+              const avatarUrl = conv?.contact?.avatar_url;
+              const name = conv?.contact?.name || conv?.subject || conv?.channel_key || "?";
+              if (avatarUrl) {
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setViewerSource({ type: "image", url: avatarUrl, filename: `${name}.jpg` })}
+                    title="Ver foto de perfil"
+                    className="h-12 w-12 rounded-full overflow-hidden flex-shrink-0 transition-opacity hover:opacity-80"
+                    style={{ background: "rgba(255,255,255,0.04)" }}
+                  >
+                    <img src={avatarUrl} alt={name} className="h-12 w-12 object-cover" />
+                  </button>
+                );
+              }
+              if (isGroup) {
+                return (
+                  <div
+                    className="flex h-12 w-12 items-center justify-center rounded-full flex-shrink-0"
+                    style={{
+                      background: "rgba(167,139,250,0.12)",
+                      border: "1px solid rgba(167,139,250,0.25)",
+                      color: "#c4b5fd",
+                    }}
+                  >
+                    <UsersIcon className="h-5 w-5" />
+                  </div>
+                );
+              }
+              let hash = 0;
+              for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+              const hue = Math.abs(hash) % 360;
+              const initials = (name.split(/\s+/).filter(Boolean).slice(0, 2).map((s) => s[0] || "").join("") || "?").toUpperCase();
+              return (
+                <div
+                  className="flex h-12 w-12 items-center justify-center rounded-full font-semibold flex-shrink-0"
+                  style={{
+                    background: `hsl(${hue} 50% 22%)`,
+                    color: `hsl(${hue} 70% 75%)`,
+                    fontSize: 16,
+                  }}
+                >
+                  {initials}
+                </div>
+              );
+            })()}
+            <div className="min-w-0 flex-1">
+              <div className="font-medium truncate">{conv?.contact?.name || "—"}</div>
+              <div className="text-sm text-zinc-500 truncate">{conv?.contact?.phone || conv?.channel_key}</div>
+              {conv?.contact?.email && <div className="text-xs text-zinc-500 truncate">{conv.contact.email}</div>}
+            </div>
           </div>
         </div>
 
@@ -820,13 +912,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           )}
           {conv?.status === "open" && canSnooze && (
             <ActionRow
-              onClick={() => {
-                const hours = Number(prompt("Em quantas horas desnoozear?", "4") || 4);
-                if (hours > 0) {
-                  const iso = new Date(Date.now() + hours * 3600_000).toISOString();
-                  snooze.mutate(iso);
-                }
-              }}
+              onClick={openSnoozePrompt}
               icon={<Clock3 className="h-4 w-4" />}
               label="Soneca"
             />
@@ -848,7 +934,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           {canUpdate && conv && (
             <ActionRow
               onClick={() => patchConv.mutate({ is_muted: !conv.is_muted })}
-              icon={<span className="inline-block w-4 h-4 text-center leading-4 text-base">{conv.is_muted ? "🔕" : "🔔"}</span>}
+              icon={conv.is_muted ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
               label={conv.is_muted ? "Reativar notificações" : "Silenciar notificações"}
             />
           )}
@@ -925,6 +1011,31 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           conversationId={conversationId}
           msg={infoMsg}
           onClose={() => setInfoMsg(null)}
+        />
+      )}
+
+      {snoozeOpen && (
+        <SnoozeDialog
+          onClose={() => setSnoozeOpen(false)}
+          onSubmit={(iso) => {
+            snooze.mutate(iso);
+            setSnoozeOpen(false);
+          }}
+        />
+      )}
+
+      {confirmRevokeMsg && (
+        <ConfirmDialog
+          title="Apagar mensagem"
+          body="A mensagem será removida pra você e pro destinatário no canal. Não pode ser desfeito."
+          confirmLabel="Apagar"
+          variant="danger"
+          onConfirm={() => {
+            revokeMsg.mutate(confirmRevokeMsg.id);
+            setConfirmRevokeMsg(null);
+          }}
+          onCancel={() => setConfirmRevokeMsg(null)}
+          isPending={revokeMsg.isPending}
         />
       )}
     </div>
@@ -2343,9 +2454,7 @@ function MessageActionsToolbar({
       {canRevoke && (
         <button
           type="button"
-          onClick={() => {
-            if (confirm("Apagar esta mensagem para todos?")) onRevoke!(m);
-          }}
+          onClick={() => onRevoke!(m)}
           className="rounded-full p-1 hover:bg-red-500/20"
           title="Apagar para todos"
           style={{ color: "#ef4444" }}
@@ -3555,8 +3664,8 @@ function ForwardDialog({
     });
   };
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
-      <div className="w-full max-w-md rounded-2xl shadow-2xl" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+    <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+      <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
           <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Encaminhar mensagem</h3>
           <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "hsl(240 8% 60%)" }}>
@@ -3624,8 +3733,8 @@ function EditMessageDialog({
   const initial = parseMessageContent(msg.content).text || "";
   const [text, setText] = useState(initial);
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
-      <div className="w-full max-w-md rounded-2xl shadow-2xl" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+    <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+      <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
           <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Editar mensagem</h3>
           <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "hsl(240 8% 60%)" }}>
@@ -3673,8 +3782,8 @@ function MessageInfoDialog({
   const fmt = (ts?: string | null) => (ts ? new Date(ts).toLocaleString("pt-BR") : "—");
   const phone = (jid: string) => jid.split("@")[0];
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
-      <div className="w-full max-w-md rounded-2xl shadow-2xl" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+    <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+      <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
           <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Informações da mensagem</h3>
           <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "hsl(240 8% 60%)" }}>
@@ -3923,3 +4032,81 @@ const EMOJI_CATEGORIES: Array<{ label: string; emojis: { e: string; n: string }[
   },
 ];
 
+
+// SnoozeDialog — substitui prompt() nativo. Presets de duração + custom.
+function SnoozeDialog({
+  onClose, onSubmit,
+}: {
+  onClose: () => void;
+  onSubmit: (iso: string) => void;
+}) {
+  const [hours, setHours] = useState(4);
+  const presets: Array<{ label: string; h: number }> = [
+    { label: "1 hora", h: 1 },
+    { label: "4 horas", h: 4 },
+    { label: "Final do expediente (8h)", h: 8 },
+    { label: "Amanhã (24h)", h: 24 },
+    { label: "Próxima semana", h: 24 * 7 },
+  ];
+  const submit = (h: number) => {
+    if (h <= 0) return;
+    onSubmit(new Date(Date.now() + h * 3600_000).toISOString());
+  };
+  return (
+    <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+      <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
+          <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Colocar em soneca</h3>
+          <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "hsl(240 8% 60%)" }}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="px-4 py-3 space-y-2">
+          {presets.map((p) => (
+            <button
+              key={p.h}
+              type="button"
+              onClick={() => submit(p.h)}
+              className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition-colors hover:bg-white/5"
+              style={{ color: "hsl(240 15% 88%)", border: "1px solid hsl(240 12% 16%)" }}
+            >
+              <span className="flex items-center gap-2">
+                <Clock3 className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 55%)" }} />
+                {p.label}
+              </span>
+              <span className="text-[10px]" style={{ color: "hsl(240 8% 50%)" }}>
+                até {new Date(Date.now() + p.h * 3600_000).toLocaleString("pt-BR", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
+              </span>
+            </button>
+          ))}
+          <div className="border-t pt-3 mt-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
+            <div className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 55%)" }}>
+              Personalizar
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={168}
+                value={hours}
+                onChange={(e) => setHours(parseInt(e.target.value) || 0)}
+                className="w-20 rounded-md px-2 py-1.5 text-sm outline-none"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
+              />
+              <span className="text-xs" style={{ color: "hsl(240 8% 60%)" }}>horas</span>
+              <button
+                type="button"
+                onClick={() => submit(hours)}
+                disabled={hours <= 0}
+                className="ml-auto rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                style={{ background: "#00d46a", color: "#03170a" }}
+              >
+                Aplicar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
