@@ -1161,6 +1161,12 @@ func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []
 	// AdditionalNodes biz: <biz><interactive type="native_flow" v="1">...
 	bizNodes := buildButtonsBizNodes(hasNonReply)
 
+	// Mensagens interativas exigem LID do destinatário cacheado. Falta de LID
+	// causa "no LID found for X@s.whatsapp.net from server" no encrypt.
+	if err := ic.ensureLID(recipient); err != nil {
+		log.Warn().Str("instance", ic.ID).Err(err).Msg("ensureLID failed before button send")
+	}
+
 	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
 		AdditionalNodes: &bizNodes,
 	})
@@ -1302,6 +1308,23 @@ func buildInteractiveButtonsInner(body, footer string, buttons []ButtonItem, sec
 			DeviceListMetadata:        &waE2E.DeviceListMetadata{},
 		},
 	}
+}
+
+// ensureLID força a resolução do LID (Linked Identity) do destinatário
+// antes de enviar mensagem interativa. Sem o LID cacheado no store, o
+// whatsmeow falha com "no LID found for X@s.whatsapp.net from server" ao
+// criptografar mensagens com biz nodes (botões, PIX, lista, carrossel).
+//
+// GetUserInfo dispara um usync que retorna o LID e o whatsmeow já popula
+// o LIDs store automaticamente. Idempotente — chamar pra cada send é
+// barato (cache hit no segundo+ uso e a query é rápida no usync).
+func (ic *InstanceClient) ensureLID(jid types.JID) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	if _, err := ic.client.GetUserInfo(ctx, []types.JID{jid}); err != nil {
+		return fmt.Errorf("ensure LID: %w", err)
+	}
+	return nil
 }
 
 // buildButtonsBizNodes monta os nós XML <biz> + <bot> que precisam
@@ -1464,6 +1487,11 @@ func (ic *InstanceClient) SendPixMessage(to string, data PixData) (string, error
 		},
 	}
 
+	// LID lookup obrigatório pra mensagens interativas (review_and_pay).
+	if err := ic.ensureLID(recipient); err != nil {
+		log.Warn().Str("instance", ic.ID).Err(err).Msg("ensureLID failed before PIX send")
+	}
+
 	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
 		AdditionalNodes: &pixNodes,
 	})
@@ -1555,6 +1583,13 @@ func (ic *InstanceClient) SendTemplateMessage(to, content, footer string, button
 		},
 	}
 
+	// Mesmo no formato hydrated template (legacy), accounts atualizados
+	// fazem o whatsmeow exigir LID resolvido pra criptografia. Best-effort
+	// — falha aqui só vai loggar, o send tenta seguir e cai no fallback.
+	if err := ic.ensureLID(recipient); err != nil {
+		log.Warn().Str("instance", ic.ID).Err(err).Msg("ensureLID failed before template send")
+	}
+
 	res, err := ic.sendMessage(context.Background(), recipient, msg)
 	if err != nil {
 		log.Warn().Str("instance", ic.ID).Err(err).Msg("template message failed, using text fallback")
@@ -1589,12 +1624,95 @@ type ListSection struct {
 	Rows  []ListRow `json:"rows"`
 }
 
-// SendListMessage sends a list/menu message with selectable sections.
-// Wraps ListMessage inside ViewOnceMessage > FutureProofMessage — the pattern
-// confirmed to deliver to the recipient on personal accounts (whatsmeow #305).
+// SendListMessage envia uma mensagem de lista/menu interativa (sections
+// com items selecionáveis). Implementa o protocolo atual descoberto no
+// PR EvolutionAPI/evolution-go#40: ListMessage envolto em
+// DocumentWithCaptionMessage + biz AdditionalNodes "product_list".
+//
+// Falha → fallback texto formatado.
 func (ic *InstanceClient) SendListMessage(to, title, description, buttonText, footer string, sections []ListSection) (string, error) {
-	log.Warn().Str("instance", ic.ID).Msg("list interactive disabled for regular instance, using text fallback")
-	return ic.SendListFallbackMessage(to, title, description, buttonText, footer, sections)
+	if len(sections) == 0 {
+		return "", fmt.Errorf("no sections provided")
+	}
+
+	recipient, err := types.ParseJID(normalizeJID(to))
+	if err != nil {
+		return "", fmt.Errorf("invalid JID: %w", err)
+	}
+
+	// Converte ListSection do nosso formato pro proto whatsmeow.
+	protoSections := make([]*waE2E.ListMessage_Section, 0, len(sections))
+	for _, s := range sections {
+		rows := make([]*waE2E.ListMessage_Row, 0, len(s.Rows))
+		for _, r := range s.Rows {
+			rows = append(rows, &waE2E.ListMessage_Row{
+				RowID:       proto.String(r.ID),
+				Title:       proto.String(r.Title),
+				Description: proto.String(r.Description),
+			})
+		}
+		protoSections = append(protoSections, &waE2E.ListMessage_Section{
+			Title: proto.String(s.Title),
+			Rows:  rows,
+		})
+	}
+
+	// MessageSecret 32 bytes — required pra iOS renderizar.
+	secret := make([]byte, 32)
+	_, _ = cryptorand.Read(secret)
+
+	listMsg := &waE2E.ListMessage{
+		Title:       proto.String(title),
+		Description: proto.String(description),
+		ButtonText:  proto.String(buttonText),
+		FooterText:  proto.String(footer),
+		ListType:    waE2E.ListMessage_SINGLE_SELECT.Enum(),
+		Sections:    protoSections,
+	}
+
+	inner := &waE2E.Message{
+		ListMessage: listMsg,
+		MessageContextInfo: &waE2E.MessageContextInfo{
+			MessageSecret: secret,
+		},
+	}
+
+	msg := &waE2E.Message{
+		DocumentWithCaptionMessage: &waE2E.FutureProofMessage{
+			Message: inner,
+		},
+	}
+
+	// AdditionalNodes <biz><interactive type="native_flow"><native_flow name="product_list" v="2"/>
+	bizNodes := []waBinary.Node{
+		{
+			Tag: "biz",
+			Content: []waBinary.Node{{
+				Tag: "interactive",
+				Attrs: waBinary.Attrs{
+					"type": "native_flow",
+					"v":    "1",
+				},
+				Content: []waBinary.Node{{
+					Tag:   "native_flow",
+					Attrs: waBinary.Attrs{"v": "2", "name": "product_list"},
+				}},
+			}},
+		},
+	}
+
+	if err := ic.ensureLID(recipient); err != nil {
+		log.Warn().Str("instance", ic.ID).Err(err).Msg("ensureLID failed before list send")
+	}
+
+	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
+		AdditionalNodes: &bizNodes,
+	})
+	if err != nil {
+		log.Warn().Str("instance", ic.ID).Err(err).Msg("interactive list send failed, falling back to text")
+		return ic.SendListFallbackMessage(to, title, description, buttonText, footer, sections)
+	}
+	return res.ID, nil
 }
 
 // SendStickerMessage sends a WebP sticker.
