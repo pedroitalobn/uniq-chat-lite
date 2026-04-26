@@ -105,9 +105,15 @@ func NewManager(sessionDir string, db *gorm.DB) *Manager {
 
 // StartInstance starts (or restarts) the WhatsApp client for the given instance.
 func (m *Manager) StartInstance(instance *models.Instance) error {
-	// Defensive check: only allow starting if status is connected or disconnected
-	// prevent accidental auto-start for instances that were never paired
-	if instance.Status != models.StatusConnected && instance.Status != models.StatusDisconnected {
+	// Defensive check: bloqueia status terminais (banned/error). Aceitamos
+	// connected/disconnected E connecting — esse último é estado transitório
+	// que persiste no DB quando o backend é reiniciado durante o handshake
+	// (deploy, crash, OOM kill). Sem aceitar connecting aqui o LoadAll do
+	// boot recusa todas as instances que estavam em pareamento — efeito
+	// colateral do próprio LoadAll que marca como connecting antes do start.
+	if instance.Status != models.StatusConnected &&
+		instance.Status != models.StatusDisconnected &&
+		instance.Status != models.StatusConnecting {
 		log.Warn().Str("instance", instance.ID.String()).Str("status", string(instance.Status)).
 			Msg("refusing to start instance with invalid status")
 		return fmt.Errorf("cannot start instance with status %s", instance.Status)
@@ -685,6 +691,15 @@ func (m *Manager) StartInstanceForPairing(instance *models.Instance) error {
 
 // LoadAll loads and starts all connected instances from the database.
 func (m *Manager) LoadAll() {
+	// Limpa connecting órfãs: se o backend foi reiniciado no meio de um
+	// handshake (deploy, crash), instances ficam presas em "connecting"
+	// no DB — sem o reset, o reconnection checker tenta reconectar mas a
+	// UI mostra "conectando" indefinidamente. Reseta pra "disconnected"
+	// e o auto-reconnect do LayoutClient frontend cuida do resto.
+	if err := m.db.Exec("UPDATE instances SET status = 'disconnected' WHERE status = 'connecting'").Error; err != nil {
+		log.Warn().Err(err).Msg("failed to reset stale connecting instances")
+	}
+
 	var instances []models.Instance
 
 	// Only auto-start instances that were actually connected before restart.
