@@ -287,6 +287,31 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	registerPreMsg("/menu", msgH.SendMenu)
 	registerPreMsg("/sticker", msgH.SendSticker)
 
+	// Demais paths /v1/instances/<uuid>/* que TAMBÉM são registrados no
+	// v1inst group (e por isso são interceptados antes do api group sem
+	// c.Locals("instance") setado). Mesmo bug das mensagens — pre-declara
+	// com auth pra ganhar prioridade. Apenas paths em conflito real.
+	registerPreInst := func(method, path string, h fiber.Handler) {
+		full := "/v1/instances/:id" + path
+		switch method {
+		case "GET":
+			app.Get(full, append(preMsgChain, h)...)
+		case "POST":
+			app.Post(full, append(preMsgChain, h)...)
+		}
+	}
+	registerPreInst("GET", "/profile", instanceH.Profile)
+	registerPreInst("GET", "/status", instanceH.Status)
+	registerPreInst("GET", "/qr", instanceH.GetQR)
+	registerPreInst("GET", "/chats", msgH.GetChats)
+	registerPreInst("GET", "/contacts", msgH.GetContacts)
+	registerPreInst("POST", "/pairing-code", instanceH.GetPairingCode)
+	registerPreInst("POST", "/contact/info", instanceH.ContactInfo)
+	registerPreInst("POST", "/contact/avatar", instanceH.ContactAvatar)
+	registerPreInst("POST", "/media/upload", msgH.UploadMedia)
+	registerPreInst("POST", "/check-number", msgH.CheckNumber)
+	registerPreInst("POST", "/bulk-check", msgH.BulkCheckNumbers)
+
 	// Auth: apikey / X-Instance-Token / Authorization: Bearer <instance_token>.
 	// IMPORTANT: registered BEFORE the protected /v1 group because Fiber's
 	// Group middlewares only apply to routes registered AFTER them — declaring
