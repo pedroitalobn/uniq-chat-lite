@@ -691,20 +691,15 @@ func (m *Manager) StartInstanceForPairing(instance *models.Instance) error {
 
 // LoadAll loads and starts all connected instances from the database.
 func (m *Manager) LoadAll() {
-	// Limpa connecting órfãs: se o backend foi reiniciado no meio de um
-	// handshake (deploy, crash), instances ficam presas em "connecting"
-	// no DB — sem o reset, o reconnection checker tenta reconectar mas a
-	// UI mostra "conectando" indefinidamente. Reseta pra "disconnected"
-	// e o auto-reconnect do LayoutClient frontend cuida do resto.
-	if err := m.db.Exec("UPDATE instances SET status = 'disconnected' WHERE status = 'connecting'").Error; err != nil {
-		log.Warn().Err(err).Msg("failed to reset stale connecting instances")
-	}
-
 	var instances []models.Instance
 
-	// Only auto-start instances that were actually connected before restart.
-	// Don't auto-start instances that are "connecting" (waiting for QR) or "disconnected".
-	if err := m.db.Raw("SELECT * FROM instances WHERE status = 'connected'").Scan(&instances).Error; err != nil {
+	// Carrega connected E connecting. Connecting normalmente é estado
+	// transitório do handshake; quando o backend reinicia no meio dele
+	// (deploy, crash, OOM kill), instances ficam presas com esse status.
+	// Tentamos startar — se a sessão whatsmeow ainda existe no SQLite
+	// store, a instância sobe; se não, o handshake falha e marcamos
+	// como disconnected logo abaixo, igual ao path normal.
+	if err := m.db.Raw("SELECT * FROM instances WHERE status IN ('connected', 'connecting')").Scan(&instances).Error; err != nil {
 		log.Error().Err(err).Msg("failed to load connected instances")
 		return
 	}
