@@ -383,6 +383,35 @@ export const mediaUploadApi = {
   },
 };
 
+// mediaApi.download — stream do bucket via backend pra evitar CORS.
+// O bucket Hetzner serve mídia via signed URL (preview funciona em <img src>),
+// mas fetch() do JS falha em CORS preflight. O backend stream com
+// Content-Disposition: attachment força download pelo browser.
+export const mediaApi = {
+  download: (key: string, filename?: string) =>
+    api.get(`/v1/media/download`, {
+      params: { key, ...(filename ? { filename } : {}) },
+      responseType: "blob",
+    }),
+};
+
+export interface LinkPreview {
+  id: string;
+  url: string;
+  title?: string;
+  description?: string;
+  image_url?: string;
+  site_name?: string;
+  favicon_url?: string;
+  fetched_at: string;
+  fetch_err?: string;
+}
+
+// linkPreviewApi — busca metadados OG cacheados pelo backend.
+export const linkPreviewApi = {
+  get: (url: string) => api.get<LinkPreview>(`/v1/link-preview`, { params: { url } }),
+};
+
 // WABA (Meta WhatsApp Cloud API) — templates aprovados para o
 // business. Usados quando a janela de 24h de atendimento humano fechou e
 // o operador precisa iniciar conversa via HSM.
@@ -929,6 +958,7 @@ export const conversationsApi = {
       template_name?: string;
       template_language?: string;
       template_components?: Array<Record<string, unknown>>;
+      reply_to_message_id?: string;
     },
   ) => api.post(`/v1/conversations/${id}/messages`, data, { headers: wsHeaders(workspaceId) }),
   sendTyping: (workspaceId: string, id: string, typing: boolean) =>
@@ -939,6 +969,21 @@ export const conversationsApi = {
     msgId: string,
     data: { is_pinned?: boolean; is_favorite?: boolean; is_archived?: boolean; is_deleted?: boolean },
   ) => api.patch(`/v1/conversations/${id}/messages/${msgId}`, data, { headers: wsHeaders(workspaceId) }),
+  // Message-level actions: revoke, edit, react, forward.
+  revokeMessage: (workspaceId: string, id: string, msgId: string) =>
+    api.delete(`/v1/conversations/${id}/messages/${msgId}`, { headers: wsHeaders(workspaceId) }),
+  editMessage: (workspaceId: string, id: string, msgId: string, body: string) =>
+    api.patch(`/v1/conversations/${id}/messages/${msgId}/content`, { body }, { headers: wsHeaders(workspaceId) }),
+  reactToMessage: (workspaceId: string, id: string, msgId: string, emoji: string) =>
+    api.post(`/v1/conversations/${id}/messages/${msgId}/react`, { emoji }, { headers: wsHeaders(workspaceId) }),
+  forwardMessage: (workspaceId: string, id: string, msgId: string, conversationIds: string[]) =>
+    api.post(
+      `/v1/conversations/${id}/messages/${msgId}/forward`,
+      { conversation_ids: conversationIds },
+      { headers: wsHeaders(workspaceId) },
+    ),
+  getMessageReceipts: (workspaceId: string, id: string, msgId: string) =>
+    api.get(`/v1/conversations/${id}/messages/${msgId}/receipts`, { headers: wsHeaders(workspaceId) }),
   assign: (workspaceId: string, id: string, userId?: string) =>
     api.post(`/v1/conversations/${id}/assign`, userId ? { user_id: userId } : {}, { headers: wsHeaders(workspaceId) }),
   unassign: (workspaceId: string, id: string) =>
@@ -1134,6 +1179,24 @@ export const csatApi = {
 
 // ─── CRM v2 ─────────────────────────────────────────────────────────────────
 // Companies, Deals, Funnel views and Contact groups. All send X-Workspace-ID.
+
+// crmContactsApi — CRUD do contato no CRM. Usado pelo card de vCard
+// na inbox pra "Adicionar ao CRM" diretamente.
+export const crmContactsApi = {
+  create: (workspaceId: string, data: {
+    name: string;
+    phone: string;
+    email?: string;
+    notes?: string;
+    avatar_url?: string;
+    funnel?: string;
+    stage?: string;
+    journey?: string;
+    external_id?: string;
+    owner_id?: string;
+  }) =>
+    api.post("/v1/crm/contacts", { ...data, workspace_id: workspaceId }, { headers: wsHeaders(workspaceId) }),
+};
 
 export type DealStatus = "open" | "won" | "lost" | "archived";
 export type FunnelViewKind = "kanban" | "list" | "table" | "forecast";

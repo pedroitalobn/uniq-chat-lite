@@ -194,7 +194,50 @@ func (m *Manager) IsRunning(instanceID string) bool {
 }
 
 // SaveMessage saves a message to the database for inbox display.
+// Wrapper preservado pra compatibilidade com call sites antigos. Novos
+// caminhos devem chamar SaveMessageEx pra carregar external_id (stanza_id
+// WhatsApp) e quoted reply correlation.
 func (m *Manager) SaveMessage(instanceID string, toJID string, content string, direction models.MessageDirection, msgType string, pushName string, isGroup bool, senderJID string) error {
+	return m.SaveMessageEx(SaveMessageInput{
+		InstanceID: instanceID,
+		ToJID:      toJID,
+		Content:    content,
+		Direction:  direction,
+		Type:       msgType,
+		PushName:   pushName,
+		IsGroup:    isGroup,
+		SenderJID:  senderJID,
+	})
+}
+
+// SaveMessageInput agrupa todos os parâmetros do save. Permite adicionar
+// novos campos (external_id, reply_to_external_id, ...) sem quebrar
+// signatures existentes.
+type SaveMessageInput struct {
+	InstanceID         string
+	ToJID              string
+	Content            string
+	Direction          models.MessageDirection
+	Type               string
+	PushName           string
+	IsGroup            bool
+	SenderJID          string
+	ExternalMessageID  string // ex.: stanza_id WhatsApp (v.Info.ID)
+	ReplyToExternalID  string // stanza_id da msg citada — resolve pra ReplyToID
+}
+
+// SaveMessageEx é a versão completa do save. Recebe um struct pra evoluir
+// sem quebra de assinatura. Resolve ReplyToExternalID consultando msgs
+// anteriores da mesma instance pelo external_id.
+func (m *Manager) SaveMessageEx(in SaveMessageInput) error {
+	instanceID := in.InstanceID
+	toJID := in.ToJID
+	content := in.Content
+	direction := in.Direction
+	msgType := in.Type
+	pushName := in.PushName
+	isGroup := in.IsGroup
+	senderJID := in.SenderJID
 	if m.db == nil {
 		return nil
 	}
@@ -293,17 +336,29 @@ func (m *Manager) SaveMessage(instanceID string, toJID string, content string, d
 	}
 
 	logEntry := models.MessageLog{
-		ID:            uuid.New(),
-		InstanceID:    instUUID,
-		Direction:     direction,
-		Type:          msgType,
-		ToJID:         toJID,
-		ContactName:   contactName,
-		ContactAvatar: contactAvatar,
-		SenderJID:     senderJID,
-		SenderName:    senderName,
-		Content:       string(contentJSON),
-		Status:        models.MessageStatusSent,
+		ID:                uuid.New(),
+		InstanceID:        instUUID,
+		Direction:         direction,
+		Type:              msgType,
+		ToJID:             toJID,
+		ContactName:       contactName,
+		ContactAvatar:     contactAvatar,
+		SenderJID:         senderJID,
+		SenderName:        senderName,
+		Content:           string(contentJSON),
+		Status:            models.MessageStatusSent,
+		ExternalMessageID: in.ExternalMessageID,
+	}
+
+	// Reply correlation — se a msg cita outra (ContextInfo.StanzaID), busca
+	// a MessageLog correspondente pelo external_id. Mesma instância.
+	if in.ReplyToExternalID != "" {
+		var quoted models.MessageLog
+		if err := m.db.Select("id").
+			Where("instance_id = ? AND external_message_id = ?", instUUID, in.ReplyToExternalID).
+			First(&quoted).Error; err == nil {
+			logEntry.ReplyToID = &quoted.ID
+		}
 	}
 
 	// Check for duplicate - don't save if same message was saved in last 2 seconds.
@@ -347,6 +402,154 @@ func (m *Manager) SaveMessage(instanceID string, toJID string, content string, d
 	}
 
 	return nil
+}
+
+// UpdateEditedMessage atualiza uma MessageLog existente quando o cliente
+// edita uma mensagem já enviada. O whatsmeow re-emite events.Message com
+// IsEdit=true; o stanza_id da mensagem original vem em ContextInfo.
+//
+// Se a msg original for encontrada (mesma instance + external_id), atualiza
+// content + is_edited=true. Se não, retorna false e o caller pode salvar
+// como nova msg (fallback).
+func (m *Manager) UpdateEditedMessage(instanceID, originalStanzaID, newContent string) bool {
+	if m.db == nil || originalStanzaID == "" {
+		return false
+	}
+	instUUID, err := uuid.Parse(instanceID)
+	if err != nil {
+		return false
+	}
+	res := m.db.Model(&models.MessageLog{}).
+		Where("instance_id = ? AND external_message_id = ?", instUUID, originalStanzaID).
+		Updates(map[string]any{
+			"content":   newContent,
+			"is_edited": true,
+		})
+	if res.Error != nil {
+		log.Warn().Err(res.Error).Msg("UpdateEditedMessage: falhou")
+		return false
+	}
+	return res.RowsAffected > 0
+}
+
+// ApplyReceipt persiste delivery/read receipts vindo do whatsmeow.
+// Mapeia ReceiptType → status:
+//   - ""           → delivered (default whatsmeow)
+//   - "delivery"   → delivered
+//   - "read"       → read
+//   - "read-self"  → read
+//   - "played"     → read (view-once aberto)
+//   - resto        → ignorado
+//
+// Em conversas 1:1 atualiza só MessageLog (status + delivered_at/read_at).
+// Em grupos, ALÉM disso cria uma linha em message_receipts pra montar o
+// painel "Visto por X, Y, Z" (uma linha por participante por evento).
+func (m *Manager) ApplyReceipt(instanceID string, externalIDs []string, receiptType, participantJID string, ts time.Time, isGroup bool) {
+	if m.db == nil || len(externalIDs) == 0 {
+		return
+	}
+	instUUID, err := uuid.Parse(instanceID)
+	if err != nil {
+		return
+	}
+	var newStatus models.MessageStatus
+	switch receiptType {
+	case "", "delivery":
+		newStatus = models.MessageStatusDelivered
+	case "read", "read-self", "played", "played-self":
+		newStatus = models.MessageStatusRead
+	default:
+		// retry, sender, server-error, inactive, peer_msg, hist_sync — ignora
+		return
+	}
+
+	// Lookup pelas msgs alvo (outbound nossas que estão recebendo receipt)
+	var msgs []models.MessageLog
+	if err := m.db.Where(
+		"instance_id = ? AND external_message_id IN ? AND direction = ?",
+		instUUID, externalIDs, models.DirectionOut,
+	).Find(&msgs).Error; err != nil {
+		log.Warn().Err(err).Msg("ApplyReceipt: lookup falhou")
+		return
+	}
+	if len(msgs) == 0 {
+		return
+	}
+
+	// Update em batch — só promove status (sent → delivered → read), nunca regride
+	updates := map[string]any{}
+	switch newStatus {
+	case models.MessageStatusDelivered:
+		updates["status"] = models.MessageStatusDelivered
+		updates["delivered_at"] = ts
+		// Apenas promove se status atual ainda é pending/sent
+		m.db.Model(&models.MessageLog{}).
+			Where("id IN ? AND status IN ?", messageIDs(msgs), []models.MessageStatus{
+				models.MessageStatusPending, models.MessageStatusSent,
+			}).
+			Updates(updates)
+	case models.MessageStatusRead:
+		updates["status"] = models.MessageStatusRead
+		updates["read_at"] = ts
+		// Read promove qualquer status anterior
+		m.db.Model(&models.MessageLog{}).
+			Where("id IN ?", messageIDs(msgs)).
+			Updates(updates)
+	}
+
+	// Em grupos, registra cada receipt individual pra painel de "visto por"
+	if isGroup && participantJID != "" {
+		receiptKind := "delivered"
+		if newStatus == models.MessageStatusRead {
+			receiptKind = "read"
+		}
+		for _, msg := range msgs {
+			r := models.MessageReceipt{
+				ID:             uuid.New(),
+				MessageLogID:   msg.ID,
+				ParticipantJID: participantJID,
+				Type:           receiptKind,
+				Timestamp:      ts,
+			}
+			// Idempotente — se já existe receipt do mesmo tipo do mesmo participante, skipa
+			var count int64
+			m.db.Model(&models.MessageReceipt{}).
+				Where("message_log_id = ? AND participant_jid = ? AND type = ?", msg.ID, participantJID, receiptKind).
+				Count(&count)
+			if count == 0 {
+				_ = m.db.Create(&r).Error
+			}
+		}
+	}
+
+	// Broadcast WS pra UI atualizar tick em tempo real (sem polling).
+	// Reusa o hub global; targeting por workspace via room "workspace:<id>".
+	if hub := GetHub(); hub != nil {
+		for _, msg := range msgs {
+			payload := map[string]any{
+				"id":     msg.ID.String(),
+				"status": string(newStatus),
+				"ts":     ts.Unix(),
+			}
+			if msg.ConversationID != nil {
+				payload["conversation_id"] = msg.ConversationID.String()
+			}
+			ev := &Event{Type: "message.receipt", Payload: payload}
+			if msg.WorkspaceID != nil {
+				ev.Workspace = msg.WorkspaceID.String()
+			}
+			ev.Instance = instanceID
+			hub.Broadcast(ev)
+		}
+	}
+}
+
+func messageIDs(msgs []models.MessageLog) []uuid.UUID {
+	out := make([]uuid.UUID, len(msgs))
+	for i := range msgs {
+		out[i] = msgs[i].ID
+	}
+	return out
 }
 
 func extractPhoneFromJID(jid string) string {

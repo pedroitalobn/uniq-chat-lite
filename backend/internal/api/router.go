@@ -602,6 +602,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	conversations.Patch("/:id", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.Patch)
 	conversations.Post("/:id/messages", middleware.RequireWorkspacePermission(db, models.PermInboxSend), conversationH.SendMessage)
 	conversations.Patch("/:id/messages/:msgId", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.PatchMessage)
+	conversations.Delete("/:id/messages/:msgId", middleware.RequireWorkspacePermission(db, models.PermInboxSend), conversationH.RevokeMessage)
+	conversations.Patch("/:id/messages/:msgId/content", middleware.RequireWorkspacePermission(db, models.PermInboxSend), conversationH.EditMessage)
+	conversations.Post("/:id/messages/:msgId/react", middleware.RequireWorkspacePermission(db, models.PermInboxSend), conversationH.ReactToMessage)
+	conversations.Post("/:id/messages/:msgId/forward", middleware.RequireWorkspacePermission(db, models.PermInboxSend), conversationH.ForwardMessage)
+	conversations.Get("/:id/messages/:msgId/receipts", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.GetMessageReceipts)
 	conversations.Post("/:id/typing", middleware.RequireWorkspacePermission(db, models.PermInboxSend), conversationH.Typing)
 	conversations.Post("/:id/read", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.MarkRead)
 	conversations.Post("/:id/assign", middleware.RequireWorkspacePermission(db, models.PermTicketsAssign), conversationH.Assign)
@@ -841,9 +846,19 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	servers.Post("/:id/proxy/test", serverH.TestProxy)
 
 	// ─── Admin routes ─────────────────────────────────────────────────────────
+	// Media proxy download (qualquer user logado pode usar — signed URL
+	// gerada na hora pra browser baixar com Content-Disposition: attachment)
+	mediaH := handlers.NewMediaHealthHandler()
+	api.Get("/media/download", mediaH.Download)
+
+	// Link preview — fetcha OG/Twitter card metadata. Cache 7d.
+	linkPreviewSvc := services.NewLinkPreviewService(db)
+	linkPreviewH := handlers.NewLinkPreviewHandler(linkPreviewSvc)
+	api.Get("/link-preview", linkPreviewH.Get)
+
 	admin := api.Group("/admin", middleware.RequireAdmin())
 	// Diagnostic: media storage health check (upload+presign+fetch)
-	admin.Get("/media/health", handlers.NewMediaHealthHandler().Check)
+	admin.Get("/media/health", mediaH.Check)
 	// Rotas específicas primeiro (sem parâmetros)
 	admin.Get("/stats", adminH.Stats)
 	admin.Get("/users", adminH.ListUsers)

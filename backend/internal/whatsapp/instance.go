@@ -449,6 +449,36 @@ func (ic *InstanceClient) SendTextMessage(to, text string) (string, error) {
 	return res.ID, nil
 }
 
+// SendTextMessageReply envia uma mensagem de texto citando outra. O recipiente
+// vê o quote (preview) acima do texto. quotedID é o stanza_id da msg original;
+// quotedParticipant é o JID do remetente da msg citada (necessário em grupos).
+func (ic *InstanceClient) SendTextMessageReply(to, text, quotedID, quotedParticipant string) (string, error) {
+	recipient, err := types.ParseJID(normalizeJID(to))
+	if err != nil {
+		return "", fmt.Errorf("invalid JID: %w", err)
+	}
+	ci := &waE2E.ContextInfo{
+		StanzaID: proto.String(quotedID),
+		// QuotedMessage pode ser placeholder vazio — WhatsApp aceita só com
+		// stanza_id quando o cliente já tem a msg em cache local.
+		QuotedMessage: &waE2E.Message{Conversation: proto.String("")},
+	}
+	if quotedParticipant != "" {
+		ci.Participant = proto.String(normalizeJID(quotedParticipant))
+	}
+	msg := &waE2E.Message{
+		ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+			Text:        proto.String(text),
+			ContextInfo: ci,
+		},
+	}
+	res, err := ic.sendMessage(context.Background(), recipient, msg)
+	if err != nil {
+		return "", fmt.Errorf("send reply failed: %w", err)
+	}
+	return res.ID, nil
+}
+
 // SendImageMessage sends an image message with optional caption.
 func (ic *InstanceClient) SendImageMessage(to string, imageData []byte, mimeType, caption string) (string, error) {
 	recipient, err := types.ParseJID(normalizeJID(to))
@@ -622,6 +652,34 @@ func (ic *InstanceClient) RevokeMessage(chatJID, msgID, senderJID string) (strin
 		return "", fmt.Errorf("revoke failed: %w", err)
 	}
 	return res.ID, nil
+}
+
+// EditMessage edita o texto de uma msg outbound já enviada. WhatsApp só
+// aceita edit dentro da janela de 15min (lado do cliente); fora disso o
+// envio falha silenciosamente, mas atualizamos no DB de qualquer forma.
+func (ic *InstanceClient) EditMessage(chatJID, msgID, newText string) (string, error) {
+	chat, err := types.ParseJID(normalizeJID(chatJID))
+	if err != nil {
+		return "", fmt.Errorf("invalid chat JID: %w", err)
+	}
+	newMsg := &waE2E.Message{
+		Conversation: proto.String(newText),
+	}
+	edit := ic.client.BuildEdit(chat, msgID, newMsg)
+	res, err := ic.sendMessage(context.Background(), chat, edit)
+	if err != nil {
+		return "", fmt.Errorf("edit failed: %w", err)
+	}
+	return res.ID, nil
+}
+
+// OwnerJID retorna o JID da conta da própria instância (Store.ID).
+// Vazio se a instância não está autenticada.
+func (ic *InstanceClient) OwnerJID() string {
+	if ic.client == nil || ic.client.Store == nil || ic.client.Store.ID == nil {
+		return ""
+	}
+	return ic.client.Store.ID.String()
 }
 
 // SendTyping sends a chat presence (typing indicator) to a chat.
@@ -1839,13 +1897,25 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 			}
 		case v.Message.GetInteractiveMessage() != nil:
 			msgType = "interactive"
-			text = "Mensagem interativa"
+			if payload := extractInteractivePayload(v.Message.GetInteractiveMessage()); payload != "" {
+				text = payload
+			} else {
+				text = "Mensagem interativa"
+			}
 		case v.Message.GetListMessage() != nil:
 			msgType = "list"
-			text = "Lista de opções"
+			if payload := extractListPayload(v.Message.GetListMessage()); payload != "" {
+				text = payload
+			} else {
+				text = "Lista de opções"
+			}
 		case v.Message.GetButtonsMessage() != nil:
 			msgType = "buttons"
-			text = "Mensagem com botões"
+			if payload := extractButtonsPayload(v.Message.GetButtonsMessage()); payload != "" {
+				text = payload
+			} else {
+				text = "Mensagem com botões"
+			}
 		case v.Message.GetEphemeralMessage() != nil:
 			msgType = "ephemeral"
 			text = "Mensagem efêmera"
@@ -1951,10 +2021,35 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		if !isGroupMsg && v.Info.Sender.Server == types.HiddenUserServer && !v.Info.SenderAlt.IsEmpty() && v.Info.SenderAlt.Server == types.DefaultUserServer {
 			senderJID = v.Info.SenderAlt.String()
 		}
+		// Captura quoted ANTES da goroutine — v.Message é shared state e a
+		// goroutine pode rodar depois do whatsmeow recyclar o ponteiro.
+		quotedStanzaID := extractQuotedStanzaID(v.Message)
+		externalMsgID := v.Info.ID
+		isEdit := v.IsEdit
 		go func() {
-			if GlobalManager != nil {
-				_ = GlobalManager.SaveMessage(ic.ID, chatJID, msgText, direction, msgType, pushName, isGroupMsg, senderJID)
+			if GlobalManager == nil {
+				return
 			}
+			// Edit: atualiza a MessageLog original (não cria nova).
+			// Em IsEdit, quotedStanzaID aponta pra msg original.
+			if isEdit && quotedStanzaID != "" {
+				if GlobalManager.UpdateEditedMessage(ic.ID, quotedStanzaID, msgText) {
+					return
+				}
+				// Se não achamos a msg original, cai pro insert (fallback)
+			}
+			_ = GlobalManager.SaveMessageEx(SaveMessageInput{
+				InstanceID:        ic.ID,
+				ToJID:             chatJID,
+				Content:           msgText,
+				Direction:         direction,
+				Type:              msgType,
+				PushName:          pushName,
+				IsGroup:           isGroupMsg,
+				SenderJID:         senderJID,
+				ExternalMessageID: externalMsgID,
+				ReplyToExternalID: quotedStanzaID,
+			})
 		}()
 
 		// Check and execute journeys for incoming messages
@@ -1988,6 +2083,19 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		}
 		ic.broadcastWS("message.status", data)
 		ic.dispatchEvent("message.status", data, eventContext{isGroup: v.Chat.Server == "g.us"})
+
+		// Persiste receipt — atualiza MessageLog.Status + delivered_at/read_at.
+		// Mapeamento: "" (default) e "delivery" → delivered, "read"/"read-self"
+		// → read. Em grupo, registramos também a tabela message_receipts pra
+		// painel "Visto por" (handled em #9).
+		if GlobalManager != nil && len(v.MessageIDs) > 0 {
+			isGroup := v.Chat.Server == types.GroupServer
+			rt := v.Type
+			senderJID := v.Sender.String()
+			ts := v.Timestamp
+			ids := append([]string{}, v.MessageIDs...) // copy: shared slice
+			go GlobalManager.ApplyReceipt(ic.ID, ids, string(rt), senderJID, ts, isGroup)
+		}
 
 	// ── Presence ─────────────────────────────────────────────────────────────
 	case *events.Presence:
@@ -2082,7 +2190,17 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 	case *events.CallTerminate:
 		// Se NÃO houve aceite pra esse call_id, é uma chamada perdida.
 		// Emitimos evento dedicado + disparamos jornada com messageType=call_missed.
-		_, accepted := ic.acceptedCalls.LoadAndDelete(v.CallID)
+		startedAtRaw, accepted := ic.acceptedCalls.LoadAndDelete(v.CallID)
+		var durationSec int
+		if accepted {
+			if startedAt, ok := startedAtRaw.(time.Time); ok {
+				durationSec = int(time.Since(startedAt).Seconds())
+			}
+		}
+		callStatus := "missed"
+		if accepted {
+			callStatus = "answered"
+		}
 		data := map[string]interface{}{
 			"call_id":  v.CallID,
 			"from":     v.From.String(),
@@ -2091,6 +2209,34 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		}
 		ic.broadcastWS("call.terminate", data)
 		ic.dispatchEvent("call.terminate", data, eventContext{})
+
+		// Persiste como MessageLog tipo "call" — aparece na timeline com
+		// card de chamada perdida/atendida + duração.
+		if GlobalManager != nil {
+			callPayload := map[string]any{
+				"call_type":   "voice",
+				"call_status": callStatus,
+			}
+			if durationSec > 0 {
+				callPayload["call_duration_sec"] = durationSec
+			}
+			if v.Reason != "" {
+				callPayload["reason"] = v.Reason
+			}
+			if data, err := json.Marshal(callPayload); err == nil {
+				go func() {
+					_ = GlobalManager.SaveMessageEx(SaveMessageInput{
+						InstanceID:        ic.ID,
+						ToJID:             v.From.String(),
+						Content:           string(data),
+						Direction:         models.DirectionIn,
+						Type:              "call",
+						SenderJID:         v.From.String(),
+						ExternalMessageID: "call:" + v.CallID,
+					})
+				}()
+			}
+		}
 
 		if !accepted && GlobalManager != nil {
 			missedData := map[string]interface{}{
@@ -2120,6 +2266,27 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		}
 		ic.broadcastWS("call.rejected", data)
 		ic.dispatchEvent("call.rejected", data, eventContext{})
+
+		// Persiste como MessageLog tipo "call" status=rejected
+		if GlobalManager != nil {
+			payload := map[string]any{
+				"call_type":   "voice",
+				"call_status": "rejected",
+			}
+			if data, err := json.Marshal(payload); err == nil {
+				go func() {
+					_ = GlobalManager.SaveMessageEx(SaveMessageInput{
+						InstanceID:        ic.ID,
+						ToJID:             v.From.String(),
+						Content:           string(data),
+						Direction:         models.DirectionIn,
+						Type:              "call",
+						SenderJID:         v.From.String(),
+						ExternalMessageID: "call-rejected:" + v.CallID,
+					})
+				}()
+			}
+		}
 
 		if GlobalManager != nil {
 			go GlobalManager.CheckJourneys(
@@ -2396,6 +2563,164 @@ func (ic *InstanceClient) downloadAndStoreInboundMedia(
 
 	b, _ := json.Marshal(out)
 	return string(b)
+}
+
+// extractQuotedStanzaID busca o stanza_id da msg citada via ContextInfo
+// dos vários sub-tipos de mensagem. Retorna "" se não houver quote.
+// O stanza_id é usado pelo Manager.SaveMessageEx pra correlacionar
+// com a MessageLog.ExternalMessageID e popular ReplyToID.
+func extractQuotedStanzaID(msg *waE2E.Message) string {
+	if msg == nil {
+		return ""
+	}
+	type ctxer interface{ GetContextInfo() *waE2E.ContextInfo }
+	var ci *waE2E.ContextInfo
+	switch {
+	case msg.GetExtendedTextMessage() != nil:
+		ci = msg.GetExtendedTextMessage().GetContextInfo()
+	case msg.GetImageMessage() != nil:
+		ci = msg.GetImageMessage().GetContextInfo()
+	case msg.GetVideoMessage() != nil:
+		ci = msg.GetVideoMessage().GetContextInfo()
+	case msg.GetAudioMessage() != nil:
+		ci = msg.GetAudioMessage().GetContextInfo()
+	case msg.GetDocumentMessage() != nil:
+		ci = msg.GetDocumentMessage().GetContextInfo()
+	case msg.GetStickerMessage() != nil:
+		if any := any(msg.GetStickerMessage()).(ctxer); any != nil {
+			ci = any.GetContextInfo()
+		}
+	case msg.GetContactMessage() != nil:
+		if any := any(msg.GetContactMessage()).(ctxer); any != nil {
+			ci = any.GetContextInfo()
+		}
+	case msg.GetLocationMessage() != nil:
+		if any := any(msg.GetLocationMessage()).(ctxer); any != nil {
+			ci = any.GetContextInfo()
+		}
+	case msg.GetButtonsMessage() != nil:
+		ci = msg.GetButtonsMessage().GetContextInfo()
+	case msg.GetListMessage() != nil:
+		ci = msg.GetListMessage().GetContextInfo()
+	case msg.GetInteractiveMessage() != nil:
+		ci = msg.GetInteractiveMessage().GetContextInfo()
+	}
+	if ci == nil {
+		return ""
+	}
+	if ci.GetQuotedMessage() == nil && ci.GetStanzaID() == "" {
+		return ""
+	}
+	return ci.GetStanzaID()
+}
+
+// extractButtonsPayload converte ButtonsMessage em JSON estruturado
+// {body, footer, buttons: [{id,title}]} pro frontend renderizar como CTAs.
+func extractButtonsPayload(b *waE2E.ButtonsMessage) string {
+	if b == nil {
+		return ""
+	}
+	out := map[string]any{}
+	if t := b.GetContentText(); t != "" {
+		out["body"] = t
+	}
+	if f := b.GetFooterText(); f != "" {
+		out["footer"] = f
+	}
+	btns := make([]map[string]string, 0, len(b.GetButtons()))
+	for _, btn := range b.GetButtons() {
+		entry := map[string]string{"id": btn.GetButtonID()}
+		if r := btn.GetButtonText(); r != nil {
+			entry["title"] = r.GetDisplayText()
+		}
+		btns = append(btns, entry)
+	}
+	if len(btns) > 0 {
+		out["buttons"] = btns
+	}
+	if data, err := json.Marshal(out); err == nil {
+		return string(data)
+	}
+	return ""
+}
+
+// extractListPayload converte ListMessage em JSON estruturado
+// {title, body, footer, button_text, sections:[{title, rows:[{id,title,description}]}]}.
+func extractListPayload(l *waE2E.ListMessage) string {
+	if l == nil {
+		return ""
+	}
+	out := map[string]any{}
+	if v := l.GetTitle(); v != "" {
+		out["list_title"] = v
+	}
+	if v := l.GetDescription(); v != "" {
+		out["body"] = v
+	}
+	if v := l.GetFooterText(); v != "" {
+		out["footer"] = v
+	}
+	if v := l.GetButtonText(); v != "" {
+		out["button_text"] = v
+	}
+	sections := make([]map[string]any, 0, len(l.GetSections()))
+	for _, sec := range l.GetSections() {
+		rows := make([]map[string]string, 0, len(sec.GetRows()))
+		for _, r := range sec.GetRows() {
+			rows = append(rows, map[string]string{
+				"id":          r.GetRowID(),
+				"title":       r.GetTitle(),
+				"description": r.GetDescription(),
+			})
+		}
+		sections = append(sections, map[string]any{
+			"title": sec.GetTitle(),
+			"rows":  rows,
+		})
+	}
+	if len(sections) > 0 {
+		out["sections"] = sections
+	}
+	if data, err := json.Marshal(out); err == nil {
+		return string(data)
+	}
+	return ""
+}
+
+// extractInteractivePayload — InteractiveMessage tem um Body+NativeFlow
+// com botões. Converte pro mesmo formato {body, buttons[]} pra unificar
+// renderização no front.
+func extractInteractivePayload(im *waE2E.InteractiveMessage) string {
+	if im == nil {
+		return ""
+	}
+	out := map[string]any{}
+	if body := im.GetBody(); body != nil && body.GetText() != "" {
+		out["body"] = body.GetText()
+	}
+	if header := im.GetHeader(); header != nil && header.GetTitle() != "" {
+		out["header"] = header.GetTitle()
+	}
+	if footer := im.GetFooter(); footer != nil && footer.GetText() != "" {
+		out["footer"] = footer.GetText()
+	}
+	if nf := im.GetNativeFlowMessage(); nf != nil {
+		btns := make([]map[string]string, 0, len(nf.GetButtons()))
+		for _, b := range nf.GetButtons() {
+			btns = append(btns, map[string]string{
+				"id":    b.GetName(),
+				"title": b.GetButtonParamsJSON(),
+			})
+		}
+		if len(btns) > 0 {
+			out["buttons"] = btns
+		}
+	}
+	out["interactive"] = true
+	if data, err := json.Marshal(out); err == nil {
+		return string(data)
+	}
+	return ""
 }
 
 // parseVCardPhones extrai todos os telefones de um vCard (formato RFC 6350).

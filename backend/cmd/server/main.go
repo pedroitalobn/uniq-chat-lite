@@ -220,6 +220,8 @@ func autoMigrate(db *gorm.DB) error {
 		&models.Webhook{},
 		&models.GlobalWebhook{},
 		&models.MessageLog{},
+		&models.MessageReceipt{},
+		&models.LinkPreview{},
 		&models.Contact{},
 		&models.Tag{},
 		&models.Campaign{},
@@ -487,19 +489,23 @@ func seedTicketingRoles(db *gorm.DB) {
 
 // backfillDoubleEncodedMediaContent corrige MessageLog.Content que ficou
 // JSON-encoded duas vezes pelo bug da Manager.SaveMessage (json.Marshal
-// numa string que já era JSON). Detecta padrão `"{\"media_key\":...}"` e
-// desembrulha pra `{"media_key":...}`. Idempotente (depois de corrigido,
-// o conteúdo não bate o filtro de novo). Roda 1x no boot — depois desse
-// fix esse cenário não acontece mais pra mensagens novas.
+// numa string que já era JSON). Detecta padrão `"{...}"` e desembrulha
+// pra `{...}`. Idempotente (depois de corrigido, o conteúdo não bate
+// o filtro de novo). Roda 1x no boot.
+//
+// Cobre TODOS os tipos com payload JSON: mídias (image/video/audio/
+// document/sticker) E tipos estruturados (location/live_location/
+// contact/contacts/poll). Texto puro com aspas (`"oi"`) passa batido
+// porque `unwrapped` não começa com `{`.
 func backfillDoubleEncodedMediaContent(db *gorm.DB) {
 	var rows []models.MessageLog
-	// Limita o escopo aos prováveis afetados: começam com `"` e contém
-	// `media_key`. Texto puro (`"oi"`) começa com `"` mas não tem
-	// media_key, então passa batido.
-	if err := db.Where(`content LIKE '"%media_key%' AND type IN ?`,
-		[]string{"image", "video", "audio", "document", "sticker"}).
+	jsonTypes := []string{
+		"image", "video", "audio", "document", "sticker",
+		"location", "live_location", "contact", "contacts", "poll",
+	}
+	if err := db.Where(`content LIKE '"%' AND type IN ?`, jsonTypes).
 		Find(&rows).Error; err != nil {
-		log.Warn().Err(err).Msg("backfill media: query falhou (não fatal)")
+		log.Warn().Err(err).Msg("backfill content: query falhou (não fatal)")
 		return
 	}
 	if len(rows) == 0 {
@@ -518,14 +524,14 @@ func backfillDoubleEncodedMediaContent(db *gorm.DB) {
 			Where("id = ?", row.ID).
 			Update("content", unwrapped).Error; err != nil {
 			log.Warn().Err(err).Str("id", row.ID.String()).
-				Msg("backfill media: update falhou")
+				Msg("backfill content: update falhou")
 			continue
 		}
 		fixed++
 	}
 	if fixed > 0 {
 		log.Info().Int("fixed", fixed).Int("scanned", len(rows)).
-			Msg("backfill media: conteúdo double-encoded desembrulhado")
+			Msg("backfill content: JSON estruturado desembrulhado (location/contact/poll/etc)")
 	}
 }
 

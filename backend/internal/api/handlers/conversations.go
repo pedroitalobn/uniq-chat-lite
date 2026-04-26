@@ -286,6 +286,10 @@ func (h *ConversationHandler) Timeline(c *fiber.Ctx) error {
 		messages[i].Content = storage.ResolveMediaURLs(c.Context(), messages[i].Content)
 	}
 
+	// Preload reply_to snapshots em batch. Coleta todos os reply_to_id
+	// únicos, busca em uma query, monta map e atribui — evita N+1.
+	h.populateReplyTo(c.Context(), messages)
+
 	out := make([]entry, 0, len(messages)+len(notes)+len(events))
 	for i := range messages {
 		m := &messages[i]
@@ -392,6 +396,9 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		TemplateName       string           `json:"template_name"`
 		TemplateLanguage   string           `json:"template_language"`
 		TemplateComponents []map[string]any `json:"template_components"`
+		// ReplyToMessageID — id INTERNO da MessageLog citada. Backend traduz
+		// pra external_id (stanza_id WA, msg_id WABA) antes de enviar.
+		ReplyToMessageID string `json:"reply_to_message_id"`
 	}
 	if err := c.BodyParser(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -467,6 +474,24 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		b, _ := json.Marshal(body.Body)
 		contentStr = string(b)
 	}
+	// Reply context — se especificado, busca a MessageLog citada pra
+	// extrair external_message_id + sender_jid (necessários pra ContextInfo
+	// no canal). Mantém ReplyToID local pra UI mostrar o quote depois.
+	var replyToExternalID, replyToParticipant string
+	var replyToInternalID *uuid.UUID
+	if body.ReplyToMessageID != "" {
+		if rid, err := uuid.Parse(body.ReplyToMessageID); err == nil {
+			var quoted models.MessageLog
+			if err := h.db.
+				Where("id = ? AND conversation_id = ?", rid, conv.ID).
+				First(&quoted).Error; err == nil {
+				replyToInternalID = &quoted.ID
+				replyToExternalID = quoted.ExternalMessageID
+				replyToParticipant = quoted.SenderJID
+			}
+		}
+	}
+
 	logRow := models.MessageLog{
 		InstanceID:     conv.InstanceID,
 		WorkspaceID:    &wsCopy,
@@ -477,6 +502,7 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		ToJID:          conv.ChannelKey,
 		Content:        contentStr,
 		Status:         models.MessageStatusPending,
+		ReplyToID:      replyToInternalID,
 	}
 	if err := h.db.Create(&logRow).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -490,7 +516,7 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		if err := h.db.First(&inst, "id = ?", conv.InstanceID).Error; err == nil {
 			ctx, cancel := context.WithTimeout(c.UserContext(), 60*time.Second)
 			defer cancel()
-			_, sendErr := h.outbound.Send(ctx, &inst, outbound.OutboundMessage{
+			res, sendErr := h.outbound.Send(ctx, &inst, outbound.OutboundMessage{
 				To:                 conv.ChannelKey,
 				Type:               msgType,
 				Body:               body.Body,
@@ -501,10 +527,16 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 				TemplateName:       body.TemplateName,
 				TemplateLanguage:   body.TemplateLanguage,
 				TemplateComponents: body.TemplateComponents,
+				ReplyToExternalID:  replyToExternalID,
+				ReplyToParticipant: replyToParticipant,
 			})
 			if sendErr != nil {
 				sendStatus = models.MessageStatusFailed
 				sendErrStr = sendErr.Error()
+			} else if res != nil && res.ExternalID != "" {
+				// Salva external_id retornado pelo canal pra futuras correlações
+				// (receipts, reply, edit, revoke).
+				h.db.Model(&logRow).Update("external_message_id", res.ExternalID)
 			}
 		} else {
 			sendStatus = models.MessageStatusFailed
@@ -629,6 +661,372 @@ func (h *ConversationHandler) PatchMessage(c *fiber.Ctx) error {
 		"message": updated,
 	})
 	return c.JSON(updated)
+}
+
+// loadMessageInWS — helper: carrega MessageLog garantindo que pertence
+// a conversation desse workspace. Retorna 404 se não bater.
+func (h *ConversationHandler) loadMessageInWS(c *fiber.Ctx, ws uuid.UUID, convID, msgID uuid.UUID) (*models.MessageLog, *models.Conversation, error) {
+	var msg models.MessageLog
+	var conv models.Conversation
+	err := h.db.
+		Joins("JOIN conversations c ON c.id = message_logs.conversation_id").
+		Where("message_logs.id = ? AND c.workspace_id = ? AND c.id = ?", msgID, ws, convID).
+		Select("message_logs.*").
+		First(&msg).Error
+	if err != nil {
+		return nil, nil, c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "mensagem não encontrada"})
+	}
+	if err := h.db.First(&conv, "id = ?", convID).Error; err != nil {
+		return nil, nil, c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
+	}
+	return &msg, &conv, nil
+}
+
+// RevokeMessage DELETE /v1/conversations/:id/messages/:msgId
+// Apaga uma mensagem enviada pelo agente (delete-for-everyone). Funciona
+// apenas em mensagens outbound nossas com external_message_id (stanza_id).
+// Marca is_deleted=true + content="" no DB e dispara whatsmeow Revoke
+// pra remover do dispositivo do destinatário também.
+func (h *ConversationHandler) RevokeMessage(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	convID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	msgID, err := uuid.Parse(c.Params("msgId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "msgId inválido"})
+	}
+	msg, conv, errResp := h.loadMessageInWS(c, ws, convID, msgID)
+	if errResp != nil {
+		return errResp
+	}
+	if msg.Direction != models.DirectionOut {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "só é possível apagar mensagens enviadas pela equipe"})
+	}
+	if msg.ExternalMessageID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "mensagem não tem id externo — não pode ser apagada no canal"})
+	}
+
+	// Dispara revoke no canal — best-effort. Se falhar, ainda marcamos no DB
+	// (pelo menos some da inbox da equipe).
+	if h.manager != nil {
+		if client := h.manager.GetInstance(conv.InstanceID.String()); client != nil && client.IsConnected() {
+			senderJID := msg.SenderJID
+			if senderJID == "" {
+				senderJID = client.OwnerJID()
+			}
+			_, _ = client.RevokeMessage(conv.ChannelKey, msg.ExternalMessageID, senderJID)
+		}
+	}
+
+	h.db.Model(&models.MessageLog{}).Where("id = ?", msgID).Updates(map[string]any{
+		"is_deleted": true,
+		"type":       "revoke",
+		"content":    "",
+	})
+	var updated models.MessageLog
+	h.db.First(&updated, "id = ?", msgID)
+	h.broadcast(conv, "conversation.message_updated", map[string]any{"message": updated})
+	return c.JSON(updated)
+}
+
+// EditMessage PATCH /v1/conversations/:id/messages/:msgId/content { body }
+// Edita o texto de uma mensagem outbound já enviada. Whatsmeow tem janela
+// de 15min pra edit funcionar do lado do recipiente; depois disso só
+// atualiza no nosso DB.
+func (h *ConversationHandler) EditMessage(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	convID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	msgID, err := uuid.Parse(c.Params("msgId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "msgId inválido"})
+	}
+	var body struct {
+		Body string `json:"body"`
+	}
+	if err := c.BodyParser(&body); err != nil || strings.TrimSpace(body.Body) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'body' é obrigatório"})
+	}
+	msg, conv, errResp := h.loadMessageInWS(c, ws, convID, msgID)
+	if errResp != nil {
+		return errResp
+	}
+	if msg.Direction != models.DirectionOut {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "só é possível editar mensagens enviadas pela equipe"})
+	}
+	if msg.Type != "text" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "edit suportado apenas para mensagens de texto"})
+	}
+	if msg.ExternalMessageID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "mensagem não tem id externo"})
+	}
+
+	// Edit no canal — whatsmeow.BuildEdit. Best-effort.
+	if h.manager != nil {
+		if client := h.manager.GetInstance(conv.InstanceID.String()); client != nil && client.IsConnected() {
+			_, _ = client.EditMessage(conv.ChannelKey, msg.ExternalMessageID, body.Body)
+		}
+	}
+
+	h.db.Model(&models.MessageLog{}).Where("id = ?", msgID).Updates(map[string]any{
+		"content":   body.Body,
+		"is_edited": true,
+	})
+	var updated models.MessageLog
+	h.db.First(&updated, "id = ?", msgID)
+	h.broadcast(conv, "conversation.message_updated", map[string]any{"message": updated})
+	return c.JSON(updated)
+}
+
+// ReactToMessage POST /v1/conversations/:id/messages/:msgId/react { emoji }
+// Reage com emoji a uma mensagem (qualquer direção). emoji vazio remove a
+// reação. Salva como MessageLog tipo "reaction" e dispara SendReaction.
+func (h *ConversationHandler) ReactToMessage(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	convID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	msgID, err := uuid.Parse(c.Params("msgId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "msgId inválido"})
+	}
+	var body struct {
+		Emoji string `json:"emoji"`
+	}
+	c.BodyParser(&body)
+	msg, conv, errResp := h.loadMessageInWS(c, ws, convID, msgID)
+	if errResp != nil {
+		return errResp
+	}
+	if msg.ExternalMessageID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "mensagem não tem id externo"})
+	}
+
+	// Dispara reaction no canal
+	if h.manager != nil {
+		if client := h.manager.GetInstance(conv.InstanceID.String()); client != nil && client.IsConnected() {
+			senderJID := msg.SenderJID
+			if senderJID == "" {
+				senderJID = client.OwnerJID()
+			}
+			_, _ = client.SendReaction(conv.ChannelKey, msg.ExternalMessageID, senderJID, body.Emoji)
+		}
+	}
+
+	// Persiste como msg do agente tipo "reaction" pra aparecer na timeline.
+	// Reply_to aponta pra mensagem reagida pra agrupamento no UI (#10).
+	reaction := models.MessageLog{
+		ID:             uuid.New(),
+		InstanceID:     conv.InstanceID,
+		ConversationID: &conv.ID,
+		WorkspaceID:    &ws,
+		Direction:      models.DirectionOut,
+		Type:           "reaction",
+		ToJID:          conv.ChannelKey,
+		Content:        body.Emoji,
+		Status:         models.MessageStatusSent,
+		ReplyToID:      &msg.ID,
+	}
+	if err := h.db.Create(&reaction).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	h.broadcast(conv, "conversation.message", map[string]any{"message": reaction})
+	return c.JSON(reaction)
+}
+
+// ForwardMessage POST /v1/conversations/:id/messages/:msgId/forward { targets[] }
+// Encaminha uma mensagem para uma ou mais conversations alvo. Targets pode
+// ter conversation_id (existente) OU contact_phone (cria/abre conv 1:1).
+// Cada target gera um novo SendMessage outbound; mantém media_key (re-presign
+// na hora). Marca o forward com flag is_forwarded no JSON content.
+func (h *ConversationHandler) ForwardMessage(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	convID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	msgID, err := uuid.Parse(c.Params("msgId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "msgId inválido"})
+	}
+	var body struct {
+		ConversationIDs []string `json:"conversation_ids"`
+	}
+	if err := c.BodyParser(&body); err != nil || len(body.ConversationIDs) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "informe ao menos um conversation_id"})
+	}
+	msg, _, errResp := h.loadMessageInWS(c, ws, convID, msgID)
+	if errResp != nil {
+		return errResp
+	}
+
+	type result struct {
+		ConversationID string `json:"conversation_id"`
+		MessageID      string `json:"message_id,omitempty"`
+		Error          string `json:"error,omitempty"`
+	}
+	results := make([]result, 0, len(body.ConversationIDs))
+	for _, raw := range body.ConversationIDs {
+		targetID, err := uuid.Parse(raw)
+		if err != nil {
+			results = append(results, result{ConversationID: raw, Error: "id inválido"})
+			continue
+		}
+		var target models.Conversation
+		if err := h.db.Where("workspace_id = ? AND id = ?", ws, targetID).First(&target).Error; err != nil {
+			results = append(results, result{ConversationID: raw, Error: "conversation não encontrada"})
+			continue
+		}
+		// Novo MessageLog outbound copiando content + flag forwarded
+		forwardedContent := injectForwardedFlag(msg.Content)
+		newMsg := models.MessageLog{
+			ID:             uuid.New(),
+			InstanceID:     target.InstanceID,
+			ConversationID: &target.ID,
+			WorkspaceID:    &ws,
+			Direction:      models.DirectionOut,
+			Type:           msg.Type,
+			ToJID:          target.ChannelKey,
+			Content:        forwardedContent,
+			Status:         models.MessageStatusPending,
+		}
+		if err := h.db.Create(&newMsg).Error; err != nil {
+			results = append(results, result{ConversationID: raw, Error: err.Error()})
+			continue
+		}
+		// Dispara envio no canal via outbound registry. Reusa o body/url/mime
+		// extraídos do content original.
+		if h.outbound != nil {
+			var inst models.Instance
+			if err := h.db.First(&inst, "id = ?", target.InstanceID).Error; err == nil {
+				out := buildOutboundFromContent(forwardedContent, msg.Type, target.ChannelKey)
+				ctx, cancel := context.WithTimeout(c.UserContext(), 30*time.Second)
+				_, sendErr := h.outbound.Send(ctx, &inst, out)
+				cancel()
+				if sendErr != nil {
+					h.db.Model(&newMsg).Update("status", models.MessageStatusFailed)
+					results = append(results, result{ConversationID: raw, MessageID: newMsg.ID.String(), Error: sendErr.Error()})
+					continue
+				}
+				h.db.Model(&newMsg).Update("status", models.MessageStatusSent)
+			}
+		}
+		results = append(results, result{ConversationID: raw, MessageID: newMsg.ID.String()})
+		h.broadcast(&target, "conversation.message", map[string]any{"message": newMsg})
+	}
+	return c.JSON(fiber.Map{"results": results})
+}
+
+// buildOutboundFromContent monta o OutboundMessage extraindo body+url+mime
+// do JSON content. Tipos de mídia (image/video/audio/document) usam media_url
+// + caption; texto usa body. Tipos não suportados (poll/contact/etc) caem
+// pra body=stripJSONString fallback.
+func buildOutboundFromContent(content, msgType, to string) outbound.OutboundMessage {
+	out := outbound.OutboundMessage{To: to, Type: msgType}
+	var asObj map[string]any
+	if json.Unmarshal([]byte(content), &asObj) == nil {
+		if v, ok := asObj["url"].(string); ok {
+			out.MediaURL = v
+		}
+		if v, ok := asObj["mime_type"].(string); ok {
+			out.MediaMime = v
+		}
+		if v, ok := asObj["filename"].(string); ok {
+			out.Filename = v
+		}
+		if v, ok := asObj["caption"].(string); ok {
+			out.Caption = v
+		}
+		if v, ok := asObj["text"].(string); ok {
+			out.Body = v
+		}
+	} else {
+		out.Body = stripJSONString(content)
+	}
+	return out
+}
+
+// injectForwardedFlag adiciona is_forwarded=true ao JSON content (se for JSON)
+// ou empacota texto puro como {text, is_forwarded:true}.
+func injectForwardedFlag(content string) string {
+	if content == "" {
+		return content
+	}
+	var asObj map[string]any
+	if err := json.Unmarshal([]byte(content), &asObj); err == nil {
+		asObj["is_forwarded"] = true
+		if data, err := json.Marshal(asObj); err == nil {
+			return string(data)
+		}
+		return content
+	}
+	// texto puro — mantém como string mas via wrap (simples manter compat).
+	wrap := map[string]any{"text": stripJSONString(content), "is_forwarded": true}
+	if data, err := json.Marshal(wrap); err == nil {
+		return string(data)
+	}
+	return content
+}
+
+// stripJSONString lida com content que veio JSON-encoded ("oi") devolvendo
+// "oi". Se já é texto puro, retorna como veio.
+func stripJSONString(s string) string {
+	var out string
+	if json.Unmarshal([]byte(s), &out) == nil {
+		return out
+	}
+	return s
+}
+
+// GetMessageReceipts GET /v1/conversations/:id/messages/:msgId/receipts
+// Lista quem recebeu/leu a mensagem em grupo. Em conversa 1:1 retorna 0..1
+// linhas (ou nenhuma — basta usar message.delivered_at/read_at). É o painel
+// "Info da mensagem" do WhatsApp Web.
+func (h *ConversationHandler) GetMessageReceipts(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	convID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	msgID, err := uuid.Parse(c.Params("msgId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "msgId inválido"})
+	}
+	msg, _, errResp := h.loadMessageInWS(c, ws, convID, msgID)
+	if errResp != nil {
+		return errResp
+	}
+	var receipts []models.MessageReceipt
+	h.db.Where("message_log_id = ?", msg.ID).Order("timestamp ASC").Find(&receipts)
+
+	// Agrupa por participant — entrega antes da leitura (uma linha cada).
+	// Frontend usa pra montar duas listas: "Entregue a" e "Lida por".
+	delivered := make([]map[string]any, 0)
+	read := make([]map[string]any, 0)
+	for _, r := range receipts {
+		entry := map[string]any{
+			"participant_jid": r.ParticipantJID,
+			"timestamp":       r.Timestamp,
+		}
+		switch r.Type {
+		case "read":
+			read = append(read, entry)
+		default:
+			delivered = append(delivered, entry)
+		}
+	}
+	return c.JSON(fiber.Map{
+		"message_id":   msg.ID,
+		"delivered":    delivered,
+		"read":         read,
+		"delivered_at": msg.DeliveredAt,
+		"read_at":      msg.ReadAt,
+	})
 }
 
 // Typing POST /v1/conversations/:id/typing  { typing: bool }
@@ -1594,3 +1992,87 @@ func sortEntriesDesc(entries []timelineEntry) {
 
 // resolveMediaURLs foi movido pra internal/storage/resolver.go pra ser
 // reutilizado pelo Timeline, Get e pelo WS broadcast (inbound pipeline).
+
+// populateReplyTo enriquece cada MessageLog com snapshot da mensagem citada.
+// Coleta os reply_to_id únicos, faz UMA query batch, monta map e atribui
+// cada msg.ReplyTo. Evita N+1 ao renderizar timeline com muitos quotes.
+//
+// Para texto, extrai do JSON content (campo "text" ou "caption" ou raw).
+// Para mídia, copia url+mime pra preview thumbnail.
+func (h *ConversationHandler) populateReplyTo(ctx context.Context, messages []models.MessageLog) {
+	if len(messages) == 0 {
+		return
+	}
+	idSet := make(map[uuid.UUID]struct{})
+	for i := range messages {
+		if messages[i].ReplyToID != nil {
+			idSet[*messages[i].ReplyToID] = struct{}{}
+		}
+	}
+	if len(idSet) == 0 {
+		return
+	}
+	ids := make([]uuid.UUID, 0, len(idSet))
+	for id := range idSet {
+		ids = append(ids, id)
+	}
+	var refs []models.MessageLog
+	if err := h.db.Where("id IN ?", ids).Find(&refs).Error; err != nil {
+		log.Warn().Err(err).Msg("populateReplyTo: batch query falhou")
+		return
+	}
+	byID := make(map[uuid.UUID]*models.MessageLog, len(refs))
+	for i := range refs {
+		// Resolve mídia também na quoted (thumbnail vai aparecer)
+		refs[i].Content = storage.ResolveMediaURLs(ctx, refs[i].Content)
+		byID[refs[i].ID] = &refs[i]
+	}
+	for i := range messages {
+		if messages[i].ReplyToID == nil {
+			continue
+		}
+		ref, ok := byID[*messages[i].ReplyToID]
+		if !ok {
+			continue
+		}
+		preview := &models.MessageLogReplyPreview{
+			ID:         ref.ID,
+			Direction:  ref.Direction,
+			Type:       ref.Type,
+			SenderName: ref.SenderName,
+		}
+		// Extrai texto+url+mime do content (legacy texto puro ou JSON estruturado)
+		if ref.Content != "" {
+			var asObj map[string]any
+			if err := json.Unmarshal([]byte(ref.Content), &asObj); err == nil {
+				if v, ok := asObj["text"].(string); ok {
+					preview.Text = v
+				}
+				if preview.Text == "" {
+					if v, ok := asObj["caption"].(string); ok {
+						preview.Text = v
+					}
+				}
+				if v, ok := asObj["url"].(string); ok {
+					preview.MediaURL = v
+				}
+				if v, ok := asObj["mime_type"].(string); ok {
+					preview.MimeType = v
+				}
+			} else {
+				// raw text — pode estar JSON-encoded ("...") ou puro
+				var s string
+				if json.Unmarshal([]byte(ref.Content), &s) == nil {
+					preview.Text = s
+				} else {
+					preview.Text = ref.Content
+				}
+			}
+		}
+		// Truncate texto pra preview compacto
+		if len(preview.Text) > 280 {
+			preview.Text = preview.Text[:280] + "…"
+		}
+		messages[i].ReplyTo = preview
+	}
+}

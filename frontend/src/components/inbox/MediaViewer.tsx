@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import {
   X, Download, ZoomIn, ZoomOut, RotateCw, Maximize2, FileText,
 } from "lucide-react";
+import { mediaApi } from "@/lib/api";
 
 export interface MediaViewerSource {
   type: "image" | "video" | "audio" | "document";
@@ -12,6 +13,9 @@ export interface MediaViewerSource {
   filename?: string;
   mimeType?: string;
   caption?: string;
+  // mediaKey — quando vem do storage Hetzner, usamos o proxy /v1/media/download
+  // ao invés de fetch direto (que esbarra em CORS do bucket).
+  mediaKey?: string;
 }
 
 // MediaViewer — lightbox fullscreen pra inbox.
@@ -95,9 +99,12 @@ export function MediaViewer({
   const onMouseUp = () => setDragging(false);
 
   const downloadHandler = async () => {
+    // Hetzner não retorna CORS no bucket; fetch direto falha.
+    // Usa o proxy /v1/media/download que stream com Content-Disposition: attachment.
     try {
-      const res = await fetch(source.url);
-      const blob = await res.blob();
+      if (!source.mediaKey) throw new Error("media sem key");
+      const res = await mediaApi.download(source.mediaKey, source.filename);
+      const blob = res.data as Blob;
       const objectURL = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = objectURL;
@@ -107,7 +114,7 @@ export function MediaViewer({
       document.body.removeChild(a);
       URL.revokeObjectURL(objectURL);
     } catch {
-      // fallback: abre em nova aba
+      // fallback: abre em nova aba (signed URL ainda funciona pra preview)
       window.open(source.url, "_blank");
     }
   };

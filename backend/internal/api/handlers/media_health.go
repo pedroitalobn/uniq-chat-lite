@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -90,4 +92,86 @@ func (h *MediaHealthHandler) Check(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(out)
+}
+
+// MediaProxyDownload — força download de mídia via backend (em vez do front
+// fazer fetch direto pra Hetzner que esbarra em CORS). Stream do bucket
+// pro browser com Content-Disposition: attachment + filename original.
+//
+// GET /v1/media/download?key=<media_key>&filename=<filename-opcional>
+// Auth: requireAuth (qualquer usuário logado pode baixar — assume que ele
+// já tem permissão pra ver a conversa onde a mídia foi linkada).
+func (h *MediaHealthHandler) Download(c *fiber.Ctx) error {
+	if !storage.IsConfigured() {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error": "storage não configurado",
+		})
+	}
+	key := c.Query("key")
+	if key == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "param ?key=<media_key> é obrigatório",
+		})
+	}
+	filename := c.Query("filename")
+	if filename == "" {
+		// extrai filename do final do key
+		if idx := strings.LastIndex(key, "/"); idx >= 0 {
+			filename = key[idx+1:]
+		} else {
+			filename = key
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// Gera signed URL curta pra fazer o GET interno
+	signedURL, err := storage.GlobalStorage.PresignURL(ctx, key, 5*time.Minute)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "falha ao assinar URL: " + err.Error(),
+		})
+	}
+
+	client := &http.Client{
+		Timeout: 60 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: false},
+		},
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, signedURL, nil)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+			"error": "falha ao buscar do storage: " + err.Error(),
+		})
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+			"error":          "storage retornou erro",
+			"upstream_status": resp.StatusCode,
+			"body_excerpt":   string(body),
+		})
+	}
+
+	// Headers que forçam download em vez de inline rendering
+	c.Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	if ct := resp.Header.Get("Content-Type"); ct != "" {
+		c.Set("Content-Type", ct)
+	} else {
+		c.Set("Content-Type", "application/octet-stream")
+	}
+	if cl := resp.Header.Get("Content-Length"); cl != "" {
+		c.Set("Content-Length", cl)
+	}
+
+	// Stream pro client (não buffer todo na memória — vídeos grandes)
+	return c.SendStream(resp.Body)
 }

@@ -34,6 +34,13 @@ type OutboundMessage struct {
 	Caption   string
 	Filename  string // document only
 
+	// Reply context — quando o agente está respondendo (citando) uma msg
+	// anterior. ReplyToExternalID é o stanza_id (whatsmeow) ou message_id
+	// (WABA/IG) da msg original. ReplyToParticipant só é usado em grupos
+	// pra montar ContextInfo corretamente.
+	ReplyToExternalID  string
+	ReplyToParticipant string
+
 	// Template (WABA somente): Meta exige nome do template aprovado,
 	// linguagem (ex.: pt_BR) e componentes opcionais com variáveis.
 	TemplateName       string
@@ -116,7 +123,13 @@ func (r *Registry) sendWhatsApp(inst *models.Instance, msg OutboundMessage) (*Se
 
 	switch msg.Type {
 	case "", "text":
-		id, err := client.SendTextMessage(msg.To, msg.Body)
+		var id string
+		var err error
+		if msg.ReplyToExternalID != "" {
+			id, err = client.SendTextMessageReply(msg.To, msg.Body, msg.ReplyToExternalID, msg.ReplyToParticipant)
+		} else {
+			id, err = client.SendTextMessage(msg.To, msg.Body)
+		}
 		if err != nil {
 			return nil, err
 		}

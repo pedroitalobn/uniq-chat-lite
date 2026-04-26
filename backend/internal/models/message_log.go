@@ -43,7 +43,38 @@ type MessageLog struct {
 	IsDeleted      bool             `gorm:"default:false" json:"is_deleted"`
 	IsInternalNote bool             `gorm:"default:false" json:"is_internal_note"`
 	ReplyToID      *uuid.UUID       `gorm:"type:uuid;index" json:"reply_to_id,omitempty"`
-	CreatedAt      time.Time        `json:"created_at"`
+	// ExternalMessageID — id da msg no canal externo (ex.: stanza_id WhatsApp,
+	// message_id Instagram). Indexed por (instance_id, external_message_id)
+	// pra lookup O(log n) ao correlacionar quotes/replies.
+	ExternalMessageID string `gorm:"type:varchar(120);index" json:"external_message_id,omitempty"`
+	// Timestamps de receipt — preenchidos quando chega events.Receipt do
+	// whatsmeow (ou equivalente WABA/IG). DeliveredAt = 2 ticks cinzas,
+	// ReadAt = 2 ticks azuis. Status string acompanha pro front simples.
+	DeliveredAt *time.Time `json:"delivered_at,omitempty"`
+	ReadAt      *time.Time `json:"read_at,omitempty"`
+	// IsEdited — flag pra mostrar selo "editada" na bubble. Atualizado
+	// quando chega events.Message com IsEdit=true matching a MessageLog
+	// existente via reply_to/external_id.
+	IsEdited  bool      `gorm:"default:false" json:"is_edited"`
+	CreatedAt time.Time `json:"created_at"`
+
+	// ReplyTo é um snapshot in-memory da mensagem citada — preenchido pelo
+	// Timeline handler em batch. Não é persistido. Permite ao frontend
+	// renderizar o "quoted preview" sem N+1 queries.
+	ReplyTo *MessageLogReplyPreview `gorm:"-" json:"reply_to,omitempty"`
+}
+
+// MessageLogReplyPreview — versão enxuta usada como snapshot citado.
+// Conteúdo limitado ao essencial pra renderizar a quote (sender, texto curto,
+// preview de mídia). Não traz status/flags/timestamps detalhados.
+type MessageLogReplyPreview struct {
+	ID         uuid.UUID        `json:"id"`
+	Direction  MessageDirection `json:"direction"`
+	Type       string           `json:"type"`
+	Text       string           `json:"text,omitempty"`
+	SenderName string           `json:"sender_name,omitempty"`
+	MediaURL   string           `json:"media_url,omitempty"`
+	MimeType   string           `json:"mime_type,omitempty"`
 }
 
 func (m *MessageLog) BeforeCreate(tx *gorm.DB) error {

@@ -9,10 +9,12 @@ import {
   UserCheck, UserX, ArrowRightLeft, Bot, BotOff, Lock, AlertTriangle,
   Smile, X, Star, Mic, Image as ImageIcon, FileText, MapPin, Check,
   CheckCheck, AlertCircle, Paperclip, Pin, Sparkles, Users as UsersIcon,
-  Maximize2 as Maximize2Icon,
+  Maximize2 as Maximize2Icon, Phone, Video as VideoIcon, PhoneMissed,
+  UserPlus, MessageSquare, ListChecks, CornerUpLeft, CornerUpRight,
+  Pencil, Trash2, Search, Info,
 } from "lucide-react";
 import { MediaViewer, type MediaViewerSource } from "@/components/inbox/MediaViewer";
-import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi } from "@/lib/api";
+import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi, crmContactsApi, linkPreviewApi } from "@/lib/api";
 import { TemplatePicker } from "@/components/inbox/TemplatePicker";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
@@ -87,6 +89,20 @@ interface MessagePayload {
   is_internal_note?: boolean;
   is_pinned?: boolean;
   is_favorite?: boolean;
+  is_edited?: boolean;
+  delivered_at?: string | null;
+  read_at?: string | null;
+  external_message_id?: string;
+  reply_to_id?: string;
+  reply_to?: {
+    id?: string;
+    type?: string;
+    text?: string;
+    sender_name?: string;
+    direction?: string;
+    media_url?: string;
+    mime_type?: string;
+  };
 }
 
 interface NotePayload {
@@ -135,6 +151,11 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
 
   // Lightbox state — abre quando agente clica em mídia. null = fechado.
   const [viewerSource, setViewerSource] = useState<MediaViewerSource | null>(null);
+  // Reply context — composer mostra barra com preview e envia reply_to_message_id
+  const [replyTo, setReplyTo] = useState<MessagePayload | null>(null);
+  const [forwardMsg, setForwardMsg] = useState<MessagePayload | null>(null);
+  const [editingMsg, setEditingMsg] = useState<MessagePayload | null>(null);
+  const [infoMsg, setInfoMsg] = useState<MessagePayload | null>(null);
   const canClose = hasPerm(PERM.ticketsClose);
   const canReopen = hasPerm(PERM.ticketsReopen);
   const canSnooze = hasPerm(PERM.ticketsSnooze);
@@ -204,7 +225,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   // invalidates the relevant queries. Payloads that embed `conversation_id`
   // are filtered so we don't re-fetch for unrelated tickets.
   useConversationWS({
-    prefixes: ["conversation."],
+    prefixes: ["conversation.", "message."],
     onEvent: (evt: WSEvent) => {
       const payload = (evt.payload ?? {}) as { conversation_id?: string; conversation?: { id?: string } };
       const eventConvID = payload.conversation_id ?? payload.conversation?.id;
@@ -216,8 +237,13 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
 
 
   const send = useMutation({
-    mutationFn: (body: string) => conversationsApi.sendMessage(wsId as string, conversationId, { body }),
+    mutationFn: (input: { body: string; replyToMessageId?: string }) =>
+      conversationsApi.sendMessage(wsId as string, conversationId, {
+        body: input.body,
+        ...(input.replyToMessageId ? { reply_to_message_id: input.replyToMessageId } : {}),
+      }),
     onSuccess: () => {
+      setReplyTo(null);
       qc.invalidateQueries({ queryKey: ["conversation-timeline", wsId, conversationId] });
       qc.invalidateQueries({ queryKey: ["conversation", wsId, conversationId] });
     },
@@ -297,6 +323,49 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     onError: () => toast.error("Falha ao atualizar mensagem"),
   });
 
+  const revokeMsg = useMutation({
+    mutationFn: (msgId: string) => conversationsApi.revokeMessage(wsId as string, conversationId, msgId),
+    onSuccess: () => {
+      toast.success("Mensagem apagada");
+      qc.invalidateQueries({ queryKey: ["conversation-timeline", wsId, conversationId] });
+    },
+    onError: () => toast.error("Falha ao apagar"),
+  });
+
+  const editMsg = useMutation({
+    mutationFn: ({ msgId, body }: { msgId: string; body: string }) =>
+      conversationsApi.editMessage(wsId as string, conversationId, msgId, body),
+    onSuccess: () => {
+      toast.success("Mensagem editada");
+      setEditingMsg(null);
+      qc.invalidateQueries({ queryKey: ["conversation-timeline", wsId, conversationId] });
+    },
+    onError: () => toast.error("Falha ao editar"),
+  });
+
+  const reactMsg = useMutation({
+    mutationFn: ({ msgId, emoji }: { msgId: string; emoji: string }) =>
+      conversationsApi.reactToMessage(wsId as string, conversationId, msgId, emoji),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["conversation-timeline", wsId, conversationId] });
+    },
+    onError: () => toast.error("Falha ao reagir"),
+  });
+
+  const forwardMutation = useMutation({
+    mutationFn: ({ msgId, conversationIds }: { msgId: string; conversationIds: string[] }) =>
+      conversationsApi.forwardMessage(wsId as string, conversationId, msgId, conversationIds),
+    onSuccess: (res) => {
+      const data = res.data as { results: Array<{ error?: string }> };
+      const failed = (data.results || []).filter((r) => r.error).length;
+      if (failed === 0) toast.success("Encaminhado");
+      else toast.warning(`Encaminhado com ${failed} falha(s)`);
+      setForwardMsg(null);
+      qc.invalidateQueries({ queryKey: ["conversation-timeline", wsId, conversationId] });
+    },
+    onError: () => toast.error("Falha ao encaminhar"),
+  });
+
   // Keyboard shortcuts — declared after all mutations to avoid TDZ refs.
   const openSnoozePrompt = useCallback(() => {
     const hours = Number(prompt("Em quantas horas desnoozear?", "4") || 4);
@@ -348,7 +417,35 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     }
     return out.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
   }, [timelineQ.data]);
-  const timeline = timelineAll;
+  // Agrupa reactions por mensagem-alvo. Reaction msgs têm reply_to_id apontando
+  // pra msg original. Filtramos elas do timeline e injetamos como chips dentro
+  // da bubble da msg referenciada (paridade WhatsApp Web).
+  const { timeline, reactionsByTarget } = useMemo(() => {
+    const reactions = new Map<string, ReactionEntry[]>();
+    const filtered: TimelinePayload["items"] = [];
+    for (const e of timelineAll) {
+      if (e.kind === "message") {
+        const m = e.payload as MessagePayload;
+        if (m.type === "reaction" && m.reply_to_id) {
+          const list = reactions.get(m.reply_to_id) ?? [];
+          if (m.content && m.content !== "" && m.content !== '""') {
+            const emoji = parseMessageContent(m.content).text || m.content;
+            list.push({
+              id: m.id,
+              emoji,
+              sender_name: m.sender_name,
+              direction: m.direction,
+              created_at: m.created_at,
+            });
+          }
+          reactions.set(m.reply_to_id, list);
+          continue;
+        }
+      }
+      filtered.push(e);
+    }
+    return { timeline: filtered, reactionsByTarget: reactions };
+  }, [timelineAll]);
   const status = conv ? STATUS_LABELS[conv.status] ?? STATUS_LABELS.open : null;
 
   // SLA breach indicator: scan the audit events for a sla_breached row; if
@@ -571,10 +668,18 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                   {e.kind === "message" ? (
                     <MessageBubble
                       m={e.payload as MessagePayload}
+                      wsId={wsId}
+                      reactions={reactionsByTarget.get((e.payload as MessagePayload).id)}
                       onPatch={(patch) =>
                         patchMsg.mutate({ msgId: (e.payload as MessagePayload).id, patch })
                       }
                       onOpenViewer={setViewerSource}
+                      onReply={(msg) => setReplyTo(msg)}
+                      onRevoke={(msg) => revokeMsg.mutate(msg.id)}
+                      onForward={(msg) => setForwardMsg(msg)}
+                      onReact={(msg, emoji) => reactMsg.mutate({ msgId: msg.id, emoji })}
+                      onEdit={(msg) => setEditingMsg(msg)}
+                      onInfo={(msg) => setInfoMsg(msg)}
                     />
                   ) : e.kind === "note" ? (
                     <NoteCard n={e.payload as NotePayload} />
@@ -593,10 +698,12 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           instanceId={conv?.instance_id}
           canSend={canSend}
           canNote={canNote}
-          onSendMessage={(body) => send.mutate(body)}
+          onSendMessage={(body) => send.mutate({ body, replyToMessageId: replyTo?.id })}
           onSendNote={(body) => note.mutate(body)}
           isSending={send.isPending}
           isNoting={note.isPending}
+          replyTo={replyTo}
+          onClearReply={() => setReplyTo(null)}
         />
       </section>
 
@@ -714,6 +821,35 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
       {/* Lightbox de mídia — abre quando agente clica em foto/vídeo/audio/doc.
           Renderizado via portal pra ficar fora do split layout. */}
       <MediaViewer source={viewerSource} onClose={() => setViewerSource(null)} />
+
+      {forwardMsg && wsId && (
+        <ForwardDialog
+          wsId={wsId}
+          msg={forwardMsg}
+          fromConversationId={conversationId}
+          onClose={() => setForwardMsg(null)}
+          onSubmit={(ids) => forwardMutation.mutate({ msgId: forwardMsg.id, conversationIds: ids })}
+          isPending={forwardMutation.isPending}
+        />
+      )}
+
+      {editingMsg && (
+        <EditMessageDialog
+          msg={editingMsg}
+          onClose={() => setEditingMsg(null)}
+          onSubmit={(body) => editMsg.mutate({ msgId: editingMsg.id, body })}
+          isPending={editMsg.isPending}
+        />
+      )}
+
+      {infoMsg && wsId && (
+        <MessageInfoDialog
+          wsId={wsId}
+          conversationId={conversationId}
+          msg={infoMsg}
+          onClose={() => setInfoMsg(null)}
+        />
+      )}
     </div>
   );
 }
@@ -885,12 +1021,28 @@ function TransferDialog({
   );
 }
 
+interface ReactionEntry {
+  id: string;
+  emoji: string;
+  sender_name?: string;
+  direction: "in" | "out";
+  created_at: string;
+}
+
 function MessageBubble({
-  m, onPatch, onOpenViewer,
+  m, onPatch, onOpenViewer, wsId, onReply, onRevoke, onForward, onReact, onEdit, onInfo, reactions,
 }: {
   m: MessagePayload;
   onPatch?: (patch: { is_pinned?: boolean; is_favorite?: boolean }) => void;
   onOpenViewer: (source: MediaViewerSource) => void;
+  wsId?: string;
+  onReply?: (m: MessagePayload) => void;
+  onRevoke?: (m: MessagePayload) => void;
+  onForward?: (m: MessagePayload) => void;
+  onReact?: (m: MessagePayload, emoji: string) => void;
+  onEdit?: (m: MessagePayload) => void;
+  onInfo?: (m: MessagePayload) => void;
+  reactions?: ReactionEntry[];
 }) {
   const isOut = m.direction === "out";
   const parsed = parseMessageContent(m.content);
@@ -945,7 +1097,7 @@ function MessageBubble({
               background: "hsl(240 18% 5%)",
             }}
           >
-            <MediaBody type={m.type} parsed={parsed} onOpenViewer={onOpenViewer} />
+            <MediaBody type={m.type} parsed={parsed} onOpenViewer={onOpenViewer} wsId={wsId} isOut={isOut} />
           </div>
 
           {/* Pin / favorite badges — abs positioned mantém limpo */}
@@ -982,37 +1134,18 @@ function MessageBubble({
             </span>
           </div>
 
-          {/* Hover actions */}
-          {onPatch && (
-            <div
-              className={`pointer-events-none absolute -top-3 flex gap-0.5 rounded-full px-1 py-0.5 opacity-0 shadow-lg transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 ${
-                isOut ? "right-2" : "left-2"
-              }`}
-              style={{
-                background: "hsl(240 18% 6%)",
-                border: "1px solid hsl(240 12% 16%)",
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => onPatch({ is_pinned: !m.is_pinned })}
-                className="rounded-full p-1 hover:bg-white/10"
-                title={m.is_pinned ? "Desfixar" : "Fixar"}
-                style={{ color: m.is_pinned ? "#00d46a" : "hsl(240 8% 62%)" }}
-              >
-                <Pin className="h-3 w-3" />
-              </button>
-              <button
-                type="button"
-                onClick={() => onPatch({ is_favorite: !m.is_favorite })}
-                className="rounded-full p-1 hover:bg-white/10"
-                title={m.is_favorite ? "Remover favorito" : "Favoritar"}
-                style={{ color: m.is_favorite ? "#f59e0b" : "hsl(240 8% 62%)" }}
-              >
-                <Star className="h-3 w-3" />
-              </button>
-            </div>
-          )}
+          <MessageActionsToolbar
+            m={m}
+            isOut={isOut}
+            onPatch={onPatch}
+            onReply={onReply}
+            onRevoke={onRevoke}
+            onForward={onForward}
+            onReact={onReact}
+            onEdit={onEdit}
+            onInfo={onInfo}
+          />
+          <ReactionChips reactions={reactions} isOut={isOut} />
         </div>
       </div>
     );
@@ -1066,46 +1199,31 @@ function MessageBubble({
           </div>
         )}
 
-        <MediaBody type={m.type} parsed={parsed} onOpenViewer={onOpenViewer} />
+        {m.reply_to && <QuotedReply reply={m.reply_to} isOut={isOut} />}
+
+        <MediaBody type={m.type} parsed={parsed} onOpenViewer={onOpenViewer} wsId={wsId} isOut={isOut} />
 
         <div
           className="mt-1 flex items-center justify-end gap-1 text-[10px]"
           style={{ color: isOut ? "rgba(255,255,255,0.55)" : "hsl(240 8% 44%)" }}
         >
+          {m.is_edited && <span className="italic">editada</span>}
           <span>{relativeTime(m.created_at)}</span>
           {isOut && <StatusTicks status={m.status} />}
         </div>
 
-        {onPatch && (
-          <div
-            className={`pointer-events-none absolute -top-3 flex gap-0.5 rounded-full px-1 py-0.5 opacity-0 shadow-lg transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 ${
-              isOut ? "right-2" : "left-2"
-            }`}
-            style={{
-              background: "hsl(240 18% 6%)",
-              border: "1px solid hsl(240 12% 16%)",
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => onPatch({ is_pinned: !m.is_pinned })}
-              className="rounded-full p-1 hover:bg-white/10"
-              title={m.is_pinned ? "Desfixar" : "Fixar"}
-              style={{ color: m.is_pinned ? "#00d46a" : "hsl(240 8% 62%)" }}
-            >
-              <Pin className="h-3 w-3" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onPatch({ is_favorite: !m.is_favorite })}
-              className="rounded-full p-1 hover:bg-white/10"
-              title={m.is_favorite ? "Remover favorito" : "Favoritar"}
-              style={{ color: m.is_favorite ? "#f59e0b" : "hsl(240 8% 62%)" }}
-            >
-              <Star className="h-3 w-3" />
-            </button>
-          </div>
-        )}
+        <MessageActionsToolbar
+          m={m}
+          isOut={isOut}
+          onPatch={onPatch}
+          onReply={onReply}
+          onRevoke={onRevoke}
+          onForward={onForward}
+          onReact={onReact}
+          onEdit={onEdit}
+          onInfo={onInfo}
+        />
+        <ReactionChips reactions={reactions} isOut={isOut} />
       </div>
     </div>
   );
@@ -1119,13 +1237,15 @@ function MessageBubble({
 // de nova aba. Áudios renderizam inline (pequeno) E também ganham um botão
 // de "expandir" que abre o viewer com player maior.
 function MediaBody({
-  type, parsed, onOpenViewer,
+  type, parsed, onOpenViewer, wsId, isOut,
 }: {
   type: string;
   parsed: ParsedContent;
   onOpenViewer: (source: MediaViewerSource) => void;
+  wsId?: string;
+  isOut?: boolean;
 }) {
-  const { text, url, filename, caption, error, latitude, longitude, mimeType } = parsed;
+  const { text, url, mediaKey, filename, caption, error, latitude, longitude, mimeType } = parsed;
   const body = caption || text;
 
   if (type === "image") {
@@ -1135,7 +1255,7 @@ function MediaBody({
           <button
             type="button"
             onClick={() =>
-              onOpenViewer({ type: "image", url, filename, mimeType, caption: body })
+              onOpenViewer({ type: "image", url, mediaKey, filename, mimeType, caption: body })
             }
             className="block rounded-lg overflow-hidden transition-opacity hover:opacity-90 focus-visible:opacity-90"
             aria-label="Abrir imagem"
@@ -1164,7 +1284,7 @@ function MediaBody({
           <button
             type="button"
             onClick={() =>
-              onOpenViewer({ type: "video", url, filename, mimeType, caption: body })
+              onOpenViewer({ type: "video", url, mediaKey, filename, mimeType, caption: body })
             }
             className="relative block group"
             aria-label="Abrir vídeo"
@@ -1208,7 +1328,7 @@ function MediaBody({
              <button
               type="button"
               onClick={() =>
-                onOpenViewer({ type: "audio", url, filename, mimeType, caption: body })
+                onOpenViewer({ type: "audio", url, mediaKey, filename, mimeType, caption: body })
               }
               title="Abrir em tela cheia"
               className="rounded-md p-1 transition-colors hover:bg-white/5"
@@ -1236,7 +1356,7 @@ function MediaBody({
             <button
               type="button"
               onClick={() =>
-                onOpenViewer({ type: "image", url, filename, mimeType, caption: body })
+                onOpenViewer({ type: "image", url, mediaKey, filename, mimeType, caption: body })
               }
               className="block rounded-lg overflow-hidden transition-opacity hover:opacity-90"
               aria-label={filename || "imagem"}
@@ -1263,7 +1383,7 @@ function MediaBody({
             <button
               type="button"
               onClick={() =>
-                onOpenViewer({ type: "video", url, filename, mimeType, caption: body })
+                onOpenViewer({ type: "video", url, mediaKey, filename, mimeType, caption: body })
               }
               className="relative block group"
               aria-label="Abrir vídeo"
@@ -1304,7 +1424,7 @@ function MediaBody({
         <button
           type="button"
           onClick={() =>
-            onOpenViewer({ type: "document", url, filename, mimeType, caption: body })
+            onOpenViewer({ type: "document", url, mediaKey, filename, mimeType, caption: body })
           }
           className="flex items-center gap-2 rounded-lg p-2 transition-colors hover:bg-white/5 text-left w-full"
           style={{ background: "rgba(255,255,255,0.03)" }}
@@ -1398,57 +1518,9 @@ function MediaBody({
     return <IconFallback icon={<MapPin className="h-4 w-4" />} label={body || "Localização"} />;
   }
 
-  // Contact — vCard único. Mostra nome, telefones com tipo, copia/abre WA.
+  // Contact — vCard com ações de "Adicionar ao CRM" e "Iniciar conversa".
   if (type === "contact") {
-    const name = parsed.displayName || body || "Contato";
-    return (
-      <div
-        className="flex flex-col gap-2 rounded-lg p-3 max-w-[280px]"
-        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
-      >
-        <div className="flex items-center gap-2.5">
-          <div
-            className="flex h-10 w-10 items-center justify-center rounded-full font-semibold flex-shrink-0"
-            style={{
-              background: "rgba(0,212,106,0.1)",
-              color: "#00d46a",
-              border: "1px solid rgba(0,212,106,0.25)",
-            }}
-          >
-            {name.split(/\s+/).slice(0, 2).map(p => p[0] || "").join("").toUpperCase()}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 92%)" }}>
-              {name}
-            </div>
-            {parsed.phones && parsed.phones.length > 0 && (
-              <div className="text-[10px]" style={{ color: "hsl(240 8% 55%)" }}>
-                {parsed.phones.length} {parsed.phones.length === 1 ? "telefone" : "telefones"}
-              </div>
-            )}
-          </div>
-        </div>
-        {parsed.phones && parsed.phones.length > 0 && (
-          <div className="space-y-1">
-            {parsed.phones.map((p, i) => (
-              <a
-                key={i}
-                href={`https://wa.me/${p.number.replace(/[^\d]/g, "")}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between gap-2 rounded px-2 py-1 text-xs transition-colors hover:bg-white/5"
-                style={{ color: "hsl(240 15% 88%)" }}
-              >
-                <span className="font-mono">{p.number}</span>
-                {p.type && (
-                  <span className="text-[9px] uppercase tracking-wider opacity-70">{p.type}</span>
-                )}
-              </a>
-            ))}
-          </div>
-        )}
-      </div>
-    );
+    return <ContactCard parsed={parsed} body={body} wsId={wsId} />;
   }
 
   // Múltiplos contatos (ContactsArrayMessage)
@@ -1516,6 +1588,118 @@ function MediaBody({
     );
   }
 
+  // Buttons / Interactive — botões de CTA (read-only no view do agente).
+  if (type === "buttons" || type === "interactive") {
+    const btns = parsed.buttons || [];
+    return (
+      <div className="flex flex-col gap-2 max-w-[300px]">
+        {parsed.interactive?.header && (
+          <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "hsl(240 8% 60%)" }}>
+            {parsed.interactive.header}
+          </div>
+        )}
+        {(text || parsed.interactive?.body) && (
+          <Text text={text || parsed.interactive?.body || ""} />
+        )}
+        {btns.length > 0 && (
+          <div className="flex flex-col gap-1 mt-1">
+            {btns.map((b, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-center gap-1.5 rounded-md py-1.5 text-[11px] font-medium"
+                style={{
+                  background: "rgba(0,212,106,0.06)",
+                  border: "1px solid rgba(0,212,106,0.2)",
+                  color: "#00d46a",
+                }}
+                title={b.id ? `id: ${b.id}` : undefined}
+              >
+                <ListChecks className="h-3 w-3" /> {b.title || b.id || "Botão"}
+              </div>
+            ))}
+          </div>
+        )}
+        {parsed.listFooter && (
+          <div className="text-[10px]" style={{ color: "hsl(240 8% 55%)" }}>
+            {parsed.listFooter}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (type === "list") {
+    return (
+      <div className="flex flex-col gap-2 max-w-[320px]">
+        {parsed.listHeader && (
+          <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "hsl(240 8% 60%)" }}>
+            {parsed.listHeader}
+          </div>
+        )}
+        {parsed.listTitle && (
+          <div className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+            {parsed.listTitle}
+          </div>
+        )}
+        {body && <Text text={body} />}
+        {parsed.listSections && parsed.listSections.length > 0 && (
+          <div className="flex flex-col gap-2 mt-1">
+            {parsed.listSections.map((sec, i) => (
+              <div key={i}>
+                {sec.title && (
+                  <div className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 50%)" }}>
+                    {sec.title}
+                  </div>
+                )}
+                <div className="flex flex-col gap-1">
+                  {(sec.rows || []).map((r, j) => (
+                    <div
+                      key={j}
+                      className="rounded-md p-2 text-xs"
+                      style={{
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        color: "hsl(240 15% 88%)",
+                      }}
+                    >
+                      <div className="font-medium">{r.title}</div>
+                      {r.description && (
+                        <div className="text-[10px] mt-0.5" style={{ color: "hsl(240 8% 60%)" }}>
+                          {r.description}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {parsed.listButtonText && (
+          <div
+            className="flex items-center justify-center gap-1.5 rounded-md py-1.5 text-[11px] font-medium"
+            style={{
+              background: "rgba(0,212,106,0.06)",
+              border: "1px solid rgba(0,212,106,0.2)",
+              color: "#00d46a",
+            }}
+          >
+            <ListChecks className="h-3 w-3" /> {parsed.listButtonText}
+          </div>
+        )}
+        {parsed.listFooter && (
+          <div className="text-[10px]" style={{ color: "hsl(240 8% 55%)" }}>
+            {parsed.listFooter}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (type === "call") {
+    return <CallCard parsed={parsed} isOut={!!isOut} />;
+  }
+
   if (type === "revoke") {
     return (
       <span className="italic" style={{ color: "hsl(240 8% 50%)" }}>
@@ -1528,14 +1712,581 @@ function MediaBody({
   return <Text text={body || "—"} />;
 }
 
-function Text({ text }: { text: string }) {
+// CallCard — render de chamada perdida/atendida/rejeitada com ícone+duração.
+function CallCard({ parsed, isOut }: { parsed: ParsedContent; isOut: boolean }) {
+  const isVideo = parsed.callType === "video";
+  const status = parsed.callStatus || "missed";
+  const dur = parsed.callDurationSec;
+  const missed = status === "missed" || status === "rejected" || status === "timeout";
+  const color = missed ? "#ef4444" : "#00d46a";
+  const Icon = missed ? PhoneMissed : isVideo ? VideoIcon : Phone;
+  const labelByStatus: Record<string, string> = {
+    missed: "Chamada perdida",
+    answered: "Chamada atendida",
+    rejected: "Chamada rejeitada",
+    timeout: "Chamada não atendida",
+  };
+  const label = labelByStatus[status] || (isVideo ? "Chamada de vídeo" : "Chamada de voz");
+  const fmtDur = (s?: number) => {
+    if (!s || s <= 0) return "";
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return m > 0 ? `${m}min ${sec.toString().padStart(2, "0")}s` : `${sec}s`;
+  };
   return (
-    <p
-      className="text-sm"
-      style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+    <div
+      className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 max-w-[280px]"
+      style={{
+        background: "rgba(255,255,255,0.03)",
+        border: `1px solid ${missed ? "rgba(239,68,68,0.25)" : "rgba(0,212,106,0.2)"}`,
+      }}
     >
-      {text}
-    </p>
+      <div
+        className="flex h-8 w-8 items-center justify-center rounded-full flex-shrink-0"
+        style={{ background: `${color}20`, color }}
+      >
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+          {label}
+        </div>
+        <div className="text-[10px]" style={{ color: "hsl(240 8% 60%)" }}>
+          {isOut ? "Saída" : "Recebida"}
+          {isVideo && " · vídeo"}
+          {dur ? ` · ${fmtDur(dur)}` : ""}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// QuotedReply — bloco compacto acima da bubble mostrando a mensagem citada.
+function QuotedReply({
+  reply, isOut,
+}: {
+  reply: NonNullable<MessagePayload["reply_to"]>;
+  isOut: boolean;
+}) {
+  const accent = reply.direction === "out" ? "#00d46a" : "hsl(240 8% 70%)";
+  const isMedia = reply.type && reply.type !== "text" && reply.type !== "reaction";
+  const typeLabel = REPLY_TYPE_LABELS[reply.type || ""] || reply.type;
+  const showThumb = !!reply.media_url && (reply.type === "image" || (reply.mime_type || "").startsWith("image/"));
+  return (
+    <div
+      className="mb-1 flex gap-2 rounded-md py-1 pl-2 pr-2 text-[11px]"
+      style={{
+        background: isOut ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.04)",
+        borderLeft: `3px solid ${accent}`,
+      }}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="font-medium truncate" style={{ color: accent }}>
+          {reply.sender_name || (reply.direction === "out" ? "Você" : "Cliente")}
+        </div>
+        {isMedia && !reply.text && (
+          <div className="flex items-center gap-1 opacity-80" style={{ color: "hsl(240 15% 80%)" }}>
+            {reply.type === "image" && <ImageIcon className="h-3 w-3" />}
+            {reply.type === "video" && <ImageIcon className="h-3 w-3" />}
+            {reply.type === "audio" && <Mic className="h-3 w-3" />}
+            {reply.type === "document" && <FileText className="h-3 w-3" />}
+            {reply.type === "location" && <MapPin className="h-3 w-3" />}
+            <span>{typeLabel || "Mídia"}</span>
+          </div>
+        )}
+        {reply.text && (
+          <div
+            className="truncate"
+            style={{ color: "hsl(240 15% 80%)", maxWidth: 240 }}
+            title={reply.text}
+          >
+            {reply.text}
+          </div>
+        )}
+      </div>
+      {showThumb && reply.media_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={reply.media_url}
+          alt=""
+          className="h-9 w-9 flex-shrink-0 rounded object-cover"
+        />
+      )}
+    </div>
+  );
+}
+
+const REPLY_TYPE_LABELS: Record<string, string> = {
+  image: "Imagem",
+  video: "Vídeo",
+  audio: "Áudio",
+  document: "Documento",
+  sticker: "Sticker",
+  location: "Localização",
+  live_location: "Localização ao vivo",
+  contact: "Contato",
+  contacts: "Contatos",
+  poll: "Enquete",
+  call: "Chamada",
+};
+
+// ContactCard — vCard rico com ações: copiar, abrir WhatsApp, adicionar ao CRM.
+function ContactCard({
+  parsed, body, wsId,
+}: {
+  parsed: ParsedContent;
+  body?: string;
+  wsId?: string;
+}) {
+  const name = parsed.displayName || body || "Contato";
+  const phones = parsed.phones || [];
+  const primaryPhone = phones[0]?.number || "";
+  const cleanPhone = (n: string) => n.replace(/[^\d]/g, "");
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState(false);
+
+  const addToCrm = async () => {
+    if (!wsId || !primaryPhone || adding) return;
+    setAdding(true);
+    try {
+      await crmContactsApi.create(wsId, {
+        name,
+        phone: cleanPhone(primaryPhone),
+      });
+      setAdded(true);
+      toast.success(`${name} adicionado ao CRM`);
+    } catch (e) {
+      const err = e as { response?: { data?: { error?: string } } };
+      toast.error(err?.response?.data?.error || "Falha ao adicionar contato");
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <div
+      className="flex flex-col gap-2 rounded-lg p-3 max-w-[300px]"
+      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+    >
+      <div className="flex items-center gap-2.5">
+        <div
+          className="flex h-10 w-10 items-center justify-center rounded-full font-semibold flex-shrink-0"
+          style={{
+            background: "rgba(0,212,106,0.1)",
+            color: "#00d46a",
+            border: "1px solid rgba(0,212,106,0.25)",
+          }}
+        >
+          {name.split(/\s+/).slice(0, 2).map(p => p[0] || "").join("").toUpperCase()}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 92%)" }}>
+            {name}
+          </div>
+          {phones.length > 0 && (
+            <div className="text-[10px]" style={{ color: "hsl(240 8% 55%)" }}>
+              {phones.length} {phones.length === 1 ? "telefone" : "telefones"}
+            </div>
+          )}
+        </div>
+      </div>
+      {phones.length > 0 && (
+        <div className="space-y-1">
+          {phones.map((p, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between gap-2 rounded px-2 py-1 text-xs"
+              style={{ color: "hsl(240 15% 88%)", background: "rgba(255,255,255,0.02)" }}
+            >
+              <span className="font-mono truncate">{p.number}</span>
+              {p.type && (
+                <span className="text-[9px] uppercase tracking-wider opacity-70 flex-shrink-0">{p.type}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {primaryPhone && (
+        <div className="flex items-center gap-1.5 mt-1">
+          <a
+            href={`https://wa.me/${cleanPhone(primaryPhone)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1.5 rounded-md flex-1 py-1.5 text-[11px] font-medium transition-colors"
+            style={{
+              background: "rgba(0,212,106,0.12)",
+              color: "#00d46a",
+              border: "1px solid rgba(0,212,106,0.25)",
+            }}
+            title="Abrir conversa no WhatsApp"
+          >
+            <MessageSquare className="h-3 w-3" /> Conversar
+          </a>
+          {wsId && (
+            <button
+              type="button"
+              onClick={addToCrm}
+              disabled={adding || added}
+              className="flex items-center justify-center gap-1.5 rounded-md flex-1 py-1.5 text-[11px] font-medium transition-colors disabled:opacity-60"
+              style={{
+                background: added ? "rgba(245,158,11,0.12)" : "rgba(255,255,255,0.04)",
+                color: added ? "#f59e0b" : "hsl(240 15% 88%)",
+                border: `1px solid ${added ? "rgba(245,158,11,0.25)" : "rgba(255,255,255,0.08)"}`,
+              }}
+              title="Adicionar ao CRM"
+            >
+              <UserPlus className="h-3 w-3" /> {added ? "No CRM" : adding ? "Salvando…" : "+ CRM"}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// replyPreviewText extrai um label compacto pro reply bar do composer.
+function replyPreviewText(m: MessagePayload): string {
+  const parsed = parseMessageContent(m.content);
+  const txt = parsed.caption || parsed.text;
+  if (txt) return txt.length > 80 ? txt.slice(0, 80) + "…" : txt;
+  switch (m.type) {
+    case "image": return "📷 Imagem";
+    case "video": return "🎬 Vídeo";
+    case "audio": return "🔊 Áudio";
+    case "document": return "📄 Documento";
+    case "sticker": return "😊 Sticker";
+    case "location": case "live_location": return "📍 Localização";
+    case "contact": case "contacts": return "👤 Contato";
+    case "poll": return "📊 Enquete";
+    case "call": return "📞 Chamada";
+    default: return "Mensagem";
+  }
+}
+
+// ReactionChips — agrupa reactions por emoji e mostra chip "👍 3" abaixo da bubble.
+function ReactionChips({ reactions, isOut }: { reactions?: ReactionEntry[]; isOut: boolean }) {
+  if (!reactions || reactions.length === 0) return null;
+  const counts = new Map<string, number>();
+  const senders = new Map<string, string[]>();
+  for (const r of reactions) {
+    counts.set(r.emoji, (counts.get(r.emoji) ?? 0) + 1);
+    const list = senders.get(r.emoji) ?? [];
+    list.push(r.sender_name || (r.direction === "out" ? "Você" : "Cliente"));
+    senders.set(r.emoji, list);
+  }
+  const items = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  return (
+    <div
+      className={`absolute -bottom-3.5 flex gap-0.5 ${isOut ? "right-2" : "left-2"}`}
+      style={{ zIndex: 1 }}
+    >
+      {items.map(([emoji, count]) => (
+        <span
+          key={emoji}
+          title={(senders.get(emoji) ?? []).join(", ")}
+          className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px]"
+          style={{
+            background: "hsl(240 18% 8%)",
+            border: "1px solid hsl(240 12% 18%)",
+            color: "hsl(240 15% 90%)",
+          }}
+        >
+          <span className="text-[12px] leading-none">{emoji}</span>
+          {count > 1 && <span className="font-semibold tabular-nums">{count}</span>}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// MessageActionsToolbar — barra flutuante no hover.
+function MessageActionsToolbar({
+  m, isOut, onPatch, onReply, onRevoke, onForward, onReact, onEdit, onInfo,
+}: {
+  m: MessagePayload;
+  isOut: boolean;
+  onPatch?: (patch: { is_pinned?: boolean; is_favorite?: boolean }) => void;
+  onReply?: (m: MessagePayload) => void;
+  onRevoke?: (m: MessagePayload) => void;
+  onForward?: (m: MessagePayload) => void;
+  onReact?: (m: MessagePayload, emoji: string) => void;
+  onEdit?: (m: MessagePayload) => void;
+  onInfo?: (m: MessagePayload) => void;
+}) {
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const canRevoke = isOut && !!onRevoke && m.type !== "revoke";
+  const canEdit = isOut && !!onEdit && m.type === "text";
+  const QUICK_EMOJI = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+  return (
+    <div
+      className={`pointer-events-none absolute -top-3.5 flex gap-0.5 rounded-full px-1 py-0.5 opacity-0 shadow-lg transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 ${
+        isOut ? "right-2" : "left-2"
+      }`}
+      style={{
+        background: "hsl(240 18% 6%)",
+        border: "1px solid hsl(240 12% 16%)",
+      }}
+    >
+      {onReact && (
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setEmojiOpen((v) => !v)}
+            className="rounded-full p-1 hover:bg-white/10"
+            title="Reagir"
+            style={{ color: "hsl(240 8% 62%)" }}
+          >
+            <Smile className="h-3 w-3" />
+          </button>
+          {emojiOpen && (
+            <div
+              className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5 rounded-full px-1.5 py-1 shadow-xl z-30"
+              style={{
+                background: "hsl(240 18% 8%)",
+                border: "1px solid hsl(240 12% 18%)",
+              }}
+            >
+              {QUICK_EMOJI.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => {
+                    onReact(m, e);
+                    setEmojiOpen(false);
+                  }}
+                  className="rounded-full px-1 py-0.5 text-base hover:bg-white/10"
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {onReply && (
+        <button
+          type="button"
+          onClick={() => onReply(m)}
+          className="rounded-full p-1 hover:bg-white/10"
+          title="Responder"
+          style={{ color: "hsl(240 8% 62%)" }}
+        >
+          <CornerUpLeft className="h-3 w-3" />
+        </button>
+      )}
+      {onForward && (
+        <button
+          type="button"
+          onClick={() => onForward(m)}
+          className="rounded-full p-1 hover:bg-white/10"
+          title="Encaminhar"
+          style={{ color: "hsl(240 8% 62%)" }}
+        >
+          <CornerUpRight className="h-3 w-3" />
+        </button>
+      )}
+      {canEdit && (
+        <button
+          type="button"
+          onClick={() => onEdit!(m)}
+          className="rounded-full p-1 hover:bg-white/10"
+          title="Editar"
+          style={{ color: "hsl(240 8% 62%)" }}
+        >
+          <Pencil className="h-3 w-3" />
+        </button>
+      )}
+      {onPatch && (
+        <>
+          <button
+            type="button"
+            onClick={() => onPatch({ is_pinned: !m.is_pinned })}
+            className="rounded-full p-1 hover:bg-white/10"
+            title={m.is_pinned ? "Desfixar" : "Fixar"}
+            style={{ color: m.is_pinned ? "#00d46a" : "hsl(240 8% 62%)" }}
+          >
+            <Pin className="h-3 w-3" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onPatch({ is_favorite: !m.is_favorite })}
+            className="rounded-full p-1 hover:bg-white/10"
+            title={m.is_favorite ? "Remover favorito" : "Favoritar"}
+            style={{ color: m.is_favorite ? "#f59e0b" : "hsl(240 8% 62%)" }}
+          >
+            <Star className="h-3 w-3" />
+          </button>
+        </>
+      )}
+      {isOut && onInfo && (
+        <button
+          type="button"
+          onClick={() => onInfo(m)}
+          className="rounded-full p-1 hover:bg-white/10"
+          title="Informações da mensagem"
+          style={{ color: "hsl(240 8% 62%)" }}
+        >
+          <Info className="h-3 w-3" />
+        </button>
+      )}
+      {canRevoke && (
+        <button
+          type="button"
+          onClick={() => {
+            if (confirm("Apagar esta mensagem para todos?")) onRevoke!(m);
+          }}
+          className="rounded-full p-1 hover:bg-red-500/20"
+          title="Apagar para todos"
+          style={{ color: "#ef4444" }}
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Text({ text }: { text: string }) {
+  const segments = useMemo(() => splitLinks(text), [text]);
+  const firstURL = useMemo(() => segments.find((s) => s.type === "url")?.value, [segments]);
+  return (
+    <>
+      <p className="text-sm" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+        {segments.map((seg, i) =>
+          seg.type === "url" ? (
+            <a
+              key={i}
+              href={seg.value}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:no-underline"
+              style={{ color: "#60a5fa" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {seg.value}
+            </a>
+          ) : (
+            <WhatsAppMarkdown key={i} text={seg.value} />
+          ),
+        )}
+      </p>
+      {firstURL && <LinkPreviewCard url={firstURL} />}
+    </>
+  );
+}
+
+function splitLinks(text: string): Array<{ type: "url" | "text"; value: string }> {
+  const re = /https?:\/\/[^\s<>"']+/g;
+  const out: Array<{ type: "url" | "text"; value: string }> = [];
+  let lastIdx = 0;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > lastIdx) out.push({ type: "text", value: text.slice(lastIdx, m.index) });
+    let url = m[0];
+    const trail = url.match(/[.,);!?]+$/);
+    if (trail) url = url.slice(0, -trail[0].length);
+    out.push({ type: "url", value: url });
+    lastIdx = m.index + url.length;
+  }
+  if (lastIdx < text.length) out.push({ type: "text", value: text.slice(lastIdx) });
+  if (out.length === 0) out.push({ type: "text", value: text });
+  return out;
+}
+
+// WhatsAppMarkdown — *bold*, _italic_, ~strike~, ```mono``` inline.
+function WhatsAppMarkdown({ text }: { text: string }) {
+  if (!text) return null;
+  const tokens: Array<{ type: "plain" | "bold" | "italic" | "strike" | "mono"; value: string }> = [];
+  const re = /(```[^`\n]+```|\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~)/g;
+  let lastIdx = 0;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > lastIdx) tokens.push({ type: "plain", value: text.slice(lastIdx, m.index) });
+    const t = m[1];
+    if (t.startsWith("```")) tokens.push({ type: "mono", value: t.slice(3, -3) });
+    else if (t.startsWith("*")) tokens.push({ type: "bold", value: t.slice(1, -1) });
+    else if (t.startsWith("_")) tokens.push({ type: "italic", value: t.slice(1, -1) });
+    else if (t.startsWith("~")) tokens.push({ type: "strike", value: t.slice(1, -1) });
+    lastIdx = m.index + t.length;
+  }
+  if (lastIdx < text.length) tokens.push({ type: "plain", value: text.slice(lastIdx) });
+  if (tokens.length === 0) return <>{text}</>;
+  return (
+    <>
+      {tokens.map((tk, i) => {
+        switch (tk.type) {
+          case "bold":
+            return <strong key={i}>{tk.value}</strong>;
+          case "italic":
+            return <em key={i}>{tk.value}</em>;
+          case "strike":
+            return <s key={i}>{tk.value}</s>;
+          case "mono":
+            return (
+              <code
+                key={i}
+                className="rounded px-1 py-0.5 text-[12px]"
+                style={{ background: "rgba(255,255,255,0.06)", fontFamily: "monospace" }}
+              >
+                {tk.value}
+              </code>
+            );
+          default:
+            return <span key={i}>{tk.value}</span>;
+        }
+      })}
+    </>
+  );
+}
+
+function LinkPreviewCard({ url }: { url: string }) {
+  const q = useQuery({
+    queryKey: ["link-preview", url],
+    queryFn: () => linkPreviewApi.get(url).then((r) => r.data),
+    enabled: !!url,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+  });
+  if (!q.data || q.data.fetch_err) return null;
+  const { title, description, image_url, site_name, favicon_url } = q.data;
+  if (!title && !description && !image_url) return null;
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-2 block overflow-hidden rounded-md transition-opacity hover:opacity-95"
+      style={{
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        maxWidth: 320,
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {image_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={image_url} alt="" className="h-32 w-full object-cover" loading="lazy" />
+      )}
+      <div className="px-2.5 py-2">
+        <div className="flex items-center gap-1.5 text-[10px]" style={{ color: "hsl(240 8% 60%)" }}>
+          {favicon_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={favicon_url} alt="" className="h-3 w-3" />
+          )}
+          <span className="truncate">{site_name || new URL(url).host}</span>
+        </div>
+        {title && (
+          <div className="mt-0.5 text-xs font-medium line-clamp-2" style={{ color: "hsl(240 15% 92%)" }}>
+            {title}
+          </div>
+        )}
+        {description && (
+          <div className="mt-0.5 text-[11px] line-clamp-2" style={{ color: "hsl(240 8% 65%)" }}>
+            {description}
+          </div>
+        )}
+      </div>
+    </a>
   );
 }
 
@@ -1623,6 +2374,7 @@ const EVENT_LABELS: Record<string, string> = {
 interface ParsedContent {
   text?: string;
   url?: string;
+  mediaKey?: string;
   filename?: string;
   caption?: string;
   error?: string;
@@ -1645,6 +2397,29 @@ interface ParsedContent {
   // Address (location)
   name?: string;
   address?: string;
+  // Reply (quoted)
+  replyToId?: string;
+  replyTo?: {
+    id?: string;
+    type?: string;
+    text?: string;
+    sender_name?: string;
+    direction?: string;
+    media_url?: string;
+    mime_type?: string;
+  };
+  // Interactive / buttons / list
+  interactive?: { type?: string; body?: string; header?: string; footer?: string };
+  buttons?: { id?: string; title: string }[];
+  listTitle?: string;
+  listHeader?: string;
+  listFooter?: string;
+  listButtonText?: string;
+  listSections?: { title?: string; rows: { id?: string; title: string; description?: string }[] }[];
+  // Call
+  callType?: string;
+  callStatus?: string;
+  callDurationSec?: number;
 }
 
 // parseMessageContent normaliza os diferentes formatos que MessageLog.Content
@@ -1662,6 +2437,7 @@ function parseMessageContent(raw: string): ParsedContent {
       return {
         text: parsed.text ?? parsed.body,
         url: parsed.url,
+        mediaKey: parsed.media_key,
         filename: parsed.filename,
         caption: parsed.caption,
         error: parsed.error,
@@ -1679,6 +2455,18 @@ function parseMessageContent(raw: string): ParsedContent {
         contacts: Array.isArray(parsed.contacts) ? parsed.contacts : undefined,
         name: parsed.name,
         address: parsed.address,
+        replyToId: parsed.reply_to_id,
+        replyTo: parsed.reply_to,
+        interactive: parsed.interactive,
+        buttons: Array.isArray(parsed.buttons) ? parsed.buttons : undefined,
+        listSections: Array.isArray(parsed.sections) ? parsed.sections : undefined,
+        listTitle: parsed.list_title,
+        listFooter: parsed.footer,
+        listHeader: parsed.header,
+        listButtonText: parsed.button_text,
+        callType: parsed.call_type,
+        callStatus: parsed.call_status,
+        callDurationSec: typeof parsed.call_duration_sec === "number" ? parsed.call_duration_sec : undefined,
       };
     }
   } catch {
@@ -1689,6 +2477,7 @@ function parseMessageContent(raw: string): ParsedContent {
 
 function Composer({
   wsId, conversationId, instanceId, canSend, canNote, onSendMessage, onSendNote, isSending, isNoting,
+  replyTo, onClearReply,
 }: {
   wsId?: string;
   conversationId: string;
@@ -1699,6 +2488,8 @@ function Composer({
   onSendNote: (body: string) => void;
   isSending: boolean;
   isNoting: boolean;
+  replyTo?: MessagePayload | null;
+  onClearReply?: () => void;
 }) {
   const [mode, setMode] = useState<"message" | "note">("message");
   const [text, setText] = useState("");
@@ -2043,6 +2834,37 @@ function Composer({
           </div>
         )}
 
+        {replyTo && mode === "message" && (
+          <div
+            className="mb-2 flex items-start gap-2 rounded-md px-3 py-2 text-[11px]"
+            style={{
+              background: "rgba(0,212,106,0.06)",
+              borderLeft: "3px solid #00d46a",
+            }}
+          >
+            <CornerUpLeft className="h-3 w-3 flex-shrink-0 mt-0.5" style={{ color: "#00d46a" }} />
+            <div className="min-w-0 flex-1">
+              <div className="font-medium" style={{ color: "#00d46a" }}>
+                Respondendo a {replyTo.sender_name || (replyTo.direction === "out" ? "você" : "cliente")}
+              </div>
+              <div className="truncate" style={{ color: "hsl(240 15% 80%)" }}>
+                {replyPreviewText(replyTo)}
+              </div>
+            </div>
+            {onClearReply && (
+              <button
+                type="button"
+                onClick={onClearReply}
+                className="rounded-full p-0.5 hover:bg-white/10"
+                title="Cancelar resposta"
+                style={{ color: "hsl(240 8% 60%)" }}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="flex items-end gap-2">
           <button
             type="button"
@@ -2171,3 +2993,237 @@ function DRow({ label, value }: { label: string; value?: string | null }) {
     </div>
   );
 }
+
+
+// ───────────────────────────────────────────────────────────────────────────
+// Dialogs: Forward, Edit, MessageInfo
+// ───────────────────────────────────────────────────────────────────────────
+
+function ForwardDialog({
+  wsId, msg, fromConversationId, onClose, onSubmit, isPending,
+}: {
+  wsId: string;
+  msg: MessagePayload;
+  fromConversationId: string;
+  onClose: () => void;
+  onSubmit: (ids: string[]) => void;
+  isPending: boolean;
+}) {
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const listQ = useQuery({
+    queryKey: ["forward-conversations", wsId, search],
+    queryFn: () =>
+      conversationsApi.list(wsId, { q: search || undefined, limit: 50 }).then(
+        (r) => r.data as { items: Conversation[] },
+      ),
+    enabled: !!wsId,
+  });
+  const items = (listQ.data?.items || []).filter((c) => c.id !== fromConversationId);
+  const toggle = (id: string) => {
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  return (
+    <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+      <div className="w-full max-w-md rounded-2xl shadow-2xl" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
+          <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Encaminhar mensagem</h3>
+          <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "hsl(240 8% 60%)" }}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="px-4 py-3">
+          <div className="mb-2 rounded-md px-3 py-2 text-[11px]" style={{ background: "rgba(255,255,255,0.04)", borderLeft: "3px solid #00d46a" }}>
+            <div className="font-medium" style={{ color: "hsl(240 15% 90%)" }}>
+              {msg.sender_name || (msg.direction === "out" ? "Você" : "Cliente")}
+            </div>
+            <div className="truncate" style={{ color: "hsl(240 8% 60%)" }}>
+              {replyPreviewText(msg)}
+            </div>
+          </div>
+          <div className="relative mb-2">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "hsl(240 8% 50%)" }} />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar contato ou conversa…" className="w-full rounded-md py-2 pl-9 pr-3 text-sm outline-none" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} />
+          </div>
+          <div className="max-h-72 overflow-y-auto rounded-md" style={{ background: "rgba(255,255,255,0.02)" }}>
+            {items.length === 0 ? (
+              <div className="p-4 text-center text-xs" style={{ color: "hsl(240 8% 55%)" }}>
+                {listQ.isLoading ? "Carregando…" : "Nenhuma conversa encontrada"}
+              </div>
+            ) : (
+              <ul>
+                {items.map((c) => {
+                  const isSel = selected.has(c.id);
+                  return (
+                    <li key={c.id}>
+                      <button type="button" onClick={() => toggle(c.id)} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-white/5" style={{ color: "hsl(240 15% 88%)" }}>
+                        <span className="min-w-0 flex-1 truncate">{c.contact?.name || c.subject || c.channel_key}</span>
+                        {isSel ? (
+                          <Check className="h-4 w-4 flex-shrink-0" style={{ color: "#00d46a" }} />
+                        ) : (
+                          <span className="h-4 w-4 flex-shrink-0 rounded-full border" style={{ borderColor: "hsl(240 8% 30%)" }} />
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
+          <button type="button" onClick={onClose} className="rounded-md px-3 py-1.5 text-xs" style={{ color: "hsl(240 8% 70%)" }}>Cancelar</button>
+          <button type="button" onClick={() => onSubmit(Array.from(selected))} disabled={selected.size === 0 || isPending} className="rounded-md px-4 py-1.5 text-xs font-semibold disabled:opacity-50" style={{ background: "#00d46a", color: "#03170a" }}>
+            {isPending ? "Enviando…" : `Encaminhar ${selected.size > 0 ? `(${selected.size})` : ""}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditMessageDialog({
+  msg, onClose, onSubmit, isPending,
+}: {
+  msg: MessagePayload;
+  onClose: () => void;
+  onSubmit: (body: string) => void;
+  isPending: boolean;
+}) {
+  const initial = parseMessageContent(msg.content).text || "";
+  const [text, setText] = useState(initial);
+  return (
+    <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+      <div className="w-full max-w-md rounded-2xl shadow-2xl" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
+          <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Editar mensagem</h3>
+          <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "hsl(240 8% 60%)" }}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="px-4 py-3">
+          <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={4} className="w-full rounded-md px-3 py-2 text-sm outline-none" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} />
+          <p className="mt-1 text-[10px]" style={{ color: "hsl(240 8% 50%)" }}>WhatsApp aceita edição em até 15 minutos do envio.</p>
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
+          <button type="button" onClick={onClose} className="rounded-md px-3 py-1.5 text-xs" style={{ color: "hsl(240 8% 70%)" }}>Cancelar</button>
+          <button type="button" onClick={() => onSubmit(text.trim())} disabled={text.trim() === "" || text.trim() === initial || isPending} className="rounded-md px-4 py-1.5 text-xs font-semibold disabled:opacity-50" style={{ background: "#00d46a", color: "#03170a" }}>
+            {isPending ? "Salvando…" : "Salvar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MessageInfoDialog({
+  wsId, conversationId, msg, onClose,
+}: {
+  wsId: string;
+  conversationId: string;
+  msg: MessagePayload;
+  onClose: () => void;
+}) {
+  const q = useQuery({
+    queryKey: ["msg-receipts", wsId, conversationId, msg.id],
+    queryFn: () =>
+      conversationsApi.getMessageReceipts(wsId, conversationId, msg.id).then(
+        (r) =>
+          r.data as {
+            delivered: Array<{ participant_jid: string; timestamp: string }>;
+            read: Array<{ participant_jid: string; timestamp: string }>;
+            delivered_at?: string | null;
+            read_at?: string | null;
+          },
+      ),
+    refetchInterval: 5_000,
+  });
+  const data = q.data;
+  const fmt = (ts?: string | null) => (ts ? new Date(ts).toLocaleString("pt-BR") : "—");
+  const phone = (jid: string) => jid.split("@")[0];
+  return (
+    <div className="fixed inset-0 z-[150] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+      <div className="w-full max-w-md rounded-2xl shadow-2xl" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
+          <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Informações da mensagem</h3>
+          <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "hsl(240 8% 60%)" }}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="px-4 py-3">
+          <div className="mb-3 rounded-md px-3 py-2 text-[11px]" style={{ background: "rgba(255,255,255,0.04)" }}>
+            <div className="font-medium" style={{ color: "hsl(240 15% 90%)" }}>{replyPreviewText(msg)}</div>
+            <div className="mt-0.5 text-[10px]" style={{ color: "hsl(240 8% 55%)" }}>Enviada {fmt(msg.created_at)}</div>
+          </div>
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <StatusCard label="Entregue" when={msg.delivered_at || data?.delivered_at} icon={<CheckCheck className="h-3 w-3" />} color="hsl(240 8% 65%)" />
+            <StatusCard label="Lida" when={msg.read_at || data?.read_at} icon={<CheckCheck className="h-3 w-3" />} color="#00d46a" />
+          </div>
+          {(data?.read?.length || data?.delivered?.length) ? (
+            <div className="space-y-3">
+              {data && data.read.length > 0 && (
+                <div>
+                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "#00d46a" }}>
+                    <CheckCheck className="h-3 w-3" /> Lida por · {data.read.length}
+                  </div>
+                  <ul className="space-y-1">
+                    {data.read.map((r, i) => (
+                      <li key={i} className="flex items-center justify-between text-xs" style={{ color: "hsl(240 15% 88%)" }}>
+                        <span className="font-mono">{phone(r.participant_jid)}</span>
+                        <span className="text-[10px]" style={{ color: "hsl(240 8% 60%)" }}>{fmt(r.timestamp)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {data && data.delivered.length > 0 && (
+                <div>
+                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 65%)" }}>
+                    <CheckCheck className="h-3 w-3" /> Entregue a · {data.delivered.length}
+                  </div>
+                  <ul className="space-y-1">
+                    {data.delivered.map((r, i) => (
+                      <li key={i} className="flex items-center justify-between text-xs" style={{ color: "hsl(240 15% 88%)" }}>
+                        <span className="font-mono">{phone(r.participant_jid)}</span>
+                        <span className="text-[10px]" style={{ color: "hsl(240 8% 60%)" }}>{fmt(r.timestamp)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : null}
+          {q.isLoading && (
+            <div className="text-center text-xs py-2" style={{ color: "hsl(240 8% 55%)" }}>Carregando…</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusCard({
+  label, when, icon, color,
+}: {
+  label: string;
+  when?: string | null;
+  icon: React.ReactNode;
+  color: string;
+}) {
+  return (
+    <div className="rounded-md px-3 py-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 14%)" }}>
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest" style={{ color }}>
+        {icon} {label}
+      </div>
+      <div className="mt-0.5 text-xs" style={{ color: when ? "hsl(240 15% 88%)" : "hsl(240 8% 50%)" }}>
+        {when ? new Date(when).toLocaleString("pt-BR") : "Aguardando"}
+      </div>
+    </div>
+  );
+}
+
