@@ -57,6 +57,12 @@ type InstanceClient struct {
 	recipientCacheMu sync.RWMutex
 	recipientCache   map[string]types.JID
 
+	// Cache negativo de LID: quando o usync devolveu erro/sem LID pra um
+	// PN, evitamos hammering por 60s. Resolve o caso onde o destinatário
+	// não está no índice LID (raro, mas existe).
+	lidNegMu sync.Mutex
+	lidNeg   map[string]time.Time
+
 	// Track de chamadas aceitas: quando CallTerminate chega e o call_id NÃO
 	// está aqui, consideramos "missed call" (ligou e ninguém atendeu). Chave:
 	// call_id → timestamp da aceitação. GC simples: deleta no CallTerminate.
@@ -429,8 +435,12 @@ func (ic *InstanceClient) cacheRecipient(phoneJID, resolved types.JID) {
 }
 
 // sendMessage resolves the canonical JID/LID then calls SendMessage.
+// ensureLID antes do envio cobre text/image/video/etc — accounts modernos
+// passaram a exigir LID resolvido também pra mensagens não-interativas.
+// O ensureLID é cheap (cache no store local) e idempotente.
 func (ic *InstanceClient) sendMessage(ctx context.Context, recipient types.JID, msg *waE2E.Message) (whatsmeow.SendResponse, error) {
 	recipient = ic.resolveRecipient(ctx, recipient)
+	_ = ic.ensureLID(recipient)
 	return ic.client.SendMessage(ctx, recipient, msg)
 }
 
@@ -1310,21 +1320,80 @@ func buildInteractiveButtonsInner(body, footer string, buttons []ButtonItem, sec
 	}
 }
 
-// ensureLID força a resolução do LID (Linked Identity) do destinatário
-// antes de enviar mensagem interativa. Sem o LID cacheado no store, o
-// whatsmeow falha com "no LID found for X@s.whatsapp.net from server" ao
-// criptografar mensagens com biz nodes (botões, PIX, lista, carrossel).
+// ensureLID garante que o LID (Linked Identity) do destinatário esteja
+// no store local do whatsmeow antes do envio. Sem isso, accounts modernas
+// falham com "no LID found for X@s.whatsapp.net from server" no encrypt
+// — afeta tanto interactive quanto, em alguns clientes, mensagens normais.
 //
-// GetUserInfo dispara um usync que retorna o LID e o whatsmeow já popula
-// o LIDs store automaticamente. Idempotente — chamar pra cada send é
-// barato (cache hit no segundo+ uso e a query é rápida no usync).
+// Estratégia em 2 níveis pra não saturar o usync (rate-limit 429):
+//
+//  1. Consulta o store local primeiro (GetLIDForPN). Cache hit é grátis
+//     e cobre 99% dos casos depois da primeira mensagem.
+//  2. Cache MISS → cache negativo de 60s na memória do processo pra evitar
+//     spam de usync quando o destinatário não está em "lid index" (raro
+//     mas existe — ex: número novo). Decorrido 60s, tenta de novo.
+//  3. Cache MISS sem TTL ativo → faz client.GetUserInfo([jid]) — usync
+//     retorna LID e whatsmeow popula o store. Se 429 vier, retorna nil
+//     pra deixar o send tentar (whatsmeow vai falhar com "no LID found"
+//     mas a queue vai re-tentar com backoff).
 func (ic *InstanceClient) ensureLID(jid types.JID) error {
+	if jid.Server != types.DefaultUserServer {
+		return nil // grupos/broadcast não usam LID
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
+
+	// 1) Cache hit no store local
+	lid, _ := ic.client.Store.LIDs.GetLIDForPN(ctx, jid)
+	if !lid.IsEmpty() {
+		return nil
+	}
+
+	// 2) Cache negativo recente — não vale spammar usync
+	if ic.lidNegCacheRecent(jid) {
+		return nil
+	}
+
+	// 3) USync
 	if _, err := ic.client.GetUserInfo(ctx, []types.JID{jid}); err != nil {
-		return fmt.Errorf("ensure LID: %w", err)
+		ic.lidNegCacheStore(jid)
+		// 429 explícito: log baixo (debug) — backoff vem da queue
+		if strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "rate-overlimit") {
+			log.Debug().Str("instance", ic.ID).Str("jid", jid.String()).Msg("LID lookup rate-limited, send will likely fail and retry")
+		}
+		return nil // não bloqueia o envio — deixa o whatsmeow tentar/falhar normal
 	}
 	return nil
+}
+
+// lidNegCache* — cache negativo simples por instância pra evitar disparar
+// 100 usync queries por segundo quando o LID realmente não existe pra um
+// número (cenário raro). TTL 60s, in-memory only.
+const lidNegTTL = 60 * time.Second
+
+func (ic *InstanceClient) lidNegCacheRecent(jid types.JID) bool {
+	ic.lidNegMu.Lock()
+	defer ic.lidNegMu.Unlock()
+	if ic.lidNeg == nil {
+		return false
+	}
+	t, ok := ic.lidNeg[jid.String()]
+	if !ok {
+		return false
+	}
+	if time.Since(t) > lidNegTTL {
+		delete(ic.lidNeg, jid.String())
+		return false
+	}
+	return true
+}
+func (ic *InstanceClient) lidNegCacheStore(jid types.JID) {
+	ic.lidNegMu.Lock()
+	defer ic.lidNegMu.Unlock()
+	if ic.lidNeg == nil {
+		ic.lidNeg = make(map[string]time.Time)
+	}
+	ic.lidNeg[jid.String()] = time.Now()
 }
 
 // buildButtonsBizNodes monta os nós XML <biz> + <bot> que precisam
