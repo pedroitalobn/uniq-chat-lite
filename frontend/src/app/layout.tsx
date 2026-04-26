@@ -1,16 +1,15 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-// IBM Plex Sans — fonte default do uniq.chat. Carregamos múltiplos pesos
-// pra mapear hierarquia visual:
+// Inter — fonte default do uniq.chat (Apr/26). Pesos cobrindo a hierarquia:
 //   300 light    → metadados secundários (timestamps, captions, hints)
 //   400 regular  → corpo de mensagens, texto comum
 //   500 medium   → labels, nomes de contato, sub-headers
 //   600 semibold → títulos de seção, headers de conversa, CTAs
 //   700 bold     → títulos principais, valores destacados (badges, contadores)
-const sans = IBM_Plex_Sans({
+const sans = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
   display: "swap",

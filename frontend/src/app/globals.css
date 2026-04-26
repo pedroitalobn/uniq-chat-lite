@@ -83,14 +83,14 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* IBM Plex Sans:
-       - cv11/ss03 deixam o ‘a’ e ‘g’ mais geométricos
-       - lnum + pnum + kern: numerais alinhados, kerning nativo
-       - rlig + calt: ligaduras raras + alternativas contextuais
-       Resultado: leitura mais densa, ideal pra inbox + dashboards. */
-    font-feature-settings: "rlig" 1, "calt" 1, "kern" 1, "lnum" 1, "pnum" 1, "ss03" 1, "cv11" 1;
+    /* Inter:
+       - cv11 ativa o 'l' single-storey (mais legível em UI densa)
+       - ss01 desliga ligaduras de seta/pontuação que destoam em interface
+       - lnum/pnum/kern: numerais alinhados, kerning nativo
+       - rlig + calt: ligaduras tipográficas e alternativas contextuais. */
+    font-feature-settings: "rlig" 1, "calt" 1, "kern" 1, "lnum" 1, "pnum" 1, "ss01" 1, "cv11" 1;
     font-weight: 400;
-    letter-spacing: -0.005em; /* IBM Plex tem tracking levemente folgado; reduzimos um toque */
+    letter-spacing: -0.011em; /* Inter rende bem com leve tracking negativo. */
   }
   /* Hierarquia de pesos por nível semântico — pode ser sobrescrito por classes Tailwind. */
   h1 { font-weight: 700; letter-spacing: -0.02em; }
