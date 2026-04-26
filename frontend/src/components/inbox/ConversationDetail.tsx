@@ -1166,7 +1166,7 @@ function MessageBubble({
             <MediaBody type={m.type} parsed={parsed} onOpenViewer={onOpenViewer} wsId={wsId} isOut={isOut} />
           </div>
 
-          {/* Pin / favorite badges — abs positioned mantém limpo */}
+          {/* Pin / favorite / view-once badges — abs positioned mantém limpo */}
           {m.is_pinned && (
             <span
               className="absolute -top-2 left-2 flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium"
@@ -1183,6 +1183,15 @@ function MessageBubble({
               title="Favoritada"
             >
               <Star className="h-2.5 w-2.5" /> favorita
+            </span>
+          )}
+          {parsed.isViewOnce && !m.is_pinned && !m.is_favorite && (
+            <span
+              className="absolute -top-2 right-2 flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium"
+              style={{ background: "#a78bfa", color: "#1a1a2e" }}
+              title="Visualização única"
+            >
+              👁 única
             </span>
           )}
 
@@ -1266,6 +1275,22 @@ function MessageBubble({
         )}
 
         {m.reply_to && <QuotedReply reply={m.reply_to} isOut={isOut} />}
+
+        {(parsed.isViewOnce || parsed.isEphemeral) && (
+          <div className="mb-1 flex items-center gap-1.5 text-[10px]" style={{ color: parsed.isViewOnce ? "#a78bfa" : "hsl(240 8% 60%)" }}>
+            {parsed.isViewOnce ? (
+              <>
+                <span className="inline-block h-3 w-3 text-center leading-3">👁</span>
+                <span className="font-medium">Visualização única</span>
+              </>
+            ) : (
+              <>
+                <Clock3 className="h-3 w-3" />
+                <span className="font-medium">Mensagem temporária</span>
+              </>
+            )}
+          </div>
+        )}
 
         <MediaBody type={m.type} parsed={parsed} onOpenViewer={onOpenViewer} wsId={wsId} isOut={isOut} />
 
@@ -2581,6 +2606,9 @@ interface ParsedContent {
   callType?: string;
   callStatus?: string;
   callDurationSec?: number;
+  // TTL / visibilidade
+  isViewOnce?: boolean;
+  isEphemeral?: boolean;
 }
 
 // parseMessageContent normaliza os diferentes formatos que MessageLog.Content
@@ -2628,6 +2656,8 @@ function parseMessageContent(raw: string): ParsedContent {
         callType: parsed.call_type,
         callStatus: parsed.call_status,
         callDurationSec: typeof parsed.call_duration_sec === "number" ? parsed.call_duration_sec : undefined,
+        isViewOnce: parsed.is_view_once === true,
+        isEphemeral: parsed.is_ephemeral === true,
       };
     }
   } catch {

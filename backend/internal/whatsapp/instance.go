@@ -2462,6 +2462,14 @@ func (ic *InstanceClient) downloadAndStoreInboundMedia(
 	if caption != "" {
 		out["caption"] = caption
 	}
+	// Flags de TTL/visibilidade — view-once aparece como badge específico
+	// na UI; ephemeral é mensagem com timer de auto-delete (TTL global do chat).
+	if v.IsViewOnce || v.IsViewOnceV2 || v.IsViewOnceV2Extension {
+		out["is_view_once"] = true
+	}
+	if v.IsEphemeral {
+		out["is_ephemeral"] = true
+	}
 
 	// Sem MinIO configurado, retorna JSON com error pra a UI mostrar
 	// IconFallback ao invés de tentar carregar URL inexistente.
