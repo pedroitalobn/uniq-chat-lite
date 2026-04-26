@@ -71,6 +71,10 @@ type Conversation struct {
 
 	IsBotActive bool `gorm:"default:false" json:"is_bot_active"`
 	IsArchived  bool `gorm:"default:false;index" json:"is_archived"`
+	// IsPinned: aparece no topo da lista. IsMuted: suprime notificações
+	// no frontend (não bloqueia entrada — só reduz ruído pro agente).
+	IsPinned bool `gorm:"default:false;index" json:"is_pinned"`
+	IsMuted  bool `gorm:"default:false" json:"is_muted"`
 
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `gorm:"index" json:"updated_at"`

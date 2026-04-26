@@ -20,6 +20,7 @@ import { ConversationList, type ConversationRow } from "@/components/atendimento
 import { ConversationDetail } from "@/components/inbox/ConversationDetail";
 import { InboxReports } from "@/components/inbox/InboxReports";
 import { useConversationWS } from "@/hooks/useConversationWS";
+import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import type { ChannelInfo, Instance } from "@/types";
 
@@ -69,6 +70,9 @@ export default function InboxPage() {
   const { currentWorkspace } = useWorkspace();
   const { hasPerm, isLoading: permsLoading, isOwner } = useWorkspacePermissions();
   const { data: session } = useSession();
+  // Desktop notifications + audio ping + title badge para msgs inbound.
+  // Hook é silencioso até o agente clicar em "Ativar notificações".
+  const { permission: notifPerm, requestPermission: requestNotif } = useDesktopNotifications();
   const qc = useQueryClient();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -393,6 +397,22 @@ export default function InboxPage() {
 
           {viewMode === "conversations" && (
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            <GlobalSearchButton wsId={wsId} />
+            {notifPerm === "default" && (
+              <button
+                type="button"
+                onClick={requestNotif}
+                title="Ativar notificações desktop e som de mensagens"
+                className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium"
+                style={{
+                  background: "rgba(0,212,106,0.08)",
+                  border: "1px solid rgba(0,212,106,0.25)",
+                  color: "#00d46a",
+                }}
+              >
+                🔔 Ativar notificações
+              </button>
+            )}
             {/* Agent */}
             <AgentDropdown
               agentScope={agentScope}
@@ -1274,5 +1294,150 @@ function PageSkeleton() {
         ))}
       </div>
     </div>
+  );
+}
+
+// GlobalSearchButton — busca global por conteúdo de mensagens. Click abre
+// dialog overlay com input + lista de hits. Click em hit navega pra
+// /inbox?c=<conversation_id> e fecha.
+type SearchHit = {
+  message_id: string;
+  conversation_id: string;
+  direction: "in" | "out";
+  type: string;
+  snippet: string;
+  sender_name?: string;
+  contact_name?: string;
+  channel_key: string;
+  created_at: string;
+};
+
+function GlobalSearchButton({ wsId }: { wsId?: string }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const router = useRouter();
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q.trim()), 250);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  // Atalho: Ctrl/Cmd+K abre busca
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setOpen(true);
+      }
+      if (e.key === "Escape" && open) setOpen(false);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open]);
+
+  const hitsQ = useQuery({
+    queryKey: ["search-messages", wsId, debouncedQ],
+    queryFn: () => conversationsApi.searchMessages(wsId as string, debouncedQ).then((r) => r.data as { hits: SearchHit[] }),
+    enabled: !!wsId && debouncedQ.length >= 2 && open,
+    staleTime: 10_000,
+  });
+
+  const goTo = (h: SearchHit) => {
+    router.push(`/inbox?c=${h.conversation_id}`);
+    setOpen(false);
+    setQ("");
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title="Buscar mensagens (Ctrl+K)"
+        className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium"
+        style={{
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid hsl(240 12% 16%)",
+          color: "hsl(240 8% 65%)",
+        }}
+      >
+        <Search className="h-3 w-3" />
+        Buscar
+        <kbd className="ml-1 rounded px-1 py-0.5 text-[9px]" style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 8% 50%)" }}>⌘K</kbd>
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-[150] flex items-start justify-center pt-24" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }} onClick={() => setOpen(false)}>
+          <div className="w-full max-w-xl rounded-2xl shadow-2xl" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
+              <Search className="h-4 w-4 flex-shrink-0" style={{ color: "hsl(240 8% 50%)" }} />
+              <input
+                autoFocus
+                type="text"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Buscar em todas as mensagens…"
+                className="flex-1 bg-transparent text-sm outline-none"
+                style={{ color: "hsl(240 15% 92%)" }}
+              />
+              <span className="text-[10px]" style={{ color: "hsl(240 8% 50%)" }}>Esc fecha</span>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto">
+              {debouncedQ.length < 2 ? (
+                <div className="p-6 text-center text-xs" style={{ color: "hsl(240 8% 55%)" }}>
+                  Digite ao menos 2 caracteres
+                </div>
+              ) : hitsQ.isLoading ? (
+                <div className="p-6 text-center text-xs" style={{ color: "hsl(240 8% 55%)" }}>Buscando…</div>
+              ) : !hitsQ.data?.hits || hitsQ.data.hits.length === 0 ? (
+                <div className="p-6 text-center text-xs" style={{ color: "hsl(240 8% 55%)" }}>Nenhum resultado</div>
+              ) : (
+                <ul className="py-1">
+                  {hitsQ.data.hits.map((h) => (
+                    <li key={h.message_id}>
+                      <button
+                        type="button"
+                        onClick={() => goTo(h)}
+                        className="flex w-full items-start gap-3 px-4 py-2.5 text-left hover:bg-white/5"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 text-[11px]" style={{ color: "hsl(240 8% 60%)" }}>
+                            <span className="font-medium" style={{ color: h.direction === "out" ? "#00d46a" : "hsl(240 15% 88%)" }}>
+                              {h.contact_name || h.sender_name || h.channel_key}
+                            </span>
+                            <span>·</span>
+                            <span>{new Date(h.created_at).toLocaleString("pt-BR")}</span>
+                          </div>
+                          <div className="mt-0.5 text-xs truncate" style={{ color: "hsl(240 15% 88%)" }}>
+                            {highlightMatch(h.snippet, debouncedQ)}
+                          </div>
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function highlightMatch(snippet: string, q: string): React.ReactNode {
+  if (!q) return snippet;
+  const lower = snippet.toLowerCase();
+  const qLower = q.toLowerCase();
+  const idx = lower.indexOf(qLower);
+  if (idx < 0) return snippet;
+  return (
+    <>
+      {snippet.slice(0, idx)}
+      <mark style={{ background: "rgba(0,212,106,0.25)", color: "#00d46a", padding: "0 2px", borderRadius: 2 }}>
+        {snippet.slice(idx, idx + q.length)}
+      </mark>
+      {snippet.slice(idx + q.length)}
+    </>
   );
 }

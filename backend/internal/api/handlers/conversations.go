@@ -164,7 +164,7 @@ func (h *ConversationHandler) List(c *fiber.Ctx) error {
 		Preload("Instance", func(tx *gorm.DB) *gorm.DB {
 			return tx.Select("id, name, channel, phone_number")
 		}).
-		Order("COALESCE(last_message_at, updated_at) DESC").
+		Order("is_pinned DESC, COALESCE(last_message_at, updated_at) DESC").
 		Limit(limit + 1).
 		Offset(atoiDefault(c.Query("offset"), 0)).
 		Find(&items).Error
@@ -329,6 +329,8 @@ func (h *ConversationHandler) Patch(c *fiber.Ctx) error {
 		Priority   *string `json:"priority"`
 		SubStatus  *string `json:"sub_status"`
 		IsArchived *bool   `json:"is_archived"`
+		IsPinned   *bool   `json:"is_pinned"`
+		IsMuted    *bool   `json:"is_muted"`
 		FunnelID   *string `json:"funnel_id"`
 		StageID    *string `json:"stage_id"`
 	}
@@ -349,6 +351,12 @@ func (h *ConversationHandler) Patch(c *fiber.Ctx) error {
 	}
 	if body.IsArchived != nil {
 		updates["is_archived"] = *body.IsArchived
+	}
+	if body.IsPinned != nil {
+		updates["is_pinned"] = *body.IsPinned
+	}
+	if body.IsMuted != nil {
+		updates["is_muted"] = *body.IsMuted
 	}
 	if body.FunnelID != nil {
 		if *body.FunnelID == "" {
@@ -661,6 +669,205 @@ func (h *ConversationHandler) PatchMessage(c *fiber.Ctx) error {
 		"message": updated,
 	})
 	return c.JSON(updated)
+}
+
+// SendConstraints GET /v1/conversations/:id/send-constraints
+// Retorna o que o canal aceita pra essa conversation. Frontend usa pra
+// desabilitar botões/abrir modal de template quando necessário.
+//
+// Por canal:
+//   - whatsapp (whatsmeow): janela 24h irrelevante (E2E direto), todos os
+//     tipos de mídia, reactions, reply, edits.
+//   - waba: janela 24h relevante; fora da janela só template; reactions OK,
+//     reply OK, edit não.
+//   - instagram: janela 24h; só image/video/text; sem reaction/reply/edit.
+//   - tiktok: text + image; sem reactions; reply ok.
+func (h *ConversationHandler) SendConstraints(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var conv models.Conversation
+	if err := h.db.Where("workspace_id = ? AND id = ?", ws, id).First(&conv).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
+	}
+	var inst models.Instance
+	if err := h.db.First(&inst, "id = ?", conv.InstanceID).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "instance não encontrada"})
+	}
+
+	windowOpen := true
+	if h.outbound != nil {
+		windowOpen = h.outbound.WindowOpen(&inst, conv.LastCustomerMsgAt)
+	}
+
+	type cons struct {
+		Channel          string   `json:"channel"`
+		WindowOpen       bool     `json:"window_open"`
+		AllowsTemplate   bool     `json:"allows_template"`
+		SupportsReply    bool     `json:"supports_reply"`
+		SupportsReaction bool     `json:"supports_reaction"`
+		SupportsEdit     bool     `json:"supports_edit"`
+		SupportsRevoke   bool     `json:"supports_revoke"`
+		AllowedTypes     []string `json:"allowed_types"`
+		MaxBodyChars     int      `json:"max_body_chars"`
+	}
+	out := cons{
+		Channel:    string(inst.Channel),
+		WindowOpen: windowOpen,
+	}
+	switch inst.Channel {
+	case models.ChannelWhatsApp:
+		out.AllowedTypes = []string{"text", "image", "video", "audio", "document", "sticker", "location", "contact"}
+		out.SupportsReply = true
+		out.SupportsReaction = true
+		out.SupportsEdit = true
+		out.SupportsRevoke = true
+		out.MaxBodyChars = 65536
+	case models.ChannelWABA:
+		out.AllowsTemplate = true
+		out.SupportsReply = true
+		out.SupportsReaction = true
+		out.SupportsEdit = false
+		out.SupportsRevoke = false
+		out.AllowedTypes = []string{"text", "image", "video", "audio", "document", "template"}
+		out.MaxBodyChars = 4096
+	case models.ChannelInstagram:
+		out.SupportsReply = true
+		out.SupportsReaction = false
+		out.SupportsEdit = false
+		out.SupportsRevoke = false
+		out.AllowedTypes = []string{"text", "image", "video"}
+		out.MaxBodyChars = 1000
+	case models.ChannelTikTok:
+		out.SupportsReply = true
+		out.SupportsReaction = false
+		out.AllowedTypes = []string{"text", "image"}
+		out.MaxBodyChars = 1000
+	default:
+		out.AllowedTypes = []string{"text"}
+		out.MaxBodyChars = 4096
+	}
+	return c.JSON(out)
+}
+
+// SearchMessages GET /v1/conversations/messages/search?q=&limit=
+// Busca global no conteúdo de mensagens do workspace. Retorna até 30 hits
+// ordenados por created_at DESC com snippet + conversation_id pra UI abrir.
+//
+// Indexação: depende de índice gin no postgres pra performance em volume —
+// `CREATE INDEX idx_msglogs_content_trgm ON message_logs USING gin (content gin_trgm_ops)`.
+// Sem o índice, ILIKE faz seq scan; aceitável até ~100k msgs por workspace.
+func (h *ConversationHandler) SearchMessages(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	q := strings.TrimSpace(c.Query("q"))
+	if len(q) < 2 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "q precisa ter ao menos 2 caracteres"})
+	}
+	limit := atoiDefault(c.Query("limit"), 30)
+	if limit > 100 {
+		limit = 100
+	}
+
+	type hit struct {
+		MessageID      uuid.UUID `json:"message_id"`
+		ConversationID uuid.UUID `json:"conversation_id"`
+		Direction      string    `json:"direction"`
+		Type           string    `json:"type"`
+		Snippet        string    `json:"snippet"`
+		SenderName     string    `json:"sender_name,omitempty"`
+		ContactName    string    `json:"contact_name,omitempty"`
+		ChannelKey     string    `json:"channel_key"`
+		CreatedAt      time.Time `json:"created_at"`
+	}
+
+	rows := []struct {
+		MessageID      uuid.UUID
+		ConversationID uuid.UUID
+		Direction      string
+		Type           string
+		Content        string
+		SenderName     string
+		ContactName    string
+		ChannelKey     string
+		CreatedAt      time.Time
+	}{}
+
+	pattern := "%" + q + "%"
+	if err := h.db.Table("message_logs ml").
+		Select(`ml.id AS message_id, ml.conversation_id, ml.direction, ml.type,
+			ml.content, ml.sender_name, ml.contact_name,
+			c.channel_key, ml.created_at`).
+		Joins("JOIN conversations c ON c.id = ml.conversation_id").
+		Where("c.workspace_id = ? AND ml.is_deleted = false AND ml.content ILIKE ?", ws, pattern).
+		Order("ml.created_at DESC").
+		Limit(limit).
+		Scan(&rows).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	hits := make([]hit, 0, len(rows))
+	qLower := strings.ToLower(q)
+	for _, r := range rows {
+		// Snippet: extrai trecho ao redor do match (~80 chars total).
+		snippet := buildSnippet(r.Content, qLower, 80)
+		hits = append(hits, hit{
+			MessageID:      r.MessageID,
+			ConversationID: r.ConversationID,
+			Direction:      r.Direction,
+			Type:           r.Type,
+			Snippet:        snippet,
+			SenderName:     r.SenderName,
+			ContactName:    r.ContactName,
+			ChannelKey:     r.ChannelKey,
+			CreatedAt:      r.CreatedAt,
+		})
+	}
+	return c.JSON(fiber.Map{"hits": hits})
+}
+
+// buildSnippet gera trecho com ~maxLen chars centrado no primeiro match.
+// Se o content é JSON ({text:..., caption:...}), tenta extrair o texto antes.
+func buildSnippet(content, qLower string, maxLen int) string {
+	text := content
+	// Se for JSON estruturado, extrai text/caption pra display.
+	if strings.HasPrefix(strings.TrimSpace(content), "{") {
+		var obj map[string]any
+		if err := json.Unmarshal([]byte(content), &obj); err == nil {
+			if v, ok := obj["text"].(string); ok && v != "" {
+				text = v
+			} else if v, ok := obj["caption"].(string); ok && v != "" {
+				text = v
+			}
+		}
+	}
+	idx := strings.Index(strings.ToLower(text), qLower)
+	if idx < 0 {
+		// query bateu em campo JSON cru — devolve só os primeiros chars
+		if len(text) > maxLen {
+			return text[:maxLen] + "…"
+		}
+		return text
+	}
+	half := maxLen / 2
+	start := idx - half
+	if start < 0 {
+		start = 0
+	}
+	end := idx + len(qLower) + half
+	if end > len(text) {
+		end = len(text)
+	}
+	prefix := ""
+	if start > 0 {
+		prefix = "…"
+	}
+	suffix := ""
+	if end < len(text) {
+		suffix = "…"
+	}
+	return prefix + text[start:end] + suffix
 }
 
 // loadMessageInWS — helper: carrega MessageLog garantindo que pertence

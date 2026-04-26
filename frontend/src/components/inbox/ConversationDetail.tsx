@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -42,6 +42,8 @@ interface Conversation {
   last_message_at?: string;
   unread_count: number;
   is_bot_active: boolean;
+  is_pinned?: boolean;
+  is_muted?: boolean;
   reopen_count: number;
   first_response_at?: string | null;
   created_at: string;
@@ -156,6 +158,10 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   const [forwardMsg, setForwardMsg] = useState<MessagePayload | null>(null);
   const [editingMsg, setEditingMsg] = useState<MessagePayload | null>(null);
   const [infoMsg, setInfoMsg] = useState<MessagePayload | null>(null);
+  // Presence state — preenchido quando WS emite presence.update / chat.presence
+  // pra channel_key desta conversation. typing reseta após 5s de silêncio.
+  const [presence, setPresence] = useState<{ online?: boolean; lastSeen?: string; typing?: boolean }>({});
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canClose = hasPerm(PERM.ticketsClose);
   const canReopen = hasPerm(PERM.ticketsReopen);
   const canSnooze = hasPerm(PERM.ticketsSnooze);
@@ -232,6 +238,33 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
       if (eventConvID && eventConvID !== conversationId) return;
       qc.invalidateQueries({ queryKey: ["conversation", wsId, conversationId] });
       qc.invalidateQueries({ queryKey: ["conversation-timeline", wsId, conversationId] });
+    },
+  });
+
+  // Presence WS — escuta presence.update + chat.presence pro channel_key
+  // dessa conversation. Atualiza online/lastSeen/typing no header.
+  useConversationWS({
+    prefixes: ["presence.", "chat."],
+    onEvent: (evt: WSEvent) => {
+      if (!convQ.data?.channel_key) return;
+      const channelKey = convQ.data.channel_key;
+      const payload = (evt.payload ?? {}) as { from?: string; chat?: string; unavailable?: boolean; last_seen?: string; state?: string };
+      const target = payload.chat || payload.from || "";
+      // Match por phone — channel_key normalmente vem como "5511...@s.whatsapp.net"
+      // Eventos podem vir só com phone ou JID completo.
+      const matches = target && (target === channelKey || target.startsWith(channelKey.split("@")[0]) || channelKey.startsWith(target.split("@")[0]));
+      if (!matches) return;
+
+      if (evt.type === "presence.update") {
+        setPresence((p) => ({ ...p, online: !payload.unavailable, lastSeen: payload.last_seen }));
+      } else if (evt.type === "chat.presence") {
+        const isTyping = payload.state === "composing";
+        setPresence((p) => ({ ...p, typing: isTyping }));
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        if (isTyping) {
+          typingTimeoutRef.current = setTimeout(() => setPresence((p) => ({ ...p, typing: false })), 5000);
+        }
+      }
     },
   });
 
@@ -312,6 +345,16 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
         ? conversationsApi.enableBot(wsId as string, conversationId)
         : conversationsApi.disableBot(wsId as string, conversationId),
     onSuccess: () => refresh(),
+  });
+
+  // Pin / Mute conversation — patch direto na conversation.
+  const patchConv = useMutation({
+    mutationFn: (patch: { is_pinned?: boolean; is_muted?: boolean; is_archived?: boolean }) =>
+      conversationsApi.patch(wsId as string, conversationId, patch),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["conversation", wsId, conversationId] });
+      qc.invalidateQueries({ queryKey: ["conversations", wsId] });
+    },
   });
 
   const patchMsg = useMutation({
@@ -592,6 +635,8 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               )}
             </div>
             <div className="flex items-center gap-2 text-xs flex-wrap" style={{ color: "hsl(240 8% 50%)" }}>
+              {/* Presence indicator — typing > online > last seen */}
+              <PresenceLabel presence={presence} />
               {/* Chip do canal — ícone + cor por tipo */}
               <span
                 className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium"
@@ -663,9 +708,14 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                   Início da conversa
                 </div>
               )}
-              {timeline.map((e) => (
-                <li key={`${e.kind}-${e.id}`}>
-                  {e.kind === "message" ? (
+              {timeline.map((e, idx) => {
+                const prev = idx > 0 ? timeline[idx - 1] : null;
+                const dayChanged = !prev || !sameDay(prev.at, e.at);
+                return (
+                  <Fragment key={`${e.kind}-${e.id}`}>
+                    {dayChanged && <DaySeparator at={e.at} />}
+                    <li>
+                      {e.kind === "message" ? (
                     <MessageBubble
                       m={e.payload as MessagePayload}
                       wsId={wsId}
@@ -681,13 +731,15 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                       onEdit={(msg) => setEditingMsg(msg)}
                       onInfo={(msg) => setInfoMsg(msg)}
                     />
-                  ) : e.kind === "note" ? (
-                    <NoteCard n={e.payload as NotePayload} />
-                  ) : (
-                    <EventLine e={e.payload as EventPayload} />
-                  )}
-                </li>
-              ))}
+                      ) : e.kind === "note" ? (
+                        <NoteCard n={e.payload as NotePayload} />
+                      ) : (
+                        <EventLine e={e.payload as EventPayload} />
+                      )}
+                    </li>
+                  </Fragment>
+                );
+              })}
             </ol>
           )}
         </div>
@@ -773,6 +825,20 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               onClick={() => bot.mutate(!conv.is_bot_active)}
               icon={conv.is_bot_active ? <BotOff className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
               label={conv.is_bot_active ? "Desligar bot nesta conversa" : "Ligar bot nesta conversa"}
+            />
+          )}
+          {canUpdate && conv && (
+            <ActionRow
+              onClick={() => patchConv.mutate({ is_pinned: !conv.is_pinned })}
+              icon={<Pin className="h-4 w-4" style={{ color: conv.is_pinned ? "#00d46a" : undefined }} />}
+              label={conv.is_pinned ? "Desfixar conversa" : "Fixar conversa no topo"}
+            />
+          )}
+          {canUpdate && conv && (
+            <ActionRow
+              onClick={() => patchConv.mutate({ is_muted: !conv.is_muted })}
+              icon={<span className="inline-block w-4 h-4 text-center leading-4 text-base">{conv.is_muted ? "🔕" : "🔔"}</span>}
+              label={conv.is_muted ? "Reativar notificações" : "Silenciar notificações"}
             />
           )}
         </div>
@@ -1944,6 +2010,76 @@ function ContactCard({
   );
 }
 
+// PresenceLabel — chip compacto que prioriza typing > online > last seen.
+// Tipos: digitando (verde animado), online (verde sólido), "visto às X" (cinza).
+function PresenceLabel({ presence }: { presence: { online?: boolean; lastSeen?: string; typing?: boolean } }) {
+  if (presence.typing) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "#00d46a" }}>
+        <span className="inline-flex gap-0.5">
+          <span className="h-1 w-1 rounded-full" style={{ background: "#00d46a", animation: "uniq-typing-dot 1.2s infinite" }} />
+          <span className="h-1 w-1 rounded-full" style={{ background: "#00d46a", animation: "uniq-typing-dot 1.2s infinite 0.15s" }} />
+          <span className="h-1 w-1 rounded-full" style={{ background: "#00d46a", animation: "uniq-typing-dot 1.2s infinite 0.3s" }} />
+        </span>
+        digitando…
+      </span>
+    );
+  }
+  if (presence.online) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: "#00d46a" }}>
+        <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#00d46a" }} />
+        online
+      </span>
+    );
+  }
+  if (presence.lastSeen) {
+    const d = new Date(presence.lastSeen);
+    const diffMin = Math.floor((Date.now() - d.getTime()) / 60_000);
+    let label = "visto há pouco";
+    if (diffMin > 60 * 24) label = `visto em ${d.toLocaleDateString("pt-BR")}`;
+    else if (diffMin > 60) label = `visto há ${Math.floor(diffMin / 60)}h`;
+    else if (diffMin > 1) label = `visto há ${diffMin} min`;
+    return <span className="text-[11px]" style={{ color: "hsl(240 8% 55%)" }}>{label}</span>;
+  }
+  return null;
+}
+
+// sameDay — true se os dois timestamps caem no mesmo dia local.
+function sameDay(a: string, b: string): boolean {
+  const da = new Date(a);
+  const db = new Date(b);
+  return da.getFullYear() === db.getFullYear() &&
+    da.getMonth() === db.getMonth() &&
+    da.getDate() === db.getDate();
+}
+
+// DaySeparator — selo central "Hoje" / "Ontem" / "12 de março, 2026".
+function DaySeparator({ at }: { at: string }) {
+  const d = new Date(at);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  let label: string;
+  if (sameDay(at, today.toISOString())) label = "Hoje";
+  else if (sameDay(at, yesterday.toISOString())) label = "Ontem";
+  else label = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+  return (
+    <li className="flex justify-center my-2 list-none">
+      <span
+        className="rounded-full px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider"
+        style={{
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          color: "hsl(240 8% 60%)",
+        }}
+      >
+        {label}
+      </span>
+    </li>
+  );
+}
+
 // replyPreviewText extrai um label compacto pro reply bar do composer.
 function replyPreviewText(m: MessagePayload): string {
   const parsed = parseMessageContent(m.content);
@@ -2152,41 +2288,66 @@ function Text({ text }: { text: string }) {
   return (
     <>
       <p className="text-sm" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-        {segments.map((seg, i) =>
-          seg.type === "url" ? (
-            <a
-              key={i}
-              href={seg.value}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:no-underline"
-              style={{ color: "#60a5fa" }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {seg.value}
-            </a>
-          ) : (
-            <WhatsAppMarkdown key={i} text={seg.value} />
-          ),
-        )}
+        {segments.map((seg, i) => {
+          if (seg.type === "url") {
+            return (
+              <a
+                key={i}
+                href={seg.value}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:no-underline"
+                style={{ color: "#60a5fa" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {seg.value}
+              </a>
+            );
+          }
+          if (seg.type === "mention") {
+            const phone = seg.value.slice(1); // strip @
+            return (
+              <a
+                key={i}
+                href={`https://wa.me/${phone}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium hover:underline"
+                style={{ color: "#00d46a" }}
+                onClick={(e) => e.stopPropagation()}
+                title={`Abrir conversa com ${phone}`}
+              >
+                {seg.value}
+              </a>
+            );
+          }
+          return <WhatsAppMarkdown key={i} text={seg.value} />;
+        })}
       </p>
       {firstURL && <LinkPreviewCard url={firstURL} />}
     </>
   );
 }
 
-function splitLinks(text: string): Array<{ type: "url" | "text"; value: string }> {
-  const re = /https?:\/\/[^\s<>"']+/g;
-  const out: Array<{ type: "url" | "text"; value: string }> = [];
+function splitLinks(text: string): Array<{ type: "url" | "text" | "mention"; value: string }> {
+  // Combinado: URL OR @<phone-digits>. Captura ambos numa só pass pra preservar ordem.
+  const re = /(https?:\/\/[^\s<>"']+)|(@\d{7,15})/g;
+  const out: Array<{ type: "url" | "text" | "mention"; value: string }> = [];
   let lastIdx = 0;
   let m;
   while ((m = re.exec(text)) !== null) {
     if (m.index > lastIdx) out.push({ type: "text", value: text.slice(lastIdx, m.index) });
-    let url = m[0];
-    const trail = url.match(/[.,);!?]+$/);
-    if (trail) url = url.slice(0, -trail[0].length);
-    out.push({ type: "url", value: url });
-    lastIdx = m.index + url.length;
+    if (m[1]) {
+      // URL
+      let url = m[1];
+      const trail = url.match(/[.,);!?]+$/);
+      if (trail) url = url.slice(0, -trail[0].length);
+      out.push({ type: "url", value: url });
+      lastIdx = m.index + url.length;
+    } else if (m[2]) {
+      out.push({ type: "mention", value: m[2] });
+      lastIdx = m.index + m[2].length;
+    }
   }
   if (lastIdx < text.length) out.push({ type: "text", value: text.slice(lastIdx) });
   if (out.length === 0) out.push({ type: "text", value: text });
@@ -2493,6 +2654,7 @@ function Composer({
 }) {
   const [mode, setMode] = useState<"message" | "note">("message");
   const [text, setText] = useState("");
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const draftKey = `inbox:draft:${conversationId}:${mode}`;
 
@@ -2581,18 +2743,64 @@ function Composer({
 
   const onPickFile = () => fileInputRef.current?.click();
 
-  const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // permite re-selecionar o mesmo arquivo
+  // Aceita um File já lido (drag-drop, paste ou input). Centralizado pra
+  // todos os caminhos de attach passarem pela mesma validação + preview.
+  const acceptFile = useCallback((file: File) => {
     if (!file) return;
     if (!instanceId) {
       toast.error("Anexar requer instância conectada");
       return;
     }
-    // Preview só para imagens; outros tipos usam ícone no bubble de preview
+    if (mode !== "message") return;
     const preview = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
     setPending({ file, preview });
+  }, [instanceId, mode]);
+
+  const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite re-selecionar o mesmo arquivo
+    if (file) acceptFile(file);
   };
+
+  // Drag-drop sobre o composer. Highlight visual + accept primeiro File.
+  const [dragActive, setDragActive] = useState(false);
+  const onDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    if (!dragActive) setDragActive(true);
+  };
+  const onDragLeave = () => setDragActive(false);
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragActive(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) acceptFile(file);
+  };
+
+  // Paste image — Ctrl+V de um screenshot/imagem do clipboard.
+  useEffect(() => {
+    const handler = (e: ClipboardEvent) => {
+      if (mode !== "message" || !instanceId) return;
+      const target = e.target as HTMLElement | null;
+      // Só intercepta paste na conversa (não em outros inputs da página)
+      if (target && target.tagName === "INPUT") return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            acceptFile(file);
+            return;
+          }
+        }
+      }
+    };
+    window.addEventListener("paste", handler);
+    return () => window.removeEventListener("paste", handler);
+  }, [mode, instanceId, acceptFile]);
 
   const clearPending = () => {
     if (pending?.preview) URL.revokeObjectURL(pending.preview);
@@ -2674,12 +2882,27 @@ function Composer({
 
   return (
     <div
-      className="p-3"
+      className="p-3 relative"
       style={{
         background: composerBg,
         borderTop: "1px solid hsl(240 12% 16%)",
       }}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
     >
+      {dragActive && (
+        <div
+          className="absolute inset-0 z-20 flex items-center justify-center rounded-md pointer-events-none"
+          style={{
+            background: "rgba(0,212,106,0.1)",
+            border: "2px dashed #00d46a",
+            color: "#00d46a",
+          }}
+        >
+          <span className="text-sm font-semibold">Solte para anexar</span>
+        </div>
+      )}
       <input
         ref={fileInputRef}
         type="file"
@@ -2880,6 +3103,45 @@ function Composer({
           >
             <Paperclip className="h-4 w-4" />
           </button>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setEmojiOpen((v) => !v)}
+              disabled={!canSend || mode !== "message"}
+              title="Emoji"
+              className="flex h-10 w-10 items-center justify-center rounded-md transition-colors disabled:opacity-40"
+              style={{
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: emojiOpen ? "#00d46a" : "hsl(240 8% 52%)",
+              }}
+            >
+              <Smile className="h-4 w-4" />
+            </button>
+            {emojiOpen && (
+              <EmojiPickerPanel
+                onPick={(e) => {
+                  const ta = textareaRef.current;
+                  if (!ta) {
+                    setText((t) => t + e);
+                    return;
+                  }
+                  const start = ta.selectionStart ?? text.length;
+                  const end = ta.selectionEnd ?? text.length;
+                  const next = text.slice(0, start) + e + text.slice(end);
+                  setText(next);
+                  // Reposiciona cursor após o emoji
+                  requestAnimationFrame(() => {
+                    ta.focus();
+                    const pos = start + e.length;
+                    ta.setSelectionRange(pos, pos);
+                  });
+                }}
+                onClose={() => setEmojiOpen(false)}
+              />
+            )}
+          </div>
 
           <textarea
             ref={textareaRef}
@@ -3226,4 +3488,174 @@ function StatusCard({
     </div>
   );
 }
+
+
+
+// EmojiPickerPanel — picker compacto in-file (sem dependência externa).
+// Categorias básicas; busca por nome. Emoji frequents in localStorage.
+function EmojiPickerPanel({ onPick, onClose }: { onPick: (e: string) => void; onClose: () => void }) {
+  const [search, setSearch] = useState("");
+  const [recent, setRecent] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("inbox:emoji-recent");
+      if (raw) setRecent(JSON.parse(raw).slice(0, 16));
+    } catch { /* noop */ }
+  }, []);
+
+  const pick = (e: string) => {
+    onPick(e);
+    setRecent((r) => {
+      const next = [e, ...r.filter((x) => x !== e)].slice(0, 16);
+      try { localStorage.setItem("inbox:emoji-recent", JSON.stringify(next)); } catch { /* noop */ }
+      return next;
+    });
+  };
+
+  // Click outside fecha
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("[data-emoji-picker]")) return;
+      onClose();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  const filtered = (cat: { label: string; emojis: { e: string; n: string }[] }) => {
+    if (!search) return cat.emojis;
+    const q = search.toLowerCase();
+    return cat.emojis.filter((it) => it.n.includes(q));
+  };
+
+  return (
+    <div
+      data-emoji-picker
+      className="absolute bottom-full mb-2 left-0 z-50 w-72 rounded-lg shadow-2xl"
+      style={{
+        background: "hsl(240 18% 7%)",
+        border: "1px solid hsl(240 12% 16%)",
+        maxHeight: 360,
+      }}
+    >
+      <div className="p-2 border-b" style={{ borderColor: "hsl(240 12% 14%)" }}>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar emoji..."
+          autoFocus
+          className="w-full rounded px-2 py-1 text-xs outline-none"
+          style={{ background: "rgba(255,255,255,0.04)", color: "hsl(240 15% 90%)", border: "1px solid hsl(240 12% 16%)" }}
+        />
+      </div>
+      <div className="overflow-y-auto" style={{ maxHeight: 300 }}>
+        {!search && recent.length > 0 && (
+          <Section title="Recentes">
+            {recent.map((e, i) => (
+              <button key={i} type="button" onClick={() => pick(e)} className="text-xl leading-none p-1 rounded hover:bg-white/5">{e}</button>
+            ))}
+          </Section>
+        )}
+        {EMOJI_CATEGORIES.map((cat) => {
+          const items = filtered(cat);
+          if (items.length === 0) return null;
+          return (
+            <Section key={cat.label} title={cat.label}>
+              {items.map((it, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => pick(it.e)}
+                  title={it.n}
+                  className="text-xl leading-none p-1 rounded hover:bg-white/5"
+                >
+                  {it.e}
+                </button>
+              ))}
+            </Section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="px-2 py-1.5">
+      <div className="text-[9px] font-semibold uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 50%)" }}>
+        {title}
+      </div>
+      <div className="grid grid-cols-8 gap-0.5">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+const EMOJI_CATEGORIES: Array<{ label: string; emojis: { e: string; n: string }[] }> = [
+  {
+    label: "Smileys",
+    emojis: [
+      { e: "😀", n: "feliz" }, { e: "😁", n: "sorrir" }, { e: "😂", n: "rir" },
+      { e: "🤣", n: "gargalhar" }, { e: "😊", n: "fofo" }, { e: "😇", n: "anjo" },
+      { e: "🙂", n: "leve" }, { e: "😉", n: "piscar" }, { e: "😍", n: "amor" },
+      { e: "🥰", n: "amoroso" }, { e: "😘", n: "beijo" }, { e: "😎", n: "legal" },
+      { e: "🤩", n: "estrela" }, { e: "🤔", n: "pensando" }, { e: "😐", n: "neutro" },
+      { e: "😴", n: "dormindo" }, { e: "🤯", n: "explodir" }, { e: "🥳", n: "festa" },
+      { e: "😢", n: "triste" }, { e: "😭", n: "chorar" }, { e: "😤", n: "bufar" },
+      { e: "😠", n: "raiva" }, { e: "😡", n: "furioso" }, { e: "🤬", n: "xingar" },
+      { e: "😱", n: "assustado" }, { e: "😨", n: "medo" }, { e: "🤢", n: "enjoado" },
+      { e: "🤮", n: "vomitar" }, { e: "🥺", n: "pidao" }, { e: "🙄", n: "olhos" },
+    ],
+  },
+  {
+    label: "Mãos",
+    emojis: [
+      { e: "👍", n: "joinha" }, { e: "👎", n: "joia baixo" }, { e: "👏", n: "palmas" },
+      { e: "🙌", n: "viva" }, { e: "🤝", n: "aperto mao" }, { e: "🙏", n: "obrigado" },
+      { e: "💪", n: "forca" }, { e: "👌", n: "ok" }, { e: "✌️", n: "paz" },
+      { e: "🤞", n: "sorte" }, { e: "🤟", n: "amor metal" }, { e: "🤘", n: "rock" },
+      { e: "👋", n: "aceno tchau" }, { e: "🫶", n: "coracao mao" }, { e: "🫡", n: "saudar" },
+      { e: "🤲", n: "duas maos" },
+    ],
+  },
+  {
+    label: "Coração",
+    emojis: [
+      { e: "❤️", n: "amor" }, { e: "🧡", n: "laranja" }, { e: "💛", n: "amarelo" },
+      { e: "💚", n: "verde" }, { e: "💙", n: "azul" }, { e: "💜", n: "roxo" },
+      { e: "🖤", n: "preto" }, { e: "🤍", n: "branco" }, { e: "🤎", n: "marrom" },
+      { e: "💔", n: "partido" }, { e: "❣️", n: "exclamacao" }, { e: "💕", n: "dois" },
+      { e: "💞", n: "girando" }, { e: "💓", n: "batendo" }, { e: "💗", n: "crescendo" },
+      { e: "💖", n: "brilhando" }, { e: "💘", n: "flecha" }, { e: "💝", n: "presente" },
+    ],
+  },
+  {
+    label: "Objetos",
+    emojis: [
+      { e: "🔥", n: "fogo" }, { e: "✨", n: "brilho" }, { e: "🎉", n: "festa" },
+      { e: "🎊", n: "confete" }, { e: "🎁", n: "presente" }, { e: "💯", n: "100" },
+      { e: "💰", n: "dinheiro" }, { e: "💸", n: "voando" }, { e: "💎", n: "diamante" },
+      { e: "🏆", n: "trofeu" }, { e: "🥇", n: "primeiro" }, { e: "🎯", n: "alvo" },
+      { e: "📌", n: "fixar" }, { e: "📎", n: "clipe" }, { e: "✅", n: "check" },
+      { e: "❌", n: "x" }, { e: "⚠️", n: "alerta" }, { e: "❓", n: "pergunta" },
+      { e: "💡", n: "ideia" }, { e: "📞", n: "telefone" }, { e: "📱", n: "celular" },
+      { e: "💻", n: "computador" }, { e: "📧", n: "email" }, { e: "🔔", n: "sino" },
+    ],
+  },
+  {
+    label: "Comida",
+    emojis: [
+      { e: "🍕", n: "pizza" }, { e: "🍔", n: "hamburguer" }, { e: "🍟", n: "batata" },
+      { e: "🌮", n: "taco" }, { e: "🍣", n: "sushi" }, { e: "🍜", n: "lamen" },
+      { e: "🍰", n: "bolo" }, { e: "🍦", n: "sorvete" }, { e: "🍩", n: "rosquinha" },
+      { e: "☕", n: "cafe" }, { e: "🍺", n: "cerveja" }, { e: "🍷", n: "vinho" },
+      { e: "🥂", n: "brinde" }, { e: "🥃", n: "whisky" }, { e: "🧉", n: "chimarrao" },
+    ],
+  },
+];
 

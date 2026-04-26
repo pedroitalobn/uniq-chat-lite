@@ -940,6 +940,8 @@ export const conversationsApi = {
     priority?: ConversationPriority;
     sub_status?: string;
     is_archived?: boolean;
+    is_pinned?: boolean;
+    is_muted?: boolean;
     funnel_id?: string | null;
     stage_id?: string | null;
   }) => api.patch(`/v1/conversations/${id}`, data, { headers: wsHeaders(workspaceId) }),
@@ -984,6 +986,13 @@ export const conversationsApi = {
     ),
   getMessageReceipts: (workspaceId: string, id: string, msgId: string) =>
     api.get(`/v1/conversations/${id}/messages/${msgId}/receipts`, { headers: wsHeaders(workspaceId) }),
+  searchMessages: (workspaceId: string, q: string, limit = 30) =>
+    api.get(`/v1/conversations/messages/search`, {
+      headers: wsHeaders(workspaceId),
+      params: { q, limit },
+    }),
+  sendConstraints: (workspaceId: string, id: string) =>
+    api.get(`/v1/conversations/${id}/send-constraints`, { headers: wsHeaders(workspaceId) }),
   assign: (workspaceId: string, id: string, userId?: string) =>
     api.post(`/v1/conversations/${id}/assign`, userId ? { user_id: userId } : {}, { headers: wsHeaders(workspaceId) }),
   unassign: (workspaceId: string, id: string) =>
