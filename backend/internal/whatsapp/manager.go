@@ -565,6 +565,10 @@ func extractPhoneFromJID(jid string) string {
 // Upstream code (InstanceClient.resolveChatPNJID) is responsible for mapping LID → PN
 // before calling SaveMessage; any @lid that still reaches here is filtered out of
 // the inbox listing downstream.
+//
+// Strip device suffix `:N` (e.g. "5511XXX:1@s.whatsapp.net" → "5511XXX@s.whatsapp.net").
+// CallOffer/Terminate frequentemente vêm com device suffix; sem strip, calls
+// criariam conversation duplicada por não casar com a key sem suffix.
 func canonicalJID(jid string) string {
 	if jid == "" {
 		return jid
@@ -578,6 +582,10 @@ func canonicalJID(jid string) string {
 	phone := extractPhoneFromJID(jid)
 	if phone == "" {
 		return jid
+	}
+	// Strip device suffix `:N` se houver
+	if idx := strings.Index(phone, ":"); idx > 0 {
+		phone = phone[:idx]
 	}
 	return phone + "@s.whatsapp.net"
 }

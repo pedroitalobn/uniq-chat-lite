@@ -451,17 +451,23 @@ func (ic *InstanceClient) SendTextMessage(to, text string) (string, error) {
 
 // SendTextMessageReply envia uma mensagem de texto citando outra. O recipiente
 // vê o quote (preview) acima do texto. quotedID é o stanza_id da msg original;
-// quotedParticipant é o JID do remetente da msg citada (necessário em grupos).
-func (ic *InstanceClient) SendTextMessageReply(to, text, quotedID, quotedParticipant string) (string, error) {
+// quotedParticipant é o JID do remetente da msg citada (necessário em grupos);
+// quotedText é o conteúdo real da msg citada — sem isso, o WhatsApp mobile
+// renderiza como mensagem nova em vez de quote.
+func (ic *InstanceClient) SendTextMessageReply(to, text, quotedID, quotedParticipant, quotedText string) (string, error) {
 	recipient, err := types.ParseJID(normalizeJID(to))
 	if err != nil {
 		return "", fmt.Errorf("invalid JID: %w", err)
 	}
+	// QuotedMessage PRECISA carregar o conteúdo real (mesmo que truncado)
+	// pra mobile/desktop renderizarem o bubble de quote corretamente.
+	// Placeholder vazio fazia mobile mostrar como msg nova sem o quote.
+	if quotedText == "" {
+		quotedText = "..." // fallback mínimo: mantém o quote mesmo sem conteúdo
+	}
 	ci := &waE2E.ContextInfo{
-		StanzaID: proto.String(quotedID),
-		// QuotedMessage pode ser placeholder vazio — WhatsApp aceita só com
-		// stanza_id quando o cliente já tem a msg em cache local.
-		QuotedMessage: &waE2E.Message{Conversation: proto.String("")},
+		StanzaID:      proto.String(quotedID),
+		QuotedMessage: &waE2E.Message{Conversation: proto.String(quotedText)},
 	}
 	if quotedParticipant != "" {
 		ci.Participant = proto.String(normalizeJID(quotedParticipant))
@@ -1805,8 +1811,16 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 			msgType = "image"
 			text = v.Message.GetImageMessage().GetCaption()
 		case v.Message.GetVideoMessage() != nil:
-			msgType = "video"
-			text = v.Message.GetVideoMessage().GetCaption()
+			vm := v.Message.GetVideoMessage()
+			// GIFs no WhatsApp chegam como VideoMessage com gifPlayback=true.
+			// Marcamos como type="gif" pra UI renderizar com autoplay+loop+muted
+			// e ratio fixo (não precisa de controles).
+			if vm.GetGifPlayback() {
+				msgType = "gif"
+			} else {
+				msgType = "video"
+			}
+			text = vm.GetCaption()
 		case v.Message.GetAudioMessage() != nil:
 			msgType = "audio"
 		case v.Message.GetDocumentMessage() != nil:
@@ -1978,12 +1992,22 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		// (ou IconFallback no caso de erro). Tipos sem mídia (text/reaction
 		// /protocol/location) ignoram e mantém msgText = text original.
 		msgText := text
-		isMediaType := msgType == "image" || msgType == "video" ||
+		isMediaType := msgType == "image" || msgType == "video" || msgType == "gif" ||
 			msgType == "audio" || msgType == "document" || msgType == "sticker"
 		if isMediaType && !v.IsEdit {
 			// `ctx` neste escopo é eventContext, não context.Context — uso
 			// background com timeout próprio dentro do helper.
-			msgText = ic.downloadAndStoreInboundMedia(context.Background(), v, msgType, text)
+			// GIF: passa "video" pro download (whatsmeow trata igual), mas
+			// preserva msgType="gif" pra UI renderizar diferente.
+			downloadType := msgType
+			if downloadType == "gif" {
+				downloadType = "video"
+			}
+			msgText = ic.downloadAndStoreInboundMedia(context.Background(), v, downloadType, text)
+			// Re-injeta o flag is_gif no JSON resultante pra UI saber.
+			if msgType == "gif" {
+				msgText = injectFlag(msgText, "is_gif", true)
+			}
 		}
 		if msgText == "" {
 			switch msgType {
@@ -2571,6 +2595,22 @@ func (ic *InstanceClient) downloadAndStoreInboundMedia(
 
 	b, _ := json.Marshal(out)
 	return string(b)
+}
+
+// injectFlag adiciona uma chave booleana no JSON content. Se content não
+// é JSON válido, retorna como veio. Usado pra anexar flags como is_gif sem
+// re-rodar todo o pipeline de mídia.
+func injectFlag(content, key string, value bool) string {
+	var obj map[string]any
+	if err := json.Unmarshal([]byte(content), &obj); err != nil {
+		return content
+	}
+	obj[key] = value
+	out, err := json.Marshal(obj)
+	if err != nil {
+		return content
+	}
+	return string(out)
 }
 
 // extractQuotedStanzaID busca o stanza_id da msg citada via ContextInfo

@@ -14,6 +14,7 @@ export interface ConversationRow {
   subject?: string;
   last_message_preview?: string;
   last_message_at?: string;
+  last_message_type?: string;
   unread_count: number;
   agent_unread_count: number;
   assigned_user_id?: string | null;
@@ -125,6 +126,56 @@ const PRIORITY_DOT: Record<string, string> = {
   high: "bg-amber-500",
   urgent: "bg-red-500",
 };
+
+// formatPreview — converte last_message_preview pro display amigável.
+// Backend pode estar gravando JSON cru de mídia ({"url":...,"caption":...,"media_key":...}).
+// Extraímos texto/caption ou caímos pra label do tipo.
+export function formatPreview(raw?: string, type?: string, isFromMe?: boolean): string {
+  void isFromMe;
+  if (!raw) return "—";
+  // Se começa com { tenta JSON
+  const trimmed = raw.trimStart();
+  if (trimmed.startsWith("{")) {
+    try {
+      const obj = JSON.parse(raw) as Record<string, unknown>;
+      const cap = typeof obj.caption === "string" ? obj.caption : "";
+      const text = typeof obj.text === "string" ? obj.text : "";
+      const body = (cap || text).trim();
+      if (body) return body;
+      const t = (type || (typeof obj.type === "string" ? obj.type : "") || "").toLowerCase();
+      return labelForType(t);
+    } catch {
+      return raw;
+    }
+  }
+  // JSON-encoded string ("oi") — desempacota
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    try {
+      const unwrap = JSON.parse(raw);
+      if (typeof unwrap === "string") return unwrap || "—";
+    } catch { /* fall through */ }
+  }
+  return raw;
+}
+
+function labelForType(t: string): string {
+  switch (t) {
+    case "image": return "📷 Imagem";
+    case "video": return "🎬 Vídeo";
+    case "audio": return "🔊 Áudio";
+    case "document": return "📄 Documento";
+    case "sticker": return "😊 Sticker";
+    case "location": case "live_location": return "📍 Localização";
+    case "contact": case "contacts": return "👤 Contato";
+    case "poll": return "📊 Enquete";
+    case "call": return "📞 Chamada";
+    case "reaction": return "😀 Reação";
+    case "buttons": case "interactive": return "🎯 Botões";
+    case "list": return "📋 Lista";
+    case "revoke": return "🚫 Apagada";
+    default: return "Mensagem";
+  }
+}
 
 export function relativeTime(iso?: string): string {
   if (!iso) return "";
@@ -272,7 +323,7 @@ export function ConversationList({
                 {conv.last_message_from_me && (
                   <span style={{ color: "hsl(240 8% 42%)" }}>Você: </span>
                 )}
-                {conv.last_message_preview || "—"}
+                {formatPreview(conv.last_message_preview, conv.last_message_type, conv.last_message_from_me)}
               </p>
               <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
                 <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${status.cls}`}>

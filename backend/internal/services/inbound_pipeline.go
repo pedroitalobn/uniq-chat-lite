@@ -438,6 +438,7 @@ func (p *InboundPipeline) updateDenorm(ctx context.Context, conv *models.Convers
 	updates := map[string]any{
 		"last_message_at":      in.OccurredAt,
 		"last_message_preview": preview,
+		"last_message_type":    in.Type,
 		"last_message_from_me": fromAgent,
 		"message_count":        gorm.Expr("message_count + 1"),
 	}
@@ -527,6 +528,8 @@ func buildPreview(msgType, content string) string {
 		return "📷 Imagem"
 	case "video":
 		return "🎬 Vídeo"
+	case "gif":
+		return "🎞 GIF"
 	case "audio":
 		return "🎤 Áudio"
 	case "document":

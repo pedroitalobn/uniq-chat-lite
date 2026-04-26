@@ -483,9 +483,10 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		contentStr = string(b)
 	}
 	// Reply context — se especificado, busca a MessageLog citada pra
-	// extrair external_message_id + sender_jid (necessários pra ContextInfo
-	// no canal). Mantém ReplyToID local pra UI mostrar o quote depois.
-	var replyToExternalID, replyToParticipant string
+	// extrair external_message_id + sender_jid + texto (necessários pra
+	// ContextInfo no canal). Texto é crítico: sem ele, o WhatsApp mobile
+	// renderiza como msg nova em vez de quote.
+	var replyToExternalID, replyToParticipant, replyToText string
 	var replyToInternalID *uuid.UUID
 	if body.ReplyToMessageID != "" {
 		if rid, err := uuid.Parse(body.ReplyToMessageID); err == nil {
@@ -496,6 +497,7 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 				replyToInternalID = &quoted.ID
 				replyToExternalID = quoted.ExternalMessageID
 				replyToParticipant = quoted.SenderJID
+				replyToText = extractQuotedDisplayText(quoted.Content, quoted.Type)
 			}
 		}
 	}
@@ -537,6 +539,7 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 				TemplateComponents: body.TemplateComponents,
 				ReplyToExternalID:  replyToExternalID,
 				ReplyToParticipant: replyToParticipant,
+				ReplyToText:        replyToText,
 			})
 			if sendErr != nil {
 				sendStatus = models.MessageStatusFailed
@@ -590,6 +593,7 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 	h.db.Model(&conv).Updates(map[string]any{
 		"last_message_at":      now,
 		"last_message_preview": preview,
+		"last_message_type":    msgType,
 		"last_message_from_me": true,
 		"last_agent_msg_at":    now,
 		"agent_unread_count":   0,
@@ -868,6 +872,58 @@ func buildSnippet(content, qLower string, maxLen int) string {
 		suffix = "…"
 	}
 	return prefix + text[start:end] + suffix
+}
+
+// extractQuotedDisplayText extrai o texto que vai no QuotedMessage do
+// ContextInfo. Priorities: text → caption → label do tipo (fallback).
+// Sem isso, mobile do WhatsApp não consegue renderizar o quote bubble.
+func extractQuotedDisplayText(content, msgType string) string {
+	if content != "" {
+		// JSON estruturado (mídia)
+		if strings.HasPrefix(strings.TrimSpace(content), "{") {
+			var obj map[string]any
+			if err := json.Unmarshal([]byte(content), &obj); err == nil {
+				if v, ok := obj["text"].(string); ok && v != "" {
+					return truncate(v, 280)
+				}
+				if v, ok := obj["caption"].(string); ok && v != "" {
+					return truncate(v, 280)
+				}
+			}
+		} else {
+			// Texto puro ou JSON-encoded
+			var s string
+			if json.Unmarshal([]byte(content), &s) == nil && s != "" {
+				return truncate(s, 280)
+			}
+			return truncate(content, 280)
+		}
+	}
+	// Fallback: label do tipo
+	switch msgType {
+	case "image":
+		return "📷 Imagem"
+	case "video":
+		return "🎬 Vídeo"
+	case "gif":
+		return "🎞 GIF"
+	case "audio":
+		return "🔊 Áudio"
+	case "document":
+		return "📄 Documento"
+	case "sticker":
+		return "😊 Sticker"
+	case "location", "live_location":
+		return "📍 Localização"
+	case "contact", "contacts":
+		return "👤 Contato"
+	case "poll":
+		return "📊 Enquete"
+	case "call":
+		return "📞 Chamada"
+	default:
+		return "..."
+	}
 }
 
 // loadMessageInWS — helper: carrega MessageLog garantindo que pertence

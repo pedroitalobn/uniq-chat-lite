@@ -64,6 +64,7 @@ type Conversation struct {
 
 	LastMessageAt      *time.Time `gorm:"index:idx_conv_last_msg" json:"last_message_at,omitempty"`
 	LastMessagePreview string     `gorm:"type:varchar(280)" json:"last_message_preview,omitempty"`
+	LastMessageType    string     `gorm:"type:varchar(30)" json:"last_message_type,omitempty"`
 	LastMessageFromMe  bool       `gorm:"default:false" json:"last_message_from_me"`
 
 	FunnelID *uuid.UUID `gorm:"type:uuid;index" json:"funnel_id,omitempty"`

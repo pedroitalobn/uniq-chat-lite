@@ -562,19 +562,26 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               <ArrowLeft className="h-4 w-4" />
             </Link>
           )}
-          {/* Avatar do contato/grupo — quem clica logo identifica visualmente */}
+          {/* Avatar do contato/grupo — clicável quando tem foto, abre lightbox */}
           {(() => {
             const isGroup = (conv?.channel_key || "").toLowerCase().endsWith("@g.us");
             const avatarUrl = conv?.contact?.avatar_url;
             const name = conv?.contact?.name || conv?.subject || conv?.channel_key || "?";
             if (avatarUrl) {
               return (
-                <img
-                  src={avatarUrl}
-                  alt={name}
-                  className="h-9 w-9 rounded-full object-cover flex-shrink-0"
+                <button
+                  type="button"
+                  onClick={() => setViewerSource({ type: "image", url: avatarUrl, filename: `${name}.jpg` })}
+                  title="Ver foto de perfil"
+                  className="h-9 w-9 rounded-full overflow-hidden flex-shrink-0 transition-opacity hover:opacity-80"
                   style={{ background: "rgba(255,255,255,0.04)" }}
-                />
+                >
+                  <img
+                    src={avatarUrl}
+                    alt={name}
+                    className="h-9 w-9 object-cover"
+                  />
+                </button>
               );
             }
             if (isGroup) {
@@ -776,7 +783,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
 
         <div className="space-y-1 border-b border-zinc-200 p-3 dark:border-zinc-800">
           {!conv?.assigned_user_id && canAssign && (
-            <ActionRow onClick={() => claim.mutate()} icon={<UserCheck className="h-4 w-4" />} label="Atender (atribuir a mim)" tone="primary" />
+            <ActionRow onClick={() => claim.mutate()} icon={<UserCheck className="h-4 w-4" />} label="Atender" tone="primary" />
           )}
           {conv?.assigned_user_id && canAssign && (
             <ActionRow onClick={() => unassign.mutate()} icon={<UserX className="h-4 w-4" />} label="Remover atribuição" />
@@ -1142,7 +1149,7 @@ function MessageBubble({
   // (cards verticais com layout próprio). Sticker fica isolado pra dar
   // a sensação flutuante característica do WhatsApp.
   const isPureMedia =
-    ((m.type === "image" || m.type === "video" || m.type === "audio") &&
+    ((m.type === "image" || m.type === "video" || m.type === "audio" || m.type === "gif") &&
       !!parsed.url && !body) ||
     (m.type === "sticker" && !!parsed.url);
 
@@ -1368,6 +1375,45 @@ function MediaBody({
       );
     }
     return <IconFallback icon={<ImageIcon className="h-4 w-4" />} label={body || "Imagem"} />;
+  }
+
+  // GIF — VideoMessage com gifPlayback=true. Renderiza com autoplay+loop+muted
+  // pra simular comportamento de imagem animada. Sem controles, sem reset de
+  // ratio. Click abre lightbox em modo "video" pra quem quiser pausar/scrubar.
+  if (type === "gif" || (type === "video" && parsed.isGif)) {
+    if (url) {
+      return (
+        <div className="flex flex-col gap-1.5 relative">
+          <button
+            type="button"
+            onClick={() =>
+              onOpenViewer({ type: "video", url, mediaKey, filename, mimeType, caption: body })
+            }
+            className="relative block group"
+            aria-label="Abrir GIF"
+          >
+            <video
+              src={url}
+              className="max-w-[280px] rounded-lg"
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="auto"
+            />
+            <span
+              className="absolute bottom-1.5 left-1.5 rounded px-1 text-[9px] font-bold tracking-wider"
+              style={{ background: "rgba(0,0,0,0.65)", color: "white" }}
+            >
+              GIF
+            </span>
+          </button>
+          {body && <Text text={body} />}
+          {error && <ErrorLine text={error} />}
+        </div>
+      );
+    }
+    return <IconFallback icon={<ImageIcon className="h-4 w-4" />} label={body || "GIF"} />;
   }
 
   if (type === "video") {
@@ -2613,6 +2659,8 @@ interface ParsedContent {
   // TTL / visibilidade
   isViewOnce?: boolean;
   isEphemeral?: boolean;
+  // GIF — VideoMessage com gifPlayback=true; renderiza como autoplay+loop+muted
+  isGif?: boolean;
 }
 
 // parseMessageContent normaliza os diferentes formatos que MessageLog.Content
@@ -2662,6 +2710,7 @@ function parseMessageContent(raw: string): ParsedContent {
         callDurationSec: typeof parsed.call_duration_sec === "number" ? parsed.call_duration_sec : undefined,
         isViewOnce: parsed.is_view_once === true,
         isEphemeral: parsed.is_ephemeral === true,
+        isGif: parsed.is_gif === true,
       };
     }
   } catch {
@@ -3423,13 +3472,37 @@ function ActionRow({
   label: string;
   tone?: "primary";
 }) {
-  const cls = tone === "primary"
-    ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20"
-    : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800";
+  // tone=primary é discreto: ícone verde + texto normal + borda fina.
+  // Foi excessivamente azul/destacado antes; agora destaque é só pelo ícone.
+  if (tone === "primary") {
+    return (
+      <button
+        onClick={onClick}
+        type="button"
+        className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors"
+        style={{
+          background: "transparent",
+          color: "hsl(240 15% 88%)",
+          border: "1px solid hsl(240 12% 16%)",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "rgba(0,212,106,0.06)";
+          e.currentTarget.style.borderColor = "rgba(0,212,106,0.25)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "transparent";
+          e.currentTarget.style.borderColor = "hsl(240 12% 16%)";
+        }}
+      >
+        <span style={{ color: "#00d46a" }}>{icon}</span>
+        {label}
+      </button>
+    );
+  }
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm ${cls}`}
+      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
       type="button"
     >
       {icon}
