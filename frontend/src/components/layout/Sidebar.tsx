@@ -5,11 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
-  Building2, Calendar, ChevronDown, Contact, CreditCard, Globe, Hash, HelpCircle, Home,
+  Bot, Building2, Calendar, ChevronDown, Contact, CreditCard, Globe, Hash, HelpCircle, Home,
   Info, KanbanSquare, Layers, LayoutDashboard, Link2, List, Loader2, LogOut,
   Mail, MapPin, Megaphone, Menu, MessageSquare, Minus, MoreHorizontal,
   MoreVertical, Phone, Plug, Plus, Search, Send, Settings, Shield, Smartphone,
-  Smile, Sparkles, Star, Tag, Trash2, Users, X, Zap, StickyNote,
+  Smile, Sparkles, Star, Tag, Trash2, Users, Wand2, X, Zap, StickyNote,
   Wrench, ExternalLink, Server, Headset
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -58,6 +58,12 @@ export function Sidebar() {
   const canSeeInbox = optimistic || hasPerm(PERM.inboxView);
   const canSeeCRM = optimistic || hasAnyPerm([PERM.crmView, PERM.companiesView, PERM.dealsView]);
   const canSeeDashboard = optimistic || hasPerm(PERM.dashboardView) || hasAnyPerm([PERM.ticketsView, PERM.inboxView]);
+  // Uniq AI e Jornadas saíram de /agents (Apr/26). Como o backend ainda não
+  // distribuiu uniqai:use / journeys:* nos roles existentes, usamos
+  // agents:view como fallback pra que quem já tinha acesso continue vendo
+  // os novos itens. Owners/super-admin já bypassam por hasPerm.
+  const canSeeUniqAi = optimistic || hasAnyPerm([PERM.uniqAiUse, PERM.agentsView]);
+  const canSeeJourneys = optimistic || hasAnyPerm([PERM.journeysView, PERM.journeysManage, PERM.agentsView]);
   const canSeeAgents = optimistic || hasAnyPerm([PERM.agentsView, PERM.agentsManage]);
   const canSeeServers = optimistic || hasAnyPerm([PERM.serversView, PERM.serversManage]);
   const canSeeInstances = optimistic || hasAnyPerm([PERM.instancesView, PERM.instancesCreate, PERM.instancesEdit]);
@@ -65,14 +71,20 @@ export function Sidebar() {
   const canSeeIntegrations = optimistic || hasAnyPerm([PERM.integrationsView, PERM.integrationsManage]);
   const canSeeBilling = optimistic || hasAnyPerm([PERM.billingView, PERM.billingManage]);
 
+  // Ordem reflete a hierarquia mental: Uniq AI primeiro (entrada principal,
+  // estilo Claude/GPT), depois Inbox/CRM/Campanhas/Jornadas (módulos onde se
+  // executa o trabalho), depois Agentes (configuração de personalidade), e
+  // por último a infra (Servers/Instances/Integrations) e Conta.
   const navItems: NavItem[] = [
+    { href: "/uniq-ai",      label: "Uniq AI",             icon: Sparkles,        exact: false, show: canSeeUniqAi },
     { href: "/dashboard",    label: t("nav_dashboard"),    icon: LayoutDashboard, exact: true,  show: canSeeDashboard },
-    { href: "/agents",       label: "Agentes IA",          icon: Zap,             exact: false, show: canSeeAgents },
-    { href: "/servers",      label: t("nav_servers"),      icon: Server,          exact: false, show: canSeeServers },
-    { href: "/instances",    label: t("nav_instances"),    icon: Smartphone,      exact: false, show: canSeeInstances },
     { href: "/inbox",        label: "Inbox",               icon: Headset,         exact: false, show: canSeeInbox },
     { href: "/crm",          label: t("nav_crm"),          icon: Contact,         exact: false, show: canSeeCRM },
     { href: "/campaigns",    label: t("nav_campaigns"),    icon: Megaphone,       exact: false, show: canSeeCampaigns },
+    { href: "/journeys",     label: "Jornadas",            icon: Wand2,           exact: false, show: canSeeJourneys },
+    { href: "/agents",       label: "Agentes",             icon: Bot,             exact: false, show: canSeeAgents },
+    { href: "/servers",      label: t("nav_servers"),      icon: Server,          exact: false, show: canSeeServers },
+    { href: "/instances",    label: t("nav_instances"),    icon: Smartphone,      exact: false, show: canSeeInstances },
     { href: "/integrations", label: t("nav_integrations"), icon: Plug,            exact: false, show: canSeeIntegrations },
     { href: "/settings",     label: "Conta",               icon: Settings,        exact: false, show: true },
   ];

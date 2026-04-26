@@ -155,6 +155,14 @@ export const PERM = {
   serversManage: "servers:manage",
   agentsView: "agents:view",
   agentsManage: "agents:manage",
+  // Uniq AI — chat interativo central que cria/lista/edita recursos via NL.
+  uniqAiUse: "uniqai:use",
+  // Jornadas — módulo top-level (saiu de dentro de /agents em Apr/26).
+  // No backend ainda compartilha o flag agents:* — gateamos a UI já com
+  // chaves próprias pra que roles futuras (vendedor sem builder, etc) possam
+  // restringir só o módulo de jornada sem mexer em /agents.
+  journeysView: "journeys:view",
+  journeysManage: "journeys:manage",
   instancesView: "instances:view",
   instancesCreate: "instances:create",
   instancesEdit: "instances:edit",

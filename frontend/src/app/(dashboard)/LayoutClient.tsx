@@ -13,7 +13,12 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
   // CRM com kanban/laterais, etc). Demais páginas seguem o padding padrão
   // mas sem o cap de max-w-6xl — laterais ganham espaço pra reorganizar
   // conteúdo ao invés de ficar tudo empilhado verticalmente.
+  // /uniq-ai e /journeys ocupam viewport inteiro pra render do chat
+  // estilo Claude e da lista/atividade lado-a-lado sem max-w cap.
   const isFullWidth =
+    pathname === "/uniq-ai" ||
+    pathname === "/journeys" ||
+    pathname.startsWith("/journeys/") ||
     pathname === "/inbox" ||
     pathname.startsWith("/inbox/") ||
     pathname === "/crm" ||

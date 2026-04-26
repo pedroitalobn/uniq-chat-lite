@@ -5,6 +5,8 @@ import { LayoutClient } from "./LayoutClient";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { WorkspacePermissionsProvider } from "@/contexts/WorkspacePermissionsContext";
 import { PresenceProvider } from "@/contexts/PresenceProvider";
+import { UniqAIIslandProvider } from "@/components/uniq-ai/island-context";
+import { UniqAIIsland } from "@/components/uniq-ai/dynamic-island";
 
 export default async function DashboardLayout({
   children,
@@ -18,10 +20,13 @@ export default async function DashboardLayout({
     <WorkspaceProvider>
       <WorkspacePermissionsProvider>
         <PresenceProvider>
-          <div className="flex h-screen overflow-hidden bg-background">
-            <Sidebar />
-            <LayoutClient>{children}</LayoutClient>
-          </div>
+          <UniqAIIslandProvider>
+            <div className="flex h-screen overflow-hidden bg-background">
+              <Sidebar />
+              <LayoutClient>{children}</LayoutClient>
+            </div>
+            <UniqAIIsland />
+          </UniqAIIslandProvider>
         </PresenceProvider>
       </WorkspacePermissionsProvider>
     </WorkspaceProvider>
