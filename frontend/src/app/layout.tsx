@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Rubik, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const sans = Inter({
+const sans = Rubik({
   subsets: ["latin"],
   variable: "--font-sans",
   display: "swap",
