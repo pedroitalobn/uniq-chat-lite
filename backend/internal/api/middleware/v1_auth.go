@@ -13,22 +13,34 @@ import (
 // resolveAuthInstanceByID popula c.Locals("instance") respeitando o gating
 // do OwnsInstance — usado quando uma rota /v1/instances/<uuid>/... é
 // roteada pelo v1inst group (porque foi declarada antes do api group).
-// Sem isso o handler downstream chega com Locals vazia e responde 404.
 //
-// Erros são repassados como response final (auth/permission), retornando
-// nil indica "popular ok, prossiga". Não setar Locals = c.Next() default
-// seguirá pro handler que vai retornar 404 (caminho SDK não autenticado),
-// preservando o comportamento histórico pra clientes externos.
+// IMPORTANTE: nunca chame middlewares (RequireAuth etc) daqui. Eles
+// disparam c.Next() ao final, que causaria dupla execução do handler
+// final — request fica em loop e timeout no client. Lógica de auth é
+// inline pra controlar o fluxo.
 func resolveAuthInstanceByID(db *gorm.DB, c *fiber.Ctx, instanceID uuid.UUID) error {
-	// Garante auth via JWT — RequireAuth seta c.Locals("user").
-	if GetCurrentUser(c) == nil {
-		if err := RequireAuth(db)(c); err != nil {
-			return err
-		}
-	}
+	// Carrega user do JWT inline (sem chamar middleware que faria Next).
 	user := GetCurrentUser(c)
 	if user == nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+		tokenStr := extractToken(c)
+		if tokenStr == "" {
+			// Sem JWT — esse path requer auth de app, instance token aqui não vale.
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "autenticação requerida"})
+		}
+		claims, err := ParseAccessToken(tokenStr)
+		if err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "token inválido ou expirado"})
+		}
+		var u models.User
+		if err := db.Preload("Plan").First(&u, "id = ?", claims.UserID).Error; err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "usuário não encontrado"})
+		}
+		if u.IsBlocked() {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "conta desativada ou bloqueada"})
+		}
+		c.Locals("user", &u)
+		c.Locals("user_id", u.ID)
+		user = &u
 	}
 
 	var instance models.Instance
