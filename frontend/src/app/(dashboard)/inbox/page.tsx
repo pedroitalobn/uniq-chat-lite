@@ -9,7 +9,7 @@ import Link from "next/link";
 import {
   Lock, Search, ChevronDown, User as UserIcon, MessageSquare,
   Layers, Smartphone, Radio, RefreshCw, Check, BarChart3,
-  MoreVertical, Users, Building2, Zap, Bell,
+  MoreVertical, Users, Building2, Zap, Bell, X,
 } from "lucide-react";
 import {
   conversationsApi, queuesApi, workspacesApi, channelsApi, instancesApi,
@@ -227,11 +227,17 @@ export default function InboxPage() {
     },
   });
 
+  // queryKey usa JSON.stringify do listParams pra forçar refetch sempre que
+  // qualquer filtro muda. Antes a chave era o object literal, que (mesmo
+  // com useMemo correto) podia bater com cache antigo se referência fosse
+  // estável após uma re-render. Stringify dá identidade determinística.
   const listQ = useQuery({
-    queryKey: ["conversations", wsId, "unified", listParams],
+    queryKey: ["conversations", wsId, "unified", JSON.stringify(listParams)],
     queryFn: () =>
       conversationsApi
-        .list(wsId as string, { ...(listParams as Record<string, string>), limit: 100 })
+        // listParams contém arrays (status), o tipo de ConversationListParams
+        // aceita ambos — o cast é só pra calar o TS no spread.
+        .list(wsId as string, { ...(listParams as any), limit: 100 })
         .then((r) => r.data as { items: ConversationRow[]; total: number }),
     enabled: !!wsId && canView,
     refetchInterval: 20_000,
@@ -491,6 +497,28 @@ export default function InboxPage() {
                 </Link>
               }
             />
+
+            {/* Clear filters — só aparece quando há ao menos um ativo. Útil
+                pra desfazer rápido toda a combinação (canal + instância + fila). */}
+            {(channelFilter.length > 0 || instanceFilter.length > 0 || queueScope !== "all") && (
+              <button
+                onClick={() => {
+                  setChannelFilter([]);
+                  setInstanceFilter([]);
+                  setQueueScope("all");
+                }}
+                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors"
+                style={{
+                  background: "rgba(248,113,113,0.08)",
+                  border: "1px solid rgba(248,113,113,0.2)",
+                  color: "#f87171",
+                }}
+                title="Remover todos os filtros"
+              >
+                <X className="h-3 w-3" />
+                Limpar filtros
+              </button>
+            )}
 
             {/* Search */}
             <div className="relative">

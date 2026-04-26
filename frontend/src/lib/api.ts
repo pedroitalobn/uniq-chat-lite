@@ -483,7 +483,8 @@ export const workspacesApi = {
   list: () => api.get("/v1/workspaces"),
   create: (data: { name: string }) => api.post("/v1/workspaces", data),
   get: (id: string) => api.get(`/v1/workspaces/${id}`),
-  update: (id: string, data: { name: string }) => api.put(`/v1/workspaces/${id}`, data),
+  update: (id: string, data: { name?: string; color?: string; icon?: string }) =>
+    api.put(`/v1/workspaces/${id}`, data),
   delete: (id: string) => api.delete(`/v1/workspaces/${id}`),
   // Members
   listMembers: (id: string) => api.get(`/v1/workspaces/${id}/members`),

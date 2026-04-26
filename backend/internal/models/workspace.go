@@ -7,13 +7,19 @@ import (
 	"gorm.io/gorm"
 )
 
-// Workspace represents a business/account that groups users, instances, and resources.
+// Workspace representa um negócio/conta agrupando users, instâncias e
+// recursos. Color e Icon são personalização visual: Color guarda hex
+// (ex: "#00d46a"), Icon guarda nome PascalCase de um ícone lucide-react
+// (ex: "Sparkles"). Ambos vazios → frontend cai em default (#7c3aed +
+// Building2). AutoMigrate adiciona as colunas com default vazio.
 type Workspace struct {
 	ID        uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
 	OwnerID   uuid.UUID  `gorm:"type:uuid;not null;index" json:"owner_id"`
 	Owner     *User      `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
 	Name      string     `gorm:"not null" json:"name"`
 	Slug      string     `gorm:"type:varchar(63);uniqueIndex;not null" json:"slug"`
+	Color     string     `gorm:"type:varchar(7);default:''" json:"color"`
+	Icon      string     `gorm:"type:varchar(40);default:''" json:"icon"`
 	PlanID    *uuid.UUID `gorm:"type:uuid" json:"plan_id"`
 	Plan      *Plan      `gorm:"foreignKey:PlanID" json:"plan,omitempty"`
 	IsActive  bool       `gorm:"default:true" json:"is_active"`

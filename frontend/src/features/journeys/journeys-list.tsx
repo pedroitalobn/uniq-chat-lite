@@ -4,12 +4,12 @@
 // Antes vivia em /agents/page.tsx::JourneysSection — extraído para que o
 // módulo /journeys seja standalone (sem dependência do hub /agents).
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
   Activity, ChevronDown, ChevronUp, Circle, Clock, Copy, Edit3, Loader2, Pause,
-  Play, Plus, Send, Sparkles as SparklesIcon, Trash2, TrendingUp, User, Wand2,
+  Play, Plus, Search, Send, Sparkles as SparklesIcon, Trash2, TrendingUp, User, Wand2,
   X, Zap,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -221,16 +221,32 @@ function EditJourneyModal({
   );
 }
 
+type StatusFilter = "all" | "active" | "paused";
+
 export function JourneysList() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
   const [editingJourney, setEditingJourney] = useState<any>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const queryClient = useQueryClient();
 
   const { data: journeys = [], isLoading } = useQuery({
     queryKey: ["journeys"],
     queryFn: async () => (await journeysApi.list()).data,
   });
+
+  const filteredJourneys = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return journeys.filter((j: any) => {
+      if (statusFilter !== "all" && j.status !== statusFilter) return false;
+      if (!q) return true;
+      const haystack = [
+        j.name, j.prompt, j.trigger_filter, j.instance_name,
+      ].filter(Boolean).join(" ").toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [journeys, search, statusFilter]);
 
   const { data: agentStats } = useQuery({
     queryKey: ["agent-stats"],
@@ -298,32 +314,68 @@ export function JourneysList() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Stats bar */}
-      <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-2.5 sm:py-3 border-b flex-shrink-0 flex-wrap" style={{ borderColor: "var(--surface-border)", background: "var(--surface-2)" }}>
-        <div className="flex items-center gap-2">
-          <Wand2 className="w-4 h-4" style={{ color: "#8b5cf6" }} />
-          <h2 className="text-sm font-bold" style={{ color: "var(--text-1)" }}>Jornadas</h2>
-        </div>
-        <div className="flex-1" />
-        {agentStats?.journeys && (
-          <div className="hidden sm:flex items-center gap-3 sm:gap-4 text-xs" style={{ color: "var(--text-3)" }}>
-            <span className="flex items-center gap-1">
-              <Circle className="w-2 h-2 fill-emerald-500 text-emerald-500" />
-              {agentStats.journeys.active_journeys} ativas
-            </span>
-            <span className="flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              {agentStats.journeys.today_executions} hoje
-            </span>
-            <span className="flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" />
-              {agentStats.journeys.total_executions} total
-            </span>
+      {/* Stats + filter bar */}
+      <div className="flex flex-col gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b flex-shrink-0" style={{ borderColor: "var(--surface-border)", background: "var(--surface-2)" }}>
+        <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Wand2 className="w-4 h-4" style={{ color: "#8b5cf6" }} />
+            <h2 className="text-sm font-bold" style={{ color: "var(--text-1)" }}>Jornadas</h2>
           </div>
-        )}
-        <span className="text-xs px-2 py-1 rounded-full" style={{ background: "var(--surface-3)", color: "var(--text-3)" }}>
-          {journeys.length}
-        </span>
+          <div className="flex-1" />
+          {agentStats?.journeys && (
+            <div className="hidden sm:flex items-center gap-3 sm:gap-4 text-xs" style={{ color: "var(--text-3)" }}>
+              <span className="flex items-center gap-1">
+                <Circle className="w-2 h-2 fill-emerald-500 text-emerald-500" />
+                {agentStats.journeys.active_journeys} ativas
+              </span>
+              <span className="flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {agentStats.journeys.today_executions} hoje
+              </span>
+              <span className="flex items-center gap-1">
+                <TrendingUp className="w-3 h-3" />
+                {agentStats.journeys.total_executions} total
+              </span>
+            </div>
+          )}
+          <span className="text-xs px-2 py-1 rounded-full" style={{ background: "var(--surface-3)", color: "var(--text-3)" }}>
+            {filteredJourneys.length}{filteredJourneys.length !== journeys.length ? `/${journeys.length}` : ""}
+          </span>
+        </div>
+
+        {/* Search + status pills */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[180px] max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "var(--text-3)" }} />
+            <input
+              type="text"
+              placeholder="Buscar por nome, gatilho…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full text-xs rounded-lg pl-8 pr-3 py-1.5 outline-none"
+              style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+            />
+          </div>
+          <div className="flex gap-0.5 p-0.5 rounded-lg" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+            {([
+              { id: "all", label: "Todas" },
+              { id: "active", label: "Ativas" },
+              { id: "paused", label: "Pausadas" },
+            ] as const).map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setStatusFilter(s.id)}
+                className="text-[11px] font-medium px-2.5 py-1 rounded-md transition-colors"
+                style={{
+                  background: statusFilter === s.id ? "rgba(0,212,106,0.15)" : "transparent",
+                  color: statusFilter === s.id ? "var(--green)" : "var(--text-3)",
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Lista */}
@@ -359,8 +411,16 @@ export function JourneysList() {
               </button>
             </div>
           </div>
+        ) : filteredJourneys.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 text-center px-4">
+            <Search className="w-10 h-10 mb-2 opacity-40" style={{ color: "var(--text-3)" }} />
+            <p className="text-sm font-medium" style={{ color: "var(--text-2)" }}>Nenhum resultado</p>
+            <p className="text-xs mt-1 max-w-sm" style={{ color: "var(--text-3)" }}>
+              Ajuste a busca ou o filtro de status pra ver outras jornadas.
+            </p>
+          </div>
         ) : (
-          journeys.map((j: any) => (
+          filteredJourneys.map((j: any) => (
             <div key={j.id} className="rounded-xl overflow-hidden" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
               <div
                 className="p-3 sm:p-4 flex items-center justify-between cursor-pointer hover:bg-[var(--surface-2)] transition-colors gap-2"

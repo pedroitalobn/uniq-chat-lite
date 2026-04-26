@@ -1,16 +1,17 @@
 "use client";
 
 // Painel principal do Uniq AI — chat estilo Claude/GPT.
-// Antes vivia inline em /agents/page.tsx::ChatSection. Aqui foi extraído
-// para que possa ser embutido em /uniq-ai (home full-screen) e em qualquer
-// outra superfície (Dynamic Island futura, modal contextual, etc).
+// O histórico (multi-conversa) vive fora deste componente, em
+// /app/(dashboard)/uniq-ai/page.tsx, que passa a conversa ativa via
+// props. Aqui só cuidamos do render do chat + envio + criação de jornada.
+//
+// Canvas e Templates SAÍRAM do header — agora vivem em /journeys.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  CheckCircle2, ChevronDown, LayoutTemplate, Loader2, Plus, Server, Sparkles,
-  Trash2, Wand2, X,
+  CheckCircle2, ChevronDown, Loader2, Sparkles, Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { agentsApi, instancesApi, integrationsApi, journeysApi } from "@/lib/api";
@@ -19,105 +20,30 @@ import {
   ChatMessage, EmptyState, type Message, ThinkingDots,
 } from "./atoms";
 
-// Storage key — manter o mesmo do legado pra preservar histórico de quem já
-// usava /agents. Migra zero-effort.
-const HISTORY_KEY = "agents_chat_history";
-
-function TemplatesDialog({
-  onClose, instanceId,
-}: {
-  onClose: () => void;
-  instanceId?: string;
-}) {
-  const { data: templates = [], isLoading } = useQuery<any[]>({
-    queryKey: ["journey-templates"],
-    queryFn: async () => {
-      const r = await journeysApi.listTemplates();
-      return r.data?.templates ?? r.data ?? [];
-    },
-  });
-
-  const pick = async (slug: string, name?: string) => {
-    try {
-      const r = await journeysApi.createFromTemplate(slug, instanceId, name);
-      const id = r.data?.id;
-      if (!id) throw new Error("id ausente");
-      toast.success("Jornada criada a partir do template");
-      window.location.href = `/journeys/${id}`;
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error || "Falha ao criar jornada");
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }} onClick={onClose} />
-      <div className="relative w-full max-w-2xl rounded-2xl p-5 sm:p-6 shadow-2xl max-h-[85vh] overflow-hidden flex flex-col"
-        style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Começar de um template</h2>
-            <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 54%)" }}>
-              Modelos prontos com flow configurado. Edite depois no canvas.
-            </p>
-          </div>
-          <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }} className="hover:opacity-70">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12" style={{ color: "var(--text-3)" }}>
-              <Loader2 className="w-6 h-6 animate-spin" />
-            </div>
-          ) : templates.length === 0 ? (
-            <p className="text-center text-xs py-12" style={{ color: "hsl(240 8% 38%)" }}>
-              Nenhum template disponível ainda.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {templates.map((t: any) => (
-                <button
-                  key={t.slug || t.id}
-                  onClick={() => pick(t.slug, t.name)}
-                  className="text-left rounded-xl p-4 transition-all hover:scale-[1.01]"
-                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 14%)" }}
-                >
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <LayoutTemplate className="w-4 h-4" style={{ color: "var(--green)" }} />
-                    <span className="font-semibold text-sm" style={{ color: "hsl(240 15% 93%)" }}>{t.name}</span>
-                  </div>
-                  {t.description && (
-                    <p className="text-xs" style={{ color: "hsl(240 8% 56%)" }}>{t.description}</p>
-                  )}
-                  {t.flow?.steps?.length > 0 && (
-                    <p className="text-[10px] mt-2 font-mono" style={{ color: "hsl(240 8% 42%)" }}>
-                      {t.flow.steps.length} step{t.flow.steps.length !== 1 ? "s" : ""}
-                    </p>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export interface UniqAIChatPanelProps {
-  // `compact` reduz paddings/headers para uso em ilha/modal — full-screen
-  // mantém o header largo. Default false (modo home).
+  // Mensagens controladas externamente — quem hospeda o painel decide
+  // como persistir (localStorage multi-conversa, Redis, etc).
+  messages: Message[];
+  onMessagesChange: (next: Message[] | ((prev: Message[]) => Message[])) => void;
+  // `compact` reduz paddings/headers para uso em ilha/modal.
   compact?: boolean;
-  // Greeting opcional sobreposto ao EmptyState quando vazio. Útil em rotas
-  // contextuais (ex: futura DI ouvindo `/inbox/[id]` pode passar um título).
-  emptyGreeting?: string;
+  // Esconde o header de chat (Uniq AI + selectores). Útil quando a página
+  // hospedeira já tem cabeçalho próprio.
+  hideHeader?: boolean;
+  // Quando o usuário tenta enviar a primeira mensagem em uma conversa,
+  // chamamos esse callback pra que a página mãe possa criar a conversa
+  // se ainda não existe (ex: clique "+ Nova conversa").
+  onBeforeFirstSend?: () => void;
 }
 
-export function UniqAIChatPanel({ compact = false }: UniqAIChatPanelProps) {
+export function UniqAIChatPanel({
+  messages,
+  onMessagesChange,
+  compact = false,
+  hideHeader = false,
+  onBeforeFirstSend,
+}: UniqAIChatPanelProps) {
   const [prompt, setPrompt] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
   const [selectedIntegration, setSelectedIntegration] = useState<string>("");
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [selectedInstance, setSelectedInstance] = useState<string>("");
@@ -127,7 +53,6 @@ export function UniqAIChatPanel({ compact = false }: UniqAIChatPanelProps) {
   const [pendingJourneyRendered, setPendingJourneyRendered] = useState<string>("");
   const [pendingJourneyMentions, setPendingJourneyMentions] = useState<Mention[]>([]);
   const [, setPendingJourneyData] = useState<any>(null);
-  const [templatesOpen, setTemplatesOpen] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoadingIntegrations, setIsLoadingIntegrations] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -137,30 +62,6 @@ export function UniqAIChatPanel({ compact = false }: UniqAIChatPanelProps) {
     queryKey: ["instances"],
     queryFn: async () => (await instancesApi.list()).data,
   });
-
-  // Carrega histórico do localStorage. Mantém a mesma chave do legado pra
-  // que conversas existentes apareçam no novo /uniq-ai.
-  useEffect(() => {
-    const saved = localStorage.getItem(HISTORY_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setMessages(parsed.map((m: any) => ({ ...m, createdAt: new Date(m.createdAt) })));
-      } catch { /* ignore */ }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(messages));
-    }
-  }, [messages]);
-
-  const clearChatHistory = () => {
-    setMessages([]);
-    localStorage.removeItem(HISTORY_KEY);
-    toast.success("Histórico limpo");
-  };
 
   const loadIntegrations = useCallback(async () => {
     setIsLoadingIntegrations(true);
@@ -200,9 +101,9 @@ export function UniqAIChatPanel({ compact = false }: UniqAIChatPanelProps) {
     extras?: { renderedText?: string; mentions?: Mention[]; displayText?: string },
   ) => {
     if (isStreaming) return;
+    if (messages.length === 0) onBeforeFirstSend?.();
 
     const bubbleContent = extras?.displayText ?? messageText;
-
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: "user",
@@ -211,7 +112,7 @@ export function UniqAIChatPanel({ compact = false }: UniqAIChatPanelProps) {
     };
     const assistantMessageId = crypto.randomUUID();
 
-    setMessages((prev) => [...prev, userMessage]);
+    onMessagesChange((prev) => [...prev, userMessage]);
     setIsStreaming(true);
 
     try {
@@ -233,14 +134,14 @@ export function UniqAIChatPanel({ compact = false }: UniqAIChatPanelProps) {
         setPendingJourneyData(res.data.pending_journey);
       }
 
-      setMessages((prev) => [...prev, {
+      onMessagesChange((prev) => [...prev, {
         id: assistantMessageId,
         role: "assistant",
-        content: content,
+        content,
       }]);
     } catch (error: any) {
       toast.error(error.response?.data?.error || error.message || "Erro ao enviar mensagem");
-      setMessages((prev) => [...prev, {
+      onMessagesChange((prev) => [...prev, {
         id: assistantMessageId,
         role: "assistant",
         content: "Desculpe, ocorreu um erro ao processar sua mensagem.",
@@ -248,7 +149,7 @@ export function UniqAIChatPanel({ compact = false }: UniqAIChatPanelProps) {
     } finally {
       setIsStreaming(false);
     }
-  }, [isStreaming, selectedIntegration, selectedModel]);
+  }, [isStreaming, selectedIntegration, selectedModel, messages.length, onBeforeFirstSend, onMessagesChange]);
 
   useEffect(() => {
     if (!selectedIntegration) {
@@ -294,7 +195,7 @@ export function UniqAIChatPanel({ compact = false }: UniqAIChatPanelProps) {
       }
       responseText += "\n\nA jornada já está ativa e monitorando mensagens!";
 
-      setMessages((prev) => [...prev, {
+      onMessagesChange((prev) => [...prev, {
         role: "assistant",
         content: responseText,
         id: crypto.randomUUID(),
@@ -318,14 +219,14 @@ export function UniqAIChatPanel({ compact = false }: UniqAIChatPanelProps) {
       sendMessage("Liste todas as minhas jornadas de automação ativas.");
     } else if (label === "Ver instâncias") {
       if (instances.length === 0) {
-        setMessages((prev) => [...prev, {
+        onMessagesChange((prev) => [...prev, {
           id: crypto.randomUUID(),
           role: "assistant",
           content: "Você ainda não tem instâncias configuradas. Vá para **Instâncias** para criar uma.",
         }]);
       } else {
         const instList = instances.map((i: any) => `- **${i.name}** (${i.status})`).join("\n");
-        setMessages((prev) => [...prev, {
+        onMessagesChange((prev) => [...prev, {
           id: crypto.randomUUID(),
           role: "assistant",
           content: `Suas instâncias:\n\n${instList}\n\nPara criar uma jornada, mencione o nome da instância no pedido.`,
@@ -384,178 +285,142 @@ export function UniqAIChatPanel({ compact = false }: UniqAIChatPanelProps) {
     setPendingJourneyRendered("");
     setPendingJourneyMentions([]);
     setPendingJourneyData(null);
-    setMessages((prev) => [...prev, {
+    onMessagesChange((prev) => [...prev, {
       role: "assistant",
       content: "Entendido. Pode me perguntar outras coisas ou criar uma jornada quando quiser.",
       id: crypto.randomUUID(),
     }]);
   };
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Header — compacto em mobile */}
-      <div
-        className={`flex items-center justify-between gap-2 flex-shrink-0 border-b ${compact ? "px-3 py-2" : "px-3 sm:px-6 py-3 sm:py-4"}`}
-        style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}
-      >
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "var(--green)" }}>
-            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-sm sm:text-base font-semibold truncate" style={{ color: "var(--text-1)" }}>Uniq AI</h2>
-            <p className="text-[10px] sm:text-xs truncate" style={{ color: "var(--text-3)" }}>Sua plataforma em linguagem natural</p>
-          </div>
-        </div>
+  // Empty state — input centralizado verticalmente como Claude/GPT.
+  // Quando não há mensagens, escondemos o header e tudo respira.
+  const isEmpty = messages.length === 0;
 
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
-          {/* Limpar histórico */}
-          {messages.length > 0 && (
-            <button
-              onClick={clearChatHistory}
-              className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium rounded-lg px-2.5 py-2 transition-all"
-              style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-2)" }}
-              title="Limpar histórico"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-
-          {/* Canvas em branco */}
-          <button
-            onClick={async () => {
-              try {
-                const res = await journeysApi.createBlank({ instance_id: selectedInstance || undefined });
-                const newId = res.data?.id;
-                if (!newId) throw new Error("id ausente");
-                window.location.href = `/journeys/${newId}`;
-              } catch (e: any) {
-                toast.error(e?.response?.data?.error || "Falha ao criar jornada em branco");
-              }
-            }}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-2.5 sm:px-3 py-2 transition-all"
-            style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
-            title="Cria uma jornada em branco e abre o canvas"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Canvas</span>
-          </button>
-
-          {/* Templates */}
-          <button
-            onClick={() => setTemplatesOpen(true)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-2.5 sm:px-3 py-2 transition-all"
-            style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
-            title="Escolha um template pronto"
-          >
-            <LayoutTemplate className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Templates</span>
-          </button>
-
-          {/* Instance selector — esconde em mobile pra não quebrar header */}
-          <div className="relative hidden md:block">
-            <select
-              value={selectedInstance}
-              onChange={(e) => setSelectedInstance(e.target.value)}
-              className="appearance-none outline-none text-xs font-medium rounded-lg px-3 py-2 pr-8 cursor-pointer min-w-[150px]"
-              style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
-            >
-              <option value="">Todas instâncias</option>
-              {instances.map((inst: any) => (
-                <option key={inst.id} value={inst.id}>
-                  {inst.name} {inst.status === "connected" ? "🟢" : "⚫"}
-                </option>
-              ))}
-            </select>
-            <Server className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "var(--text-3)" }} />
-          </div>
-
-          {/* Model selector — também só desktop */}
-          <div className="hidden lg:flex items-center gap-1">
-            <div className="relative">
-              <select
-                value={selectedIntegration || ""}
-                onChange={(e) => setSelectedIntegration(e.target.value)}
-                className="appearance-none outline-none text-xs font-medium rounded-lg px-3 py-2 pr-8 cursor-pointer min-w-[140px] max-w-[200px]"
-                style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
-              >
-                {isLoadingIntegrations ? (
-                  <option value="">Carregando...</option>
-                ) : Object.keys(groupedIntegrations).length === 0 ? (
-                  <option value="">Nenhum modelo</option>
-                ) : (
-                  <>
-                    {!selectedIntegration && <option value="">LLM...</option>}
-                    {Object.entries(groupedIntegrations).map(([provider, items]: [string, any]) => (
-                      <optgroup key={provider} label={`── ${provider} ──`}>
-                        {(items as any[]).map((i: any) => (
-                          <option key={i.id} value={i.id}>
-                            {i.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </>
-                )}
-              </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "var(--text-3)" }} />
+  if (isEmpty) {
+    return (
+      <div className="flex flex-col h-full" style={{ background: "var(--surface-2)" }}>
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-4 sm:px-8">
+          <div className="w-full max-w-2xl">
+            <EmptyState onSuggestionClick={handleSuggestionClick} />
+            <div className="mt-2">
+              <MentionPicker
+                value={prompt}
+                onChange={(v) => setPrompt(v)}
+                onSend={handleSend}
+                disabled={isStreaming}
+                isLoading={isStreaming}
+                placeholder="Pergunte ou peça… use /instancia, /grupo, /contato, /tag, /funil ou /jornada."
+              />
             </div>
-
-            {selectedIntegration && (() => {
-              const allIntegrations = Object.values(groupedIntegrations).flat();
-              const currentIntegration = allIntegrations.find((i: any) => i.id === selectedIntegration);
-              const hasModels = currentIntegration && Array.isArray(currentIntegration?.models) && currentIntegration.models.length > 1;
-              if (!hasModels || !currentIntegration?.models) return null;
-              return (
-                <div className="relative">
-                  <select
-                    value={selectedModel || ""}
-                    onChange={(e) => setSelectedModel(e.target.value)}
-                    className="appearance-none outline-none text-xs font-medium rounded-lg px-3 py-2 pr-8 cursor-pointer min-w-[120px]"
-                    style={{ background: "var(--green)", color: "#000", border: "none" }}
-                  >
-                    {(currentIntegration.models as string[]).map((m: string) => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "#000" }} />
-                </div>
-              );
-            })()}
           </div>
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header — só selectors essenciais (LLM + instância). Canvas e
+          Templates foram pra /journeys. */}
+      {!hideHeader && (
+        <div
+          className={`flex items-center justify-between gap-2 flex-shrink-0 border-b ${compact ? "px-3 py-2" : "px-3 sm:px-6 py-3 sm:py-4"}`}
+          style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}
+        >
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "var(--green)" }}>
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-semibold truncate" style={{ color: "var(--text-1)" }}>Uniq AI</h2>
+              <p className="text-[10px] sm:text-xs truncate" style={{ color: "var(--text-3)" }}>Sua plataforma em linguagem natural</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
+            {/* Model selector — só desktop */}
+            <div className="hidden lg:flex items-center gap-1">
+              <div className="relative">
+                <select
+                  value={selectedIntegration || ""}
+                  onChange={(e) => setSelectedIntegration(e.target.value)}
+                  className="appearance-none outline-none text-xs font-medium rounded-lg px-3 py-2 pr-8 cursor-pointer min-w-[140px] max-w-[200px]"
+                  style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+                >
+                  {isLoadingIntegrations ? (
+                    <option value="">Carregando...</option>
+                  ) : Object.keys(groupedIntegrations).length === 0 ? (
+                    <option value="">Nenhum modelo</option>
+                  ) : (
+                    <>
+                      {!selectedIntegration && <option value="">LLM...</option>}
+                      {Object.entries(groupedIntegrations).map(([provider, items]: [string, any]) => (
+                        <optgroup key={provider} label={`── ${provider} ──`}>
+                          {(items as any[]).map((i: any) => (
+                            <option key={i.id} value={i.id}>
+                              {i.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </>
+                  )}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "var(--text-3)" }} />
+              </div>
+
+              {selectedIntegration && (() => {
+                const allIntegrations = Object.values(groupedIntegrations).flat();
+                const currentIntegration = allIntegrations.find((i: any) => i.id === selectedIntegration);
+                const hasModels = currentIntegration && Array.isArray(currentIntegration?.models) && currentIntegration.models.length > 1;
+                if (!hasModels || !currentIntegration?.models) return null;
+                return (
+                  <div className="relative">
+                    <select
+                      value={selectedModel || ""}
+                      onChange={(e) => setSelectedModel(e.target.value)}
+                      className="appearance-none outline-none text-xs font-medium rounded-lg px-3 py-2 pr-8 cursor-pointer min-w-[120px]"
+                      style={{ background: "var(--green)", color: "#000", border: "none" }}
+                    >
+                      {(currentIntegration.models as string[]).map((m: string) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "#000" }} />
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Conversa */}
       <div className="flex-1 min-h-0 flex flex-col" style={{ background: "var(--surface-2)" }}>
-        {messages.length === 0 ? (
-          <EmptyState onSuggestionClick={handleSuggestionClick} />
-        ) : (
-          <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto" style={{ background: "var(--surface-2)" }}>
-            <AnimatePresence initial={false}>
-              {messages.map((msg, i) => (
-                <ChatMessage key={msg.id} message={msg} isNew={i === messages.length - 1 && msg.role === "assistant"} />
-              ))}
-              {isStreaming && (
-                <motion.div
-                  key="thinking"
-                  className="flex gap-3 sm:gap-4 px-4 sm:px-8 py-4 sm:py-5 border-b border-[var(--surface-border)]"
-                  style={{ background: "var(--surface-2)" }}
-                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ background: "var(--green)" }}>
-                    <Sparkles className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold mb-1.5" style={{ color: "var(--text-3)" }}>Uniq AI</p>
-                    <ThinkingDots />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )}
+        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto" style={{ background: "var(--surface-2)" }}>
+          <AnimatePresence initial={false}>
+            {messages.map((msg, i) => (
+              <ChatMessage key={msg.id} message={msg} isNew={i === messages.length - 1 && msg.role === "assistant"} />
+            ))}
+            {isStreaming && (
+              <motion.div
+                key="thinking"
+                className="flex gap-3 sm:gap-4 px-4 sm:px-8 py-4 sm:py-5 border-b border-[var(--surface-border)]"
+                style={{ background: "var(--surface-2)" }}
+                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ background: "var(--green)" }}>
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold mb-1.5" style={{ color: "var(--text-3)" }}>Uniq AI</p>
+                  <ThinkingDots />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {/* Loading overlay */}
         {isStreaming && (
@@ -604,13 +469,6 @@ export function UniqAIChatPanel({ compact = false }: UniqAIChatPanelProps) {
           />
         </div>
       </div>
-
-      {templatesOpen && (
-        <TemplatesDialog
-          onClose={() => setTemplatesOpen(false)}
-          instanceId={selectedInstance || undefined}
-        />
-      )}
     </div>
   );
 }

@@ -171,7 +171,7 @@ export default function DealsPage() {
           (ex.: Vendas, Pós-venda, Suporte) com visualizações separadas.
         </p>
         <Link
-          href="/crm"
+          href="/crm/contacts"
           className="mt-2 rounded-lg px-3 py-1.5 text-xs font-medium"
           style={{ background: uniq.green, color: "#03170a" }}
         >

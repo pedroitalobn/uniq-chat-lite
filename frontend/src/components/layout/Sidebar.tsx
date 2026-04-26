@@ -17,6 +17,7 @@ import { usePreferences } from "@/lib/preferences";
 import { Logo } from "@/components/Logo";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
+import { WorkspaceCustomizeDialog, resolveWorkspaceIcon } from "@/components/layout/WorkspaceCustomizeDialog";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -24,7 +25,14 @@ export function Sidebar() {
   const { data: session } = useSession();
   const { t } = usePreferences();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
   const { currentWorkspace, setCurrentWorkspace, workspaces } = useWorkspace();
+  // Cor + ícone do workspace atual (com fallbacks). Defaults:
+  // roxo (#7c3aed) e Building2 — aplicados quando o user ainda
+  // não personalizou. Mudanças locais via dialog dão feedback
+  // imediato (sem esperar refetch de workspaces).
+  const wsColor = currentWorkspace?.color || "#7c3aed";
+  const WsIcon = resolveWorkspaceIcon(currentWorkspace?.icon);
   const { hasPerm, hasAnyPerm, isOwner, isSuperAdmin, isLoading: permsLoading } = useWorkspacePermissions();
   const isAdmin = isSuperAdmin;
   const planName = (session?.user?.plan as { name?: string } | undefined)?.name ?? session?.user?.role;
@@ -120,9 +128,15 @@ export function Sidebar() {
       {/* Workspace info */}
       <div className="px-3 py-3 border-b" style={{ borderColor: "var(--sidebar-border)" }}>
         <div className="flex items-center gap-2 mb-2">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(124,58,237,0.15)" }}>
-            <Building2 className="w-4 h-4" style={{ color: "#a78bfa" }} />
-          </div>
+          <button
+            onClick={() => currentWorkspace && setCustomizeOpen(true)}
+            disabled={!currentWorkspace}
+            title={currentWorkspace?.is_owner ? "Personalizar workspace" : "Detalhes"}
+            className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform hover:scale-105"
+            style={{ background: `${wsColor}26`, border: `1px solid ${wsColor}44` }}
+          >
+            <WsIcon className="w-4 h-4" style={{ color: wsColor }} />
+          </button>
           <div className="flex-1 min-w-0">
             {workspaces.length > 1 ? (
               <div className="relative">
@@ -333,6 +347,28 @@ export function Sidebar() {
       )}>
         {sidebarContent}
       </div>
+
+      {/* Customize dialog — abre clicando no chip de workspace */}
+      {customizeOpen && currentWorkspace && (
+        <WorkspaceCustomizeDialog
+          workspaceId={currentWorkspace.id}
+          initialName={currentWorkspace.name}
+          initialColor={currentWorkspace.color}
+          initialIcon={currentWorkspace.icon}
+          isOwner={!!currentWorkspace.is_owner}
+          onClose={() => setCustomizeOpen(false)}
+          onSaved={(next) => {
+            // Update otimista no contexto global pra ver o ícone/cor mudar
+            // sem esperar o refetch da lista de workspaces.
+            setCurrentWorkspace({
+              ...currentWorkspace,
+              name: next.name,
+              color: next.color,
+              icon: next.icon,
+            });
+          }}
+        />
+      )}
     </>
   );
 }

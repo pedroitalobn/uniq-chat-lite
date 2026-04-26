@@ -131,7 +131,7 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
       >
         <div className="flex items-center gap-3">
           <Link
-            href="/crm"
+            href="/crm/contacts"
             className="rounded-md p-1.5 transition-opacity hover:opacity-70"
             style={{ color: uniq.textFaint }}
           >

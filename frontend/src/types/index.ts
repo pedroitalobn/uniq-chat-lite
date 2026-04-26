@@ -365,6 +365,11 @@ export interface Workspace {
   owner_id: string;
   name: string;
   slug: string;
+  // Personalização opcional. Color é hex (#rrggbb). Icon é nome de
+  // ícone do lucide-react (PascalCase). Quando vazios, frontend usa
+  // o default visual (#7c3aed + Building2).
+  color?: string;
+  icon?: string;
   plan_id?: string;
   is_active: boolean;
   is_owner: boolean;

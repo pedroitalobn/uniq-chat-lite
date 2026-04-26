@@ -160,15 +160,30 @@ func (h *WorkspaceHandler) Update(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "apenas o proprietário pode editar"})
 	}
 
+	// Personalização opcional: cor (hex com #) e ícone (nome lucide-react).
+	// Usamos pointers pra distinguir "não enviado" de "enviar string vazia".
+	// String vazia explícita → reseta pro default no frontend.
 	var req struct {
-		Name string `json:"name"`
+		Name  string  `json:"name"`
+		Color *string `json:"color,omitempty"`
+		Icon  *string `json:"icon,omitempty"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "dados inválidos"})
 	}
 
+	updates := map[string]any{}
 	if req.Name != "" {
-		h.db.Model(&models.Workspace{}).Where("id = ?", workspaceID).Update("name", req.Name)
+		updates["name"] = req.Name
+	}
+	if req.Color != nil {
+		updates["color"] = *req.Color
+	}
+	if req.Icon != nil {
+		updates["icon"] = *req.Icon
+	}
+	if len(updates) > 0 {
+		h.db.Model(&models.Workspace{}).Where("id = ?", workspaceID).Updates(updates)
 	}
 
 	return c.JSON(fiber.Map{"success": true})

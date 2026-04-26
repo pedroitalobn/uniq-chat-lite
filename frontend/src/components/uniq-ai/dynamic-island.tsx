@@ -16,6 +16,7 @@ import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, Loader2, MessageSquare, Sparkles, X } from "lucide-react";
 import { UniqAIChatPanel } from "@/features/uniq-ai/chat-panel";
+import type { Message } from "@/features/uniq-ai/atoms";
 import { useUniqAIIsland } from "./island-context";
 
 function shouldHide(pathname: string, isMobile: boolean): boolean {
@@ -43,6 +44,12 @@ export function UniqAIIsland() {
   const { state, open, close } = useUniqAIIsland();
   const pathname = usePathname() || "";
   const isMobile = useIsMobile();
+  // Scratch chat efêmero — a ilha não persiste conversa nem se mistura
+  // com o histórico do /uniq-ai. Reset a cada navegação ou close.
+  const [messages, setMessages] = useState<Message[]>([]);
+  useEffect(() => {
+    if (state.mode !== "expanded") return;
+  }, [state.mode]);
 
   if (shouldHide(pathname, isMobile)) return null;
 
@@ -95,7 +102,7 @@ export function UniqAIIsland() {
                   <div className="w-10 h-1 rounded-full" style={{ background: "var(--surface-border)" }} />
                 </button>
                 <div className="flex-1 min-h-0">
-                  <UniqAIChatPanel compact />
+                  <UniqAIChatPanel compact messages={messages} onMessagesChange={setMessages} />
                 </div>
               </motion.div>
             </>
@@ -186,7 +193,7 @@ export function UniqAIIsland() {
                 <X className="w-4 h-4" />
               </button>
               <div className="flex-1 min-h-0">
-                <UniqAIChatPanel compact />
+                <UniqAIChatPanel compact messages={messages} onMessagesChange={setMessages} />
               </div>
             </motion.div>
           </>

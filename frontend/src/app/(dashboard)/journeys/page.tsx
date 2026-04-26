@@ -1,7 +1,8 @@
 "use client";
 
-// Módulo Jornadas — top-level. Antes era uma sub-aba de /agents.
-// Renderiza lista de jornadas + painel de atividade em tempo real, com tabs.
+// Módulo Jornadas — top-level. Cabeçalho concentra todas as formas de
+// criar uma jornada (Uniq AI / Templates / Canvas em branco). Tabs
+// dividem listagem e atividade em tempo real.
 
 import { useState } from "react";
 import Link from "next/link";
@@ -10,6 +11,7 @@ import { toast } from "sonner";
 import { journeysApi } from "@/lib/api";
 import { JourneysList } from "@/features/journeys/journeys-list";
 import { ActivityPanel } from "@/features/journeys/activity-panel";
+import { TemplatesDialog } from "@/features/journeys/templates-dialog";
 import { cn } from "@/lib/utils";
 
 type Tab = "list" | "activity";
@@ -21,6 +23,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 
 export default function JourneysPage() {
   const [tab, setTab] = useState<Tab>("list");
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   const createBlank = async () => {
     try {
@@ -37,13 +40,13 @@ export default function JourneysPage() {
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="mb-3 sm:mb-4 flex-shrink-0">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2 sm:gap-3" style={{ color: "var(--text-1)" }}>
               <Wand2 className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: "#8b5cf6" }} />
               Jornadas
             </h1>
-            <p className="text-xs sm:text-sm mt-1 hidden sm:block" style={{ color: "var(--text-3)" }}>
+            <p className="text-xs sm:text-sm mt-1" style={{ color: "var(--text-3)" }}>
               Cadências e regras de relacionamento — crie via canvas, template ou linguagem natural pelo Uniq AI.
             </p>
           </div>
@@ -54,8 +57,17 @@ export default function JourneysPage() {
               style={{ background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.18)", color: "var(--green)" }}
             >
               <Sparkles className="w-4 h-4" />
-              Criar via Uniq AI
+              <span className="hidden sm:inline">Criar via Uniq AI</span>
+              <span className="sm:hidden">Uniq AI</span>
             </Link>
+            <button
+              onClick={() => setTemplatesOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors"
+              style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.18)", color: "#a78bfa" }}
+            >
+              <LayoutTemplate className="w-4 h-4" />
+              Templates
+            </button>
             <button
               onClick={createBlank}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors"
@@ -98,6 +110,10 @@ export default function JourneysPage() {
         {tab === "list" && <JourneysList />}
         {tab === "activity" && <ActivityPanel />}
       </div>
+
+      {templatesOpen && (
+        <TemplatesDialog onClose={() => setTemplatesOpen(false)} />
+      )}
     </div>
   );
 }
