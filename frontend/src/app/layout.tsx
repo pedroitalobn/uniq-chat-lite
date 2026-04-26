@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { Rubik, JetBrains_Mono } from "next/font/google";
+import { Manrope, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const sans = Rubik({
+const sans = Manrope({
   subsets: ["latin"],
   variable: "--font-sans",
   display: "swap",
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 const mono = JetBrains_Mono({
