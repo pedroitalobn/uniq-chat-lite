@@ -1,13 +1,20 @@
 import type { Metadata } from "next";
-import { Poppins, JetBrains_Mono } from "next/font/google";
+import { IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const sans = Poppins({
+// IBM Plex Sans — fonte default do uniq.chat. Carregamos múltiplos pesos
+// pra mapear hierarquia visual:
+//   300 light    → metadados secundários (timestamps, captions, hints)
+//   400 regular  → corpo de mensagens, texto comum
+//   500 medium   → labels, nomes de contato, sub-headers
+//   600 semibold → títulos de seção, headers de conversa, CTAs
+//   700 bold     → títulos principais, valores destacados (badges, contadores)
+const sans = IBM_Plex_Sans({
   subsets: ["latin"],
   variable: "--font-sans",
   display: "swap",
-  weight: ["400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
 const mono = JetBrains_Mono({

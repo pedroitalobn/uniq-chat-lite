@@ -83,8 +83,23 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+    /* IBM Plex Sans:
+       - cv11/ss03 deixam o ‘a’ e ‘g’ mais geométricos
+       - lnum + pnum + kern: numerais alinhados, kerning nativo
+       - rlig + calt: ligaduras raras + alternativas contextuais
+       Resultado: leitura mais densa, ideal pra inbox + dashboards. */
+    font-feature-settings: "rlig" 1, "calt" 1, "kern" 1, "lnum" 1, "pnum" 1, "ss03" 1, "cv11" 1;
+    font-weight: 400;
+    letter-spacing: -0.005em; /* IBM Plex tem tracking levemente folgado; reduzimos um toque */
   }
+  /* Hierarquia de pesos por nível semântico — pode ser sobrescrito por classes Tailwind. */
+  h1 { font-weight: 700; letter-spacing: -0.02em; }
+  h2 { font-weight: 600; letter-spacing: -0.015em; }
+  h3 { font-weight: 600; letter-spacing: -0.01em; }
+  h4, h5, h6 { font-weight: 600; }
+  /* Numerais tabulares globais em campos que usam tabular-nums já vêm OK; */
+  /* esta extensão garante que <kbd>/<code>/.tabular-nums sempre alinhem. */
+  .tabular-nums, kbd, code, time { font-variant-numeric: tabular-nums lining-nums; }
   ::selection {
     background: rgba(0, 212, 106, 0.18);
     color: #00d46a;

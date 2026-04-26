@@ -2658,6 +2658,33 @@ function Composer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const draftKey = `inbox:draft:${conversationId}:${mode}`;
 
+  // Send constraints — endpoint informa o que o canal aceita.
+  // window_open=false + allows_template=true → fora da janela 24h, só template.
+  // allowed_types informa o que mostrar como botão (image/audio/video/etc).
+  const constraintsQ = useQuery({
+    queryKey: ["send-constraints", wsId, conversationId],
+    queryFn: () =>
+      conversationsApi.sendConstraints(wsId as string, conversationId).then(
+        (r) =>
+          r.data as {
+            channel: string;
+            window_open: boolean;
+            allows_template: boolean;
+            supports_reply: boolean;
+            supports_reaction: boolean;
+            supports_edit: boolean;
+            supports_revoke: boolean;
+            allowed_types: string[];
+            max_body_chars: number;
+          },
+      ),
+    enabled: !!wsId && !!conversationId,
+    staleTime: 60_000,
+  });
+  const constraints = constraintsQ.data;
+  const allowsType = (t: string) => !constraints || constraints.allowed_types.includes(t);
+  const windowClosed = !!constraints && !constraints.window_open;
+
   // Draft persistence — survive accidental reloads
   useEffect(() => {
     try {
@@ -2720,8 +2747,13 @@ function Composer({
     requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
+  const tooLong = !!constraints && text.length > constraints.max_body_chars;
   const disabled =
-    (!canSend && mode === "message") || (!canNote && mode === "note") || text.trim() === "";
+    (!canSend && mode === "message") ||
+    (!canNote && mode === "note") ||
+    text.trim() === "" ||
+    tooLong ||
+    (mode === "message" && windowClosed && !constraints?.allows_template);
 
   const submit = () => {
     if (disabled) return;
@@ -2737,29 +2769,59 @@ function Composer({
   const pickerOpen = mode === "message" && currentShortcut.length >= 1 && pickerItems.length > 0;
 
   // ── Anexos (imagem, áudio, vídeo, documento) ─────────────────────────────
+  // Múltiplos anexos: queue local, envio sequencial. Caption (text) vai
+  // anexada ao PRIMEIRO item enviado; os demais vão sem caption.
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [pending, setPending] = useState<{ file: File; preview?: string } | null>(null);
+  const MAX_ATTACHMENTS = 10;
+  const [pending, setPending] = useState<Array<{ id: string; file: File; preview?: string }>>([]);
   const [uploading, setUploading] = useState(false);
 
   const onPickFile = () => fileInputRef.current?.click();
 
-  // Aceita um File já lido (drag-drop, paste ou input). Centralizado pra
+  // Aceita um ou vários Files (drag-drop, paste ou input). Centralizado pra
   // todos os caminhos de attach passarem pela mesma validação + preview.
-  const acceptFile = useCallback((file: File) => {
-    if (!file) return;
+  const acceptFiles = useCallback((files: File[] | FileList) => {
     if (!instanceId) {
       toast.error("Anexar requer instância conectada");
       return;
     }
     if (mode !== "message") return;
-    const preview = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
-    setPending({ file, preview });
+    const arr = Array.from(files);
+    if (arr.length === 0) return;
+    setPending((prev) => {
+      const remaining = MAX_ATTACHMENTS - prev.length;
+      if (remaining <= 0) {
+        toast.warning(`Máximo de ${MAX_ATTACHMENTS} anexos por envio`);
+        return prev;
+      }
+      const slice = arr.slice(0, remaining);
+      const additions = slice.map((file) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        file,
+        preview: file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined,
+      }));
+      if (arr.length > slice.length) {
+        toast.warning(`${arr.length - slice.length} arquivo(s) ignorado(s) — limite ${MAX_ATTACHMENTS}`);
+      }
+      return [...prev, ...additions];
+    });
   }, [instanceId, mode]);
 
+  // Wrapper compatível pro paste que ainda recebe um único File
+  const acceptFile = useCallback((file: File) => acceptFiles([file]), [acceptFiles]);
+
   const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // permite re-selecionar o mesmo arquivo
-    if (file) acceptFile(file);
+    const files = e.target.files;
+    e.target.value = "";
+    if (files && files.length > 0) acceptFiles(files);
+  };
+
+  const removePending = (id: string) => {
+    setPending((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (target?.preview) URL.revokeObjectURL(target.preview);
+      return prev.filter((p) => p.id !== id);
+    });
   };
 
   // Drag-drop sobre o composer. Highlight visual + accept primeiro File.
@@ -2773,8 +2835,7 @@ function Composer({
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragActive(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) acceptFile(file);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) acceptFiles(e.dataTransfer.files);
   };
 
   // Paste image — Ctrl+V de um screenshot/imagem do clipboard.
@@ -2803,33 +2864,52 @@ function Composer({
   }, [mode, instanceId, acceptFile]);
 
   const clearPending = () => {
-    if (pending?.preview) URL.revokeObjectURL(pending.preview);
-    setPending(null);
+    setPending((prev) => {
+      prev.forEach((p) => p.preview && URL.revokeObjectURL(p.preview));
+      return [];
+    });
   };
 
+  // Envia em sequência. Caption vai SOMENTE no primeiro (alinhado ao WhatsApp,
+  // que só renderiza caption no primeiro media de uma "salva"). Se um falha,
+  // os demais ainda tentam — feedback agregado no toast final.
   const sendAttachment = async () => {
-    if (!pending || !wsId || !instanceId) return;
-    const { file } = pending;
+    if (pending.length === 0 || !wsId || !instanceId) return;
     const caption = text.trim();
     setUploading(true);
+    let okCount = 0;
+    let failCount = 0;
     try {
-      const up = await mediaUploadApi.upload(instanceId, file);
-      const data = up.data as { url: string; mime_type?: string };
-      const url = data.url;
-      const mime = data.mime_type || file.type || "application/octet-stream";
-      const type = inferMediaType(file, mime);
-      await conversationsApi.sendMessage(wsId, conversationId, {
-        type,
-        media_url: url,
-        media_mime: mime,
-        caption: caption || undefined,
-        filename: type === "document" ? file.name : undefined,
-      });
+      for (let i = 0; i < pending.length; i++) {
+        const { file } = pending[i];
+        try {
+          const up = await mediaUploadApi.upload(instanceId, file);
+          const data = up.data as { url: string; mime_type?: string };
+          const url = data.url;
+          const mime = data.mime_type || file.type || "application/octet-stream";
+          const type = inferMediaType(file, mime);
+          await conversationsApi.sendMessage(wsId, conversationId, {
+            type,
+            media_url: url,
+            media_mime: mime,
+            caption: i === 0 && caption ? caption : undefined,
+            filename: type === "document" ? file.name : undefined,
+          });
+          okCount++;
+        } catch {
+          failCount++;
+        }
+      }
+      if (failCount === 0) {
+        if (okCount > 1) toast.success(`${okCount} anexos enviados`);
+      } else if (okCount === 0) {
+        toast.error("Falha ao enviar anexos");
+      } else {
+        toast.warning(`${okCount} enviados, ${failCount} falharam`);
+      }
       setText("");
       try { localStorage.removeItem(draftKey); } catch { /* noop */ }
       clearPending();
-    } catch {
-      toast.error("Falha ao enviar anexo");
     } finally {
       setUploading(false);
     }
@@ -2878,7 +2958,7 @@ function Composer({
   const accentFg = mode === "note" ? "#1f1300" : "#03170a";
   const composerBg = mode === "note" ? "rgba(245,158,11,0.06)" : "hsl(240 18% 6.5%)";
 
-  const hasAttachment = !!pending;
+  const hasAttachment = pending.length > 0;
 
   return (
     <div
@@ -2907,6 +2987,7 @@ function Composer({
         ref={fileInputRef}
         type="file"
         hidden
+        multiple
         accept="image/*,video/*,audio/*,application/pdf,application/*"
         onChange={onFileSelected}
       />
@@ -2946,58 +3027,94 @@ function Composer({
         </span>
       </div>
 
-      {/* Pending attachment preview */}
-      {hasAttachment && pending && (
+      {/* Pending attachments — múltiplos chips horizontais. Caption só vai no
+          primeiro envio (alinhado ao WhatsApp). */}
+      {hasAttachment && (
         <div
-          className="mb-2 flex items-center gap-3 rounded-lg p-2"
+          className="mb-2 rounded-lg p-2"
           style={{
             background: "rgba(255,255,255,0.03)",
             border: "1px solid rgba(255,255,255,0.08)",
           }}
         >
-          {pending.preview ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={pending.preview} alt="" className="h-12 w-12 rounded object-cover" />
-          ) : (
-            <div
-              className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded"
-              style={{ background: "rgba(0,212,106,0.08)" }}
-            >
-              {pending.file.type.startsWith("audio/") ? (
-                <Mic className="h-5 w-5" style={{ color: "#00d46a" }} />
-              ) : pending.file.type.startsWith("video/") ? (
-                <ImageIcon className="h-5 w-5" style={{ color: "#00d46a" }} />
-              ) : (
-                <FileText className="h-5 w-5" style={{ color: "#00d46a" }} />
-              )}
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm" style={{ color: "hsl(240 15% 90%)" }}>
-              {pending.file.name}
-            </div>
-            <div className="text-[10px]" style={{ color: "hsl(240 8% 44%)" }}>
-              {humanSize(pending.file.size)} · {pending.file.type || "desconhecido"}
+          <div className="flex items-center justify-between gap-2 mb-2 px-1">
+            <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 55%)" }}>
+              {pending.length} anexo{pending.length > 1 ? "s" : ""}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onPickFile}
+                disabled={uploading || pending.length >= MAX_ATTACHMENTS}
+                className="text-[10px] font-medium hover:underline disabled:opacity-40"
+                style={{ color: "#00d46a" }}
+              >
+                + Adicionar
+              </button>
+              <button
+                type="button"
+                onClick={clearPending}
+                disabled={uploading}
+                className="text-[10px] hover:underline disabled:opacity-40"
+                style={{ color: "hsl(240 8% 60%)" }}
+              >
+                Limpar tudo
+              </button>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={clearPending}
-            disabled={uploading}
-            className="rounded-md p-1.5 disabled:opacity-40 hover:bg-white/5"
-            style={{ color: "hsl(240 8% 48%)" }}
-          >
-            <X className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={sendAttachment}
-            disabled={uploading}
-            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
-            style={{ background: accentBg, color: accentFg }}
-          >
-            {uploading ? "Enviando…" : "Enviar anexo"}
-          </button>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {pending.map((att) => (
+              <div
+                key={att.id}
+                className="relative flex-shrink-0 rounded-md"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  width: 84,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => removePending(att.id)}
+                  disabled={uploading}
+                  title="Remover"
+                  className="absolute -top-1.5 -right-1.5 z-10 rounded-full p-0.5 disabled:opacity-40"
+                  style={{
+                    background: "hsl(240 18% 8%)",
+                    border: "1px solid hsl(240 12% 18%)",
+                    color: "hsl(240 8% 70%)",
+                  }}
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+                {att.preview ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={att.preview} alt="" className="h-16 w-full rounded-t-md object-cover" />
+                ) : (
+                  <div
+                    className="flex h-16 w-full items-center justify-center rounded-t-md"
+                    style={{ background: "rgba(0,212,106,0.08)" }}
+                  >
+                    {att.file.type.startsWith("audio/") ? (
+                      <Mic className="h-6 w-6" style={{ color: "#00d46a" }} />
+                    ) : att.file.type.startsWith("video/") ? (
+                      <ImageIcon className="h-6 w-6" style={{ color: "#00d46a" }} />
+                    ) : (
+                      <FileText className="h-6 w-6" style={{ color: "#00d46a" }} />
+                    )}
+                  </div>
+                )}
+                <div className="px-1.5 py-1">
+                  <div className="truncate text-[10px]" style={{ color: "hsl(240 15% 88%)" }} title={att.file.name}>
+                    {att.file.name}
+                  </div>
+                  <div className="text-[9px]" style={{ color: "hsl(240 8% 50%)" }}>
+                    {humanSize(att.file.size)}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -3088,12 +3205,42 @@ function Composer({
           </div>
         )}
 
+        {/* Banner: janela 24h fechada (WABA/Instagram fora da janela) */}
+        {mode === "message" && windowClosed && (
+          <div
+            className="mb-2 flex items-start gap-2 rounded-md px-3 py-2 text-[11px]"
+            style={{
+              background: "rgba(245,158,11,0.08)",
+              borderLeft: "3px solid #f59e0b",
+              color: "hsl(240 15% 88%)",
+            }}
+          >
+            <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" style={{ color: "#f59e0b" }} />
+            <div className="min-w-0 flex-1">
+              <div className="font-medium" style={{ color: "#f59e0b" }}>
+                Janela de 24h fechada
+              </div>
+              <div style={{ color: "hsl(240 8% 65%)" }}>
+                {constraints?.allows_template
+                  ? "Para iniciar conversa, use um template aprovado."
+                  : "Aguarde o cliente responder pra reabrir o canal."}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-end gap-2">
           <button
             type="button"
             onClick={onPickFile}
-            disabled={!canSend || mode !== "message" || !instanceId || uploading}
-            title={instanceId ? "Anexar arquivo" : "Instância não disponível"}
+            disabled={!canSend || mode !== "message" || !instanceId || uploading || !allowsType("image")}
+            title={
+              !instanceId
+                ? "Instância não disponível"
+                : !allowsType("image")
+                  ? "Canal não aceita anexos"
+                  : "Anexar arquivo"
+            }
             className="flex h-10 w-10 items-center justify-center rounded-md transition-colors disabled:opacity-40"
             style={{
               background: "rgba(255,255,255,0.03)",
@@ -3204,6 +3351,16 @@ function Composer({
             {hasAttachment ? (uploading ? "Enviando…" : "Enviar") : (mode === "note" ? "Adicionar" : "Enviar")}
           </button>
         </div>
+
+        {/* Char counter — só aparece quando passa de 80% do limite do canal */}
+        {constraints && mode === "message" && text.length > constraints.max_body_chars * 0.8 && (
+          <div
+            className="mt-1 text-right text-[10px] tabular-nums"
+            style={{ color: tooLong ? "#ef4444" : "hsl(240 8% 55%)" }}
+          >
+            {text.length} / {constraints.max_body_chars}
+          </div>
+        )}
       </div>
     </div>
   );
