@@ -127,20 +127,37 @@ export default function DashboardPage() {
     refetchInterval: 60_000,
   });
 
+  // Helper: vários endpoints do backend retornam shapes diferentes
+  // (`{data,total}`, `{items,total}`, ou array puro). Esse normalize cobre
+  // todos os casos sem quebrar o dashboard quando o formato muda.
+  const asArray = <T,>(raw: any): T[] => {
+    if (Array.isArray(raw)) return raw as T[];
+    if (Array.isArray(raw?.data)) return raw.data as T[];
+    if (Array.isArray(raw?.items)) return raw.items as T[];
+    return [];
+  };
+  const asTotal = (raw: any): number => {
+    if (typeof raw?.total === "number") return raw.total;
+    if (Array.isArray(raw)) return raw.length;
+    if (Array.isArray(raw?.data)) return raw.data.length;
+    if (Array.isArray(raw?.items)) return raw.items.length;
+    return 0;
+  };
+
   const campaignsQ = useQuery({
     queryKey: ["campaigns", wsId],
-    queryFn: () => campaignsApi.list(wsId).then((r) => r.data as any[]),
+    queryFn: () => campaignsApi.list(wsId).then((r) => r.data),
     enabled: !!wsId,
   });
-  const campaigns = campaignsQ.data ?? [];
+  const campaigns = asArray<any>(campaignsQ.data);
   const activeCampaigns = campaigns.filter((c: any) => ["running", "active", "scheduled"].includes(c.status)).length;
 
   const dealsQ = useQuery({
     queryKey: ["deals-dashboard", wsId],
-    queryFn: () => dealsApi.list(wsId as string).then((r) => r.data as { items?: any[] } | any[]),
+    queryFn: () => dealsApi.list(wsId as string).then((r) => r.data),
     enabled: !!wsId,
   });
-  const deals = (Array.isArray(dealsQ.data) ? dealsQ.data : dealsQ.data?.items) ?? [];
+  const deals = asArray<any>(dealsQ.data);
   const openDeals = deals.filter((d: any) => d.status === "open").length;
   const wonDeals = deals.filter((d: any) => d.status === "won").length;
   const dealsValue = deals
@@ -149,17 +166,17 @@ export default function DashboardPage() {
 
   const contactsQ = useQuery({
     queryKey: ["contacts-count", wsId],
-    queryFn: () => crmApi.listContacts({ workspace_id: wsId, limit: 1 }).then((r) => r.data as any),
+    queryFn: () => crmApi.listContacts({ workspace_id: wsId, limit: 1 }).then((r) => r.data),
     enabled: !!wsId,
   });
-  const contactsTotal = (contactsQ.data as any)?.total ?? (Array.isArray(contactsQ.data) ? contactsQ.data.length : 0);
+  const contactsTotal = asTotal(contactsQ.data);
 
   const companiesQ = useQuery({
     queryKey: ["companies-count", wsId],
-    queryFn: () => companiesApi.list(wsId as string, { limit: 1 }).then((r) => r.data as any),
+    queryFn: () => companiesApi.list(wsId as string, { limit: 1 }).then((r) => r.data),
     enabled: !!wsId,
   });
-  const companiesTotal = (companiesQ.data as any)?.total ?? (Array.isArray(companiesQ.data) ? companiesQ.data.length : 0);
+  const companiesTotal = asTotal(companiesQ.data);
 
   // Top 5 deals abertos
   const topOpenDeals = deals
