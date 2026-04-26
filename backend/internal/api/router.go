@@ -250,6 +250,30 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	app.Post("/v1/csat/:token", csatH.SubmitPublic)
 
 	// ─── Public v1 API: /v1/:server_slug/:instance_slug/* ─────────────────────
+	// Pre-rotas autenticadas pra /v1/instances/<uuid>/messages/* — declaradas
+	// ANTES do v1inst group pra ganhar prioridade no roteamento. Sem isso,
+	// o pattern /v1/:server_slug/:instance_slug/messages/* (v1inst, declarado
+	// logo abaixo) casa primeiro com server_slug="instances" e o handler é
+	// chamado sem c.Locals("instance") — retorna 404. Aqui forçamos JWT +
+	// OwnsInstance, então o handler downstream encontra a instância OK.
+	preInst := app.Group("/v1/instances/:id", middleware.RequireAuth(db), middleware.OwnsInstance(db), middleware.RateLimit(1500))
+	preInstMsgs := preInst.Group("/messages")
+	preInstMsgs.Post("/text", msgH.SendText)
+	preInstMsgs.Post("/image", msgH.SendImage)
+	preInstMsgs.Post("/document", msgH.SendDocument)
+	preInstMsgs.Post("/audio", msgH.SendAudio)
+	preInstMsgs.Post("/video", msgH.SendVideo)
+	preInstMsgs.Post("/location", msgH.SendLocation)
+	preInstMsgs.Post("/contact", msgH.SendContact)
+	preInstMsgs.Post("/reaction", msgH.SendReaction)
+	preInstMsgs.Post("/poll", msgH.SendPoll)
+	preInstMsgs.Post("/buttons", msgH.SendButtons)
+	preInstMsgs.Post("/template", msgH.SendTemplate)
+	preInstMsgs.Post("/list", msgH.SendList)
+	preInstMsgs.Post("/pix", msgH.SendPix)
+	preInstMsgs.Post("/menu", msgH.SendMenu)
+	preInstMsgs.Post("/sticker", msgH.SendSticker)
+
 	// Auth: apikey / X-Instance-Token / Authorization: Bearer <instance_token>.
 	// IMPORTANT: registered BEFORE the protected /v1 group because Fiber's
 	// Group middlewares only apply to routes registered AFTER them — declaring

@@ -5,70 +5,9 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"github.com/uniq-chat/backend/internal/models"
 	"gorm.io/gorm"
 )
-
-// resolveAuthInstanceByID popula c.Locals("instance") respeitando o gating
-// do OwnsInstance — usado quando uma rota /v1/instances/<uuid>/... é
-// roteada pelo v1inst group (porque foi declarada antes do api group).
-//
-// IMPORTANTE: nunca chame middlewares (RequireAuth etc) daqui. Eles
-// disparam c.Next() ao final, que causaria dupla execução do handler
-// final — request fica em loop e timeout no client. Lógica de auth é
-// inline pra controlar o fluxo.
-func resolveAuthInstanceByID(db *gorm.DB, c *fiber.Ctx, instanceID uuid.UUID) error {
-	// Carrega user do JWT inline (sem chamar middleware que faria Next).
-	user := GetCurrentUser(c)
-	if user == nil {
-		tokenStr := extractToken(c)
-		if tokenStr == "" {
-			// Sem JWT — esse path requer auth de app, instance token aqui não vale.
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "autenticação requerida"})
-		}
-		claims, err := ParseAccessToken(tokenStr)
-		if err != nil {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "token inválido ou expirado"})
-		}
-		var u models.User
-		if err := db.Preload("Plan").First(&u, "id = ?", claims.UserID).Error; err != nil {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "usuário não encontrado"})
-		}
-		if u.IsBlocked() {
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "conta desativada ou bloqueada"})
-		}
-		c.Locals("user", &u)
-		c.Locals("user_id", u.ID)
-		user = &u
-	}
-
-	var instance models.Instance
-	if err := db.Preload("Server").First(&instance, "id = ?", instanceID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error":       "instância não encontrada",
-				"instance_id": instanceID.String(),
-				"hint":        "ID não existe no DB — pode ter sido deletada por outra sessão. Recarregue a lista de instâncias.",
-			})
-		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar instância: " + err.Error()})
-	}
-
-	// SuperAdmin / dono / membro do workspace — mesmo gating do OwnsInstance.
-	if user.Role == models.RoleSuperAdmin || instance.UserID == user.ID {
-		c.Locals("instance", &instance)
-		return nil
-	}
-	if instance.WorkspaceID != nil {
-		var uw models.UserWorkspace
-		if err := db.Where("user_id = ? AND workspace_id = ?", user.ID, *instance.WorkspaceID).First(&uw).Error; err == nil {
-			c.Locals("instance", &instance)
-			return nil
-		}
-	}
-	return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado"})
-}
 
 // reservedV1Namespaces — primeiros segmentos depois de /v1/ que pertencem
 // ao API tradicional (não ao layout /v1/:server/:instance). ResolveV1Instance
@@ -122,30 +61,9 @@ func ResolveV1Instance(db *gorm.DB) fiber.Handler {
 		serverSlug := c.Params("server_slug")
 		instanceSlug := c.Params("instance_slug")
 
-		// Bypass: prefixo é namespace reservado da API tradicional.
-		//
-		// MAS: o Fiber às vezes casa rotas do v1inst group antes das do
-		// api group quando ambas são candidatas (ex:
-		// /v1/instances/<uuid>/messages/template casa tanto
-		// /v1/:server_slug/:instance_slug/messages/template como
-		// /v1/instances/:id/messages/template, e a primeira foi
-		// declarada antes). Sem mais nada, c.Next() cai no handler do
-		// v1inst (rota SDK) com Locals vazia e o handler retorna 404
-		// "instância não encontrada".
-		//
-		// Solução: quando o slug é "instances" e o instance_slug é um
-		// UUID válido, popula c.Locals("instance") aplicando o mesmo
-		// gating de OwnsInstance — assim o handler downstream encontra
-		// a instância com o ID correto e responde como na rota auth.
-		// Para os demais reserved (workspaces, me, etc), só Next().
+		// Bypass: prefixo é namespace reservado da API tradicional. Deixa
+		// os handlers do api.Group("/v1") cuidarem da request.
 		if reservedV1Namespaces[serverSlug] {
-			if serverSlug == "instances" && instanceSlug != "" {
-				if iid, err := uuid.Parse(instanceSlug); err == nil {
-					if err := resolveAuthInstanceByID(db, c, iid); err != nil {
-						return err
-					}
-				}
-			}
 			return c.Next()
 		}
 
