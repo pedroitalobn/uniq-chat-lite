@@ -256,7 +256,7 @@ export function MediaViewer({
                 </div>
               )}
             </div>
-            <audio src={source.url} controls autoPlay className="w-full" />
+             <audio src={source.url} controls autoPlay preload="auto" className="w-full" />
           </div>
         )}
 

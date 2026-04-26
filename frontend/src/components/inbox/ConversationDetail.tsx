@@ -172,9 +172,9 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
       // `items` chegam DESC (mais novo primeiro); a mais antiga é a última.
       return items[items.length - 1]?.at;
     },
-    enabled: !!wsId && canView,
-    refetchInterval: 5_000,
-  });
+     enabled: !!wsId && canView,
+     refetchInterval: 2_000,
+   });
 
   const queuesQ = useQuery({
     queryKey: ["queues", wsId],
@@ -1201,11 +1201,11 @@ function MediaBody({
     if (url) {
       // Áudio fica inline (player nativo é compacto e funcional).
       // Botão pequeno expande pro lightbox quem quiser.
-      return (
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-2">
-            <audio src={url} controls className="max-w-[260px]" />
-            <button
+       return (
+         <div className="flex flex-col gap-1.5">
+           <div className="flex items-center gap-2">
+             <audio src={url} controls preload="auto" className="max-w-[260px]" />
+             <button
               type="button"
               onClick={() =>
                 onOpenViewer({ type: "audio", url, filename, mimeType, caption: body })
@@ -1289,7 +1289,7 @@ function MediaBody({
       if (mimeType?.startsWith("audio/")) {
         return (
           <div className="flex flex-col gap-1.5">
-            <audio src={url} controls className="max-w-[260px]" />
+            <audio src={url} controls preload="auto" className="max-w-[260px]" />
             {filename && (
               <span className="text-[10px] truncate" style={{ color: "hsl(240 8% 50%)" }}>
                 📎 {filename}
