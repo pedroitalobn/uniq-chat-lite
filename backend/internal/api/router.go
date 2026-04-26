@@ -253,26 +253,39 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Pre-rotas autenticadas pra /v1/instances/<uuid>/messages/* — declaradas
 	// ANTES do v1inst group pra ganhar prioridade no roteamento. Sem isso,
 	// o pattern /v1/:server_slug/:instance_slug/messages/* (v1inst, declarado
-	// logo abaixo) casa primeiro com server_slug="instances" e o handler é
-	// chamado sem c.Locals("instance") — retorna 404. Aqui forçamos JWT +
-	// OwnsInstance, então o handler downstream encontra a instância OK.
-	preInst := app.Group("/v1/instances/:id", middleware.RequireAuth(db), middleware.OwnsInstance(db), middleware.RateLimit(1500))
-	preInstMsgs := preInst.Group("/messages")
-	preInstMsgs.Post("/text", msgH.SendText)
-	preInstMsgs.Post("/image", msgH.SendImage)
-	preInstMsgs.Post("/document", msgH.SendDocument)
-	preInstMsgs.Post("/audio", msgH.SendAudio)
-	preInstMsgs.Post("/video", msgH.SendVideo)
-	preInstMsgs.Post("/location", msgH.SendLocation)
-	preInstMsgs.Post("/contact", msgH.SendContact)
-	preInstMsgs.Post("/reaction", msgH.SendReaction)
-	preInstMsgs.Post("/poll", msgH.SendPoll)
-	preInstMsgs.Post("/buttons", msgH.SendButtons)
-	preInstMsgs.Post("/template", msgH.SendTemplate)
-	preInstMsgs.Post("/list", msgH.SendList)
-	preInstMsgs.Post("/pix", msgH.SendPix)
-	preInstMsgs.Post("/menu", msgH.SendMenu)
-	preInstMsgs.Post("/sticker", msgH.SendSticker)
+	// logo abaixo) casa primeiro com server_slug="instances" e o handler
+	// retorna 404 sem c.Locals("instance").
+	//
+	// Atenção: NÃO usar app.Group("/v1/instances/:id", ...) aqui — o group
+	// faz o middleware (RequireAuth + OwnsInstance) rodar pra qualquer URL
+	// /v1/instances/<id>/* mesmo sem rota matching dentro do group, e o
+	// request fica pendurado/404 em rotas declaradas só no api group
+	// (profile, qr, settings, etc). Por isso registramos handler-por-handler
+	// pra escopar só ao path exato.
+	preMsgChain := []fiber.Handler{
+		middleware.RequireAuth(db),
+		middleware.OwnsInstance(db),
+		middleware.RateLimit(1500),
+	}
+	registerPreMsg := func(path string, h fiber.Handler) {
+		full := "/v1/instances/:id/messages" + path
+		app.Post(full, append(preMsgChain, h)...)
+	}
+	registerPreMsg("/text", msgH.SendText)
+	registerPreMsg("/image", msgH.SendImage)
+	registerPreMsg("/document", msgH.SendDocument)
+	registerPreMsg("/audio", msgH.SendAudio)
+	registerPreMsg("/video", msgH.SendVideo)
+	registerPreMsg("/location", msgH.SendLocation)
+	registerPreMsg("/contact", msgH.SendContact)
+	registerPreMsg("/reaction", msgH.SendReaction)
+	registerPreMsg("/poll", msgH.SendPoll)
+	registerPreMsg("/buttons", msgH.SendButtons)
+	registerPreMsg("/template", msgH.SendTemplate)
+	registerPreMsg("/list", msgH.SendList)
+	registerPreMsg("/pix", msgH.SendPix)
+	registerPreMsg("/menu", msgH.SendMenu)
+	registerPreMsg("/sticker", msgH.SendSticker)
 
 	// Auth: apikey / X-Instance-Token / Authorization: Bearer <instance_token>.
 	// IMPORTANT: registered BEFORE the protected /v1 group because Fiber's
