@@ -97,6 +97,23 @@ api.interceptors.response.use(
       }
     }
 
+    // 404 em /v1/instances/<uuid>/* = instance ID stale no frontend (deletada
+    // ou movida pra outro workspace). Invalida o cache global de instances
+    // pra forçar refetch e o user vê a lista atualizada na próxima nav.
+    // Disparamos o evento custom — quem ouve (LayoutClient com QueryClient)
+    // chama qc.invalidateQueries(["instances"]).
+    if (
+      error.response?.status === 404 &&
+      typeof originalRequest?.url === "string" &&
+      /\/v1\/instances\/[0-9a-f-]{36}/i.test(originalRequest.url)
+    ) {
+      try {
+        window.dispatchEvent(new CustomEvent("uniq:instance-stale", {
+          detail: { url: originalRequest.url },
+        }));
+      } catch { /* SSR */ }
+    }
+
     // 429 Too Many Requests: respeita Retry-After (segundos) ou
     // x-ratelimit-reset (RFC3339), default 5s. Faz 1 retry automático
     // depois do delay — UI não vê erro a menos que persista.

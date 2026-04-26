@@ -86,14 +86,27 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
   // Refresh inbox chats when instances are loaded
   useEffect(() => {
     if (!instances || instances.length === 0) return;
-    
+
     const connectedInstances = instances.filter((i: any) => i.status === "connected");
-    
+
     if (connectedInstances.length > 0 && pathname === "/inbox") {
       console.log("[Layout] Refreshing inbox for", connectedInstances.length, "instances");
       qc.invalidateQueries({ queryKey: ["chats"] });
     }
   }, [instances, pathname, qc]);
+
+  // Listener pro evento "instance-stale" disparado pelo interceptor axios
+  // quando bate 404 em /v1/instances/<id>/*. Invalida o cache de instances
+  // pra forçar refresh — sem isso o user fica preso vendo "instância não
+  // encontrada" mesmo a lista estando errada no client.
+  useEffect(() => {
+    function onStale() {
+      qc.invalidateQueries({ queryKey: ["instances"] });
+      qc.invalidateQueries({ queryKey: ["instances-for-inbox"] });
+    }
+    window.addEventListener("uniq:instance-stale", onStale);
+    return () => window.removeEventListener("uniq:instance-stale", onStale);
+  }, [qc]);
 
   if (sessionLoading) {
     return (
