@@ -199,9 +199,13 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
       // `items` chegam DESC (mais novo primeiro); a mais antiga é a última.
       return items[items.length - 1]?.at;
     },
-     enabled: !!wsId && canView,
-     refetchInterval: 2_000,
-   });
+    enabled: !!wsId && canView,
+    // Polling reduzido: WS dispara invalidate em conversation.message,
+    // então 30s é fallback caso o WS caia. Polling agressivo (2s) fazia
+    // <audio src> "mudar" toda vez que ResolveMediaURLs gerava signed URL
+    // nova → browser descartava o buffer e reproducão reiniciava.
+    refetchInterval: 30_000,
+  });
 
   const queuesQ = useQuery({
     queryKey: ["queues", wsId],
