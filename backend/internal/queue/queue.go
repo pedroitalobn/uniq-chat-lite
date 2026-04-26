@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -368,15 +369,30 @@ func (m *Manager) runConsumer(ctx context.Context, instanceID string, handler fu
 					d.Ack(false) // remove from queue regardless
 					if job.RetryCount < maxRetries {
 						job.RetryCount++
-						// Re-enqueue after a back-off
-						go func(j SendJob) {
-							time.Sleep(time.Duration(j.RetryCount*5) * time.Second)
+						// Backoff inteligente: erros normais usam exponencial 5s, 10s,
+						// 15s. Rate-limit do WhatsApp (usync 429 / "rate-overlimit"
+						// / "fill LID cache" do whatsmeow interno) só cura com tempo,
+						// então damos 60s+ pra cada retry — sem isso o retry rápido
+						// alimenta o próprio rate-limit em loop.
+						errStr := err.Error()
+						isRateLimit := strings.Contains(errStr, "429") ||
+							strings.Contains(errStr, "rate-overlimit") ||
+							strings.Contains(errStr, "to fill LID cache")
+						var delay time.Duration
+						if isRateLimit {
+							// 60s, 120s, 180s
+							delay = time.Duration(job.RetryCount*60) * time.Second
+						} else {
+							delay = time.Duration(job.RetryCount*5) * time.Second
+						}
+						go func(j SendJob, d time.Duration) {
+							time.Sleep(d)
 							if err := m.Enqueue(j); err != nil {
 								log.Error().Err(err).Str("job", j.ID.String()).Msg("queue: requeue failed")
 								// Publish directly to DLQ
 								m.sendToDLQ(j)
 							}
-						}(job)
+						}(job, delay)
 					} else {
 						m.sendToDLQ(job)
 					}

@@ -70,4 +70,9 @@ require (
 	golang.org/x/text v0.34.0 // indirect
 )
 
-replace go.mau.fi/whatsmeow => github.com/tulir/whatsmeow v0.0.0-20260322133016-ce4daa5e5a86
+// Fork local do whatsmeow com cherry-picks de PRs upstream relevantes:
+//   #1107 (poll vote LID), #1091 (range queries perf), #974 (GetManyPNsForLIDs),
+//   #1101 (bulk insert), #749 (BuildContact), #1106 (pin edit attr).
+// Branch: uniq-patches em vendor-fork/whatsmeow/. Veja CHANGELOG-WHATSMEOW.md
+// na raiz pra detalhes dos patches.
+replace go.mau.fi/whatsmeow => ../vendor-fork/whatsmeow
