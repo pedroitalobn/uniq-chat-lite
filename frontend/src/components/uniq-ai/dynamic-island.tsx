@@ -1,11 +1,13 @@
 "use client";
 
 // Dynamic Island do Uniq AI — pill/bubble flutuante que dá acesso ao chat
-// global em qualquer página. Inspirado no iOS 16+ e na implementação de
-// /Users/p/Documents/Dev/obliqthink, mas posicionada no rodapé (não topo).
+// global em qualquer página. Inspirado no iOS 16+ Dynamic Island.
 //
 // Layouts:
-//  - Desktop: pill no rodapé central → expande pra um popover com o chat.
+//  - Desktop: pill no TOPO central → MORFA in-place pra um chat expandido
+//    (mesmo elemento, layoutId compartilhado, transição spring fluida).
+//    É exatamente o efeito do iPhone: a ilha cresce a partir dela mesma
+//    em vez de surgir um popover separado.
 //  - Mobile: bubble FAB no canto direito inferior → abre bottom-sheet.
 //
 // Visibilidade: oculta em /uniq-ai (já é o chat full-screen) e em
@@ -129,76 +131,102 @@ export function UniqAIIsland() {
     );
   }
 
-  // Desktop: pill rodapé central + popover acima quando expandida.
+  // Desktop: TOPO central. Mesmo motion.div pro pill e pro chat expandido
+  // — Framer Motion tween automaticamente width/height/borderRadius/posição
+  // entre os dois layouts via layoutId. É o "morph" do iPhone Dynamic
+  // Island: a pill cresce in-place pra virar o chat e volta colapsando.
+  const isExpanded = state.mode === "expanded";
+  const islandSpring = { type: "spring" as const, stiffness: 380, damping: 32, mass: 0.8 };
+
   return (
     <>
-      {state.mode !== "expanded" && (
-        <motion.button
-          onClick={open}
-          initial={{ opacity: 0, y: 12, scale: 0.92 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 12, scale: 0.92 }}
-          transition={{ type: "spring", stiffness: 360, damping: 28 }}
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] flex items-center gap-2 px-4 py-2.5 rounded-full shadow-2xl group"
-          style={{
-            background: "rgba(10, 12, 14, 0.92)",
-            backdropFilter: "blur(12px)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.04)",
-          }}
-          aria-label="Abrir Uniq AI"
-        >
-          <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: "var(--green)" }}>
-            {state.mode === "executing"
-              ? <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
-              : state.mode === "result"
-                ? <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                : <Sparkles className="w-3.5 h-3.5 text-white" />}
-          </div>
-          <span className="text-xs font-medium text-white/90">
-            {state.mode === "executing"
-              ? (state.preview || "Processando…")
-              : state.mode === "result"
-                ? state.result.text.slice(0, 60)
-                : "Pergunte ao Uniq AI"}
-          </span>
-          <span className="text-[10px] text-white/40 font-mono ml-1 hidden sm:inline">⌘K</span>
-        </motion.button>
-      )}
-
+      {/* Backdrop (só no expanded). Click fora fecha. */}
       <AnimatePresence>
-        {state.mode === "expanded" && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={close}
-              className="fixed inset-0 z-[89] bg-black/40 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, y: 24, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 24, scale: 0.96 }}
-              transition={{ type: "spring", stiffness: 340, damping: 30 }}
-              className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] w-[min(820px,calc(100vw-2rem))] h-[min(680px,calc(100vh-6rem))] rounded-3xl overflow-hidden shadow-2xl flex flex-col"
-              style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}
-            >
-              <button
-                onClick={close}
-                className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
-                style={{ background: "var(--surface-3)", color: "var(--text-2)" }}
-                aria-label="Fechar"
-              >
-                <X className="w-4 h-4" />
-              </button>
-              <div className="flex-1 min-h-0">
-                <UniqAIChatPanel compact messages={messages} onMessagesChange={setMessages} />
-              </div>
-            </motion.div>
-          </>
+        {isExpanded && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            onClick={close}
+            className="fixed inset-0 z-[89] bg-black/40 backdrop-blur-sm"
+          />
         )}
       </AnimatePresence>
+
+      {/* A "ilha". Width/height/border-radius animam via layout, dando o
+          efeito de pill esticando até virar o chat. */}
+      <motion.div
+        layout
+        transition={islandSpring}
+        onClick={isExpanded ? undefined : open}
+        role={isExpanded ? undefined : "button"}
+        aria-label={isExpanded ? undefined : "Abrir Uniq AI"}
+        className={`fixed top-3 left-1/2 -translate-x-1/2 z-[90] overflow-hidden shadow-2xl ${
+          isExpanded
+            ? "w-[min(820px,calc(100vw-2rem))] h-[min(680px,calc(100vh-2.5rem))] rounded-3xl flex flex-col cursor-default"
+            : "h-10 rounded-full flex items-center gap-2 px-4 cursor-pointer"
+        }`}
+        style={{
+          background: isExpanded ? "var(--surface-1)" : "rgba(10, 12, 14, 0.92)",
+          backdropFilter: isExpanded ? undefined : "blur(12px)",
+          border: isExpanded ? "1px solid var(--surface-border)" : "1px solid rgba(255,255,255,0.08)",
+          boxShadow: isExpanded
+            ? "0 24px 80px rgba(0,0,0,0.55)"
+            : "0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.04)",
+        }}
+      >
+        {!isExpanded && (
+          // Conteúdo da pill (compacto). AnimatePresence interno faz fade
+          // entre os estados (idle/executing/result) sem reabrir a ilha.
+          <motion.div
+            layout="position"
+            className="flex items-center gap-2 w-full"
+          >
+            <div
+              className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: "var(--green)" }}
+            >
+              {state.mode === "executing"
+                ? <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+                : state.mode === "result"
+                  ? <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                  : <Sparkles className="w-3.5 h-3.5 text-white" />}
+            </div>
+            <span className="text-xs font-medium text-white/90 whitespace-nowrap">
+              {state.mode === "executing"
+                ? (state.preview || "Processando…")
+                : state.mode === "result"
+                  ? state.result.text.slice(0, 60)
+                  : "Pergunte ao Uniq AI"}
+            </span>
+            <span className="text-[10px] text-white/40 font-mono ml-1 hidden sm:inline">⌘K</span>
+          </motion.div>
+        )}
+
+        {isExpanded && (
+          // Conteúdo expandido — fade-in suave. layout="position" preserva
+          // o posicionamento durante o morph.
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.22, delay: 0.1 }}
+            className="flex-1 min-h-0 flex flex-col relative"
+          >
+            <button
+              onClick={close}
+              className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
+              style={{ background: "var(--surface-3)", color: "var(--text-2)" }}
+              aria-label="Fechar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex-1 min-h-0">
+              <UniqAIChatPanel compact messages={messages} onMessagesChange={setMessages} />
+            </div>
+          </motion.div>
+        )}
+      </motion.div>
     </>
   );
 }
