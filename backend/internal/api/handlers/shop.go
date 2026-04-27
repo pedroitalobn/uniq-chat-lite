@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -501,7 +502,7 @@ func (h *ShopHandler) ListProviders(c *fiber.Ctx) error {
 		Status      string `json:"status"` // ready / coming_soon
 	}
 	providers := []provider{
-		{ID: "shopify", Name: "Shopify", Region: "Global", Description: "Sincroniza produtos e pedidos via Admin API.", Status: "coming_soon"},
+		{ID: "shopify", Name: "Shopify", Region: "Global", Description: "Sincroniza produtos e pedidos via Admin API.", Status: "ready"},
 		{ID: "mercado_livre", Name: "Mercado Livre", Region: "BR / LATAM", Description: "Importa anúncios e recebe webhooks de pedidos.", Status: "coming_soon"},
 		{ID: "vtex", Name: "VTEX", Region: "BR Enterprise", Description: "Catalog API + OMS — maior plataforma BR de grandes lojas.", Status: "coming_soon"},
 		{ID: "magalu", Name: "Magazine Luiza Marketplace", Region: "BR", Description: "Marketplace BR — sync via API do parceiro.", Status: "coming_soon"},
@@ -596,6 +597,95 @@ func (h *ShopHandler) ConnectIntegration(c *fiber.Ctx) error {
 	}
 	return c.JSON(fiber.Map{"auth_url": authURL, "state": state})
 }
+
+// OAuthCallback — GET /v1/shops/integrations/oauth/callback?code=...&state=...&integration_id=...
+//
+// Endpoint genérico que delega ao provider via state. O frontend abre
+// o popup do provider; ele redireciona pra cá; aqui salvamos credentials.
+//
+// Auth: este endpoint é PROTEGIDO (precisa JWT) — só dono da integração
+// pode finalizar OAuth dela. Mas como Shopify+ML+VTEX redirecionam pra
+// URL fixa, o backend precisa achar a integração via integration_id no
+// query (passado no state).
+func (h *ShopHandler) OAuthCallback(c *fiber.Ctx) error {
+	wsID, err := h.workspaceID(c)
+	if err != nil {
+		return err
+	}
+	code := strings.TrimSpace(c.Query("code"))
+	stateQ := strings.TrimSpace(c.Query("state"))
+	integID := strings.TrimSpace(c.Query("integration_id"))
+	if code == "" || integID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "code e integration_id são obrigatórios"})
+	}
+	id, err := uuid.Parse(integID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "integration_id inválido"})
+	}
+	var integ models.ShopIntegration
+	if err := h.db.Joins("JOIN shops ON shops.id = shop_integrations.shop_id").
+		Where("shop_integrations.id = ? AND shops.workspace_id = ?", id, wsID).
+		First(&integ).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "integração não encontrada"})
+	}
+	// Valida state (anti-CSRF) — comparado ao que setamos em Connect.
+	var cfg map[string]any
+	if integ.Config != "" {
+		_ = json.Unmarshal([]byte(integ.Config), &cfg)
+	}
+	if savedState, _ := cfg["oauth_state"].(string); savedState != "" && savedState != stateQ {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "state inválido — possível CSRF"})
+	}
+
+	provider := shop.GetProvider(string(integ.Provider))
+	if provider == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "provider não disponível"})
+	}
+	redirectURI := config.AppConfig.FrontendURL + "/integrations/shop/oauth/callback"
+	if err := provider.HandleCallback(c.Context(), &integ, code, redirectURI); err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+	}
+	// Persiste credenciais + ativa integração.
+	if err := h.db.Model(&integ).Updates(map[string]any{
+		"credentials": integ.Credentials,
+		"is_active":   integ.IsActive,
+	}).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"success": true, "integration_id": integ.ID, "provider": integ.Provider})
+}
+
+// HandleProviderWebhook — POST /v1/shop/webhooks/:provider/:integrationId
+//
+// Endpoint público (sem JWT). Validação fica a cargo do provider via
+// HMAC/signature. Cada provider impl trata o body e atualiza products/orders.
+func (h *ShopHandler) HandleProviderWebhook(c *fiber.Ctx) error {
+	providerID := c.Params("provider")
+	integID, err := uuid.Parse(c.Params("integrationId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "integrationId inválido"})
+	}
+	var integ models.ShopIntegration
+	if err := h.db.First(&integ, "id = ? AND provider = ?", integID, providerID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "integração não encontrada"})
+	}
+	provider := shop.GetProvider(providerID)
+	if provider == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "provider desconhecido"})
+	}
+
+	headers := map[string]string{}
+	c.Request().Header.VisitAll(func(k, v []byte) {
+		headers[string(k)] = string(v)
+	})
+	if err := provider.HandleWebhook(c.Context(), h.db, &integ, headers, c.Body()); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"received": true})
+}
+
+// json é importado pro OAuthCallback acima.
+var _ = json.Marshal
 
 // getUserFromCtx — helper que pega *models.User dos Locals com ambas as
 // formas (ponteiro/valor) que diferentes middlewares usam.

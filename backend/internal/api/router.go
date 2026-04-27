@@ -973,6 +973,12 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	api.Get("/shops/integrations/providers", shopH.ListProviders)
 	api.Get("/shop/providers", shopH.ListProviders) // alias mais curto
 
+	// OAuth callback genérico (autenticado — só dono finaliza OAuth dele).
+	api.Get("/shops/integrations/oauth/callback", shopH.OAuthCallback)
+
+	// Webhooks dos providers (público, validado por HMAC do próprio provider).
+	app.Post("/v1/shop/webhooks/:provider/:integrationId", shopH.HandleProviderWebhook)
+
 	shops := api.Group("/shops", middleware.RequireFeature(db, models.FeatureShop))
 	shops.Get("/", shopH.ListShops)
 	shops.Post("/", shopH.CreateShop)

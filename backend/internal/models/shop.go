@@ -112,6 +112,9 @@ type Product struct {
 	LengthMm    int `gorm:"default:0" json:"length_mm,omitempty"`
 
 	// External provider — quando produto vem de Shopify/ML/VTEX/etc.
+	// Não tem unique index porque produtos manuais ficam com '' nos dois
+	// campos (e múltiplos manuais por workspace seriam negados).
+	// O sync faz upsert manual (lookup por external_provider+id).
 	ExternalProvider string `gorm:"type:varchar(30);index" json:"external_provider,omitempty"`
 	ExternalID       string `gorm:"type:varchar(120);index" json:"external_id,omitempty"`
 	ExternalData     string `gorm:"type:text" json:"-"` // cache do payload externo (debug)
