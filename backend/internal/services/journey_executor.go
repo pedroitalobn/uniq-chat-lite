@@ -318,9 +318,14 @@ func (e *JourneyExecutor) HandleIncoming(instanceID, messageID, fromJID, fromNam
 		return false
 	}
 
-	// Log estruturado pra ajudar a diagnosticar "por que a jornada não
-	// disparou". Info level (não Debug) pra aparecer em prod sem precisar
-	// mexer em config de log. Fica até decidirmos rebaixar depois.
+	// Sem jornadas ativas → early return SEM log. Antes logávamos sempre
+	// pra debug "por que a jornada não disparou", mas isso polui o log
+	// em instâncias que não usam jornadas (1 linha por mensagem inbound).
+	if len(journeys) == 0 {
+		return false
+	}
+
+	// Com jornadas ativas, log Info pra diagnosticar match/no-match.
 	log.Info().
 		Str("instance", instanceID).
 		Str("from", fromJID).
