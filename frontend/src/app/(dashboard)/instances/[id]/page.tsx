@@ -942,14 +942,55 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
           break;
         }
         case "carousel": {
-          const choices = carouselChoices.split("\n").filter(Boolean);
-          await messagesApi.sendMenu(instanceId, {
-            number: recipient,
-            type: "carousel",
-            text: carouselText,
-            choices,
-            footerText: carouselFooter || undefined,
-          });
+          // Parse do formato textarea pra cards estruturados:
+          //   [Título do card 1]
+          //   {https://imagem1.jpg}     ← image_url do header (opcional)
+          //   Texto|https://link.com    ← botão URL (auto-detecta http/tel/copy)
+          //   Texto|+5511999999999      ← botão call (telefone)
+          //   Texto|reply:btn_id        ← botão reply (id explícito)
+          //   [Título do card 2]
+          //   ...
+          type CardDraft = {
+            header: { title: string; image_url?: string };
+            body: string;
+            buttons: { id?: string; text: string; type?: "reply" | "url" | "call" | "copy"; url?: string; phone?: string; copy_code?: string }[];
+          };
+          const cards: CardDraft[] = [];
+          let current: CardDraft | null = null;
+          for (const raw of carouselChoices.split("\n")) {
+            const line = raw.trim();
+            if (!line) continue;
+            if (line.startsWith("[") && line.endsWith("]")) {
+              if (current) cards.push(current);
+              current = { header: { title: line.slice(1, -1).trim() }, body: carouselText || "", buttons: [] };
+            } else if (line.startsWith("{") && line.endsWith("}")) {
+              if (!current) current = { header: { title: "" }, body: carouselText || "", buttons: [] };
+              current.header.image_url = line.slice(1, -1).trim();
+            } else {
+              if (!current) current = { header: { title: "" }, body: carouselText || "", buttons: [] };
+              const [textPart, valuePart] = line.split("|");
+              const text = (textPart || "").trim();
+              const value = (valuePart || "").trim();
+              if (!text) continue;
+              if (/^https?:\/\//i.test(value)) {
+                current.buttons.push({ text, type: "url", url: value });
+              } else if (value.startsWith("+") || /^\d{10,}$/.test(value)) {
+                current.buttons.push({ text, type: "call", phone: value });
+              } else if (value.startsWith("reply:")) {
+                current.buttons.push({ text, type: "reply", id: value.slice(6) });
+              } else if (value) {
+                current.buttons.push({ text, type: "copy", copy_code: value });
+              } else {
+                current.buttons.push({ text, type: "reply", id: text.toLowerCase().replace(/\s+/g, "_") });
+              }
+            }
+          }
+          if (current) cards.push(current);
+          if (cards.length === 0) {
+            toast.error("Adicione ao menos um card no carrossel");
+            return;
+          }
+          await messagesApi.sendCarousel(instanceId, { to: recipient, cards });
           break;
         }
       }

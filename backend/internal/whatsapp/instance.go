@@ -445,13 +445,11 @@ func (ic *InstanceClient) resolveRecipient(ctx context.Context, jid types.JID) t
 		}
 	}
 
-	// Fallback BR: número móvel brasileiro tem o "9" extra que foi adicionado
-	// pelo governo em 2012, mas muitos contatos no WhatsApp ainda têm o JID
-	// antigo de 12 dígitos (55+DD+XXXXXXXX) em vez de 13 (55+DD+9XXXXXXXX).
-	// Se o input tem 13 dígitos com prefixo BR mobile (9 após DDD), também
-	// tenta a variante sem o 9 — se ela tiver LID/cache hit, usa ela. Caso
-	// contrário mantém a forma original.
-	if alt := brazilianMobileVariant(jid); !alt.IsEmpty() {
+	// Fallback BR: o "9" móvel foi adicionado em 2012, mas o WhatsApp
+	// pode ter contatos com JID de 12 dígitos (sem 9, formato antigo) OU
+	// 13 dígitos (com 9, formato novo). Independente do que o frontend
+	// mande, tentamos a variante alternativa via cache local + LIDs store.
+	for _, alt := range brazilianMobileVariants(jid) {
 		ic.recipientCacheMu.RLock()
 		altCached, altOK := ic.recipientCache[alt.String()]
 		ic.recipientCacheMu.RUnlock()
@@ -470,23 +468,42 @@ func (ic *InstanceClient) resolveRecipient(ctx context.Context, jid types.JID) t
 	return jid
 }
 
-// brazilianMobileVariant retorna a variante "sem 9" de um número BR mobile
-// (55 + DDD + 9XXXXXXXX → 55 + DDD + XXXXXXXX). Se o JID não casa esse
-// padrão, retorna empty. Útil pra fallback de contatos antigos no WhatsApp
-// que ainda usam o JID de 12 dígitos.
-func brazilianMobileVariant(jid types.JID) types.JID {
+// brazilianMobileVariants retorna as variantes BR (com 9 / sem 9) que
+// devem ser testadas como alternativas ao JID original. Cobre os 2 casos:
+//
+//   - Input 13 dig "55 + DDD + 9 + 8" (com 9, formato novo) →
+//     variante "55 + DDD + 8" (sem 9, formato antigo)
+//   - Input 12 dig "55 + DDD + 8" (sem 9, formato antigo) →
+//     variante "55 + DDD + 9 + 8" (com 9, formato novo)
+//
+// Só retorna variantes pra DDDs móveis (>=10). Inputs não-BR ou de
+// formatos diferentes retornam slice vazia.
+func brazilianMobileVariants(jid types.JID) []types.JID {
+	if jid.Server != types.DefaultUserServer {
+		return nil
+	}
 	user := jid.User
-	// 55 (BR) + 2 dígitos DDD + 9 + 8 dígitos = 13 caracteres totais
-	if len(user) != 13 || !strings.HasPrefix(user, "55") {
-		return types.JID{}
+	if !strings.HasPrefix(user, "55") {
+		return nil
 	}
-	// 5° dígito (índice 4) tem que ser '9' (prefixo móvel)
-	if user[4] != '9' {
-		return types.JID{}
+	switch len(user) {
+	case 13:
+		// 5585 + 9 + 92502010 — tira o '9' do índice 4
+		if user[4] != '9' {
+			return nil
+		}
+		return []types.JID{{
+			User:   user[:4] + user[5:],
+			Server: types.DefaultUserServer,
+		}}
+	case 12:
+		// 5585 + 92502010 — adiciona '9' no índice 4 (entre DDD e número)
+		return []types.JID{{
+			User:   user[:4] + "9" + user[4:],
+			Server: types.DefaultUserServer,
+		}}
 	}
-	// Remove o '9' na posição 4
-	altUser := user[:4] + user[5:]
-	return types.JID{User: altUser, Server: types.DefaultUserServer}
+	return nil
 }
 
 func (ic *InstanceClient) cacheRecipient(phoneJID, resolved types.JID) {
