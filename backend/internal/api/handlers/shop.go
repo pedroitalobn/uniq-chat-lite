@@ -511,7 +511,7 @@ func (h *ShopHandler) ListProviders(c *fiber.Ctx) error {
 		{ID: "ebay", Name: "eBay", Region: "EUA / Global", Description: "Sell + Inventory API — listings + orders.", Status: "coming_soon"},
 		{ID: "woocommerce", Name: "WooCommerce", Region: "Global", Description: "REST API self-hosted (WordPress).", Status: "coming_soon"},
 		{ID: "bigcommerce", Name: "BigCommerce", Region: "EUA / Global", Description: "Storefront + Catalog API.", Status: "coming_soon"},
-		{ID: "whatsapp_catalog", Name: "WhatsApp Catalog", Region: "Global", Description: "Sincroniza produtos pro catálogo do WhatsApp Business.", Status: "coming_soon"},
+		{ID: "whatsapp_catalog", Name: "WhatsApp Catalog", Region: "Global", Description: "Sincroniza produtos pro catálogo do WhatsApp Business (Meta Commerce).", Status: "ready"},
 	}
 	return c.JSON(providers)
 }
