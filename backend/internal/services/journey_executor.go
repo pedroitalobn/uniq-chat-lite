@@ -854,6 +854,10 @@ func (e *JourneyExecutor) executeStep(ctx *execCtx, step *models.FlowStep) (*mod
 		return e.stepRemoveTag(ctx, step)
 	case models.StepTypeUpdateStage:
 		return e.stepUpdateStage(ctx, step)
+	case models.StepTypeProductSearch:
+		return e.stepProductSearch(ctx, step)
+	case models.StepTypeProductCarousel:
+		return e.stepProductCarousel(ctx, step)
 	case models.StepTypeEnd:
 		return nil, false, nil
 	default:

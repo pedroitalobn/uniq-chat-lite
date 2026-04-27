@@ -366,6 +366,9 @@ const (
 	StepTypeAddTag      StepType = "add_tag"      // adiciona tag no contato
 	StepTypeRemoveTag   StepType = "remove_tag"   // remove tag
 	StepTypeEnd         StepType = "end"          // encerra execução explicitamente
+	// Shop / Products integration nodes
+	StepTypeProductSearch   StepType = "product_search"   // busca produtos por keyword/categoria → var
+	StepTypeProductCarousel StepType = "product_carousel" // envia lista interativa de produtos do shop
 )
 
 type FlowStep struct {

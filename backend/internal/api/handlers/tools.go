@@ -53,6 +53,12 @@ func (h *ToolsHandler) ExecuteToolCall(userID uuid.UUID, toolCall models.ToolCal
 		result.Result = h.sendMessage(userID, args)
 	case "get_user_context":
 		result.Result = h.getUserContext(userID)
+	case "list_products":
+		result.Result = h.toolListProducts(userID, args)
+	case "search_products":
+		result.Result = h.toolSearchProducts(userID, args)
+	case "get_product_details":
+		result.Result = h.toolGetProductDetails(userID, args)
 	default:
 		result.Error = fmt.Sprintf("tool '%s' não encontrada", toolCall.Name)
 	}

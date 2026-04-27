@@ -136,6 +136,33 @@ var AvailableTools = []Tool{
 		Description: "Obtém contexto geral do usuário: instâncias, integrações ativas, contagem de jornadas e grupos.",
 		Parameters:  map[string]Parameter{},
 	},
+	// ─── Shop / Products tools ──────────────────────────────────────────
+	{
+		Name:        "list_products",
+		Description: "Lista produtos do catálogo (Shop) do workspace ativo. Retorna nome, preço, SKU, estoque e imagem. Use limit pra controlar tamanho do retorno.",
+		Parameters: map[string]Parameter{
+			"shop_id": {Type: "string", Description: "Filtrar por shop específica (UUID, opcional)", Required: false},
+			"limit":   {Type: "integer", Description: "Máximo de produtos (default 10, max 50)", Required: false},
+		},
+	},
+	{
+		Name:        "search_products",
+		Description: "Busca produtos por palavra-chave em nome, descrição ou SKU. Use pra responder perguntas de cliente sobre disponibilidade.",
+		Parameters: map[string]Parameter{
+			"query":     {Type: "string", Description: "Termo de busca (ex: 'tênis nike')", Required: true},
+			"shop_id":   {Type: "string", Description: "Restringir a uma shop (UUID, opcional)", Required: false},
+			"max_price": {Type: "number", Description: "Preço máximo (opcional)", Required: false},
+			"min_price": {Type: "number", Description: "Preço mínimo (opcional)", Required: false},
+			"limit":     {Type: "integer", Description: "Máximo de resultados (default 5)", Required: false},
+		},
+	},
+	{
+		Name:        "get_product_details",
+		Description: "Detalhes completos de um produto: descrição, preço, estoque, imagens, categoria.",
+		Parameters: map[string]Parameter{
+			"product_id": {Type: "string", Description: "UUID do produto", Required: true},
+		},
+	},
 }
 
 func GetToolsJSON() string {

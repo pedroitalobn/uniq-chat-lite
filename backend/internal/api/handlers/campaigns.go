@@ -278,6 +278,12 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 			Tags       []string `json:"tags,omitempty"`
 			Owner      string   `json:"owner,omitempty"`
 			ExternalID string   `json:"external_id,omitempty"`
+			// Shop / Purchase history filters — INNER JOIN com orders
+			PurchasedShopID    string  `json:"purchased_shop_id,omitempty"`    // só compradores dessa shop
+			PurchasedSinceDays int     `json:"purchased_since_days,omitempty"` // janela "últimos N dias"
+			PurchasedMinTotal  float64 `json:"purchased_min_total,omitempty"`  // ticket médio mínimo
+			PurchasedStatus    string  `json:"purchased_status,omitempty"`     // ex: "paid"
+			NeverPurchased     bool    `json:"never_purchased,omitempty"`      // contatos SEM nenhum pedido
 		} `json:"segment_filter"`
 	}
 	if err := c.BodyParser(&req); err != nil {
@@ -387,12 +393,17 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 
 // resolveSegmentedContacts queries contacts matching the segment filter
 func (h *CampaignHandler) resolveSegmentedContacts(userID uuid.UUID, filter struct {
-	Funnel     string   `json:"funnel,omitempty"`
-	Stage      string   `json:"stage,omitempty"`
-	Journey    string   `json:"journey,omitempty"`
-	Tags       []string `json:"tags,omitempty"`
-	Owner      string   `json:"owner,omitempty"`
-	ExternalID string   `json:"external_id,omitempty"`
+	Funnel             string   `json:"funnel,omitempty"`
+	Stage              string   `json:"stage,omitempty"`
+	Journey            string   `json:"journey,omitempty"`
+	Tags               []string `json:"tags,omitempty"`
+	Owner              string   `json:"owner,omitempty"`
+	ExternalID         string   `json:"external_id,omitempty"`
+	PurchasedShopID    string   `json:"purchased_shop_id,omitempty"`
+	PurchasedSinceDays int      `json:"purchased_since_days,omitempty"`
+	PurchasedMinTotal  float64  `json:"purchased_min_total,omitempty"`
+	PurchasedStatus    string   `json:"purchased_status,omitempty"`
+	NeverPurchased     bool     `json:"never_purchased,omitempty"`
 }) []models.Contact {
 	query := h.db.Where("user_id = ?", userID)
 
@@ -415,6 +426,33 @@ func (h *CampaignHandler) resolveSegmentedContacts(userID uuid.UUID, filter stru
 		query = query.Joins("INNER JOIN contact_tags ON contact_tags.contact_id = contacts.id").
 			Joins("INNER JOIN tags ON tags.id = contact_tags.tag_id").
 			Where("tags.name IN ?", filter.Tags)
+	}
+
+	// Purchase history segmentation — junta com orders quando há ContactID.
+	hasPurchaseFilter := filter.PurchasedShopID != "" || filter.PurchasedSinceDays > 0 ||
+		filter.PurchasedMinTotal > 0 || filter.PurchasedStatus != ""
+	if hasPurchaseFilter {
+		query = query.Joins("INNER JOIN orders ON orders.contact_id = contacts.id")
+		if filter.PurchasedShopID != "" {
+			if sid, err := uuid.Parse(filter.PurchasedShopID); err == nil {
+				query = query.Where("orders.shop_id = ?", sid)
+			}
+		}
+		if filter.PurchasedSinceDays > 0 {
+			cutoff := time.Now().AddDate(0, 0, -filter.PurchasedSinceDays)
+			query = query.Where("orders.created_at >= ?", cutoff)
+		}
+		if filter.PurchasedMinTotal > 0 {
+			query = query.Where("orders.total >= ?", filter.PurchasedMinTotal)
+		}
+		if filter.PurchasedStatus != "" {
+			query = query.Where("orders.status = ?", filter.PurchasedStatus)
+		}
+	}
+	if filter.NeverPurchased {
+		// LEFT JOIN + IS NULL — só contatos sem pedido nenhum.
+		query = query.Joins("LEFT JOIN orders ON orders.contact_id = contacts.id").
+			Where("orders.id IS NULL")
 	}
 
 	var contacts []models.Contact
