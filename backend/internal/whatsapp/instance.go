@@ -2,6 +2,7 @@ package whatsapp
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"github.com/uniq-chat/backend/internal/queue"
 	"github.com/uniq-chat/backend/internal/storage"
 	"go.mau.fi/whatsmeow"
+	waBinary "go.mau.fi/whatsmeow/binary"
 	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waCompanionReg"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -1180,12 +1182,22 @@ func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []
 		return "", fmt.Errorf("no valid buttons after parsing")
 	}
 
+	// MessageParamsJSON com from+templateId — required pra que o WhatsApp
+	// não descarte silenciosamente. Sem isso retorna 200 OK na stanza mas
+	// recipient nunca vê a mensagem.
+	templateID := fmt.Sprintf("%d", time.Now().UnixNano()/1_000_000)
+	messageParamsJSON := fmt.Sprintf(`{"from":"api","templateId":"%s"}`, templateID)
+
+	// MessageSecret 32 bytes — required pra iOS rendererizar interactive.
+	secret := make([]byte, 32)
+	_, _ = cryptorand.Read(secret)
+
 	interactive := &waE2E.InteractiveMessage{
 		Body: &waE2E.InteractiveMessage_Body{Text: proto.String(body)},
 		InteractiveMessage: &waE2E.InteractiveMessage_NativeFlowMessage_{
 			NativeFlowMessage: &waE2E.InteractiveMessage_NativeFlowMessage{
 				Buttons:           nfButtons,
-				MessageParamsJSON: proto.String(""),
+				MessageParamsJSON: proto.String(messageParamsJSON),
 				MessageVersion:    proto.Int32(1),
 			},
 		},
@@ -1195,9 +1207,38 @@ func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []
 		interactive.Footer = &waE2E.InteractiveMessage_Footer{Text: proto.String(footer)}
 	}
 
-	msg := &waE2E.Message{InteractiveMessage: interactive}
+	// Decide flowName pelos botões (mixed pra URL/Call/Copy + reply, etc).
+	hasNonReply := false
+	for _, b := range buttons {
+		t := strings.ToLower(strings.TrimSpace(b.Type))
+		if t == "url" || strings.TrimSpace(b.URL) != "" ||
+			t == "call" || strings.TrimSpace(b.Phone) != "" ||
+			t == "copy" || strings.TrimSpace(b.CopyCode) != "" {
+			hasNonReply = true
+			break
+		}
+	}
 
-	res, err := ic.client.SendMessage(context.Background(), recipient, msg)
+	// Wrap em DocumentWithCaptionMessage + biz nodes — esse combo era o
+	// que fazia URL/Call/Copy renderizarem em prod. Reply puro também
+	// funciona com o mesmo wrap, contanto que o messageParamsJSON tenha
+	// from+templateId.
+	msg := &waE2E.Message{
+		DocumentWithCaptionMessage: &waE2E.FutureProofMessage{
+			Message: &waE2E.Message{
+				InteractiveMessage: interactive,
+				MessageContextInfo: &waE2E.MessageContextInfo{
+					MessageSecret: secret,
+				},
+			},
+		},
+	}
+
+	bizNodes := buildButtonsBizNodes(hasNonReply)
+
+	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
+		AdditionalNodes: &bizNodes,
+	})
 	if err != nil {
 		log.Warn().
 			Str("instance", ic.ID).
@@ -1207,6 +1248,33 @@ func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []
 		return ic.SendButtonsFallbackMessage(to, body, footer, buttons)
 	}
 	return res.ID, nil
+}
+
+// buildButtonsBizNodes monta os nós XML <biz><interactive type="native_flow">
+// que vão como AdditionalNodes na stanza. Esse combo é necessário pra
+// renderizar botões em recipients modernos — sem ele, mensagem chega
+// como texto puro ou é silenciosamente descartada.
+func buildButtonsBizNodes(interactive bool) []waBinary.Node {
+	flowType := "quick_reply"
+	if interactive {
+		flowType = "mixed"
+	}
+	return []waBinary.Node{
+		{
+			Tag: "biz",
+			Content: []waBinary.Node{{
+				Tag: "interactive",
+				Attrs: waBinary.Attrs{
+					"type": "native_flow",
+					"v":    "1",
+				},
+				Content: []waBinary.Node{{
+					Tag:   "native_flow",
+					Attrs: waBinary.Attrs{"v": "9", "name": flowType},
+				}},
+			}},
+		},
+	}
 }
 
 // buildNativeFlowButtons extrai a parte que monta os botões NativeFlow
@@ -1438,6 +1506,13 @@ func (ic *InstanceClient) SendPixMessage(to string, data PixData) (string, error
 		return "", fmt.Errorf("falha ao serializar payload pix: %w", err)
 	}
 
+	// Mesmo combo de SendButtonsMessage: messageParamsJSON + secret + wrap + biz.
+	templateID := fmt.Sprintf("%d", time.Now().UnixNano()/1_000_000)
+	messageParamsJSON := fmt.Sprintf(`{"from":"api","templateId":"%s"}`, templateID)
+
+	secret := make([]byte, 32)
+	_, _ = cryptorand.Read(secret)
+
 	interactive := &waE2E.InteractiveMessage{
 		Header: &waE2E.InteractiveMessage_Header{
 			Title:              proto.String(data.HeaderTitle),
@@ -1450,7 +1525,7 @@ func (ic *InstanceClient) SendPixMessage(to string, data PixData) (string, error
 					Name:             proto.String("payment_info"),
 					ButtonParamsJSON: proto.String(string(paymentJSON)),
 				}},
-				MessageParamsJSON: proto.String(""),
+				MessageParamsJSON: proto.String(messageParamsJSON),
 				MessageVersion:    proto.Int32(1),
 			},
 		},
@@ -1460,9 +1535,38 @@ func (ic *InstanceClient) SendPixMessage(to string, data PixData) (string, error
 		interactive.Footer = &waE2E.InteractiveMessage_Footer{Text: proto.String(footer)}
 	}
 
-	msg := &waE2E.Message{InteractiveMessage: interactive}
+	msg := &waE2E.Message{
+		DocumentWithCaptionMessage: &waE2E.FutureProofMessage{
+			Message: &waE2E.Message{
+				InteractiveMessage: interactive,
+				MessageContextInfo: &waE2E.MessageContextInfo{
+					MessageSecret: secret,
+				},
+			},
+		},
+	}
 
-	res, err := ic.client.SendMessage(context.Background(), recipient, msg)
+	// PIX usa flow type "review_and_pay".
+	pixNodes := []waBinary.Node{
+		{
+			Tag: "biz",
+			Content: []waBinary.Node{{
+				Tag: "interactive",
+				Attrs: waBinary.Attrs{
+					"type": "native_flow",
+					"v":    "1",
+				},
+				Content: []waBinary.Node{{
+					Tag:   "native_flow",
+					Attrs: waBinary.Attrs{"v": "9", "name": "review_and_pay"},
+				}},
+			}},
+		},
+	}
+
+	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
+		AdditionalNodes: &pixNodes,
+	})
 	if err != nil {
 		log.Warn().Str("instance", ic.ID).Err(err).Msg("PIX send failed, falling back to text")
 		fallback := fmt.Sprintf("*%s*\n\n%s\n\n💳 *Pagamento PIX*\nFavor: %s\nChave (%s): `%s`",
@@ -1634,9 +1738,41 @@ func (ic *InstanceClient) SendListMessage(to, title, description, buttonText, fo
 		Sections:    protoSections,
 	}
 
-	msg := &waE2E.Message{ListMessage: listMsg}
+	secret := make([]byte, 32)
+	_, _ = cryptorand.Read(secret)
 
-	res, err := ic.client.SendMessage(context.Background(), recipient, msg)
+	// Lista também precisa do wrap+biz pra renderizar como UI nativa.
+	msg := &waE2E.Message{
+		DocumentWithCaptionMessage: &waE2E.FutureProofMessage{
+			Message: &waE2E.Message{
+				ListMessage: listMsg,
+				MessageContextInfo: &waE2E.MessageContextInfo{
+					MessageSecret: secret,
+				},
+			},
+		},
+	}
+
+	bizNodes := []waBinary.Node{
+		{
+			Tag: "biz",
+			Content: []waBinary.Node{{
+				Tag: "interactive",
+				Attrs: waBinary.Attrs{
+					"type": "native_flow",
+					"v":    "1",
+				},
+				Content: []waBinary.Node{{
+					Tag:   "native_flow",
+					Attrs: waBinary.Attrs{"v": "2", "name": "product_list"},
+				}},
+			}},
+		},
+	}
+
+	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
+		AdditionalNodes: &bizNodes,
+	})
 	if err != nil {
 		log.Warn().Str("instance", ic.ID).Err(err).Msg("interactive list send failed, falling back to text")
 		return ic.SendListFallbackMessage(to, title, description, buttonText, footer, sections)
