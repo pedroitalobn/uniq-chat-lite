@@ -407,6 +407,8 @@ const SECTIONS: Section[] = [
       { method: "GET",    path: "/v1/conversations/{id}/csat", description: "Pesquisas de satisfação dessa conversa", auth: "bearer" },
       { method: "POST",   path: "/v1/conversations/{id}/csat", description: "Disparar CSAT manualmente", auth: "bearer" },
       { method: "POST",   path: "/v1/conversations/bulk", description: "Ações em lote (até 200 ids). Actions: resolve, close, reopen, snooze, unsnooze, read, unread, assign, unassign, transfer, archive, unarchive, pin, unpin, mute, unmute", auth: "bearer", body: { ids: ["<uuid>", "<uuid>"], action: "transfer", queue_id: "<uuid>", note: "Triagem" } },
+      { method: "GET",    path: "/v1/conversations/{id}/shop-context", description: "Contexto comercial do contato: últimos 10 pedidos + totais (gasto, ticket médio, qtde, último pedido)", auth: "bearer" },
+      { method: "GET",    path: "/v1/contacts/{id}/orders", description: "Pedidos paginados de um contato (limit/offset)", auth: "bearer" },
     ],
   },
   {
