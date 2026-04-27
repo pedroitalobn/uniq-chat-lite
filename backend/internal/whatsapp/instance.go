@@ -1250,15 +1250,13 @@ func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []
 	return res.ID, nil
 }
 
-// buildButtonsBizNodes monta os nós XML <biz><interactive type="native_flow">
-// que vão como AdditionalNodes na stanza. Esse combo é necessário pra
-// renderizar botões em recipients modernos — sem ele, mensagem chega
-// como texto puro ou é silenciosamente descartada.
-func buildButtonsBizNodes(interactive bool) []waBinary.Node {
-	flowType := "quick_reply"
-	if interactive {
-		flowType = "mixed"
-	}
+// buildButtonsBizNodes monta os nós XML <biz><interactive type="native_flow">.
+//
+// Sempre usa flow name="mixed" — em testes em prod, "quick_reply" puro
+// chegava sem renderizar enquanto "mixed" (URL/Call/Copy) renderizava.
+// "mixed" aceita todos os tipos de botão e é o caminho que o WhatsApp
+// passa pelo gate anti-spam pra recipients de contas pessoais.
+func buildButtonsBizNodes(_ bool) []waBinary.Node {
 	return []waBinary.Node{
 		{
 			Tag: "biz",
@@ -1270,7 +1268,7 @@ func buildButtonsBizNodes(interactive bool) []waBinary.Node {
 				},
 				Content: []waBinary.Node{{
 					Tag:   "native_flow",
-					Attrs: waBinary.Attrs{"v": "9", "name": flowType},
+					Attrs: waBinary.Attrs{"v": "9", "name": "mixed"},
 				}},
 			}},
 		},

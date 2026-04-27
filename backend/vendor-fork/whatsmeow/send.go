@@ -322,7 +322,10 @@ func (cli *Client) SendMessage(ctx context.Context, to types.JID, message *waE2E
 		resp.DebugTimings.GetParticipants = time.Since(start)
 	} else if to.Server == types.HiddenUserServer {
 		ownID = cli.getOwnLID()
-	} else if to.Server == types.DefaultUserServer && cli.Store.LIDMigrationTimestamp > 0 && !req.Peer {
+	} else if to.Server == types.DefaultUserServer && cli.Store.LIDMigrationTimestamp > 0 && !req.Peer && !isInteractiveMessage(message) {
+		// PATCH UNIQ: skip LID migration pra interactive messages.
+		// Servidor WhatsApp rejeita interactive enviado pra LID com 405.
+		// Mantemos PN no destino — protocolo legacy aceita interactive.
 		start := time.Now()
 		var toLID types.JID
 		toLID, err = cli.Store.LIDs.GetLIDForPN(ctx, to)
@@ -1422,4 +1425,27 @@ func (cli *Client) encryptMessageForDevice(
 		Attrs:   encAttrs,
 		Content: ciphertext.Serialize(),
 	}, includeDeviceIdentity, nil
+}
+
+
+// isInteractiveMessage retorna true se a mensagem é interactive/list/template
+// — esses tipos são rejeitados (405) quando enviados pra LID, então o PATCH
+// UNIQ skipa LID migration pra esses casos.
+func isInteractiveMessage(msg *waE2E.Message) bool {
+	if msg == nil {
+		return false
+	}
+	if msg.InteractiveMessage != nil || msg.ListMessage != nil ||
+		msg.TemplateMessage != nil || msg.ButtonsMessage != nil {
+		return true
+	}
+	// Wrapped em DocumentWithCaptionMessage / FutureProofMessage
+	if msg.DocumentWithCaptionMessage != nil && msg.DocumentWithCaptionMessage.Message != nil {
+		inner := msg.DocumentWithCaptionMessage.Message
+		if inner.InteractiveMessage != nil || inner.ListMessage != nil ||
+			inner.TemplateMessage != nil || inner.ButtonsMessage != nil {
+			return true
+		}
+	}
+	return false
 }
