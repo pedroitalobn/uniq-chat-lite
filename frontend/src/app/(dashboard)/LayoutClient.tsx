@@ -110,7 +110,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
 
   if (sessionLoading) {
     return (
-      <main className="flex-1 overflow-hidden bg-dot-grid">
+      <main className="flex-1 overflow-hidden">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 lg:py-8 pt-16 lg:pt-8 h-full flex items-center justify-center">
           <div className="flex items-center gap-3">
             <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -123,7 +123,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
 
   if (isFullWidth) {
     return (
-      <main className="flex-1 overflow-hidden bg-dot-grid">
+      <main className="flex-1 overflow-hidden">
         <div className="px-4 sm:px-6 py-6 lg:py-8 pt-16 lg:pt-8 h-full overflow-y-auto">
           {children}
         </div>
@@ -135,7 +135,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
   // breakpoints. Laterais ganham espaço; conteúdo que precisa de leitura
   // confortável usa max-w no próprio componente (ex: settings forms).
   return (
-    <main className="flex-1 overflow-hidden bg-dot-grid">
+    <main className="flex-1 overflow-hidden">
       <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pt-16 lg:pt-8 h-full overflow-y-auto">
         {children}
       </div>
