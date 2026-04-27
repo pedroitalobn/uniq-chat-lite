@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronRight, ChevronDown, Copy, Check, Globe, Key,
   MessageSquare, Webhook, Smartphone, Send, BookOpen,
   Users, Tag, Megaphone, Bot, Settings, Zap,
   Hash, FileText, Phone, Video, Image, Music, MapPin,
   RefreshCw, Lock, LogIn, CreditCard, BarChart2, Inbox, Server,
-  Building2, Activity, UserCheck, Mail
+  Building2, Activity, UserCheck, Mail, Search, X,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 
@@ -508,7 +508,17 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function EndpointCard({ ep }: { ep: Endpoint }) {
+// endpointSlug — gera ID estável pra anchor + key (ex: "post-v1-server-instance-messages-text").
+function endpointSlug(ep: Endpoint): string {
+  const cleanPath = ep.path
+    .replace(/[{}]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase();
+  return `${ep.method.toLowerCase()}-${cleanPath}`;
+}
+
+function EndpointCard({ ep, anchor }: { ep: Endpoint; anchor: string }) {
   const [open, setOpen] = useState(false);
   const mc = METHOD_COLORS[ep.method];
   const auth = ep.auth ? AUTH_LABELS[ep.auth] : AUTH_LABELS.none;
@@ -522,30 +532,40 @@ function EndpointCard({ ep }: { ep: Endpoint }) {
   const curlCmd = `curl -X ${ep.method} ${BASE}${ep.path} ${curlAuth}${curlBody}`;
 
   return (
-    <div className="rounded-xl overflow-hidden border" style={{ borderColor: "hsl(240 8% 16%)" }}>
+    <div id={anchor} className="rounded-xl overflow-hidden border scroll-mt-24" style={{ borderColor: "hsl(240 8% 16%)" }}>
       <button
-        className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/5"
+        className="w-full text-left transition-colors hover:bg-white/5"
         style={{ background: "hsl(240 8% 10%)" }}
         onClick={() => setOpen(!open)}
       >
-        <span className="text-xs font-bold px-2 py-0.5 rounded shrink-0 min-w-[52px] text-center" style={{ background: mc.bg, color: mc.text }}>
-          {ep.method}
-        </span>
-        <code className="text-sm font-mono flex-1 truncate" style={{ color: "hsl(240 8% 80%)" }}>{ep.path}</code>
-        <span className="text-xs hidden sm:block shrink-0" style={{ color: "hsl(240 8% 46%)" }}>{ep.description}</span>
-        {ep.auth && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0 font-medium" style={{ background: `${auth.color}20`, color: auth.color }}>
-            {auth.label}
+        {/* Linha 1: METHOD + PATH (sempre visível, sem truncate) + auth + chevron */}
+        <div className="flex items-center gap-3 px-4 pt-3">
+          <span className="text-xs font-bold px-2 py-0.5 rounded shrink-0 min-w-[52px] text-center" style={{ background: mc.bg, color: mc.text }}>
+            {ep.method}
           </span>
-        )}
-        {open
-          ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: "hsl(240 8% 40%)" }} />
-          : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: "hsl(240 8% 40%)" }} />}
+          <code className="text-sm font-mono flex-1 break-all leading-relaxed" style={{ color: "hsl(240 8% 88%)" }}>
+            {ep.path}
+          </code>
+          {ep.auth && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0 font-medium hidden sm:inline" style={{ background: `${auth.color}20`, color: auth.color }}>
+              {auth.label}
+            </span>
+          )}
+          {open
+            ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: "hsl(240 8% 40%)" }} />
+            : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: "hsl(240 8% 40%)" }} />}
+        </div>
+        {/* Linha 2: descrição (cor mais soft, com indent pra alinhar com o path) */}
+        <p className="text-xs leading-relaxed pl-[76px] pr-4 pb-3 pt-1" style={{ color: "hsl(240 8% 55%)" }}>
+          {ep.description}
+        </p>
       </button>
 
       {open && (
         <div className="px-5 py-4 space-y-4 border-t" style={{ background: "hsl(240 8% 8%)", borderColor: "hsl(240 8% 14%)" }}>
-          <p className="text-sm" style={{ color: "hsl(240 8% 65%)" }}>{ep.description}</p>
+          {/* Description já aparece no header agora — removida daqui pra
+              não duplicar. Se precisar de copy do path no detalhe, é
+              renderizado pelo bloco de cURL abaixo. */}
 
           {ep.auth && ep.auth !== "none" && (
             <div>
@@ -603,9 +623,61 @@ function EndpointCard({ ep }: { ep: Endpoint }) {
 
 export default function ApiDocsPage() {
   const [activeSection, setActiveSection] = useState("messages");
+  const [activeAnchor, setActiveAnchor] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  // Quais seções vêm expandidas no menu — só a ativa por padrão.
+  // Set vazio significa "expande só a active". User pode clicar no
+  // chevron pra expandir outras sem trocar de seção.
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set([activeSection]));
 
   const totalEndpoints = SECTIONS.reduce((sum, s) => sum + s.endpoints.length, 0);
   const activeS = SECTIONS.find(s => s.id === activeSection)!;
+
+  // Filtrar endpoints pela busca (search é case-insensitive em path + description).
+  const searchLower = search.trim().toLowerCase();
+  const matchesSearch = (ep: Endpoint) =>
+    !searchLower ||
+    ep.path.toLowerCase().includes(searchLower) ||
+    ep.description.toLowerCase().includes(searchLower) ||
+    ep.method.toLowerCase().includes(searchLower);
+
+  // Quando busca está ativa, expandir todas as seções com matches.
+  const sectionMatches = useMemo(() => {
+    return SECTIONS.map(s => ({
+      ...s,
+      filteredEndpoints: s.endpoints.filter(matchesSearch),
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchLower]);
+
+  useEffect(() => {
+    if (searchLower) {
+      // Auto-expande seções com match enquanto o user digita.
+      setOpenSections(new Set(sectionMatches.filter(s => s.filteredEndpoints.length > 0).map(s => s.id)));
+    } else {
+      // Sem busca, mantém só a ativa expandida.
+      setOpenSections(new Set([activeSection]));
+    }
+  }, [searchLower, activeSection, sectionMatches]);
+
+  const toggleSection = (id: string) => {
+    setOpenSections(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  // Click num endpoint da sidebar: troca seção + scroll suave pro anchor.
+  const goToEndpoint = (sectionId: string, anchor: string) => {
+    setActiveSection(sectionId);
+    setActiveAnchor(anchor);
+    // Aguarda re-render pra que o anchor exista no DOM.
+    setTimeout(() => {
+      const el = document.getElementById(anchor);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  };
 
   return (
     <div className="min-h-screen" style={{ background: "hsl(240 8% 6%)", color: "hsl(240 8% 85%)" }}>
@@ -639,34 +711,114 @@ export default function ApiDocsPage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-10 flex gap-8">
-        {/* Sidebar */}
-        <aside className="w-56 shrink-0">
-          <div className="sticky top-24 space-y-0.5">
-            <p className="text-xs font-semibold uppercase mb-3 px-3" style={{ color: "hsl(240 8% 35%)" }}>Recursos</p>
-            {SECTIONS.map((s) => {
-              const Icon = s.icon;
-              const isActive = activeSection === s.id;
-              return (
+        {/* Sidebar — Mintlify-style: 2 níveis (seção → endpoints), busca global */}
+        <aside className="w-72 shrink-0 hidden lg:block">
+          <div className="sticky top-24 space-y-3">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "hsl(240 8% 40%)" }} />
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Buscar endpoint..."
+                className="w-full text-sm rounded-lg pl-9 pr-9 py-2 outline-none"
+                style={{ background: "hsl(240 8% 10%)", border: "1px solid hsl(240 8% 16%)", color: "hsl(240 8% 85%)" }}
+              />
+              {search && (
                 <button
-                  key={s.id}
-                  onClick={() => setActiveSection(s.id)}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-left transition-colors"
-                  style={{
-                    background: isActive ? "rgba(0,212,106,0.1)" : "transparent",
-                    color: isActive ? "#00d46a" : "hsl(240 8% 55%)",
-                    border: isActive ? "1px solid rgba(0,212,106,0.2)" : "1px solid transparent",
-                  }}
+                  onClick={() => setSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-white/10"
+                  aria-label="Limpar busca"
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <span className="flex-1">{s.title}</span>
-                  {s.badge && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ background: isActive ? "rgba(0,212,106,0.2)" : "var(--border-default)", color: isActive ? "#00d46a" : "hsl(240 8% 40%)" }}>
-                      {s.badge}
-                    </span>
-                  )}
+                  <X className="w-3.5 h-3.5" style={{ color: "hsl(240 8% 50%)" }} />
                 </button>
-              );
-            })}
+              )}
+            </div>
+
+            <p className="text-xs font-semibold uppercase px-3" style={{ color: "hsl(240 8% 35%)" }}>
+              Recursos
+              {searchLower && (
+                <span className="ml-2 normal-case font-normal" style={{ color: "hsl(240 8% 50%)" }}>
+                  · {sectionMatches.reduce((n, s) => n + s.filteredEndpoints.length, 0)} matches
+                </span>
+              )}
+            </p>
+
+            <div className="space-y-0.5 max-h-[calc(100vh-12rem)] overflow-y-auto pr-1 -mr-1">
+              {sectionMatches.map((s) => {
+                const Icon = s.icon;
+                const isActive = activeSection === s.id;
+                const isOpen = openSections.has(s.id);
+                const endpoints = searchLower ? s.filteredEndpoints : s.endpoints;
+                if (searchLower && endpoints.length === 0) return null;
+
+                return (
+                  <div key={s.id}>
+                    {/* Section header */}
+                    <button
+                      onClick={() => {
+                        setActiveSection(s.id);
+                        toggleSection(s.id);
+                        setActiveAnchor(null);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors"
+                      style={{
+                        background: isActive && !activeAnchor ? "rgba(0,212,106,0.1)" : "transparent",
+                        color: isActive ? "#00d46a" : "hsl(240 8% 70%)",
+                        border: isActive && !activeAnchor ? "1px solid rgba(0,212,106,0.2)" : "1px solid transparent",
+                      }}
+                    >
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span className="flex-1 font-medium">{s.title}</span>
+                      <span className="text-[10px] tabular-nums shrink-0" style={{ color: "hsl(240 8% 40%)" }}>
+                        {endpoints.length}
+                      </span>
+                      {isOpen ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
+                    </button>
+
+                    {/* Endpoints list — só renderiza se a seção tá aberta */}
+                    {isOpen && (
+                      <div className="ml-2 pl-3 mt-0.5 space-y-0.5" style={{ borderLeft: "1px solid hsl(240 8% 14%)" }}>
+                        {endpoints.map((ep) => {
+                          const anchor = endpointSlug(ep);
+                          const isEpActive = isActive && activeAnchor === anchor;
+                          const mc = METHOD_COLORS[ep.method];
+                          return (
+                            <button
+                              key={anchor}
+                              onClick={() => goToEndpoint(s.id, anchor)}
+                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-left transition-colors group"
+                              style={{
+                                background: isEpActive ? "rgba(0,212,106,0.08)" : "transparent",
+                                color: isEpActive ? "#00d46a" : "hsl(240 8% 60%)",
+                              }}
+                            >
+                              <span
+                                className="text-[9px] font-bold uppercase shrink-0 w-9 text-center px-1 py-0.5 rounded"
+                                style={{ background: mc.bg, color: mc.text }}
+                              >
+                                {ep.method === "DELETE" ? "DEL" : ep.method}
+                              </span>
+                              <span className="flex-1 truncate font-mono" style={{ fontSize: "11px" }}>
+                                {/* Mostra última parte significativa do path */}
+                                {ep.path.split("/").filter(p => p && !p.startsWith("{")).slice(-2).join("/")}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {searchLower && sectionMatches.every(s => s.filteredEndpoints.length === 0) && (
+                <p className="text-xs px-3 py-4 italic" style={{ color: "hsl(240 8% 45%)" }}>
+                  Nenhum endpoint encontrado para &quot;{search}&quot;
+                </p>
+              )}
+            </div>
           </div>
         </aside>
 
@@ -711,7 +863,10 @@ export default function ApiDocsPage() {
 
           {/* Endpoints */}
           <div className="space-y-2">
-            {activeS.endpoints.map((ep, i) => <EndpointCard key={i} ep={ep} />)}
+            {activeS.endpoints.map((ep, i) => {
+              const anchor = endpointSlug(ep);
+              return <EndpointCard key={`${anchor}-${i}`} ep={ep} anchor={anchor} />;
+            })}
           </div>
 
           {/* Auth legend — explicação detalhada */}
