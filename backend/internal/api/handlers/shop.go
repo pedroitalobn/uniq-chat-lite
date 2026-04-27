@@ -504,7 +504,7 @@ func (h *ShopHandler) ListProviders(c *fiber.Ctx) error {
 	providers := []provider{
 		{ID: "shopify", Name: "Shopify", Region: "Global", Description: "Sincroniza produtos e pedidos via Admin API.", Status: "ready"},
 		{ID: "mercado_livre", Name: "Mercado Livre", Region: "BR / LATAM", Description: "Importa anúncios e recebe webhooks de pedidos.", Status: "ready"},
-		{ID: "vtex", Name: "VTEX", Region: "BR Enterprise", Description: "Catalog API + OMS — maior plataforma BR de grandes lojas.", Status: "coming_soon"},
+		{ID: "vtex", Name: "VTEX", Region: "BR Enterprise", Description: "Catalog API + OMS — maior plataforma BR de grandes lojas.", Status: "ready"},
 		{ID: "magalu", Name: "Magazine Luiza Marketplace", Region: "BR", Description: "Marketplace BR — sync via API do parceiro.", Status: "coming_soon"},
 		{ID: "shopee", Name: "Shopee", Region: "BR / SEA", Description: "Open Platform API.", Status: "coming_soon"},
 		{ID: "amazon", Name: "Amazon SP-API", Region: "EUA / Global", Description: "Selling Partner API — catalog + orders.", Status: "coming_soon"},
