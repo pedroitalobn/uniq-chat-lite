@@ -30,6 +30,11 @@ type Shop struct {
 	Currency       string `gorm:"type:varchar(3);default:'BRL'" json:"currency"`
 	Visibility     string `gorm:"type:varchar(16);default:'private'" json:"visibility"` // private/link_only/public
 	CustomDomain   string `gorm:"type:varchar(255)" json:"custom_domain,omitempty"`     // futuro
+	// Type controla o modelo operacional:
+	//   - "catalog":     catálogo simples gerenciado aqui (próximo do WhatsApp Catalog)
+	//   - "integration": sincronizado de provider externo (Shopify, ML, VTEX…)
+	//   - "hybrid":      mistura — produtos manuais + produtos sincronizados
+	Type string `gorm:"type:varchar(20);default:'catalog';index" json:"type"`
 
 	// WhatsApp Business Catalog (Fase 5) — guarda o ID do catálogo na Meta
 	// pra sync produto→catálogo + envio em mensagens interactive.

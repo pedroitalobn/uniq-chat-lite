@@ -22,6 +22,17 @@ interface Shop {
   visibility: "private" | "link_only" | "public";
   is_active: boolean;
   created_at: string;
+  type?: "catalog" | "integration" | "hybrid";
+  instance_id?: string;
+  whatsapp_catalog_id?: string;
+}
+
+interface Instance {
+  id: string;
+  name: string;
+  channel: string;
+  phone_number?: string;
+  status: string;
 }
 
 interface Product {
@@ -107,6 +118,10 @@ export default function ShopDetailPage({ params }: { params: Promise<{ id: strin
     );
   }
 
+  // Setup wizard: shop sem type definido → orientar usuário a escolher
+  // o modo operacional antes de mostrar a interface completa.
+  const needsSetup = !shop.type;
+
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
       {/* Header */}
@@ -117,6 +132,10 @@ export default function ShopDetailPage({ params }: { params: Promise<{ id: strin
       >
         <ArrowLeft className="w-3.5 h-3.5" /> Voltar pra Shops
       </button>
+
+      {needsSetup && (
+        <ShopSetupWizard shop={shop} headers={headers} onComplete={() => qc.invalidateQueries({ queryKey: ["shop", shopId] })} />
+      )}
 
       <div className="flex items-start justify-between mb-6 gap-4">
         <div className="flex items-center gap-3">
@@ -497,6 +516,14 @@ function ShopSettingsForm({ shop, headers }: { shop: Shop; headers?: Record<stri
     visibility: shop.visibility,
     is_active: shop.is_active,
     logo_url: shop.logo_url ?? "",
+    type: shop.type || "catalog",
+    instance_id: shop.instance_id || "",
+    whatsapp_catalog_id: shop.whatsapp_catalog_id || "",
+  });
+
+  const { data: instances = [] } = useQuery<Instance[]>({
+    queryKey: ["instances-for-shop"],
+    queryFn: () => api.get("/v1/instances", { headers }).then((r) => (r.data?.data || r.data) as Instance[]),
   });
 
   const saveMut = useMutation({
@@ -539,6 +566,38 @@ function ShopSettingsForm({ shop, headers }: { shop: Shop; headers?: Record<stri
         <input value={form.logo_url} onChange={(e) => setForm({ ...form, logo_url: e.target.value })}
           className="input-field w-full" placeholder="https://…" />
       </Field>
+
+      <div className="pt-3 border-t" style={{ borderColor: "var(--surface-border)" }}>
+        <p className="text-xs font-medium mb-2" style={{ color: "var(--text-1)" }}>
+          Modo operacional
+        </p>
+        <Field label="Tipo de loja">
+          <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as Shop["type"] })}
+            className="input-field w-full">
+            <option value="catalog">Catálogo simples (gerenciado aqui)</option>
+            <option value="integration">Sincronizado de integração externa</option>
+            <option value="hybrid">Híbrido (manual + sincronizado)</option>
+          </select>
+        </Field>
+        <Field label="Instância WhatsApp atrelada (opcional)">
+          <select value={form.instance_id} onChange={(e) => setForm({ ...form, instance_id: e.target.value })}
+            className="input-field w-full">
+            <option value="">Nenhuma — não atrelar</option>
+            {instances.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.name} {i.phone_number ? `· ${i.phone_number}` : ""}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="WhatsApp Catalog ID (Meta Commerce)">
+          <input value={form.whatsapp_catalog_id}
+            onChange={(e) => setForm({ ...form, whatsapp_catalog_id: e.target.value })}
+            className="input-field w-full font-mono"
+            placeholder="ex: 123456789012345" />
+        </Field>
+      </div>
+
       <label className="flex items-center gap-2 text-xs" style={{ color: "var(--text-2)" }}>
         <input type="checkbox" checked={form.is_active}
           onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
@@ -563,6 +622,124 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
         {label}
       </label>
       {children}
+    </div>
+  );
+}
+
+// ─── ShopSetupWizard ─────────────────────────────────────────────────────────
+// Mostrado quando shop.type ainda não foi definido. Apresenta 3 opções
+// claras: catálogo simples, integração externa, híbrido. Salva e fecha.
+function ShopSetupWizard({ shop, headers, onComplete }: {
+  shop: Shop;
+  headers?: Record<string, string>;
+  onComplete: () => void;
+}) {
+  const [selecting, setSelecting] = useState<"catalog" | "integration" | "hybrid" | null>(null);
+  const saveMut = useMutation({
+    mutationFn: (type: "catalog" | "integration" | "hybrid") =>
+      api.patch(`/v1/shops/${shop.id}`, { type }, { headers }),
+    onSuccess: () => {
+      toast.success("Configuração salva");
+      onComplete();
+    },
+    onError: () => toast.error("Erro ao salvar configuração"),
+  });
+
+  const options: Array<{
+    id: "catalog" | "integration" | "hybrid";
+    title: string;
+    icon: typeof Box;
+    color: string;
+    description: string;
+    bullets: string[];
+  }> = [
+    {
+      id: "catalog",
+      title: "Catálogo simples",
+      icon: Package,
+      color: "var(--green)",
+      description: "Crie e gerencie produtos manualmente. Ideal pra serviços, infoprodutos e quem não tem e-commerce externo.",
+      bullets: ["Cadastro manual de produtos", "Sincroniza pro WhatsApp Catalog (Meta)", "Sem dependência de provider externo"],
+    },
+    {
+      id: "integration",
+      title: "Sincronizado de e-commerce",
+      icon: ExternalLink,
+      color: "#60a5fa",
+      description: "Importa produtos automaticamente do seu Shopify, Mercado Livre, VTEX, Magalu, Amazon, Shopee, eBay, BigCommerce ou WooCommerce.",
+      bullets: ["10+ integrações disponíveis", "Sync automático de produtos e preços", "Ideal pra quem já tem loja online"],
+    },
+    {
+      id: "hybrid",
+      title: "Híbrido",
+      icon: Box,
+      color: "#a78bfa",
+      description: "Mistura: produtos do seu e-commerce + produtos exclusivos cadastrados aqui (combos, infoprodutos, serviços).",
+      bullets: ["Produtos manuais + sincronizados convivem", "Filtragem por origem", "Mais flexibilidade pra promoções"],
+    },
+  ];
+
+  return (
+    <div className="rounded-2xl p-6 mb-6"
+      style={{ background: "var(--surface-2)", border: "1px solid var(--green-border)" }}>
+      <div className="flex items-start gap-3 mb-5">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: "var(--green-soft)" }}>
+          <Settings className="w-5 h-5" style={{ color: "var(--green)" }} />
+        </div>
+        <div>
+          <h2 className="text-base font-medium" style={{ color: "var(--text-1)" }}>
+            Como você vai operar essa loja?
+          </h2>
+          <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
+            Escolha o modelo que mais se encaixa. Você pode trocar depois nas Configurações.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid sm:grid-cols-3 gap-3">
+        {options.map((opt) => {
+          const isSelected = selecting === opt.id;
+          return (
+            <button
+              key={opt.id}
+              onClick={() => setSelecting(opt.id)}
+              className="text-left rounded-xl p-4 transition-all"
+              style={{
+                background: isSelected ? "var(--green-soft)" : "var(--surface-3)",
+                border: `1px solid ${isSelected ? "var(--green-border)" : "var(--surface-border)"}`,
+              }}
+            >
+              <opt.icon className="w-5 h-5 mb-2" style={{ color: opt.color }} />
+              <p className="text-sm font-medium mb-1" style={{ color: "var(--text-1)" }}>
+                {opt.title}
+              </p>
+              <p className="text-[11px] mb-2" style={{ color: "var(--text-3)" }}>
+                {opt.description}
+              </p>
+              <ul className="space-y-1">
+                {opt.bullets.map((b, i) => (
+                  <li key={i} className="text-[10px] flex items-start gap-1" style={{ color: "var(--text-2)" }}>
+                    <span style={{ color: opt.color }}>·</span> {b}
+                  </li>
+                ))}
+              </ul>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex justify-end mt-5">
+        <button
+          onClick={() => selecting && saveMut.mutate(selecting)}
+          disabled={!selecting || saveMut.isPending}
+          className="text-xs font-medium px-4 py-2 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-40"
+          style={{ background: "var(--green)", color: "var(--green-fg)" }}
+        >
+          {saveMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+          Continuar
+        </button>
+      </div>
     </div>
   );
 }

@@ -193,7 +193,7 @@ func (h *ShopHandler) UpdateShop(c *fiber.Ctx) error {
 		"name": true, "description": true, "logo_url": true, "banner_url": true,
 		"currency": true, "visibility": true, "custom_domain": true,
 		"checkout_config": true, "is_active": true, "instance_id": true,
-		"whatsapp_catalog_id": true,
+		"whatsapp_catalog_id": true, "type": true,
 	}
 	updates := map[string]any{}
 	for k, v := range patch {
