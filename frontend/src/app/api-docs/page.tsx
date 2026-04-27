@@ -518,8 +518,19 @@ function endpointSlug(ep: Endpoint): string {
   return `${ep.method.toLowerCase()}-${cleanPath}`;
 }
 
-function EndpointCard({ ep, anchor }: { ep: Endpoint; anchor: string }) {
-  const [open, setOpen] = useState(false);
+function EndpointCard({
+  ep,
+  anchor,
+  open,
+  onToggle,
+}: {
+  ep: Endpoint;
+  anchor: string;
+  open: boolean;
+  onToggle: (anchor: string) => void;
+}) {
+  // Card é totalmente controlado pelo parent (accordion):
+  // só 1 aberto por vez na página. Click no header → toggle no parent.
   const mc = METHOD_COLORS[ep.method];
   const auth = ep.auth ? AUTH_LABELS[ep.auth] : AUTH_LABELS.none;
 
@@ -536,7 +547,7 @@ function EndpointCard({ ep, anchor }: { ep: Endpoint; anchor: string }) {
       <button
         className="w-full text-left transition-colors hover:bg-white/5"
         style={{ background: "hsl(240 8% 10%)" }}
-        onClick={() => setOpen(!open)}
+        onClick={() => onToggle(anchor)}
       >
         {/* Linha 1: METHOD + PATH (sempre visível, sem truncate) + auth + chevron */}
         <div className="flex items-center gap-3 px-4 pt-3">
@@ -668,15 +679,20 @@ export default function ApiDocsPage() {
     });
   };
 
-  // Click num endpoint da sidebar: troca seção + scroll suave pro anchor.
+  // Click num endpoint da sidebar: troca seção + abre o card + scroll.
+  // activeAnchor controla qual card está expandido (accordion: só 1 aberto).
   const goToEndpoint = (sectionId: string, anchor: string) => {
     setActiveSection(sectionId);
     setActiveAnchor(anchor);
-    // Aguarda re-render pra que o anchor exista no DOM.
     setTimeout(() => {
       const el = document.getElementById(anchor);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 50);
+  };
+
+  // Toggle a partir do header do card: se já é o ativo, fecha; senão abre.
+  const toggleCard = (anchor: string) => {
+    setActiveAnchor(prev => (prev === anchor ? null : anchor));
   };
 
   return (
@@ -861,11 +877,19 @@ export default function ApiDocsPage() {
             )}
           </div>
 
-          {/* Endpoints */}
+          {/* Endpoints — accordion (só 1 aberto por vez, controlado pelo activeAnchor) */}
           <div className="space-y-2">
             {activeS.endpoints.map((ep, i) => {
               const anchor = endpointSlug(ep);
-              return <EndpointCard key={`${anchor}-${i}`} ep={ep} anchor={anchor} />;
+              return (
+                <EndpointCard
+                  key={`${anchor}-${i}`}
+                  ep={ep}
+                  anchor={anchor}
+                  open={activeAnchor === anchor}
+                  onToggle={toggleCard}
+                />
+              );
             })}
           </div>
 
