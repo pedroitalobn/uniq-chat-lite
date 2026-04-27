@@ -428,6 +428,114 @@ export const messagesApi = {
     api.post(`/v1/instances/${id}/messages/carousel`, data),
   sendMenu: (id: string, data: { number: string; type: "button"|"list"|"poll"|"carousel"; text: string; choices: string[]; footerText?: string; listButton?: string; selectableCount?: number; imageButton?: string }) =>
     api.post(`/v1/instances/${id}/messages/menu`, data),
+  // Texto com preview de link automático (foto + título extraídos pelo WhatsApp).
+  sendLink: (id: string, data: { to: string; text: string }) =>
+    api.post(`/v1/instances/${id}/messages/link`, data),
+  // Editar mensagem já enviada (janela de 15min do WhatsApp).
+  editMessage: (id: string, data: { chat_jid: string; message_id: string; new_text: string }) =>
+    api.post(`/v1/instances/${id}/messages/edit`, data),
+};
+
+// Operações de chat (pin/archive/mute) e history-sync.
+export const chatOpsApi = {
+  pin: (id: string, jid: string, pinned: boolean) =>
+    api.post(`/v1/instances/${id}/chat/pin`, { jid, pinned }),
+  archive: (id: string, jid: string, archived: boolean) =>
+    api.post(`/v1/instances/${id}/chat/archive`, { jid, archived }),
+  // duration_ms = 0 → silencia "para sempre" (default WhatsApp = 8h se não informado).
+  mute: (id: string, data: { jid: string; mute: boolean; duration_ms?: number }) =>
+    api.post(`/v1/instances/${id}/chat/mute`, data),
+  historySync: (id: string, data: { chat_jid: string; sender_jid?: string; message_id: string; count?: number }) =>
+    api.post(`/v1/instances/${id}/chat/history-sync`, data),
+};
+
+// Perfil da própria conta conectada à instância.
+export const profileApi = {
+  setName: (id: string, name: string) =>
+    api.put(`/v1/instances/${id}/profile/name`, { name }),
+  setStatus: (id: string, status: string) =>
+    api.put(`/v1/instances/${id}/profile/status`, { status }),
+  // remove=true ignora url/base64; senão mande url ou base64.
+  setPicture: (id: string, data: { url?: string; base64?: string; remove?: boolean }) =>
+    api.put(`/v1/instances/${id}/profile/picture`, data),
+};
+
+// Bloqueio de contatos.
+export const blockApi = {
+  block: (id: string, jid: string) =>
+    api.post(`/v1/instances/${id}/block`, { jid }),
+  unblock: (id: string, jid: string) =>
+    api.post(`/v1/instances/${id}/unblock`, { jid }),
+  list: (id: string) =>
+    api.get(`/v1/instances/${id}/blocklist`),
+};
+
+// Atributos de grupo (foto/announce/locked).
+export const groupOpsApi = {
+  setPhoto: (id: string, data: { jid: string; url?: string; base64?: string; remove?: boolean }) =>
+    api.put(`/v1/instances/${id}/group-ops/photo`, data),
+  setAnnounce: (id: string, jid: string, announce: boolean) =>
+    api.put(`/v1/instances/${id}/group-ops/announce`, { jid, announce }),
+  setLocked: (id: string, jid: string, locked: boolean) =>
+    api.put(`/v1/instances/${id}/group-ops/locked`, { jid, locked }),
+};
+
+// Labels do WhatsApp (estrelinhas/cores).
+export const labelsApi = {
+  labelChat: (id: string, data: { jid: string; label_id: string; labeled: boolean }) =>
+    api.post(`/v1/instances/${id}/labels/chat`, data),
+  labelMessage: (id: string, data: { jid: string; label_id: string; message_id: string; labeled: boolean }) =>
+    api.post(`/v1/instances/${id}/labels/message`, data),
+  // color = índice 0..19 da paleta. deleted=true apaga.
+  edit: (id: string, data: { label_id: string; name?: string; color?: number; deleted?: boolean }) =>
+    api.post(`/v1/instances/${id}/labels/edit`, data),
+};
+
+// Privacy settings.
+export const privacyApi = {
+  get: (id: string) =>
+    api.get(`/v1/instances/${id}/privacy`),
+  set: (id: string, setting: string, value: string) =>
+    api.put(`/v1/instances/${id}/privacy`, { setting, value }),
+};
+
+// Comunidades WhatsApp.
+export const communityApi = {
+  create: (id: string, data: { name: string; description?: string }) =>
+    api.post(`/v1/instances/${id}/communities`, data),
+  link: (id: string, data: { parent_jid: string; child_jid: string }) =>
+    api.post(`/v1/instances/${id}/communities/link`, data),
+  unlink: (id: string, data: { parent_jid: string; child_jid: string }) =>
+    api.post(`/v1/instances/${id}/communities/unlink`, data),
+  listGroups: (id: string, jid: string) =>
+    api.get(`/v1/instances/${id}/communities/${encodeURIComponent(jid)}/groups`),
+};
+
+// Newsletters (channels).
+export const newsletterApi = {
+  create: (id: string, data: { name: string; description?: string; picture_url?: string; picture_base64?: string }) =>
+    api.post(`/v1/instances/${id}/newsletters`, data),
+  list: (id: string) =>
+    api.get(`/v1/instances/${id}/newsletters`),
+  // info aceita ?invite=<key> em vez de :jid pra resolver convite.
+  info: (id: string, jidOrInvite: string, byInvite = false) =>
+    byInvite
+      ? api.get(`/v1/instances/${id}/newsletters/_?invite=${encodeURIComponent(jidOrInvite)}`)
+      : api.get(`/v1/instances/${id}/newsletters/${encodeURIComponent(jidOrInvite)}`),
+  follow: (id: string, jid: string) =>
+    api.post(`/v1/instances/${id}/newsletters/${encodeURIComponent(jid)}/follow`),
+  unfollow: (id: string, jid: string) =>
+    api.post(`/v1/instances/${id}/newsletters/${encodeURIComponent(jid)}/unfollow`),
+  messages: (id: string, jid: string, params?: { count?: number; before?: string }) =>
+    api.get(`/v1/instances/${id}/newsletters/${encodeURIComponent(jid)}/messages`, { params }),
+};
+
+// Reconnect & calls.
+export const instanceOpsApi = {
+  forceReconnect: (id: string) =>
+    api.post(`/v1/instances/${id}/force-reconnect`),
+  rejectCall: (id: string, data: { caller_jid: string; call_id: string }) =>
+    api.post(`/v1/instances/${id}/calls/reject`, data),
 };
 
 // inboxApi foi removido da aplicação. As rotas /v1/instances/:id/inbox/*

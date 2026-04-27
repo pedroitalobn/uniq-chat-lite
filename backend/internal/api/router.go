@@ -347,6 +347,56 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	v1msgs.Post("/revoke", msgH.RevokeMessage)
 	v1msgs.Post("/typing", msgH.SendTyping)
 	v1msgs.Post("/read", msgH.MarkRead)
+	v1msgs.Post("/link", msgH.SendLink)
+	v1msgs.Post("/edit", msgH.EditMessage)
+
+	// Paridade Evo-Go no SDK público
+	v1chat := v1inst.Group("/chat")
+	v1chat.Post("/pin", msgH.PinChat)
+	v1chat.Post("/archive", msgH.ArchiveChat)
+	v1chat.Post("/mute", msgH.MuteChat)
+	v1chat.Post("/history-sync", msgH.HistorySync)
+
+	v1profile := v1inst.Group("/profile")
+	v1profile.Put("/name", msgH.UpdateProfileName)
+	v1profile.Put("/status", msgH.UpdateProfileStatus)
+	v1profile.Put("/picture", msgH.UpdateProfilePicture)
+
+	v1inst.Post("/block", msgH.BlockUser)
+	v1inst.Post("/unblock", msgH.UnblockUser)
+	v1inst.Get("/blocklist", msgH.GetBlocklist)
+
+	v1groupOps := v1inst.Group("/group-ops")
+	v1groupOps.Put("/photo", msgH.SetGroupPhoto)
+	v1groupOps.Put("/announce", msgH.SetGroupAnnounceMode)
+	v1groupOps.Put("/locked", msgH.SetGroupLockedMode)
+
+	v1labels := v1inst.Group("/labels")
+	v1labels.Post("/chat", msgH.LabelChat)
+	v1labels.Post("/message", msgH.LabelMessage)
+	v1labels.Post("/edit", msgH.EditLabel)
+
+	v1privacy := v1inst.Group("/privacy")
+	v1privacy.Get("/", msgH.GetPrivacy)
+	v1privacy.Put("/", msgH.SetPrivacy)
+
+	v1inst.Post("/force-reconnect", msgH.ForceReconnect)
+
+	v1communities := v1inst.Group("/communities")
+	v1communities.Post("/", msgH.CreateCommunity)
+	v1communities.Post("/link", msgH.LinkCommunityGroup)
+	v1communities.Post("/unlink", msgH.UnlinkCommunityGroup)
+	v1communities.Get("/:jid/groups", msgH.ListCommunityGroups)
+
+	v1newsletters := v1inst.Group("/newsletters")
+	v1newsletters.Post("/", msgH.CreateNewsletter)
+	v1newsletters.Get("/", msgH.ListNewsletters)
+	v1newsletters.Get("/:jid", msgH.GetNewsletterInfo)
+	v1newsletters.Post("/:jid/follow", msgH.FollowNewsletter)
+	v1newsletters.Post("/:jid/unfollow", msgH.UnfollowNewsletter)
+	v1newsletters.Get("/:jid/messages", msgH.GetNewsletterMessages)
+
+	v1inst.Post("/calls/reject", msgH.RejectCall)
 
 	v1inst.Post("/media/upload", msgH.UploadMedia)
 	v1inst.Get("/chats", msgH.GetChats)
@@ -523,6 +573,66 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	msgs.Post("/revoke", msgH.RevokeMessage)
 	msgs.Post("/typing", msgH.SendTyping)
 	msgs.Post("/read", msgH.MarkRead)
+	// Paridade Evolution-Go (interno)
+	msgs.Post("/link", msgH.SendLink)
+	msgs.Post("/edit", msgH.EditMessage)
+
+	// Chat operations (pin/archive/mute) — paridade Evo-Go
+	chat := instance.Group("/chat")
+	chat.Post("/pin", msgH.PinChat)
+	chat.Post("/archive", msgH.ArchiveChat)
+	chat.Post("/mute", msgH.MuteChat)
+	chat.Post("/history-sync", msgH.HistorySync)
+
+	// Self profile (do dono da instância conectada)
+	profile := instance.Group("/profile")
+	profile.Put("/name", msgH.UpdateProfileName)
+	profile.Put("/status", msgH.UpdateProfileStatus)
+	profile.Put("/picture", msgH.UpdateProfilePicture)
+
+	// Block / unblock
+	instance.Post("/block", msgH.BlockUser)
+	instance.Post("/unblock", msgH.UnblockUser)
+	instance.Get("/blocklist", msgH.GetBlocklist)
+
+	// Group attributes (foto, announce, locked)
+	groupOps := instance.Group("/group-ops")
+	groupOps.Put("/photo", msgH.SetGroupPhoto)
+	groupOps.Put("/announce", msgH.SetGroupAnnounceMode)
+	groupOps.Put("/locked", msgH.SetGroupLockedMode)
+
+	// Labels
+	labels := instance.Group("/labels")
+	labels.Post("/chat", msgH.LabelChat)
+	labels.Post("/message", msgH.LabelMessage)
+	labels.Post("/edit", msgH.EditLabel)
+
+	// Privacy
+	privacy := instance.Group("/privacy")
+	privacy.Get("/", msgH.GetPrivacy)
+	privacy.Put("/", msgH.SetPrivacy)
+
+	// Force reconnect (instância "viva" mas sem trafegar)
+	instance.Post("/force-reconnect", msgH.ForceReconnect)
+
+	// Communities
+	communities := instance.Group("/communities")
+	communities.Post("/", msgH.CreateCommunity)
+	communities.Post("/link", msgH.LinkCommunityGroup)
+	communities.Post("/unlink", msgH.UnlinkCommunityGroup)
+	communities.Get("/:jid/groups", msgH.ListCommunityGroups)
+
+	// Newsletters (channels)
+	newsletters := instance.Group("/newsletters")
+	newsletters.Post("/", msgH.CreateNewsletter)
+	newsletters.Get("/", msgH.ListNewsletters)
+	newsletters.Get("/:jid", msgH.GetNewsletterInfo)
+	newsletters.Post("/:jid/follow", msgH.FollowNewsletter)
+	newsletters.Post("/:jid/unfollow", msgH.UnfollowNewsletter)
+	newsletters.Get("/:jid/messages", msgH.GetNewsletterMessages)
+
+	// Calls
+	instance.Post("/calls/reject", msgH.RejectCall)
 
 	// Recovery
 	recovery := instance.Group("/recovery")
