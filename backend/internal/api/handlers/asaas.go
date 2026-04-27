@@ -125,6 +125,20 @@ type AsaasPaymentLinkResponse struct {
 }
 
 // POST /asaas/checkout — create Asaas payment (protected)
+// CreateCheckout cria uma SUBSCRIPTION RECORRENTE em PIX no Asaas.
+//
+// Decisão de produto: Asaas só vende PIX recorrente. Boleto/cartão
+// nunca via Asaas — pra cartão usar Stripe (/v1/stripe/checkout).
+// Não vendemos PIX único nem boleto.
+//
+// Fluxo:
+//  1. Cria customer no Asaas (idempotente — reusa se já existir)
+//  2. Cria subscription com billingType=PIX, cycle=MONTHLY
+//  3. Asaas gera a primeira fatura imediatamente; user recebe QR/copia-e-cola
+//  4. Próximas faturas são geradas automaticamente todo mês
+//
+// Webhook Asaas atualiza user.asaas_subscription_id quando confirmar
+// o primeiro pagamento (PAYMENT_RECEIVED → ativa o plano).
 func (h *AsaasHandler) CreateCheckout(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 	if user == nil {
@@ -137,10 +151,8 @@ func (h *AsaasHandler) CreateCheckout(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		PlanID        string `json:"plan_id"`
-		PaymentMethod string `json:"payment_method"` // CREDIT_CARD, BOLETO, PIX
-		Cpf           string `json:"cpf"`
-		Name          string `json:"name"`
+		PlanID string `json:"plan_id"`
+		Cpf    string `json:"cpf"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -150,33 +162,20 @@ func (h *AsaasHandler) CreateCheckout(c *fiber.Ctx) error {
 	if err := h.db.First(&plan, "id = ?", req.PlanID).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "plano não encontrado"})
 	}
-	if plan.AsaasProductID == "" && plan.Price > 0 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "plano sem produto Asaas configurado"})
-	}
 	if plan.Price == 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "use este endpoint apenas para planos pagos"})
 	}
 
-	paymentMethod := "PIX"
-	if req.PaymentMethod != "" {
-		paymentMethod = req.PaymentMethod
-	}
-
-	// Buscar configurações de checkout
-	var paySettings models.PaymentSettings
-	checkoutType := "transparent"
-	h.db.First(&paySettings)
-	if paySettings.AsaasCheckoutType != "" {
-		checkoutType = paySettings.AsaasCheckoutType
-	}
-
+	// Customer (idempotente)
 	customerID := user.AsaasCustomerID
 	if customerID == "" {
 		cpf := req.Cpf
 		if cpf == "" {
-			cpf = "00000000000"
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error":   "cpf_required",
+				"message": "CPF é obrigatório pra criar cliente Asaas (PIX exige CPF/CNPJ)",
+			})
 		}
-
 		custReq := AsaasCustomerRequest{
 			Name:  user.Name,
 			Email: user.Email,
@@ -187,63 +186,77 @@ func (h *AsaasHandler) CreateCheckout(c *fiber.Ctx) error {
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar cliente Asaas"})
 		}
-
 		var cust AsaasCustomerResponse
 		if err := json.Unmarshal(custResp, &cust); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao processar resposta"})
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao processar resposta Asaas"})
 		}
 		customerID = cust.ID
 		h.db.Model(user).Update("asaas_customer_id", customerID)
 	}
 
-	// Gerar payment token para checkout transparente
-	tokenReq := map[string]interface{}{
-		"customer": customerID,
-		"billingType": map[string]string{
-			"creditCard": "CREDIT_CARD",
-			"boleto":     "BOLETO",
-			"pix":        "PIX",
-		}[paymentMethod],
-		"value":             plan.Price,
-		"dueDate":           time.Now().AddDate(0, 0, 3).Format("2006-01-02"),
-		"description":       "Assinatura " + plan.Name,
-		"externalReference": user.ID.String() + "|" + plan.ID.String(),
+	// Subscription recorrente PIX. Asaas cria a primeira fatura na hora;
+	// próximas saem automaticamente todo mês na nextDueDate.
+	subReq := AsaasSubscriptionRequest{
+		Customer:          customerID,
+		Plan:              plan.AsaasProductID, // optional reference
+		Price:             plan.Price,
+		Cycle:             "MONTHLY",
+		PaymentMethod:     "PIX",
+		NextDueDate:       time.Now().AddDate(0, 0, 1).Format("2006-01-02"), // 1 dia
+		Description:       "Assinatura " + plan.Name + " — Uniq Chat",
+		ExternalReference: user.ID.String() + "|" + plan.ID.String(),
 	}
-	tokenBody, _ := json.Marshal(tokenReq)
-	tokenResp, err := h.apiRequest("POST", "/api/v3/payments", tokenBody)
+	subBody, _ := json.Marshal(subReq)
+	subRespBytes, err := h.apiRequest("POST", "/api/v3/subscriptions", subBody)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar pagamento"})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar assinatura: " + err.Error()})
 	}
-
-	var paymentResult map[string]interface{}
-	json.Unmarshal(tokenResp, &paymentResult)
-
-	if checkoutType == "transparent" {
-		// Checkout transparente - retorna dados para o frontend criar o formulario
-		return c.JSON(fiber.Map{
-			"checkout_type": "transparent",
-			"payment_id":    paymentResult["id"],
-			"customer_id":   customerID,
-			"plan_name":     plan.Name,
-			"plan_price":    plan.Price,
-			"qr_code":       paymentResult["encodedImage"],
-			"qr_code_text":  paymentResult["payload"],
-			"boleto_url":    paymentResult["bankSlipUrl"],
-			"status":        paymentResult["status"],
+	var subResp AsaasSubscriptionResponse
+	if err := json.Unmarshal(subRespBytes, &subResp); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "resposta Asaas inválida"})
+	}
+	if subResp.ID == "" {
+		// Asaas devolveu erro detalhado no body (4xx)
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+			"error":  "asaas_error",
+			"detail": string(subRespBytes),
 		})
 	}
 
-	// Redirect - retorna URL de pagamento
-	invoiceURL, _ := paymentResult["invoiceUrl"].(string)
-	bankSlipLink, _ := paymentResult["bankSlipUrl"].(string)
-
-	return c.JSON(fiber.Map{
-		"checkout_type": "redirect",
-		"payment_id":    paymentResult["id"],
-		"url":           invoiceURL,
-		"boleto_link":   bankSlipLink,
-		"status":        paymentResult["status"],
+	// Marca pendente — vai virar ACTIVE quando o webhook PAYMENT_RECEIVED chegar.
+	h.db.Model(user).Updates(map[string]any{
+		"asaas_subscription_id":     subResp.ID,
+		"asaas_subscription_status": "PENDING_PAYMENT",
 	})
+
+	// A primeira fatura tem QR PIX gerado pelo Asaas. Pra mostrar pro user
+	// imediatamente, listamos os payments dessa subscription e pegamos o
+	// invoice_url da primeira (mais recente).
+	listResp, _ := h.apiRequest("GET", "/api/v3/payments?subscription="+subResp.ID+"&limit=1", nil)
+	var listed struct {
+		Data []struct {
+			ID         string `json:"id"`
+			InvoiceURL string `json:"invoiceUrl"`
+			Status     string `json:"status"`
+		} `json:"data"`
+	}
+	json.Unmarshal(listResp, &listed)
+
+	out := fiber.Map{
+		"checkout_type":    "subscription",
+		"subscription_id":  subResp.ID,
+		"plan_name":        plan.Name,
+		"plan_price":       plan.Price,
+		"payment_method":   "PIX",
+		"recurrence":       "MONTHLY",
+		"status":           subResp.Status,
+		"message":          "Assinatura PIX recorrente criada. Pague a primeira fatura pra ativar.",
+	}
+	if len(listed.Data) > 0 {
+		out["first_invoice_url"] = listed.Data[0].InvoiceURL
+		out["first_payment_id"] = listed.Data[0].ID
+	}
+	return c.JSON(out)
 }
 
 // GET /asaas/subscription — get current user subscription status (protected)
@@ -284,6 +297,10 @@ func (h *AsaasHandler) Webhook(c *fiber.Ctx) error {
 	switch eventType {
 	case "PAYMENT_RECEIVED", "PAYMENT_CONFIRMED":
 		externalRef, _ := paymentEvent["externalReference"].(string)
+		// subscription ID vem em payment.subscription (não payment.id, que é
+		// o payment do mês). Subscription só está presente em recorrentes.
+		subscriptionID, _ := paymentEvent["subscription"].(string)
+
 		if externalRef != "" {
 			parts := strings.Split(externalRef, "|")
 			if len(parts) >= 2 {
@@ -291,16 +308,34 @@ func (h *AsaasHandler) Webhook(c *fiber.Ctx) error {
 				planID := parts[1]
 
 				var plan models.Plan
+				var oldUser models.User
+				_ = h.db.First(&oldUser, "id = ?", userID).Error
 				if h.db.First(&plan, "id = ?", planID).Error == nil {
-					h.db.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+					updates := map[string]interface{}{
 						"plan_id":                   plan.ID,
-						"asaas_subscription_id":     paymentEvent["id"],
 						"asaas_subscription_status": "active",
-					})
+					}
+					if subscriptionID != "" {
+						updates["asaas_subscription_id"] = subscriptionID
+					}
+					h.db.Model(&models.User{}).Where("id = ?", userID).Updates(updates)
 
-					// Proxy provisioning moved to server-level configuration;
-					// no per-user pool to allocate here.
-					_ = userID
+					// Audit: cria PlanChangeLog na primeira ativação. Pra
+					// pagamentos subsequentes (renovação) o plano não muda
+					// e o INSERT vira no-op via condição (oldUser.PlanID
+					// já é o mesmo).
+					if oldUser.PlanID == nil || *oldUser.PlanID != plan.ID {
+						h.db.Create(&models.PlanChangeLog{
+							UserID:       oldUser.ID,
+							FromPlanID:   oldUser.PlanID,
+							ToPlanID:     &plan.ID,
+							ToPlanName:   plan.Name,
+							Source:       models.PlanChangeSourceAsaas,
+							ActorID:      &oldUser.ID,
+							ActorEmail:   oldUser.Email,
+							Notes:        "Ativação após pagamento PIX confirmado.",
+						})
+					}
 
 					var user models.User
 					if h.db.First(&user, "id = ?", userID).Error == nil {

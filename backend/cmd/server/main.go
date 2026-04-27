@@ -199,6 +199,10 @@ func main() {
 	})
 	services.SetGlobalUsageService(usageSvc)
 
+	// Asaas cron — emula cancel_at_period_end via flag asaas_cancel_at.
+	asaasCron := services.NewAsaasCron(db)
+	asaasCron.Start()
+
 	// Ticketing periodic jobs: unsnoozer, presence sweep, pending redispatch,
 	// resolve auto-close.
 	ticketingScheduler := services.NewTicketingScheduler(db, services.NewDispatchService(db))

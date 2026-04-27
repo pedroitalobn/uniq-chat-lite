@@ -284,18 +284,37 @@ func (h *BillingHandler) Cancel(c *fiber.Ctx) error {
 	_ = c.BodyParser(&req)
 
 	if provider == "asaas" {
-		// Asaas só tem DELETE imediato. "cancel at period end" não é nativo —
-		// simulamos guardando flag local + cron limpa no nextDueDate.
-		// Por enquanto: imediate=true cancela já; immediate=false cancela
-		// também (sem distinção real até termos cron de billing).
-		if err := h.asaas.DeleteSubscription(user.AsaasSubscriptionID); err != nil {
+		// Imediato: deleta direto na Asaas. Plan cai pra Free na hora.
+		if req.Immediate {
+			if err := h.asaas.DeleteSubscription(user.AsaasSubscriptionID); err != nil {
+				return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+			}
+			h.db.Model(user).Updates(map[string]any{
+				"asaas_subscription_id":     "",
+				"asaas_subscription_status": "CANCELLED",
+				"asaas_cancel_at":           nil,
+			})
+			return c.JSON(fiber.Map{"success": true, "cancelled": "immediate", "provider": "asaas"})
+		}
+		// Cancel at period end: guardamos a data alvo. Cron diário
+		// (services/asaas_cron.go) deleta a subscription quando bate.
+		// Asaas não tem isso nativo, então emulamos.
+		sub, err := h.asaas.GetSubscription(user.AsaasSubscriptionID)
+		if err != nil {
 			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
 		}
+		nextDue, _ := time.Parse("2006-01-02", sub.NextDueDate)
 		h.db.Model(user).Updates(map[string]any{
-			"asaas_subscription_id":     "",
-			"asaas_subscription_status": "CANCELLED",
+			"asaas_cancel_at":           &nextDue,
+			"asaas_subscription_status": "ACTIVE_CANCEL_PENDING",
 		})
-		return c.JSON(fiber.Map{"success": true, "cancelled": "immediate", "provider": "asaas"})
+		return c.JSON(fiber.Map{
+			"success":            true,
+			"cancelled":          "at_period_end",
+			"provider":           "asaas",
+			"current_period_end": nextDue,
+			"note":               "Acesso mantido até " + nextDue.Format("2006-01-02") + ". Próximo ciclo não será cobrado.",
+		})
 	}
 
 	// Stripe
@@ -420,9 +439,9 @@ func (h *BillingHandler) upgradeAsaas(c *fiber.Ctx, user *models.User, newPlan *
 	if prorationCents > 0 {
 		paymentResp, err = h.asaas.CreatePayment(services.AsaasPaymentRequest{
 			Customer:          user.AsaasCustomerID,
-			BillingType:       "UNDEFINED", // user escolhe boleto/pix/cartão na hora de pagar
+			BillingType:       "PIX", // Asaas só vende PIX — não oferecer boleto nem cartão aqui
 			Value:             prorationValue,
-			DueDate:           time.Now().AddDate(0, 0, 3).Format("2006-01-02"), // 3 dias pra pagar
+			DueDate:           time.Now().AddDate(0, 0, 3).Format("2006-01-02"),
 			Description:       fmt.Sprintf("Diferença upgrade %s → %s (proration de %d dias)", oldPlan.Name, newPlan.Name, int(time.Until(nextDue).Hours()/24)),
 			ExternalReference: user.ID.String(),
 		})

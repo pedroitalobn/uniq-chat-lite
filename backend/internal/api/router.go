@@ -985,17 +985,20 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	warmup.Post("/stop", warmupH.Stop)
 	campaigns.Delete("/:id", campaignH.Delete)
 
-	// Stripe (protected)
+	// Stripe (protected) — ramo direto, sempre cartão. UI usa esse pra
+	// botão "Pagar com cartão" independente do active_provider global.
 	stripeRoutes := api.Group("/stripe")
-	stripeRoutes.Post("/checkout", paymentH.CreateCheckout)
-	stripeRoutes.Get("/subscription", paymentH.GetSubscription)
+	stripeRoutes.Post("/checkout", stripeH.CreateCheckout)
+	stripeRoutes.Get("/subscription", stripeH.GetSubscription)
 
-	// Asaas (protected)
+	// Asaas (protected) — ramo direto, sempre PIX recorrente.
 	asaasRoutes := api.Group("/asaas")
-	asaasRoutes.Post("/checkout", paymentH.CreateCheckout)
-	asaasRoutes.Get("/subscription", paymentH.GetSubscription)
+	asaasRoutes.Post("/checkout", asaasH.CreateCheckout)
+	asaasRoutes.Get("/subscription", asaasH.GetSubscription)
 
-	// Payments (protected)
+	// Payments (protected) — proxy que escolhe provider via active_provider
+	// (default Stripe). Mantido pra compat. Novos clientes devem usar
+	// /v1/stripe/checkout ou /v1/asaas/checkout direto.
 	paymentRoutes := api.Group("/payments")
 	paymentRoutes.Post("/checkout", paymentH.CreateCheckout)
 	paymentRoutes.Get("/subscription", paymentH.GetSubscription)

@@ -5,9 +5,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   Check, Loader2, Lock, Sparkles, Zap, Building2, Crown,
-  ArrowRight, AlertCircle,
+  ArrowRight, CreditCard, QrCode, X,
 } from "lucide-react";
-import { plansApi, billingApi, authApi } from "@/lib/api";
+import { plansApi, billingApi, authApi, stripeApi, asaasApi } from "@/lib/api";
 import { toast } from "sonner";
 
 interface Plan {
@@ -76,10 +76,16 @@ function fmtLimit(n: number, unit: string): string {
   return `${n.toLocaleString("pt-BR")} ${unit}`;
 }
 
+type PaymentMethod = "card" | "pix";
+
 export default function PlansPage() {
   const router = useRouter();
   const qc = useQueryClient();
   const [previewing, setPreviewing] = useState<{ plan: Plan; preview: UpgradePreview } | null>(null);
+  // Modal de checkout pra novo cliente (sem subscription) escolhendo método
+  const [checkingOut, setCheckingOut] = useState<{ plan: Plan; method: PaymentMethod } | null>(null);
+  const [cpf, setCpf] = useState("");
+  const [pixResult, setPixResult] = useState<{ url: string; subId: string } | null>(null);
 
   const { data: me } = useQuery({
     queryKey: ["auth-me"],
@@ -120,25 +126,79 @@ export default function PlansPage() {
   });
 
   const currentPlanId = me?.plan?.id;
+  const hasActiveSub = !!(me?.stripe_subscription_id || me?.asaas_subscription_id);
 
-  const handlePlanClick = (plan: Plan) => {
+  // Click em "Cartão" — usa Stripe. Se já tem sub Stripe ativa, faz upgrade
+  // proration. Senão, redireciona pro checkout Stripe.
+  const handlePayCard = (plan: Plan) => {
     if (plan.id === currentPlanId) return;
     if (plan.price === 0) {
-      // Downgrade pra free — usa cancel no fim do ciclo
-      if (confirm("Cancelar plano pago e voltar pro Free no fim do ciclo?")) {
-        billingApi.cancel(false).then(() => {
-          toast.success("Cancelamento agendado pro fim do ciclo.");
-          qc.invalidateQueries();
-        });
-      }
+      handleDowngrade();
       return;
     }
     if (!plan.stripe_price_id) {
       toast.error("Plano sem stripe_price_id. Contate suporte.");
       return;
     }
-    // Preview proration antes de aplicar (UX importante)
-    previewMut.mutate(plan.id);
+    if (me?.stripe_subscription_id) {
+      // Já tem sub Stripe — preview proration nativo
+      previewMut.mutate(plan.id);
+    } else {
+      // Não tem sub — manda pra checkout Stripe
+      stripeApi.createCheckout(plan.id).then((res) => {
+        if (res.data.url) window.location.href = res.data.url;
+      }).catch(() => toast.error("Falha ao iniciar checkout Stripe"));
+    }
+  };
+
+  // Click em "PIX recorrente" — usa Asaas. Se já tem sub Asaas, faz upgrade
+  // (cancela atual, cria nova alinhada, emite payment de proration). Senão,
+  // abre modal pedindo CPF.
+  const handlePayPix = (plan: Plan) => {
+    if (plan.id === currentPlanId) return;
+    if (plan.price === 0) {
+      handleDowngrade();
+      return;
+    }
+    if (me?.asaas_subscription_id) {
+      previewMut.mutate(plan.id);
+    } else {
+      setCheckingOut({ plan, method: "pix" });
+    }
+  };
+
+  const handleDowngrade = () => {
+    if (confirm("Cancelar plano pago e voltar pro Free no fim do ciclo?")) {
+      billingApi.cancel(false).then(() => {
+        toast.success("Cancelamento agendado.");
+        qc.invalidateQueries();
+      });
+    }
+  };
+
+  const handleAsaasCheckoutConfirm = async () => {
+    if (!checkingOut) return;
+    if (!cpf.trim() || cpf.replace(/\D/g, "").length !== 11) {
+      toast.error("CPF inválido");
+      return;
+    }
+    try {
+      const res = await asaasApi.createCheckout({ plan_id: checkingOut.plan.id, cpf: cpf.replace(/\D/g, "") });
+      const data = res.data as { first_invoice_url?: string; subscription_id: string };
+      if (data.first_invoice_url) {
+        setPixResult({ url: data.first_invoice_url, subId: data.subscription_id });
+      } else {
+        toast.success("Assinatura PIX criada — em alguns segundos a fatura aparece.");
+      }
+      setCheckingOut(null);
+      setCpf("");
+      qc.invalidateQueries({ queryKey: ["auth-me"] });
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { error?: string; message?: string } } })?.response?.data?.message
+                || (e as { response?: { data?: { error?: string } } })?.response?.data?.error
+                || "Falha ao criar assinatura";
+      toast.error(msg);
+    }
   };
 
   return (
@@ -209,20 +269,48 @@ export default function PlansPage() {
                   </FeatureRow>
                 </ul>
 
-                <button
-                  onClick={() => handlePlanClick(plan)}
-                  disabled={isCurrent || isUpgrading}
-                  className="w-full py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-                  style={{
-                    background: isCurrent ? "var(--surface-3)" : "var(--green)",
-                    color: isCurrent ? "var(--text-3)" : "var(--green-fg)",
-                  }}
-                >
-                  {isUpgrading ? <Loader2 className="w-4 h-4 animate-spin" /> :
-                    isCurrent ? "Plano atual" :
-                    plan.price === 0 ? "Voltar pro Free" :
-                    <>Fazer upgrade <ArrowRight className="w-4 h-4" /></>}
-                </button>
+                {isCurrent ? (
+                  <button
+                    disabled
+                    className="w-full py-2.5 rounded-lg text-sm font-semibold transition-colors"
+                    style={{ background: "var(--surface-3)", color: "var(--text-3)" }}
+                  >
+                    Plano atual
+                  </button>
+                ) : plan.price === 0 ? (
+                  <button
+                    onClick={handleDowngrade}
+                    disabled={!hasActiveSub}
+                    className="w-full py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                    style={{ background: "var(--surface-3)", color: "var(--text-2)" }}
+                  >
+                    {hasActiveSub ? "Voltar pro Free" : "Plano gratuito"}
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => handlePayCard(plan)}
+                      disabled={isUpgrading}
+                      className="w-full py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                      style={{ background: "var(--green)", color: "var(--green-fg)" }}
+                    >
+                      {isUpgrading ? <Loader2 className="w-4 h-4 animate-spin" /> :
+                        <><CreditCard className="w-4 h-4" /> Cartão</>}
+                    </button>
+                    <button
+                      onClick={() => handlePayPix(plan)}
+                      disabled={isUpgrading}
+                      className="w-full py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                      style={{
+                        background: "var(--surface-3)",
+                        color: "var(--text-1)",
+                        border: "1px solid var(--surface-border)",
+                      }}
+                    >
+                      <QrCode className="w-4 h-4" /> PIX recorrente
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -237,6 +325,100 @@ export default function PlansPage() {
           onConfirm={() => upgradeMut.mutate(previewing.plan.id)}
           confirming={upgradeMut.isPending}
         />
+      )}
+
+      {checkingOut && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "var(--surface-overlay)" }}
+          onClick={() => setCheckingOut(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl p-6"
+            style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <QrCode className="w-5 h-5" style={{ color: "var(--green)" }} />
+              <h3 className="text-lg font-bold" style={{ color: "var(--text-1)" }}>
+                PIX recorrente — {checkingOut.plan.name}
+              </h3>
+            </div>
+            <p className="text-sm mb-4" style={{ color: "var(--text-2)" }}>
+              Asaas exige CPF pra criar a assinatura PIX. A primeira fatura é gerada na hora.
+              Próximas saem automaticamente todo mês.
+            </p>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-2)" }}>
+              CPF
+            </label>
+            <input
+              value={cpf}
+              onChange={(e) => setCpf(e.target.value)}
+              placeholder="000.000.000-00"
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none mb-4"
+              style={{
+                background: "var(--surface-3)",
+                color: "var(--text-1)",
+                border: "1px solid var(--surface-border)",
+              }}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCheckingOut(null)}
+                className="flex-1 py-2.5 rounded-lg text-sm font-medium"
+                style={{ background: "var(--surface-3)", color: "var(--text-2)" }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleAsaasCheckoutConfirm}
+                className="flex-1 py-2.5 rounded-lg text-sm font-semibold"
+                style={{ background: "var(--green)", color: "var(--green-fg)" }}
+              >
+                Criar assinatura
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pixResult && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "var(--surface-overlay)" }}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl p-6 text-center"
+            style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}
+          >
+            <div className="flex items-center justify-end mb-2">
+              <button
+                onClick={() => setPixResult(null)}
+                className="p-1.5 rounded-lg hover:bg-white/5"
+                style={{ color: "var(--text-3)" }}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <QrCode className="w-12 h-12 mx-auto mb-3" style={{ color: "var(--green)" }} />
+            <h3 className="text-lg font-bold mb-2" style={{ color: "var(--text-1)" }}>
+              Assinatura PIX criada!
+            </h3>
+            <p className="text-sm mb-5" style={{ color: "var(--text-2)" }}>
+              Sua primeira fatura está pronta. Pague com PIX e o plano ativa automaticamente.
+              As próximas faturas serão geradas mensalmente.
+            </p>
+            <a
+              href={pixResult.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold"
+              style={{ background: "var(--green)", color: "var(--green-fg)" }}
+            >
+              Abrir fatura PIX <ArrowRight className="w-4 h-4" />
+            </a>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1102,10 +1102,20 @@ export const aiApi = {
   }) => api.post("/v1/ai/generate", data),
 };
 
+// Stripe — sempre cartão. Use direto pra "Pagar com cartão" indep
+// do active_provider configurado no admin.
 export const stripeApi = {
   plans: () => api.get("/v1/payments/plans"),
-  createCheckout: (planId: string) => api.post("/v1/payments/checkout", { plan_id: planId }),
-  subscription: () => api.get("/v1/payments/subscription"),
+  createCheckout: (planId: string) => api.post("/v1/stripe/checkout", { plan_id: planId }),
+  subscription: () => api.get("/v1/stripe/subscription"),
+};
+
+// Asaas — sempre PIX recorrente (cycle MONTHLY). User precisa fornecer CPF
+// pra Asaas validar o customer. Não vendemos boleto nem PIX único.
+export const asaasApi = {
+  createCheckout: (data: { plan_id: string; cpf: string }) =>
+    api.post("/v1/asaas/checkout", data),
+  subscription: () => api.get("/v1/asaas/subscription"),
 };
 
 export const adminApi = {
