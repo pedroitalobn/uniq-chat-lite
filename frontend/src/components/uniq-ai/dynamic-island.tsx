@@ -164,8 +164,8 @@ export function UniqAIIsland() {
         aria-label={isExpanded ? undefined : "Abrir Uniq AI"}
         className={`fixed top-3 left-1/2 -translate-x-1/2 z-[90] overflow-hidden shadow-2xl ${
           isExpanded
-            ? "w-[min(820px,calc(100vw-2rem))] h-[min(680px,calc(100vh-2.5rem))] rounded-3xl flex flex-col cursor-default"
-            : "h-10 rounded-full flex items-center gap-2 px-4 cursor-pointer"
+            ? "w-[min(480px,calc(100vw-2rem))] h-[min(540px,calc(100vh-2.5rem))] rounded-3xl flex flex-col cursor-default"
+            : "h-9 rounded-full flex items-center gap-2 px-3 cursor-pointer"
         }`}
         style={{
           background: isExpanded ? "var(--surface-1)" : "rgba(10, 12, 14, 0.92)",
@@ -221,6 +221,7 @@ export function UniqAIIsland() {
             >
               <X className="w-4 h-4" />
             </button>
+            <IslandQuickActions />
             <div className="flex-1 min-h-0">
               <UniqAIChatPanel compact messages={messages} onMessagesChange={setMessages} />
             </div>
@@ -234,3 +235,37 @@ export function UniqAIIsland() {
 // Mantenho o ícone exportado pro caso de qualquer outra superfície querer
 // disparar o "abrir DI" via botão próprio (header de uma página, etc).
 export { MessageSquare as UniqAIIconAlt };
+
+// IslandQuickActions — strip de notificações/ações rápidas no topo da
+// ilha expandida. Discreto, navegável por teclado, agiliza tarefas
+// comuns sem precisar abrir o chat completo.
+//
+// Próxima iteração: pollar /v1/conversations/inbox-stats + WS subscriber
+// pra puxar eventos reais (mensagem nova, venda concluída, campanha
+// finalizada). Aqui é a estrutura.
+import Link from "next/link";
+import { Inbox, ShoppingBag, Megaphone, Bot } from "lucide-react";
+
+function IslandQuickActions() {
+  const items = [
+    { href: "/inbox", icon: Inbox, label: "Inbox", color: "var(--green)" },
+    { href: "/shops", icon: ShoppingBag, label: "Shop", color: "#fbbf24" },
+    { href: "/campaigns", icon: Megaphone, label: "Campanhas", color: "#60a5fa" },
+    { href: "/agents", icon: Bot, label: "Agentes", color: "#a78bfa" },
+  ];
+  return (
+    <div className="px-3 pt-3 pb-2 flex items-center gap-1.5 border-b" style={{ borderColor: "var(--surface-border)" }}>
+      {items.map((it) => (
+        <Link
+          key={it.href}
+          href={it.href}
+          className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-medium transition-colors"
+          style={{ background: "var(--surface-3)", color: "var(--text-2)" }}
+        >
+          <it.icon className="w-3.5 h-3.5" style={{ color: it.color }} />
+          <span className="hidden sm:inline">{it.label}</span>
+        </Link>
+      ))}
+    </div>
+  );
+}

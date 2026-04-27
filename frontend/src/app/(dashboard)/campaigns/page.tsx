@@ -84,6 +84,14 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
     tags?: string[];
     owner?: string;
     external_id?: string;
+    // Shop / Purchase history filters (Fase 10 do roadmap):
+    purchased_shop_id?: string;
+    purchased_since_days?: number;
+    purchased_min_total?: number;
+    purchased_status?: string;
+    never_purchased?: boolean;
+    // Agente IA: contatos que conversaram com agente específico:
+    passed_agent_id?: string;
   }>({});
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
@@ -189,6 +197,12 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
           owner: crmFilter.owner || undefined,
           external_id: crmFilter.external_id || undefined,
           tags: selectedTags.length > 0 ? selectedTags : undefined,
+          purchased_shop_id: crmFilter.purchased_shop_id || undefined,
+          purchased_since_days: crmFilter.purchased_since_days || undefined,
+          purchased_min_total: crmFilter.purchased_min_total || undefined,
+          purchased_status: crmFilter.purchased_status || undefined,
+          never_purchased: crmFilter.never_purchased || undefined,
+          passed_agent_id: crmFilter.passed_agent_id || undefined,
         } : undefined,
       });
       toast.success("Campanha criada!");
@@ -468,6 +482,30 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
                       <option key={id} value={id}>{id}</option>
                     ))}
                   </select>
+                </div>
+
+                {/* Compras: filtro por histórico no Shop */}
+                <div>
+                  <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>Comprou nos últimos N dias</label>
+                  <input type="number" min="0" placeholder="ex: 30"
+                    value={crmFilter.purchased_since_days || ""}
+                    onChange={(e) => setCrmFilter({...crmFilter, purchased_since_days: parseInt(e.target.value) || undefined})}
+                    className="input-field w-full text-xs" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>Compras totais ≥ R$</label>
+                  <input type="number" min="0" step="0.01" placeholder="ex: 100"
+                    value={crmFilter.purchased_min_total || ""}
+                    onChange={(e) => setCrmFilter({...crmFilter, purchased_min_total: parseFloat(e.target.value) || undefined})}
+                    className="input-field w-full text-xs" />
+                </div>
+                <div className="col-span-2 flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-xs" style={{ color: "hsl(240 8% 50%)" }}>
+                    <input type="checkbox"
+                      checked={!!crmFilter.never_purchased}
+                      onChange={(e) => setCrmFilter({...crmFilter, never_purchased: e.target.checked || undefined})} />
+                    Apenas contatos que <strong>nunca compraram</strong>
+                  </label>
                 </div>
               </div>
 

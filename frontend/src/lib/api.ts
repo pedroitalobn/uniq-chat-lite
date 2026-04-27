@@ -937,6 +937,14 @@ export const campaignsApi = {
     segment_filter?: {
       funnel?: string; stage?: string; journey?: string;
       tags?: string[]; owner?: string; external_id?: string;
+      // Shop / purchase history filters (Fase 10)
+      purchased_shop_id?: string;
+      purchased_since_days?: number;
+      purchased_min_total?: number;
+      purchased_status?: string;
+      never_purchased?: boolean;
+      // Agente IA: contatos que conversaram com agente específico
+      passed_agent_id?: string;
     };
   }) => api.post("/v1/campaigns", data),
   get: (id: string) => api.get(`/v1/campaigns/${id}`),
