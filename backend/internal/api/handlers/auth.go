@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/mail"
+	"os"
 	"strings"
 	"time"
 
@@ -60,6 +61,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		InviteCode           string `json:"invite_code"`
 		PlanID               string `json:"plan_id"`
 		WorkspaceInviteToken string `json:"workspace_invite_token"`
+		TurnstileToken       string `json:"turnstile_token"` // cf-turnstile-response
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
@@ -109,6 +111,10 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	if workspaceInvite == nil {
 		if reason := suspiciousSignupEmail(req.Email); reason != "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": reason})
+		}
+		// Captcha Turnstile — bypass automático em dev (sem TURNSTILE_SECRET_KEY).
+		if err := verifyTurnstile(c.Context(), req.TurnstileToken, c.IP()); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
 	}
 
@@ -167,15 +173,29 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	}
 
 	// If paid plan, create as "lead" (not active, no login yet)
+	// Email verification: gerada quando NÃO é convite (admin já validou).
+	// Quando REQUIRE_EMAIL_VERIFICATION=true, IsActive começa false.
+	requireVerify := strings.EqualFold(os.Getenv("REQUIRE_EMAIL_VERIFICATION"), "true")
+	needsVerify := workspaceInvite == nil && requireVerify
+	verifyToken := ""
+	if needsVerify {
+		verifyToken = generateToken("verify_")
+	}
+	now := time.Now()
+
 	// If free plan or no plan, create as "customer" (active)
 	var user models.User
 	if isPaidPlan {
 		// Lead - inactive, no login until payment confirmed
 		user = models.User{
-			Name:     req.Name,
-			Email:    req.Email,
-			Role:     models.RoleLead,
-			IsActive: false, // Inactive until payment confirmed
+			Name:                    req.Name,
+			Email:                   req.Email,
+			Role:                    models.RoleLead,
+			IsActive:                false, // Inactive until payment confirmed
+			SignupIP:                c.IP(),
+			SignupUserAgent:         truncate(c.Get("User-Agent"), 500),
+			EmailVerificationToken:  verifyToken,
+			EmailVerificationSentAt: ptrTime(now),
 		}
 		if req.Username != "" {
 			user.Username = &req.Username
@@ -184,15 +204,23 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 			user.PlanID = &plan.ID
 		}
 	} else {
-		// Customer - active immediately (free plan)
+		// Customer - active immediately (free plan), exceto se needsVerify.
 		var freePlan models.Plan
 		h.db.First(&freePlan, "name = 'Free'")
 
 		user = models.User{
-			Name:     req.Name,
-			Email:    req.Email,
-			Role:     models.RoleCustomer,
-			IsActive: true,
+			Name:                    req.Name,
+			Email:                   req.Email,
+			Role:                    models.RoleCustomer,
+			IsActive:                !needsVerify,
+			SignupIP:                c.IP(),
+			SignupUserAgent:         truncate(c.Get("User-Agent"), 500),
+			EmailVerificationToken:  verifyToken,
+			EmailVerificationSentAt: ptrTime(now),
+		}
+		if workspaceInvite != nil {
+			// Convidado já está verificado (clicou no link do convite no email dele).
+			user.EmailVerifiedAt = ptrTime(now)
 		}
 		if req.Username != "" {
 			user.Username = &req.Username
@@ -344,7 +372,20 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		})
 	}
 
-	// Free plan - create account normally and return token
+	// Free plan - se precisa verificação, manda email de verificação e
+	// responde 202 (sem access_token). Caso contrário fluxo normal.
+	if needsVerify {
+		appURL := strings.TrimRight(os.Getenv("APP_URL"), "/")
+		if appURL == "" {
+			appURL = "https://app.uniq.chat"
+		}
+		verifyLink := appURL + "/verify-email?token=" + verifyToken
+		h.emailSvc.SendEmailVerification(user.Email, user.Name, verifyLink)
+		return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
+			"verification_required": true,
+			"message":               "enviamos um e-mail de confirmação para " + user.Email,
+		})
+	}
 	h.emailSvc.SendWelcome(user.Email, user.Name)
 	h.db.Preload("Plan").First(&user, "id = ?", user.ID)
 

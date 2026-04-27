@@ -225,6 +225,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	auth.Post("/logout", authH.Logout)
 	auth.Post("/forgot-password", authStrict, authH.ForgotPassword)
 	auth.Post("/reset-password", authStrict, authH.ResetPassword)
+	auth.Post("/verify-email", authStrict, authH.VerifyEmail)
+	auth.Post("/resend-verification", authStrict, authH.ResendVerification)
 	auth.Get("/me", middleware.RequireAuth(db), authH.Me)
 	auth.Put("/me", middleware.RequireAuth(db), authH.UpdateMe)
 	auth.Post("/change-password", middleware.RequireAuth(db), authH.ChangePassword)
@@ -250,6 +252,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	v1PublicAuth.Post("/logout", authH.Logout)
 	v1PublicAuth.Post("/forgot-password", authStrict, authH.ForgotPassword)
 	v1PublicAuth.Post("/reset-password", authStrict, authH.ResetPassword)
+	v1PublicAuth.Post("/verify-email", authStrict, authH.VerifyEmail)
+	v1PublicAuth.Post("/resend-verification", authStrict, authH.ResendVerification)
 
 	// CSAT public endpoints (no auth — customer answers via tokenized link)
 	app.Get("/csat/:token", csatH.GetPublic)

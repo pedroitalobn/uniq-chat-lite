@@ -145,6 +145,13 @@ func (s *Service) SyncSend(to, subject, html, emailType string) error {
 	return s.send(to, subject, html, emailType)
 }
 
+func (s *Service) SendEmailVerification(to, name, verifyLink string) {
+	html := emailVerificationHTML(s.appName, s.appURL, name, verifyLink)
+	if err := s.send(to, "Confirme seu e-mail — "+s.appName, html, "email_verification"); err != nil {
+		log.Error().Err(err).Str("to", to).Msg("email: failed to send verification")
+	}
+}
+
 func (s *Service) SendWelcome(to, name string) {
 	if err := s.send(to, "Bem-vindo ao "+s.appName+"!", welcomeHTML(s.appName, name, s.appURL), "welcome"); err != nil {
 		log.Error().Err(err).Str("to", to).Msg("email: failed to send welcome")

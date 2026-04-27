@@ -202,6 +202,23 @@ func passwordChangedHTML(appName, name, appURL string) string {
 	return baseTemplate(appName, appURL, BrandWarning, content)
 }
 
+// ── Email Verification ────────────────────────────────────────────────────────
+
+func emailVerificationHTML(appName, appURL, name, verifyLink string) string {
+	content := iconEmoji("✉️") +
+		h1("Confirme seu e-mail") +
+		p("Olá, <strong>"+name+"</strong>. Bem-vindo ao "+appName+"!") +
+		p("Pra ativar sua conta, confirme seu e-mail clicando no botão abaixo:") +
+		btn("Confirmar e-mail", verifyLink, BrandPrimary) +
+		highlightBox(
+			inlineP("⏰ Este link expira em <strong>24 horas</strong>."),
+			BrandWarning,
+		) +
+		divider() +
+		pSmall("Se você não criou esta conta, pode ignorar este email — a conta será removida automaticamente.")
+	return baseTemplate(appName, appURL, BrandPrimary, content)
+}
+
 // ── Forgot Password ───────────────────────────────────────────────────────────
 
 func forgotPasswordHTML(appName, name, appURL, resetLink string) string {

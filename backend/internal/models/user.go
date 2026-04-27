@@ -29,6 +29,14 @@ type User struct {
 	IsActive                 bool       `gorm:"default:true" json:"is_active"`
 	BlockedUntil             *time.Time `json:"blocked_until,omitempty"`
 	LastLoginAt              *time.Time `json:"last_login_at,omitempty"`
+	// Email verification (anti-bot signup). Quando EmailVerifiedAt é nil,
+	// o usuário só consegue logar se REQUIRE_EMAIL_VERIFICATION=false.
+	EmailVerifiedAt          *time.Time `json:"email_verified_at,omitempty"`
+	EmailVerificationToken   string     `gorm:"type:varchar(64);index" json:"-"`
+	EmailVerificationSentAt  *time.Time `json:"-"`
+	// Audit do signup pra rastreio de ataque/abuso.
+	SignupIP                 string     `gorm:"type:varchar(64)" json:"-"`
+	SignupUserAgent          string     `gorm:"type:varchar(512)" json:"-"`
 	Timezone                 string     `gorm:"type:varchar(50);default:'America/Sao_Paulo'" json:"timezone,omitempty"`
 	StripeCustomerID         string     `gorm:"type:varchar(255)" json:"stripe_customer_id,omitempty"`
 	StripeSubscriptionID     string     `gorm:"type:varchar(255)" json:"stripe_subscription_id,omitempty"`
