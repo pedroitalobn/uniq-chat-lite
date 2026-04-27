@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/queue"
+	"github.com/uniq-chat/backend/internal/services"
 	"github.com/uniq-chat/backend/internal/storage"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
@@ -110,11 +111,71 @@ func (h *MessageHandler) logMessage(instanceID, direction, msgType, jid, msgID s
 		Status:     status,
 	}
 	h.db.Create(&entry)
+
+	// Sprint billing — incrementa usage counter (msgs do dia) por user.
+	// Acumulado por user_id (todas as instâncias) pra checar limite do plano.
+	// Best-effort: falha aqui não impede o log da mensagem.
+	if direction == string(models.DirectionOut) {
+		usage := services.GetGlobalUsageService()
+		if usage != nil {
+			var inst models.Instance
+			if err := h.db.Select("user_id, plan_id").First(&inst, "id = ?", instID).Error; err == nil {
+				var plan *models.Plan
+				if inst.UserID != uuid.Nil {
+					var u models.User
+					if err := h.db.Preload("Plan").First(&u, "id = ?", inst.UserID).Error; err == nil {
+						plan = u.Plan
+					}
+					usage.Increment(context.Background(), inst.UserID, models.UsageTypeMessagesSent, plan)
+				}
+			}
+		}
+	}
+}
+
+// checkSendQuota retorna 402 se o user atingiu MaxMessagesPerDay do
+// plano. Chamado no início dos handlers de send (text/media/etc).
+//
+// Por que aqui em vez de middleware: cada send tem um path diferente
+// (preInst, v1inst, instance), aplicar middleware em todos é mais
+// código que helper único. Plus o helper pode acessar c.Locals("instance")
+// que já está populado.
+func (h *MessageHandler) checkSendQuota(c *fiber.Ctx) error {
+	instance, ok := c.Locals("instance").(*models.Instance)
+	if !ok {
+		return nil
+	}
+	usage := services.GetGlobalUsageService()
+	if usage == nil {
+		return nil
+	}
+	var user models.User
+	if err := h.db.Preload("Plan").First(&user, "id = ?", instance.UserID).Error; err != nil {
+		return nil // se não conseguimos carregar, não bloqueamos (fail-open)
+	}
+	if user.Role == models.RoleSuperAdmin {
+		return nil
+	}
+	if user.Plan == nil || user.Plan.IsUnlimitedMessages() {
+		return nil
+	}
+	if usage.HasReachedLimit(c.Context(), user.ID, models.UsageTypeMessagesSent, user.Plan.MaxMessagesPerDay) {
+		return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
+			"error":       "quota_exceeded",
+			"message":     "Limite diário de mensagens do plano atingido. Faça upgrade pra continuar.",
+			"limit":       user.Plan.MaxMessagesPerDay,
+			"upgrade_url": "/plans",
+		})
+	}
+	return nil
 }
 
 // SendText godoc
 // POST /instances/:id/messages/text
 func (h *MessageHandler) SendText(c *fiber.Ctx) error {
+	if err := h.checkSendQuota(c); err != nil {
+		return err
+	}
 	client, err := h.getClient(c)
 	if err != nil {
 		return err

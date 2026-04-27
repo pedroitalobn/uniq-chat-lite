@@ -190,12 +190,19 @@ export default function InboxPage() {
 
   const listParams = useMemo(() => {
     const p: Record<string, string | string[]> = {};
-    if (agentScope === "me") p.assigned_user_id = "me";
-    else if (agentScope !== "all") p.assigned_user_id = agentScope;
+    // "Todos" (statusTab=all) é UX de visão geral: mostra TUDO no workspace
+    // — atribuídas a qualquer um + sem atribuição. Não filtra por agente.
+    // Para qualquer outro statusTab, respeita o agentScope normalmente.
     if (statusTab === "unassigned") {
       p.assigned_user_id = "none";
       p.status = ["open", "pending"];
-    } else if (statusTab !== "all") {
+    } else if (statusTab === "all") {
+      // intencionalmente sem assigned_user_id e sem status — backend
+      // traz todas as conversas que o usuário tem permissão de ver
+      // (RBAC scope é aplicado no handler).
+    } else {
+      if (agentScope === "me") p.assigned_user_id = "me";
+      else if (agentScope !== "all") p.assigned_user_id = agentScope;
       p.status = statusTab;
     }
     if (queueScope !== "all") p.queue_id = queueScope;

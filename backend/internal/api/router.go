@@ -491,6 +491,15 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	roles.Delete("/:role_id", roleH.Delete)
 
 	// Global System Webhooks
+	// Billing — upgrade/cancel/preview com Stripe proration nativo.
+	billingH := handlers.NewBillingHandler(db)
+	billing := api.Group("/billing")
+	billing.Get("/status", billingH.Status)
+	billing.Get("/preview/:planId", billingH.PreviewUpgrade)
+	billing.Post("/upgrade", billingH.Upgrade)
+	billing.Post("/cancel", billingH.Cancel)
+	billing.Post("/resume", billingH.Resume)
+
 	systemWebhooks := api.Group("/webhooks/system")
 	systemWebhooks.Get("/events", globalWebhookH.ListEvents)
 	systemWebhooks.Get("/events/:eventID/preview", webhookLogsH.PreviewEvent)
@@ -747,7 +756,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	tk.Get("/dms", tiktokH.ListDMs)
 
 	// ─── CRM routes ───────────────────────────────────────────────────────────
-	crm := api.Group("/crm")
+	crm := api.Group("/crm", middleware.RequireFeature(db, models.FeatureCRM))
 	contacts := crm.Group("/contacts")
 	contacts.Get("/", contactH.ListContacts)
 	contacts.Post("/", contactH.CreateContact)
@@ -819,7 +828,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// ─── Ticketing / Atendimento ──────────────────────────────────────────────
 	// All routes require an active workspace passed via X-Workspace-ID header
 	// (or ?workspace_id=). RequireWorkspacePermission enforces the RBAC key.
-	conversations := api.Group("/conversations")
+	conversations := api.Group("/conversations", middleware.RequireFeature(db, models.FeatureInbox))
 	// Health — deliberately NO workspace permission so the UI can distinguish
 	// "route missing / old deploy" from "route exists, something else broken".
 	conversations.Get("/health", conversationH.Health)
@@ -943,7 +952,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	workspace.Get("/presence", middleware.RequireWorkspacePermission(db, models.PermPresenceViewOthers), presenceH.ListWorkspacePresence)
 
 	// ─── Campaign routes ───────────────────────────────────────────────────────
-	campaigns := api.Group("/campaigns")
+	campaigns := api.Group("/campaigns", middleware.RequireFeature(db, models.FeatureCampaigns))
 	campaigns.Get("/", campaignH.List)
 	campaigns.Post("/", campaignH.Create)
 	campaigns.Get("/segment-options", campaignH.SegmentOptions)
@@ -958,7 +967,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	campaigns.Get("/:id/messages", campaignH.ListMessageStatus)
 
 	// Sprint 8 — keyword triggers (autoresponder simples gap UazAPI)
-	triggers := api.Group("/triggers")
+	triggers := api.Group("/triggers", middleware.RequireFeature(db, models.FeatureTriggers))
 	triggers.Get("/", triggerH.List)
 	triggers.Post("/", triggerH.Create)
 	triggers.Get("/:id", triggerH.Get)
@@ -1015,7 +1024,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// AI Chat & Journeys
 	api.Post("/ai/chat", chatH.HandleChat)
 	api.Get("/ai/tools", chatH.GetTools)
-	journeys := api.Group("/journeys")
+	journeys := api.Group("/journeys", middleware.RequireFeature(db, models.FeatureJourneys))
 	journeys.Get("/", journeyH.ListJourneys)
 	journeys.Post("/", journeyH.CreateJourney)
 	journeys.Get("/templates", journeyH.ListTemplates)
@@ -1030,7 +1039,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	journeys.Get("/:id/executions", agentH.GetJourneyExecutions)
 
 	// Agent Center
-	agent := api.Group("/agent")
+	agent := api.Group("/agent", middleware.RequireFeature(db, models.FeatureAI))
 	agent.Get("/stats", agentH.GetStats)
 	agent.Get("/activity", agentH.GetActivity)
 	agent.Get("/instances", agentH.GetInstances)
@@ -1133,6 +1142,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	admin.Delete("/proxy-config/:id", adminH.DeleteGlobalProxyConfig)
 	admin.Post("/proxy-test", adminH.TestGlobalProxy)
 	admin.Get("/proxy-stats", adminH.GetGlobalProxyStats)
+	// Sprint billing F — audit de mudanças de plano
+	admin.Get("/plan-changes", adminH.AllPlanChanges)
+	admin.Get("/users/:id/plan-changes", adminH.ListUserPlanChanges)
 	// Inspect/Support routes - list all servers and instances for super admin support
 	inspect := admin.Group("/inspect")
 	inspect.Get("/servers", adminH.ListAllServers)

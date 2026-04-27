@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/api"
@@ -175,6 +177,28 @@ func main() {
 	inboundPipeline.SetTriggerService(triggerSvc)
 	manager.SetInboundProcessor(inboundPipeline)
 
+	// Sprint billing — usage counters + thresholds. Notifier dispara
+	// webhook usage.threshold + WS pra UI mostrar banner.
+	usageSvc := services.NewUsageService(db)
+	usageSvc.SetNotifier(func(ctx context.Context, userID uuid.UUID, usageType string, percent int, current, limit int) {
+		hub := whatsapp.GetHub()
+		if hub != nil {
+			hub.Broadcast(&whatsapp.Event{
+				Type: "usage.threshold",
+				Payload: map[string]any{
+					"user_id":  userID.String(),
+					"type":     usageType,
+					"percent":  percent,
+					"current":  current,
+					"limit":    limit,
+				},
+			})
+		}
+		log.Info().Str("user", userID.String()).Str("type", usageType).Int("percent", percent).
+			Int("current", current).Int("limit", limit).Msg("usage threshold reached")
+	})
+	services.SetGlobalUsageService(usageSvc)
+
 	// Ticketing periodic jobs: unsnoozer, presence sweep, pending redispatch,
 	// resolve auto-close.
 	ticketingScheduler := services.NewTicketingScheduler(db, services.NewDispatchService(db))
@@ -288,6 +312,9 @@ func autoMigrate(db *gorm.DB) error {
 		&models.TriggerFire{},
 		// Sprint 7 — warm-up
 		&models.WarmupSession{},
+		// Sprint billing — usage counters
+		&models.UsageCounter{},
+		&models.PlanChangeLog{},
 	)
 }
 

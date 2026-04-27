@@ -374,6 +374,30 @@ func (h *AdminHandler) UpdateUser(c *fiber.Ctx) error {
 			updates["plan_id"] = pid
 		}
 	}
+
+	// Sprint billing F — audit log quando admin troca o plano de um user.
+	// Captura plano anterior + novo + email do admin que executou.
+	if pidNew, ok := updates["plan_id"].(uuid.UUID); ok && (user.PlanID == nil || *user.PlanID != pidNew) {
+		actor := middleware.GetCurrentUser(c)
+		var oldPlan, newPlan models.Plan
+		if user.PlanID != nil {
+			h.db.First(&oldPlan, "id = ?", *user.PlanID)
+		}
+		h.db.First(&newPlan, "id = ?", pidNew)
+		entry := models.PlanChangeLog{
+			UserID:       user.ID,
+			FromPlanID:   user.PlanID,
+			ToPlanID:     &pidNew,
+			FromPlanName: oldPlan.Name,
+			ToPlanName:   newPlan.Name,
+			Source:       models.PlanChangeSourceAdmin,
+		}
+		if actor != nil {
+			entry.ActorID = &actor.ID
+			entry.ActorEmail = actor.Email
+		}
+		h.db.Create(&entry)
+	}
 	if req.BlockedUntil != nil {
 		if *req.BlockedUntil == "" || *req.BlockedUntil == "null" {
 			updates["blocked_until"] = nil
@@ -480,13 +504,35 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 
 	var req struct {
 		Name              string   `json:"name"`
+		Slug              string   `json:"slug"`
 		Price             *float64 `json:"price"`
 		MaxInstances      *int     `json:"max_instances"`
 		MaxMessagesPerDay *int     `json:"max_messages_per_day"`
 		MaxUsers          *int     `json:"max_users"`
 		MaxWorkspaces     *int     `json:"max_workspaces"`
+		MaxAgents         *int     `json:"max_agents"`
+		MaxJourneys       *int     `json:"max_journeys"`
+		MaxCampaigns      *int     `json:"max_campaigns"`
+		MaxTriggers       *int     `json:"max_triggers"`
+		MaxWebhooks       *int     `json:"max_webhooks"`
+		MaxContacts       *int     `json:"max_contacts"`
+		MaxDeals          *int     `json:"max_deals"`
 		Features          string   `json:"features"`
+		AllowAI           *bool    `json:"allow_ai"`
+		AllowJourneys     *bool    `json:"allow_journeys"`
+		AllowCRM          *bool    `json:"allow_crm"`
+		AllowInbox        *bool    `json:"allow_inbox"`
+		AllowCampaigns    *bool    `json:"allow_campaigns"`
+		AllowTriggers     *bool    `json:"allow_triggers"`
+		AllowWarmup       *bool    `json:"allow_warmup"`
+		AllowNewsletters  *bool    `json:"allow_newsletters"`
+		AllowCommunities  *bool    `json:"allow_communities"`
+		AllowInstagram    *bool    `json:"allow_instagram"`
+		AllowTikTok       *bool    `json:"allow_tiktok"`
+		AllowAPIAccess    *bool    `json:"allow_api_access"`
+		AllowGlobalWebhook *bool   `json:"allow_global_webhook"`
 		AllowProxy        *bool    `json:"allow_proxy"`
+		AllowProxyResidencial *bool `json:"allow_proxy_residencial"`
 		IsActive          *bool    `json:"is_active"`
 		StripePriceID     string   `json:"stripe_price_id"`
 		AsaasProductID    string   `json:"asaas_product_id"`
@@ -517,8 +563,75 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 	if req.Features != "" {
 		updates["features"] = req.Features
 	}
+	if req.Slug != "" {
+		updates["slug"] = req.Slug
+	}
+	if req.MaxAgents != nil {
+		updates["max_agents"] = *req.MaxAgents
+	}
+	if req.MaxJourneys != nil {
+		updates["max_journeys"] = *req.MaxJourneys
+	}
+	if req.MaxCampaigns != nil {
+		updates["max_campaigns"] = *req.MaxCampaigns
+	}
+	if req.MaxTriggers != nil {
+		updates["max_triggers"] = *req.MaxTriggers
+	}
+	if req.MaxWebhooks != nil {
+		updates["max_webhooks"] = *req.MaxWebhooks
+	}
+	if req.MaxContacts != nil {
+		updates["max_contacts"] = *req.MaxContacts
+	}
+	if req.MaxDeals != nil {
+		updates["max_deals"] = *req.MaxDeals
+	}
+	// Feature flags (pointer pra distinguir false explícito de não-enviado)
+	if req.AllowAI != nil {
+		updates["allow_ai"] = *req.AllowAI
+	}
+	if req.AllowJourneys != nil {
+		updates["allow_journeys"] = *req.AllowJourneys
+	}
+	if req.AllowCRM != nil {
+		updates["allow_crm"] = *req.AllowCRM
+	}
+	if req.AllowInbox != nil {
+		updates["allow_inbox"] = *req.AllowInbox
+	}
+	if req.AllowCampaigns != nil {
+		updates["allow_campaigns"] = *req.AllowCampaigns
+	}
+	if req.AllowTriggers != nil {
+		updates["allow_triggers"] = *req.AllowTriggers
+	}
+	if req.AllowWarmup != nil {
+		updates["allow_warmup"] = *req.AllowWarmup
+	}
+	if req.AllowNewsletters != nil {
+		updates["allow_newsletters"] = *req.AllowNewsletters
+	}
+	if req.AllowCommunities != nil {
+		updates["allow_communities"] = *req.AllowCommunities
+	}
+	if req.AllowInstagram != nil {
+		updates["allow_instagram"] = *req.AllowInstagram
+	}
+	if req.AllowTikTok != nil {
+		updates["allow_tiktok"] = *req.AllowTikTok
+	}
+	if req.AllowAPIAccess != nil {
+		updates["allow_api_access"] = *req.AllowAPIAccess
+	}
+	if req.AllowGlobalWebhook != nil {
+		updates["allow_global_webhook"] = *req.AllowGlobalWebhook
+	}
 	if req.AllowProxy != nil {
 		updates["allow_proxy"] = *req.AllowProxy
+	}
+	if req.AllowProxyResidencial != nil {
+		updates["allow_proxy_residencial"] = *req.AllowProxyResidencial
 	}
 	if req.IsActive != nil {
 		updates["is_active"] = *req.IsActive
@@ -536,6 +649,57 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 
 	h.db.First(&plan, "id = ?", plan.ID)
 	return c.JSON(plan)
+}
+
+// PlanChangeLog GET /admin/users/:id/plan-changes
+//
+// Histórico de mudanças de plano de um user específico. Útil pra suporte
+// debugar "por que esse cliente caiu de Pro pra Free?".
+func (h *AdminHandler) ListUserPlanChanges(c *fiber.Ctx) error {
+	userID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID inválido"})
+	}
+	limit := c.QueryInt("limit", 50)
+	if limit < 1 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	var logs []models.PlanChangeLog
+	if err := h.db.Where("user_id = ?", userID).Order("created_at DESC").Limit(limit).Find(&logs).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"data": logs, "total": len(logs)})
+}
+
+// AllPlanChanges GET /admin/plan-changes
+//
+// Audit log global de TODAS mudanças. Filtros: ?source=stripe|admin|self,
+// ?from=YYYY-MM-DD, ?to=YYYY-MM-DD, ?limit, ?offset.
+func (h *AdminHandler) AllPlanChanges(c *fiber.Ctx) error {
+	limit := c.QueryInt("limit", 100)
+	if limit > 500 {
+		limit = 500
+	}
+	offset := c.QueryInt("offset", 0)
+	q := h.db.Model(&models.PlanChangeLog{})
+	if src := c.Query("source"); src != "" {
+		q = q.Where("source = ?", src)
+	}
+	if from := c.Query("from"); from != "" {
+		q = q.Where("created_at >= ?", from)
+	}
+	if to := c.Query("to"); to != "" {
+		q = q.Where("created_at <= ?", to)
+	}
+
+	var total int64
+	q.Count(&total)
+	var logs []models.PlanChangeLog
+	q.Order("created_at DESC").Limit(limit).Offset(offset).Find(&logs)
+	return c.JSON(fiber.Map{"data": logs, "total": total, "limit": limit, "offset": offset})
 }
 
 // ─── Platform Proxies (admin) ────────────────────────────────────────────
