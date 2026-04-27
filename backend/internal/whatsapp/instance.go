@@ -1485,16 +1485,12 @@ func (ic *InstanceClient) SendPixMessage(to string, data PixData) (string, error
 		return "", fmt.Errorf("falha ao serializar payload pix: %w", err)
 	}
 
-	// Mesma stack que SendButtonsMessage: wrap em DocumentWithCaption +
-	// AdditionalNodes biz native_flow. Confirmado em prod que esse combo é
-	// o que faz a UI nativa renderizar (template começou a chegar quando
-	// passou a usar essa stack).
-	templateID := fmt.Sprintf("%d", time.Now().UnixNano()/1_000_000)
-	messageParamsJSON := fmt.Sprintf(`{"from":"api","templateId":"%s"}`, templateID)
-
-	secret := make([]byte, 32)
-	_, _ = cryptorand.Read(secret)
-
+	// Estrutura paritária com PR EvolutionAPI/evolution-go#40 PIX:
+	// - InteractiveMessage com Header(Title) + Body + Footer + NativeFlow
+	// - MessageContextInfo com DeviceListMetadata (sem MessageSecret)
+	// - SEM DocumentWithCaption wrap
+	// - biz nodes: <biz><interactive type=native_flow v=1><native_flow name=payment_info/>
+	// - + <bot biz_bot="1"/> separado (pra 1:1 chats, não grupos)
 	interactive := &waE2E.InteractiveMessage{
 		Header: &waE2E.InteractiveMessage_Header{
 			Title:              proto.String(data.HeaderTitle),
@@ -1507,30 +1503,53 @@ func (ic *InstanceClient) SendPixMessage(to string, data PixData) (string, error
 					Name:             proto.String("payment_info"),
 					ButtonParamsJSON: proto.String(string(paymentJSON)),
 				}},
-				MessageParamsJSON: proto.String(messageParamsJSON),
+				MessageParamsJSON: proto.String(""),
 				MessageVersion:    proto.Int32(1),
 			},
 		},
-		ContextInfo: &waE2E.ContextInfo{},
 	}
 	if footer := strings.TrimSpace(data.FooterText); footer != "" {
 		interactive.Footer = &waE2E.InteractiveMessage_Footer{Text: proto.String(footer)}
 	}
 
 	msg := &waE2E.Message{
-		DocumentWithCaptionMessage: &waE2E.FutureProofMessage{
-			Message: &waE2E.Message{
-				InteractiveMessage: interactive,
-				MessageContextInfo: &waE2E.MessageContextInfo{
-					MessageSecret: secret,
-				},
-			},
+		InteractiveMessage: interactive,
+		MessageContextInfo: &waE2E.MessageContextInfo{
+			DeviceListMetadataVersion: proto.Int32(2),
+			DeviceListMetadata:        &waE2E.DeviceListMetadata{},
 		},
 	}
-	bizNodes := buildButtonsBizNodes(true)
+
+	pixNodes := []waBinary.Node{
+		{
+			Tag: "biz",
+			Content: []waBinary.Node{{
+				Tag: "interactive",
+				Attrs: waBinary.Attrs{
+					"type": "native_flow",
+					"v":    "1",
+				},
+				Content: []waBinary.Node{{
+					Tag: "native_flow",
+					Attrs: waBinary.Attrs{
+						"name": "payment_info",
+					},
+				}},
+			}},
+		},
+	}
+	// Bot node pra 1:1 chats (não grupos). Recipient é PN ou LID, não @g.us.
+	if recipient.Server != types.GroupServer {
+		pixNodes = append(pixNodes, waBinary.Node{
+			Tag: "bot",
+			Attrs: waBinary.Attrs{
+				"biz_bot": "1",
+			},
+		})
+	}
 
 	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
-		AdditionalNodes: &bizNodes,
+		AdditionalNodes: &pixNodes,
 	})
 	if err != nil {
 		log.Warn().Str("instance", ic.ID).Err(err).Msg("PIX send failed, falling back to text")
@@ -1657,7 +1676,18 @@ func (ic *InstanceClient) SendListMessage(to, title, description, buttonText, fo
 			},
 		},
 	}
-	bizNodes := buildButtonsBizNodes(true)
+	// Estrutura paritária com PR EvolutionAPI#40 List: biz com <list>
+	// (NÃO <interactive>!) com type=product_list v=2.
+	bizNodes := []waBinary.Node{{
+		Tag: "biz",
+		Content: []waBinary.Node{{
+			Tag: "list",
+			Attrs: waBinary.Attrs{
+				"type": "product_list",
+				"v":    "2",
+			},
+		}},
+	}}
 
 	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
 		AdditionalNodes: &bizNodes,
