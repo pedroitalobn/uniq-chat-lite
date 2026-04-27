@@ -535,10 +535,10 @@ export default function AdminProxyPage() {
             const country = getCountryInfo(proxy.country || "br");
             return (
               <div key={proxy.id} className="rounded-xl p-4 flex items-center justify-between"
-                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg flex items-center justify-center"
-                    style={{ background: proxy.enabled ? "rgba(0,212,106,0.1)" : "rgba(255,255,255,0.04)" }}>
+                    style={{ background: proxy.enabled ? "rgba(0,212,106,0.1)" : "var(--surface-2)" }}>
                     <Globe className="w-5 h-5" style={{ color: proxy.enabled ? "var(--green)" : "hsl(240 8% 40%)" }} />
                   </div>
                   <div>
@@ -610,7 +610,7 @@ export default function AdminProxyPage() {
           <div className="space-y-2">
             {stats.users.map((u) => (
               <div key={u.user_id} className="rounded-lg p-3 flex items-center justify-between"
-                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
                 <div>
                   <p className="text-sm font-medium" style={{ color: "hsl(240 15% 90%)" }}>
                     {u.name} <span style={{ color: "hsl(240 8% 46%)" }}>({u.plan_name})</span>

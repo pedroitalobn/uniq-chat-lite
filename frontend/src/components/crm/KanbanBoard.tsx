@@ -156,7 +156,7 @@ function StageHeader({
           </span>
           <span
             className="rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-            style={{ background: "rgba(255,255,255,0.05)", color: uniq.textDim }}
+            style={{ background: "var(--surface-2)", color: uniq.textDim }}
           >
             {count}
           </span>
@@ -176,7 +176,7 @@ function SkeletonCard() {
   return (
     <div
       className="h-24 animate-pulse rounded-xl"
-      style={{ background: "rgba(255,255,255,0.04)" }}
+      style={{ background: "var(--surface-2)" }}
     />
   );
 }

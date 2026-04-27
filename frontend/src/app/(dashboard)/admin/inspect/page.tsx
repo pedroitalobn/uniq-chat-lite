@@ -192,8 +192,8 @@ function ServerRow({ server, isLast }: { server: ServerExt; isLast: boolean }) {
 
   return (
     <div className="grid grid-cols-[1fr_1fr_100px_80px_60px] gap-3 px-4 py-3 items-center transition-colors cursor-pointer"
-      style={{ borderBottom: isLast ? undefined : "1px solid rgba(255,255,255,0.04)" }}
-      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.015)"}
+      style={{ borderBottom: isLast ? undefined : "1px solid var(--border-default)" }}
+      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--surface-2)"}
       onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}>
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "hsl(240 12% 10%)" }}>
@@ -254,8 +254,8 @@ function InstanceRow({ instance, isLast }: { instance: Instance; isLast: boolean
 
   return (
     <div className="grid grid-cols-[1fr_1fr_100px_80px_80px] gap-3 px-4 py-3 items-center transition-colors cursor-pointer"
-      style={{ borderBottom: isLast ? undefined : "1px solid rgba(255,255,255,0.04)" }}
-      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.015)"}
+      style={{ borderBottom: isLast ? undefined : "1px solid var(--border-default)" }}
+      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--surface-2)"}
       onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}>
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${channelColor}15`, border: `1px solid ${channelColor}30` }}>

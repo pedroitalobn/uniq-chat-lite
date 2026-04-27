@@ -440,7 +440,7 @@ function ActionBtn({ children, onClick, tone, icon }: {
   const cls =
     tone === "win" ? { color: uniq.statusWon, bg: "rgba(16,185,129,0.08)" }
     : tone === "lose" ? { color: uniq.statusLost, bg: "rgba(239,68,68,0.08)" }
-    : { color: uniq.textDim, bg: "rgba(255,255,255,0.04)" };
+    : { color: uniq.textDim, bg: "var(--surface-2)" };
   return (
     <button
       onClick={onClick}
@@ -462,7 +462,7 @@ function TimelineItemRow({ item }: { item: TimelineItem }) {
       style={cardStyle}
     >
       <div className="flex items-center justify-between text-[10px]" style={{ color: uniq.textFaint }}>
-        <span className="rounded-full px-1.5 py-0.5" style={{ background: "rgba(255,255,255,0.04)", color: uniq.textDim }}>
+        <span className="rounded-full px-1.5 py-0.5" style={{ background: "var(--surface-2)", color: uniq.textDim }}>
           {label}
         </span>
         <span>{relativeTime(item.created_at)}</span>

@@ -67,7 +67,7 @@ function FieldInput({
       </label>
       <div
         className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 16%)" }}
+        style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)" }}
       >
         <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }} />
         <input
@@ -103,7 +103,7 @@ function FieldSelect({
         )}
       </div>
       <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 16%)", opacity: disabled ? 0.5 : 1 }}>
+        style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)", opacity: disabled ? 0.5 : 1 }}>
         <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }} />
         <select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}
           className="flex-1 bg-transparent text-sm outline-none cursor-pointer" style={{ color: "hsl(240 15% 90%)" }}>
@@ -185,14 +185,14 @@ function ContactModal({
   };
 
   const tabStyle = (active: boolean) => ({
-    background: active ? "rgba(255,255,255,0.07)" : "transparent",
+    background: active ? "var(--border-default)" : "transparent",
     color: active ? "hsl(240 15% 90%)" : "hsl(240 8% 46%)",
-    border: active ? "1px solid rgba(255,255,255,0.1)" : "1px solid transparent",
+    border: active ? "1px solid var(--border-strong)" : "1px solid transparent",
   });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose} />
+      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div
         className="relative w-full max-w-lg rounded-2xl shadow-2xl animate-fade-in-up flex flex-col"
         style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)", maxHeight: "90vh" }}
@@ -231,7 +231,7 @@ function ContactModal({
 
               <div>
                 <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 48%)" }}>Notas</label>
-                <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 16%)" }}>
+                <div className="rounded-xl p-3" style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)" }}>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -255,9 +255,9 @@ function ContactModal({
                           onClick={() => toggleTag(tag.id)}
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-all"
                           style={{
-                            background: selected ? tag.color + "22" : "rgba(255,255,255,0.04)",
+                            background: selected ? tag.color + "22" : "var(--surface-2)",
                             color: selected ? tag.color : "hsl(240 8% 46%)",
-                            border: `1px solid ${selected ? tag.color + "44" : "rgba(255,255,255,0.08)"}`,
+                            border: `1px solid ${selected ? tag.color + "44" : "var(--border-default)"}`,
                           }}
                         >
                           {selected && <Check className="w-2.5 h-2.5" />}
@@ -319,7 +319,7 @@ function ContactModal({
           <button
             onClick={onClose}
             className="flex-1 text-sm py-2.5 rounded-xl transition-all"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 8% 46%)" }}
+            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 46%)" }}
           >
             Cancelar
           </button>
@@ -361,7 +361,7 @@ function TagManager({ onClose, workspaceId }: { onClose: () => void; workspaceId
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose} />
+      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-fade-in-up"
         style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
         <div className="flex items-center justify-between mb-5">
@@ -370,7 +370,7 @@ function TagManager({ onClose, workspaceId }: { onClose: () => void; workspaceId
         </div>
         <div className="space-y-3 mb-4">
           <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 16%)" }}>
+            style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)" }}>
             <TagIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }} />
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome da tag"
               className="flex-1 bg-transparent text-sm outline-none" style={{ color: "hsl(240 15% 90%)" }}
@@ -390,7 +390,7 @@ function TagManager({ onClose, workspaceId }: { onClose: () => void; workspaceId
         </div>
         <div className="space-y-1.5 max-h-48 overflow-y-auto">
           {tags.map((tag) => (
-            <div key={tag.id} className="flex items-center justify-between p-2 rounded-xl" style={{ background: "rgba(255,255,255,0.02)" }}>
+            <div key={tag.id} className="flex items-center justify-between p-2 rounded-xl" style={{ background: "var(--surface-2)" }}>
               <TagBadge tag={tag} />
               <button onClick={() => deleteTag.mutate(tag.id)} className="p-1 rounded-lg transition-colors hover:text-red-400" style={{ color: "hsl(240 8% 38%)" }}>
                 <Trash2 className="w-3.5 h-3.5" />
@@ -444,7 +444,7 @@ function FunnelManager({ onClose, workspaceId }: { onClose: () => void; workspac
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose} />
+      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div
         className="relative w-full max-w-2xl rounded-2xl shadow-2xl animate-fade-in-up overflow-hidden flex flex-col"
         style={{
@@ -530,7 +530,7 @@ function FunnelList({
       {funnels.length === 0 ? (
         <div
           className="rounded-xl p-8 text-center"
-          style={{ background: "rgba(255,255,255,0.02)", border: "1px dashed hsl(240 12% 16%)" }}
+          style={{ background: "var(--surface-2)", border: "1px dashed hsl(240 12% 16%)" }}
         >
           <GitBranch className="w-8 h-8 mx-auto mb-2" style={{ color: "hsl(240 8% 30%)" }} />
           <p className="text-sm font-medium" style={{ color: "hsl(240 8% 60%)" }}>Nenhum funil ainda</p>
@@ -565,7 +565,7 @@ function FunnelListItem({
   return (
     <div
       className="rounded-xl p-3 flex items-center gap-3 transition-colors hover:bg-white/[0.02]"
-      style={{ background: "rgba(255,255,255,0.02)", border: "1px solid hsl(240 12% 13%)" }}
+      style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 13%)" }}
     >
       <span className="inline-block w-3 h-3 rounded-full flex-shrink-0" style={{ background: funnel.color || "#a78bfa" }} />
       <div className="flex-1 min-w-0">
@@ -756,7 +756,7 @@ function FunnelForm({
             rows={2}
             className="w-full bg-transparent rounded-xl px-3 py-2 text-sm outline-none resize-none"
             style={{
-              background: "rgba(255,255,255,0.03)",
+              background: "var(--surface-2)",
               border: "1px solid hsl(240 12% 16%)",
               color: "hsl(240 15% 90%)",
             }}
@@ -803,7 +803,7 @@ function FunnelForm({
             <div
               key={s.id}
               className="flex items-center gap-2 rounded-xl p-2"
-              style={{ background: "rgba(255,255,255,0.02)", border: "1px solid hsl(240 12% 13%)" }}
+              style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 13%)" }}
             >
               <div className="flex flex-col">
                 <button
@@ -916,8 +916,8 @@ function FunnelSwitcher({
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors min-w-[200px]"
         style={{
-          background: selectedId ? "rgba(167,139,250,0.1)" : "rgba(255,255,255,0.04)",
-          border: `1px solid ${selectedId ? "rgba(167,139,250,0.3)" : "rgba(255,255,255,0.08)"}`,
+          background: selectedId ? "rgba(167,139,250,0.1)" : "var(--surface-2)",
+          border: `1px solid ${selectedId ? "rgba(167,139,250,0.3)" : "var(--border-default)"}`,
           color: selectedId ? "#c4b5fd" : "hsl(240 15% 90%)",
         }}
       >
@@ -1065,7 +1065,7 @@ function JourneyManager({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.6)" }} onClick={onClose} />
+      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-md rounded-2xl p-6 shadow-2xl animate-fade-in-up"
         style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
         <div className="flex items-center justify-between mb-5">
@@ -1079,7 +1079,7 @@ function JourneyManager({ onClose }: { onClose: () => void }) {
             </p>
           </div>
           <div className="rounded-xl px-3 py-2.5"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 16%)" }}>
+            style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)" }}>
             <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)}
               placeholder="Ex: Qualificar leads B2B, agendar reunião com SDR quando interesse for confirmado..."
               rows={3}
@@ -1093,7 +1093,7 @@ function JourneyManager({ onClose }: { onClose: () => void }) {
         </div>
         <div className="space-y-1.5 max-h-80 overflow-y-auto">
           {journeys.map((j) => (
-            <div key={j.id} className="flex items-center justify-between gap-2 p-2 rounded-xl" style={{ background: "rgba(255,255,255,0.02)" }}>
+            <div key={j.id} className="flex items-center justify-between gap-2 p-2 rounded-xl" style={{ background: "var(--surface-2)" }}>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <Route className="w-3.5 h-3.5 flex-shrink-0" style={{ color: j.status === "active" ? "var(--green)" : "hsl(240 8% 46%)" }} />
@@ -1201,7 +1201,7 @@ function FilterPanel({
               onChange={(e) => onChange("external_id", e.target.value)}
               placeholder="Buscar por ID externo..."
               className="w-full text-sm rounded-xl px-3 py-2 outline-none"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
+              style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
             />
           </div>
         </div>
@@ -1235,7 +1235,7 @@ function SecondaryButton({
     <button
       onClick={onClick}
       className="flex items-center gap-2 text-sm font-medium px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl transition-all"
-      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 8% 62%)" }}
+      style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 62%)" }}
       onMouseEnter={(e) => (e.currentTarget.style.color = "hsl(240 15% 93%)")}
       onMouseLeave={(e) => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
     >
@@ -1287,8 +1287,8 @@ function CRMOverflowMenu({
         onClick={() => setOpen((o) => !o)}
         className="flex items-center justify-center p-2 rounded-xl transition-colors"
         style={{
-          background: open ? "rgba(0,212,106,0.08)" : "rgba(255,255,255,0.04)",
-          border: "1px solid " + (open ? "rgba(0,212,106,0.2)" : "rgba(255,255,255,0.08)"),
+          background: open ? "rgba(0,212,106,0.08)" : "var(--surface-2)",
+          border: "1px solid " + (open ? "rgba(0,212,106,0.2)" : "var(--border-default)"),
           color: open ? "#00d46a" : "hsl(240 8% 62%)",
         }}
         aria-label="Mais opções"
@@ -1420,11 +1420,11 @@ export default function CRMPage() {
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           {/* View toggle — sempre visível */}
-          <div className="flex bg-white/5 p-1 rounded-xl items-center" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div className="flex bg-white/5 p-1 rounded-xl items-center" style={{ border: "1px solid var(--border-default)" }}>
             <button
               onClick={() => setViewMode("list")}
               className="p-1.5 rounded-lg transition-colors"
-              style={{ background: viewMode === "list" ? "rgba(255,255,255,0.1)" : "transparent", color: viewMode === "list" ? "white" : "hsl(240 8% 62%)" }}
+              style={{ background: viewMode === "list" ? "var(--border-strong)" : "transparent", color: viewMode === "list" ? "white" : "hsl(240 8% 62%)" }}
               aria-label="Vista em lista"
             >
               <ListIcon className="w-4 h-4" />
@@ -1432,7 +1432,7 @@ export default function CRMPage() {
             <button
               onClick={() => setViewMode("kanban")}
               className="p-1.5 rounded-lg transition-colors"
-              style={{ background: viewMode === "kanban" ? "rgba(255,255,255,0.1)" : "transparent", color: viewMode === "kanban" ? "white" : "hsl(240 8% 62%)" }}
+              style={{ background: viewMode === "kanban" ? "var(--border-strong)" : "transparent", color: viewMode === "kanban" ? "white" : "hsl(240 8% 62%)" }}
               aria-label="Vista em kanban"
             >
               <KanbanSquare className="w-4 h-4" />
@@ -1444,8 +1444,8 @@ export default function CRMPage() {
             onClick={() => setFilterOpen(true)}
             className="relative flex items-center gap-2 text-sm font-medium px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl transition-all"
             style={{
-              background: activeFilterCount > 0 ? "rgba(0,212,106,0.08)" : "rgba(255,255,255,0.04)",
-              border: `1px solid ${activeFilterCount > 0 ? "rgba(0,212,106,0.2)" : "rgba(255,255,255,0.08)"}`,
+              background: activeFilterCount > 0 ? "rgba(0,212,106,0.08)" : "var(--surface-2)",
+              border: `1px solid ${activeFilterCount > 0 ? "rgba(0,212,106,0.2)" : "var(--border-default)"}`,
               color: activeFilterCount > 0 ? "var(--green)" : "hsl(240 8% 62%)",
             }}
             aria-label="Filtros do pipeline"
@@ -1503,9 +1503,9 @@ export default function CRMPage() {
           <div className="flex gap-1.5 flex-wrap items-center">
             <button onClick={() => setActiveTagFilter(null)} className="px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all"
               style={{
-                background: activeTagFilter === null ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
+                background: activeTagFilter === null ? "var(--border-default)" : "var(--surface-2)",
                 color: activeTagFilter === null ? "hsl(240 15% 90%)" : "hsl(240 8% 46%)",
-                border: "1px solid rgba(255,255,255,0.06)",
+                border: "1px solid var(--border-default)",
               }}>
               Todos
             </button>
@@ -1513,9 +1513,9 @@ export default function CRMPage() {
               <button key={tag.id} onClick={() => setActiveTagFilter(activeTagFilter === tag.id ? null : tag.id)}
                 className="px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all"
                 style={{
-                  background: activeTagFilter === tag.id ? tag.color + "22" : "rgba(255,255,255,0.03)",
+                  background: activeTagFilter === tag.id ? tag.color + "22" : "var(--surface-2)",
                   color: activeTagFilter === tag.id ? tag.color : "hsl(240 8% 46%)",
-                  border: `1px solid ${activeTagFilter === tag.id ? tag.color + "44" : "rgba(255,255,255,0.06)"}`,
+                  border: `1px solid ${activeTagFilter === tag.id ? tag.color + "44" : "var(--surface-2)"}`,
                 }}>
                 {tag.name}
               </button>
@@ -1554,7 +1554,7 @@ export default function CRMPage() {
                     value={kanbanGroup}
                     onChange={(e) => setKanbanGroup(e.target.value as any)}
                     className="text-xs rounded-lg px-2.5 py-1.5 outline-none font-medium transition-colors cursor-pointer"
-                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 15% 90%)" }}
+                    style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 15% 90%)" }}
                   >
                     <option value="stage" style={{ background: "#111" }}>Etapa</option>
                     <option value="journey" style={{ background: "#111" }}>Jornada</option>
@@ -1601,7 +1601,7 @@ export default function CRMPage() {
         <div className="rounded-2xl p-14 text-center animate-fade-in-up"
           style={{ background: "hsl(240 18% 6%)", border: "1px dashed hsl(240 12% 16%)" }}>
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
             <User className="w-6 h-6" style={{ color: "hsl(240 8% 35%)" }} />
           </div>
           <p className="font-semibold text-sm" style={{ color: "hsl(240 8% 70%)" }}>Nenhum contato encontrado</p>
@@ -1678,7 +1678,7 @@ export default function CRMPage() {
                   onClick={() => setEditContact(contact)}
                   className="p-1.5 rounded-lg transition-all"
                   style={{ color: "hsl(240 8% 42%)" }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "hsl(240 15% 80%)"; (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "hsl(240 15% 80%)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-2)"; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "hsl(240 8% 42%)"; (e.currentTarget as HTMLElement).style.background = ""; }}
                 >
                   <Edit2 className="w-3.5 h-3.5" />
@@ -1720,11 +1720,11 @@ export default function CRMPage() {
                       key={col.key}
                       className="flex-shrink-0 w-80 flex flex-col snap-start rounded-2xl"
                       style={{
-                        background: "rgba(255,255,255,0.02)",
-                        border: `1px solid ${col.isNoStage ? "rgba(255,255,255,0.05)" : (col.color || "#60a5fa") + "33"}`,
+                        background: "var(--surface-2)",
+                        border: `1px solid ${col.isNoStage ? "var(--surface-2)" : (col.color || "#60a5fa") + "33"}`,
                       }}
                     >
-                      <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                      <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "var(--border-default)" }}>
                         <div className="flex items-center gap-2">
                           <span className="inline-block w-2 h-2 rounded-full" style={{ background: col.isNoStage ? "#64748b" : (col.color || "#60a5fa") }} />
                           <h3 className="text-sm font-semibold truncate" style={{ color: col.isNoStage ? "hsl(240 8% 62%)" : "hsl(240 15% 90%)" }}>
@@ -1732,7 +1732,7 @@ export default function CRMPage() {
                           </h3>
                         </div>
                         <span className="text-xs font-medium px-2 py-0.5 rounded-full"
-                          style={{ background: "rgba(255,255,255,0.08)", color: "hsl(240 8% 62%)" }}>
+                          style={{ background: "var(--surface-3)", color: "hsl(240 8% 62%)" }}>
                           {colContacts.length}
                         </span>
                       </div>
@@ -1742,7 +1742,7 @@ export default function CRMPage() {
                             {...provided.droppableProps}
                             ref={provided.innerRef}
                             className="flex-1 p-3 space-y-3 min-h-[150px] transition-colors"
-                            style={{ background: snapshot.isDraggingOver ? "rgba(255,255,255,0.02)" : "transparent" }}
+                            style={{ background: snapshot.isDraggingOver ? "var(--surface-2)" : "transparent" }}
                           >
                             {colContacts.map((contact, index) => (
                               <Draggable key={contact.id} draggableId={contact.id} index={index}>
@@ -1772,7 +1772,7 @@ export default function CRMPage() {
                                     <div className="flex flex-wrap gap-1 mt-2">
                                       {contact.tags?.map((tag) => <TagBadge key={tag.id} tag={tag} />)}
                                     </div>
-                                    <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                                    <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: "var(--border-default)" }}>
                                       <div className="flex items-center gap-1">
                                         {contact.owner && <span className="text-[10px]" style={{ color: "hsl(240 8% 42%)" }}>👤 {contact.owner}</span>}
                                       </div>
@@ -1828,12 +1828,12 @@ export default function CRMPage() {
                     }}
                     className="flex-shrink-0 w-80 flex flex-col snap-start rounded-2xl transition-opacity"
                     style={{ 
-                      background: "rgba(255,255,255,0.02)", 
-                      border: "1px solid rgba(255,255,255,0.05)",
+                      background: "var(--surface-2)", 
+                      border: "1px solid var(--border-default)",
                       cursor: "grab"
                     }}
                   >
-                    <div className="px-4 py-3 border-b flex items-center justify-between select-none" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                    <div className="px-4 py-3 border-b flex items-center justify-between select-none" style={{ borderColor: "var(--border-default)" }}>
                       <div className="flex items-center gap-2">
                         <GripVertical className="w-4 h-4 opacity-40" style={{ color: "hsl(240 8% 38%)" }} />
                         <h3 className="text-sm font-semibold truncate" style={{ color: "hsl(240 15% 90%)" }}>
@@ -1841,7 +1841,7 @@ export default function CRMPage() {
                         </h3>
                       </div>
                       <span className="text-xs font-medium px-2 py-0.5 rounded-full" 
-                        style={{ background: "rgba(255,255,255,0.08)", color: "hsl(240 8% 62%)" }}>
+                        style={{ background: "var(--surface-3)", color: "hsl(240 8% 62%)" }}>
                         {colContacts.length}
                       </span>
                     </div>
@@ -1852,7 +1852,7 @@ export default function CRMPage() {
                           {...provided.droppableProps}
                           ref={provided.innerRef}
                           className="flex-1 p-3 space-y-3 min-h-[150px] transition-colors"
-                          style={{ background: snapshot.isDraggingOver ? "rgba(255,255,255,0.02)" : "transparent" }}
+                          style={{ background: snapshot.isDraggingOver ? "var(--surface-2)" : "transparent" }}
                         >
                           {colContacts.map((contact, index) => (
                             <Draggable key={contact.id} draggableId={contact.id} index={index}>
@@ -1887,7 +1887,7 @@ export default function CRMPage() {
                                     {contact.tags?.map((tag) => <TagBadge key={tag.id} tag={tag} />)}
                                   </div>
                                   
-                                  <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                                  <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: "var(--border-default)" }}>
                                     <div className="flex items-center gap-1">
                                       {contact.owner && <span className="text-[10px]" style={{ color: "hsl(240 8% 42%)" }}>👤 {contact.owner}</span>}
                                     </div>

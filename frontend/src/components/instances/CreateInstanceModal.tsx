@@ -196,7 +196,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
         className="absolute inset-0 backdrop-blur-sm"
-        style={{ background: "rgba(0,0,0,0.6)" }}
+        style={{ background: "var(--surface-overlay)" }}
         onClick={handleClose}
       />
       <div
@@ -240,10 +240,10 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
                 style={{
                   background: selectedChannel === channel.id
                     ? `${channel.color}12`
-                    : "rgba(255,255,255,0.03)",
+                    : "var(--surface-2)",
                   border: selectedChannel === channel.id
                     ? `1px solid ${channel.color}40`
-                    : "1px solid rgba(255,255,255,0.06)",
+                    : "1px solid var(--border-default)",
                   opacity: channel.available ? 1 : 0.4,
                   cursor: channel.available ? "pointer" : "not-allowed",
                 }}
@@ -268,7 +268,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
                     )}
                     {!channel.available && (
                       <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
-                        style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 8% 50%)" }}>
+                        style={{ background: "var(--surface-2)", color: "hsl(240 8% 50%)" }}>
                         Em breve
                       </span>
                     )}
@@ -374,7 +374,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
                     </button>
                   </>
                 ) : (
-                  <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div className="rounded-xl p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
                     <p className="text-xs" style={{ color: "hsl(240 8% 58%)" }}>
                       O Instagram pediu confirmação de segurança fora da API. Acesse o app/site do Instagram dessa conta,
                       conclua a verificação e tente novamente.

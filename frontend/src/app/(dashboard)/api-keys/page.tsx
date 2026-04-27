@@ -171,7 +171,7 @@ export default function ApiKeysPage() {
           <div className="p-12 text-center">
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-3"
-              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+              style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}
             >
               <Key className="w-5 h-5" style={{ color: "hsl(240 8% 28%)" }} />
             </div>
@@ -184,14 +184,14 @@ export default function ApiKeysPage() {
                 key={k.id}
                 className="px-5 py-4 flex items-center gap-4 transition-colors"
                 style={{
-                  borderBottom: i < keys.length - 1 ? "1px solid rgba(255,255,255,0.04)" : undefined,
+                  borderBottom: i < keys.length - 1 ? "1px solid var(--border-default)" : undefined,
                 }}
-                onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.02)")}
+                onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = "var(--surface-2)")}
                 onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = "transparent")}
               >
                 <div
                   className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
+                  style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}
                 >
                   <Key className="w-3.5 h-3.5" style={{ color: "hsl(240 8% 42%)" }} />
                 </div>

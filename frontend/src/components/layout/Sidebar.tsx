@@ -192,8 +192,8 @@ export function Sidebar() {
                 active ? "text-white" : "hover:opacity-80"
               )}
               style={active
-                ? { background: "rgba(255,255,255,0.06)", color: "var(--text-1)",
-                    boxShadow: "inset 1px 0 0 0 var(--green), inset 0 0 0 1px rgba(255,255,255,0.06)" }
+                ? { background: "var(--surface-2)", color: "var(--text-1)",
+                    boxShadow: "inset 1px 0 0 0 var(--green), inset 0 0 0 1px var(--border-default)" }
                 : { color: "var(--text-3)" }
               }
             >
@@ -223,8 +223,8 @@ export function Sidebar() {
                 <Link key={item.href} href={item.href} onClick={closeMobile}
                   className="group relative flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150"
                   style={active
-                    ? { background: "rgba(255,255,255,0.06)", color: "var(--text-1)",
-                        boxShadow: "inset 1px 0 0 0 var(--green), inset 0 0 0 1px rgba(255,255,255,0.06)" }
+                    ? { background: "var(--surface-2)", color: "var(--text-1)",
+                        boxShadow: "inset 1px 0 0 0 var(--green), inset 0 0 0 1px var(--border-default)" }
                     : { color: "var(--text-3)" }
                   }
                 >
@@ -241,12 +241,12 @@ export function Sidebar() {
       {/* Upgrade prompt for free plan — só pro dono do workspace */}
       {canSeeBilling && planName?.toLowerCase() === "free" && (
         <div className="px-2.5 pb-2 space-y-2">
-          <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+          <div className="rounded-xl p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 38%)" }}>Mensagens hoje</span>
               <span className="text-[10px] font-mono" style={{ color: "hsl(240 8% 50%)" }}>—/100</span>
             </div>
-            <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+            <div className="h-1 rounded-full overflow-hidden" style={{ background: "var(--surface-2)" }}>
               <div className="h-full rounded-full transition-all" style={{ width: "0%", background: "var(--green)" }} />
             </div>
           </div>
@@ -264,9 +264,9 @@ export function Sidebar() {
         <div className="px-2.5 pb-2">
           <Link href="/settings" onClick={closeMobile}
             className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-xs font-medium transition-all"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "hsl(240 8% 46%)" }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}>
+            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 46%)" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-2)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "var(--surface-2)"; }}>
             <CreditCard className="w-3 h-3" />
             Gerenciar plano
           </Link>

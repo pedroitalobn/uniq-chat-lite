@@ -60,7 +60,7 @@ function CreateUserModal({ plans, onClose, onCreated }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose} />
+      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-md rounded-2xl p-6 animate-fade-in-up"
         style={{ background: "hsl(240 18% 6%)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 32px 80px rgba(0,0,0,0.6)" }}>
         <div className="flex items-center justify-between mb-5">
@@ -152,7 +152,7 @@ function ResetPasswordModal({ user, onClose }: { user: User; onClose: () => void
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose} />
+      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl p-6 animate-fade-in-up"
         style={{ background: "hsl(240 18% 6%)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 24px 64px rgba(0,0,0,0.5)" }}>
         <div className="flex items-center gap-3 mb-5">
@@ -208,7 +208,7 @@ function BlockModal({ user, onClose, onConfirm }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose} />
+      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl p-6 animate-fade-in-up"
         style={{ background: "hsl(240 18% 6%)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 24px 64px rgba(0,0,0,0.5)" }}>
         <div className="flex items-center gap-3 mb-5">
@@ -227,8 +227,8 @@ function BlockModal({ user, onClose, onConfirm }: {
             <button key={t} onClick={() => setType(t)}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all"
               style={{
-                background: type === t ? "rgba(239,68,68,0.06)" : "rgba(255,255,255,0.02)",
-                border: type === t ? "1px solid rgba(239,68,68,0.2)" : "1px solid rgba(255,255,255,0.05)",
+                background: type === t ? "rgba(239,68,68,0.06)" : "var(--surface-2)",
+                border: type === t ? "1px solid rgba(239,68,68,0.2)" : "1px solid var(--border-default)",
               }}>
               <div className="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0"
                 style={{ borderColor: type === t ? "#f87171" : "hsl(240 8% 30%)" }}>
@@ -285,10 +285,10 @@ function LabelInput({ label, value, onChange, placeholder, type = "text" }: {
 }
 
 function planBadge(plan?: Plan) {
-  if (!plan) return { bg: "rgba(255,255,255,0.04)", color: "hsl(240 8% 46%)" };
+  if (!plan) return { bg: "var(--surface-2)", color: "hsl(240 8% 46%)" };
   if (plan.name === "Enterprise") return { bg: "rgba(167,139,250,0.08)", color: "#a78bfa" };
   if (plan.name === "Pro") return { bg: "rgba(96,165,250,0.08)", color: "#60a5fa" };
-  return { bg: "rgba(255,255,255,0.04)", color: "hsl(240 8% 46%)" };
+  return { bg: "var(--surface-2)", color: "hsl(240 8% 46%)" };
 }
 
 // ─── Invite System Toggle ─────────────────────────────────────────────────────
@@ -506,7 +506,7 @@ export default function AdminUsersPage() {
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-3"
-              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+              style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
               <Users className="w-5 h-5" style={{ color: "hsl(240 8% 28%)" }} />
             </div>
             <p className="text-sm" style={{ color: "hsl(240 8% 42%)" }}>
@@ -525,8 +525,8 @@ export default function AdminUsersPage() {
                   <div
                     className={cn("grid gap-4 items-center px-5 py-3.5 transition-colors cursor-pointer",
                       blocked && "opacity-60")}
-                    style={{ borderBottom: i < filtered.length - 1 || isExpanded ? "1px solid rgba(255,255,255,0.04)" : undefined, gridTemplateColumns: "1fr auto auto auto auto auto" }}
-                    onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.015)")}
+                    style={{ borderBottom: i < filtered.length - 1 || isExpanded ? "1px solid var(--border-default)" : undefined, gridTemplateColumns: "1fr auto auto auto auto auto" }}
+                    onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = "var(--surface-2)")}
                     onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = "transparent")}
                     onClick={() => setExpandedId(isExpanded ? null : user.id)}
                   >
@@ -535,7 +535,7 @@ export default function AdminUsersPage() {
                       <div className="w-8 h-8 rounded-xl flex items-center justify-center border flex-shrink-0"
                         style={user.role === "super_admin" ? {
                           background: "rgba(251,191,36,0.08)", borderColor: "rgba(251,191,36,0.18)",
-                        } : { background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.07)" }}>
+                        } : { background: "var(--surface-2)", borderColor: "var(--border-default)" }}>
                         {user.role === "super_admin"
                           ? <Shield className="w-3.5 h-3.5" style={{ color: "#fbbf24" }} />
                           : <UserIcon className="w-3.5 h-3.5" style={{ color: "hsl(240 8% 42%)" }} />}
@@ -591,7 +591,7 @@ export default function AdminUsersPage() {
                       <span className="text-xs font-medium px-2.5 py-1 rounded-lg"
                         style={user.role === "super_admin"
                           ? { background: "rgba(251,191,36,0.08)", color: "#fbbf24" }
-                          : { background: "rgba(255,255,255,0.04)", color: "hsl(240 8% 50%)" }}>
+                          : { background: "var(--surface-2)", color: "hsl(240 8% 50%)" }}>
                         {user.role}
                       </span>
                     </div>
@@ -628,7 +628,7 @@ export default function AdminUsersPage() {
                   {/* Expanded actions */}
                   {isExpanded && (
                     <div className="px-5 py-3 flex items-center gap-2 flex-wrap"
-                      style={{ background: "rgba(255,255,255,0.01)", borderBottom: i < filtered.length - 1 ? "1px solid rgba(255,255,255,0.04)" : undefined }}>
+                      style={{ background: "var(--surface-2)", borderBottom: i < filtered.length - 1 ? "1px solid var(--border-default)" : undefined }}>
 
                       {/* Plan change */}
                       <select
@@ -724,8 +724,8 @@ function ActionBtn({ icon, label, color, danger, onClick }: {
     <button onClick={onClick}
       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
       style={{
-        background: danger ? "rgba(239,68,68,0.06)" : "rgba(255,255,255,0.04)",
-        border: `1px solid ${danger ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.07)"}`,
+        background: danger ? "rgba(239,68,68,0.06)" : "var(--surface-2)",
+        border: `1px solid ${danger ? "rgba(239,68,68,0.15)" : "var(--border-default)"}`,
         color,
       }}
       onMouseEnter={e => (e.currentTarget.style.opacity = "0.8")}

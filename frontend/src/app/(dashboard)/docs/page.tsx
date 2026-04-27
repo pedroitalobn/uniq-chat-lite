@@ -1074,9 +1074,9 @@ export default function DocsPage() {
           <span className="font-mono text-xs px-1.5 py-0.5 rounded-md mr-1"
             style={{ background: "rgba(0,212,106,0.08)", color: "var(--green)" }}>{totalEndpoints}</span>
           endpoints — autentique com{" "}
-          <code className="text-xs px-1.5 py-0.5 rounded-md font-mono" style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 15% 80%)" }}>X-API-Key</code>
+          <code className="text-xs px-1.5 py-0.5 rounded-md font-mono" style={{ background: "var(--surface-2)", color: "hsl(240 15% 80%)" }}>X-API-Key</code>
           {" "}ou{" "}
-          <code className="text-xs px-1.5 py-0.5 rounded-md font-mono" style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 15% 80%)" }}>Authorization: Bearer</code>
+          <code className="text-xs px-1.5 py-0.5 rounded-md font-mono" style={{ background: "var(--surface-2)", color: "hsl(240 15% 80%)" }}>Authorization: Bearer</code>
         </p>
       </div>
 
@@ -1160,12 +1160,12 @@ export default function DocsPage() {
             <button key={s.id} onClick={() => setActiveSection(s.id)}
               className={cn("w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all",
                 activeSection === s.id ? "text-white" : "text-slate-500 hover:text-slate-300")}
-              style={activeSection === s.id ? { background: "rgba(255,255,255,0.06)", boxShadow: "inset 1px 0 0 0 var(--green)" } : undefined}
+              style={activeSection === s.id ? { background: "var(--surface-2)", boxShadow: "inset 1px 0 0 0 var(--green)" } : undefined}
             >
               <span style={activeSection === s.id ? { color: "var(--green)" } : { color: "hsl(240 8% 40%)" }}>{s.icon}</span>
               {s.label}
               <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-lg"
-                style={{ background: "rgba(255,255,255,0.04)", color: "hsl(240 8% 38%)" }}>
+                style={{ background: "var(--surface-2)", color: "hsl(240 8% 38%)" }}>
                 {s.endpoints.length}
               </span>
             </button>
@@ -1176,7 +1176,7 @@ export default function DocsPage() {
             <button onClick={() => setActiveSection("webhook-events")}
               className={cn("w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all",
                 activeSection === "webhook-events" ? "text-white" : "text-slate-500 hover:text-slate-300")}
-              style={activeSection === "webhook-events" ? { background: "rgba(255,255,255,0.06)", boxShadow: "inset 1px 0 0 0 var(--green)" } : undefined}
+              style={activeSection === "webhook-events" ? { background: "var(--surface-2)", boxShadow: "inset 1px 0 0 0 var(--green)" } : undefined}
             >
               <BookOpen className="w-3.5 h-3.5" style={activeSection === "webhook-events" ? { color: "var(--green)" } : { color: "hsl(240 8% 40%)" }} />
               Eventos

@@ -268,7 +268,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
         className="absolute inset-0 backdrop-blur-sm"
-        style={{ background: "rgba(0,0,0,0.6)" }}
+        style={{ background: "var(--surface-overlay)" }}
         onClick={onClose}
       />
       <div
@@ -342,7 +342,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
               <div className="flex flex-col items-center gap-3">
                 <div
                   className="w-56 h-56 rounded-2xl flex items-center justify-center"
-                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+                  style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}
                 >
                   <RefreshCw className="w-7 h-7 animate-spin" style={{ color: "hsl(240 8% 38%)" }} />
                 </div>
@@ -435,7 +435,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
                   Número (com DDI, sem + ou espaços)
                 </label>
                 <div className="flex items-center gap-2 rounded-xl px-3 py-2"
-                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 16%)" }}>
+                  style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)" }}>
                   <Smartphone className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }} />
                   <input
                     type="tel"
@@ -473,7 +473,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
                     <button
                       onClick={() => { setPairingCode(""); requestPairingCode(); }}
                       className="flex-1 text-xs py-2 rounded-xl transition-all"
-                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 15%)", color: "hsl(240 8% 46%)" }}
+                      style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 15%)", color: "hsl(240 8% 46%)" }}
                     >
                       Novo código
                     </button>

@@ -1069,7 +1069,7 @@ export function MentionPicker({
             </div>
             {(picker.mode === "search" || picker.mode === "followUp") && (
               <div className="flex items-center gap-2 rounded-lg px-2 py-1.5"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 14%)" }}>
+                style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 14%)" }}>
                 {/* Operador dropdown aparece antes do input quando o
                     follow-up tem operatorOptions (caso atual: /palavra). */}
                 {picker.mode === "followUp" && picker.followUp?.operatorOptions && (
@@ -1152,7 +1152,7 @@ export function MentionPicker({
                       onMouseEnter={() => setHighlight(idx)}
                       onClick={() => applySuggestion(s)}
                       className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors"
-                      style={{ background: active ? "rgba(255,255,255,0.05)" : "transparent" }}
+                      style={{ background: active ? "var(--surface-2)" : "transparent" }}
                     >
                       <span className="flex items-center justify-center w-5 h-5 rounded flex-shrink-0"
                         style={{ background: s.color + "22" }}>

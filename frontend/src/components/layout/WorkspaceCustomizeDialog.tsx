@@ -73,7 +73,7 @@ export function WorkspaceCustomizeDialog({
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center sm:p-4">
-      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose} />
+      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 32 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}

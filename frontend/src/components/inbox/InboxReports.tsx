@@ -116,7 +116,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
             Peça pro administrador do workspace marcar a permissão{" "}
             <code
               className="rounded px-1.5 py-0.5 text-[11px]"
-              style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 15% 85%)" }}
+              style={{ background: "var(--surface-2)", color: "hsl(240 15% 85%)" }}
             >
               reports:view
             </code>{" "}
@@ -320,7 +320,7 @@ function ReportsHeader({
       </div>
       <div
         className="flex items-center gap-1 rounded-xl p-1 text-xs"
-        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 16%)" }}
+        style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)" }}
       >
         {(["7d", "30d", "90d"] as const).map((r) => (
           <button
@@ -361,14 +361,14 @@ function InboxReportsSkeleton({
               className="rounded-xl p-3"
               style={{ background: CARD_BG, border: CARD_BORDER }}
             >
-              <div className="h-3 w-16 rounded mb-2" style={{ background: "rgba(255,255,255,0.04)" }} />
-              <div className="h-7 w-12 rounded" style={{ background: "rgba(255,255,255,0.06)" }} />
+              <div className="h-3 w-16 rounded mb-2" style={{ background: "var(--surface-2)" }} />
+              <div className="h-7 w-12 rounded" style={{ background: "var(--surface-2)" }} />
             </div>
           ))}
         </section>
 
         <Card>
-          <div className="h-3 w-44 rounded mb-3" style={{ background: "rgba(255,255,255,0.04)" }} />
+          <div className="h-3 w-44 rounded mb-3" style={{ background: "var(--surface-2)" }} />
           <div className="flex items-end gap-1.5" style={{ height: 110 }}>
             {Array.from({ length: 14 }).map((_, i) => (
               <div
@@ -376,7 +376,7 @@ function InboxReportsSkeleton({
                 className="flex-1 rounded-sm animate-pulse"
                 style={{
                   height: `${30 + ((i * 13) % 70)}%`,
-                  background: "rgba(255,255,255,0.04)",
+                  background: "var(--surface-2)",
                 }}
               />
             ))}
@@ -385,17 +385,17 @@ function InboxReportsSkeleton({
 
         <section className="grid gap-3 md:grid-cols-2">
           <Card>
-            <div className="h-3 w-12 rounded mb-3" style={{ background: "rgba(255,255,255,0.04)" }} />
+            <div className="h-3 w-12 rounded mb-3" style={{ background: "var(--surface-2)" }} />
             <div className="grid grid-cols-2 gap-3">
-              <div className="h-14 rounded" style={{ background: "rgba(255,255,255,0.03)" }} />
-              <div className="h-14 rounded" style={{ background: "rgba(255,255,255,0.03)" }} />
+              <div className="h-14 rounded" style={{ background: "var(--surface-2)" }} />
+              <div className="h-14 rounded" style={{ background: "var(--surface-2)" }} />
             </div>
           </Card>
           <Card>
-            <div className="h-3 w-14 rounded mb-3" style={{ background: "rgba(255,255,255,0.04)" }} />
+            <div className="h-3 w-14 rounded mb-3" style={{ background: "var(--surface-2)" }} />
             <div className="space-y-2">
               {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="h-2 w-full rounded animate-pulse" style={{ background: "rgba(255,255,255,0.03)" }} />
+                <div key={i} className="h-2 w-full rounded animate-pulse" style={{ background: "var(--surface-2)" }} />
               ))}
             </div>
           </Card>
@@ -409,12 +409,12 @@ function InboxReportsSkeleton({
               style={{ background: CARD_BG, border: CARD_BORDER }}
             >
               <div className="px-4 py-3" style={{ borderBottom: "1px solid hsl(240 12% 11%)" }}>
-                <div className="h-3 w-20 rounded" style={{ background: "rgba(255,255,255,0.04)" }} />
+                <div className="h-3 w-20 rounded" style={{ background: "var(--surface-2)" }} />
               </div>
               {Array.from({ length: 3 }).map((_, j) => (
-                <div key={j} className="px-4 py-2.5 flex justify-between" style={{ borderTop: "1px solid rgba(255,255,255,0.03)" }}>
-                  <div className="h-3 w-32 rounded animate-pulse" style={{ background: "rgba(255,255,255,0.04)" }} />
-                  <div className="h-3 w-16 rounded animate-pulse" style={{ background: "rgba(255,255,255,0.03)" }} />
+                <div key={j} className="px-4 py-2.5 flex justify-between" style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                  <div className="h-3 w-32 rounded animate-pulse" style={{ background: "var(--surface-2)" }} />
+                  <div className="h-3 w-16 rounded animate-pulse" style={{ background: "var(--surface-2)" }} />
                 </div>
               ))}
             </div>
@@ -563,7 +563,7 @@ function CSATPanel({
               return (
                 <div key={r} className="flex items-center gap-2 text-[10px]" style={{ color: "hsl(240 8% 50%)" }}>
                   <span className="w-3">{r}</span>
-                  <div className="h-1.5 flex-1 rounded" style={{ background: "rgba(255,255,255,0.06)" }}>
+                  <div className="h-1.5 flex-1 rounded" style={{ background: "var(--surface-2)" }}>
                     <div
                       className="h-full rounded transition-all"
                       style={{ width: `${(count / max) * 100}%`, background: "#fbbf24" }}
@@ -615,7 +615,7 @@ function TableCard({
       ) : loading ? (
         <div className="p-3 space-y-2">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-8 rounded animate-pulse" style={{ background: "rgba(255,255,255,0.03)" }} />
+            <div key={i} className="h-8 rounded animate-pulse" style={{ background: "var(--surface-2)" }} />
           ))}
         </div>
       ) : hasChildren ? (
@@ -633,7 +633,7 @@ function Row({ left, children }: { left: string; children: React.ReactNode }) {
   return (
     <li
       className="flex items-center justify-between gap-3 px-4 py-2.5"
-      style={{ borderTop: "1px solid rgba(255,255,255,0.03)" }}
+      style={{ borderTop: "1px solid var(--border-subtle)" }}
     >
       <span className="truncate text-sm font-medium" style={{ color: "hsl(240 15% 82%)" }}>
         {left}

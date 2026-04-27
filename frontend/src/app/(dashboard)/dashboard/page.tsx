@@ -265,7 +265,7 @@ export default function DashboardPage() {
                   <stop offset="95%" stopColor="#00d46a" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-2)" />
               <XAxis dataKey="date" tick={{ fill: "#52526a", fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: "#52526a", fontSize: 11 }} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={{ background: "hsl(240 18% 8%)", border: "1px solid hsl(240 12% 16%)", borderRadius: 10, fontSize: 12, color: "hsl(240 15% 80%)" }} />

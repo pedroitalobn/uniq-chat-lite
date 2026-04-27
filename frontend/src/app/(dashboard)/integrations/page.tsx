@@ -267,12 +267,12 @@ function APIKeysSection() {
         {isLoading ? (
           <div className="p-5 space-y-2">{[1, 2].map(i => <div key={i} className="skeleton h-14 rounded-xl" />)}</div>
         ) : !data?.length ? (
-          <div className="p-12 text-center"><div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}><Key className="w-5 h-5" style={{ color: "hsl(240 8% 28%)" }} /></div><p className="text-sm" style={{ color: "hsl(240 8% 42%)" }}>Nenhuma chave criada</p></div>
+          <div className="p-12 text-center"><div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}><Key className="w-5 h-5" style={{ color: "hsl(240 8% 28%)" }} /></div><p className="text-sm" style={{ color: "hsl(240 8% 42%)" }}>Nenhuma chave criada</p></div>
         ) : (
           <div>{data.map((k, i) => (
-            <div key={k.id} className="px-5 py-4 flex items-center gap-4 transition-colors" style={{ borderBottom: i < data.length - 1 ? "1px solid rgba(255,255,255,0.04)" : undefined }}
-              onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}><Key className="w-3.5 h-3.5" style={{ color: "hsl(240 8% 42%)" }} /></div>
+            <div key={k.id} className="px-5 py-4 flex items-center gap-4 transition-colors" style={{ borderBottom: i < data.length - 1 ? "1px solid var(--border-default)" : undefined }}
+              onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-2)")} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}><Key className="w-3.5 h-3.5" style={{ color: "hsl(240 8% 42%)" }} /></div>
               <div className="flex-1 min-w-0"><p className="text-sm font-medium" style={{ color: "hsl(240 15% 80%)" }}>{k.name}</p><p className="text-xs font-mono mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>{k.masked_key}</p></div>
               <div className="text-right flex-shrink-0 hidden sm:block">{k.last_used_at ? <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>Usado {new Date(k.last_used_at).toLocaleDateString("pt-BR")}</p> : <p className="text-xs" style={{ color: "hsl(240 8% 30%)" }}>Nunca usada</p>}<p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 30%)" }}>Criada {new Date(k.created_at).toLocaleDateString("pt-BR")}</p></div>
               <button onClick={() => del.mutate(k.id)} className="p-2 rounded-lg transition-colors flex-shrink-0" style={{ color: "hsl(240 8% 32%)" }} onMouseEnter={e => (e.currentTarget.style.color = "#ef4444")} onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 32%)")}><Trash2 className="w-4 h-4" /></button>
@@ -428,7 +428,7 @@ function ProxiesSection() {
               </div>
               <div className="flex items-center gap-2">
                 {p.country && (
-                  <span className="text-xs px-2 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.05)", color: "var(--text-2)" }}>
+                  <span className="text-xs px-2 py-1 rounded-full" style={{ background: "var(--surface-2)", color: "var(--text-2)" }}>
                     {COUNTRY_FLAGS[p.country.toLowerCase()] || "🌍"} {p.country.toUpperCase()}
                   </span>
                 )}
@@ -447,7 +447,7 @@ function ProxiesSection() {
       ) : null}
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "var(--surface-overlay)" }}>
           <div className="w-full max-w-md rounded-2xl border p-5 space-y-4" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
             <div className="flex items-center justify-between">
               <h2 className="font-semibold" style={{ color: "var(--text-1)" }}>Novo proxy</h2>
@@ -598,7 +598,7 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "var(--surface-overlay)" }}>
       <div className="w-full max-w-md rounded-2xl border p-6 space-y-4" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: provider.bg, border: `1px solid ${provider.border}` }}><ProviderIcon id={provider.id} color={provider.color} /></div>
@@ -619,7 +619,7 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
               type="button"
               onClick={() => setAuthMode("api_key")}
               className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-              style={{ background: authMode === "api_key" ? "rgba(255,255,255,0.08)" : "transparent", color: authMode === "api_key" ? "var(--text-1)" : "var(--text-3)" }}>
+              style={{ background: authMode === "api_key" ? "var(--border-default)" : "transparent", color: authMode === "api_key" ? "var(--text-1)" : "var(--text-3)" }}>
               🔑 API Key
             </button>
           </div>

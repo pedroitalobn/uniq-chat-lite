@@ -208,7 +208,7 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.65)" }} onClick={onClose} />
+      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-lg rounded-2xl shadow-2xl animate-fade-in-up"
         style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
 
@@ -267,7 +267,7 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
                       className="flex items-center gap-2 px-3 py-3 rounded-xl border text-xs font-medium transition-all"
                       style={recipientType === val
                         ? { background: "rgba(0,212,106,0.08)", borderColor: "rgba(0,212,106,0.25)", color: "var(--green)" }
-                        : { background: "rgba(255,255,255,0.02)", borderColor: "hsl(240 12% 14%)", color: "hsl(240 8% 52%)" }}>
+                        : { background: "var(--surface-2)", borderColor: "hsl(240 12% 14%)", color: "hsl(240 8% 52%)" }}>
                       <Icon className="w-4 h-4" />
                       {lbl}
                     </button>
@@ -330,7 +330,7 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
                       className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl border transition-all flex-shrink-0"
                       style={groupAdminOnly
                         ? { background: "rgba(167,139,250,0.12)", borderColor: "rgba(167,139,250,0.3)", color: "#a78bfa" }
-                        : { background: "rgba(255,255,255,0.03)", borderColor: "hsl(240 12% 16%)", color: "hsl(240 8% 46%)" }}>
+                        : { background: "var(--surface-2)", borderColor: "hsl(240 12% 16%)", color: "hsl(240 8% 46%)" }}>
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
                       Admin
                     </button>
@@ -369,7 +369,7 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
                           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all"
                           style={sel
                             ? { background: "rgba(0,212,106,0.06)", borderColor: "rgba(0,212,106,0.2)" }
-                            : { background: "rgba(255,255,255,0.02)", borderColor: "hsl(240 12% 13%)" }}>
+                            : { background: "var(--surface-2)", borderColor: "hsl(240 12% 13%)" }}>
                           <div className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center"
                             style={sel
                               ? { background: "rgba(0,212,106,0.2)", border: "1px solid rgba(0,212,106,0.4)" }
@@ -482,7 +482,7 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
                         onClick={() => setSelectedTags(isSelected ? selectedTags.filter((t) => t !== tag.name) : [...selectedTags, tag.name])}
                         className="text-[11px] px-2.5 py-1 rounded-full border transition-all"
                         style={{
-                          background: isSelected ? "rgba(168,85,247,0.15)" : "rgba(255,255,255,0.02)",
+                          background: isSelected ? "rgba(168,85,247,0.15)" : "var(--surface-2)",
                           borderColor: isSelected ? "rgba(168,85,247,0.3)" : "hsl(240 12% 14%)",
                           color: isSelected ? "#a855f7" : "hsl(240 8% 52%)",
                         }}>
@@ -514,7 +514,7 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
                   )}
                 </div>
               ) : (
-                <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.02)", border: "1px dashed hsl(240 12% 14%)" }}>
+                <div className="rounded-xl p-3 text-center" style={{ background: "var(--surface-2)", border: "1px dashed hsl(240 12% 14%)" }}>
                   <p className="text-xs" style={{ color: "hsl(240 8% 36%)" }}>
                     Aplique filtros para ver a prévia de contatos
                   </p>
@@ -534,7 +534,7 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
                       className="flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl border text-xs font-medium transition-all"
                       style={msgType === value
                         ? { background: "rgba(0,212,106,0.08)", borderColor: "rgba(0,212,106,0.25)", color: "var(--green)" }
-                        : { background: "rgba(255,255,255,0.02)", borderColor: "hsl(240 12% 14%)", color: "hsl(240 8% 48%)" }}>
+                        : { background: "var(--surface-2)", borderColor: "hsl(240 12% 14%)", color: "hsl(240 8% 48%)" }}>
                       <Icon className="w-4 h-4" />
                       {label}
                     </button>
@@ -558,7 +558,7 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
                   </label>
                   <div
                     className="rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all"
-                    style={{ border: "2px dashed hsl(240 12% 16%)", background: file ? "rgba(0,212,106,0.04)" : "rgba(255,255,255,0.01)" }}
+                    style={{ border: "2px dashed hsl(240 12% 16%)", background: file ? "rgba(0,212,106,0.04)" : "var(--surface-2)" }}
                     onClick={() => fileRef.current?.click()}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) setFile(f); }}>
@@ -663,7 +663,7 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
                       className="text-[11px] py-1.5 rounded-lg font-mono transition-all"
                       style={selectedHours.includes(h)
                         ? { background: "rgba(0,212,106,0.12)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.25)" }
-                        : { background: "rgba(255,255,255,0.02)", color: "hsl(240 8% 40%)", border: "1px solid hsl(240 12% 13%)" }}>
+                        : { background: "var(--surface-2)", color: "hsl(240 8% 40%)", border: "1px solid hsl(240 12% 13%)" }}>
                       {h}h
                     </button>
                   ))}
@@ -678,13 +678,13 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
           {step > 1 ? (
             <button onClick={() => setStep(s => s - 1)}
               className="flex items-center gap-1.5 text-sm px-4 py-2.5 rounded-xl transition-all"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", color: "hsl(240 8% 52%)" }}>
+              style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 52%)" }}>
               <ChevronLeft className="w-3.5 h-3.5" /> Voltar
             </button>
           ) : (
             <button onClick={onClose}
               className="flex-1 text-sm py-2.5 rounded-xl transition-all"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", color: "hsl(240 8% 52%)" }}>
+              style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 52%)" }}>
               Cancelar
             </button>
           )}
@@ -769,13 +769,13 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
           <div className="flex flex-wrap gap-1.5 mb-3">
             {campaign.start_date && (
               <span className="text-[10px] px-2 py-0.5 rounded font-mono"
-                style={{ background: "rgba(255,255,255,0.03)", color: "hsl(240 8% 40%)" }}>
+                style={{ background: "var(--surface-2)", color: "hsl(240 8% 40%)" }}>
                 {fmtDate(campaign.start_date)}
               </span>
             )}
             {campaign.end_date && (
               <span className="text-[10px] px-2 py-0.5 rounded font-mono"
-                style={{ background: "rgba(255,255,255,0.03)", color: "hsl(240 8% 40%)" }}>
+                style={{ background: "var(--surface-2)", color: "hsl(240 8% 40%)" }}>
                 até {fmtDate(campaign.end_date)}
               </span>
             )}
@@ -812,9 +812,9 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
         <div className="flex gap-2">
           <Link href={`/campaigns/${campaign.id}`}
             className="flex-1 text-center text-xs font-medium py-2 px-3 rounded-xl transition-all"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", color: "hsl(240 8% 62%)" }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.07)"; (e.currentTarget as HTMLElement).style.color = "hsl(240 15% 90%)"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; (e.currentTarget as HTMLElement).style.color = "hsl(240 8% 62%)"; }}>
+            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 62%)" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--surface-3)"; (e.currentTarget as HTMLElement).style.color = "hsl(240 15% 90%)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "var(--surface-2)"; (e.currentTarget as HTMLElement).style.color = "hsl(240 8% 62%)"; }}>
             Detalhes
           </Link>
           {(campaign.status === "draft" || campaign.status === "paused") && (
@@ -835,9 +835,9 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
           )}
           <button onClick={handleDelete}
             className="p-2 rounded-xl transition-all"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)", color: "#64748b" }}
+            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "#64748b" }}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.08)"; (e.currentTarget as HTMLElement).style.color = "#ef4444"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)"; (e.currentTarget as HTMLElement).style.color = "#64748b"; }}>
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "var(--surface-2)"; (e.currentTarget as HTMLElement).style.color = "#64748b"; }}>
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -902,7 +902,7 @@ export default function CampaignsPage() {
         <div className="rounded-2xl p-14 text-center animate-fade-in-up"
           style={{ background: "hsl(240 18% 6%)", border: "1px dashed hsl(240 12% 16%)" }}>
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
             <Megaphone className="w-6 h-6" style={{ color: "hsl(240 8% 35%)" }} />
           </div>
           <p className="font-semibold text-sm" style={{ color: "hsl(240 8% 70%)" }}>Nenhuma campanha ainda</p>

@@ -170,8 +170,8 @@ function FeatureGrid({ checkboxes, onChange }: { checkboxes: Record<string, bool
         {FEATURE_KEYS.map(({ key, label, icon }) => (
           <label key={key} className="flex items-center gap-2 cursor-pointer p-2 rounded-xl transition-colors overflow-hidden min-w-0"
             style={{
-              background: checkboxes[key] ? "rgba(0,212,106,0.06)" : "rgba(255,255,255,0.02)",
-              border: checkboxes[key] ? "1px solid rgba(0,212,106,0.18)" : "1px solid rgba(255,255,255,0.05)",
+              background: checkboxes[key] ? "rgba(0,212,106,0.06)" : "var(--surface-2)",
+              border: checkboxes[key] ? "1px solid rgba(0,212,106,0.18)" : "1px solid var(--border-default)",
             }}>
             <span className="text-sm leading-none flex-shrink-0">{icon}</span>
             <span className="text-xs flex-1 truncate min-w-0" style={{ color: checkboxes[key] ? "hsl(240 15% 88%)" : "hsl(240 8% 50%)" }}>{label}</span>
@@ -381,7 +381,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
               <div className="space-y-6 animate-fade-in-up">
                 <FeatureGrid checkboxes={checkboxes} onChange={(key, val) => setCheckboxes({ ...checkboxes, [key]: val })} />
                 
-                <div className="pt-4 border-t" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                <div className="pt-4 border-t" style={{ borderColor: "var(--border-default)" }}>
                   <label className="flex items-center gap-3 cursor-pointer mt-4">
                     <Toggle checked={form.allow_proxy} onChange={(v) => setForm({ ...form, allow_proxy: v })} color="#60a5fa" />
                     <div>
@@ -520,11 +520,11 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
       </div>
       
       {/* Bottom Footer Area: Tags + Edit Button */}
-      <div className="mt-4 pt-4 border-t flex items-center justify-between gap-4" style={{ borderColor: "rgba(255,255,255,0.04)" }}>
+      <div className="mt-4 pt-4 border-t flex items-center justify-between gap-4" style={{ borderColor: "var(--border-subtle)" }}>
         {/* Tags */}
         <div className="flex flex-wrap gap-2 flex-1">
           {enabledFeatures.map(({ key, label, icon }) => (
-            <span key={key} className="flex items-center gap-1.5 text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "hsl(240 8% 65%)" }}>
+            <span key={key} className="flex items-center gap-1.5 text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 65%)" }}>
               {icon} {label}
             </span>
           ))}
@@ -624,7 +624,7 @@ export default function AdminPlansPage() {
         </h3>
         <ul className="space-y-2">
           {[
-            <>Use <code className="text-xs px-1.5 py-0.5 rounded-md" style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 15% 88%)" }}>-1</code> em limites numéricos para definir como ilimitado.</>,
+            <>Use <code className="text-xs px-1.5 py-0.5 rounded-md" style={{ background: "var(--surface-2)", color: "hsl(240 15% 88%)" }}>-1</code> em limites numéricos para definir como ilimitado.</>,
             "Alterar o status de comercialização para 'Inativo' remove o plano da tela de aquisição, mas não interrompe subscrições em andamento.",
             <>O campo <strong style={{ color: "hsl(240 15% 88%)" }}>Stripe Price ID</strong> dita o produto faturado no checkout dinâmico da plataforma.</>,
           ].map((note, i) => (

@@ -67,7 +67,7 @@ function Avatar({
         src={src}
         alt={name || "avatar"}
         className="rounded-full object-cover flex-shrink-0"
-        style={{ width: size, height: size, background: "rgba(255,255,255,0.04)" }}
+        style={{ width: size, height: size, background: "var(--surface-2)" }}
         onError={(e) => {
           // Fallback se imagem 404 — esconde e deixa o sibling render
           (e.target as HTMLImageElement).style.display = "none";
@@ -332,7 +332,7 @@ export function ConversationList({
                 <span
                   className="rounded-full px-1.5 py-0.5 text-[10px] font-medium"
                   style={{
-                    background: "rgba(255,255,255,0.04)",
+                    background: "var(--surface-2)",
                     color: "hsl(240 8% 58%)",
                   }}
                 >
@@ -393,7 +393,7 @@ export function ConversationList({
           <li
             key={conv.id}
             style={{
-              borderBottom: "1px solid rgba(255,255,255,0.04)",
+              borderBottom: "1px solid var(--border-default)",
             }}
             className="hover:bg-white/5"
           >

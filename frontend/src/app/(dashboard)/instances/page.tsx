@@ -116,8 +116,8 @@ function InstanceCard({
               ) : (
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center relative"
                   style={{
-                    background: isConnected ? "rgba(0,212,106,0.1)" : "rgba(255,255,255,0.04)",
-                    border: isConnected ? "1px solid rgba(0,212,106,0.2)" : "1px solid rgba(255,255,255,0.06)",
+                    background: isConnected ? "rgba(0,212,106,0.1)" : "var(--surface-2)",
+                    border: isConnected ? "1px solid rgba(0,212,106,0.2)" : "1px solid var(--border-default)",
                   }}>
                   <Smartphone className="w-4 h-4" style={{ color: isConnected ? "var(--green)" : "#64748b" }} />
                   {instance.proxy_mode === "residencial" && instance.proxy_status === "ok" && (
@@ -149,7 +149,7 @@ function InstanceCard({
                 title="Clique para copiar o ID"
               >
                 <code className="text-[10px] font-mono px-1.5 py-0.5 rounded-md truncate max-w-[180px]"
-                  style={{ background: "rgba(255,255,255,0.04)", color: "hsl(240 8% 50%)" }}>
+                  style={{ background: "var(--surface-2)", color: "hsl(240 8% 50%)" }}>
                   {instance.id}
                 </code>
                 {idCopied ? (
@@ -270,16 +270,16 @@ function InstanceCard({
             href={`/instances/${instance.id}`}
             className="flex-1 text-center text-xs font-medium py-2 px-3 rounded-xl transition-all duration-150"
             style={{
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.06)",
+              background: "var(--surface-2)",
+              border: "1px solid var(--border-default)",
               color: "hsl(240 8% 62%)",
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.07)";
+              (e.currentTarget as HTMLElement).style.background = "var(--surface-3)";
               (e.currentTarget as HTMLElement).style.color = "hsl(240 15% 93%)";
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
+              (e.currentTarget as HTMLElement).style.background = "var(--surface-2)";
               (e.currentTarget as HTMLElement).style.color = "hsl(240 8% 62%)";
             }}
           >
@@ -308,8 +308,8 @@ function InstanceCard({
             disabled={deleteMutation.isPending}
             className="p-2 rounded-xl transition-all duration-150 disabled:opacity-40"
             style={{
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.05)",
+              background: "var(--surface-2)",
+              border: "1px solid var(--border-default)",
               color: "#64748b",
             }}
             onMouseEnter={e => {
@@ -318,9 +318,9 @@ function InstanceCard({
               (e.currentTarget as HTMLElement).style.borderColor = "rgba(239,68,68,0.15)";
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)";
+              (e.currentTarget as HTMLElement).style.background = "var(--surface-2)";
               (e.currentTarget as HTMLElement).style.color = "#64748b";
-              (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.05)";
+              (e.currentTarget as HTMLElement).style.borderColor = "var(--surface-2)";
             }}
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -470,18 +470,18 @@ function InstancesContent() {
                 onClick={() => setChannelFilter(ch)}
                 className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl transition-all duration-150"
                 style={isActive ? {
-                  background: meta ? `${meta.color}15` : "rgba(255,255,255,0.08)",
+                  background: meta ? `${meta.color}15` : "var(--border-default)",
                   color: meta ? meta.color : "hsl(240 15% 93%)",
-                  border: `1px solid ${meta ? `${meta.color}35` : "rgba(255,255,255,0.12)"}`,
+                  border: `1px solid ${meta ? `${meta.color}35` : "var(--border-strong)"}`,
                 } : {
-                  background: "rgba(255,255,255,0.03)",
+                  background: "var(--surface-2)",
                   color: "hsl(240 8% 50%)",
-                  border: "1px solid rgba(255,255,255,0.05)",
+                  border: "1px solid var(--border-default)",
                 }}
               >
                 {ch === "all" ? "Todos" : meta?.label}
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
-                  style={{ background: "rgba(255,255,255,0.06)" }}>
+                  style={{ background: "var(--surface-2)" }}>
                   {ch === "all"
                     ? instances.length
                     : instances.filter((i) => (i.channel ?? "whatsapp") === ch).length}
@@ -529,7 +529,7 @@ function InstancesContent() {
         >
           <div
             className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
+            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}
           >
             <Smartphone className="w-6 h-6" style={{ color: "hsl(240 8% 35%)" }} />
           </div>

@@ -74,7 +74,7 @@ function SuccessContent() {
 
         {sessionId && (
           <p className="text-[11px] font-mono mb-6 px-3 py-1.5 rounded-lg inline-block"
-            style={{ background: "rgba(255,255,255,0.04)", color: "hsl(240 8% 38%)", border: "1px solid hsl(240 12% 12%)" }}>
+            style={{ background: "var(--surface-2)", color: "hsl(240 8% 38%)", border: "1px solid hsl(240 12% 12%)" }}>
             Ref: {sessionId.slice(0, 24)}...
           </p>
         )}

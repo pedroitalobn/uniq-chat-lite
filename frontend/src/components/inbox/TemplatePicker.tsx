@@ -96,7 +96,7 @@ export function TemplatePicker({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
         className="absolute inset-0 uniq-fade-in"
-        style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
+        style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}
         onClick={onClose}
       />
       <div
@@ -132,7 +132,7 @@ export function TemplatePicker({
                 placeholder="Buscar…"
                 className="w-full rounded-md py-1.5 pl-8 pr-3 text-xs outline-none"
                 style={{
-                  background: "rgba(255,255,255,0.03)",
+                  background: "var(--surface-2)",
                   border: "1px solid hsl(240 12% 16%)",
                   color: "hsl(240 15% 90%)",
                 }}
@@ -175,7 +175,7 @@ export function TemplatePicker({
                       {tpl.name}
                       <span
                         className="rounded px-1 text-[9px]"
-                        style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 8% 58%)" }}
+                        style={{ background: "var(--surface-2)", color: "hsl(240 8% 58%)" }}
                       >
                         {tpl.language}
                       </span>
@@ -242,7 +242,7 @@ export function TemplatePicker({
                   <div
                     className="mt-4 rounded-xl p-4"
                     style={{
-                      background: "rgba(255,255,255,0.02)",
+                      background: "var(--surface-2)",
                       border: "1px solid hsl(240 12% 16%)",
                     }}
                   >
@@ -269,7 +269,7 @@ export function TemplatePicker({
                             placeholder={`Valor para {{${v}}}`}
                             className="w-full rounded-md px-3 py-2 text-xs outline-none"
                             style={{
-                              background: "rgba(255,255,255,0.03)",
+                              background: "var(--surface-2)",
                               border: "1px solid hsl(240 12% 16%)",
                               color: "hsl(240 15% 90%)",
                             }}
@@ -291,7 +291,7 @@ export function TemplatePicker({
               onClick={onClose}
               className="rounded-md px-3 py-1.5 text-xs"
               style={{
-                background: "rgba(255,255,255,0.04)",
+                background: "var(--surface-2)",
                 border: "1px solid hsl(240 12% 16%)",
                 color: "hsl(240 8% 62%)",
               }}
@@ -328,8 +328,8 @@ function TemplatePreview({ tpl, variables }: { tpl: MetaTemplate; variables: Rec
     <div
       className="mx-auto max-w-md rounded-2xl p-3 shadow-sm"
       style={{
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.08)",
+        background: "var(--surface-2)",
+        border: "1px solid var(--border-default)",
         borderBottomLeftRadius: 6,
         color: "hsl(240 15% 92%)",
       }}

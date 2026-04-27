@@ -69,7 +69,7 @@ export function UniqAIIsland() {
             className="fixed bottom-4 right-4 z-[100] w-14 h-14 rounded-full flex items-center justify-center shadow-2xl"
             style={{
               background: "var(--green)",
-              boxShadow: "0 8px 32px rgba(0,212,106,0.35), inset 0 0 0 1px rgba(255,255,255,0.1)",
+              boxShadow: "0 8px 32px rgba(0,212,106,0.35), inset 0 0 0 1px var(--border-strong)",
             }}
             aria-label="Abrir Uniq AI"
           >
@@ -170,10 +170,10 @@ export function UniqAIIsland() {
         style={{
           background: isExpanded ? "var(--surface-1)" : "rgba(10, 12, 14, 0.92)",
           backdropFilter: isExpanded ? undefined : "blur(12px)",
-          border: isExpanded ? "1px solid var(--surface-border)" : "1px solid rgba(255,255,255,0.08)",
+          border: isExpanded ? "1px solid var(--surface-border)" : "1px solid var(--border-default)",
           boxShadow: isExpanded
             ? "0 24px 80px rgba(0,0,0,0.55)"
-            : "0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.04)",
+            : "0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 1px var(--border-default)",
         }}
       >
         {!isExpanded && (

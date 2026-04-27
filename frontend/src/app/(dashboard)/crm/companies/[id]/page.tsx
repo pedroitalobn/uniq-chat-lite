@@ -135,7 +135,7 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
           <button
             onClick={() => setEditing(editing === "overview" ? null : "overview")}
             className="flex items-center gap-1 rounded-md px-2.5 py-1 text-xs"
-            style={{ background: "rgba(255,255,255,0.04)", color: uniq.textDim }}
+            style={{ background: "var(--surface-2)", color: uniq.textDim }}
           >
             <Pencil className="h-3 w-3" />
             {editing === "overview" ? "Fechar" : "Editar"}

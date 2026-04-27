@@ -37,7 +37,7 @@ export function ConfirmDialog({
   return (
     <div
       className="fixed inset-0 z-[160] flex items-center justify-center uniq-fade-in"
-      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+      style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}
       onClick={onCancel}
     >
       <div

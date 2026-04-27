@@ -157,7 +157,7 @@ function StatPill({ icon, value, label, accent }: {
   return (
     <div
       className="flex flex-col items-center rounded-md py-1.5"
-      style={{ background: "rgba(255,255,255,0.03)" }}
+      style={{ background: "var(--surface-2)" }}
     >
       <div
         className="flex items-center gap-0.5 text-xs font-semibold"
@@ -289,7 +289,7 @@ function NewCompanyDialog({
           <button
             onClick={onClose}
             className="rounded-lg px-3 py-1.5 text-xs"
-            style={{ background: "rgba(255,255,255,0.04)", color: uniq.textDim }}
+            style={{ background: "var(--surface-2)", color: uniq.textDim }}
           >
             Cancelar
           </button>

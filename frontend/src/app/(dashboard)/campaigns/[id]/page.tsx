@@ -144,7 +144,7 @@ export default function CampaignDetailPage() {
       <div className="flex items-center gap-3">
         <Link href="/campaigns"
           className="p-2 rounded-xl transition-all"
-          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", color: "hsl(240 8% 46%)" }}
+          style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 46%)" }}
           onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 15% 90%)")}
           onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 46%)")}
         >
@@ -190,9 +190,9 @@ export default function CampaignDetailPage() {
           )}
           <button onClick={handleDelete}
             className="p-2 rounded-xl transition-all"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", color: "#64748b" }}
+            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "#64748b" }}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.08)"; (e.currentTarget as HTMLElement).style.color = "#ef4444"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; (e.currentTarget as HTMLElement).style.color = "#64748b"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "var(--surface-2)"; (e.currentTarget as HTMLElement).style.color = "#64748b"; }}
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -291,7 +291,7 @@ export default function CampaignDetailPage() {
         <div className="rounded-2xl overflow-hidden" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
           {/* Header */}
           <div className="grid grid-cols-[1fr_80px_60px_auto] gap-4 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-widest"
-            style={{ background: "rgba(255,255,255,0.02)", borderBottom: "1px solid hsl(240 12% 11%)", color: "hsl(240 8% 40%)" }}>
+            style={{ background: "var(--surface-2)", borderBottom: "1px solid hsl(240 12% 11%)", color: "hsl(240 8% 40%)" }}>
             <span>Destinatário</span>
             <span>Status</span>
             <span>Envios</span>

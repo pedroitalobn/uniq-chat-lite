@@ -55,7 +55,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       border: "1px solid transparent",
     },
     soft: {
-      background: "rgba(255,255,255,0.04)",
+      background: "var(--surface-2)",
       color: "hsl(240 15% 88%)",
       border: "1px solid hsl(240 12% 16%)",
     },

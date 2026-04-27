@@ -62,7 +62,7 @@ function channelChipStyle(channel?: string): { label: string; bg: string; color:
     case "linkedin":  return { label: "LinkedIn",  bg: "rgba(10,102,194,0.08)", color: "#0a66c2", border: "rgba(10,102,194,0.2)" };
     case "tiktok":    return { label: "TikTok",    bg: "rgba(255,0,80,0.08)",   color: "#ff0050", border: "rgba(255,0,80,0.2)" };
     case "kwai":      return { label: "Kwai",      bg: "rgba(255,102,0,0.08)",  color: "#ff6600", border: "rgba(255,102,0,0.2)" };
-    default:          return { label: channel || "Canal", bg: "rgba(255,255,255,0.04)", color: "hsl(240 8% 60%)", border: "rgba(255,255,255,0.08)" };
+    default:          return { label: channel || "Canal", bg: "var(--surface-2)", color: "hsl(240 8% 60%)", border: "var(--border-default)" };
   }
 }
 
@@ -616,7 +616,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                   onClick={() => setViewerSource({ type: "image", url: avatarUrl, filename: `${name}.jpg` })}
                   title="Ver foto de perfil"
                   className="h-9 w-9 rounded-full overflow-hidden flex-shrink-0 transition-opacity hover:opacity-80"
-                  style={{ background: "rgba(255,255,255,0.04)" }}
+                  style={{ background: "var(--surface-2)" }}
                 >
                   <img
                     src={avatarUrl}
@@ -745,7 +745,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                 <div
                   className="mx-auto my-1 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px]"
                   style={{
-                    background: "rgba(255,255,255,0.04)",
+                    background: "var(--surface-2)",
                     color: "hsl(240 8% 52%)",
                   }}
                 >
@@ -828,7 +828,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                     onClick={() => setViewerSource({ type: "image", url: avatarUrl, filename: `${name}.jpg` })}
                     title="Ver foto de perfil"
                     className="h-12 w-12 rounded-full overflow-hidden flex-shrink-0 transition-opacity hover:opacity-80"
-                    style={{ background: "rgba(255,255,255,0.04)" }}
+                    style={{ background: "var(--surface-2)" }}
                   >
                     <img src={avatarUrl} alt={name} className="h-12 w-12 object-cover" />
                   </button>
@@ -1106,7 +1106,7 @@ function TransferDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
         className="absolute inset-0 uniq-fade-in"
-        style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
+        style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}
         onClick={onClose}
       />
       <div
@@ -1243,8 +1243,8 @@ function MessageBubble({
         <div
           className="rounded-2xl px-3 py-1 text-2xl uniq-slide-up"
           style={{
-            background: isOut ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.04)",
-            border: `1px solid ${isOut ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.08)"}`,
+            background: isOut ? "rgba(0,212,106,0.12)" : "var(--surface-2)",
+            border: `1px solid ${isOut ? "rgba(0,212,106,0.25)" : "var(--border-default)"}`,
           }}
         >
           {parsed.text || "👍"}
@@ -1275,7 +1275,7 @@ function MessageBubble({
             padding: 3,
             background: isOut
               ? "linear-gradient(135deg, rgba(0,212,106,0.35), rgba(0,212,106,0.15))"
-              : "linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04))",
+              : "linear-gradient(135deg, var(--border-strong), var(--border-default))",
           }}
         >
           <div
@@ -1361,8 +1361,8 @@ function MessageBubble({
                 borderBottomRightRadius: 6,
               }
             : {
-                background: "rgba(255,255,255,0.04)",
-                border: `1px solid ${m.is_pinned ? "#00d46a" : "rgba(255,255,255,0.08)"}`,
+                background: "var(--surface-2)",
+                border: `1px solid ${m.is_pinned ? "#00d46a" : "var(--border-default)"}`,
                 color: "hsl(240 15% 90%)",
                 borderBottomLeftRadius: 6,
               }
@@ -1418,7 +1418,7 @@ function MessageBubble({
 
         <div
           className="mt-1 flex items-center justify-end gap-1 text-[10px]"
-          style={{ color: isOut ? "rgba(255,255,255,0.55)" : "hsl(240 8% 44%)" }}
+          style={{ color: isOut ? "var(--text-3)" : "hsl(240 8% 44%)" }}
         >
           {m.is_edited && <span className="italic">editada</span>}
           <span>{relativeTime(m.created_at)}</span>
@@ -1514,7 +1514,7 @@ function MediaBody({
             />
             <span
               className="absolute bottom-1.5 left-1.5 rounded px-1 text-[9px] font-bold tracking-wider"
-              style={{ background: "rgba(0,0,0,0.65)", color: "white" }}
+              style={{ background: "var(--surface-overlay)", color: "white" }}
             >
               GIF
             </span>
@@ -1553,7 +1553,7 @@ function MediaBody({
             >
               <span
                 className="flex h-14 w-14 items-center justify-center rounded-full"
-                style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+                style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}
               >
                 <svg className="h-6 w-6 ml-1" viewBox="0 0 24 24" fill="white">
                   <path d="M8 5v14l11-7z" />
@@ -1642,7 +1642,7 @@ function MediaBody({
             >
               <video src={url} className="max-w-[320px] rounded-lg" preload="metadata" muted />
               <span className="absolute inset-0 flex items-center justify-center rounded-lg group-hover:bg-black/30" style={{ background: "rgba(0,0,0,0.2)" }}>
-                <span className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: "rgba(0,0,0,0.6)" }}>
+                <span className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: "var(--surface-overlay)" }}>
                   <svg className="h-6 w-6 ml-1" viewBox="0 0 24 24" fill="white">
                     <path d="M8 5v14l11-7z" />
                   </svg>
@@ -1679,7 +1679,7 @@ function MediaBody({
             onOpenViewer({ type: "document", url, mediaKey, filename, mimeType, caption: body })
           }
           className="flex items-center gap-2 rounded-lg p-2 transition-colors hover:bg-white/5 text-left w-full"
-          style={{ background: "rgba(255,255,255,0.03)" }}
+          style={{ background: "var(--surface-2)" }}
         >
           <FileText className="h-5 w-5 flex-shrink-0" style={{ color: "hsl(240 8% 70%)" }} />
           <span className="truncate text-xs flex-1">{filename || "Documento"}</span>
@@ -1726,7 +1726,7 @@ function MediaBody({
             target="_blank"
             rel="noopener noreferrer"
             className="block rounded-lg overflow-hidden border transition-opacity hover:opacity-95"
-            style={{ borderColor: "rgba(255,255,255,0.08)" }}
+            style={{ borderColor: "var(--border-default)" }}
             title="Abrir no Google Maps"
           >
             <iframe
@@ -1738,7 +1738,7 @@ function MediaBody({
             />
             <div
               className="flex items-start gap-2 px-2.5 py-2"
-              style={{ background: "rgba(0,0,0,0.4)" }}
+              style={{ background: "var(--surface-overlay)" }}
             >
               <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: isLive ? "#ef4444" : "#00d46a" }} />
               <div className="min-w-0 flex-1">
@@ -1781,7 +1781,7 @@ function MediaBody({
     return (
       <div
         className="flex flex-col gap-1.5 rounded-lg p-3 max-w-[300px]"
-        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+        style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}
       >
         <div className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
           {list.length} contatos
@@ -1805,7 +1805,7 @@ function MediaBody({
     return (
       <div
         className="flex flex-col gap-2 rounded-lg p-3 max-w-[300px]"
-        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+        style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}
       >
         <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
           📊 Enquete{parsed.multi ? " · múltipla escolha" : ""}
@@ -1822,8 +1822,8 @@ function MediaBody({
                 key={i}
                 className="flex items-center gap-2 rounded px-2 py-1.5 text-xs"
                 style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.06)",
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border-default)",
                   color: "hsl(240 15% 88%)",
                 }}
               >
@@ -1909,8 +1909,8 @@ function MediaBody({
                       key={j}
                       className="rounded-md p-2 text-xs"
                       style={{
-                        background: "rgba(255,255,255,0.04)",
-                        border: "1px solid rgba(255,255,255,0.08)",
+                        background: "var(--surface-2)",
+                        border: "1px solid var(--border-default)",
                         color: "hsl(240 15% 88%)",
                       }}
                     >
@@ -1989,7 +1989,7 @@ function CallCard({ parsed, isOut }: { parsed: ParsedContent; isOut: boolean }) 
     <div
       className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 max-w-[280px]"
       style={{
-        background: "rgba(255,255,255,0.03)",
+        background: "var(--surface-2)",
         border: `1px solid ${missed ? "rgba(239,68,68,0.25)" : "rgba(0,212,106,0.2)"}`,
       }}
     >
@@ -2028,7 +2028,7 @@ function QuotedReply({
     <div
       className="mb-1 flex gap-2 rounded-md py-1 pl-2 pr-2 text-[11px]"
       style={{
-        background: isOut ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.04)",
+        background: isOut ? "rgba(0,0,0,0.18)" : "var(--surface-2)",
         borderLeft: `3px solid ${accent}`,
       }}
     >
@@ -2118,7 +2118,7 @@ function ContactCard({
   return (
     <div
       className="flex flex-col gap-2 rounded-lg p-3 max-w-[300px]"
-      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+      style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}
     >
       <div className="flex items-center gap-2.5">
         <div
@@ -2148,7 +2148,7 @@ function ContactCard({
             <div
               key={i}
               className="flex items-center justify-between gap-2 rounded px-2 py-1 text-xs"
-              style={{ color: "hsl(240 15% 88%)", background: "rgba(255,255,255,0.02)" }}
+              style={{ color: "hsl(240 15% 88%)", background: "var(--surface-2)" }}
             >
               <span className="font-mono truncate">{p.number}</span>
               {p.type && (
@@ -2181,9 +2181,9 @@ function ContactCard({
               disabled={adding || added}
               className="flex items-center justify-center gap-1.5 rounded-md flex-1 py-1.5 text-[11px] font-medium transition-colors disabled:opacity-60"
               style={{
-                background: added ? "rgba(245,158,11,0.12)" : "rgba(255,255,255,0.04)",
+                background: added ? "rgba(245,158,11,0.12)" : "var(--surface-2)",
                 color: added ? "#f59e0b" : "hsl(240 15% 88%)",
-                border: `1px solid ${added ? "rgba(245,158,11,0.25)" : "rgba(255,255,255,0.08)"}`,
+                border: `1px solid ${added ? "rgba(245,158,11,0.25)" : "var(--border-default)"}`,
               }}
               title="Adicionar ao CRM"
             >
@@ -2255,8 +2255,8 @@ function DaySeparator({ at }: { at: string }) {
       <span
         className="rounded-full px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider"
         style={{
-          background: "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.08)",
+          background: "var(--surface-2)",
+          border: "1px solid var(--border-default)",
           color: "hsl(240 8% 60%)",
         }}
       >
@@ -2571,7 +2571,7 @@ function WhatsAppMarkdown({ text }: { text: string }) {
               <code
                 key={i}
                 className="rounded px-1 py-0.5 text-[12px]"
-                style={{ background: "rgba(255,255,255,0.06)", fontFamily: "monospace" }}
+                style={{ background: "var(--surface-2)", fontFamily: "monospace" }}
               >
                 {tk.value}
               </code>
@@ -2602,8 +2602,8 @@ function LinkPreviewCard({ url }: { url: string }) {
       rel="noopener noreferrer"
       className="mt-2 block overflow-hidden rounded-md transition-opacity hover:opacity-95"
       style={{
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.08)",
+        background: "var(--surface-2)",
+        border: "1px solid var(--border-default)",
         maxWidth: 320,
       }}
       onClick={(e) => e.stopPropagation()}
@@ -3225,8 +3225,8 @@ function Composer({
         <div
           className="mb-2 rounded-lg p-2"
           style={{
-            background: "rgba(255,255,255,0.03)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            background: "var(--surface-2)",
+            border: "1px solid var(--border-default)",
           }}
         >
           <div className="flex items-center justify-between gap-2 mb-2 px-1">
@@ -3260,8 +3260,8 @@ function Composer({
                 key={att.id}
                 className="relative flex-shrink-0 rounded-md"
                 style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border-default)",
                   width: 84,
                 }}
               >
@@ -3343,7 +3343,7 @@ function Composer({
                     <span
                       className="mt-0.5 rounded px-1.5 py-0.5 font-mono text-[10px]"
                       style={{
-                        background: "rgba(255,255,255,0.06)",
+                        background: "var(--surface-2)",
                         color: "hsl(240 15% 85%)",
                       }}
                     >
@@ -3435,8 +3435,8 @@ function Composer({
             }
             className="flex h-10 w-10 items-center justify-center rounded-md transition-colors disabled:opacity-40"
             style={{
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              background: "var(--surface-2)",
+              border: "1px solid var(--border-default)",
               color: "hsl(240 8% 52%)",
             }}
           >
@@ -3451,8 +3451,8 @@ function Composer({
               title="Emoji"
               className="flex h-10 w-10 items-center justify-center rounded-md transition-colors disabled:opacity-40"
               style={{
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                background: "var(--surface-2)",
+                border: "1px solid var(--border-default)",
                 color: emojiOpen ? "#00d46a" : "hsl(240 8% 52%)",
               }}
             >
@@ -3486,7 +3486,7 @@ function Composer({
             ref={textareaRef}
             className="min-h-[44px] max-h-40 flex-1 resize-y rounded-md px-3 py-2 text-sm outline-none"
             style={{
-              background: "rgba(255,255,255,0.03)",
+              background: "var(--surface-2)",
               border: `1px solid ${mode === "note" ? "rgba(245,158,11,0.35)" : "hsl(240 12% 16%)"}`,
               color: "hsl(240 15% 90%)",
             }}
@@ -3664,7 +3664,7 @@ function ForwardDialog({
     });
   };
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+    <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
           <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Encaminhar mensagem</h3>
@@ -3673,7 +3673,7 @@ function ForwardDialog({
           </button>
         </div>
         <div className="px-4 py-3">
-          <div className="mb-2 rounded-md px-3 py-2 text-[11px]" style={{ background: "rgba(255,255,255,0.04)", borderLeft: "3px solid #00d46a" }}>
+          <div className="mb-2 rounded-md px-3 py-2 text-[11px]" style={{ background: "var(--surface-2)", borderLeft: "3px solid #00d46a" }}>
             <div className="font-medium" style={{ color: "hsl(240 15% 90%)" }}>
               {msg.sender_name || (msg.direction === "out" ? "Você" : "Cliente")}
             </div>
@@ -3683,9 +3683,9 @@ function ForwardDialog({
           </div>
           <div className="relative mb-2">
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "hsl(240 8% 50%)" }} />
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar contato ou conversa…" className="w-full rounded-md py-2 pl-9 pr-3 text-sm outline-none" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar contato ou conversa…" className="w-full rounded-md py-2 pl-9 pr-3 text-sm outline-none" style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} />
           </div>
-          <div className="max-h-72 overflow-y-auto rounded-md" style={{ background: "rgba(255,255,255,0.02)" }}>
+          <div className="max-h-72 overflow-y-auto rounded-md" style={{ background: "var(--surface-2)" }}>
             {items.length === 0 ? (
               <div className="p-4 text-center text-xs" style={{ color: "hsl(240 8% 55%)" }}>
                 {listQ.isLoading ? "Carregando…" : "Nenhuma conversa encontrada"}
@@ -3733,7 +3733,7 @@ function EditMessageDialog({
   const initial = parseMessageContent(msg.content).text || "";
   const [text, setText] = useState(initial);
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+    <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
           <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Editar mensagem</h3>
@@ -3742,7 +3742,7 @@ function EditMessageDialog({
           </button>
         </div>
         <div className="px-4 py-3">
-          <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={4} className="w-full rounded-md px-3 py-2 text-sm outline-none" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} />
+          <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={4} className="w-full rounded-md px-3 py-2 text-sm outline-none" style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} />
           <p className="mt-1 text-[10px]" style={{ color: "hsl(240 8% 50%)" }}>WhatsApp aceita edição em até 15 minutos do envio.</p>
         </div>
         <div className="flex items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
@@ -3782,7 +3782,7 @@ function MessageInfoDialog({
   const fmt = (ts?: string | null) => (ts ? new Date(ts).toLocaleString("pt-BR") : "—");
   const phone = (jid: string) => jid.split("@")[0];
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+    <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
           <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Informações da mensagem</h3>
@@ -3791,7 +3791,7 @@ function MessageInfoDialog({
           </button>
         </div>
         <div className="px-4 py-3">
-          <div className="mb-3 rounded-md px-3 py-2 text-[11px]" style={{ background: "rgba(255,255,255,0.04)" }}>
+          <div className="mb-3 rounded-md px-3 py-2 text-[11px]" style={{ background: "var(--surface-2)" }}>
             <div className="font-medium" style={{ color: "hsl(240 15% 90%)" }}>{replyPreviewText(msg)}</div>
             <div className="mt-0.5 text-[10px]" style={{ color: "hsl(240 8% 55%)" }}>Enviada {fmt(msg.created_at)}</div>
           </div>
@@ -3851,7 +3851,7 @@ function StatusCard({
   color: string;
 }) {
   return (
-    <div className="rounded-md px-3 py-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 14%)" }}>
+    <div className="rounded-md px-3 py-2" style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 14%)" }}>
       <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest" style={{ color }}>
         {icon} {label}
       </div>
@@ -3921,7 +3921,7 @@ function EmojiPickerPanel({ onPick, onClose }: { onPick: (e: string) => void; on
           placeholder="Buscar emoji..."
           autoFocus
           className="w-full rounded px-2 py-1 text-xs outline-none"
-          style={{ background: "rgba(255,255,255,0.04)", color: "hsl(240 15% 90%)", border: "1px solid hsl(240 12% 16%)" }}
+          style={{ background: "var(--surface-2)", color: "hsl(240 15% 90%)", border: "1px solid hsl(240 12% 16%)" }}
         />
       </div>
       <div className="overflow-y-auto" style={{ maxHeight: 300 }}>
@@ -4053,7 +4053,7 @@ function SnoozeDialog({
     onSubmit(new Date(Date.now() + h * 3600_000).toISOString());
   };
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+    <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
           <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Colocar em soneca</h3>
@@ -4091,7 +4091,7 @@ function SnoozeDialog({
                 value={hours}
                 onChange={(e) => setHours(parseInt(e.target.value) || 0)}
                 className="w-20 rounded-md px-2 py-1.5 text-sm outline-none"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
+                style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
               />
               <span className="text-xs" style={{ color: "hsl(240 8% 60%)" }}>horas</span>
               <button

@@ -415,7 +415,7 @@ export default function InboxPage() {
               aria-label="Atualizar lista"
               className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
               style={{
-                background: "rgba(255,255,255,0.04)",
+                background: "var(--surface-2)",
                 border: "1px solid hsl(240 12% 16%)",
                 color: "hsl(240 8% 65%)",
               }}
@@ -532,7 +532,7 @@ export default function InboxPage() {
                 placeholder="Buscar…"
                 className="w-44 rounded-lg py-1.5 pl-8 pr-3 text-xs outline-none"
                 style={{
-                  background: "rgba(255,255,255,0.03)",
+                  background: "var(--surface-2)",
                   border: "1px solid hsl(240 12% 16%)",
                   color: "hsl(240 15% 90%)",
                 }}
@@ -720,8 +720,8 @@ function AgentDropdown({
           disabled={!canViewAll}
           className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
           style={{
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            background: "var(--surface-2)",
+            border: "1px solid var(--border-default)",
             color: "hsl(240 15% 90%)",
             opacity: canViewAll ? 1 : 0.6,
           }}
@@ -794,8 +794,8 @@ function SingleSelectDropdown({
           onClick={() => setOpen((o) => !o)}
           className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
           style={{
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            background: "var(--surface-2)",
+            border: "1px solid var(--border-default)",
             color: "hsl(240 15% 90%)",
           }}
         >
@@ -847,8 +847,8 @@ function MultiSelectDropdown({
           onClick={() => setOpen((o) => !o)}
           className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
           style={{
-            background: selected.length > 0 ? "rgba(0,212,106,0.05)" : "rgba(255,255,255,0.04)",
-            border: `1px solid ${selected.length > 0 ? "rgba(0,212,106,0.2)" : "rgba(255,255,255,0.08)"}`,
+            background: selected.length > 0 ? "rgba(0,212,106,0.05)" : "var(--surface-2)",
+            border: `1px solid ${selected.length > 0 ? "rgba(0,212,106,0.2)" : "var(--border-default)"}`,
             color: "hsl(240 15% 90%)",
           }}
         >
@@ -1120,7 +1120,7 @@ function ErrorState({ error, probe, onRetry }: { error: unknown; probe?: HealthP
         <details
           className="mt-1 w-full max-w-md rounded-lg p-3 text-left text-[11px]"
           style={{
-            background: "rgba(255,255,255,0.03)",
+            background: "var(--surface-2)",
             border: "1px solid hsl(240 12% 16%)",
             color: "hsl(240 8% 48%)",
           }}
@@ -1207,7 +1207,7 @@ function InboxMenu({
           onClick={() => setOpen((o) => !o)}
           className="flex items-center justify-center rounded-lg p-1.5 transition-colors"
           style={{
-            background: open ? "rgba(0,212,106,0.08)" : "rgba(255,255,255,0.03)",
+            background: open ? "rgba(0,212,106,0.08)" : "var(--surface-2)",
             border: "1px solid hsl(240 12% 16%)",
             color: open ? "#00d46a" : "hsl(240 8% 60%)",
           }}
@@ -1310,7 +1310,7 @@ function Forbidden() {
         Peça ao administrador a permissão{" "}
         <code
           className="rounded px-1 text-xs"
-          style={{ background: "rgba(255,255,255,0.05)", color: "hsl(240 15% 85%)" }}
+          style={{ background: "var(--surface-2)", color: "hsl(240 15% 85%)" }}
         >
           tickets:view
         </code>.
@@ -1324,18 +1324,18 @@ function PageSkeleton() {
     <div className="space-y-3 p-6">
       <div
         className="h-8 w-40 animate-pulse rounded"
-        style={{ background: "rgba(255,255,255,0.04)" }}
+        style={{ background: "var(--surface-2)" }}
       />
       <div
         className="h-4 w-64 animate-pulse rounded"
-        style={{ background: "rgba(255,255,255,0.04)" }}
+        style={{ background: "var(--surface-2)" }}
       />
       <div className="mt-6 space-y-2">
         {[...Array(6)].map((_, i) => (
           <div
             key={i}
             className="h-16 w-full animate-pulse rounded"
-            style={{ background: "rgba(255,255,255,0.03)" }}
+            style={{ background: "var(--surface-2)" }}
           />
         ))}
       </div>
@@ -1403,17 +1403,17 @@ function GlobalSearchButton({ wsId }: { wsId?: string }) {
         title="Buscar mensagens (Ctrl+K)"
         className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium"
         style={{
-          background: "rgba(255,255,255,0.04)",
+          background: "var(--surface-2)",
           border: "1px solid hsl(240 12% 16%)",
           color: "hsl(240 8% 65%)",
         }}
       >
         <Search className="h-3 w-3" />
         Buscar
-        <kbd className="ml-1 rounded px-1 py-0.5 text-[9px]" style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 8% 50%)" }}>⌘K</kbd>
+        <kbd className="ml-1 rounded px-1 py-0.5 text-[9px]" style={{ background: "var(--surface-2)", color: "hsl(240 8% 50%)" }}>⌘K</kbd>
       </button>
       {open && (
-        <div className="fixed inset-0 z-[150] flex items-start justify-center pt-24" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }} onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-[150] flex items-start justify-center pt-24" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }} onClick={() => setOpen(false)}>
           <div className="w-full max-w-xl rounded-2xl shadow-2xl" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
               <Search className="h-4 w-4 flex-shrink-0" style={{ color: "hsl(240 8% 50%)" }} />

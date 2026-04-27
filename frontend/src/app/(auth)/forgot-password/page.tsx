@@ -93,8 +93,8 @@ export default function ForgotPasswordPage() {
                 onClick={() => router.push("/login")}
                 className="mt-2 text-sm px-5 py-2.5 rounded-xl transition-colors"
                 style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border-default)",
                   color: "hsl(240 8% 70%)",
                 }}
               >

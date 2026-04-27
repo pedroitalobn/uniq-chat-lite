@@ -223,7 +223,7 @@ export function NewDealDialog({
             onClick={onClose}
             className="rounded-lg px-3 py-1.5 text-xs font-medium"
             style={{
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--surface-2)",
               border: `1px solid ${uniq.borderFaint}`,
               color: uniq.textDim,
             }}

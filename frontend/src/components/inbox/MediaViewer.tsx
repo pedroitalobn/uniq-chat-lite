@@ -143,7 +143,7 @@ export function MediaViewer({
       {/* Header com toolbar */}
       <header
         className="flex items-center justify-between px-4 sm:px-6 py-3 flex-shrink-0 pointer-events-auto"
-        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+        style={{ borderBottom: "1px solid var(--border-default)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -325,8 +325,8 @@ export function MediaViewer({
           className="flex-shrink-0 px-4 sm:px-6 py-3 text-center text-sm pointer-events-auto"
           style={{
             color: "hsl(240 15% 80%)",
-            borderTop: "1px solid rgba(255,255,255,0.06)",
-            background: "rgba(0,0,0,0.4)",
+            borderTop: "1px solid var(--border-default)",
+            background: "var(--surface-overlay)",
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -360,15 +360,15 @@ function ToolBtn({
       className="flex items-center justify-center rounded-lg p-2 transition-colors"
       style={{
         color: intent === "close" ? "hsl(240 15% 90%)" : "hsl(240 8% 65%)",
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        background: "var(--surface-2)",
+        border: "1px solid var(--border-default)",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = intent === "close" ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.08)";
+        e.currentTarget.style.background = intent === "close" ? "rgba(239,68,68,0.15)" : "var(--border-default)";
         e.currentTarget.style.color = intent === "close" ? "#f87171" : "hsl(240 15% 95%)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+        e.currentTarget.style.background = "var(--surface-2)";
         e.currentTarget.style.color = intent === "close" ? "hsl(240 15% 90%)" : "hsl(240 8% 65%)";
       }}
     >
@@ -378,5 +378,5 @@ function ToolBtn({
 }
 
 function Sep() {
-  return <span className="mx-1 h-5 w-px" style={{ background: "rgba(255,255,255,0.08)" }} />;
+  return <span className="mx-1 h-5 w-px" style={{ background: "var(--surface-3)" }} />;
 }

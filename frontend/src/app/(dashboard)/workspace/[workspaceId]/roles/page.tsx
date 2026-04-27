@@ -199,7 +199,7 @@ export default function RolesPage() {
             onClick={() => router.push(`/workspace/${workspaceId}/team`)}
             className="p-2 rounded-lg transition-colors"
             style={{ color: "hsl(240 8% 50%)" }}
-            onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+            onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-2)")}
             onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
           >
             <ChevronLeft className="w-5 h-5" />
@@ -308,7 +308,7 @@ export default function RolesPage() {
                       className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] transition-colors hover:bg-white/5"
                       style={{
                         color: allSelected ? "#00d46a" : someSelected ? "#f59e0b" : "hsl(240 8% 52%)",
-                        border: `1px solid ${allSelected ? "rgba(0,212,106,0.3)" : "rgba(255,255,255,0.08)"}`,
+                        border: `1px solid ${allSelected ? "rgba(0,212,106,0.3)" : "var(--border-default)"}`,
                       }}
                       title={allSelected ? "Desmarcar todas do módulo" : "Selecionar todas do módulo"}
                     >
@@ -319,7 +319,7 @@ export default function RolesPage() {
                             ? "var(--green)"
                             : someSelected
                             ? "rgba(245,158,11,0.4)"
-                            : "rgba(255,255,255,0.06)",
+                            : "var(--surface-2)",
                         }}
                       >
                         {allSelected && <Check className="h-2 w-2" style={{ color: "#03170a" }} />}
@@ -337,15 +337,15 @@ export default function RolesPage() {
                           onClick={() => togglePerm(perm.id)}
                           className="flex items-center gap-2 p-2.5 rounded-xl text-left transition-all"
                           style={{
-                            background: isSelected ? "rgba(0,212,106,0.08)" : "rgba(255,255,255,0.02)",
-                            border: `1px solid ${isSelected ? "rgba(0,212,106,0.2)" : "rgba(255,255,255,0.06)"}`,
+                            background: isSelected ? "rgba(0,212,106,0.08)" : "var(--surface-2)",
+                            border: `1px solid ${isSelected ? "rgba(0,212,106,0.2)" : "var(--surface-2)"}`,
                           }}
                         >
                           <div
                             className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
                             style={{
-                              background: isSelected ? "rgba(0,212,106,0.15)" : "rgba(255,255,255,0.05)",
-                              border: `1px solid ${isSelected ? "rgba(0,212,106,0.3)" : "rgba(255,255,255,0.1)"}`,
+                              background: isSelected ? "rgba(0,212,106,0.15)" : "var(--surface-2)",
+                              border: `1px solid ${isSelected ? "rgba(0,212,106,0.3)" : "var(--border-strong)"}`,
                             }}
                           >
                             {isSelected && <Check className="w-3 h-3" style={{ color: "var(--green)" }} />}
@@ -411,9 +411,9 @@ export default function RolesPage() {
                 key={role.id}
                 className="px-5 py-4 transition-colors"
                 style={{
-                  borderBottom: i < roles.length - 1 ? "1px solid rgba(255,255,255,0.04)" : undefined,
+                  borderBottom: i < roles.length - 1 ? "1px solid var(--border-default)" : undefined,
                 }}
-                onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.02)")}
+                onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = "var(--surface-2)")}
                 onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = "transparent")}
               >
                 <div className="flex items-start justify-between gap-4">
@@ -423,7 +423,7 @@ export default function RolesPage() {
                       {role.is_default && (
                         <span
                           className="text-xs px-2 py-0.5 rounded-full"
-                          style={{ background: "rgba(255,255,255,0.05)", color: "hsl(240 8% 50%)" }}
+                          style={{ background: "var(--surface-2)", color: "hsl(240 8% 50%)" }}
                         >
                           Padrão
                         </span>
@@ -437,7 +437,7 @@ export default function RolesPage() {
                         <span
                           key={perm.id}
                           className="text-xs px-2 py-0.5 rounded"
-                          style={{ background: "rgba(255,255,255,0.04)", color: "hsl(240 8% 55%)" }}
+                          style={{ background: "var(--surface-2)", color: "hsl(240 8% 55%)" }}
                         >
                           {perm.name}
                         </span>
@@ -445,7 +445,7 @@ export default function RolesPage() {
                       {(role.permissions ?? []).length > 6 && (
                         <span
                           className="text-xs px-2 py-0.5 rounded"
-                          style={{ background: "rgba(255,255,255,0.04)", color: "hsl(240 8% 40%)" }}
+                          style={{ background: "var(--surface-2)", color: "hsl(240 8% 40%)" }}
                         >
                           +{(role.permissions ?? []).length - 6} mais
                         </span>

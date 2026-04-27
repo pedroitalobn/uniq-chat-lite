@@ -166,8 +166,8 @@ export default function InviteAcceptPage({
           onClick={() => router.replace("/login")}
           className="text-sm px-5 py-2.5 mt-2 rounded-xl transition-colors"
           style={{
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            background: "var(--surface-2)",
+            border: "1px solid var(--border-default)",
             color: "hsl(240 8% 70%)",
           }}
         >
@@ -331,8 +331,8 @@ export default function InviteAcceptPage({
           onClick={() => router.replace("/inbox")}
           className="text-sm px-5 py-2.5 mt-2 rounded-xl transition-colors"
           style={{
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            background: "var(--surface-2)",
+            border: "1px solid var(--border-default)",
             color: "hsl(240 8% 70%)",
           }}
         >

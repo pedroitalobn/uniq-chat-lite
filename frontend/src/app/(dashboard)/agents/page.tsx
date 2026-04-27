@@ -171,7 +171,7 @@ function mapAgent(data: any): AgentForm {
 
 function cardStyle(emphasis = false): CSSProperties {
   return {
-    background: emphasis ? "linear-gradient(180deg, rgba(0,212,106,0.08), rgba(255,255,255,0.02))" : "var(--surface-2)",
+    background: emphasis ? "linear-gradient(180deg, rgba(0,212,106,0.08), var(--border-subtle))" : "var(--surface-2)",
     border: `1px solid ${emphasis ? "rgba(0,212,106,0.18)" : "var(--surface-border)"}`,
   };
 }

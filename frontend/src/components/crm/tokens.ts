@@ -6,13 +6,13 @@ export const uniq = {
   // Superfícies
   bg: "hsl(240 18% 6%)",
   bgElevated: "hsl(240 18% 7.5%)",
-  panel: "rgba(255,255,255,0.03)",
-  hover: "rgba(255,255,255,0.06)",
+  panel: "var(--border-subtle)",
+  hover: "var(--border-default)",
 
   // Bordas
   border: "hsl(240 12% 14%)",
   borderSoft: "hsl(240 12% 16%)",
-  borderFaint: "rgba(255,255,255,0.08)",
+  borderFaint: "var(--border-default)",
 
   // Texto
   textStrong: "hsl(240 15% 93%)",
@@ -53,7 +53,7 @@ export const buttonPrimary: React.CSSProperties = {
 };
 
 export const buttonGhost: React.CSSProperties = {
-  background: "rgba(255,255,255,0.04)",
+  background: "var(--border-default)",
   border: `1px solid ${uniq.borderFaint}`,
   color: uniq.textDim,
 };

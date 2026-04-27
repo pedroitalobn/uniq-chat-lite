@@ -198,12 +198,12 @@ export default function DealsPage() {
             onChange={setFunnelId}
           />
 
-          <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${uniq.borderFaint}` }}>
+          <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ background: "var(--surface-2)", border: `1px solid ${uniq.borderFaint}` }}>
             <ViewToggle active={viewMode === "kanban"} onClick={() => setViewMode("kanban")} label="Kanban" icon={<LayoutGrid className="h-3.5 w-3.5" />} />
             <ViewToggle active={viewMode === "list"} onClick={() => setViewMode("list")} label="Lista" icon={<List className="h-3.5 w-3.5" />} />
           </div>
 
-          <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${uniq.borderFaint}` }}>
+          <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ background: "var(--surface-2)", border: `1px solid ${uniq.borderFaint}` }}>
             <ViewToggle active={ownerFilter === "all"} onClick={() => setOwnerFilter("all")} label="Todos" />
             <ViewToggle active={ownerFilter === "me"} onClick={() => setOwnerFilter("me")} label="Meus" />
           </div>
@@ -216,7 +216,7 @@ export default function DealsPage() {
               placeholder="Buscar deal…"
               className="w-52 rounded-lg py-1.5 pl-8 pr-3 text-xs outline-none"
               style={{
-                background: "rgba(255,255,255,0.03)",
+                background: "var(--surface-2)",
                 border: `1px solid ${uniq.borderSoft}`,
                 color: uniq.textPrimary,
               }}
@@ -356,7 +356,7 @@ function FunnelSelector({ funnels, activeId, onChange }: {
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold"
         style={{
-          background: "rgba(255,255,255,0.04)",
+          background: "var(--surface-2)",
           border: `1px solid ${uniq.borderFaint}`,
           color: uniq.textStrong,
         }}

@@ -325,7 +325,7 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
                   <MessageSquare className="h-3 w-3" style={{ color: uniq.textFaint }} />
                   <span
                     className="rounded-full px-1.5 py-0.5 text-[9px]"
-                    style={{ background: "rgba(255,255,255,0.05)", color: uniq.textDim }}
+                    style={{ background: "var(--surface-2)", color: uniq.textDim }}
                   >
                     {conv.channel_type}
                   </span>

@@ -105,7 +105,7 @@ function BridgeToggle({ label, color, enabled, onToggle, children }: {
   return (
     <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${enabled ? color + "30" : "hsl(240 12% 13%)"}` }}>
       <div className="flex items-center justify-between px-3 py-2.5"
-        style={{ background: enabled ? color + "08" : "rgba(255,255,255,0.02)" }}>
+        style={{ background: enabled ? color + "08" : "var(--surface-2)" }}>
         <span className="text-xs font-semibold" style={{ color: enabled ? color : "hsl(240 8% 42%)" }}>{label}</span>
         <button onClick={onToggle}
           className="relative flex-shrink-0 rounded-full transition-colors"
@@ -115,7 +115,7 @@ function BridgeToggle({ label, color, enabled, onToggle, children }: {
         </button>
       </div>
       {enabled && children && (
-        <div className="px-3 pb-3 pt-1 space-y-2" style={{ background: "rgba(255,255,255,0.01)" }}>
+        <div className="px-3 pb-3 pt-1 space-y-2" style={{ background: "var(--surface-2)" }}>
           {children}
         </div>
       )}
@@ -182,10 +182,10 @@ function WebhookCard({ wh, instanceId, onDelete }: { wh: Webhook; instanceId: st
           <div className="flex flex-wrap gap-1 mt-1.5">
             {evList.slice(0, 5).map(ev => (
               <span key={ev} className="text-[9px] px-1.5 py-0.5 rounded font-mono"
-                style={{ background: "rgba(255,255,255,0.04)", color: "hsl(240 8% 38%)" }}>{ev}</span>
+                style={{ background: "var(--surface-2)", color: "hsl(240 8% 38%)" }}>{ev}</span>
             ))}
             {evList.length > 5 && <span className="text-[9px] px-1.5 py-0.5 rounded font-mono"
-              style={{ background: "rgba(255,255,255,0.04)", color: "hsl(240 8% 38%)" }}>+{evList.length - 5}</span>}
+              style={{ background: "var(--surface-2)", color: "hsl(240 8% 38%)" }}>+{evList.length - 5}</span>}
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -501,7 +501,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
                 Endpoint SSE
               </label>
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 14%)" }}>
+                style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 14%)" }}>
                 <code className="text-[10px] flex-1 truncate font-mono" style={{ color: "#60a5fa" }}>{mcpSSEUrl}</code>
                 <button onClick={() => { navigator.clipboard.writeText(mcpSSEUrl); setCopiedMCP(true); setTimeout(() => setCopiedMCP(false), 2000); }}>
                   {copiedMCP ? <Check className="w-3.5 h-3.5" style={{ color: "var(--green)" }} /> : <Copy className="w-3.5 h-3.5" style={{ color: "hsl(240 8% 40%)" }} />}
@@ -521,7 +521,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
                 <div className="space-y-1.5">
                   {(tools.tools as Array<{ name: string; description: string }>).map(t => (
                     <div key={t.name} className="flex items-start gap-2 px-2 py-1.5 rounded-lg"
-                      style={{ background: "rgba(255,255,255,0.02)" }}>
+                      style={{ background: "var(--surface-2)" }}>
                       <code className="text-[10px] font-mono font-semibold flex-shrink-0" style={{ color: "#a78bfa" }}>{t.name}</code>
                       <span className="text-[10px]" style={{ color: "hsl(240 8% 44%)" }}>{t.description}</span>
                     </div>
@@ -536,7 +536,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
                 Config Claude Desktop / claude_desktop_config.json
               </label>
               <pre className="text-[9px] p-3 rounded-xl overflow-x-auto font-mono"
-                style={{ background: "rgba(0,0,0,0.3)", color: "hsl(240 8% 56%)", border: "1px solid hsl(240 12% 12%)" }}>
+                style={{ background: "var(--surface-overlay)", color: "hsl(240 8% 56%)", border: "1px solid hsl(240 12% 12%)" }}>
                 {claudeConfig}
               </pre>
             </div>
@@ -1297,11 +1297,11 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
               </p>
 
               {contactLookup && (
-                <div className="rounded-xl p-3 flex gap-3 items-start" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="rounded-xl p-3 flex gap-3 items-start" style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
                   {contactLookup.avatar_url ? (
                     <img src={contactLookup.avatar_url} alt="Avatar do contato" className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
                   ) : (
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(255,255,255,0.05)" }}>
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "var(--surface-2)" }}>
                       <User className="w-5 h-5" style={{ color: "hsl(240 8% 45%)" }} />
                     </div>
                   )}
@@ -1396,9 +1396,9 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
               onClick={() => reconnectMutation.mutate()}
               disabled={reconnectMutation.isPending}
               className="flex items-center justify-center gap-2 text-sm font-medium py-2.5 px-4 rounded-xl transition-all disabled:opacity-50"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", color: "hsl(240 8% 62%)" }}
-              onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.07)")}
-              onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+              style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 62%)" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-3)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "var(--surface-2)")}
             >
               {reconnectMutation.isPending
                 ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -1449,7 +1449,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                   className="flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg transition-all"
                   style={msgType === id
                     ? { background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.3)", color: "#60a5fa" }
-                    : { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "hsl(240 8% 44%)" }}>
+                    : { background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 44%)" }}>
                   <Icon className="w-3 h-3" />{label}
                 </button>
               ))}
@@ -1670,7 +1670,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
 
       {showIgLogin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.7)" }} onClick={() => setShowIgLogin(false)} />
+          <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={() => setShowIgLogin(false)} />
           <div className="relative w-full max-w-sm rounded-2xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto"
             style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
             {/* Header com ícone Instagram */}
@@ -1704,7 +1704,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                     placeholder="seu_usuario"
                     autoComplete="username"
                     className="w-full text-sm rounded-xl px-3 py-2.5 pl-10 outline-none"
-                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
+                    style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
                   />
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "hsl(240 8% 40%)" }} />
                 </div>
@@ -1719,7 +1719,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                     placeholder="••••••••"
                     autoComplete="current-password"
                     className="w-full text-sm rounded-xl px-3 py-2.5 pl-10 pr-10 outline-none"
-                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
+                    style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
                   />
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "hsl(240 8% 40%)" }} />
                   <button
@@ -1782,7 +1782,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                   {/* External verification - no code input, just instructions */}
                   {igChallenge.external_verification ? (
                     <>
-                      <div className="rounded-xl p-3 space-y-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid hsl(240 12% 16%)" }}>
+                      <div className="rounded-xl p-3 space-y-2" style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)" }}>
                         <p className="text-xs font-medium" style={{ color: "hsl(240 15% 85%)" }}>
                           📱 Como verificar sua conta:
                         </p>
@@ -1797,7 +1797,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                         type="button"
                         onClick={() => { setIgChallenge(null); setIgChallengeCode(""); }}
                         className="w-full text-sm font-semibold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2"
-                        style={{ background: "rgba(255,255,255,0.08)", color: "hsl(240 15% 90%)" }}
+                        style={{ background: "var(--surface-3)", color: "hsl(240 15% 90%)" }}
                       >
                         <RotateCcw className="w-4 h-4" />
                         Tentar novamente
@@ -1819,7 +1819,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                                 onClick={() => setIgChallengeMethod("phone")}
                                 className="flex-1 text-xs py-2 px-3 rounded-lg transition-all font-medium"
                                 style={{
-                                  background: igChallengeMethod === "phone" ? "rgba(225,48,108,0.15)" : "rgba(255,255,255,0.04)",
+                                  background: igChallengeMethod === "phone" ? "rgba(225,48,108,0.15)" : "var(--surface-2)",
                                   color: igChallengeMethod === "phone" ? "#e1306c" : "hsl(240 8% 58%)",
                                   border: igChallengeMethod === "phone" ? "1px solid rgba(225,48,108,0.3)" : "1px solid transparent",
                                 }}
@@ -1833,7 +1833,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                                 onClick={() => setIgChallengeMethod("email")}
                                 className="flex-1 text-xs py-2 px-3 rounded-lg transition-all font-medium"
                                 style={{
-                                  background: igChallengeMethod === "email" ? "rgba(225,48,108,0.15)" : "rgba(255,255,255,0.04)",
+                                  background: igChallengeMethod === "email" ? "rgba(225,48,108,0.15)" : "var(--surface-2)",
                                   color: igChallengeMethod === "email" ? "#e1306c" : "hsl(240 8% 58%)",
                                   border: igChallengeMethod === "email" ? "1px solid rgba(225,48,108,0.3)" : "1px solid transparent",
                                 }}
@@ -1847,7 +1847,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
 
                       {/* Single option info */}
                       {igChallenge.options && igChallenge.options.length === 1 && (
-                        <p className="text-xs px-3 py-2 rounded-lg" style={{ color: "hsl(240 8% 52%)", background: "rgba(255,255,255,0.03)" }}>
+                        <p className="text-xs px-3 py-2 rounded-lg" style={{ color: "hsl(240 8% 52%)", background: "var(--surface-2)" }}>
                           {igChallenge.options[0] === "email"
                             ? `ℹ️ O Instagram só permitiu verificação por email para ${igChallenge.email_mask || "este email"}.`
                             : `ℹ️ O Instagram só permitiu verificação por SMS para ${igChallenge.phone_mask || "este telefone"}.`}
@@ -1872,7 +1872,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                           placeholder="000000"
                           className="w-full text-sm rounded-xl px-3 py-3 outline-none"
                           style={{
-                            background: "rgba(255,255,255,0.04)",
+                            background: "var(--surface-2)",
                             border: "1px solid hsl(240 12% 16%)",
                             color: "hsl(240 15% 90%)",
                             letterSpacing: "0.4em",
@@ -1908,7 +1908,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                           onClick={() => instagramChallengeResendMutation.mutate({ api_path: igChallenge.api_path, method: igChallengeMethod })}
                           disabled={instagramChallengeResendMutation.isPending}
                           className="w-full text-xs py-2.5 rounded-lg transition-all flex items-center justify-center gap-2"
-                          style={{ color: "hsl(240 8% 58%)", background: "rgba(255,255,255,0.04)" }}
+                          style={{ color: "hsl(240 8% 58%)", background: "var(--surface-2)" }}
                         >
                           {instagramChallengeResendMutation.isPending ? (
                             <Loader2 className="w-3 h-3 animate-spin" />
@@ -2057,8 +2057,8 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
                   border: "1px solid rgba(245,158,11,0.35)",
                   color: "#f59e0b",
                 } : {
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.07)",
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border-default)",
                   color: "hsl(240 8% 42%)",
                 }}>
                 <span className="text-sm font-medium" style={active ? { color: "#f59e0b" } : valText}>{opt.label}</span>
@@ -2103,7 +2103,7 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
                 {data.groups.map(g => (
                   <div key={g.jid} className="p-3.5 flex items-center gap-3">
                     <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: g.is_admin ? "rgba(251,191,36,0.1)" : "rgba(255,255,255,0.04)", border: g.is_admin ? "1px solid rgba(251,191,36,0.2)" : "1px solid rgba(255,255,255,0.06)" }}>
+                      style={{ background: g.is_admin ? "rgba(251,191,36,0.1)" : "var(--surface-2)", border: g.is_admin ? "1px solid rgba(251,191,36,0.2)" : "1px solid var(--border-default)" }}>
                       <Users className="w-3.5 h-3.5" style={{ color: g.is_admin ? "#fbbf24" : "hsl(240 8% 42%)" }} />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -2289,13 +2289,13 @@ export default function InstanceDetailPage() {
           <Link
             href="/instances"
             className="w-9 h-9 flex items-center justify-center rounded-xl transition-all flex-shrink-0"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", color: "hsl(240 8% 52%)" }}
+            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 52%)" }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.07)";
+              (e.currentTarget as HTMLElement).style.background = "var(--surface-3)";
               (e.currentTarget as HTMLElement).style.color = "hsl(240 15% 93%)";
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
+              (e.currentTarget as HTMLElement).style.background = "var(--surface-2)";
               (e.currentTarget as HTMLElement).style.color = "hsl(240 8% 52%)";
             }}
           >
@@ -2306,8 +2306,8 @@ export default function InstanceDetailPage() {
               <div
                 className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{
-                  background: isConnected ? "rgba(0,212,106,0.1)" : "rgba(255,255,255,0.04)",
-                  border: isConnected ? "1px solid rgba(0,212,106,0.2)" : "1px solid rgba(255,255,255,0.06)",
+                  background: isConnected ? "rgba(0,212,106,0.1)" : "var(--surface-2)",
+                  border: isConnected ? "1px solid rgba(0,212,106,0.2)" : "1px solid var(--border-default)",
                 }}
               >
                 <Smartphone className="w-4 h-4" style={{ color: isConnected ? "var(--green)" : "hsl(240 8% 38%)" }} />
@@ -2343,16 +2343,16 @@ export default function InstanceDetailPage() {
           onClick={handleDelete}
           disabled={deleting}
           className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl transition-all disabled:opacity-40"
-          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)", color: "hsl(240 8% 42%)" }}
+          style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 42%)" }}
           onMouseEnter={e => {
             (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.08)";
             (e.currentTarget as HTMLElement).style.color = "#ef4444";
             (e.currentTarget as HTMLElement).style.borderColor = "rgba(239,68,68,0.15)";
           }}
           onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)";
+            (e.currentTarget as HTMLElement).style.background = "var(--surface-2)";
             (e.currentTarget as HTMLElement).style.color = "hsl(240 8% 42%)";
-            (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.05)";
+            (e.currentTarget as HTMLElement).style.borderColor = "var(--surface-2)";
           }}
         >
           {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
@@ -2373,9 +2373,9 @@ export default function InstanceDetailPage() {
               onClick={() => setActiveTab(tab.id)}
               className="relative flex items-center gap-2 text-xs font-medium px-3.5 py-2 rounded-lg transition-all"
               style={active ? {
-                background: "rgba(255,255,255,0.07)",
+                background: "var(--surface-3)",
                 color: "hsl(240 15% 93%)",
-                boxShadow: "inset 1px 0 0 0 var(--green), inset 0 0 0 1px rgba(255,255,255,0.06)",
+                boxShadow: "inset 1px 0 0 0 var(--green), inset 0 0 0 1px var(--border-default)",
               } : {
                 color: "hsl(240 8% 42%)",
               }}

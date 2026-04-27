@@ -658,7 +658,7 @@ export default function ApiDocsPage() {
                   <Icon className="w-4 h-4 shrink-0" />
                   <span className="flex-1">{s.title}</span>
                   {s.badge && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ background: isActive ? "rgba(0,212,106,0.2)" : "rgba(255,255,255,0.08)", color: isActive ? "#00d46a" : "hsl(240 8% 40%)" }}>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ background: isActive ? "rgba(0,212,106,0.2)" : "var(--border-default)", color: isActive ? "#00d46a" : "hsl(240 8% 40%)" }}>
                       {s.badge}
                     </span>
                   )}

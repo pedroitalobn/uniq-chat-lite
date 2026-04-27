@@ -169,7 +169,7 @@ export default function TeamPage() {
       case "accepted": return { bg: "rgba(0,212,106,0.1)", color: "#4ade80" };
       case "expired": return { bg: "rgba(251,146,60,0.1)", color: "#fb923c" };
       case "revoked": return { bg: "rgba(239,68,68,0.1)", color: "#f87171" };
-      default: return { bg: "rgba(255,255,255,0.05)", color: "hsl(240 8% 50%)" };
+      default: return { bg: "var(--surface-2)", color: "hsl(240 8% 50%)" };
     }
   };
 
@@ -182,7 +182,7 @@ export default function TeamPage() {
             onClick={() => router.push("/workspace")}
             className="p-2 rounded-lg transition-colors"
             style={{ color: "hsl(240 8% 50%)" }}
-            onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+            onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-2)")}
             onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
           >
             <ChevronLeft className="w-5 h-5" />
@@ -300,7 +300,7 @@ export default function TeamPage() {
               </div>
               <div
                 className="flex items-center gap-2 rounded-lg px-3 py-2"
-                style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.06)" }}
+                style={{ background: "var(--surface-overlay)", border: "1px solid var(--border-default)" }}
               >
                 <code className="flex-1 text-xs truncate" style={{ color: "hsl(240 15% 80%)" }}>
                   {copiedLink}
@@ -312,7 +312,7 @@ export default function TeamPage() {
                     });
                   }}
                   className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md transition-colors"
-                  style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 15% 80%)" }}
+                  style={{ background: "var(--surface-2)", color: "hsl(240 15% 80%)" }}
                 >
                   <Copy className="w-3.5 h-3.5" /> Copiar
                 </button>
@@ -355,9 +355,9 @@ export default function TeamPage() {
                 key={member.id}
                 className="px-5 py-4 flex items-center gap-4 transition-colors"
                 style={{
-                  borderBottom: i < members.length - 1 ? "1px solid rgba(255,255,255,0.04)" : undefined,
+                  borderBottom: i < members.length - 1 ? "1px solid var(--border-default)" : undefined,
                 }}
-                onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.02)")}
+                onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = "var(--surface-2)")}
                 onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = "transparent")}
               >
                 <div
@@ -405,8 +405,8 @@ export default function TeamPage() {
                       disabled={!canManageRoles || updateMemberRoleMutation.isPending}
                       className="rounded-lg px-2 py-1 text-xs outline-none disabled:cursor-not-allowed disabled:opacity-60"
                       style={{
-                        background: "rgba(255,255,255,0.04)",
-                        border: "1px solid rgba(255,255,255,0.08)",
+                        background: "var(--surface-2)",
+                        border: "1px solid var(--border-default)",
                         color: "hsl(240 8% 85%)",
                       }}
                     >
@@ -467,9 +467,9 @@ export default function TeamPage() {
                   key={invite.id}
                   className="px-5 py-4 flex items-center gap-4 transition-colors"
                   style={{
-                    borderBottom: i < invites.length - 1 ? "1px solid rgba(255,255,255,0.04)" : undefined,
+                    borderBottom: i < invites.length - 1 ? "1px solid var(--border-default)" : undefined,
                   }}
-                  onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.02)")}
+                  onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = "var(--surface-2)")}
                   onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = "transparent")}
                 >
                   <div
@@ -500,8 +500,8 @@ export default function TeamPage() {
                     title="Copiar link de convite"
                     className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors"
                     style={{
-                      background: copiedInviteId === invite.id ? "rgba(0,212,106,0.1)" : "rgba(255,255,255,0.04)",
-                      border: `1px solid ${copiedInviteId === invite.id ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.08)"}`,
+                      background: copiedInviteId === invite.id ? "rgba(0,212,106,0.1)" : "var(--surface-2)",
+                      border: `1px solid ${copiedInviteId === invite.id ? "rgba(0,212,106,0.25)" : "var(--border-default)"}`,
                       color: copiedInviteId === invite.id ? "#4ade80" : "hsl(240 8% 65%)",
                     }}
                   >
