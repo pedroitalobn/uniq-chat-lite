@@ -11,6 +11,7 @@ import {
   Sparkles as SparklesIcon, Tag, User, Wand2, Zap,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { RichMentionText } from "@/components/MentionPicker";
 import { cn } from "@/lib/utils";
 
@@ -255,8 +256,32 @@ export function ChatMessage({ message, isNew = false }: { message: Message; isNe
           ) : (
             isNew ? <TypewriterText text={message.content} /> : (
               <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
                 components={{
                   p({ children }) { return <p className="mb-2 last:mb-0">{children}</p>; },
+                  code({ className, children, ...props }: any) {
+                    const inline = !/language-/.test(className || "");
+                    if (inline) {
+                      return <code className="px-1 py-0.5 rounded text-[12px] font-mono"
+                        style={{ background: "var(--surface-3)", color: "var(--green)" }} {...props}>{children}</code>;
+                    }
+                    return <code className={cn("font-mono text-[12px]", className)} {...props}>{children}</code>;
+                  },
+                  pre({ children }) {
+                    return <pre className="rounded-lg p-3 my-2 overflow-x-auto text-[12px]"
+                      style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>{children}</pre>;
+                  },
+                  table({ children }) {
+                    return <div className="my-2 overflow-x-auto"><table className="text-[13px] border-collapse">{children}</table></div>;
+                  },
+                  th({ children }) { return <th className="px-2 py-1 text-left font-medium border-b" style={{ borderColor: "var(--surface-border)", color: "var(--text-2)" }}>{children}</th>; },
+                  td({ children }) { return <td className="px-2 py-1 border-b" style={{ borderColor: "var(--surface-border)" }}>{children}</td>; },
+                  blockquote({ children }) {
+                    return <blockquote className="border-l-2 pl-3 my-2 italic" style={{ borderColor: "var(--green)", color: "var(--text-2)" }}>{children}</blockquote>;
+                  },
+                  h1({ children }) { return <h3 className="text-base font-medium mt-3 mb-2">{children}</h3>; },
+                  h2({ children }) { return <h4 className="text-sm font-medium mt-3 mb-1.5">{children}</h4>; },
+                  h3({ children }) { return <h5 className="text-sm font-medium mt-2 mb-1">{children}</h5>; },
                   strong({ children }) { return <strong className="font-semibold">{children}</strong>; },
                   em({ children }) { return <em className="italic opacity-90">{children}</em>; },
                   ol({ children }) { return <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>; },

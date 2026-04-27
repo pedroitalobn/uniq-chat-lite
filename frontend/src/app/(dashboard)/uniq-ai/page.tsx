@@ -34,19 +34,25 @@ export default function UniqAIPage() {
   const [hydrated, setHydrated] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
+    // Sempre abrir em "Nova conversa" — usuários reportaram preferir começar
+    // limpo. Histórico continua acessível na sidebar (que está colapsada por
+    // default), mantendo paridade visual com Claude/ChatGPT em mobile.
     const migrated = migrateLegacyIfNeeded();
-    const list = migrated || loadConversations();
+    const existing = migrated || loadConversations();
+    // Se a primeira conversa estiver vazia, reaproveita pra evitar lixo no
+    // histórico. Caso contrário, cria uma nova no topo.
+    const fresh = existing.length > 0 && existing[0].messages.length === 0
+      ? existing[0]
+      : newConversation();
+    const list = existing.length > 0 && existing[0].messages.length === 0
+      ? existing
+      : [fresh, ...existing];
     setConversations(list);
-    const stored = getActiveId();
-    if (stored && list.some((c) => c.id === stored)) {
-      setActiveIdState(stored);
-    } else if (list.length > 0) {
-      setActiveIdState(list[0].id);
-    }
+    setActiveIdState(fresh.id);
     setHydrated(true);
   }, []);
 
