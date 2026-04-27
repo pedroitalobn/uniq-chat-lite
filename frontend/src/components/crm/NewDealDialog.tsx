@@ -132,7 +132,7 @@ export function NewDealDialog({
               <ComboBox
                 query={contactQuery}
                 onQueryChange={setContactQuery}
-                placeholder="Buscar contato…"
+                placeholder="Buscar ou criar contato…"
                 items={(contactsQ.data ?? []).map((c) => ({
                   id: c.id,
                   label: c.name,
@@ -140,17 +140,45 @@ export function NewDealDialog({
                 }))}
                 selectedId={contactId}
                 onSelect={setContactId}
+                createLabel="Criar contato"
+                onCreate={async (name) => {
+                  try {
+                    const r = await crmApi.createContact({ name, workspace_id: wsId } as any);
+                    const created = (r.data as any)?.id || (r.data as any)?.data?.id;
+                    if (created) {
+                      toast.success("Contato criado");
+                      return created as string;
+                    }
+                  } catch {
+                    toast.error("Falha ao criar contato");
+                  }
+                  return null;
+                }}
               />
             </Field>
             <Field label="Empresa (opcional)">
               <ComboBox
                 query={companyQuery}
                 onQueryChange={setCompanyQuery}
-                placeholder="Buscar empresa…"
+                placeholder="Buscar ou criar empresa…"
                 items={(companiesQ.data ?? []).map((c) => ({ id: c.id, label: c.name }))}
                 selectedId={companyId}
                 onSelect={setCompanyId}
                 allowClear
+                createLabel="Criar empresa"
+                onCreate={async (name) => {
+                  try {
+                    const r = await companiesApi.create(wsId, { name } as any);
+                    const created = (r.data as any)?.id || (r.data as any)?.data?.id;
+                    if (created) {
+                      toast.success("Empresa criada");
+                      return created as string;
+                    }
+                  } catch {
+                    toast.error("Falha ao criar empresa");
+                  }
+                  return null;
+                }}
               />
             </Field>
           </div>
@@ -256,7 +284,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function ComboBox({
-  query, onQueryChange, placeholder, items, selectedId, onSelect, allowClear,
+  query, onQueryChange, placeholder, items, selectedId, onSelect, allowClear, onCreate, createLabel,
 }: {
   query: string;
   onQueryChange: (v: string) => void;
@@ -265,9 +293,24 @@ function ComboBox({
   selectedId?: string;
   onSelect: (id: string) => void;
   allowClear?: boolean;
+  onCreate?: (name: string) => Promise<string | null>; // retorna id criado
+  createLabel?: string;
 }) {
   const selected = items.find((i) => i.id === selectedId);
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  const handleCreate = async () => {
+    if (!onCreate || !query.trim()) return;
+    setCreating(true);
+    const id = await onCreate(query.trim());
+    setCreating(false);
+    if (id) {
+      onSelect(id);
+      onQueryChange("");
+      setOpen(false);
+    }
+  };
 
   return (
     <div className="relative">
@@ -286,6 +329,16 @@ function ComboBox({
             className="absolute left-0 top-full z-20 mt-1 w-full max-h-56 overflow-auto rounded-lg shadow-xl"
             style={{ background: uniq.bg, border: `1px solid ${uniq.border}` }}
           >
+            {onCreate && query.trim() && !items.some((i) => i.label.toLowerCase() === query.trim().toLowerCase()) && (
+              <button
+                onClick={handleCreate}
+                disabled={creating}
+                className="block w-full px-3 py-2 text-left text-xs hover:bg-white/5 disabled:opacity-50 border-b"
+                style={{ color: "#00d46a", borderColor: uniq.border }}
+              >
+                {creating ? "Criando…" : `+ ${createLabel ?? "Criar"} "${query.trim()}"`}
+              </button>
+            )}
             {allowClear && selected && (
               <button
                 onClick={() => { onSelect(""); onQueryChange(""); setOpen(false); }}
@@ -295,7 +348,7 @@ function ComboBox({
                 Remover seleção
               </button>
             )}
-            {items.length === 0 && (
+            {items.length === 0 && !onCreate && (
               <div className="px-3 py-2 text-xs" style={{ color: uniq.textFaint }}>
                 Nenhum resultado.
               </div>
