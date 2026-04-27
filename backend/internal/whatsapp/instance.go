@@ -30,6 +30,12 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// mediaFetchClient é o cliente usado pra baixar imagens/vídeos de URLs
+// externas (ex.: header de cartão de carrossel) antes do upload pro
+// WhatsApp. Timeout total de 15s — sem isso, uma URL lenta podia
+// segurar o handler por minutos (default Go = sem timeout).
+var mediaFetchClient = &http.Client{Timeout: 15 * time.Second}
+
 // buildButtonsBizNodes — biz nodes do native_flow.  Configuração que está
 // funcionando em prod pra Buttons + Template (via reroute).
 // NÃO mexer sem teste explícito.
@@ -1883,7 +1889,7 @@ func (ic *InstanceClient) SendCarouselMessage(to string, cards []CarouselCard) (
 			HasMediaAttachment: proto.Bool(false),
 		}
 		if u := strings.TrimSpace(card.Header.ImageURL); u != "" {
-			if resp, hErr := http.Get(u); hErr == nil {
+			if resp, hErr := mediaFetchClient.Get(u); hErr == nil {
 				fileData, rdErr := io.ReadAll(resp.Body)
 				_ = resp.Body.Close()
 				if rdErr == nil {
@@ -1902,9 +1908,11 @@ func (ic *InstanceClient) SendCarouselMessage(to string, cards []CarouselCard) (
 						}
 					}
 				}
+			} else {
+				log.Warn().Str("instance", ic.ID).Str("url", u).Err(hErr).Msg("carousel image fetch failed; sending card without media")
 			}
 		} else if u := strings.TrimSpace(card.Header.VideoURL); u != "" {
-			if resp, hErr := http.Get(u); hErr == nil {
+			if resp, hErr := mediaFetchClient.Get(u); hErr == nil {
 				fileData, rdErr := io.ReadAll(resp.Body)
 				_ = resp.Body.Close()
 				if rdErr == nil {
@@ -1923,6 +1931,8 @@ func (ic *InstanceClient) SendCarouselMessage(to string, cards []CarouselCard) (
 						}
 					}
 				}
+			} else {
+				log.Warn().Str("instance", ic.ID).Str("url", u).Err(hErr).Msg("carousel video fetch failed; sending card without media")
 			}
 		}
 		interactiveCard.Header = header

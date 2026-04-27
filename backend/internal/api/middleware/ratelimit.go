@@ -49,27 +49,33 @@ func RateLimit(limit int) fiber.Handler {
 		})
 		entry := val.(*rateLimitEntry)
 
+		// CRÍTICO: trava só pra incrementar counter e ler resetAt. Nunca
+		// segurar o mutex durante c.Next() — uma request lenta (ex.: envio
+		// de carrossel baixando imagem por 60s) ficaria com o lock
+		// segurando TODO request /v1/* do mesmo user atrás dela. Isso
+		// causou bloqueio em fila de ~57s em prod (issue regressivo).
 		entry.mu.Lock()
-		defer entry.mu.Unlock()
-
 		if time.Now().After(entry.resetAt) {
 			entry.count = 0
 			entry.resetAt = time.Now().Add(windowSize)
 		}
-
 		entry.count++
-		if entry.count > limit {
+		count := entry.count
+		resetAt := entry.resetAt
+		entry.mu.Unlock()
+
+		if count > limit {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 				"error":       "muitas requisições",
-				"retry_after": entry.resetAt.UTC().Format(time.RFC3339),
+				"retry_after": resetAt.UTC().Format(time.RFC3339),
 			})
 		}
 
 		// Headers informativos pra UI poder mostrar "X req restantes" e
 		// programar refetch antes do reset. Tipo o GitHub API faz.
 		c.Set("X-RateLimit-Limit", itoa(limit))
-		c.Set("X-RateLimit-Remaining", itoa(limit-entry.count))
-		c.Set("X-RateLimit-Reset", entry.resetAt.UTC().Format(time.RFC3339))
+		c.Set("X-RateLimit-Remaining", itoa(limit-count))
+		c.Set("X-RateLimit-Reset", resetAt.UTC().Format(time.RFC3339))
 
 		return c.Next()
 	}
