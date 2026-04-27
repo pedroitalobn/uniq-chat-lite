@@ -212,14 +212,19 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	app.Post("/asaas/webhook", asaasH.Webhook)
 
 	// ─── Auth routes (public) ─────────────────────────────────────────────────
+	// Rate limits agressivos: contas/login/reset são alvo #1 de bots.
+	// 5/min é o suficiente pra usuário humano e barra ataques de massa.
+	authStrict := middleware.RateLimit(5)   // signup/forgot/reset
+	authLogin := middleware.RateLimit(10)   // login pode legitimamente repetir (typo de senha)
+	authValidate := middleware.RateLimit(20) // validate-key/refresh: chamados pela UI
 	auth := app.Group("/auth")
-	auth.Post("/login", authH.Login)
-	auth.Post("/register", authH.Register)
-	auth.Post("/validate-key", authH.ValidateKey)
-	auth.Post("/refresh", authH.Refresh)
+	auth.Post("/login", authLogin, authH.Login)
+	auth.Post("/register", authStrict, authH.Register)
+	auth.Post("/validate-key", authValidate, authH.ValidateKey)
+	auth.Post("/refresh", authValidate, authH.Refresh)
 	auth.Post("/logout", authH.Logout)
-	auth.Post("/forgot-password", authH.ForgotPassword)
-	auth.Post("/reset-password", authH.ResetPassword)
+	auth.Post("/forgot-password", authStrict, authH.ForgotPassword)
+	auth.Post("/reset-password", authStrict, authH.ResetPassword)
 	auth.Get("/me", middleware.RequireAuth(db), authH.Me)
 	auth.Put("/me", middleware.RequireAuth(db), authH.UpdateMe)
 	auth.Post("/change-password", middleware.RequireAuth(db), authH.ChangePassword)
@@ -227,24 +232,24 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// ─── Public v1 routes (no auth required) ─────────────────────────────────
 	v1Public := app.Group("/v1")
 
-	// Invite system (public)
+	// Invite system (public) — rate limit pra evitar enumeração de tokens.
 	v1Public.Get("/invites/status", inviteH.GetStatus)
-	v1Public.Post("/invites/validate", inviteH.Validate)
+	v1Public.Post("/invites/validate", middleware.RateLimit(10), inviteH.Validate)
 
 	// Workspace invite preview — público pra decidir se mandamos o
 	// destinatário pra /login ou /register.
-	v1Public.Get("/workspaces/invites/preview/:token", workspaceH.PreviewInvite)
+	v1Public.Get("/workspaces/invites/preview/:token", middleware.RateLimit(10), workspaceH.PreviewInvite)
 
 	// Auth aliases em /v1/auth/* — o frontend chama com o prefixo /v1.
 	// Mantemos os originais em /auth/* também (retrocompat com SDKs).
 	v1PublicAuth := v1Public.Group("/auth")
-	v1PublicAuth.Post("/login", authH.Login)
-	v1PublicAuth.Post("/register", authH.Register)
-	v1PublicAuth.Post("/validate-key", authH.ValidateKey)
-	v1PublicAuth.Post("/refresh", authH.Refresh)
+	v1PublicAuth.Post("/login", authLogin, authH.Login)
+	v1PublicAuth.Post("/register", authStrict, authH.Register)
+	v1PublicAuth.Post("/validate-key", authValidate, authH.ValidateKey)
+	v1PublicAuth.Post("/refresh", authValidate, authH.Refresh)
 	v1PublicAuth.Post("/logout", authH.Logout)
-	v1PublicAuth.Post("/forgot-password", authH.ForgotPassword)
-	v1PublicAuth.Post("/reset-password", authH.ResetPassword)
+	v1PublicAuth.Post("/forgot-password", authStrict, authH.ForgotPassword)
+	v1PublicAuth.Post("/reset-password", authStrict, authH.ResetPassword)
 
 	// CSAT public endpoints (no auth — customer answers via tokenized link)
 	app.Get("/csat/:token", csatH.GetPublic)

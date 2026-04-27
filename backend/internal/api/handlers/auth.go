@@ -104,6 +104,24 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "senha deve ter ao menos 8 caracteres"})
 	}
 
+	// Anti-bot: bloqueia padrões clássicos de signup automatizado.
+	// Convites de workspace pulam essa checagem (admin já validou o email).
+	if workspaceInvite == nil {
+		if reason := suspiciousSignupEmail(req.Email); reason != "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": reason})
+		}
+	}
+
+	// Dedup canônico: bloqueia Gmail dot-trick e plus-addressing usados
+	// pra criar N contas na mesma caixa real.
+	canon := canonicalEmail(req.Email)
+	if canon != req.Email {
+		var dup models.User
+		if h.db.Where("LOWER(email) = ? OR LOWER(email) = ?", canon, req.Email).First(&dup).Error == nil {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "e-mail já cadastrado"})
+		}
+	}
+
 	// Check if invite system is enabled
 	var inviteSetting models.SystemSetting
 	inviteEnabled := false
