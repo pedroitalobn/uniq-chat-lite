@@ -48,8 +48,35 @@ type shopifyCreds struct {
 }
 
 type shopifyConfig struct {
-	ShopDomain string `json:"shop_domain"`
-	OAuthState string `json:"oauth_state,omitempty"`
+	ShopDomain   string `json:"shop_domain"`
+	OAuthState   string `json:"oauth_state,omitempty"`
+	// Per-workspace OAuth app (Modelo B). Quando vazio, cai no env do
+	// SaaS (Modelo A — Business Solution Provider). Cliente avançado
+	// cola seu próprio app pra ter escopos custom / branding próprio.
+	ClientID     string `json:"client_id,omitempty"`
+	ClientSecret string `json:"client_secret,omitempty"`
+	Scopes       string `json:"scopes,omitempty"`
+}
+
+// shopifyAppCreds resolve client_id/secret/scopes priorizando o que o
+// workspace setou no Config; fallback no env do SaaS.
+func (p *shopifyProvider) shopifyAppCreds(cfg *shopifyConfig) (clientID, clientSecret, scopes string) {
+	clientID = cfg.ClientID
+	if clientID == "" {
+		clientID = os.Getenv("SHOPIFY_CLIENT_ID")
+	}
+	clientSecret = cfg.ClientSecret
+	if clientSecret == "" {
+		clientSecret = os.Getenv("SHOPIFY_CLIENT_SECRET")
+	}
+	scopes = cfg.Scopes
+	if scopes == "" {
+		scopes = os.Getenv("SHOPIFY_SCOPES")
+	}
+	if scopes == "" {
+		scopes = "read_products,write_products,read_orders,read_inventory"
+	}
+	return
 }
 
 func (p *shopifyProvider) ID() string                  { return "shopify" }
@@ -59,16 +86,12 @@ func (p *shopifyProvider) AuthMode() AuthMode          { return AuthOAuth2 }
 // AuthorizeURL — Shopify exige saber o shop_domain ANTES de redirecionar
 // (o domínio é parte da URL). UI passa shop_domain no Config.
 func (p *shopifyProvider) AuthorizeURL(_ context.Context, integration *models.ShopIntegration, state, redirectURI string) (string, error) {
-	clientID := os.Getenv("SHOPIFY_CLIENT_ID")
-	if clientID == "" {
-		return "", &ProviderError{Provider: p.ID(), Op: "authorize", Err: errors.New("SHOPIFY_CLIENT_ID não configurado")}
-	}
-	scopes := os.Getenv("SHOPIFY_SCOPES")
-	if scopes == "" {
-		scopes = "read_products,write_products,read_orders,read_inventory"
-	}
 	var cfg shopifyConfig
 	_ = json.Unmarshal([]byte(integration.Config), &cfg)
+	clientID, _, scopes := p.shopifyAppCreds(&cfg)
+	if clientID == "" {
+		return "", &ProviderError{Provider: p.ID(), Op: "authorize", Err: errors.New("client_id não configurado: nem no workspace, nem no env SHOPIFY_CLIENT_ID")}
+	}
 	if cfg.ShopDomain == "" {
 		return "", &ProviderError{Provider: p.ID(), Op: "authorize", Err: errors.New("config.shop_domain ausente — UI deve enviar 'minhaloja.myshopify.com'")}
 	}
@@ -85,13 +108,12 @@ func (p *shopifyProvider) AuthorizeURL(_ context.Context, integration *models.Sh
 // HandleCallback troca o ?code=... por access_token via Shopify token endpoint.
 // shop_domain vem do query (?shop=) ou do Config.
 func (p *shopifyProvider) HandleCallback(ctx context.Context, integration *models.ShopIntegration, code, redirectURI string) error {
-	clientID := os.Getenv("SHOPIFY_CLIENT_ID")
-	clientSecret := os.Getenv("SHOPIFY_CLIENT_SECRET")
-	if clientID == "" || clientSecret == "" {
-		return &ProviderError{Provider: p.ID(), Op: "callback", Err: errors.New("SHOPIFY_CLIENT_ID/SECRET não configurados")}
-	}
 	var cfg shopifyConfig
 	_ = json.Unmarshal([]byte(integration.Config), &cfg)
+	clientID, clientSecret, _ := p.shopifyAppCreds(&cfg)
+	if clientID == "" || clientSecret == "" {
+		return &ProviderError{Provider: p.ID(), Op: "callback", Err: errors.New("client_id/secret não configurados (workspace nem env)")}
+	}
 	if cfg.ShopDomain == "" {
 		return &ProviderError{Provider: p.ID(), Op: "callback", Err: errors.New("shop_domain ausente no config")}
 	}
@@ -215,10 +237,13 @@ func (p *shopifyProvider) SyncProducts(ctx context.Context, db *gorm.DB, integra
 }
 
 // HandleWebhook — Shopify envia HMAC SHA-256 base64 em X-Shopify-Hmac-Sha256.
+// Secret vem do app — Modelo A (env) ou Modelo B (per-workspace config).
 func (p *shopifyProvider) HandleWebhook(ctx context.Context, db *gorm.DB, integration *models.ShopIntegration, headers map[string]string, body []byte) error {
-	secret := os.Getenv("SHOPIFY_CLIENT_SECRET") // Shopify usa o app secret pra HMAC
+	var cfg shopifyConfig
+	_ = json.Unmarshal([]byte(integration.Config), &cfg)
+	_, secret, _ := p.shopifyAppCreds(&cfg)
 	if secret == "" {
-		return errors.New("SHOPIFY_CLIENT_SECRET não configurado")
+		return errors.New("client_secret não configurado (workspace nem env)")
 	}
 	sig := headers["X-Shopify-Hmac-Sha256"]
 	if sig == "" {

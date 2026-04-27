@@ -51,6 +51,31 @@ type mlCreds struct {
 	SiteID       string    `json:"site_id"` // MLB, MLA, MLM, MLC, MCO, etc
 }
 
+// mlConfig — guardado em Integration.Config (não criptografado).
+// Modelo B (per-workspace app) usa esses campos; vazio = Modelo A (env).
+type mlConfig struct {
+	OAuthState   string `json:"oauth_state,omitempty"`
+	ClientID     string `json:"client_id,omitempty"`
+	ClientSecret string `json:"client_secret,omitempty"`
+}
+
+// mlAppCreds resolve client_id/secret priorizando Config; fallback env.
+func (p *mlProvider) mlAppCreds(integration *models.ShopIntegration) (clientID, clientSecret string) {
+	var cfg mlConfig
+	if integration != nil && integration.Config != "" {
+		_ = json.Unmarshal([]byte(integration.Config), &cfg)
+	}
+	clientID = cfg.ClientID
+	if clientID == "" {
+		clientID = os.Getenv("ML_CLIENT_ID")
+	}
+	clientSecret = cfg.ClientSecret
+	if clientSecret == "" {
+		clientSecret = os.Getenv("ML_CLIENT_SECRET")
+	}
+	return
+}
+
 func (p *mlProvider) ID() string          { return "mercado_livre" }
 func (p *mlProvider) DisplayName() string { return "Mercado Livre" }
 func (p *mlProvider) AuthMode() AuthMode  { return AuthOAuth2 }
@@ -63,10 +88,10 @@ func (p *mlProvider) authDomain() string {
 	return d
 }
 
-func (p *mlProvider) AuthorizeURL(_ context.Context, _ *models.ShopIntegration, state, redirectURI string) (string, error) {
-	clientID := os.Getenv("ML_CLIENT_ID")
+func (p *mlProvider) AuthorizeURL(_ context.Context, integration *models.ShopIntegration, state, redirectURI string) (string, error) {
+	clientID, _ := p.mlAppCreds(integration)
 	if clientID == "" {
-		return "", &ProviderError{Provider: p.ID(), Op: "authorize", Err: errors.New("ML_CLIENT_ID não configurado")}
+		return "", &ProviderError{Provider: p.ID(), Op: "authorize", Err: errors.New("client_id não configurado (workspace nem env ML_CLIENT_ID)")}
 	}
 	q := url.Values{
 		"response_type": {"code"},
@@ -78,10 +103,9 @@ func (p *mlProvider) AuthorizeURL(_ context.Context, _ *models.ShopIntegration, 
 }
 
 func (p *mlProvider) HandleCallback(ctx context.Context, integration *models.ShopIntegration, code, redirectURI string) error {
-	clientID := os.Getenv("ML_CLIENT_ID")
-	clientSecret := os.Getenv("ML_CLIENT_SECRET")
+	clientID, clientSecret := p.mlAppCreds(integration)
 	if clientID == "" || clientSecret == "" {
-		return &ProviderError{Provider: p.ID(), Op: "callback", Err: errors.New("ML_CLIENT_ID/SECRET não configurados")}
+		return &ProviderError{Provider: p.ID(), Op: "callback", Err: errors.New("client_id/secret não configurados (workspace nem env)")}
 	}
 	body := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -309,8 +333,7 @@ func (p *mlProvider) refreshIfNeeded(ctx context.Context, integration *models.Sh
 	if time.Until(c.ExpiresAt) > 5*time.Minute {
 		return c, nil
 	}
-	clientID := os.Getenv("ML_CLIENT_ID")
-	clientSecret := os.Getenv("ML_CLIENT_SECRET")
+	clientID, clientSecret := p.mlAppCreds(integration)
 	body := url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {clientID},
