@@ -439,6 +439,89 @@ const SECTIONS: Section[] = [
       { method: "GET",  path: "/instances/{id}/resolve/business-link", summary: "Resolve wa.me/message/<code>", pathParams: ["id"] },
       { method: "GET",  path: "/instances/{id}/resolve/contact-qr",    summary: "Resolve wa.me/qr/<code>", pathParams: ["id"] },
       { method: "GET",  path: "/instances/{id}/qr-link",               summary: "Link QR público da conta. ?revoke=true regera", pathParams: ["id"] },
+
+      // ─── Sprint 8 — PIX simplificado ────────────────────────────
+      { method: "POST", path: "/instances/{id}/messages/pix-button",   summary: "PIX minimalista — só pix_key + key_type (paridade UazAPI)", pathParams: ["id"],
+        body: {
+          to:            { type: "string", required: true,  description: "Destinatário",                example: "5511999999999" },
+          pix_key:       { type: "string", required: true,  description: "Chave PIX",                    example: "pagamentos@uniq.chat" },
+          key_type:      { type: "string", required: true,  description: "CPF | CNPJ | EMAIL | PHONE | EVP", example: "EMAIL" },
+          merchant_name: { type: "string", required: false, description: "Nome do recebedor (default: 'Pagamento PIX')" },
+          body_text:     { type: "string", required: false, description: "Texto do card (gerado se vazio)" },
+        } },
+
+      // ─── Sprint 7 — Warmup (anti-ban) ────────────────────────────
+      { method: "GET",  path: "/instances/{id}/warmup",                summary: "Estado da sessão de warmup", pathParams: ["id"] },
+      { method: "POST", path: "/instances/{id}/warmup",                summary: "Configurar warmup (curva de volume + pools)", pathParams: ["id"],
+        body: {
+          duration_days: { type: "number",   required: false, description: "Total da curva (default 14)",          example: "14" },
+          daily_target:  { type: "number",   required: false, description: "Target ao final (default 200)",         example: "200" },
+          start_hour:    { type: "number",   required: false, description: "Janela ativa início (0..23)",            example: "9" },
+          end_hour:      { type: "number",   required: false, description: "Janela ativa fim",                        example: "21" },
+          min_delay_sec: { type: "number",   required: false, description: "Intervalo mínimo entre msgs",            example: "60" },
+          max_delay_sec: { type: "number",   required: false, description: "Intervalo máximo",                        example: "300" },
+          message_pool:  { type: "string[]", required: true,  description: "Frases humanas (sortidas aleatoriamente)", example: '["Bom dia!","Tudo certo?"]' },
+          contact_pool:  { type: "string[]", required: true,  description: "JIDs/telefones de teste",                  example: '["5511...@s.whatsapp.net"]' },
+        } },
+      { method: "POST", path: "/instances/{id}/warmup/start",          summary: "Iniciar warmup",  pathParams: ["id"] },
+      { method: "POST", path: "/instances/{id}/warmup/pause",          summary: "Pausar warmup",   pathParams: ["id"] },
+      { method: "POST", path: "/instances/{id}/warmup/resume",         summary: "Retomar warmup",  pathParams: ["id"] },
+      { method: "POST", path: "/instances/{id}/warmup/stop",           summary: "Parar definitivamente", pathParams: ["id"] },
+
+      // ─── Sprint 9 — RAG ingestion (sem upload de arquivo) ────────
+      { method: "POST", path: "/instances/{id}/agent/ingest-url",      summary: "Ingerir URL na knowledge base do agente", pathParams: ["id"],
+        body: {
+          url:  { type: "string", required: true,  description: "URL pública (HTML/MD/TXT)",  example: "https://uniq.chat/faq" },
+          name: { type: "string", required: false, description: "Nome amigável do asset" },
+        } },
+      { method: "POST", path: "/instances/{id}/agent/ingest-text",     summary: "Ingerir texto direto na knowledge base", pathParams: ["id"],
+        body: {
+          name:     { type: "string", required: false, description: "Nome do asset" },
+          text:     { type: "string", required: true,  description: "Texto cru (FAQ, instruções, catálogo)" },
+          category: { type: "string", required: false, description: "knowledge | faq | skill (default knowledge)" },
+        } },
+    ],
+  },
+
+  // ─── Sprint 7 — Campaign control granular ───────────────────────
+  {
+    id: "campaigns-control",
+    label: "Campanhas (controle)",
+    icon: <ShieldCheck className="w-3.5 h-3.5" />,
+    endpoints: [
+      { method: "POST", path: "/campaigns/{id}/resume",      summary: "Retomar campanha pausada", pathParams: ["id"] },
+      { method: "POST", path: "/campaigns/{id}/abort",       summary: "Cancelar campanha (alias UazAPI-style)", pathParams: ["id"] },
+      { method: "POST", path: "/campaigns/{id}/clear-sent",  summary: "Limpar fila já enviada (pra reusar a campanha)", pathParams: ["id"] },
+      { method: "GET",  path: "/campaigns/{id}/messages",    summary: "Status por mensagem com paginação. Query: ?status=sent|failed|pending&limit=100&offset=0", pathParams: ["id"] },
+    ],
+  },
+
+  // ─── Sprint 8 — Triggers (autoresponder por keyword) ────────────
+  {
+    id: "triggers",
+    label: "Triggers",
+    icon: <ShieldCheck className="w-3.5 h-3.5" />,
+    endpoints: [
+      { method: "GET",    path: "/triggers",              summary: "Listar triggers. Query: ?instance_id=<uuid>&only_active=true" },
+      { method: "POST",   path: "/triggers",              summary: "Criar trigger (autoresponder simples)",
+        body: {
+          name:           { type: "string",  required: true,  description: "Nome amigável",                                            example: "Saudação" },
+          keyword:        { type: "string",  required: true,  description: "Palavra/regex que dispara",                                example: "oi" },
+          action:         { type: "string",  required: true,  description: "reply | forward_ai | tag | start_journey",                  example: "reply" },
+          payload:        { type: "string",  required: false, description: "Reply: texto. Tag: nome da tag. Journey: UUID.",            example: "Olá! Como posso ajudar?" },
+          match_mode:     { type: "string",  required: false, description: "exact | contains | starts | regex (default contains)",      example: "contains" },
+          case_sensitive: { type: "boolean", required: false, description: "Default false" },
+          priority:       { type: "number",  required: false, description: "Menor = mais prioritário (default 100)",                     example: "100" },
+          multi_match:    { type: "boolean", required: false, description: "Se true, não para no primeiro match" },
+          cooldown_sec:   { type: "number",  required: false, description: "Cooldown por contato (default 300)",                         example: "300" },
+          only_direct:    { type: "boolean", required: false, description: "Se true, ignora grupos (default true)" },
+          instance_id:    { type: "string",  required: false, description: "Limita a uma instância (vazio = todas)" },
+        } },
+      { method: "GET",    path: "/triggers/{id}",         summary: "Detalhes do trigger",          pathParams: ["id"] },
+      { method: "PUT",    path: "/triggers/{id}",         summary: "Atualizar trigger",            pathParams: ["id"] },
+      { method: "DELETE", path: "/triggers/{id}",         summary: "Remover trigger",              pathParams: ["id"] },
+      { method: "POST",   path: "/triggers/{id}/test",    summary: "Simular match com texto",       pathParams: ["id"],
+        body: { text: { type: "string", required: true, description: "Texto sample", example: "olá, gostaria de saber mais" } } },
     ],
   },
   {
