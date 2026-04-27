@@ -502,6 +502,58 @@ func (h *MessageHandler) SendButtons(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message_id": msgID, "status": "sent"})
 }
 
+// SendCarousel godoc
+// POST /instances/:id/messages/carousel
+//
+// Envia um carrossel horizontal de cards interativos (HSCROLL_CARDS).
+// Cada card tem cabeçalho (com mídia opcional), corpo e até 3 botões.
+func (h *MessageHandler) SendCarousel(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	instance := c.Locals("instance").(*models.Instance)
+
+	var req struct {
+		To    string `json:"to"`
+		Cards []struct {
+			Header struct {
+				Title    string `json:"title"`
+				ImageURL string `json:"image_url"`
+				VideoURL string `json:"video_url"`
+			} `json:"header"`
+			Body    string                `json:"body"`
+			Buttons []whatsapp.ButtonItem `json:"buttons"`
+		} `json:"cards"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.To == "" || len(req.Cards) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campos 'to' e 'cards' são obrigatórios"})
+	}
+
+	cards := make([]whatsapp.CarouselCard, 0, len(req.Cards))
+	for _, c := range req.Cards {
+		cards = append(cards, whatsapp.CarouselCard{
+			Header: whatsapp.CarouselCardHeader{
+				Title:    c.Header.Title,
+				ImageURL: c.Header.ImageURL,
+				VideoURL: c.Header.VideoURL,
+			},
+			Body:    c.Body,
+			Buttons: c.Buttons,
+		})
+	}
+
+	msgID, err := client.SendCarouselMessage(req.To, cards)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	go h.logMessage(instance.ID.String(), "out", "carousel", req.To, msgID, map[string]interface{}{
+		"cards": len(req.Cards),
+	})
+	return c.JSON(fiber.Map{"message_id": msgID, "status": "sent"})
+}
+
 // SendPix godoc
 // POST /instances/:id/messages/pix
 //

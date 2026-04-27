@@ -284,6 +284,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	registerPreMsg("/template", msgH.SendTemplate)
 	registerPreMsg("/list", msgH.SendList)
 	registerPreMsg("/pix", msgH.SendPix)
+	registerPreMsg("/carousel", msgH.SendCarousel)
 	registerPreMsg("/menu", msgH.SendMenu)
 	registerPreMsg("/sticker", msgH.SendSticker)
 
@@ -337,6 +338,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	v1msgs.Post("/template", msgH.SendTemplate)
 	v1msgs.Post("/list", msgH.SendList)
 	v1msgs.Post("/pix", msgH.SendPix)
+	v1msgs.Post("/carousel", msgH.SendCarousel)
 	v1msgs.Post("/menu", msgH.SendMenu)
 	v1msgs.Post("/sticker", msgH.SendSticker)
 	v1msgs.Post("/status", msgH.SendStatus)
@@ -512,6 +514,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	msgs.Post("/template", msgH.SendTemplate)
 	msgs.Post("/list", msgH.SendList)
 	msgs.Post("/pix", msgH.SendPix)
+	msgs.Post("/carousel", msgH.SendCarousel)
 	msgs.Post("/menu", msgH.SendMenu)
 	msgs.Post("/sticker", msgH.SendSticker)
 	msgs.Post("/status", msgH.SendStatus)

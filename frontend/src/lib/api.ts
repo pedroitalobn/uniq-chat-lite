@@ -405,6 +405,27 @@ export const messagesApi = {
     },
   ) =>
     api.post(`/v1/instances/${id}/messages/pix`, data),
+  // Carrossel — cards horizontais (HSCROLL_CARDS). Cada card tem
+  // header com título e mídia opcional, body e até 3 botões interativos.
+  sendCarousel: (
+    id: string,
+    data: {
+      to: string;
+      cards: {
+        header: { title: string; image_url?: string; video_url?: string };
+        body: string;
+        buttons: {
+          id?: string;
+          text: string;
+          type?: "reply" | "url" | "call" | "copy";
+          url?: string;
+          phone?: string;
+          copy_code?: string;
+        }[];
+      }[];
+    },
+  ) =>
+    api.post(`/v1/instances/${id}/messages/carousel`, data),
   sendMenu: (id: string, data: { number: string; type: "button"|"list"|"poll"|"carousel"; text: string; choices: string[]; footerText?: string; listButton?: string; selectableCount?: number; imageButton?: string }) =>
     api.post(`/v1/instances/${id}/messages/menu`, data),
 };

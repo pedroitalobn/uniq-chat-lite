@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -1695,6 +1696,145 @@ func (ic *InstanceClient) SendListMessage(to, title, description, buttonText, fo
 	if err != nil {
 		log.Warn().Str("instance", ic.ID).Err(err).Msg("interactive list send failed, falling back to text")
 		return ic.SendListFallbackMessage(to, title, description, buttonText, footer, sections)
+	}
+	return res.ID, nil
+}
+
+// CarouselCardHeader controla o cabeçalho de um cartão do carrossel.
+// Title é obrigatório. ImageURL/VideoURL são opcionais (mutuamente
+// exclusivos; se ambos vierem, ImageURL ganha).
+type CarouselCardHeader struct {
+	Title    string
+	ImageURL string
+	VideoURL string
+}
+
+// CarouselCard é um cartão do carrossel: cabeçalho, corpo e até 3 botões.
+type CarouselCard struct {
+	Header  CarouselCardHeader
+	Body    string
+	Buttons []ButtonItem
+}
+
+// SendCarouselMessage envia um carrossel horizontal de cards interativos.
+//
+// Cada card tem cabeçalho (com mídia opcional), corpo e botões próprios.
+// Renderiza como HSCROLL_CARDS no WhatsApp moderno.
+//
+// Estrutura paritária com PR EvolutionAPI/evolution-go#40 SendCarousel:
+//   - InteractiveMessage com CarouselMessage(Cards, HSCROLL_CARDS)
+//   - MessageContextInfo com MessageSecret 32B (required pra iOS)
+//   - SEM DocumentWithCaption wrap
+//   - SEM AdditionalNodes biz nodes
+//   - Cada card tem messageParamsJSON {"from":"api","templateId":...} + MessageVersion 1
+func (ic *InstanceClient) SendCarouselMessage(to string, cards []CarouselCard) (string, error) {
+	if len(cards) == 0 {
+		return "", fmt.Errorf("no cards provided")
+	}
+
+	recipient, err := types.ParseJID(normalizeJID(to))
+	if err != nil {
+		return "", fmt.Errorf("invalid JID: %w", err)
+	}
+
+	protoCards := make([]*waE2E.InteractiveMessage, 0, len(cards))
+	for _, card := range cards {
+		interactiveCard := &waE2E.InteractiveMessage{
+			Body: &waE2E.InteractiveMessage_Body{Text: proto.String(card.Body)},
+		}
+
+		// Header: Title obrigatório. Imagem/vídeo opcional, com upload.
+		header := &waE2E.InteractiveMessage_Header{
+			Title:              proto.String(card.Header.Title),
+			HasMediaAttachment: proto.Bool(false),
+		}
+		if u := strings.TrimSpace(card.Header.ImageURL); u != "" {
+			if resp, hErr := http.Get(u); hErr == nil {
+				fileData, rdErr := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				if rdErr == nil {
+					if uploaded, upErr := ic.client.Upload(context.Background(), fileData, whatsmeow.MediaImage); upErr == nil {
+						header.HasMediaAttachment = proto.Bool(true)
+						header.Media = &waE2E.InteractiveMessage_Header_ImageMessage{
+							ImageMessage: &waE2E.ImageMessage{
+								URL:           proto.String(uploaded.URL),
+								DirectPath:    proto.String(uploaded.DirectPath),
+								MediaKey:      uploaded.MediaKey,
+								Mimetype:      proto.String("image/jpeg"),
+								FileEncSHA256: uploaded.FileEncSHA256,
+								FileSHA256:    uploaded.FileSHA256,
+								FileLength:    proto.Uint64(uint64(len(fileData))),
+							},
+						}
+					}
+				}
+			}
+		} else if u := strings.TrimSpace(card.Header.VideoURL); u != "" {
+			if resp, hErr := http.Get(u); hErr == nil {
+				fileData, rdErr := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				if rdErr == nil {
+					if uploaded, upErr := ic.client.Upload(context.Background(), fileData, whatsmeow.MediaVideo); upErr == nil {
+						header.HasMediaAttachment = proto.Bool(true)
+						header.Media = &waE2E.InteractiveMessage_Header_VideoMessage{
+							VideoMessage: &waE2E.VideoMessage{
+								URL:           proto.String(uploaded.URL),
+								DirectPath:    proto.String(uploaded.DirectPath),
+								MediaKey:      uploaded.MediaKey,
+								Mimetype:      proto.String("video/mp4"),
+								FileEncSHA256: uploaded.FileEncSHA256,
+								FileSHA256:    uploaded.FileSHA256,
+								FileLength:    proto.Uint64(uint64(len(fileData))),
+							},
+						}
+					}
+				}
+			}
+		}
+		interactiveCard.Header = header
+
+		// Botões do card — reusa o builder do SendButtonsMessage.
+		nfButtons := buildNativeFlowButtons(card.Buttons)
+		templateID := fmt.Sprintf("%d", time.Now().UnixNano()/1_000_000)
+		messageParamsJSON := fmt.Sprintf(`{"from":"api","templateId":"%s"}`, templateID)
+		interactiveCard.InteractiveMessage = &waE2E.InteractiveMessage_NativeFlowMessage_{
+			NativeFlowMessage: &waE2E.InteractiveMessage_NativeFlowMessage{
+				Buttons:           nfButtons,
+				MessageParamsJSON: proto.String(messageParamsJSON),
+				MessageVersion:    proto.Int32(1),
+			},
+		}
+
+		protoCards = append(protoCards, interactiveCard)
+	}
+
+	// MessageSecret 32 bytes — required pra iOS renderizar o carrossel.
+	secret := make([]byte, 32)
+	_, _ = cryptorand.Read(secret)
+
+	carouselType := waE2E.InteractiveMessage_CarouselMessage_HSCROLL_CARDS
+	carouselVersion := int32(1)
+	interactiveMsg := &waE2E.InteractiveMessage{
+		InteractiveMessage: &waE2E.InteractiveMessage_CarouselMessage_{
+			CarouselMessage: &waE2E.InteractiveMessage_CarouselMessage{
+				Cards:            protoCards,
+				MessageVersion:   &carouselVersion,
+				CarouselCardType: &carouselType,
+			},
+		},
+	}
+
+	msg := &waE2E.Message{
+		InteractiveMessage: interactiveMsg,
+		MessageContextInfo: &waE2E.MessageContextInfo{
+			MessageSecret: secret,
+		},
+	}
+
+	res, err := ic.client.SendMessage(context.Background(), recipient, msg)
+	if err != nil {
+		log.Warn().Str("instance", ic.ID).Err(err).Msg("carousel send failed")
+		return "", err
 	}
 	return res.ID, nil
 }
