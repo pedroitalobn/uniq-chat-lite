@@ -199,6 +199,27 @@ function LoginForm({ onSuccess, tr }: { onSuccess: () => void; tr: (typeof LOGIN
     setLoading(true);
     setError("");
     try {
+      // Pré-check: bate direto no backend pra detectar 2FA. NextAuth v5
+      // sanitiza erros do authorize() — não dá pra propagar o challenge_token
+      // pelo result.error. Então fazemos a probe separada.
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "";
+      const probe = await fetch(`${apiBase}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: identifier.trim(), password: password.trim() }),
+      });
+      const probeData = await probe.json().catch(() => ({}));
+      if (probe.status === 202 && probeData.requires_2fa) {
+        setLoading(false);
+        setChallengeToken(probeData.challenge_token);
+        return;
+      }
+      if (!probe.ok) {
+        setLoading(false);
+        setError(probeData.error || "Credenciais incorretas");
+        return;
+      }
+      // Senha OK e sem 2FA — chama signIn pra criar a sessão NextAuth.
       const result = await signIn("credentials", {
         identifier: identifier.trim(),
         password: password.trim(),
@@ -206,19 +227,7 @@ function LoginForm({ onSuccess, tr }: { onSuccess: () => void; tr: (typeof LOGIN
       });
       setLoading(false);
       if (result?.error) {
-        // 2FA exigido — entra no modo de challenge.
-        const m = /^REQUIRES_2FA::(.+)$/.exec(result.error);
-        if (m) {
-          setChallengeToken(m[1]);
-          setError("");
-          return;
-        }
-        const msg = result.error === "CredentialsSignin" || result.error === "configuration"
-          ? "Credenciais incorretas"
-          : result.error === "AccessDenied"
-          ? "Acesso negado"
-          : "Credenciais incorretas";
-        setError(msg);
+        setError("Erro ao iniciar sessão");
       } else {
         toast.success(tr.welcome);
         onSuccess();

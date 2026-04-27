@@ -46,17 +46,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return null;
           }
         }
-        // Caso 1: login normal por senha.
+        // Caso 1: login normal por senha. Se 2FA exigido, /auth/login
+        // retorna 202 — devolvemos null aqui pra o NextAuth não criar
+        // sessão. O login page faz uma probe ANTES desse signIn pra
+        // detectar 202 e renderizar o form de TOTP (NextAuth v5
+        // sanitiza erros do authorize, não dá pra propagar challenge_token).
         if (!credentials?.identifier || !credentials?.password) return null;
         try {
           const response = await axios.post(`${API_URL}/auth/login`, {
             identifier: credentials.identifier,
             password: credentials.password,
           });
-          // 2FA exigido — backend retorna 202 com challenge_token. Sinalizamos
-          // pro frontend via Error.message no formato "REQUIRES_2FA::<token>".
           if (response.status === 202 && response.data?.requires_2fa) {
-            throw new Error(`REQUIRES_2FA::${response.data.challenge_token}`);
+            return null; // login page já detectou via probe
           }
           const { access_token, user } = response.data;
           return {
@@ -65,16 +67,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             accessToken: access_token,
           };
         } catch (error: unknown) {
-          if (error instanceof Error && error.message.startsWith("REQUIRES_2FA::")) {
-            throw error;
-          }
           if (axios.isAxiosError(error)) {
             const status = error.response?.status || 0;
-            // 202 vem aqui se axios validateStatus default rejeitar — checa data
-            if (status === 202 && error.response?.data?.requires_2fa) {
-              throw new Error(`REQUIRES_2FA::${error.response.data.challenge_token}`);
-            }
-            if (status === 400 || status === 401) {
+            if (status === 202 || status === 400 || status === 401) {
               return null;
             }
             const msg = error.response?.data?.error || "Erro ao autenticar";
