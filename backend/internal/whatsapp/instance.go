@@ -2,7 +2,6 @@ package whatsapp
 
 import (
 	"context"
-	cryptorand "crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -17,7 +16,6 @@ import (
 	"github.com/uniq-chat/backend/internal/queue"
 	"github.com/uniq-chat/backend/internal/storage"
 	"go.mau.fi/whatsmeow"
-	waBinary "go.mau.fi/whatsmeow/binary"
 	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waCompanionReg"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -1155,15 +1153,14 @@ func (ic *InstanceClient) SendListFallbackMessage(to, title, description, button
 
 // SendButtonsMessage envia uma mensagem com botões interativos.
 //
-// Sempre usa InteractiveMessage (NativeFlowMessage) com tipos
-// quick_reply/cta_url/cta_call/cta_copy. ButtonsMessage legado (com
-// HeaderType e Buttons[].Type=RESPONSE) parou de renderizar em accounts
-// modernas — caía em fallback texto com emojis numerados ❌.
+// Implementação alinhada com Evolution-Go (main, não o PR #40):
+// usa InteractiveMessage direto, SEM DocumentWithCaptionMessage wrapper
+// e SEM AdditionalNodes biz. Esses dois estavam causando "error 405"
+// do server WhatsApp em contas pessoais — o protocolo atual aceita
+// InteractiveMessage simples diretamente.
 //
-// Stack: NativeFlowMessage → MessageContextInfo (secret 32B) →
-// DocumentWithCaptionMessage wrap → AdditionalNodes biz native_flow.
-//
-// Em caso de erro real (não rate-limit), faz fallback pro texto formatado.
+// Tipos de botão suportados: quick_reply (text-only), cta_url, cta_call,
+// cta_copy. Fallback pra texto formatado em caso de erro.
 func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []ButtonItem) (string, error) {
 	if len(buttons) == 0 {
 		return "", fmt.Errorf("no buttons provided")
@@ -1178,74 +1175,51 @@ func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []
 	}
 	recipient = ic.resolveRecipient(context.Background(), recipient)
 
-	secret := make([]byte, 32)
-	_, _ = cryptorand.Read(secret)
+	nfButtons := buildNativeFlowButtons(buttons)
+	if len(nfButtons) == 0 {
+		return "", fmt.Errorf("no valid buttons after parsing")
+	}
 
-	inner := buildInteractiveButtonsInner(body, footer, buttons, secret)
-	msg := &waE2E.Message{
-		DocumentWithCaptionMessage: &waE2E.FutureProofMessage{
-			Message: inner,
+	interactive := &waE2E.InteractiveMessage{
+		Body: &waE2E.InteractiveMessage_Body{Text: proto.String(body)},
+		InteractiveMessage: &waE2E.InteractiveMessage_NativeFlowMessage_{
+			NativeFlowMessage: &waE2E.InteractiveMessage_NativeFlowMessage{
+				Buttons:           nfButtons,
+				MessageParamsJSON: proto.String(""),
+				MessageVersion:    proto.Int32(1),
+			},
 		},
+		ContextInfo: &waE2E.ContextInfo{},
+	}
+	if footer != "" {
+		interactive.Footer = &waE2E.InteractiveMessage_Footer{Text: proto.String(footer)}
 	}
 
-	// Decide flowType pelos botões: misto se algum é URL/CALL/COPY, else
-	// quick_reply. Igual ao PR Evolution.
-	hasNonReply := false
-	for _, b := range buttons {
-		t := strings.ToLower(strings.TrimSpace(b.Type))
-		if t == "url" || strings.TrimSpace(b.URL) != "" ||
-			t == "call" || strings.TrimSpace(b.Phone) != "" ||
-			t == "copy" || strings.TrimSpace(b.CopyCode) != "" {
-			hasNonReply = true
-			break
-		}
-	}
-	bizNodes := buildButtonsBizNodes(hasNonReply)
+	msg := &waE2E.Message{InteractiveMessage: interactive}
 
-	if err := ic.ensureLID(recipient); err != nil {
-		log.Warn().Str("instance", ic.ID).Err(err).Msg("ensureLID failed before button send")
-	}
-
-	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
-		AdditionalNodes: &bizNodes,
-	})
+	res, err := ic.client.SendMessage(context.Background(), recipient, msg)
 	if err != nil {
-		// Erro 405 do server = conta pessoal sem permissão pra biz/interactive.
-		// Não é bug — é limitação. Loga em info pra não poluir, e cai em texto.
-		if strings.Contains(err.Error(), "error 405") {
-			log.Info().
-				Str("instance", ic.ID).
-				Msg("interactive não suportado nesta conta (405) — usando fallback texto. Para habilitar botões interativos, use uma conta WhatsApp Business")
-		} else {
-			log.Warn().
-				Str("instance", ic.ID).
-				Str("to", recipient.String()).
-				Err(err).
-				Msg("interactive button send failed, falling back to text")
-		}
+		log.Warn().
+			Str("instance", ic.ID).
+			Str("to", recipient.String()).
+			Err(err).
+			Msg("interactive button send failed, falling back to text")
 		return ic.SendButtonsFallbackMessage(to, body, footer, buttons)
 	}
 	return res.ID, nil
 }
 
-// buildInteractiveButtonsInner monta o waE2E.Message interno usando
-// InteractiveMessage (NativeFlowMessage) — necessário quando há botões
-// de URL, CALL ou COPY. Renderiza como o card cinza estilo "Business",
-// mas é o ÚNICO caminho que aceita esses tipos no WhatsApp atual.
-func buildInteractiveButtonsInner(body, footer string, buttons []ButtonItem, secret []byte) *waE2E.Message {
-	nfButtons := make([]*waE2E.InteractiveMessage_NativeFlowMessage_NativeFlowButton, 0, len(buttons))
+// buildNativeFlowButtons extrai a parte que monta os botões NativeFlow
+// de uma lista de ButtonItem — reusada por SendButtonsMessage e funções
+// que querem reaproveitar o mesmo formato.
+func buildNativeFlowButtons(buttons []ButtonItem) []*waE2E.InteractiveMessage_NativeFlowMessage_NativeFlowButton {
+	out := make([]*waE2E.InteractiveMessage_NativeFlowMessage_NativeFlowButton, 0, len(buttons))
 	for i, b := range buttons {
 		text := strings.TrimSpace(b.Text)
 		if text == "" {
 			continue
 		}
-		var name *string
-		var paramsJSON *string
-
 		typ := strings.ToLower(strings.TrimSpace(b.Type))
-		// Inferência por preenchimento: se não vier Type explícito mas
-		// veio URL/Phone/CopyCode, decide pelo campo dominante. Mantém
-		// retrocompat com clients que não enviam Type.
 		if typ == "" {
 			switch {
 			case strings.TrimSpace(b.URL) != "":
@@ -1258,7 +1232,8 @@ func buildInteractiveButtonsInner(body, footer string, buttons []ButtonItem, sec
 				typ = "reply"
 			}
 		}
-
+		var name *string
+		var paramsJSON *string
 		switch typ {
 		case "url":
 			url := strings.TrimSpace(b.URL)
@@ -1288,7 +1263,7 @@ func buildInteractiveButtonsInner(body, footer string, buttons []ButtonItem, sec
 			name = proto.String("cta_copy")
 			j, _ := json.Marshal(map[string]string{"display_text": text, "id": id, "copy_code": code})
 			paramsJSON = proto.String(string(j))
-		default: // reply
+		default: // reply / quick_reply
 			id := strings.TrimSpace(b.ID)
 			if id == "" {
 				id = fmt.Sprintf("btn_%d", i)
@@ -1297,37 +1272,14 @@ func buildInteractiveButtonsInner(body, footer string, buttons []ButtonItem, sec
 			j, _ := json.Marshal(map[string]string{"display_text": text, "id": id})
 			paramsJSON = proto.String(string(j))
 		}
-
-		nfButtons = append(nfButtons, &waE2E.InteractiveMessage_NativeFlowMessage_NativeFlowButton{
+		out = append(out, &waE2E.InteractiveMessage_NativeFlowMessage_NativeFlowButton{
 			Name:             name,
 			ButtonParamsJSON: paramsJSON,
 		})
 	}
-
-	return &waE2E.Message{
-		InteractiveMessage: &waE2E.InteractiveMessage{
-			Body: &waE2E.InteractiveMessage_Body{Text: proto.String(body)},
-			Footer: func() *waE2E.InteractiveMessage_Footer {
-				if footer == "" {
-					return nil
-				}
-				return &waE2E.InteractiveMessage_Footer{Text: proto.String(footer)}
-			}(),
-			InteractiveMessage: &waE2E.InteractiveMessage_NativeFlowMessage_{
-				NativeFlowMessage: &waE2E.InteractiveMessage_NativeFlowMessage{
-					Buttons:           nfButtons,
-					MessageParamsJSON: proto.String(""),
-					MessageVersion:    proto.Int32(1),
-				},
-			},
-		},
-		MessageContextInfo: &waE2E.MessageContextInfo{
-			MessageSecret:             secret,
-			DeviceListMetadataVersion: proto.Int32(2),
-			DeviceListMetadata:        &waE2E.DeviceListMetadata{},
-		},
-	}
+	return out
 }
+
 
 // ensureLID garante que o LID (Linked Identity) do destinatário esteja
 // no store local do whatsmeow antes do envio. Sem isso, accounts modernas
@@ -1403,32 +1355,6 @@ func (ic *InstanceClient) lidNegCacheStore(jid types.JID) {
 		ic.lidNeg = make(map[string]time.Time)
 	}
 	ic.lidNeg[jid.String()] = time.Now()
-}
-
-// buildButtonsBizNodes monta os nós XML <biz> + <bot> que precisam
-// acompanhar a stanza pra que o WhatsApp renderize os botões. Sem isso,
-// no protocolo atual a mensagem chega como texto puro (sem cards).
-func buildButtonsBizNodes(interactive bool) []waBinary.Node {
-	flowType := "quick_reply"
-	if interactive {
-		flowType = "mixed"
-	}
-	return []waBinary.Node{
-		{
-			Tag: "biz",
-			Content: []waBinary.Node{{
-				Tag: "interactive",
-				Attrs: waBinary.Attrs{
-					"type": "native_flow",
-					"v":    "1",
-				},
-				Content: []waBinary.Node{{
-					Tag:   "native_flow",
-					Attrs: waBinary.Attrs{"v": "9", "name": flowType},
-				}},
-			}},
-		},
-	}
 }
 
 // PixData carrega os campos pra montar uma mensagem de cobrança PIX
@@ -1512,9 +1438,6 @@ func (ic *InstanceClient) SendPixMessage(to string, data PixData) (string, error
 		return "", fmt.Errorf("falha ao serializar payload pix: %w", err)
 	}
 
-	secret := make([]byte, 32)
-	_, _ = cryptorand.Read(secret)
-
 	interactive := &waE2E.InteractiveMessage{
 		Header: &waE2E.InteractiveMessage_Header{
 			Title:              proto.String(data.HeaderTitle),
@@ -1531,54 +1454,17 @@ func (ic *InstanceClient) SendPixMessage(to string, data PixData) (string, error
 				MessageVersion:    proto.Int32(1),
 			},
 		},
+		ContextInfo: &waE2E.ContextInfo{},
 	}
 	if footer := strings.TrimSpace(data.FooterText); footer != "" {
 		interactive.Footer = &waE2E.InteractiveMessage_Footer{Text: proto.String(footer)}
 	}
 
-	msg := &waE2E.Message{
-		InteractiveMessage: interactive,
-		MessageContextInfo: &waE2E.MessageContextInfo{
-			MessageSecret:             secret,
-			DeviceListMetadataVersion: proto.Int32(2),
-			DeviceListMetadata:        &waE2E.DeviceListMetadata{},
-		},
-	}
+	msg := &waE2E.Message{InteractiveMessage: interactive}
 
-	// AdditionalNodes específicos pra fluxo de pagamento — biz com tipo
-	// review_and_pay + bot ack. O WhatsApp espera o stanza nessa forma
-	// pra renderizar o card "Pagar" no recipient.
-	pixNodes := []waBinary.Node{
-		{
-			Tag: "biz",
-			Content: []waBinary.Node{{
-				Tag: "interactive",
-				Attrs: waBinary.Attrs{
-					"type": "native_flow",
-					"v":    "1",
-				},
-				Content: []waBinary.Node{{
-					Tag:   "native_flow",
-					Attrs: waBinary.Attrs{"v": "9", "name": "review_and_pay"},
-				}},
-			}},
-		},
-	}
-
-	// LID lookup obrigatório pra mensagens interativas (review_and_pay).
-	if err := ic.ensureLID(recipient); err != nil {
-		log.Warn().Str("instance", ic.ID).Err(err).Msg("ensureLID failed before PIX send")
-	}
-
-	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
-		AdditionalNodes: &pixNodes,
-	})
+	res, err := ic.client.SendMessage(context.Background(), recipient, msg)
 	if err != nil {
-		if strings.Contains(err.Error(), "error 405") {
-			log.Info().Str("instance", ic.ID).Msg("PIX não suportado nesta conta (405) — usando fallback texto. Para habilitar PIX interativo, use conta WhatsApp Business")
-		} else {
-			log.Warn().Str("instance", ic.ID).Err(err).Msg("PIX send failed, falling back to text")
-		}
+		log.Warn().Str("instance", ic.ID).Err(err).Msg("PIX send failed, falling back to text")
 		fallback := fmt.Sprintf("*%s*\n\n%s\n\n💳 *Pagamento PIX*\nFavor: %s\nChave (%s): `%s`",
 			data.HeaderTitle, data.BodyText, data.MerchantName, keyType, data.PixKey)
 		if footer := strings.TrimSpace(data.FooterText); footer != "" {
@@ -1739,10 +1625,6 @@ func (ic *InstanceClient) SendListMessage(to, title, description, buttonText, fo
 		})
 	}
 
-	// MessageSecret 32 bytes — required pra iOS renderizar.
-	secret := make([]byte, 32)
-	_, _ = cryptorand.Read(secret)
-
 	listMsg := &waE2E.ListMessage{
 		Title:       proto.String(title),
 		Description: proto.String(description),
@@ -1752,50 +1634,11 @@ func (ic *InstanceClient) SendListMessage(to, title, description, buttonText, fo
 		Sections:    protoSections,
 	}
 
-	inner := &waE2E.Message{
-		ListMessage: listMsg,
-		MessageContextInfo: &waE2E.MessageContextInfo{
-			MessageSecret: secret,
-		},
-	}
+	msg := &waE2E.Message{ListMessage: listMsg}
 
-	msg := &waE2E.Message{
-		DocumentWithCaptionMessage: &waE2E.FutureProofMessage{
-			Message: inner,
-		},
-	}
-
-	// AdditionalNodes <biz><interactive type="native_flow"><native_flow name="product_list" v="2"/>
-	bizNodes := []waBinary.Node{
-		{
-			Tag: "biz",
-			Content: []waBinary.Node{{
-				Tag: "interactive",
-				Attrs: waBinary.Attrs{
-					"type": "native_flow",
-					"v":    "1",
-				},
-				Content: []waBinary.Node{{
-					Tag:   "native_flow",
-					Attrs: waBinary.Attrs{"v": "2", "name": "product_list"},
-				}},
-			}},
-		},
-	}
-
-	if err := ic.ensureLID(recipient); err != nil {
-		log.Warn().Str("instance", ic.ID).Err(err).Msg("ensureLID failed before list send")
-	}
-
-	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
-		AdditionalNodes: &bizNodes,
-	})
+	res, err := ic.client.SendMessage(context.Background(), recipient, msg)
 	if err != nil {
-		if strings.Contains(err.Error(), "error 405") {
-			log.Info().Str("instance", ic.ID).Msg("Lista interativa não suportada nesta conta (405) — usando fallback texto. Para habilitar listas, use conta WhatsApp Business")
-		} else {
-			log.Warn().Str("instance", ic.ID).Err(err).Msg("interactive list send failed, falling back to text")
-		}
+		log.Warn().Str("instance", ic.ID).Err(err).Msg("interactive list send failed, falling back to text")
 		return ic.SendListFallbackMessage(to, title, description, buttonText, footer, sections)
 	}
 	return res.ID, nil
