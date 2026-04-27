@@ -218,6 +218,7 @@ const (
 	ShopProviderShopee      ShopIntegrationProvider = "shopee"
 	ShopProviderWooCommerce ShopIntegrationProvider = "woocommerce"
 	ShopProviderBigCommerce ShopIntegrationProvider = "bigcommerce"
+	ShopProviderEbay        ShopIntegrationProvider = "ebay"
 	ShopProviderWhatsApp    ShopIntegrationProvider = "whatsapp_catalog" // sync nosso → WA Business
 )
 

@@ -456,7 +456,7 @@ func (h *ShopHandler) CreateIntegration(c *fiber.Ctx) error {
 		models.ShopProviderVTEX, models.ShopProviderMagalu,
 		models.ShopProviderAmazon, models.ShopProviderShopee,
 		models.ShopProviderWooCommerce, models.ShopProviderBigCommerce,
-		models.ShopProviderWhatsApp:
+		models.ShopProviderEbay, models.ShopProviderWhatsApp:
 	default:
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "provider desconhecido"})
 	}
@@ -507,6 +507,7 @@ func (h *ShopHandler) ListProviders(c *fiber.Ctx) error {
 		{ID: "magalu", Name: "Magazine Luiza Marketplace", Region: "BR", Description: "Marketplace BR — sync via API do parceiro.", Status: "coming_soon"},
 		{ID: "shopee", Name: "Shopee", Region: "BR / SEA", Description: "Open Platform API.", Status: "coming_soon"},
 		{ID: "amazon", Name: "Amazon SP-API", Region: "EUA / Global", Description: "Selling Partner API — catalog + orders.", Status: "coming_soon"},
+		{ID: "ebay", Name: "eBay", Region: "EUA / Global", Description: "Sell + Inventory API — listings + orders.", Status: "coming_soon"},
 		{ID: "woocommerce", Name: "WooCommerce", Region: "Global", Description: "REST API self-hosted (WordPress).", Status: "coming_soon"},
 		{ID: "bigcommerce", Name: "BigCommerce", Region: "EUA / Global", Description: "Storefront + Catalog API.", Status: "coming_soon"},
 		{ID: "whatsapp_catalog", Name: "WhatsApp Catalog", Region: "Global", Description: "Sincroniza produtos pro catálogo do WhatsApp Business.", Status: "coming_soon"},
