@@ -435,12 +435,19 @@ func (ic *InstanceClient) cacheRecipient(phoneJID, resolved types.JID) {
 }
 
 // sendMessage resolves the canonical JID/LID then calls SendMessage.
-// ensureLID antes do envio cobre text/image/video/etc — accounts modernos
-// passaram a exigir LID resolvido também pra mensagens não-interativas.
-// O ensureLID é cheap (cache no store local) e idempotente.
+//
+// IMPORTANTE: NÃO chamamos ensureLID aqui. Forçar usync em todo send
+// (text/image/video/...) saturava o rate-limit do WhatsApp em prod —
+// 429 "rate-overlimit" cascateava e até mensagens de texto comuns
+// começavam a falhar com "no LID found for X from server".
+//
+// Pra mensagens normais, o próprio whatsmeow faz lookup de LID quando
+// precisa (via cache ou usync interno). Só forçamos via ensureLID em
+// caminhos interativos (buttons/pix/template/list) onde o protocolo
+// exige LID resolvido ANTES da encrypt e o whatsmeow não faz lookup
+// preventivo.
 func (ic *InstanceClient) sendMessage(ctx context.Context, recipient types.JID, msg *waE2E.Message) (whatsmeow.SendResponse, error) {
 	recipient = ic.resolveRecipient(ctx, recipient)
-	_ = ic.ensureLID(recipient)
 	return ic.client.SendMessage(ctx, recipient, msg)
 }
 

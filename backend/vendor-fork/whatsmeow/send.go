@@ -327,23 +327,34 @@ func (cli *Client) SendMessage(ctx context.Context, to types.JID, message *waE2E
 		var toLID types.JID
 		toLID, err = cli.Store.LIDs.GetLIDForPN(ctx, to)
 		if err != nil {
-			err = fmt.Errorf("failed to get LID for PN %s: %w", to, err)
-			return
+			// PATCH UNIQ: erro de leitura do store local — log + fallback PN.
+			// Antes: erro propagava e quebrava o send. Agora deixamos o
+			// whatsmeow tentar com PN (legacy path).
+			cli.Log.Warnf("failed to read LID store for PN %s, falling back to PN send: %v", to, err)
+			err = nil
 		} else if toLID.IsEmpty() {
 			var info map[types.JID]types.UserInfo
 			info, err = cli.GetUserInfo(ctx, []types.JID{to})
 			if err != nil {
-				err = fmt.Errorf("failed to get user info for %s to fill LID cache: %w", to, err)
-				return
+				// PATCH UNIQ: usync 429 / rate-overlimit / network error não
+				// devem bloquear o envio. Log + fallback PN. Da próxima vez
+				// que receber inbound do destinatário, o LID popula sozinho.
+				cli.Log.Warnf("failed to get user info for %s (LID cache fill), falling back to PN send: %v", to, err)
+				err = nil
 			} else if toLID = info[to].LID; toLID.IsEmpty() {
-				err = fmt.Errorf("no LID found for %s from server", to)
-				return
+				// PATCH UNIQ: server retornou sem LID — usuário pode estar
+				// num client antigo. Fallback PN preserva compatibilidade.
+				cli.Log.Warnf("server returned no LID for %s, falling back to PN send", to)
+				toLID = types.JID{} // garante empty pra não trocar abaixo
 			}
 		}
+		// Se conseguimos LID, troca destination. Caso contrário mantém PN.
+		if !toLID.IsEmpty() {
+			cli.Log.Debugf("Replacing SendMessage destination with LID as migration timestamp is set %s -> %s", to, toLID)
+			to = toLID
+			ownID = cli.getOwnLID()
+		}
 		resp.DebugTimings.LIDFetch = time.Since(start)
-		cli.Log.Debugf("Replacing SendMessage destination with LID as migration timestamp is set %s -> %s", to, toLID)
-		to = toLID
-		ownID = cli.getOwnLID()
 	}
 	if req.Meta != nil {
 		extraParams.metaNode = &waBinary.Node{
