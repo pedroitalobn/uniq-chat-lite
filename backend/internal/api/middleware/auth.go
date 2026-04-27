@@ -40,6 +40,43 @@ func GenerateAccessToken(user *models.User) (string, error) {
 	return token.SignedString([]byte(config.AppConfig.JWTSecret))
 }
 
+// Generate2FAChallengeToken cria um token de curta duração (5min) que
+// representa "passou na senha mas falta o 2FA". O frontend envia esse
+// token no /v1/auth/2fa/verify junto com o código TOTP.
+//
+// Usa o JWTRefreshSecret pra não confundir com access token regular —
+// um attacker que rouba o challenge não vira sessão completa.
+func Generate2FAChallengeToken(userID uuid.UUID) (string, error) {
+	claims := RefreshClaims{
+		UserID: userID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 * time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Subject:   "2fa_challenge",
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(config.AppConfig.JWTRefreshSecret))
+}
+
+// ParseChallengeToken valida o challenge_token e retorna o user_id se OK.
+func ParseChallengeToken(tokenStr string) (uuid.UUID, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &RefreshClaims{}, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fiber.ErrUnauthorized
+		}
+		return []byte(config.AppConfig.JWTRefreshSecret), nil
+	})
+	if err != nil || !token.Valid {
+		return uuid.Nil, fiber.ErrUnauthorized
+	}
+	claims, ok := token.Claims.(*RefreshClaims)
+	if !ok || claims.Subject != "2fa_challenge" {
+		return uuid.Nil, fiber.ErrUnauthorized
+	}
+	return claims.UserID, nil
+}
+
 func GenerateRefreshToken(userID uuid.UUID) (string, error) {
 	claims := RefreshClaims{
 		UserID: userID,

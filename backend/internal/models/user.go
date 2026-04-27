@@ -37,6 +37,12 @@ type User struct {
 	// Audit do signup pra rastreio de ataque/abuso.
 	SignupIP                 string     `gorm:"type:varchar(64)" json:"-"`
 	SignupUserAgent          string     `gorm:"type:varchar(512)" json:"-"`
+	// 2FA TOTP — segredo armazenado em texto puro (DB já é criptografado at-rest;
+	// o segredo precisa ser legível pra gerar códigos a cada 30s). Backup codes
+	// guardados como JSON array de hashes bcrypt (nunca em plain).
+	TOTPSecret               string     `gorm:"type:varchar(64)" json:"-"`
+	TOTPEnabledAt            *time.Time `json:"totp_enabled_at,omitempty"`
+	TOTPBackupCodesHash      string     `gorm:"type:text" json:"-"` // JSON array de bcrypt hashes
 	Timezone                 string     `gorm:"type:varchar(50);default:'America/Sao_Paulo'" json:"timezone,omitempty"`
 	StripeCustomerID         string     `gorm:"type:varchar(255)" json:"stripe_customer_id,omitempty"`
 	StripeSubscriptionID     string     `gorm:"type:varchar(255)" json:"stripe_subscription_id,omitempty"`

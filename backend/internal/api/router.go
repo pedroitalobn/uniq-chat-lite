@@ -227,6 +227,12 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	auth.Post("/reset-password", authStrict, authH.ResetPassword)
 	auth.Post("/verify-email", authStrict, authH.VerifyEmail)
 	auth.Post("/resend-verification", authStrict, authH.ResendVerification)
+	// 2FA: setup/enable/disable são autenticados; verify é público (chamado
+	// após /login retornar requires_2fa).
+	auth.Post("/2fa/verify", authLogin, authH.Verify2FA)
+	auth.Post("/2fa/setup", middleware.RequireAuth(db), authH.Setup2FA)
+	auth.Post("/2fa/enable", middleware.RequireAuth(db), authH.Enable2FA)
+	auth.Post("/2fa/disable", middleware.RequireAuth(db), authH.Disable2FA)
 	auth.Get("/me", middleware.RequireAuth(db), authH.Me)
 	auth.Put("/me", middleware.RequireAuth(db), authH.UpdateMe)
 	auth.Post("/change-password", middleware.RequireAuth(db), authH.ChangePassword)
@@ -254,6 +260,10 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	v1PublicAuth.Post("/reset-password", authStrict, authH.ResetPassword)
 	v1PublicAuth.Post("/verify-email", authStrict, authH.VerifyEmail)
 	v1PublicAuth.Post("/resend-verification", authStrict, authH.ResendVerification)
+	v1PublicAuth.Post("/2fa/verify", authLogin, authH.Verify2FA)
+	v1PublicAuth.Post("/2fa/setup", middleware.RequireAuth(db), authH.Setup2FA)
+	v1PublicAuth.Post("/2fa/enable", middleware.RequireAuth(db), authH.Enable2FA)
+	v1PublicAuth.Post("/2fa/disable", middleware.RequireAuth(db), authH.Disable2FA)
 
 	// CSAT public endpoints (no auth — customer answers via tokenized link)
 	app.Get("/csat/:token", csatH.GetPublic)

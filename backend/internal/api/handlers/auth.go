@@ -572,6 +572,19 @@ func (h *AuthHandler) loginWithCredentials(c *fiber.Ctx, identifier, password st
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": msg})
 	}
 
+	// 2FA challenge: senha OK, mas precisa do código TOTP. Frontend troca
+	// challenge_token + code em /v1/auth/2fa/verify pelo access_token real.
+	if user.TOTPEnabledAt != nil {
+		ch, err := middleware.Generate2FAChallengeToken(user.ID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao gerar challenge"})
+		}
+		return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
+			"requires_2fa":    true,
+			"challenge_token": ch,
+		})
+	}
+
 	// Record last login time
 	now := time.Now()
 	h.db.Model(&user).Update("last_login_at", now)
