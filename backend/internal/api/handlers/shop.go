@@ -506,10 +506,10 @@ func (h *ShopHandler) ListProviders(c *fiber.Ctx) error {
 		{ID: "mercado_livre", Name: "Mercado Livre", Region: "BR / LATAM", Description: "Importa anúncios e recebe webhooks de pedidos.", Status: "ready"},
 		{ID: "vtex", Name: "VTEX", Region: "BR Enterprise", Description: "Catalog API + OMS — maior plataforma BR de grandes lojas.", Status: "ready"},
 		{ID: "magalu", Name: "Magazine Luiza Marketplace", Region: "BR", Description: "Marketplace BR — sync via API do parceiro.", Status: "ready"},
-		{ID: "shopee", Name: "Shopee", Region: "BR / SEA", Description: "Open Platform API.", Status: "coming_soon"},
+		{ID: "shopee", Name: "Shopee", Region: "BR / SEA", Description: "Open Platform API.", Status: "ready"},
 		{ID: "amazon", Name: "Amazon SP-API", Region: "EUA / Global", Description: "Selling Partner API — catalog + orders.", Status: "coming_soon"},
-		{ID: "ebay", Name: "eBay", Region: "EUA / Global", Description: "Sell + Inventory API — listings + orders.", Status: "coming_soon"},
-		{ID: "woocommerce", Name: "WooCommerce", Region: "Global", Description: "REST API self-hosted (WordPress).", Status: "coming_soon"},
+		{ID: "ebay", Name: "eBay", Region: "EUA / Global", Description: "Sell + Inventory API — listings + orders.", Status: "ready"},
+		{ID: "woocommerce", Name: "WooCommerce", Region: "Global", Description: "REST API self-hosted (WordPress).", Status: "ready"},
 		{ID: "bigcommerce", Name: "BigCommerce", Region: "EUA / Global", Description: "Storefront + Catalog API.", Status: "coming_soon"},
 		{ID: "whatsapp_catalog", Name: "WhatsApp Catalog", Region: "Global", Description: "Sincroniza produtos pro catálogo do WhatsApp Business (Meta Commerce).", Status: "ready"},
 	}
