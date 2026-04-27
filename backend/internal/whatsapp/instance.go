@@ -449,7 +449,8 @@ func (ic *InstanceClient) resolveRecipient(ctx context.Context, jid types.JID) t
 	// pode ter contatos com JID de 12 dígitos (sem 9, formato antigo) OU
 	// 13 dígitos (com 9, formato novo). Independente do que o frontend
 	// mande, tentamos a variante alternativa via cache local + LIDs store.
-	for _, alt := range brazilianMobileVariants(jid) {
+	variants := brazilianMobileVariants(jid)
+	for _, alt := range variants {
 		ic.recipientCacheMu.RLock()
 		altCached, altOK := ic.recipientCache[alt.String()]
 		ic.recipientCacheMu.RUnlock()
@@ -462,6 +463,37 @@ func (ic *InstanceClient) resolveRecipient(ctx context.Context, jid types.JID) t
 				ic.cacheRecipient(jid, lid)
 				return lid
 			}
+		}
+	}
+
+	// BR mobile sem cache hit ou LID — pergunta ao servidor qual variante
+	// (com 9 / sem 9) é a real via IsOnWhatsApp. UMA query usync por
+	// destinatário novo, depois cache hit. Sem isso, mensagens enviadas
+	// pra número com 9 quando o WhatsApp tem o contato como sem 9 (ou
+	// vice-versa) ficam em "queued" e nunca chegam.
+	if len(variants) > 0 {
+		all := append([]types.JID{jid}, variants...)
+		phones := make([]string, 0, len(all))
+		for _, j := range all {
+			phones = append(phones, "+"+j.User)
+		}
+		isOnCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		if results, err := ic.client.IsOnWhatsApp(isOnCtx, phones); err == nil {
+			for _, r := range results {
+				if r.IsIn && !r.JID.IsEmpty() {
+					ic.cacheRecipient(jid, r.JID)
+					// Também guarda mapping reverso no cache pras outras variantes.
+					for _, j := range all {
+						if j.String() != r.JID.String() {
+							ic.cacheRecipient(j, r.JID)
+						}
+					}
+					return r.JID
+				}
+			}
+		} else {
+			log.Debug().Str("instance", ic.ID).Err(err).Msg("IsOnWhatsApp fallback failed; using original JID")
 		}
 	}
 
