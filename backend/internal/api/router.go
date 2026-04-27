@@ -989,6 +989,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	shops.Get("/:shopId/integrations", shopH.ListIntegrations)
 	shops.Post("/:shopId/integrations", shopH.CreateIntegration)
 	shops.Delete("/:shopId/integrations/:id", shopH.DeleteIntegration)
+	shops.Post("/:shopId/integrations/:id/test", shopH.TestIntegration)
+	shops.Post("/:shopId/integrations/:id/sync", shopH.SyncIntegration)
+	shops.Post("/:shopId/integrations/:id/connect", shopH.ConnectIntegration)
 
 	// Sprint 8 — keyword triggers (autoresponder simples gap UazAPI)
 	triggers := api.Group("/triggers", middleware.RequireFeature(db, models.FeatureTriggers))

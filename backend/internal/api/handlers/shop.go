@@ -5,7 +5,9 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/models"
+	"github.com/uniq-chat/backend/internal/services/shop"
 	"gorm.io/gorm"
 )
 
@@ -508,6 +510,88 @@ func (h *ShopHandler) ListProviders(c *fiber.Ctx) error {
 		{ID: "whatsapp_catalog", Name: "WhatsApp Catalog", Region: "Global", Description: "Sincroniza produtos pro catálogo do WhatsApp Business.", Status: "coming_soon"},
 	}
 	return c.JSON(providers)
+}
+
+// ─── Integration ops (Fase 2) ────────────────────────────────────────
+
+// findIntegration carrega integração + valida ownership do shop.
+func (h *ShopHandler) findIntegration(c *fiber.Ctx) (*models.ShopIntegration, error) {
+	wsID, err := h.workspaceID(c)
+	if err != nil {
+		return nil, err
+	}
+	id, perr := uuid.Parse(c.Params("id"))
+	if perr != nil {
+		return nil, fiber.NewError(fiber.StatusBadRequest, "id inválido")
+	}
+	var integ models.ShopIntegration
+	if err := h.db.Joins("JOIN shops ON shops.id = shop_integrations.shop_id").
+		Where("shop_integrations.id = ? AND shops.workspace_id = ?", id, wsID).
+		First(&integ).Error; err != nil {
+		return nil, fiber.NewError(fiber.StatusNotFound, "integração não encontrada")
+	}
+	return &integ, nil
+}
+
+// POST /v1/shops/:shopId/integrations/:id/test — ping no provider.
+func (h *ShopHandler) TestIntegration(c *fiber.Ctx) error {
+	integ, err := h.findIntegration(c)
+	if err != nil {
+		return err
+	}
+	provider := shop.GetProvider(string(integ.Provider))
+	if provider == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "provider_not_implemented",
+			"message": "Esse provider ainda está em construção (coming_soon).",
+		})
+	}
+	if err := provider.TestConnection(c.Context(), integ); err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"success": true})
+}
+
+// POST /v1/shops/:shopId/integrations/:id/sync — pull manual.
+func (h *ShopHandler) SyncIntegration(c *fiber.Ctx) error {
+	integ, err := h.findIntegration(c)
+	if err != nil {
+		return err
+	}
+	stats, syncErr := shop.RunSync(c.Context(), h.db, integ)
+	if syncErr != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": syncErr.Error(), "stats": stats})
+	}
+	return c.JSON(fiber.Map{"success": true, "stats": stats})
+}
+
+// POST /v1/shops/:shopId/integrations/:id/connect — gera URL OAuth.
+// Frontend abre num popup; provider redireciona pro callback abaixo.
+func (h *ShopHandler) ConnectIntegration(c *fiber.Ctx) error {
+	integ, err := h.findIntegration(c)
+	if err != nil {
+		return err
+	}
+	provider := shop.GetProvider(string(integ.Provider))
+	if provider == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "provider_not_implemented"})
+	}
+	if provider.AuthMode() != shop.AuthOAuth2 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "not_oauth",
+			"message": "Esse provider usa API key, não OAuth. Use PATCH com credentials.",
+		})
+	}
+	state := shop.GenerateOAuthState()
+	// Persiste state no Config pra validar no callback.
+	h.db.Model(integ).Update("config", `{"oauth_state":"`+state+`"}`)
+
+	redirectURI := config.AppConfig.FrontendURL + "/integrations/shop/oauth/callback"
+	authURL, err := provider.AuthorizeURL(c.Context(), integ, state, redirectURI)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"auth_url": authURL, "state": state})
 }
 
 // getUserFromCtx — helper que pega *models.User dos Locals com ambas as
