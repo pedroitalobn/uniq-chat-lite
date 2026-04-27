@@ -301,6 +301,11 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     qc.invalidateQueries({ queryKey: ["conversation", wsId, conversationId] });
     qc.invalidateQueries({ queryKey: ["conversation-timeline", wsId, conversationId] });
     qc.invalidateQueries({ queryKey: ["conversations", wsId] });
+    // Counters do header das colunas (Abertos / Resolvidos / etc) ficam num
+    // queryKey separado — sem isso o badge fica defasado e a UX parece
+    // bugada ("resolvi mas a coluna Resolvidos não muda").
+    qc.invalidateQueries({ queryKey: ["conversations-count", wsId] });
+    qc.invalidateQueries({ queryKey: ["inbox-stats", wsId] });
   };
 
   const claim = useMutation({
