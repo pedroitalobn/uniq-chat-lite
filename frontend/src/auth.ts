@@ -20,29 +20,60 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       id: "credentials",
       name: "Email ou Username",
       credentials: {
-        identifier: { label: "Email ou Username", type: "text" },
-        password:   { label: "Senha", type: "password" },
+        identifier:     { label: "Email ou Username", type: "text" },
+        password:       { label: "Senha", type: "password" },
+        // 2FA: quando o /login pede código, o cliente repete a chamada com
+        // challenge_token + code (sem identifier/password). authorize
+        // detecta esse caso e usa /auth/2fa/verify direto.
+        challenge_token: { label: "2FA Challenge", type: "text" },
+        code:            { label: "Código TOTP", type: "text" },
       },
       async authorize(credentials) {
+        // Caso 2: cliente já tem challenge_token + code (segunda etapa do 2FA).
+        if (credentials?.challenge_token && credentials?.code) {
+          try {
+            const r = await axios.post(`${API_URL}/auth/2fa/verify`, {
+              challenge_token: credentials.challenge_token,
+              code: credentials.code,
+            });
+            const { access_token, user } = r.data;
+            return {
+              id: user.id, name: user.name, email: user.email,
+              username: user.username, role: user.role, plan: user.plan,
+              accessToken: access_token,
+            };
+          } catch {
+            return null;
+          }
+        }
+        // Caso 1: login normal por senha.
         if (!credentials?.identifier || !credentials?.password) return null;
         try {
           const response = await axios.post(`${API_URL}/auth/login`, {
             identifier: credentials.identifier,
             password: credentials.password,
           });
+          // 2FA exigido — backend retorna 202 com challenge_token. Sinalizamos
+          // pro frontend via Error.message no formato "REQUIRES_2FA::<token>".
+          if (response.status === 202 && response.data?.requires_2fa) {
+            throw new Error(`REQUIRES_2FA::${response.data.challenge_token}`);
+          }
           const { access_token, user } = response.data;
           return {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            username: user.username,
-            role: user.role,
-            plan: user.plan,
+            id: user.id, name: user.name, email: user.email,
+            username: user.username, role: user.role, plan: user.plan,
             accessToken: access_token,
           };
         } catch (error: unknown) {
+          if (error instanceof Error && error.message.startsWith("REQUIRES_2FA::")) {
+            throw error;
+          }
           if (axios.isAxiosError(error)) {
             const status = error.response?.status || 0;
+            // 202 vem aqui se axios validateStatus default rejeitar — checa data
+            if (status === 202 && error.response?.data?.requires_2fa) {
+              throw new Error(`REQUIRES_2FA::${error.response.data.challenge_token}`);
+            }
             if (status === 400 || status === 401) {
               return null;
             }

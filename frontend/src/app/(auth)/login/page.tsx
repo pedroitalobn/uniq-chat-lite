@@ -190,6 +190,8 @@ function LoginForm({ onSuccess, tr }: { onSuccess: () => void; tr: (typeof LOGIN
   const [password, setPassword]     = useState("");
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState("");
+  const [challengeToken, setChallengeToken] = useState("");
+  const [totpCode, setTotpCode]     = useState("");
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,7 +206,13 @@ function LoginForm({ onSuccess, tr }: { onSuccess: () => void; tr: (typeof LOGIN
       });
       setLoading(false);
       if (result?.error) {
-        // Map NextAuth errors to friendly messages
+        // 2FA exigido — entra no modo de challenge.
+        const m = /^REQUIRES_2FA::(.+)$/.exec(result.error);
+        if (m) {
+          setChallengeToken(m[1]);
+          setError("");
+          return;
+        }
         const msg = result.error === "CredentialsSignin" || result.error === "configuration"
           ? "Credenciais incorretas"
           : result.error === "AccessDenied"
@@ -220,6 +228,63 @@ function LoginForm({ onSuccess, tr }: { onSuccess: () => void; tr: (typeof LOGIN
       setError("Erro de conexão. Tente novamente.");
     }
   };
+
+  const submitTotp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (totpCode.length !== 6) return;
+    setLoading(true);
+    setError("");
+    const result = await signIn("credentials", {
+      challenge_token: challengeToken,
+      code: totpCode,
+      redirect: false,
+    });
+    setLoading(false);
+    if (result?.error) {
+      setError("Código inválido");
+      setTotpCode("");
+    } else {
+      toast.success(tr.welcome);
+      onSuccess();
+    }
+  };
+
+  // Modo 2FA: se já temos challenge, troca o form por input de código.
+  if (challengeToken) {
+    return (
+      <form onSubmit={submitTotp} className="space-y-4">
+        {error && (
+          <div className="rounded-xl px-3.5 py-2.5 flex items-center gap-2"
+            style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.18)" }}>
+            <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+            <p className="text-xs text-red-400">{error}</p>
+          </div>
+        )}
+        <div>
+          <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>
+            Código do app autenticador
+          </label>
+          <input type="text" inputMode="numeric" maxLength={6} value={totpCode}
+            onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
+            autoFocus
+            className="input-field tracking-widest text-center text-xl font-mono"
+            placeholder="000000" />
+          <p className="text-[11px] mt-2" style={{ color: "var(--text-3)" }}>
+            Use o código de 6 dígitos do Google Authenticator, Authy ou 1Password.
+          </p>
+        </div>
+        <button type="submit" disabled={totpCode.length !== 6 || loading}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
+          style={{ background: "var(--green)", color: "var(--green-fg)" }}>
+          {loading ? "Verificando..." : "Confirmar"}
+        </button>
+        <button type="button" onClick={() => { setChallengeToken(""); setTotpCode(""); setPassword(""); }}
+          className="w-full text-xs" style={{ color: "var(--text-3)" }}>
+          Voltar
+        </button>
+      </form>
+    );
+  }
 
   return (
     <form onSubmit={submit} className="space-y-4">

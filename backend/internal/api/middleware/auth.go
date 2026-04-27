@@ -164,7 +164,10 @@ func RequireAuth(db *gorm.DB) fiber.Handler {
 	}
 }
 
-// RequireAdmin ensures the authenticated user has admin role
+// RequireAdmin ensures the authenticated user has admin role.
+// Super-admins SEM 2FA ativo são bloqueados — exigência reforçada pra
+// painel /admin/* depois do incidente de signup-bot. Resposta inclui
+// flag totp_required pra UI redirecionar pra /settings.
 func RequireAdmin() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		user, ok := c.Locals("user").(*models.User)
@@ -173,6 +176,12 @@ func RequireAdmin() fiber.Handler {
 		}
 		if user.Role != models.RoleSuperAdmin {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso restrito a administradores"})
+		}
+		if user.TOTPEnabledAt == nil {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error":         "super_admin precisa ativar 2FA antes de acessar /admin",
+				"totp_required": true,
+			})
 		}
 		return c.Next()
 	}

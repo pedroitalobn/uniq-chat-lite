@@ -204,6 +204,14 @@ export const authApi = {
     api.post("/auth/change-password", { current_password, new_password }),
   logout: () => api.post("/auth/logout"),
   refresh: () => api.post("/auth/refresh"),
+  // 2FA TOTP
+  setup2FA: () => api.post("/auth/2fa/setup"),
+  enable2FA: (code: string) => api.post("/auth/2fa/enable", { code }),
+  disable2FA: (code: string) => api.post("/auth/2fa/disable", { code }),
+  verify2FA: (challenge_token: string, code: string) =>
+    api.post("/auth/2fa/verify", { challenge_token, code }),
+  verify2FABackup: (challenge_token: string, backup_code: string) =>
+    api.post("/auth/2fa/verify", { challenge_token, backup_code }),
 };
 
 export const serversApi = {

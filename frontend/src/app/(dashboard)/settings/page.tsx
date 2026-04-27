@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import QRCode from "qrcode";
 import { authApi, plansApi } from "@/lib/api";
 import { usePreferences, TIMEZONES, type Language, type ThemeMode } from "@/lib/preferences";
 import {
@@ -346,7 +347,9 @@ function SecuritySection() {
   });
 
   return (
-    <SectionWrap title="Segurança" description="Altere sua senha de acesso.">
+    <SectionWrap title="Segurança" description="Altere sua senha e ative autenticação em duas etapas.">
+      <TwoFactorCard />
+      <div className="h-4" />
       <Card>
         <form onSubmit={(e) => {
           e.preventDefault();
@@ -381,6 +384,187 @@ function SecuritySection() {
         </form>
       </Card>
     </SectionWrap>
+  );
+}
+
+// ─── 2FA Card ─────────────────────────────────────────────────────────────────
+function TwoFactorCard() {
+  const { data: session, update } = useSession();
+  const totpEnabled = !!(session?.user as { totp_enabled_at?: string } | undefined)?.totp_enabled_at;
+
+  const [step, setStep] = useState<"idle" | "setup" | "verify" | "backup" | "disable">("idle");
+  const [qrDataURL, setQrDataURL] = useState("");
+  const [secret, setSecret] = useState("");
+  const [code, setCode] = useState("");
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+
+  const setupMut = useMutation({
+    mutationFn: () => authApi.setup2FA(),
+    onSuccess: async (res: { data: { secret: string; otpauth_url: string } }) => {
+      setSecret(res.data.secret);
+      const dataURL = await QRCode.toDataURL(res.data.otpauth_url, { width: 200, margin: 1 });
+      setQrDataURL(dataURL);
+      setStep("setup");
+    },
+    onError: (err: unknown) => {
+      toast.error((err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao iniciar 2FA");
+    },
+  });
+
+  const enableMut = useMutation({
+    mutationFn: () => authApi.enable2FA(code),
+    onSuccess: (res: { data: { backup_codes: string[] } }) => {
+      setBackupCodes(res.data.backup_codes);
+      setStep("backup");
+      setCode("");
+      update();
+    },
+    onError: () => toast.error("Código inválido"),
+  });
+
+  const disableMut = useMutation({
+    mutationFn: () => authApi.disable2FA(code),
+    onSuccess: () => {
+      toast.success("2FA desativado");
+      setStep("idle");
+      setCode("");
+      update();
+    },
+    onError: () => toast.error("Código inválido"),
+  });
+
+  const copyAll = () => {
+    navigator.clipboard.writeText(backupCodes.join("\n"));
+    toast.success("Códigos copiados");
+  };
+
+  return (
+    <Card>
+      <div className="flex items-start justify-between gap-4 mb-3">
+        <div>
+          <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: "var(--text-1)" }}>
+            <Lock className="w-4 h-4" /> Autenticação em duas etapas
+          </h3>
+          <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
+            {totpEnabled
+              ? "Ativa. Sua conta exige um código TOTP no login."
+              : "Adicione uma camada extra de segurança usando Google Authenticator, Authy ou 1Password."}
+          </p>
+        </div>
+        {totpEnabled ? (
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
+            style={{ background: "var(--green-soft)", color: "var(--green)" }}>
+            ATIVO
+          </span>
+        ) : (
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
+            style={{ background: "var(--surface-3)", color: "var(--text-3)" }}>
+            INATIVO
+          </span>
+        )}
+      </div>
+
+      {step === "idle" && !totpEnabled && (
+        <button onClick={() => setupMut.mutate()} disabled={setupMut.isPending}
+          className="text-xs font-semibold px-3 py-2 rounded-lg inline-flex items-center gap-2"
+          style={{ background: "var(--green)", color: "var(--green-fg)" }}>
+          {setupMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
+          Ativar 2FA
+        </button>
+      )}
+
+      {step === "idle" && totpEnabled && (
+        <button onClick={() => setStep("disable")}
+          className="text-xs font-semibold px-3 py-2 rounded-lg"
+          style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)", color: "#f87171" }}>
+          Desativar 2FA
+        </button>
+      )}
+
+      {step === "setup" && (
+        <div className="space-y-3 mt-2">
+          <div className="flex flex-col sm:flex-row gap-4 items-start">
+            {qrDataURL && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={qrDataURL} alt="QR 2FA" className="rounded-lg border" style={{ borderColor: "var(--surface-border)" }} />
+            )}
+            <div className="flex-1">
+              <p className="text-xs mb-2" style={{ color: "var(--text-2)" }}>
+                Escaneie o QR no app autenticador, ou cole este segredo manualmente:
+              </p>
+              <code className="text-[11px] block p-2 rounded-md font-mono break-all"
+                style={{ background: "var(--surface-3)", color: "var(--text-1)" }}>
+                {secret}
+              </code>
+            </div>
+          </div>
+          <Field label="Digite o código gerado pelo app">
+            <input type="text" inputMode="numeric" maxLength={6} value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              className="input-field tracking-widest text-center text-lg font-mono"
+              placeholder="000000" />
+          </Field>
+          <div className="flex gap-2">
+            <button onClick={() => setStep("idle")} className="text-xs px-3 py-2 rounded-lg"
+              style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>Cancelar</button>
+            <button onClick={() => enableMut.mutate()} disabled={code.length !== 6 || enableMut.isPending}
+              className="text-xs font-semibold px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-40"
+              style={{ background: "var(--green)", color: "var(--green-fg)" }}>
+              {enableMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              Confirmar e ativar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === "backup" && (
+        <div className="space-y-3 mt-2">
+          <div className="rounded-lg p-3" style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)" }}>
+            <p className="text-xs font-semibold mb-1" style={{ color: "#f59e0b" }}>⚠️ Guarde estes códigos AGORA</p>
+            <p className="text-[11px]" style={{ color: "var(--text-2)" }}>
+              São 10 códigos de uso único. Cada um pode substituir o app autenticador caso você perca o acesso. Não serão mostrados novamente.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 font-mono text-xs p-3 rounded-lg"
+            style={{ background: "var(--surface-3)" }}>
+            {backupCodes.map((c, i) => (
+              <span key={i} style={{ color: "var(--text-1)" }}>{c}</span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={copyAll} className="text-xs px-3 py-2 rounded-lg inline-flex items-center gap-1.5"
+              style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
+              <Copy className="w-3.5 h-3.5" /> Copiar todos
+            </button>
+            <button onClick={() => setStep("idle")}
+              className="text-xs font-semibold px-3 py-2 rounded-lg"
+              style={{ background: "var(--green)", color: "var(--green-fg)" }}>
+              Já guardei, fechar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === "disable" && (
+        <div className="space-y-3 mt-2">
+          <Field label="Digite o código atual pra confirmar">
+            <input type="text" inputMode="numeric" maxLength={6} value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              className="input-field tracking-widest text-center text-lg font-mono"
+              placeholder="000000" />
+          </Field>
+          <div className="flex gap-2">
+            <button onClick={() => { setStep("idle"); setCode(""); }} className="text-xs px-3 py-2 rounded-lg"
+              style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>Cancelar</button>
+            <button onClick={() => disableMut.mutate()} disabled={code.length !== 6 || disableMut.isPending}
+              className="text-xs font-semibold px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-40"
+              style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)", color: "#f87171" }}>
+              Desativar
+            </button>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 
