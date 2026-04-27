@@ -106,7 +106,7 @@ func (h *ShopHandler) CreateShop(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
 				"error":       "feature_locked",
 				"message":     "Seu plano não inclui criar lojas. Faça upgrade.",
-				"upgrade_url": "/plans",
+				"upgrade_url": "/billing",
 			})
 		}
 		if limit > 0 {
@@ -117,7 +117,7 @@ func (h *ShopHandler) CreateShop(c *fiber.Ctx) error {
 					"error":       "limit_reached",
 					"limit":       limit,
 					"message":     "Você atingiu o limite de lojas do plano.",
-					"upgrade_url": "/plans",
+					"upgrade_url": "/billing",
 				})
 			}
 		}
@@ -294,7 +294,7 @@ func (h *ShopHandler) CreateProduct(c *fiber.Ctx) error {
 				"error":       "limit_reached",
 				"limit":       user.Plan.MaxProducts,
 				"message":     "Limite de produtos do plano atingido.",
-				"upgrade_url": "/plans",
+				"upgrade_url": "/billing",
 			})
 		}
 	}

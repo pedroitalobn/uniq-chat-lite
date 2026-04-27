@@ -43,7 +43,7 @@ func RequireFeature(db *gorm.DB, key models.FeatureKey) fiber.Handler {
 				"error":       "feature_locked",
 				"feature":     string(key),
 				"message":     "Seu plano atual não inclui esse recurso. Faça upgrade pra desbloquear.",
-				"upgrade_url": "/plans",
+				"upgrade_url": "/billing",
 			})
 		}
 		return c.Next()

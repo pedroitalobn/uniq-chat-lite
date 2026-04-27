@@ -164,7 +164,7 @@ func (h *MessageHandler) checkSendQuota(c *fiber.Ctx) error {
 			"error":       "quota_exceeded",
 			"message":     "Limite diário de mensagens do plano atingido. Faça upgrade pra continuar.",
 			"limit":       user.Plan.MaxMessagesPerDay,
-			"upgrade_url": "/plans",
+			"upgrade_url": "/billing",
 		})
 	}
 	return nil
