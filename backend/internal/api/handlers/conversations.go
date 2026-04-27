@@ -1343,6 +1343,182 @@ func (h *ConversationHandler) MarkRead(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"ok": true})
 }
 
+// MarkUnread POST /v1/conversations/:id/unread
+// Reseta o agent_unread pra 1 (sinaliza atenção sem inflar contador).
+func (h *ConversationHandler) MarkUnread(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	if err := h.assertAccess(ws, id); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+	h.db.Model(&models.Conversation{}).Where("id = ?", id).Update("agent_unread_count", 1)
+	h.broadcast(&models.Conversation{ID: id, WorkspaceID: ws}, "conversation.unread", map[string]any{"by_user_id": middleware.GetCurrentUserID(c), "at": time.Now()})
+	return c.JSON(fiber.Map{"ok": true})
+}
+
+// Take POST /v1/conversations/:id/take
+// Atalho semântico pra "atender" — equivalente a self-assign, mas explícito
+// pra integrações (n8n/agentes/etc) que querem expressar a ação claramente.
+func (h *ConversationHandler) Take(c *fiber.Ctx) error {
+	return h.Assign(c) // mesmo comportamento; Assign sem user_id já faz self-assign race-safe
+}
+
+// Bulk POST /v1/conversations/bulk
+// Body: { ids: [uuid...], action: "resolve"|"close"|"reopen"|"snooze"|"unsnooze"|
+//                                 "read"|"unread"|"assign"|"unassign"|"transfer"|
+//                                 "archive"|"unarchive"|"pin"|"unpin"|"mute"|"unmute",
+//         user_id?, queue_id?, team_id?, department_id?, until?, reason?, note? }
+//
+// Aplica a mesma ação em N conversas. Cada item processado independentemente —
+// retorna lista de { id, ok, error? }.
+func (h *ConversationHandler) Bulk(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	var body struct {
+		IDs          []string `json:"ids"`
+		Action       string   `json:"action"`
+		UserID       string   `json:"user_id"`
+		QueueID      string   `json:"queue_id"`
+		TeamID       string   `json:"team_id"`
+		DepartmentID string   `json:"department_id"`
+		Until        string   `json:"until"`
+		Reason       string   `json:"reason"`
+		Note         string   `json:"note"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+	if body.Action == "" || len(body.IDs) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ids e action obrigatórios"})
+	}
+	if len(body.IDs) > 200 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "máximo 200 ids por request"})
+	}
+
+	actor := middleware.GetCurrentUserID(c)
+	type result struct {
+		ID    string `json:"id"`
+		OK    bool   `json:"ok"`
+		Error string `json:"error,omitempty"`
+	}
+	out := make([]result, 0, len(body.IDs))
+
+	for _, raw := range body.IDs {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			out = append(out, result{ID: raw, OK: false, Error: "id inválido"})
+			continue
+		}
+		var conv models.Conversation
+		if err := h.db.Where("workspace_id = ? AND id = ?", ws, id).First(&conv).Error; err != nil {
+			out = append(out, result{ID: raw, OK: false, Error: "não encontrado"})
+			continue
+		}
+		updates := map[string]any{}
+		eventType := models.ConvEventStatusChanged
+		switch body.Action {
+		case "resolve":
+			updates["status"] = models.ConversationStatusResolved
+			updates["resolved_at"] = time.Now()
+		case "close":
+			updates["status"] = models.ConversationStatusClosed
+			updates["closed_at"] = time.Now()
+		case "reopen":
+			updates["status"] = models.ConversationStatusOpen
+			updates["reopened_at"] = time.Now()
+			updates["reopen_count"] = gorm.Expr("reopen_count + 1")
+			eventType = models.ConvEventReopened
+		case "snooze":
+			until, err := time.Parse(time.RFC3339, body.Until)
+			if err != nil {
+				out = append(out, result{ID: raw, OK: false, Error: "until inválido (RFC3339)"})
+				continue
+			}
+			updates["status"] = models.ConversationStatusSnoozed
+			updates["snoozed_until"] = until
+			eventType = models.ConvEventSnoozed
+		case "unsnooze":
+			updates["status"] = models.ConversationStatusOpen
+			updates["snoozed_until"] = nil
+			eventType = models.ConvEventUnsnoozed
+		case "read":
+			updates["unread_count"] = 0
+			updates["agent_unread_count"] = 0
+		case "unread":
+			updates["agent_unread_count"] = 1
+		case "assign":
+			target := actor
+			if body.UserID != "" {
+				if u, err := uuid.Parse(body.UserID); err == nil {
+					target = u
+				}
+			}
+			updates["assigned_user_id"] = target
+			eventType = models.ConvEventAssignmentChanged
+		case "unassign":
+			updates["assigned_user_id"] = nil
+			eventType = models.ConvEventAssignmentChanged
+		case "transfer":
+			if body.QueueID != "" {
+				if qid, err := uuid.Parse(body.QueueID); err == nil {
+					updates["queue_id"] = qid
+					updates["assigned_user_id"] = nil
+					var q models.Queue
+					if h.db.First(&q, "id = ?", qid).Error == nil {
+						updates["department_id"] = q.DepartmentID
+						updates["team_id"] = q.TeamID
+					}
+				}
+			}
+			if body.DepartmentID != "" {
+				if did, err := uuid.Parse(body.DepartmentID); err == nil {
+					updates["department_id"] = did
+				}
+			}
+			if body.TeamID != "" {
+				if tid, err := uuid.Parse(body.TeamID); err == nil {
+					updates["team_id"] = tid
+				}
+			}
+			if body.UserID != "" {
+				if uid, err := uuid.Parse(body.UserID); err == nil {
+					updates["assigned_user_id"] = uid
+				}
+			}
+			eventType = models.ConvEventTransferred
+		case "archive":
+			updates["is_archived"] = true
+		case "unarchive":
+			updates["is_archived"] = false
+		case "pin":
+			updates["is_pinned"] = true
+		case "unpin":
+			updates["is_pinned"] = false
+		case "mute":
+			updates["is_muted"] = true
+		case "unmute":
+			updates["is_muted"] = false
+		default:
+			out = append(out, result{ID: raw, OK: false, Error: "action desconhecida: " + body.Action})
+			continue
+		}
+		if len(updates) == 0 {
+			out = append(out, result{ID: raw, OK: false, Error: "sem mudanças"})
+			continue
+		}
+		if err := h.db.Model(&models.Conversation{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+			out = append(out, result{ID: raw, OK: false, Error: err.Error()})
+			continue
+		}
+		h.appendEvent(&conv, eventType, actor, map[string]any{"action": body.Action, "note": body.Note, "reason": body.Reason})
+		h.broadcast(&conv, "conversation."+body.Action, map[string]any{"by_user_id": actor})
+		out = append(out, result{ID: raw, OK: true})
+	}
+	return c.JSON(fiber.Map{"results": out})
+}
+
 // Assign POST /v1/conversations/:id/assign  { user_id }
 // Race-safe: only succeeds if the conversation is currently unassigned OR the
 // actor has tickets:view_all (supervisor reassignment).
@@ -1449,10 +1625,11 @@ func (h *ConversationHandler) Transfer(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
 	}
 	var body struct {
-		QueueID string `json:"queue_id"`
-		TeamID  string `json:"team_id"`
-		UserID  string `json:"user_id"`
-		Note    string `json:"note"`
+		QueueID      string `json:"queue_id"`
+		TeamID       string `json:"team_id"`
+		DepartmentID string `json:"department_id"`
+		UserID       string `json:"user_id"`
+		Note         string `json:"note"`
 	}
 	c.BodyParser(&body)
 
@@ -1472,6 +1649,11 @@ func (h *ConversationHandler) Transfer(c *fiber.Ctx) error {
 				updates["department_id"] = q.DepartmentID
 				updates["team_id"] = q.TeamID
 			}
+		}
+	}
+	if body.DepartmentID != "" {
+		if did, err := uuid.Parse(body.DepartmentID); err == nil {
+			updates["department_id"] = did
 		}
 	}
 	if body.TeamID != "" {

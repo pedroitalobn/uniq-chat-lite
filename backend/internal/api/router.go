@@ -854,6 +854,10 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	conversations.Get("/:id/messages/:msgId/receipts", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.GetMessageReceipts)
 	conversations.Post("/:id/typing", middleware.RequireWorkspacePermission(db, models.PermInboxSend), conversationH.Typing)
 	conversations.Post("/:id/read", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.MarkRead)
+	conversations.Post("/:id/unread", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.MarkUnread)
+	conversations.Post("/:id/take", middleware.RequireWorkspacePermission(db, models.PermTicketsAssign), conversationH.Take)
+	// Bulk actions: assign/transfer/resolve/close/reopen/snooze/read/unread/archive/pin/mute em N conversas.
+	conversations.Post("/bulk", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.Bulk)
 	conversations.Post("/:id/assign", middleware.RequireWorkspacePermission(db, models.PermTicketsAssign), conversationH.Assign)
 	conversations.Post("/:id/unassign", middleware.RequireWorkspacePermission(db, models.PermTicketsAssign), conversationH.Unassign)
 	conversations.Post("/:id/transfer", middleware.RequireWorkspacePermission(db, models.PermTicketsTransfer), conversationH.Transfer)
