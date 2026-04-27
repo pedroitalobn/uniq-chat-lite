@@ -2,6 +2,7 @@ package whatsapp
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"github.com/uniq-chat/backend/internal/queue"
 	"github.com/uniq-chat/backend/internal/storage"
 	"go.mau.fi/whatsmeow"
+	waBinary "go.mau.fi/whatsmeow/binary"
 	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waCompanionReg"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -26,6 +28,28 @@ import (
 	waLog "go.mau.fi/whatsmeow/util/log"
 	"google.golang.org/protobuf/proto"
 )
+
+// buildButtonsBizNodes — biz nodes do native_flow.  Configuração que está
+// funcionando em prod pra Buttons + Template (via reroute).
+// NÃO mexer sem teste explícito.
+func buildButtonsBizNodes(_ bool) []waBinary.Node {
+	return []waBinary.Node{
+		{
+			Tag: "biz",
+			Content: []waBinary.Node{{
+				Tag: "interactive",
+				Attrs: waBinary.Attrs{
+					"type": "native_flow",
+					"v":    "1",
+				},
+				Content: []waBinary.Node{{
+					Tag:   "native_flow",
+					Attrs: waBinary.Attrs{"v": "9", "name": "mixed"},
+				}},
+			}},
+		},
+	}
+}
 
 // InstanceSettings holds runtime behavior flags for an instance.
 type InstanceSettings struct {
@@ -1181,10 +1205,15 @@ func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []
 		return "", fmt.Errorf("no valid buttons after parsing")
 	}
 
-	// Estrutura paritária com Evolution-Go main (linhas 1789-1820):
-	// InteractiveMessage direto, sem DocumentWithCaption wrap, sem biz nodes.
+	// Estrutura que confirmadamente funciona em prod (button reply +
+	// template renderizam): wrap em DocumentWithCaptionMessage +
+	// AdditionalNodes biz native_flow + MessageSecret + messageParamsJSON
+	// from+templateId. NÃO mexer.
 	templateID := fmt.Sprintf("%d", time.Now().UnixNano()/1_000_000)
 	messageParamsJSON := fmt.Sprintf(`{"from":"api","templateId":"%s"}`, templateID)
+
+	secret := make([]byte, 32)
+	_, _ = cryptorand.Read(secret)
 
 	interactive := &waE2E.InteractiveMessage{
 		Body: &waE2E.InteractiveMessage_Body{Text: proto.String(body)},
@@ -1201,9 +1230,21 @@ func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []
 		interactive.Footer = &waE2E.InteractiveMessage_Footer{Text: proto.String(footer)}
 	}
 
-	msg := &waE2E.Message{InteractiveMessage: interactive}
+	msg := &waE2E.Message{
+		DocumentWithCaptionMessage: &waE2E.FutureProofMessage{
+			Message: &waE2E.Message{
+				InteractiveMessage: interactive,
+				MessageContextInfo: &waE2E.MessageContextInfo{
+					MessageSecret: secret,
+				},
+			},
+		},
+	}
+	bizNodes := buildButtonsBizNodes(true)
 
-	res, err := ic.client.SendMessage(context.Background(), recipient, msg)
+	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
+		AdditionalNodes: &bizNodes,
+	})
 	if err != nil {
 		log.Warn().
 			Str("instance", ic.ID).
