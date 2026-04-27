@@ -1175,7 +1175,8 @@ func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []
 	if err != nil {
 		return "", fmt.Errorf("invalid JID: %w", err)
 	}
-	recipient = ic.resolveRecipient(context.Background(), recipient)
+	// NÃO chamamos resolveRecipient aqui: ele converteria PN→LID, e o
+	// servidor WhatsApp rejeita interactive em LID com 405. Mantemos PN.
 
 	nfButtons := buildNativeFlowButtons(buttons)
 	if len(nfButtons) == 0 {
@@ -2289,6 +2290,43 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 			text = v.Message.GetConversation()
 		case v.Message.GetExtendedTextMessage() != nil:
 			text = v.Message.GetExtendedTextMessage().GetText()
+		// Resposta de botão clicado (ButtonsMessage legado).
+		// Vem como mensagem normal pra journey/inbox: text = display_text do botão.
+		case v.Message.GetButtonsResponseMessage() != nil:
+			br := v.Message.GetButtonsResponseMessage()
+			text = br.GetSelectedDisplayText()
+			if text == "" {
+				text = br.GetSelectedButtonID()
+			}
+		// Resposta de botão TemplateMessage (HydratedTemplate).
+		case v.Message.GetTemplateButtonReplyMessage() != nil:
+			br := v.Message.GetTemplateButtonReplyMessage()
+			text = br.GetSelectedDisplayText()
+			if text == "" {
+				text = br.GetSelectedID()
+			}
+		// Resposta de InteractiveMessage (NativeFlow native_reply).
+		// O ButtonsResponse moderno vem aqui — quick_reply, cta_url click, etc.
+		case v.Message.GetInteractiveResponseMessage() != nil:
+			ir := v.Message.GetInteractiveResponseMessage()
+			if body := ir.GetBody(); body != nil {
+				text = body.GetText()
+			}
+			// NativeFlowResponseMessage tem ParamsJSON com {"id": "<button_id>"}.
+			if text == "" {
+				if nf := ir.GetNativeFlowResponseMessage(); nf != nil {
+					text = nf.GetParamsJSON()
+				}
+			}
+		// Resposta de ListMessage (item da lista selecionado).
+		case v.Message.GetListResponseMessage() != nil:
+			lr := v.Message.GetListResponseMessage()
+			text = lr.GetTitle()
+			if text == "" {
+				if ssr := lr.GetSingleSelectReply(); ssr != nil {
+					text = ssr.GetSelectedRowID()
+				}
+			}
 		case v.Message.GetImageMessage() != nil:
 			msgType = "image"
 			text = v.Message.GetImageMessage().GetCaption()
