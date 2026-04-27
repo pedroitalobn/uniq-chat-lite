@@ -9,6 +9,7 @@ import {
   Key, FileJson, ExternalLink, Loader2, Link2, Copy, X, ShoppingBag,
 } from "lucide-react";
 import { ShopSection } from "@/components/integrations/ShopSection";
+import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { integrationsApi, apiKeysApi, proxiesApi, adminApi, instancesApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -119,59 +120,92 @@ export default function IntegrationsPage() {
   ];
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--bg)" }}>
-      {/* Layout 2 colunas (largura total): sidebar lateral + main.
-          Mobile vira 1 coluna com a sidebar virando lista horizontal. */}
-      <div className="flex flex-col lg:flex-row min-h-screen">
-        {/* Sidebar lateral */}
-        <aside
-          className="lg:w-64 lg:shrink-0 lg:border-r lg:min-h-screen p-4 lg:p-6"
-          style={{ background: "var(--surface-1)", borderColor: "var(--surface-border)" }}
-        >
-          <div className="flex items-center gap-2.5 mb-6">
+    <div className="min-h-screen p-6 lg:p-8" style={{ background: "var(--bg)" }}>
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-6">
+          <div className="flex items-center gap-2.5 mb-1">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center"
               style={{ background: "var(--green-soft)", border: "1px solid var(--green-border)" }}>
               <Plug className="w-4 h-4" style={{ color: "var(--green)" }} />
             </div>
-            <div>
-              <h1 className="text-base font-bold" style={{ color: "var(--text-1)" }}>Integrações</h1>
-              <p className="text-[11px]" style={{ color: "var(--text-3)" }}>LLMs, webhooks, shop e mais</p>
-            </div>
+            <h1 className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>Integrações</h1>
           </div>
+          <p className="text-xs hidden sm:block" style={{ color: "var(--text-3)" }}>
+            LLMs, agentes, webhooks, shop e mais
+          </p>
+        </div>
 
-          {/* Mobile: lista horizontal scroll. Desktop: vertical. */}
-          <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible -mx-1 lg:mx-0 px-1 lg:px-0">
+        {/* Layout: sidebar interna + content (mesmo padrão de /settings) */}
+        <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start">
+          {/* Mobile tabs */}
+          <div className="sm:hidden flex gap-1 p-1 rounded-xl w-full overflow-x-auto"
+            style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
             {sections.map((s) => {
               const isActive = section === s.id;
               return (
-                <button
-                  key={s.id}
-                  onClick={() => handleSectionChange(s.id)}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap shrink-0 lg:w-full lg:justify-start"
-                  style={{
-                    background: isActive ? `${s.color}15` : "transparent",
-                    color: isActive ? s.color : "var(--text-2)",
-                    border: isActive ? `1px solid ${s.color}30` : "1px solid transparent",
-                  }}
-                >
-                  <s.icon className="w-4 h-4 shrink-0" />
+                <button key={s.id} onClick={() => handleSectionChange(s.id)}
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all"
+                  style={{ background: isActive ? `${s.color}15` : "transparent", color: isActive ? s.color : "var(--text-3)" }}>
+                  <s.icon className="w-3.5 h-3.5" />
                   <span>{s.label}</span>
                 </button>
               );
             })}
-          </nav>
-        </aside>
+          </div>
 
-        {/* Main */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-5xl">
-          {section === "llm" && <LLMSection onConnect={setConnecting} />}
-          {section === "agents" && <AgentsSection />}
-          {section === "mcp" && <MCPSection />}
-          {section === "webhook" && <WebhooksPanel />}
-          {section === "shop" && <ShopSection />}
-          {section === "api" && <APIKeysSection />}
-          {section === "docs" && <DocsSection />}
-        </main>
+          {/* Desktop sidebar */}
+          <aside className="hidden sm:flex w-44 lg:w-52 flex-shrink-0 sticky top-4">
+            <nav className="rounded-2xl overflow-hidden w-full"
+              style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+              {sections.map((s, i) => {
+                const Icon = s.icon;
+                const isActive = section === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => handleSectionChange(s.id)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 lg:px-4 py-3 lg:py-3.5 text-left transition-all duration-150 relative",
+                      i < sections.length - 1 ? "border-b" : ""
+                    )}
+                    style={{
+                      borderColor: "var(--surface-border)",
+                      background: isActive ? "var(--green-dim)" : "transparent",
+                    }}
+                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--surface-3)"; }}
+                    onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
+                  >
+                    {isActive && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r"
+                        style={{ background: s.color }} />
+                    )}
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{
+                        background: isActive ? `${s.color}26` : "var(--surface-3)",
+                        border: `1px solid ${isActive ? s.color + "40" : "var(--surface-border)"}`,
+                      }}>
+                      <Icon className="w-3.5 h-3.5" style={{ color: isActive ? s.color : "var(--text-3)" }} />
+                    </div>
+                    <p className="text-xs font-medium truncate" style={{ color: isActive ? s.color : "var(--text-1)" }}>
+                      {s.label}
+                    </p>
+                  </button>
+                );
+              })}
+            </nav>
+          </aside>
+
+          {/* Content */}
+          <div className="flex-1 min-w-0 w-full">
+            {section === "llm" && <LLMSection onConnect={setConnecting} />}
+            {section === "agents" && <AgentsSection />}
+            {section === "mcp" && <MCPSection />}
+            {section === "webhook" && <WebhooksPanel />}
+            {section === "shop" && <ShopSection />}
+            {section === "api" && <APIKeysSection />}
+            {section === "docs" && <DocsSection />}
+          </div>
+        </div>
       </div>
 
       {connecting && <ConnectModal provider={connecting} onClose={() => setConnecting(null)} />}

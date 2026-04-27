@@ -1,9 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ShoppingBag, ExternalLink, Loader2, MapPin } from "lucide-react";
+import { ShoppingBag, ExternalLink, Loader2, MapPin, CheckCircle2, Store, Plus } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 interface Provider {
   id: string;
@@ -11,6 +12,23 @@ interface Provider {
   region: string;
   description: string;
   status: "ready" | "coming_soon";
+}
+
+interface Shop {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+interface Integration {
+  id: string;
+  shop_id: string;
+  provider: string;
+  name: string;
+  is_active: boolean;
+  last_sync_at?: string;
+  last_sync_status?: string;
+  synced_count: number;
 }
 
 const REGION_COLORS: Record<string, string> = {
@@ -24,10 +42,45 @@ const REGION_COLORS: Record<string, string> = {
 };
 
 export function ShopSection() {
+  const { currentWorkspace } = useWorkspace();
+  const wsId = currentWorkspace?.id;
+  const headers = wsId ? { "X-Workspace-ID": wsId } : undefined;
+
   const { data: providers = [], isLoading } = useQuery<Provider[]>({
     queryKey: ["shop-providers"],
     queryFn: () => api.get("/v1/shop/providers").then(r => r.data),
   });
+
+  const { data: shopsData } = useQuery<{ data: Shop[] }>({
+    queryKey: ["shops", wsId],
+    queryFn: () => api.get("/v1/shops", { headers }).then(r => r.data),
+    enabled: !!wsId,
+  });
+  const shops = shopsData?.data ?? [];
+
+  // Integrações de TODAS as shops do workspace (concatena).
+  const { data: integrationsByShop = {} } = useQuery<Record<string, Integration[]>>({
+    queryKey: ["shop-integrations-all", wsId, shops.map(s => s.id).join(",")],
+    queryFn: async () => {
+      const map: Record<string, Integration[]> = {};
+      await Promise.all(
+        shops.map(async (s) => {
+          try {
+            const r = await api.get(`/v1/shops/${s.id}/integrations`, { headers });
+            map[s.id] = r.data?.data ?? [];
+          } catch {
+            map[s.id] = [];
+          }
+        })
+      );
+      return map;
+    },
+    enabled: !!wsId && shops.length > 0,
+  });
+
+  const allIntegrations: (Integration & { shop?: Shop })[] = shops.flatMap((s) =>
+    (integrationsByShop[s.id] ?? []).map((i) => ({ ...i, shop: s }))
+  );
 
   // Agrupar por região: BR primeiro, depois EUA, depois Global.
   const grouped = (() => {
@@ -57,27 +110,64 @@ export function ShopSection() {
         </p>
       </div>
 
-      <div
-        className="rounded-2xl p-4 flex items-start gap-3"
-        style={{ background: "rgba(0,212,106,0.06)", border: "1px solid var(--green-border)" }}
-      >
-        <ShoppingBag className="w-5 h-5 mt-0.5 shrink-0" style={{ color: "var(--green)" }} />
-        <div className="flex-1">
-          <p className="text-sm font-medium mb-0.5" style={{ color: "var(--text-1)" }}>
-            Antes de conectar uma integração, crie uma loja
-          </p>
-          <p className="text-xs" style={{ color: "var(--text-2)" }}>
-            Cada integração precisa estar atrelada a uma Shop. Vá em Shops pra criar a sua.
-          </p>
-        </div>
-        <Link
-          href="/shops"
-          className="text-xs px-3 py-1.5 rounded-lg font-semibold whitespace-nowrap"
-          style={{ background: "var(--green)", color: "var(--green-fg)" }}
+      {shops.length === 0 ? (
+        <div
+          className="rounded-2xl p-4 flex items-start gap-3"
+          style={{ background: "var(--green-soft)", border: "1px solid var(--green-border)" }}
         >
-          Ir pra Shops
-        </Link>
-      </div>
+          <ShoppingBag className="w-5 h-5 mt-0.5 shrink-0" style={{ color: "var(--green)" }} />
+          <div className="flex-1">
+            <p className="text-sm font-medium mb-0.5" style={{ color: "var(--text-1)" }}>
+              Crie uma loja primeiro
+            </p>
+            <p className="text-xs" style={{ color: "var(--text-2)" }}>
+              Cada integração precisa estar atrelada a uma Shop.
+            </p>
+          </div>
+          <Link
+            href="/shops"
+            className="text-xs px-3 py-1.5 rounded-lg font-medium whitespace-nowrap"
+            style={{ background: "var(--green)", color: "var(--green-fg)" }}
+          >
+            Ir pra Shops
+          </Link>
+        </div>
+      ) : allIntegrations.length === 0 ? (
+        <div
+          className="rounded-2xl p-4 flex items-start gap-3"
+          style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
+        >
+          <Store className="w-5 h-5 mt-0.5 shrink-0" style={{ color: "var(--text-3)" }} />
+          <div className="flex-1">
+            <p className="text-sm font-medium mb-0.5" style={{ color: "var(--text-1)" }}>
+              Nenhuma integração ativa
+            </p>
+            <p className="text-xs" style={{ color: "var(--text-2)" }}>
+              Você tem {shops.length} loja{shops.length > 1 ? "s" : ""}. Conecte uma das plataformas abaixo pra começar a sincronizar produtos.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-2)" }}>
+              Integrações ativas <span className="ml-1 normal-case font-normal" style={{ color: "var(--text-3)" }}>({allIntegrations.length})</span>
+            </p>
+            <Link
+              href="/shops"
+              className="text-[11px] inline-flex items-center gap-1"
+              style={{ color: "var(--green)" }}
+            >
+              Gerenciar shops <ExternalLink className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-2.5">
+            {allIntegrations.map((it) => (
+              <ActiveIntegrationCard key={it.id} integration={it} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="text-center py-8" style={{ color: "var(--text-3)" }}>
@@ -105,6 +195,48 @@ export function ShopSection() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function ActiveIntegrationCard({ integration }: { integration: Integration & { shop?: Shop } }) {
+  const ok = integration.last_sync_status === "ok" || integration.last_sync_status === "success";
+  const lastSync = integration.last_sync_at
+    ? new Date(integration.last_sync_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
+    : "nunca";
+  return (
+    <div
+      className="rounded-xl p-3 flex items-center gap-3"
+      style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
+    >
+      <div
+        className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-semibold shrink-0"
+        style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
+      >
+        {integration.name?.charAt(0).toUpperCase() || "?"}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>
+            {integration.name}
+          </p>
+          {integration.is_active && (
+            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--green)" }} />
+          )}
+        </div>
+        <p className="text-[11px] truncate" style={{ color: "var(--text-3)" }}>
+          {integration.shop?.name} · {integration.synced_count} produtos · {lastSync}
+        </p>
+      </div>
+      <span
+        className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+        style={{
+          background: ok ? "var(--green-soft)" : "var(--surface-3)",
+          color: ok ? "var(--green)" : "var(--text-3)",
+        }}
+      >
+        {ok ? "OK" : integration.last_sync_status || "—"}
+      </span>
     </div>
   );
 }

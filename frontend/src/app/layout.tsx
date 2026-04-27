@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter_Tight, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
@@ -9,11 +9,12 @@ import { Providers } from "./providers";
 //   500 medium   → labels, nomes de contato, sub-headers
 //   600 semibold → títulos de seção, headers de conversa, CTAs
 //   700 bold     → títulos principais, valores destacados (badges, contadores)
-const sans = Inter({
+// Inter Tight com pesos leves — design pede leveza nos títulos, buttons e menus.
+const sans = Inter_Tight({
   subsets: ["latin"],
   variable: "--font-sans",
   display: "swap",
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600"],
 });
 
 const mono = JetBrains_Mono({
