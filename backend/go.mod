@@ -73,6 +73,7 @@ require (
 // Fork local do whatsmeow com cherry-picks de PRs upstream relevantes:
 //   #1107 (poll vote LID), #1091 (range queries perf), #974 (GetManyPNsForLIDs),
 //   #1101 (bulk insert), #749 (BuildContact), #1106 (pin edit attr).
-// Branch: uniq-patches em vendor-fork/whatsmeow/. Veja CHANGELOG-WHATSMEOW.md
-// na raiz pra detalhes dos patches.
-replace go.mau.fi/whatsmeow => ../vendor-fork/whatsmeow
+// Pasta dentro de backend/ pra que o Docker build context (./backend)
+// inclua o fork — sem isso o `go mod download` falha pq o path replace
+// resolve fora do contexto. Veja CHANGELOG-WHATSMEOW.md na raiz.
+replace go.mau.fi/whatsmeow => ./vendor-fork/whatsmeow

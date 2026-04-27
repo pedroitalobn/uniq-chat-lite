@@ -1,12 +1,13 @@
 # whatsmeow fork — patches aplicados
 
-Pasta `vendor-fork/whatsmeow/` é um clone do upstream
+Pasta `backend/vendor-fork/whatsmeow/` é um clone do upstream
 [tulir/whatsmeow](https://github.com/tulir/whatsmeow) pinado no commit
 `ce4daa5e5a86` (mesma versão do go.mod original) com cherry-picks de PRs
 abertos que resolvem bugs ou adicionam features que a Uniq precisa.
 
-`backend/go.mod` aponta `replace go.mau.fi/whatsmeow => ../vendor-fork/whatsmeow`
-pra usar o fork.
+`backend/go.mod` aponta `replace go.mau.fi/whatsmeow => ./vendor-fork/whatsmeow`.
+Pasta fica DENTRO de `backend/` pra que o Docker build context (`./backend`)
+inclua o fork — `go mod download` falha se o path replace resolve fora.
 
 ## PRs aplicados (Apr/26)
 
