@@ -101,25 +101,27 @@ func (h *ShopHandler) CreateShop(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
 	}
 
-	// Verificar limite do plano (MaxShops)
-	if user.Plan != nil {
-		limit := user.Plan.MaxShops
-		if limit == 0 {
+	// Super admin nunca é gateado.
+	// Pra demais users: AllowShop=true desbloqueia o módulo. MaxShops
+	// regula quantidade (-1 ilimitado, 0 default = ilimitado quando o
+	// flag AllowShop tá ligado — admin pode setar quota explícita).
+	if user.Role != models.RoleSuperAdmin && user.Plan != nil {
+		if !user.Plan.AllowShop {
 			return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
 				"error":       "feature_locked",
 				"message":     "Seu plano não inclui criar lojas. Faça upgrade.",
-				"upgrade_url": "/billing",
+				"upgrade_url": "/settings?section=billing",
 			})
 		}
-		if limit > 0 {
+		if user.Plan.MaxShops > 0 {
 			var count int64
 			h.db.Model(&models.Shop{}).Where("workspace_id = ?", wsID).Count(&count)
-			if int(count) >= limit {
+			if int(count) >= user.Plan.MaxShops {
 				return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
 					"error":       "limit_reached",
-					"limit":       limit,
+					"limit":       user.Plan.MaxShops,
 					"message":     "Você atingiu o limite de lojas do plano.",
-					"upgrade_url": "/billing",
+					"upgrade_url": "/settings?section=billing",
 				})
 			}
 		}
@@ -287,8 +289,8 @@ func (h *ShopHandler) CreateProduct(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
 	}
 
-	// Verifica MaxProducts do plano (count global do workspace).
-	if user.Plan != nil && user.Plan.MaxProducts > 0 {
+	// MaxProducts regula contagem (admin/superadmin não gateado).
+	if user.Role != models.RoleSuperAdmin && user.Plan != nil && user.Plan.MaxProducts > 0 {
 		var count int64
 		h.db.Model(&models.Product{}).Where("workspace_id = ?", wsID).Count(&count)
 		if int(count) >= user.Plan.MaxProducts {
@@ -296,7 +298,7 @@ func (h *ShopHandler) CreateProduct(c *fiber.Ctx) error {
 				"error":       "limit_reached",
 				"limit":       user.Plan.MaxProducts,
 				"message":     "Limite de produtos do plano atingido.",
-				"upgrade_url": "/billing",
+				"upgrade_url": "/settings?section=billing",
 			})
 		}
 	}

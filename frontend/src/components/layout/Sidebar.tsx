@@ -95,7 +95,6 @@ export function Sidebar() {
     { href: "/instances",    label: t("nav_instances"),    icon: Smartphone,      exact: false, show: canSeeInstances },
     { href: "/shops",        label: "Shops",               icon: ShoppingBag,     exact: false, show: true },
     { href: "/integrations", label: t("nav_integrations"), icon: Plug,            exact: false, show: canSeeIntegrations },
-    { href: "/billing",      label: "Planos & cobrança",   icon: CreditCard,      exact: false, show: true },
     { href: "/settings",     label: "Conta",               icon: Settings,        exact: false, show: true },
   ];
   const visibleNavItems = navItems.filter((n) => n.show);
@@ -252,7 +251,7 @@ export function Sidebar() {
               <div className="h-full rounded-full transition-all" style={{ width: "0%", background: "var(--green)" }} />
             </div>
           </div>
-          <Link href="/billing" onClick={closeMobile}
+          <Link href="/settings?section=billing" onClick={closeMobile}
             className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-xs font-semibold transition-all"
             style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.2)", color: "var(--green)" }}
             onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.14)"; }}
