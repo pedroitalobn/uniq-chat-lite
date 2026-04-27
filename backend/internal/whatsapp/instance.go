@@ -1566,108 +1566,45 @@ func (ic *InstanceClient) SendPixMessage(to string, data PixData) (string, error
 	return res.ID, nil
 }
 
+// SendTemplateMessage redireciona pra SendButtonsMessage. O HydratedTemplate
+// (TemplateMessage.HydratedFourRowTemplate) é um formato deprecated do
+// WhatsApp Business API antigo — accounts atuais aceitam a stanza (200 OK)
+// mas descartam silenciosamente no recipient. NativeFlowMessage via
+// SendButtonsMessage é o único caminho que renderiza.
+//
+// Mapeia TemplateButtonItem (display_text, type, id, url, phone_number)
+// pro novo ButtonItem (text, type, id, url, phone). Mesmo limite de 3.
 func (ic *InstanceClient) SendTemplateMessage(to, content, footer string, buttons []TemplateButtonItem) (string, error) {
-	recipient, err := types.ParseJID(normalizeJID(to))
-	if err != nil {
-		return "", fmt.Errorf("invalid JID: %w", err)
+	if len(buttons) == 0 {
+		return "", fmt.Errorf("no template buttons provided")
 	}
-
-	hydratedButtons := make([]*waE2E.HydratedTemplateButton, 0, len(buttons))
-	for i, button := range buttons {
-		text := strings.TrimSpace(button.DisplayText)
+	mapped := make([]ButtonItem, 0, len(buttons))
+	for i, b := range buttons {
+		text := strings.TrimSpace(b.DisplayText)
 		if text == "" {
 			continue
 		}
-
-		index := uint32(i)
-		switch strings.ToLower(strings.TrimSpace(button.Type)) {
-		case "url":
-			url := strings.TrimSpace(button.URL)
-			if url == "" {
-				continue
-			}
-			hydratedButtons = append(hydratedButtons, &waE2E.HydratedTemplateButton{
-				Index: &index,
-				HydratedButton: &waE2E.HydratedTemplateButton_UrlButton{
-					UrlButton: &waE2E.HydratedTemplateButton_HydratedURLButton{
-						DisplayText: proto.String(text),
-						URL:         proto.String(url),
-					},
-				},
-			})
-		case "call":
-			phone := strings.TrimSpace(button.PhoneNumber)
-			if phone == "" {
-				continue
-			}
-			hydratedButtons = append(hydratedButtons, &waE2E.HydratedTemplateButton{
-				Index: &index,
-				HydratedButton: &waE2E.HydratedTemplateButton_CallButton{
-					CallButton: &waE2E.HydratedTemplateButton_HydratedCallButton{
-						DisplayText: proto.String(text),
-						PhoneNumber: proto.String(phone),
-					},
-				},
-			})
-		default:
-			id := strings.TrimSpace(button.ID)
-			if id == "" {
-				id = fmt.Sprintf("template_btn_%d", i)
-			}
-			hydratedButtons = append(hydratedButtons, &waE2E.HydratedTemplateButton{
-				Index: &index,
-				HydratedButton: &waE2E.HydratedTemplateButton_QuickReplyButton{
-					QuickReplyButton: &waE2E.HydratedTemplateButton_HydratedQuickReplyButton{
-						DisplayText: proto.String(text),
-						ID:          proto.String(id),
-					},
-				},
-			})
+		typ := strings.ToLower(strings.TrimSpace(b.Type))
+		// Aliases comuns: "quickreply" → "reply".
+		if typ == "quickreply" || typ == "quick_reply" {
+			typ = "reply"
 		}
-	}
-
-	if len(hydratedButtons) == 0 {
-		return "", fmt.Errorf("no valid template buttons provided")
-	}
-
-	msg := &waE2E.Message{
-		TemplateMessage: &waE2E.TemplateMessage{
-			Format: &waE2E.TemplateMessage_HydratedFourRowTemplate_{
-				HydratedFourRowTemplate: &waE2E.TemplateMessage_HydratedFourRowTemplate{
-					HydratedContentText: proto.String(content),
-					HydratedFooterText:  proto.String(footer),
-					HydratedButtons:     hydratedButtons,
-				},
-			},
-		},
-	}
-
-	// Mesmo no formato hydrated template (legacy), accounts atualizados
-	// fazem o whatsmeow exigir LID resolvido pra criptografia. Best-effort
-	// — falha aqui só vai loggar, o send tenta seguir e cai no fallback.
-	if err := ic.ensureLID(recipient); err != nil {
-		log.Warn().Str("instance", ic.ID).Err(err).Msg("ensureLID failed before template send")
-	}
-
-	res, err := ic.sendMessage(context.Background(), recipient, msg)
-	if err != nil {
-		log.Warn().Str("instance", ic.ID).Err(err).Msg("template message failed, using text fallback")
-		fallbackButtons := make([]ButtonItem, 0, len(buttons))
-		for i, button := range buttons {
-			fallbackButtons = append(fallbackButtons, ButtonItem{
-				ID:    button.ID,
-				Text:  button.DisplayText,
-				Type:  button.Type,
-				URL:   button.URL,
-				Phone: button.PhoneNumber,
-			})
-			if fallbackButtons[i].ID == "" {
-				fallbackButtons[i].ID = fmt.Sprintf("template_btn_%d", i)
-			}
+		id := strings.TrimSpace(b.ID)
+		if id == "" {
+			id = fmt.Sprintf("template_btn_%d", i)
 		}
-		return ic.SendButtonsFallbackMessage(to, content, footer, fallbackButtons)
+		mapped = append(mapped, ButtonItem{
+			ID:    id,
+			Text:  text,
+			Type:  typ,
+			URL:   b.URL,
+			Phone: b.PhoneNumber,
+		})
 	}
-	return res.ID, nil
+	if len(mapped) == 0 {
+		return "", fmt.Errorf("no valid template buttons after mapping")
+	}
+	return ic.SendButtonsMessage(to, content, footer, mapped)
 }
 
 // ListRow represents a row inside a list section.
