@@ -13,17 +13,47 @@ import { cn } from "@/lib/utils";
 interface EditState {
   name: string;
   price: number;
+  // Limites globais
   max_instances: number;
   max_messages_per_day: number;
   max_users: number;
   max_workspaces: number;
+  // Sub-limites por módulo (-1=ilimitado, 0=bloqueado)
+  max_agents: number;
+  max_journeys: number;
+  max_campaigns: number;
+  max_triggers: number;
+  max_webhooks: number;
+  max_contacts: number;
+  max_deals: number;
+  max_shops: number;
+  max_products: number;
+  max_shop_integrations: number;
+  max_instances_per_proxy: number;
+  max_proxy_pool: number;
+  // Feature flags
+  allow_ai: boolean;
+  allow_journeys: boolean;
+  allow_crm: boolean;
+  allow_inbox: boolean;
+  allow_campaigns: boolean;
+  allow_triggers: boolean;
+  allow_warmup: boolean;
+  allow_newsletters: boolean;
+  allow_communities: boolean;
+  allow_instagram: boolean;
+  allow_tiktok: boolean;
+  allow_api_access: boolean;
+  allow_global_webhook: boolean;
+  allow_shop: boolean;
   allow_proxy: boolean;
+  allow_proxy_residencial: boolean;
   is_active: boolean;
   stripe_price_id: string;
   asaas_product_id: string;
   description: string;
-  highlights: string[]; 
-  features: string; 
+  highlights: string[];
+  features: string;
 }
 
 const FEATURE_KEYS = [
@@ -192,6 +222,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
   const featObj = p ? parseFeaturesObj(p) : {};
   const defaultCheckboxes = Object.fromEntries(FEATURE_KEYS.map(({ key }) => [key, false]));
 
+  const pAny = p as any;
   const [form, setForm] = useState<EditState>({
     name: p?.name || "",
     price: p?.price || 0,
@@ -199,10 +230,37 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
     max_messages_per_day: p?.max_messages_per_day ?? 100,
     max_users: p?.max_users ?? 1,
     max_workspaces: p?.max_workspaces ?? 1,
+    max_agents: pAny?.max_agents ?? 0,
+    max_journeys: pAny?.max_journeys ?? 0,
+    max_campaigns: pAny?.max_campaigns ?? 0,
+    max_triggers: pAny?.max_triggers ?? 0,
+    max_webhooks: pAny?.max_webhooks ?? 5,
+    max_contacts: pAny?.max_contacts ?? 0,
+    max_deals: pAny?.max_deals ?? 0,
+    max_shops: pAny?.max_shops ?? 0,
+    max_products: pAny?.max_products ?? 0,
+    max_shop_integrations: pAny?.max_shop_integrations ?? 0,
+    max_instances_per_proxy: pAny?.max_instances_per_proxy ?? 0,
+    max_proxy_pool: pAny?.max_proxy_pool ?? 0,
+    allow_ai: pAny?.allow_ai ?? false,
+    allow_journeys: pAny?.allow_journeys ?? false,
+    allow_crm: pAny?.allow_crm ?? false,
+    allow_inbox: pAny?.allow_inbox ?? true,
+    allow_campaigns: pAny?.allow_campaigns ?? false,
+    allow_triggers: pAny?.allow_triggers ?? false,
+    allow_warmup: pAny?.allow_warmup ?? false,
+    allow_newsletters: pAny?.allow_newsletters ?? false,
+    allow_communities: pAny?.allow_communities ?? false,
+    allow_instagram: pAny?.allow_instagram ?? false,
+    allow_tiktok: pAny?.allow_tiktok ?? false,
+    allow_api_access: pAny?.allow_api_access ?? true,
+    allow_global_webhook: pAny?.allow_global_webhook ?? false,
+    allow_shop: pAny?.allow_shop ?? false,
     allow_proxy: p?.allow_proxy ?? false,
+    allow_proxy_residencial: pAny?.allow_proxy_residencial ?? false,
     is_active: p?.is_active ?? true,
     stripe_price_id: p?.stripe_price_id ?? "",
-    asaas_product_id: (p as any)?.asaas_product_id ?? "",
+    asaas_product_id: pAny?.asaas_product_id ?? "",
     description: typeof featObj["description"] === "string" ? featObj["description"] : "",
     highlights: Array.isArray(featObj["highlights"]) ? (featObj["highlights"] as string[]) : [],
     features: JSON.stringify(featObj, null, 2),
@@ -223,7 +281,34 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
         max_messages_per_day: form.max_messages_per_day,
         max_users: form.max_users,
         max_workspaces: form.max_workspaces,
+        max_agents: form.max_agents,
+        max_journeys: form.max_journeys,
+        max_campaigns: form.max_campaigns,
+        max_triggers: form.max_triggers,
+        max_webhooks: form.max_webhooks,
+        max_contacts: form.max_contacts,
+        max_deals: form.max_deals,
+        max_shops: form.max_shops,
+        max_products: form.max_products,
+        max_shop_integrations: form.max_shop_integrations,
+        max_instances_per_proxy: form.max_instances_per_proxy,
+        max_proxy_pool: form.max_proxy_pool,
+        allow_ai: form.allow_ai,
+        allow_journeys: form.allow_journeys,
+        allow_crm: form.allow_crm,
+        allow_inbox: form.allow_inbox,
+        allow_campaigns: form.allow_campaigns,
+        allow_triggers: form.allow_triggers,
+        allow_warmup: form.allow_warmup,
+        allow_newsletters: form.allow_newsletters,
+        allow_communities: form.allow_communities,
+        allow_instagram: form.allow_instagram,
+        allow_tiktok: form.allow_tiktok,
+        allow_api_access: form.allow_api_access,
+        allow_global_webhook: form.allow_global_webhook,
+        allow_shop: form.allow_shop,
         allow_proxy: form.allow_proxy,
+        allow_proxy_residencial: form.allow_proxy_residencial,
         is_active: form.is_active,
         stripe_price_id: form.stripe_price_id || undefined,
         asaas_product_id: form.asaas_product_id || undefined,
@@ -354,41 +439,86 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
             {activeTab === "limits" && (
               <div className="space-y-4 animate-fade-in-up">
                 <div className="p-3 mb-4 rounded-lg text-[11px]" style={{ background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.2)", color: "#fbbf24" }}>
-                  Dica: Utilize <strong className="font-mono px-1 py-0.5 rounded" style={{ background: "rgba(251,191,36,0.2)" }}>-1</strong> para configurar limites infinitos (ilimitado).
+                  Dica: Utilize <strong className="font-mono px-1 py-0.5 rounded" style={{ background: "rgba(251,191,36,0.2)" }}>-1</strong> para configurar limites infinitos (ilimitado), <strong className="font-mono px-1 py-0.5 rounded" style={{ background: "rgba(251,191,36,0.2)" }}>0</strong> para bloquear.
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Max. Workspaces</label>
-                    <input type="number" value={form.max_workspaces} onChange={(e) => setForm({ ...form, max_workspaces: Number(e.target.value) })} className="input-field w-full font-mono" />
-                  </div>
-                  <div>
-                    <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Max. Usuários</label>
-                    <input type="number" value={form.max_users} onChange={(e) => setForm({ ...form, max_users: Number(e.target.value) })} className="input-field w-full font-mono" />
-                  </div>
-                  <div>
-                    <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Max. Instâncias WPP</label>
-                    <input type="number" value={form.max_instances} onChange={(e) => setForm({ ...form, max_instances: Number(e.target.value) })} className="input-field w-full font-mono" />
-                  </div>
-                  <div>
-                    <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Limite de Envios Diários</label>
-                    <input type="number" value={form.max_messages_per_day} onChange={(e) => setForm({ ...form, max_messages_per_day: Number(e.target.value) })} className="input-field w-full font-mono" />
-                  </div>
+
+                <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: "hsl(240 8% 50%)" }}>Globais</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <NumField label="Max. Workspaces" value={form.max_workspaces} onChange={(v) => setForm({ ...form, max_workspaces: v })} />
+                  <NumField label="Max. Usuários" value={form.max_users} onChange={(v) => setForm({ ...form, max_users: v })} />
+                  <NumField label="Max. Instâncias WPP" value={form.max_instances} onChange={(v) => setForm({ ...form, max_instances: v })} />
+                  <NumField label="Envios diários" value={form.max_messages_per_day} onChange={(v) => setForm({ ...form, max_messages_per_day: v })} />
+                </div>
+
+                <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "hsl(240 8% 50%)" }}>Por módulo</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <NumField label="Max. Agentes IA" value={form.max_agents} onChange={(v) => setForm({ ...form, max_agents: v })} />
+                  <NumField label="Max. Jornadas" value={form.max_journeys} onChange={(v) => setForm({ ...form, max_journeys: v })} />
+                  <NumField label="Max. Campanhas" value={form.max_campaigns} onChange={(v) => setForm({ ...form, max_campaigns: v })} />
+                  <NumField label="Max. Triggers" value={form.max_triggers} onChange={(v) => setForm({ ...form, max_triggers: v })} />
+                  <NumField label="Max. Webhooks" value={form.max_webhooks} onChange={(v) => setForm({ ...form, max_webhooks: v })} />
+                  <NumField label="Max. Contatos (CRM)" value={form.max_contacts} onChange={(v) => setForm({ ...form, max_contacts: v })} />
+                  <NumField label="Max. Deals" value={form.max_deals} onChange={(v) => setForm({ ...form, max_deals: v })} />
+                </div>
+
+                <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "hsl(240 8% 50%)" }}>Shop</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <NumField label="Max. Lojas" value={form.max_shops} onChange={(v) => setForm({ ...form, max_shops: v })} />
+                  <NumField label="Max. Produtos" value={form.max_products} onChange={(v) => setForm({ ...form, max_products: v })} />
+                  <NumField label="Max. Integrações Shop" value={form.max_shop_integrations} onChange={(v) => setForm({ ...form, max_shop_integrations: v })} />
+                </div>
+
+                <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "hsl(240 8% 50%)" }}>Proxy</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <NumField label="Instâncias por proxy" value={form.max_instances_per_proxy} onChange={(v) => setForm({ ...form, max_instances_per_proxy: v })} />
+                  <NumField label="Pool máximo" value={form.max_proxy_pool} onChange={(v) => setForm({ ...form, max_proxy_pool: v })} />
                 </div>
               </div>
             )}
 
             {activeTab === "features" && (
-              <div className="space-y-6 animate-fade-in-up">
-                <FeatureGrid checkboxes={checkboxes} onChange={(key, val) => setCheckboxes({ ...checkboxes, [key]: val })} />
-                
+              <div className="space-y-4 animate-fade-in-up">
+                <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: "hsl(240 8% 50%)" }}>Módulos principais</p>
+                <FeatureToggle label="Inbox / Atendimento" desc="/inbox + queues + departments + SLA"
+                  checked={form.allow_inbox} onChange={(v) => setForm({ ...form, allow_inbox: v })} color="#22c55e" />
+                <FeatureToggle label="Uniq AI / Agentes" desc="/agents, RAG, OpenRouter, MCP"
+                  checked={form.allow_ai} onChange={(v) => setForm({ ...form, allow_ai: v })} color="#a78bfa" />
+                <FeatureToggle label="Jornadas" desc="/journeys — automações"
+                  checked={form.allow_journeys} onChange={(v) => setForm({ ...form, allow_journeys: v })} color="#60a5fa" />
+                <FeatureToggle label="CRM" desc="/crm/contacts/companies/deals/segments"
+                  checked={form.allow_crm} onChange={(v) => setForm({ ...form, allow_crm: v })} color="#f59e0b" />
+                <FeatureToggle label="Campanhas" desc="/campaigns — disparos em massa"
+                  checked={form.allow_campaigns} onChange={(v) => setForm({ ...form, allow_campaigns: v })} color="#fb923c" />
+                <FeatureToggle label="Shop / Produtos" desc="/shops + 10 integrações de e-commerce"
+                  checked={form.allow_shop} onChange={(v) => setForm({ ...form, allow_shop: v })} color="#22c55e" />
+
+                <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "hsl(240 8% 50%)" }}>Adicionais</p>
+                <FeatureToggle label="Triggers (autoresponder)" desc="Sprint 8 — keyword matchers"
+                  checked={form.allow_triggers} onChange={(v) => setForm({ ...form, allow_triggers: v })} color="#a855f7" />
+                <FeatureToggle label="Warmup" desc="Anti-ban automático"
+                  checked={form.allow_warmup} onChange={(v) => setForm({ ...form, allow_warmup: v })} color="#ec4899" />
+                <FeatureToggle label="Newsletters / Channels" desc="WhatsApp Channels"
+                  checked={form.allow_newsletters} onChange={(v) => setForm({ ...form, allow_newsletters: v })} color="#06b6d4" />
+                <FeatureToggle label="Communities" desc="WhatsApp Communities"
+                  checked={form.allow_communities} onChange={(v) => setForm({ ...form, allow_communities: v })} color="#10b981" />
+                <FeatureToggle label="Instagram" desc="Multi-canal IG (DM)"
+                  checked={form.allow_instagram} onChange={(v) => setForm({ ...form, allow_instagram: v })} color="#e1306c" />
+                <FeatureToggle label="TikTok" desc="Multi-canal TikTok"
+                  checked={form.allow_tiktok} onChange={(v) => setForm({ ...form, allow_tiktok: v })} color="#000" />
+
+                <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "hsl(240 8% 50%)" }}>API & Infra</p>
+                <FeatureToggle label="Acesso API" desc="SDK REST + instance token"
+                  checked={form.allow_api_access} onChange={(v) => setForm({ ...form, allow_api_access: v })} color="#60a5fa" />
+                <FeatureToggle label="Webhooks globais" desc="/webhooks/system (workspace-wide)"
+                  checked={form.allow_global_webhook} onChange={(v) => setForm({ ...form, allow_global_webhook: v })} color="#fbbf24" />
+                <FeatureToggle label="Sessão via Proxy" desc="Proxy padrão na instância"
+                  checked={form.allow_proxy} onChange={(v) => setForm({ ...form, allow_proxy: v })} color="#60a5fa" />
+                <FeatureToggle label="Proxy residencial" desc="Pool premium (mais caro)"
+                  checked={form.allow_proxy_residencial} onChange={(v) => setForm({ ...form, allow_proxy_residencial: v })} color="#a78bfa" />
+
                 <div className="pt-4 border-t" style={{ borderColor: "var(--border-default)" }}>
-                  <label className="flex items-center gap-3 cursor-pointer mt-4">
-                    <Toggle checked={form.allow_proxy} onChange={(v) => setForm({ ...form, allow_proxy: v })} color="#60a5fa" />
-                    <div>
-                      <span className="text-sm font-medium block" style={{ color: "#60a5fa" }}>Sessão via Proxy</span>
-                      <span className="text-[10px] block" style={{ color: "hsl(240 8% 46%)" }}>Habilita menu de proxies na página da instância</span>
-                    </div>
-                  </label>
+                  <p className="text-[10px] uppercase tracking-wider font-medium mb-2" style={{ color: "hsl(240 8% 50%)" }}>Canais visíveis (UI marketing)</p>
+                  <FeatureGrid checkboxes={checkboxes} onChange={(key, val) => setCheckboxes({ ...checkboxes, [key]: val })} />
                 </div>
               </div>
             )}
@@ -636,5 +766,34 @@ export default function AdminPlansPage() {
         </ul>
       </div>
     </div>
+  );
+}
+
+
+function NumField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <div>
+      <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>{label}</label>
+      <input
+        type="number"
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="input-field w-full font-mono text-sm"
+      />
+    </div>
+  );
+}
+
+function FeatureToggle({ label, desc, checked, onChange, color }: {
+  label: string; desc: string; checked: boolean; onChange: (v: boolean) => void; color: string;
+}) {
+  return (
+    <label className="flex items-center gap-3 cursor-pointer">
+      <Toggle checked={checked} onChange={onChange} color={color} />
+      <div>
+        <span className="text-sm font-medium block" style={{ color: checked ? color : "hsl(240 15% 80%)" }}>{label}</span>
+        <span className="text-[10px] block" style={{ color: "hsl(240 8% 46%)" }}>{desc}</span>
+      </div>
+    </label>
   );
 }

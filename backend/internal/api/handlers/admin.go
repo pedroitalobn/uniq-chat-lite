@@ -603,8 +603,35 @@ func (h *AdminHandler) CreatePlan(c *fiber.Ctx) error {
 		MaxMessagesPerDay int     `json:"max_messages_per_day"`
 		MaxUsers          int     `json:"max_users"`
 		MaxWorkspaces     int     `json:"max_workspaces"`
+		MaxAgents         int     `json:"max_agents"`
+		MaxJourneys       int     `json:"max_journeys"`
+		MaxCampaigns      int     `json:"max_campaigns"`
+		MaxTriggers       int     `json:"max_triggers"`
+		MaxWebhooks       int     `json:"max_webhooks"`
+		MaxContacts       int     `json:"max_contacts"`
+		MaxDeals          int     `json:"max_deals"`
+		MaxShops          int     `json:"max_shops"`
+		MaxProducts       int     `json:"max_products"`
+		MaxShopIntegrations int   `json:"max_shop_integrations"`
+		MaxInstancesPerProxy int  `json:"max_instances_per_proxy"`
+		MaxProxyPool      int     `json:"max_proxy_pool"`
 		Features          string  `json:"features"`
+		AllowAI           bool    `json:"allow_ai"`
+		AllowJourneys     bool    `json:"allow_journeys"`
+		AllowCRM          bool    `json:"allow_crm"`
+		AllowInbox        bool    `json:"allow_inbox"`
+		AllowCampaigns    bool    `json:"allow_campaigns"`
+		AllowTriggers     bool    `json:"allow_triggers"`
+		AllowWarmup       bool    `json:"allow_warmup"`
+		AllowNewsletters  bool    `json:"allow_newsletters"`
+		AllowCommunities  bool    `json:"allow_communities"`
+		AllowInstagram    bool    `json:"allow_instagram"`
+		AllowTikTok       bool    `json:"allow_tiktok"`
+		AllowAPIAccess    bool    `json:"allow_api_access"`
+		AllowGlobalWebhook bool   `json:"allow_global_webhook"`
+		AllowShop         bool    `json:"allow_shop"`
 		AllowProxy        bool    `json:"allow_proxy"`
+		AllowProxyResidencial bool `json:"allow_proxy_residencial"`
 		StripePriceID     string  `json:"stripe_price_id"`
 		AsaasProductID    string  `json:"asaas_product_id"`
 	}
@@ -624,8 +651,35 @@ func (h *AdminHandler) CreatePlan(c *fiber.Ctx) error {
 		MaxMessagesPerDay: req.MaxMessagesPerDay,
 		MaxUsers:          req.MaxUsers,
 		MaxWorkspaces:     req.MaxWorkspaces,
+		MaxAgents:         req.MaxAgents,
+		MaxJourneys:       req.MaxJourneys,
+		MaxCampaigns:      req.MaxCampaigns,
+		MaxTriggers:       req.MaxTriggers,
+		MaxWebhooks:       req.MaxWebhooks,
+		MaxContacts:       req.MaxContacts,
+		MaxDeals:          req.MaxDeals,
+		MaxShops:          req.MaxShops,
+		MaxProducts:       req.MaxProducts,
+		MaxShopIntegrations: req.MaxShopIntegrations,
+		MaxInstancesPerProxy: req.MaxInstancesPerProxy,
+		MaxProxyPool:      req.MaxProxyPool,
 		Features:          features,
+		AllowAI:           req.AllowAI,
+		AllowJourneys:     req.AllowJourneys,
+		AllowCRM:          req.AllowCRM,
+		AllowInbox:        req.AllowInbox,
+		AllowCampaigns:    req.AllowCampaigns,
+		AllowTriggers:     req.AllowTriggers,
+		AllowWarmup:       req.AllowWarmup,
+		AllowNewsletters:  req.AllowNewsletters,
+		AllowCommunities:  req.AllowCommunities,
+		AllowInstagram:    req.AllowInstagram,
+		AllowTikTok:       req.AllowTikTok,
+		AllowAPIAccess:    req.AllowAPIAccess,
+		AllowGlobalWebhook: req.AllowGlobalWebhook,
+		AllowShop:         req.AllowShop,
 		AllowProxy:        req.AllowProxy,
+		AllowProxyResidencial: req.AllowProxyResidencial,
 		StripePriceID:     req.StripePriceID,
 		AsaasProductID:    req.AsaasProductID,
 		IsActive:          true,
@@ -682,6 +736,12 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 		AllowGlobalWebhook *bool   `json:"allow_global_webhook"`
 		AllowProxy        *bool    `json:"allow_proxy"`
 		AllowProxyResidencial *bool `json:"allow_proxy_residencial"`
+		AllowShop         *bool    `json:"allow_shop"`
+		MaxShops          *int     `json:"max_shops"`
+		MaxProducts       *int     `json:"max_products"`
+		MaxShopIntegrations *int   `json:"max_shop_integrations"`
+		MaxInstancesPerProxy *int  `json:"max_instances_per_proxy"`
+		MaxProxyPool      *int     `json:"max_proxy_pool"`
 		IsActive          *bool    `json:"is_active"`
 		StripePriceID     string   `json:"stripe_price_id"`
 		AsaasProductID    string   `json:"asaas_product_id"`
@@ -781,6 +841,24 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 	}
 	if req.AllowProxyResidencial != nil {
 		updates["allow_proxy_residencial"] = *req.AllowProxyResidencial
+	}
+	if req.AllowShop != nil {
+		updates["allow_shop"] = *req.AllowShop
+	}
+	if req.MaxShops != nil {
+		updates["max_shops"] = *req.MaxShops
+	}
+	if req.MaxProducts != nil {
+		updates["max_products"] = *req.MaxProducts
+	}
+	if req.MaxShopIntegrations != nil {
+		updates["max_shop_integrations"] = *req.MaxShopIntegrations
+	}
+	if req.MaxInstancesPerProxy != nil {
+		updates["max_instances_per_proxy"] = *req.MaxInstancesPerProxy
+	}
+	if req.MaxProxyPool != nil {
+		updates["max_proxy_pool"] = *req.MaxProxyPool
 	}
 	if req.IsActive != nil {
 		updates["is_active"] = *req.IsActive

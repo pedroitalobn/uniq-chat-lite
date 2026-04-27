@@ -76,16 +76,23 @@ func (h *ShopHandler) ListShops(c *fiber.Ctx) error {
 
 // GET /v1/shops/:id
 func (h *ShopHandler) GetShop(c *fiber.Ctx) error {
-	wsID, err := h.workspaceID(c)
-	if err != nil {
-		return err
-	}
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
 	}
+	user := getUserFromCtx(c)
+	q := h.db.Where("id = ?", id)
+	// Super-admin: ignora workspace gate (suporte/admin precisa enxergar
+	// shops de qualquer workspace pra debug). User comum: filtra workspace.
+	if user == nil || user.Role != models.RoleSuperAdmin {
+		wsID, err := h.workspaceID(c)
+		if err != nil {
+			return err
+		}
+		q = q.Where("workspace_id = ?", wsID)
+	}
 	var shop models.Shop
-	if err := h.db.Where("id = ? AND workspace_id = ?", id, wsID).First(&shop).Error; err != nil {
+	if err := q.First(&shop).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "shop não encontrado"})
 	}
 	return c.JSON(shop)
@@ -229,10 +236,6 @@ func (h *ShopHandler) DeleteShop(c *fiber.Ctx) error {
 
 // GET /v1/shops/:shopId/products?limit=50&offset=0&q=texto&category=<id>
 func (h *ShopHandler) ListProducts(c *fiber.Ctx) error {
-	wsID, err := h.workspaceID(c)
-	if err != nil {
-		return err
-	}
 	shopID, err := uuid.Parse(c.Params("shopId"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "shopId inválido"})
@@ -243,7 +246,16 @@ func (h *ShopHandler) ListProducts(c *fiber.Ctx) error {
 	}
 	offset := c.QueryInt("offset", 0)
 
-	q := h.db.Model(&models.Product{}).Where("workspace_id = ? AND shop_id = ?", wsID, shopID)
+	user := getUserFromCtx(c)
+	q := h.db.Model(&models.Product{}).Where("shop_id = ?", shopID)
+	// Super-admin bypassa o filtro de workspace.
+	if user == nil || user.Role != models.RoleSuperAdmin {
+		wsID, err := h.workspaceID(c)
+		if err != nil {
+			return err
+		}
+		q = q.Where("workspace_id = ?", wsID)
+	}
 	if search := strings.TrimSpace(c.Query("q")); search != "" {
 		q = q.Where("name ILIKE ? OR sku ILIKE ?", "%"+search+"%", "%"+search+"%")
 	}
