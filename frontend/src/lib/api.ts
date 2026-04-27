@@ -1143,7 +1143,7 @@ export const adminApi = {
     api.put(`/v1/admin/users/${id}`, data),
   resetPassword: (id: string, password: string) =>
     api.post(`/v1/admin/users/${id}/reset-password`, { password }),
-  deleteUser: (id: string) => api.delete(`/v1/admin/users/${id}`),
+  deleteUser: (id: string) => api.delete(`/v1/admin/users/${id}?cascade=true`),
   listPlans: () => api.get("/v1/admin/plans"),
   createPlan: (data: Record<string, unknown>) => api.post("/v1/admin/plans", data),
   updatePlan: (id: string, data: Record<string, unknown>) =>

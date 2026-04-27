@@ -419,18 +419,123 @@ func (h *AdminHandler) UpdateUser(c *fiber.Ctx) error {
 }
 
 // DeleteUser godoc
-// DELETE /admin/users/:id
+// DELETE /admin/users/:id?cascade=true
+//
+// cascade=true: descobre todas as FKs que referenciam users(id) via
+// information_schema e DELETE em cada tabela antes de remover o user.
+// Usa transaction; se qualquer DELETE falhar, ROLLBACK.
+//
+// cascade=false (default): comportamento legado — falha em FK violation
+// (preservado pra retrocompat com fluxos que esperam erro explícito).
 func (h *AdminHandler) DeleteUser(c *fiber.Ctx) error {
 	userID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID inválido"})
 	}
-
-	if err := h.db.Delete(&models.User{}, "id = ?", userID).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao deletar usuário"})
+	// Cascade: explícito via query OU automático pra super_admin (UI usa).
+	cascade := c.Query("cascade") == "true"
+	if !cascade {
+		if actor := middleware.GetCurrentUser(c); actor != nil && actor.Role == models.RoleSuperAdmin {
+			cascade = true
+		}
 	}
 
-	return c.JSON(fiber.Map{"message": "usuário removido"})
+	if !cascade {
+		if err := h.db.Delete(&models.User{}, "id = ?", userID).Error; err != nil {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error":      "erro ao deletar usuário (use ?cascade=true pra remover dependências)",
+				"detail":     err.Error(),
+			})
+		}
+		return c.JSON(fiber.Map{"message": "usuário removido"})
+	}
+
+	cleaned := map[string]int64{}
+	err = h.db.Transaction(func(tx *gorm.DB) error {
+		// 1. Coleta workspaces que esse user é OWNER (workspaces.user_id).
+		//    Vamos deletar tudo que depende dessas workspaces também.
+		var ownerWsIDs []string
+		tx.Raw(`SELECT id::text FROM workspaces WHERE user_id = ?`, userID).Scan(&ownerWsIDs)
+
+		// 2. Deleta dependentes das workspaces do user (recursivo via FKs).
+		if len(ownerWsIDs) > 0 {
+			if err := cascadeDeleteByFK(tx, "workspaces", "id", ownerWsIDs, cleaned); err != nil {
+				return err
+			}
+			res := tx.Exec(`DELETE FROM workspaces WHERE id = ANY($1)`, ownerWsIDs)
+			if res.Error != nil {
+				return res.Error
+			}
+			cleaned["workspaces"] += res.RowsAffected
+		}
+
+		// 3. Deleta dependentes do user (todas FKs → users.id).
+		if err := cascadeDeleteByFK(tx, "users", "id", []string{userID.String()}, cleaned); err != nil {
+			return err
+		}
+
+		// 4. Finalmente o user.
+		res := tx.Exec(`DELETE FROM users WHERE id = ?`, userID)
+		if res.Error != nil {
+			return res.Error
+		}
+		cleaned["users"] = res.RowsAffected
+		return nil
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":  "erro no cascade delete",
+			"detail": err.Error(),
+		})
+	}
+	return c.JSON(fiber.Map{
+		"message": "usuário removido em cascata",
+		"deleted": cleaned,
+	})
+}
+
+// cascadeDeleteByFK descobre todas as tabelas com FK pra (parentTable.parentCol)
+// e roda DELETE WHERE <fkCol> IN (<ids>) em cada uma. Acumula counts no map.
+//
+// Funciona em Postgres; usa pg_catalog pra ler as constraints.
+func cascadeDeleteByFK(tx *gorm.DB, parentTable, parentCol string, ids []string, counts map[string]int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	type fk struct {
+		Table  string
+		Column string
+	}
+	var fks []fk
+	q := `
+		SELECT
+			cl.relname  AS table,
+			att.attname AS column
+		FROM pg_constraint con
+		JOIN pg_class cl  ON cl.oid = con.conrelid
+		JOIN pg_class pcl ON pcl.oid = con.confrelid
+		JOIN pg_attribute att ON att.attrelid = cl.oid AND att.attnum = ANY(con.conkey)
+		JOIN pg_attribute patt ON patt.attrelid = pcl.oid AND patt.attnum = ANY(con.confkey)
+		WHERE con.contype = 'f'
+		  AND pcl.relname = ?
+		  AND patt.attname = ?
+	`
+	if err := tx.Raw(q, parentTable, parentCol).Scan(&fks).Error; err != nil {
+		return err
+	}
+	for _, f := range fks {
+		// Skip self-reference (would re-include parent).
+		if f.Table == parentTable {
+			continue
+		}
+		stmt := `DELETE FROM "` + f.Table + `" WHERE "` + f.Column + `" = ANY($1)`
+		res := tx.Exec(stmt, ids)
+		if res.Error != nil {
+			return res.Error
+		}
+		counts[f.Table] += res.RowsAffected
+	}
+	return nil
 }
 
 // --- Plans ---

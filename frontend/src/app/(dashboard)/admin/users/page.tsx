@@ -396,7 +396,10 @@ export default function AdminUsersPage() {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       setActionId(null);
     },
-    onError: () => { toast.error("Erro ao remover"); setActionId(null); },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error || err?.response?.data?.detail || "Erro ao remover");
+      setActionId(null);
+    },
   });
 
   const handleDelete = async (user: User) => {
