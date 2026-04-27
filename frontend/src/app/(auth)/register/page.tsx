@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/Logo";
+import { Turnstile } from "@/components/Turnstile";
 import api from "@/lib/api";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080") + "/v1";
@@ -112,6 +113,7 @@ function RegisterForm() {
   const [inviteCode, setInviteCode] = useState(inviteFromUrl);
   const [loading, setLoading]   = useState(false);
   const [errors, setErrors]     = useState<Record<string, string>>({});
+  const [turnstileToken, setTurnstileToken] = useState("");
   const [inviteEnabled, setInviteEnabled] = useState(false);
   const [inviteValid, setInviteValid] = useState<boolean | null>(null);
 
@@ -192,6 +194,7 @@ function RegisterForm() {
           invite_code: inviteCode.trim() || undefined,
           plan_id: workspaceInviteToken ? undefined : planId || undefined,
           workspace_invite_token: workspaceInviteToken || undefined,
+          turnstile_token: turnstileToken || undefined,
         }),
       });
       const data = await res.json();
@@ -406,6 +409,8 @@ function RegisterForm() {
                 )}
               </div>
             )}
+
+            <Turnstile onVerify={setTurnstileToken} onError={() => setTurnstileToken("")} />
 
             <button
               type="submit"
