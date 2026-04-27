@@ -761,17 +761,34 @@ export const webhooksApi = {
     api.put(`/v1/instances/${id}/webhooks/${webhookId}`, data),
   delete: (id: string, webhookId: string) =>
     api.delete(`/v1/instances/${id}/webhooks/${webhookId}`),
+  // Sprint webhooks: logs, retry, test selecionado
+  deliveries: (id: string, webhookId: string, params?: { status?: string; event?: string; limit?: number; offset?: number }) =>
+    api.get(`/v1/instances/${id}/webhooks/${webhookId}/deliveries`, { params }),
+  retry: (id: string, webhookId: string, deliveryId: string) =>
+    api.post(`/v1/instances/${id}/webhooks/${webhookId}/deliveries/${deliveryId}/retry`),
+  test: (id: string, webhookId: string, eventId?: string) =>
+    api.post(`/v1/instances/${id}/webhooks/${webhookId}/test`, { event_id: eventId }),
 };
 
 export const globalWebhooksApi = {
-  listEvents: () => api.get("/v1/webhooks/system/events"),
+  // listEvents aceita scope (instance|global|both) e include_admin pra super admin
+  listEvents: (params?: { scope?: "instance" | "global" | "both"; include_admin?: boolean }) =>
+    api.get("/v1/webhooks/system/events", { params }),
+  // Preview do payload sem disparar — útil pro dialog mostrar JSON exemplo
+  previewEvent: (eventId: string) =>
+    api.get(`/v1/webhooks/system/events/${encodeURIComponent(eventId)}/preview`),
   list: () => api.get("/v1/webhooks/system"),
   create: (data: { name: string; url: string; events: string[]; is_active?: boolean }) =>
     api.post("/v1/webhooks/system", data),
   update: (id: string, data: { name?: string; url?: string; events?: string[]; is_active?: boolean }) =>
     api.put(`/v1/webhooks/system/${id}`, data),
   delete: (id: string) => api.delete(`/v1/webhooks/system/${id}`),
-  test: (id: string) => api.post(`/v1/webhooks/system/${id}/test`, {}),
+  test: (id: string, eventId?: string) =>
+    api.post(`/v1/webhooks/system/${id}/test`, { event_id: eventId }),
+  deliveries: (id: string, params?: { status?: string; event?: string; limit?: number; offset?: number }) =>
+    api.get(`/v1/webhooks/system/${id}/deliveries`, { params }),
+  retry: (id: string, deliveryId: string) =>
+    api.post(`/v1/webhooks/system/${id}/deliveries/${deliveryId}/retry`),
 };
 
 export const recoveryApi = {

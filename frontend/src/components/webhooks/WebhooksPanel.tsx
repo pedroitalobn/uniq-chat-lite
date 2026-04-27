@@ -3,17 +3,21 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Webhook, Plus, Trash2, Play, CheckCircle2, XCircle, Search, Globe,
-  Pencil, X, Copy, Check, Loader2, Sparkles,
+  Webhook, Plus, Trash2, CheckCircle2, XCircle, Search, Globe,
+  Pencil, X, Copy, Check, Loader2, Sparkles, ListChecks, Lock,
 } from "lucide-react";
 import { globalWebhooksApi } from "@/lib/api";
 import { toast } from "sonner";
+import { WebhookDeliveriesDialog } from "./WebhookDeliveriesDialog";
+import { EventTestMenu } from "./EventTestMenu";
 
 interface SystemEvent {
   id: string;
   name: string;
   description: string;
   category: string;
+  admin_only?: boolean;
+  scope?: "instance" | "global" | "both";
 }
 
 interface GlobalWebhook {
@@ -47,10 +51,13 @@ export function WebhooksPanel({ showHeader = true }: { showHeader?: boolean }) {
   const [editing, setEditing] = useState<Draft | null>(null);
   const [createdSecret, setCreatedSecret] = useState<string | null>(null);
   const [secretCopied, setSecretCopied] = useState(false);
+  const [viewingLogs, setViewingLogs] = useState<{ id: string; name: string } | null>(null);
 
+  // include_admin=1 — backend filtra automaticamente conforme role.User
+  // não-admin não vê eventos admin-only mesmo passando o flag.
   const { data: events = [] } = useQuery<SystemEvent[]>({
-    queryKey: ["system-events"],
-    queryFn: () => globalWebhooksApi.listEvents().then((r) => r.data),
+    queryKey: ["system-events", "global"],
+    queryFn: () => globalWebhooksApi.listEvents({ include_admin: true, scope: "both" }).then((r) => r.data),
   });
 
   const { data: webhooks = [], isLoading } = useQuery<GlobalWebhook[]>({
@@ -99,20 +106,6 @@ export function WebhooksPanel({ showHeader = true }: { showHeader?: boolean }) {
       qc.invalidateQueries({ queryKey: ["global-webhooks"] });
     },
     onError: () => toast.error("Erro ao deletar"),
-  });
-
-  const testMut = useMutation({
-    mutationFn: (id: string) => globalWebhooksApi.test(id),
-    onSuccess: (res) => {
-      if (res.data.success) toast.success("Teste enviado com sucesso!");
-      else toast.error("Teste falhou: " + (res.data.message || ""));
-    },
-    onError: (e: unknown) => {
-      const msg =
-        (e as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-        "Erro ao testar";
-      toast.error(msg);
-    },
   });
 
   const toggleMut = useMutation({
@@ -238,14 +231,19 @@ export function WebhooksPanel({ showHeader = true }: { showHeader?: boolean }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
+                  <EventTestMenu
+                    scope={{ kind: "global", webhookId: wh.id }}
+                    enabledEvents={wh.events}
+                    allEvents={events}
+                    disabled={!wh.is_active}
+                  />
                   <button
-                    onClick={() => testMut.mutate(wh.id)}
-                    disabled={!wh.is_active || testMut.isPending}
-                    className="p-2 rounded-lg transition-colors disabled:opacity-40"
+                    onClick={() => setViewingLogs({ id: wh.id, name: wh.name })}
+                    className="p-2 rounded-lg transition-colors hover:bg-white/5"
                     style={{ color: "var(--text-2)" }}
-                    title={wh.is_active ? "Enviar teste" : "Ative o webhook para testar"}
+                    title="Logs de entrega"
                   >
-                    <Play className="w-4 h-4" />
+                    <ListChecks className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() =>
@@ -257,7 +255,7 @@ export function WebhooksPanel({ showHeader = true }: { showHeader?: boolean }) {
                         is_active: wh.is_active,
                       })
                     }
-                    className="p-2 rounded-lg transition-colors"
+                    className="p-2 rounded-lg transition-colors hover:bg-white/5"
                     style={{ color: "var(--text-2)" }}
                     title="Editar"
                   >
@@ -267,7 +265,7 @@ export function WebhooksPanel({ showHeader = true }: { showHeader?: boolean }) {
                     onClick={() => {
                       if (confirm(`Deletar "${wh.name}"?`)) deleteMut.mutate(wh.id);
                     }}
-                    className="p-2 rounded-lg transition-colors"
+                    className="p-2 rounded-lg transition-colors hover:bg-white/5"
                     style={{ color: "#ef4444" }}
                     title="Deletar"
                   >
@@ -305,6 +303,14 @@ export function WebhooksPanel({ showHeader = true }: { showHeader?: boolean }) {
           onCancel={() => setEditing(null)}
           onSave={(d) => saveMut.mutate(d)}
           saving={saveMut.isPending}
+        />
+      )}
+
+      {viewingLogs && (
+        <WebhookDeliveriesDialog
+          scope={{ kind: "global", webhookId: viewingLogs.id }}
+          webhookName={viewingLogs.name}
+          onClose={() => setViewingLogs(null)}
         />
       )}
 
@@ -615,7 +621,7 @@ function WebhookEditor({
                               key={ev.id}
                               type="button"
                               onClick={() => toggleEvent(ev.id)}
-                              title={`${ev.id}\n${ev.description}`}
+                              title={`${ev.id}\n${ev.description}${ev.admin_only ? "\n\n⚠ Apenas super admin" : ""}`}
                               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all active:scale-95"
                               style={{
                                 background: selected ? "#8b5cf6" : "var(--surface-2)",
@@ -629,6 +635,7 @@ function WebhookEditor({
                               }}
                             >
                               {selected && <Check className="w-3 h-3" strokeWidth={3} />}
+                              {ev.admin_only && <Lock className="w-3 h-3" style={{ color: selected ? "#fff" : "#f59e0b" }} />}
                               {ev.name}
                             </button>
                           );

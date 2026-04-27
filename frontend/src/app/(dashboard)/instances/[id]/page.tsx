@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { instancesApi, webhooksApi, messagesApi, settingsApi, mcpApi, recoveryApi, tiktokApi, type WebhookPayload } from "@/lib/api";
+import { instancesApi, webhooksApi, messagesApi, settingsApi, mcpApi, recoveryApi, tiktokApi, globalWebhooksApi, type WebhookPayload } from "@/lib/api";
 import {
   Smartphone, ArrowLeft, Globe, AlertTriangle,
   QrCode, Power, Trash2, Plus, X, Send, ChevronRight,
@@ -20,6 +20,8 @@ import type { Instance, InstanceSettings, MessageLog, InstanceProfile, InstanceC
 import Link from "next/link";
 import { MessageButtonsBuilder, type MessageButton, validateButtons } from "@/components/messages/MessageButtonsBuilder";
 import { QRCodeModal } from "@/components/instances/QRCodeModal";
+import { WebhookDeliveriesDialog } from "@/components/webhooks/WebhookDeliveriesDialog";
+import { EventTestMenu } from "@/components/webhooks/EventTestMenu";
 import ProxyConfigForm from "@/components/instances/ProxyConfigForm";
 
 type Tab = "geral" | "proxy" | "webhooks" | "logs" | "recovery" | "dm" | "actions" | "scraping" | "posts" | "stories" | "media";
@@ -141,12 +143,19 @@ function toPayload(wh: Webhook, overrides: WebhookPayload = {}): WebhookPayload 
 function WebhookCard({ wh, instanceId, onDelete }: { wh: Webhook; instanceId: string; onDelete: () => void }) {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(false);
+  const [showingLogs, setShowingLogs] = useState(false);
   // Bridge state — initialized from current webhook data
   const [rmq, setRmq] = useState({ url: wh.amqp_url || "", exchange: wh.exchange || "uniqchat", key: wh.routing_key || "" });
   const [nats, setNats] = useState({ url: wh.nats_url || "", subject: wh.nats_subject || "", token: "" });
   const [ws, setWs] = useState({ url: wh.ws_client_url || "", token: "" });
 
   const evList: string[] = (() => { try { return JSON.parse(wh.events); } catch { return []; } })();
+
+  // Catálogo de eventos pra EventTestMenu — só "instance" + "both"
+  const { data: catalogEvents = [] } = useQuery<Array<{ id: string; name: string; category: string; admin_only?: boolean }>>({
+    queryKey: ["system-events", "instance"],
+    queryFn: () => globalWebhooksApi.listEvents({ scope: "instance" }).then(r => r.data),
+  });
 
   const updateMutation = useMutation({
     mutationFn: (data: Parameters<typeof webhooksApi.update>[2]) =>
@@ -188,10 +197,23 @@ function WebhookCard({ wh, instanceId, onDelete }: { wh: Webhook; instanceId: st
               style={{ background: "var(--surface-2)", color: "hsl(240 8% 38%)" }}>+{evList.length - 5}</span>}
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Active toggle */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <EventTestMenu
+            scope={{ kind: "instance", instanceId, webhookId: wh.id }}
+            enabledEvents={evList}
+            allEvents={catalogEvents}
+            disabled={!wh.is_active}
+          />
+          <button
+            onClick={() => setShowingLogs(true)}
+            className="p-2 rounded-lg transition-colors hover:bg-white/5"
+            style={{ color: "hsl(240 8% 50%)" }}
+            title="Logs de entrega"
+          >
+            <Activity className="w-4 h-4" />
+          </button>
           <button onClick={() => updateMutation.mutate(toPayload(wh, { is_active: !wh.is_active }))}
-            className="relative flex-shrink-0 rounded-full transition-colors"
+            className="relative flex-shrink-0 rounded-full transition-colors mx-1"
             style={{ background: wh.is_active ? "var(--green)" : "hsl(240 12% 18%)", width: "2rem", height: "1.125rem" }}>
             <span className="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform"
               style={{ transform: wh.is_active ? "translateX(0.875rem)" : "translateX(0)" }} />
@@ -269,6 +291,14 @@ function WebhookCard({ wh, instanceId, onDelete }: { wh: Webhook; instanceId: st
             </button>
           </BridgeToggle>
         </div>
+      )}
+
+      {showingLogs && (
+        <WebhookDeliveriesDialog
+          scope={{ kind: "instance", instanceId, webhookId: wh.id }}
+          webhookName={wh.name || wh.url}
+          onClose={() => setShowingLogs(false)}
+        />
       )}
     </div>
   );
