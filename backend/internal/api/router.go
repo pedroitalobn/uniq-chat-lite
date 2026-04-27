@@ -148,6 +148,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	contactH := handlers.NewContactHandler(db)
 	groupH := handlers.NewGroupHandler(db, manager)
 	campaignH := handlers.NewCampaignHandler(db, manager)
+	triggerH := handlers.NewTriggerHandler(db)
+	warmupH := handlers.NewWarmupHandler(db, manager)
 	otpH := handlers.NewOTPHandler(db, manager)
 	serverH := handlers.NewServerHandler(db, whatsapp.GetHub())
 	integrationH := handlers.NewIntegrationHandler(db)
@@ -284,6 +286,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	registerPreMsg("/template", msgH.SendTemplate)
 	registerPreMsg("/list", msgH.SendList)
 	registerPreMsg("/pix", msgH.SendPix)
+	registerPreMsg("/pix-button", msgH.SendPixButton)
 	registerPreMsg("/carousel", msgH.SendCarousel)
 	registerPreMsg("/menu", msgH.SendMenu)
 	registerPreMsg("/sticker", msgH.SendSticker)
@@ -338,6 +341,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	v1msgs.Post("/template", msgH.SendTemplate)
 	v1msgs.Post("/list", msgH.SendList)
 	v1msgs.Post("/pix", msgH.SendPix)
+	v1msgs.Post("/pix-button", msgH.SendPixButton)
 	v1msgs.Post("/carousel", msgH.SendCarousel)
 	v1msgs.Post("/menu", msgH.SendMenu)
 	v1msgs.Post("/sticker", msgH.SendSticker)
@@ -583,6 +587,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	msgs.Post("/template", msgH.SendTemplate)
 	msgs.Post("/list", msgH.SendList)
 	msgs.Post("/pix", msgH.SendPix)
+	msgs.Post("/pix-button", msgH.SendPixButton)
 	msgs.Post("/carousel", msgH.SendCarousel)
 	msgs.Post("/menu", msgH.SendMenu)
 	msgs.Post("/sticker", msgH.SendSticker)
@@ -934,7 +939,29 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	campaigns.Get("/:id", campaignH.Get)
 	campaigns.Post("/:id/start", campaignH.Start)
 	campaigns.Post("/:id/pause", campaignH.Pause)
+	campaigns.Post("/:id/resume", campaignH.Resume)
 	campaigns.Post("/:id/cancel", campaignH.Cancel)
+	campaigns.Post("/:id/abort", campaignH.Cancel) // alias UazAPI-style
+	campaigns.Post("/:id/clear-sent", campaignH.ClearSent)
+	campaigns.Get("/:id/messages", campaignH.ListMessageStatus)
+
+	// Sprint 8 — keyword triggers (autoresponder simples gap UazAPI)
+	triggers := api.Group("/triggers")
+	triggers.Get("/", triggerH.List)
+	triggers.Post("/", triggerH.Create)
+	triggers.Get("/:id", triggerH.Get)
+	triggers.Put("/:id", triggerH.Update)
+	triggers.Delete("/:id", triggerH.Delete)
+	triggers.Post("/:id/test", triggerH.Test)
+
+	// Sprint 7 — warmup (anti-ban) per instance
+	warmup := instance.Group("/warmup")
+	warmup.Get("/", warmupH.Get)
+	warmup.Post("/", warmupH.Upsert)
+	warmup.Post("/start", warmupH.Start)
+	warmup.Post("/pause", warmupH.Pause)
+	warmup.Post("/resume", warmupH.Resume)
+	warmup.Post("/stop", warmupH.Stop)
 	campaigns.Delete("/:id", campaignH.Delete)
 
 	// Stripe (protected)
@@ -1007,6 +1034,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	instance.Put("/agent", integrationH.UpdateAgent)
 	instance.Post("/agent/assets", integrationH.UploadAgentAsset)
 	instance.Delete("/agent/assets/:assetId", integrationH.DeleteAgentAsset)
+	// Sprint 9 — RAG ingestion sem upload de arquivo
+	instance.Post("/agent/ingest-url", integrationH.IngestAgentURL)
+	instance.Post("/agent/ingest-text", integrationH.IngestAgentText)
 
 	// DEPRECATED legacy inbox routes (WhatsApp-style per-instance chat).
 	// Mantidas para clientes externos via API key — o dashboard já migrou

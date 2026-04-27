@@ -710,6 +710,176 @@ func (h *IntegrationHandler) UploadAgentAsset(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(asset)
 }
 
+// IngestAgentURL godoc
+// POST /instances/:id/agent/ingest-url
+//
+// Ingere uma URL pública na knowledge base do agente: faz GET, limpa
+// HTML pra texto plano, e salva como AgentAsset (categoria knowledge).
+// Inspirado no UazAPI knowledge upload — clientes podem alimentar o
+// bot com URLs de FAQ/blog sem precisar baixar e fazer upload manual.
+func (h *IntegrationHandler) IngestAgentURL(c *fiber.Ctx) error {
+	inst := middleware.GetCurrentInstance(c)
+	if inst == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	var req struct {
+		URL  string `json:"url"`
+		Name string `json:"name"`
+	}
+	if err := c.BodyParser(&req); err != nil || strings.TrimSpace(req.URL) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'url' é obrigatório"})
+	}
+	httpClient := &http.Client{Timeout: 20 * time.Second}
+	resp, err := httpClient.Get(req.URL)
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "falha ao buscar URL: " + err.Error()})
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": fmt.Sprintf("URL retornou HTTP %d", resp.StatusCode)})
+	}
+	// Limita 2MB pra evitar abuso (knowledge base é texto, raramente
+	// > 200KB por URL).
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "falha ao ler body"})
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	text := stripHTMLToText(body, contentType)
+	if strings.TrimSpace(text) == "" {
+		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{"error": "nenhum texto extraído da URL"})
+	}
+
+	agent, err := h.ensureInstanceAgent(inst.ID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		name = req.URL
+	}
+	asset := models.AgentAsset{
+		InstanceAgentID: agent.ID,
+		Category:        models.AgentAssetKnowledge,
+		Name:            name,
+		FileName:        req.URL,
+		ContentType:     contentType,
+		SizeBytes:       int64(len(text)),
+		ExtractedText:   text,
+		IsActive:        true,
+	}
+	if err := h.db.Create(&asset).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao salvar"})
+	}
+	return c.Status(fiber.StatusCreated).JSON(asset)
+}
+
+// IngestAgentText godoc
+// POST /instances/:id/agent/ingest-text
+//
+// Cria um AgentAsset diretamente a partir de texto colado pelo cliente
+// (não precisa upload de arquivo). Útil pra FAQs curtos, instruções,
+// catálogo simples.
+func (h *IntegrationHandler) IngestAgentText(c *fiber.Ctx) error {
+	inst := middleware.GetCurrentInstance(c)
+	if inst == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	var req struct {
+		Name     string `json:"name"`
+		Text     string `json:"text"`
+		Category string `json:"category"`
+	}
+	if err := c.BodyParser(&req); err != nil || strings.TrimSpace(req.Text) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'text' é obrigatório"})
+	}
+	if req.Category == "" {
+		req.Category = string(models.AgentAssetKnowledge)
+	}
+	switch models.AgentAssetCategory(req.Category) {
+	case models.AgentAssetKnowledge, models.AgentAssetFAQ, models.AgentAssetSkill:
+	default:
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "categoria inválida"})
+	}
+
+	agent, err := h.ensureInstanceAgent(inst.ID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		name = "Knowledge note"
+	}
+	asset := models.AgentAsset{
+		InstanceAgentID: agent.ID,
+		Category:        models.AgentAssetCategory(req.Category),
+		Name:            name,
+		FileName:        name + ".txt",
+		ContentType:     "text/plain",
+		SizeBytes:       int64(len(req.Text)),
+		ExtractedText:   req.Text,
+		IsActive:        true,
+	}
+	if err := h.db.Create(&asset).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao salvar"})
+	}
+	return c.Status(fiber.StatusCreated).JSON(asset)
+}
+
+// ensureInstanceAgent retorna o agent da instância, criando-o se ausente.
+// Usado pelos endpoints de ingestão pra permitir alimentar antes mesmo
+// do agent ser configurado pela UI.
+func (h *IntegrationHandler) ensureInstanceAgent(instanceID uuid.UUID) (*models.InstanceAgent, error) {
+	var agent models.InstanceAgent
+	if err := h.db.Where("instance_id = ?", instanceID).First(&agent).Error; err == nil {
+		return &agent, nil
+	}
+	agent = models.InstanceAgent{
+		InstanceID: instanceID,
+		FAQ:        "[]",
+		Variables:  "[]",
+		Voice:      "{}",
+		Skills:     "[]",
+		AppAccess:  "[]",
+		RAGEnabled: true,
+	}
+	if err := h.db.Create(&agent).Error; err != nil {
+		return nil, fmt.Errorf("falha ao inicializar agente: %w", err)
+	}
+	return &agent, nil
+}
+
+// stripHTMLToText extrai texto plain de HTML (best-effort sem
+// dependência externa). Pra outros content types (text/plain,
+// application/json, markdown) retorna o body raw.
+func stripHTMLToText(body []byte, contentType string) string {
+	ct := strings.ToLower(contentType)
+	if !strings.Contains(ct, "html") {
+		return strings.TrimSpace(string(body))
+	}
+	s := string(body)
+	// Remove script/style blocks (regex simples — não tenta ser HTML parser).
+	s = htmlScriptRegex.ReplaceAllString(s, " ")
+	s = htmlStyleRegex.ReplaceAllString(s, " ")
+	// Tags → espaço
+	s = htmlTagRegex.ReplaceAllString(s, " ")
+	// Decode entidades básicas
+	s = html.UnescapeString(s)
+	// Colapsa whitespace
+	s = htmlWhitespaceRegex.ReplaceAllString(s, " ")
+	return strings.TrimSpace(s)
+}
+
+var (
+	htmlScriptRegex     = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
+	htmlStyleRegex      = regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
+	htmlTagRegex        = regexp.MustCompile(`(?is)<[^>]+>`)
+	htmlWhitespaceRegex = regexp.MustCompile(`\s+`)
+)
+
 // DELETE /instances/:id/agent/assets/:assetId
 func (h *IntegrationHandler) DeleteAgentAsset(c *fiber.Ctx) error {
 	inst := middleware.GetCurrentInstance(c)

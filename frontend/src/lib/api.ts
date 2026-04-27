@@ -538,6 +538,72 @@ export const instanceOpsApi = {
     api.post(`/v1/instances/${id}/calls/reject`, data),
 };
 
+// Sprint 8 — keyword triggers (autoresponder simples).
+export const triggersApi = {
+  list: (params?: { instance_id?: string; only_active?: boolean }) =>
+    api.get(`/v1/triggers`, { params }),
+  create: (data: {
+    name: string;
+    keyword: string;
+    action: "reply" | "forward_ai" | "tag" | "start_journey";
+    payload?: string;
+    instance_id?: string;
+    match_mode?: "exact" | "contains" | "starts" | "regex";
+    case_sensitive?: boolean;
+    priority?: number;
+    multi_match?: boolean;
+    cooldown_sec?: number;
+    only_direct?: boolean;
+  }) => api.post(`/v1/triggers`, data),
+  get: (id: string) => api.get(`/v1/triggers/${id}`),
+  update: (id: string, data: Partial<{ name: string; keyword: string; action: string; payload: string; is_active: boolean; priority: number; match_mode: string; case_sensitive: boolean; multi_match: boolean; cooldown_sec: number; only_direct: boolean }>) =>
+    api.put(`/v1/triggers/${id}`, data),
+  delete: (id: string) => api.delete(`/v1/triggers/${id}`),
+  test: (id: string, text: string) => api.post(`/v1/triggers/${id}/test`, { text }),
+};
+
+// Sprint 7 — warmup (anti-ban) por instância.
+export const warmupApi = {
+  get: (id: string) => api.get(`/v1/instances/${id}/warmup`),
+  upsert: (id: string, data: {
+    duration_days?: number;
+    daily_target?: number;
+    start_hour?: number;
+    end_hour?: number;
+    min_delay_sec?: number;
+    max_delay_sec?: number;
+    message_pool: string[];
+    contact_pool: string[];
+  }) => api.post(`/v1/instances/${id}/warmup`, data),
+  start: (id: string) => api.post(`/v1/instances/${id}/warmup/start`),
+  pause: (id: string) => api.post(`/v1/instances/${id}/warmup/pause`),
+  resume: (id: string) => api.post(`/v1/instances/${id}/warmup/resume`),
+  stop: (id: string) => api.post(`/v1/instances/${id}/warmup/stop`),
+};
+
+// Sprint 7 — campaign controls granulares (resume/abort/clear-sent/messages).
+export const campaignControlApi = {
+  resume: (id: string) => api.post(`/v1/campaigns/${id}/resume`),
+  abort: (id: string) => api.post(`/v1/campaigns/${id}/abort`),
+  clearSent: (id: string) => api.post(`/v1/campaigns/${id}/clear-sent`),
+  messageStatus: (id: string, params?: { status?: string; limit?: number; offset?: number }) =>
+    api.get(`/v1/campaigns/${id}/messages`, { params }),
+};
+
+// Sprint 9 — RAG: ingestão por URL/texto direto (além do upload de arquivo).
+export const agentRagApi = {
+  ingestURL: (instanceId: string, data: { url: string; name?: string }) =>
+    api.post(`/v1/instances/${instanceId}/agent/ingest-url`, data),
+  ingestText: (instanceId: string, data: { name?: string; text: string; category?: "knowledge" | "faq" | "skill" }) =>
+    api.post(`/v1/instances/${instanceId}/agent/ingest-text`, data),
+};
+
+// Sprint 8 — PIX simplificado (alias minimalista do /pix).
+export const pixButtonApi = {
+  send: (instanceId: string, data: { to: string; pix_key: string; key_type: "CPF" | "CNPJ" | "EMAIL" | "PHONE" | "EVP"; merchant_name?: string; body_text?: string }) =>
+    api.post(`/v1/instances/${instanceId}/messages/pix-button`, data),
+};
+
 // Sprint 6 — extras whatsmeow (nem Evo-Go expõe).
 // Business profile, disappearing messages, group invite preview,
 // approve/reject join requests, newsletter avançado, TOS, QR resolvers.

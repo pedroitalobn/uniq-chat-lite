@@ -52,10 +52,17 @@ type InboundPipeline struct {
 	db       *gorm.DB
 	hub      Broadcaster
 	dispatch *DispatchService
+	triggers *TriggerService // optional — wired by SetTriggerService
 }
 
 func NewInboundPipeline(db *gorm.DB, hub Broadcaster) *InboundPipeline {
 	return &InboundPipeline{db: db, hub: hub, dispatch: NewDispatchService(db)}
+}
+
+// SetTriggerService wires the keyword-trigger evaluator into the
+// pipeline. Optional — quando nil, triggers ficam inertes.
+func (p *InboundPipeline) SetTriggerService(s *TriggerService) {
+	p.triggers = s
 }
 
 // Process handles a single inbound message. Safe to call concurrently.
@@ -116,6 +123,13 @@ func (p *InboundPipeline) Process(ctx context.Context, in InboundMessage) (*mode
 	p.updateDenorm(ctx, conv, in, msg, false)
 
 	p.broadcastConversation(conv, msg, created, reopened)
+
+	// Sprint 8: avalia triggers configurados (autoresponder por keyword).
+	// Síncrono pra cooldown ficar correto, mas a Action efetiva (envio
+	// de mensagem etc.) roda em goroutine dentro do TriggerService.
+	if p.triggers != nil {
+		p.triggers.Evaluate(ctx, in, msg)
+	}
 
 	return conv, msg, nil
 }

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -475,6 +476,85 @@ func (h *CampaignHandler) Pause(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "campanha não está em execução"})
 	}
 	return c.JSON(fiber.Map{"status": "paused"})
+}
+
+// Resume godoc
+// POST /campaigns/:id/resume — retoma uma campanha pausada.
+func (h *CampaignHandler) Resume(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	campaignID := c.Params("id")
+	result := h.db.Model(&models.Campaign{}).
+		Where("id = ? AND user_id = ? AND status = ?", campaignID, user.ID, models.CampaignStatusPaused).
+		Update("status", models.CampaignStatusRunning)
+	if result.RowsAffected == 0 {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "campanha não está pausada"})
+	}
+	return c.JSON(fiber.Map{"status": "running"})
+}
+
+// ClearSent godoc
+// POST /campaigns/:id/clear-sent — apaga recipients já enviados pra
+// poder reusar a campanha (gap UazAPI: limpar fila enviada).
+func (h *CampaignHandler) ClearSent(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	campaignID := c.Params("id")
+	var campaign models.Campaign
+	if err := h.db.Where("id = ? AND user_id = ?", campaignID, user.ID).First(&campaign).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "campanha não encontrada"})
+	}
+	res := h.db.Where("campaign_id = ? AND status = ?", campaign.ID, models.RecipientStatusSent).
+		Delete(&models.CampaignRecipient{})
+	// reset counters denormalizados
+	h.db.Model(&campaign).Updates(map[string]any{
+		"sent_count":   0,
+		"failed_count": 0,
+		"total_count":  campaign.TotalCount - int(res.RowsAffected),
+	})
+	return c.JSON(fiber.Map{"status": "ok", "removed": res.RowsAffected})
+}
+
+// ListMessageStatus godoc
+// GET /campaigns/:id/messages — status por recipient (delivered/sent/
+// failed/pending), com paginação. Replica /sender/listMessages do
+// UazAPI.
+func (h *CampaignHandler) ListMessageStatus(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	campaignID := c.Params("id")
+	var campaign models.Campaign
+	if err := h.db.Where("id = ? AND user_id = ?", campaignID, user.ID).First(&campaign).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "campanha não encontrada"})
+	}
+	limit := c.QueryInt("limit", 100)
+	if limit < 1 {
+		limit = 100
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+	offset := c.QueryInt("offset", 0)
+
+	q := h.db.Where("campaign_id = ?", campaign.ID)
+	if status := strings.TrimSpace(c.Query("status")); status != "" {
+		q = q.Where("status = ?", status)
+	}
+
+	var total int64
+	q.Model(&models.CampaignRecipient{}).Count(&total)
+
+	var recipients []models.CampaignRecipient
+	q.Order("created_at desc").Limit(limit).Offset(offset).Find(&recipients)
+
+	return c.JSON(fiber.Map{
+		"data":   recipients,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+		"summary": fiber.Map{
+			"total_count":  campaign.TotalCount,
+			"sent_count":   campaign.SentCount,
+			"failed_count": campaign.FailedCount,
+		},
+	})
 }
 
 // Cancel godoc

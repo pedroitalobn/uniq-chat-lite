@@ -604,6 +604,58 @@ func (h *MessageHandler) SendPix(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message_id": msgID, "status": "sent"})
 }
 
+// SendPixButton godoc
+// POST /instances/:id/messages/pix-button
+//
+// Alias minimalista do /pix — só pix_key + key_type + (opcional)
+// merchant_name. Header/body/footer são gerados automaticamente.
+// Inspirado no /send/pix-button do UazAPI: uma chamada e UX brasileira
+// pronta sem precisar pensar no copy.
+func (h *MessageHandler) SendPixButton(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	instance := c.Locals("instance").(*models.Instance)
+
+	var req struct {
+		To           string `json:"to"`
+		PixKey       string `json:"pix_key"`
+		KeyType      string `json:"key_type"`
+		MerchantName string `json:"merchant_name"`
+		BodyText     string `json:"body_text"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.To == "" || req.PixKey == "" || req.KeyType == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campos 'to', 'pix_key' e 'key_type' são obrigatórios"})
+	}
+	merchant := req.MerchantName
+	if merchant == "" {
+		merchant = "Pagamento PIX"
+	}
+	body := req.BodyText
+	if body == "" {
+		body = "Toque em 'Pagar' para confirmar a transferência via PIX."
+	}
+
+	msgID, err := client.SendPixMessage(req.To, whatsapp.PixData{
+		HeaderTitle:  "Pagamento",
+		BodyText:     body,
+		FooterText:   "Pagamento seguro via PIX",
+		MerchantName: merchant,
+		PixKey:       req.PixKey,
+		KeyType:      req.KeyType,
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	go h.logMessage(instance.ID.String(), "out", "pix", req.To, msgID, map[string]interface{}{
+		"merchant_name": merchant,
+		"key_type":      req.KeyType,
+	})
+	return c.JSON(fiber.Map{"message_id": msgID, "status": "sent"})
+}
+
 // SendTemplate godoc
 // POST /instances/:id/messages/template
 func (h *MessageHandler) SendTemplate(c *fiber.Ctx) error {

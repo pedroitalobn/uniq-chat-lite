@@ -169,6 +169,9 @@ func main() {
 	// Conversations for the new atendimento module). Wired into the same
 	// SaveMessage hook used by legacy Inbox — co-exists during migration.
 	inboundPipeline := services.NewInboundPipeline(db, whatsapp.GetHub())
+	// Sprint 8: keyword triggers (autoresponder simples)
+	triggerSvc := services.NewTriggerService(db, manager)
+	inboundPipeline.SetTriggerService(triggerSvc)
 	manager.SetInboundProcessor(inboundPipeline)
 
 	// Ticketing periodic jobs: unsnoozer, presence sweep, pending redispatch,
@@ -278,6 +281,11 @@ func autoMigrate(db *gorm.DB) error {
 		&models.FunnelView{},
 		&models.ContactGroup{},
 		&models.ContactGroupMembership{},
+		// Sprint 8 — triggers (autoresponder por keyword)
+		&models.Trigger{},
+		&models.TriggerFire{},
+		// Sprint 7 — warm-up
+		&models.WarmupSession{},
 	)
 }
 
