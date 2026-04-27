@@ -273,6 +273,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 		full := "/v1/instances/:id/messages" + path
 		app.Post(full, append(preMsgChain, h)...)
 	}
+	// GET por ID — declarado primeiro pra ganhar match sobre os POSTs
+	// que vêm a seguir (Fiber matcha em ordem de registro).
+	app.Get("/v1/instances/:id/messages/:msgID", append(preMsgChain, msgH.GetMessage)...)
 	registerPreMsg("/text", msgH.SendText)
 	registerPreMsg("/image", msgH.SendImage)
 	registerPreMsg("/document", msgH.SendDocument)
@@ -328,6 +331,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Messages
 	v1msgs := v1inst.Group("/messages")
 	v1msgs.Get("/", msgH.GetMessages)
+	v1msgs.Get("/:msgID", msgH.GetMessage)
 	v1msgs.Post("/text", msgH.SendText)
 	v1msgs.Post("/image", msgH.SendImage)
 	v1msgs.Post("/document", msgH.SendDocument)
@@ -574,6 +578,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Messages
 	msgs := instance.Group("/messages")
 	msgs.Get("/", msgH.GetMessages)
+	msgs.Get("/:msgID", msgH.GetMessage)
 	msgs.Post("/text", msgH.SendText)
 	msgs.Post("/image", msgH.SendImage)
 	msgs.Post("/document", msgH.SendDocument)

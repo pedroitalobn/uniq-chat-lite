@@ -343,6 +343,10 @@ export const proxyApi = {
 export const messagesApi = {
   list: (id: string, params?: { limit?: number; offset?: number }) =>
     api.get(`/v1/instances/${id}/messages`, { params }),
+  // GET por ID — funciona com qualquer tipo. Aceita UUID interno OU
+  // external_message_id (stanza WhatsApp).
+  get: (id: string, msgID: string) =>
+    api.get(`/v1/instances/${id}/messages/${encodeURIComponent(msgID)}`),
   sendText: (id: string, to: string, text: string) =>
     api.post(`/v1/instances/${id}/messages/text`, { to, text }),
   sendImage: (id: string, data: { to: string; url?: string; base64?: string; caption?: string }) =>

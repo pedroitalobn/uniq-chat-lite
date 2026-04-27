@@ -1228,6 +1228,96 @@ func (h *MessageHandler) GetMessages(c *fiber.Ctx) error {
 	})
 }
 
+// GetMessage godoc
+// GET /instances/:id/messages/:msgID
+//
+// Retorna UMA mensagem por ID — funciona com qualquer tipo (texto,
+// imagem, áudio, sticker, location, contact, poll, button, list,
+// pix, carousel, ...) sem precisar do chat_jid ou conversation_id.
+//
+// Aceita tanto:
+//   - UUID interno (MessageLog.ID): "uuid-v4-aqui"
+//   - External message ID (stanza_id do WhatsApp): "ABCD1234..."
+//
+// Resolve nessa ordem: tenta como UUID; se inválido OU não achou,
+// busca por external_message_id. Resposta inclui o registro completo
+// + parsing do content (que é JSON serializado pra mídia).
+//
+// Por que existe: WhatsApp/whatsmeow não tem nenhum endpoint REST
+// "GET message by id" no protocolo — a única busca por id é via
+// nosso storage local (MessageLog). Esse handler centraliza isso.
+func (h *MessageHandler) GetMessage(c *fiber.Ctx) error {
+	instance, ok := c.Locals("instance").(*models.Instance)
+	if !ok {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	msgID := c.Params("msgID")
+	if msgID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "msgID é obrigatório"})
+	}
+
+	var ml models.MessageLog
+	q := h.db.Where("instance_id = ?", instance.ID)
+
+	// Tenta primeiro como UUID interno.
+	if parsed, err := uuid.Parse(msgID); err == nil {
+		if err := q.Where("id = ?", parsed).First(&ml).Error; err == nil {
+			return c.JSON(decorateMessage(&ml))
+		}
+	}
+	// Fallback: external_message_id (stanza id WhatsApp).
+	if err := q.Where("external_message_id = ?", msgID).First(&ml).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error":   "mensagem não encontrada",
+			"hint":    "msgID pode ser o UUID interno OU o external_message_id (stanza WhatsApp)",
+			"queried": msgID,
+		})
+	}
+	return c.JSON(decorateMessage(&ml))
+}
+
+// decorateMessage enriquece o MessageLog antes de devolver: parseia
+// content JSON pra um campo `content_parsed` quando aplicável (mídia,
+// location, etc.), e expõe alias amigável `message_id` = ID externo.
+func decorateMessage(ml *models.MessageLog) fiber.Map {
+	out := fiber.Map{
+		"id":                  ml.ID,
+		"message_id":          ml.ExternalMessageID,
+		"instance_id":         ml.InstanceID,
+		"workspace_id":        ml.WorkspaceID,
+		"conversation_id":     ml.ConversationID,
+		"direction":           ml.Direction,
+		"type":                ml.Type,
+		"to_jid":              ml.ToJID,
+		"sender_jid":          ml.SenderJID,
+		"sender_name":         ml.SenderName,
+		"contact_name":        ml.ContactName,
+		"contact_avatar":      ml.ContactAvatar,
+		"content":             ml.Content,
+		"status":              ml.Status,
+		"is_pinned":           ml.IsPinned,
+		"is_favorite":         ml.IsFavorite,
+		"is_archived":         ml.IsArchived,
+		"is_deleted":          ml.IsDeleted,
+		"is_internal_note":    ml.IsInternalNote,
+		"is_edited":           ml.IsEdited,
+		"reply_to_id":         ml.ReplyToID,
+		"external_message_id": ml.ExternalMessageID,
+		"delivered_at":        ml.DeliveredAt,
+		"read_at":             ml.ReadAt,
+		"created_at":          ml.CreatedAt,
+	}
+	// Se content é JSON, parseia e expõe — facilita pro cliente não ter
+	// que dar JSON.parse() em cima de uma string.
+	if ml.Content != "" && (strings.HasPrefix(ml.Content, "{") || strings.HasPrefix(ml.Content, "[")) {
+		var parsed interface{}
+		if err := json.Unmarshal([]byte(ml.Content), &parsed); err == nil {
+			out["content_parsed"] = parsed
+		}
+	}
+	return out
+}
+
 // GetChats godoc
 // GET /instances/:id/chats
 func (h *MessageHandler) GetChats(c *fiber.Ctx) error {

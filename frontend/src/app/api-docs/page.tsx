@@ -63,6 +63,7 @@ const SECTIONS: Section[] = [
     badge: "V1 API",
     endpoints: [
       { method: "GET",  path: "/v1/{server}/{instance}/messages", description: "Listar histórico de mensagens de um chat", auth: "token", params: { jid: "5511999999999@s.whatsapp.net", limit: "50" }, response: `[{ "id": "...", "body": "texto", "from": "...", "timestamp": 1234567890 }]` },
+      { method: "GET",  path: "/v1/{server}/{instance}/messages/{msgID}", description: "Buscar UMA mensagem por ID — qualquer tipo (texto/imagem/áudio/sticker/poll/button/list/pix/carousel...). Aceita UUID interno ou external_message_id (stanza WhatsApp).", auth: "token", response: `{ "id": "...", "message_id": "ABCD1234", "type": "image", "content": "{...}", "content_parsed": { "url": "...", "mime_type": "image/jpeg" }, "status": "delivered" }` },
       { method: "POST", path: "/v1/{server}/{instance}/messages/text", description: "Enviar mensagem de texto simples", auth: "token", body: { to: "5511999999999@s.whatsapp.net", text: "Olá!" }, response: `{ "status": "sent", "messageId": "..." }` },
       { method: "POST", path: "/v1/{server}/{instance}/messages/image", description: "Enviar imagem com legenda opcional", auth: "token", body: { to: "5511999999999@s.whatsapp.net", url: "https://...", caption: "Legenda" } },
       { method: "POST", path: "/v1/{server}/{instance}/messages/document", description: "Enviar documento (PDF, DOCX, etc.)", auth: "token", body: { to: "5511999999999@s.whatsapp.net", url: "https://...", filename: "arquivo.pdf" } },

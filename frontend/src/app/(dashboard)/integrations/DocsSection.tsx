@@ -153,6 +153,7 @@ const SECTIONS: Section[] = [
           question: { type: "string",   required: true,  description: "Pergunta da enquete",  example: "Qual sua preferência?" },
           options:  { type: "string[]", required: true,  description: "Opções de resposta",   example: '["Opção A","Opção B"]' },
         } },
+      { method: "GET",  path: "/instances/{id}/messages/{msgID}",      summary: "Buscar UMA mensagem por ID (qualquer tipo). Aceita UUID interno ou stanza WhatsApp.", pathParams: ["id", "msgID"] },
       { method: "POST", path: "/instances/{id}/messages/revoke",       summary: "Revogar/apagar mensagem",    pathParams: ["id"],
         body: {
           to:         { type: "string", required: true, description: "Número do chat",        example: "5511999999999" },
