@@ -322,10 +322,7 @@ func (cli *Client) SendMessage(ctx context.Context, to types.JID, message *waE2E
 		resp.DebugTimings.GetParticipants = time.Since(start)
 	} else if to.Server == types.HiddenUserServer {
 		ownID = cli.getOwnLID()
-	} else if to.Server == types.DefaultUserServer && cli.Store.LIDMigrationTimestamp > 0 && !req.Peer && !isInteractiveMessage(message) {
-		// PATCH UNIQ: skip LID migration pra interactive messages.
-		// Servidor WhatsApp rejeita interactive enviado pra LID com 405.
-		// Mantemos PN no destino — protocolo legacy aceita interactive.
+	} else if to.Server == types.DefaultUserServer && cli.Store.LIDMigrationTimestamp > 0 && !req.Peer {
 		start := time.Now()
 		var toLID types.JID
 		toLID, err = cli.Store.LIDs.GetLIDForPN(ctx, to)
