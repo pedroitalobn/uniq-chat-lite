@@ -210,7 +210,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4">
           <div>
-            <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>
+            <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>
               Nova Instância
             </h2>
             <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 42%)" }}>
@@ -257,11 +257,11 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
+                    <span className="text-sm font-medium" style={{ color: "hsl(240 15% 90%)" }}>
                       {channel.label}
                     </span>
                     {(channel.id === "instagram" || channel.id === "tiktok") && channel.available && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
                         style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)" }}>
                         Beta
                       </span>

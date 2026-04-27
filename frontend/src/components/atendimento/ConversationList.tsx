@@ -98,7 +98,7 @@ function Avatar({
   const hue = Math.abs(hash) % 360;
   return (
     <div
-      className="flex items-center justify-center rounded-full font-semibold flex-shrink-0"
+      className="flex items-center justify-center rounded-full font-medium flex-shrink-0"
       style={{
         width: size,
         height: size,
@@ -353,7 +353,7 @@ export function ConversationList({
                 )}
                 {conv.agent_unread_count > 0 && (
                   <span
-                    className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                    className="rounded-full px-1.5 py-0.5 text-[10px] font-medium"
                     style={{ background: "#ef4444", color: "white" }}
                   >
                     {conv.agent_unread_count}

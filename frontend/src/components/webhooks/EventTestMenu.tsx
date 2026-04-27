@@ -108,7 +108,7 @@ export function EventTestMenu({
             }}
           >
             <div className="p-3 border-b" style={{ borderColor: "var(--surface-border)" }}>
-              <p className="text-xs font-semibold mb-2" style={{ color: "var(--text-1)" }}>
+              <p className="text-xs font-medium mb-2" style={{ color: "var(--text-1)" }}>
                 Disparar como evento de teste
               </p>
               <div className="relative">
@@ -126,7 +126,7 @@ export function EventTestMenu({
             <div className="max-h-80 overflow-y-auto">
               {grouped.subscribed.length > 0 && (
                 <div>
-                  <p className="px-3 pt-2 pb-1 text-[10px] uppercase font-semibold" style={{ color: "var(--text-3)" }}>
+                  <p className="px-3 pt-2 pb-1 text-[10px] uppercase font-medium" style={{ color: "var(--text-3)" }}>
                     Inscritos no webhook
                   </p>
                   {grouped.subscribed.map(e => (
@@ -136,7 +136,7 @@ export function EventTestMenu({
               )}
               {grouped.others.length > 0 && (
                 <div>
-                  <p className="px-3 pt-2 pb-1 text-[10px] uppercase font-semibold" style={{ color: "var(--text-3)" }}>
+                  <p className="px-3 pt-2 pb-1 text-[10px] uppercase font-medium" style={{ color: "var(--text-3)" }}>
                     Outros eventos
                   </p>
                   {grouped.others.map(e => (
@@ -181,7 +181,7 @@ function EventRow({
         </code>
         <span className="flex-1 truncate" style={{ color: "var(--text-2)" }}>{ev.name}</span>
         {ev.admin_only && (
-          <span className="text-[8px] px-1 py-0.5 rounded font-bold" style={{ background: "rgba(245,158,11,0.15)", color: "#f59e0b" }} title="Apenas admin">
+          <span className="text-[8px] px-1 py-0.5 rounded font-semibold" style={{ background: "rgba(245,158,11,0.15)", color: "#f59e0b" }} title="Apenas admin">
             ADM
           </span>
         )}
@@ -225,7 +225,7 @@ function PayloadPreviewDialog({ eventId, onClose }: { eventId: string; onClose: 
       >
         <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "var(--surface-border)" }}>
           <div>
-            <p className="text-xs uppercase font-semibold" style={{ color: "var(--text-3)" }}>Payload exemplo</p>
+            <p className="text-xs uppercase font-medium" style={{ color: "var(--text-3)" }}>Payload exemplo</p>
             <code className="text-sm font-mono" style={{ color: "#8b5cf6" }}>{eventId}</code>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5" style={{ color: "var(--text-3)" }}>

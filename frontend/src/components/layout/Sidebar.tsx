@@ -214,7 +214,7 @@ export function Sidebar() {
           <div className="pt-4">
             <div className="flex items-center gap-1.5 px-3 mb-1.5">
               <Shield className="w-3 h-3 text-amber-500/60" />
-              <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
+              <p className="text-[10px] font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
                 {t("nav_admin")}
               </p>
             </div>
@@ -244,7 +244,7 @@ export function Sidebar() {
         <div className="px-2.5 pb-2 space-y-2">
           <div className="rounded-xl p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 38%)" }}>Mensagens hoje</span>
+              <span className="text-[10px] font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 38%)" }}>Mensagens hoje</span>
               <span className="text-[10px] font-mono" style={{ color: "hsl(240 8% 50%)" }}>—/100</span>
             </div>
             <div className="h-1 rounded-full overflow-hidden" style={{ background: "var(--surface-2)" }}>
@@ -252,7 +252,7 @@ export function Sidebar() {
             </div>
           </div>
           <Link href="/settings?section=billing" onClick={closeMobile}
-            className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-xs font-semibold transition-all"
+            className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-xs font-medium transition-all"
             style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.2)", color: "var(--green)" }}
             onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.14)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.08)"; }}>
@@ -278,7 +278,7 @@ export function Sidebar() {
       <div className="p-2.5 border-t" style={{ borderColor: "var(--sidebar-border)" }}>
         <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl mb-0.5"
           style={{ background: "rgba(128,128,128,0.06)" }}>
-          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0"
             style={{
               background: "linear-gradient(135deg, rgba(0,212,106,0.2), rgba(0,212,106,0.05))",
               boxShadow: "inset 0 0 0 1px rgba(0,212,106,0.2)",
@@ -287,10 +287,10 @@ export function Sidebar() {
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold truncate leading-tight" style={{ color: "var(--text-1)" }}>
+            <p className="text-xs font-medium truncate leading-tight" style={{ color: "var(--text-1)" }}>
               {session?.user?.name || "Usuário"}
               {session?.user?.is_beta && (
-                <span className="ml-2 inline-flex items-center px-1 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                <span className="ml-2 inline-flex items-center px-1 py-0.5 rounded text-[9px] font-semibold bg-purple-500/20 text-purple-400 border border-purple-500/30">
                   BETA
                 </span>
               )}

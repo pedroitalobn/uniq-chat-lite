@@ -161,7 +161,7 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <Briefcase className="h-4 w-4" style={{ color: uniq.textFaint }} />
-              <h1 className="truncate text-base font-semibold" style={{ color: uniq.textStrong }}>
+              <h1 className="truncate text-base font-medium" style={{ color: uniq.textStrong }}>
                 {deal.title}
               </h1>
               <span
@@ -221,7 +221,7 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
 
         {/* Timeline + note composer */}
         <div className="flex-1 overflow-auto p-5">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color: uniq.textFaint }}>
+          <h2 className="mb-3 text-xs font-medium uppercase tracking-widest" style={{ color: uniq.textFaint }}>
             Linha do tempo
           </h2>
 
@@ -414,7 +414,7 @@ function SummaryTile({ label, value, accent, icon }: {
         {label}
       </div>
       <div
-        className="mt-1 text-sm font-semibold"
+        className="mt-1 text-sm font-medium"
         style={{ color: accent ?? uniq.textPrimary }}
       >
         {value}
@@ -425,7 +425,7 @@ function SummaryTile({ label, value, accent, icon }: {
 
 function SidebarSectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: uniq.textFaint }}>
+    <div className="text-[10px] font-medium uppercase tracking-widest" style={{ color: uniq.textFaint }}>
       {children}
     </div>
   );

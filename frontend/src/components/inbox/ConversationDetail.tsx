@@ -652,7 +652,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             const initials = (text.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0] || "").join("") || "?").toUpperCase();
             return (
               <div
-                className="flex h-9 w-9 items-center justify-center rounded-full font-semibold flex-shrink-0"
+                className="flex h-9 w-9 items-center justify-center rounded-full font-medium flex-shrink-0"
                 style={{
                   background: `hsl(${hue} 50% 22%)`,
                   color: `hsl(${hue} 70% 75%)`,
@@ -668,7 +668,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               {(conv?.channel_key || "").toLowerCase().endsWith("@g.us") && (
                 <UsersIcon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#a78bfa" }} aria-label="Grupo" />
               )}
-              <h1 className="truncate text-base font-semibold">
+              <h1 className="truncate text-base font-medium">
                 {conv?.contact?.name || conv?.subject || "Atendimento"}
               </h1>
               {status && (
@@ -820,7 +820,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
       {/* Sidepanel with actions + contact */}
       <aside className="hidden w-80 flex-col border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 lg:flex">
         <div className="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Contato</h2>
+          <h2 className="text-xs font-medium uppercase tracking-wide text-zinc-500">Contato</h2>
           <div className="mt-2 flex items-center gap-3">
             {(() => {
               const isGroup = (conv?.channel_key || "").toLowerCase().endsWith("@g.us");
@@ -859,7 +859,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               const initials = (name.split(/\s+/).filter(Boolean).slice(0, 2).map((s) => s[0] || "").join("") || "?").toUpperCase();
               return (
                 <div
-                  className="flex h-12 w-12 items-center justify-center rounded-full font-semibold flex-shrink-0"
+                  className="flex h-12 w-12 items-center justify-center rounded-full font-medium flex-shrink-0"
                   style={{
                     background: `hsl(${hue} 50% 22%)`,
                     color: `hsl(${hue} 70% 75%)`,
@@ -946,7 +946,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
         </div>
 
         <div className="flex-1 overflow-auto p-5 text-xs text-zinc-500">
-          <div className="mb-2 font-semibold uppercase tracking-wide">Detalhes</div>
+          <div className="mb-2 font-medium uppercase tracking-wide">Detalhes</div>
           <dl className="space-y-1">
             <DRow label="Aberto em" value={conv?.created_at && relativeTime(conv.created_at)} />
             <DRow label="Última mensagem" value={conv?.last_message_at && relativeTime(conv.last_message_at)} />
@@ -955,7 +955,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             <DRow label="Fila" value={queuesQ.data?.items.find((q) => q.id === conv?.queue_id)?.name ?? "—"} />
           </dl>
           <div className="mt-4 rounded-md border border-dashed border-zinc-300 p-3 text-[11px] dark:border-zinc-700">
-            <div className="font-semibold uppercase tracking-wide text-zinc-500">Atalhos</div>
+            <div className="font-medium uppercase tracking-wide text-zinc-500">Atalhos</div>
             <dl className="mt-1 space-y-0.5 text-zinc-500">
               <div className="flex justify-between"><span>Atender</span><kbd className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">A</kbd></div>
               <div className="flex justify-between"><span>Transferir</span><kbd className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">T</kbd></div>
@@ -1125,7 +1125,7 @@ function TransferDialog({
           className="flex items-center justify-between px-4 py-3"
           style={{ borderBottom: "1px solid hsl(240 12% 16%)" }}
         >
-          <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 93%)" }}>
+          <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>
             Transferir atendimento
           </h2>
           <button
@@ -1518,7 +1518,7 @@ function MediaBody({
               preload="auto"
             />
             <span
-              className="absolute bottom-1.5 left-1.5 rounded px-1 text-[9px] font-bold tracking-wider"
+              className="absolute bottom-1.5 left-1.5 rounded px-1 text-[9px] font-semibold tracking-wider"
               style={{ background: "var(--surface-overlay)", color: "white" }}
             >
               GIF
@@ -1748,7 +1748,7 @@ function MediaBody({
               <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: isLive ? "#ef4444" : "#00d46a" }} />
               <div className="min-w-0 flex-1">
                 {isLive && (
-                  <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: "#ef4444" }}>
+                  <div className="flex items-center gap-1 text-[10px] font-medium" style={{ color: "#ef4444" }}>
                     <span className="inline-block h-1.5 w-1.5 rounded-full ring-pulse" style={{ background: "#ef4444" }} />
                     AO VIVO
                   </div>
@@ -1788,7 +1788,7 @@ function MediaBody({
         className="flex flex-col gap-1.5 rounded-lg p-3 max-w-[300px]"
         style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}
       >
-        <div className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
+        <div className="text-[10px] font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
           {list.length} contatos
         </div>
         {list.map((c, i) => (
@@ -1812,7 +1812,7 @@ function MediaBody({
         className="flex flex-col gap-2 rounded-lg p-3 max-w-[300px]"
         style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}
       >
-        <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
+        <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
           📊 Enquete{parsed.multi ? " · múltipla escolha" : ""}
         </div>
         {parsed.question && (
@@ -1851,7 +1851,7 @@ function MediaBody({
     return (
       <div className="flex flex-col gap-2 max-w-[300px]">
         {parsed.interactive?.header && (
-          <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "hsl(240 8% 60%)" }}>
+          <div className="text-[11px] font-medium uppercase tracking-wider" style={{ color: "hsl(240 8% 60%)" }}>
             {parsed.interactive.header}
           </div>
         )}
@@ -1889,12 +1889,12 @@ function MediaBody({
     return (
       <div className="flex flex-col gap-2 max-w-[320px]">
         {parsed.listHeader && (
-          <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "hsl(240 8% 60%)" }}>
+          <div className="text-[11px] font-medium uppercase tracking-wider" style={{ color: "hsl(240 8% 60%)" }}>
             {parsed.listHeader}
           </div>
         )}
         {parsed.listTitle && (
-          <div className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+          <div className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>
             {parsed.listTitle}
           </div>
         )}
@@ -1904,7 +1904,7 @@ function MediaBody({
             {parsed.listSections.map((sec, i) => (
               <div key={i}>
                 {sec.title && (
-                  <div className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 50%)" }}>
+                  <div className="text-[10px] font-medium uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 50%)" }}>
                     {sec.title}
                   </div>
                 )}
@@ -2127,7 +2127,7 @@ function ContactCard({
     >
       <div className="flex items-center gap-2.5">
         <div
-          className="flex h-10 w-10 items-center justify-center rounded-full font-semibold flex-shrink-0"
+          className="flex h-10 w-10 items-center justify-center rounded-full font-medium flex-shrink-0"
           style={{
             background: "rgba(0,212,106,0.1)",
             color: "#00d46a",
@@ -2319,7 +2319,7 @@ function ReactionChips({ reactions, isOut }: { reactions?: ReactionEntry[]; isOu
           }}
         >
           <span className="text-[12px] leading-none">{emoji}</span>
-          {count > 1 && <span className="font-semibold tabular-nums">{count}</span>}
+          {count > 1 && <span className="font-medium tabular-nums">{count}</span>}
         </span>
       ))}
     </div>
@@ -3177,7 +3177,7 @@ function Composer({
             color: "#00d46a",
           }}
         >
-          <span className="text-sm font-semibold">Solte para anexar</span>
+          <span className="text-sm font-medium">Solte para anexar</span>
         </div>
       )}
       <input
@@ -3235,7 +3235,7 @@ function Composer({
           }}
         >
           <div className="flex items-center justify-between gap-2 mb-2 px-1">
-            <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 55%)" }}>
+            <span className="text-[10px] font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 55%)" }}>
               {pending.length} anexo{pending.length > 1 ? "s" : ""}
             </span>
             <div className="flex items-center gap-2">
@@ -3540,7 +3540,7 @@ function Composer({
                 ? uploading
                 : disabled || isSending || isNoting
             }
-            className="flex h-10 items-center gap-1.5 rounded-md px-3 text-sm font-semibold disabled:opacity-50"
+            className="flex h-10 items-center gap-1.5 rounded-md px-3 text-sm font-medium disabled:opacity-50"
             style={{ background: accentBg, color: accentFg }}
             type="button"
           >
@@ -3672,7 +3672,7 @@ function ForwardDialog({
     <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
-          <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Encaminhar mensagem</h3>
+          <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>Encaminhar mensagem</h3>
           <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "hsl(240 8% 60%)" }}>
             <X className="h-4 w-4" />
           </button>
@@ -3718,7 +3718,7 @@ function ForwardDialog({
         </div>
         <div className="flex items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
           <button type="button" onClick={onClose} className="rounded-md px-3 py-1.5 text-xs" style={{ color: "hsl(240 8% 70%)" }}>Cancelar</button>
-          <button type="button" onClick={() => onSubmit(Array.from(selected))} disabled={selected.size === 0 || isPending} className="rounded-md px-4 py-1.5 text-xs font-semibold disabled:opacity-50" style={{ background: "#00d46a", color: "#03170a" }}>
+          <button type="button" onClick={() => onSubmit(Array.from(selected))} disabled={selected.size === 0 || isPending} className="rounded-md px-4 py-1.5 text-xs font-medium disabled:opacity-50" style={{ background: "#00d46a", color: "#03170a" }}>
             {isPending ? "Enviando…" : `Encaminhar ${selected.size > 0 ? `(${selected.size})` : ""}`}
           </button>
         </div>
@@ -3741,7 +3741,7 @@ function EditMessageDialog({
     <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
-          <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Editar mensagem</h3>
+          <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>Editar mensagem</h3>
           <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "hsl(240 8% 60%)" }}>
             <X className="h-4 w-4" />
           </button>
@@ -3752,7 +3752,7 @@ function EditMessageDialog({
         </div>
         <div className="flex items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
           <button type="button" onClick={onClose} className="rounded-md px-3 py-1.5 text-xs" style={{ color: "hsl(240 8% 70%)" }}>Cancelar</button>
-          <button type="button" onClick={() => onSubmit(text.trim())} disabled={text.trim() === "" || text.trim() === initial || isPending} className="rounded-md px-4 py-1.5 text-xs font-semibold disabled:opacity-50" style={{ background: "#00d46a", color: "#03170a" }}>
+          <button type="button" onClick={() => onSubmit(text.trim())} disabled={text.trim() === "" || text.trim() === initial || isPending} className="rounded-md px-4 py-1.5 text-xs font-medium disabled:opacity-50" style={{ background: "#00d46a", color: "#03170a" }}>
             {isPending ? "Salvando…" : "Salvar"}
           </button>
         </div>
@@ -3790,7 +3790,7 @@ function MessageInfoDialog({
     <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
-          <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Informações da mensagem</h3>
+          <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>Informações da mensagem</h3>
           <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "hsl(240 8% 60%)" }}>
             <X className="h-4 w-4" />
           </button>
@@ -3808,7 +3808,7 @@ function MessageInfoDialog({
             <div className="space-y-3">
               {data && data.read.length > 0 && (
                 <div>
-                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "#00d46a" }}>
+                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest" style={{ color: "#00d46a" }}>
                     <CheckCheck className="h-3 w-3" /> Lida por · {data.read.length}
                   </div>
                   <ul className="space-y-1">
@@ -3823,7 +3823,7 @@ function MessageInfoDialog({
               )}
               {data && data.delivered.length > 0 && (
                 <div>
-                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 65%)" }}>
+                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 65%)" }}>
                     <CheckCheck className="h-3 w-3" /> Entregue a · {data.delivered.length}
                   </div>
                   <ul className="space-y-1">
@@ -3857,7 +3857,7 @@ function StatusCard({
 }) {
   return (
     <div className="rounded-md px-3 py-2" style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 14%)" }}>
-      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest" style={{ color }}>
+      <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest" style={{ color }}>
         {icon} {label}
       </div>
       <div className="mt-0.5 text-xs" style={{ color: when ? "hsl(240 15% 88%)" : "hsl(240 8% 50%)" }}>
@@ -3964,7 +3964,7 @@ function EmojiPickerPanel({ onPick, onClose }: { onPick: (e: string) => void; on
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="px-2 py-1.5">
-      <div className="text-[9px] font-semibold uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 50%)" }}>
+      <div className="text-[9px] font-medium uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 50%)" }}>
         {title}
       </div>
       <div className="grid grid-cols-8 gap-0.5">
@@ -4061,7 +4061,7 @@ function SnoozeDialog({
     <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
-          <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Colocar em soneca</h3>
+          <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>Colocar em soneca</h3>
           <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "hsl(240 8% 60%)" }}>
             <X className="h-4 w-4" />
           </button>
@@ -4085,7 +4085,7 @@ function SnoozeDialog({
             </button>
           ))}
           <div className="border-t pt-3 mt-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
-            <div className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 55%)" }}>
+            <div className="text-[10px] font-medium uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 55%)" }}>
               Personalizar
             </div>
             <div className="flex items-center gap-2">
@@ -4103,7 +4103,7 @@ function SnoozeDialog({
                 type="button"
                 onClick={() => submit(hours)}
                 disabled={hours <= 0}
-                className="ml-auto rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                className="ml-auto rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50"
                 style={{ background: "#00d46a", color: "#03170a" }}
               >
                 Aplicar

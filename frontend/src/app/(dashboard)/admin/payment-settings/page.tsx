@@ -193,7 +193,7 @@ export default function PaymentSettingsPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold" style={{ color: "hsl(240 15% 93%)" }}>
+        <h1 className="text-xl sm:text-2xl font-semibold" style={{ color: "hsl(240 15% 93%)" }}>
           <span className="hidden sm:inline">Configurações de Pagamento</span>
           <span className="sm:hidden">Pagamento</span>
         </h1>
@@ -294,7 +294,7 @@ export default function PaymentSettingsPage() {
       >
         <div className="flex items-center gap-3 mb-4">
           <CreditCard className="w-5 h-5" style={{ color: "hsl(240 8% 60%)" }} />
-          <h2 className="font-semibold" style={{ color: "hsl(240 15% 93%)" }}>
+          <h2 className="font-medium" style={{ color: "hsl(240 15% 93%)" }}>
             Selecione o Provedor
           </h2>
         </div>

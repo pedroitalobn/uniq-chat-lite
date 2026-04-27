@@ -129,7 +129,7 @@ export function WebhooksPanel({ showHeader = true }: { showHeader?: boolean }) {
           <div className="flex items-center gap-3">
             <Webhook className="w-5 h-5" style={{ color: "#8b5cf6" }} />
             <div>
-              <h2 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>
+              <h2 className="text-base font-medium" style={{ color: "var(--text-1)" }}>
                 Webhooks Globais
               </h2>
               <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
@@ -151,7 +151,7 @@ export function WebhooksPanel({ showHeader = true }: { showHeader?: boolean }) {
       {/* Botão "Novo" flutuante quando sem header */}
       {!showHeader && (
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold" style={{ color: "var(--text-2)" }}>
+          <h3 className="text-sm font-medium" style={{ color: "var(--text-2)" }}>
             Meus Webhooks ({webhooks.length})
           </h3>
           <button
@@ -166,7 +166,7 @@ export function WebhooksPanel({ showHeader = true }: { showHeader?: boolean }) {
       )}
 
       {showHeader && (
-        <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-2)" }}>
+        <h3 className="text-sm font-medium mb-3" style={{ color: "var(--text-2)" }}>
           Meus Webhooks ({webhooks.length})
         </h3>
       )}
@@ -428,7 +428,7 @@ function WebhookEditor({
           style={{ borderColor: "var(--surface-border)" }}
         >
           <div>
-            <h3 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>
+            <h3 className="text-base font-medium" style={{ color: "var(--text-1)" }}>
               {draft.id ? "Editar Webhook" : "Criar Webhook"}
             </h3>
             <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
@@ -581,7 +581,7 @@ function WebhookEditor({
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <span
-                            className="text-xs font-semibold uppercase tracking-wide"
+                            className="text-xs font-medium uppercase tracking-wide"
                             style={{ color: "var(--text-1)" }}
                           >
                             {cat}
@@ -707,7 +707,7 @@ function SecretRevealModal({
             <CheckCircle2 className="w-5 h-5" style={{ color: "#22c55e" }} />
           </div>
           <div className="flex-1">
-            <h3 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>
+            <h3 className="text-base font-medium" style={{ color: "var(--text-1)" }}>
               Webhook criado
             </h3>
             <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>

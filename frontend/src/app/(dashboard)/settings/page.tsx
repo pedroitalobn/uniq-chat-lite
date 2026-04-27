@@ -33,7 +33,7 @@ function SectionWrap({ title, description, children }: {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold tracking-tight" style={{ color: "var(--text-1)" }}>{title}</h2>
+        <h2 className="text-lg font-semibold tracking-tight" style={{ color: "var(--text-1)" }}>{title}</h2>
         {description && <p className="text-sm mt-0.5" style={{ color: "var(--text-3)" }}>{description}</p>}
       </div>
       {children}
@@ -153,7 +153,7 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
                 }
               </div>
               <div>
-                <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Plano {currentPlanName}</p>
+                <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Plano {currentPlanName}</p>
                 <p className="text-xs" style={{ color: "var(--text-3)" }}>
                   {currentPlan?.price === 0 || !currentPlan ? "Gratuito" : `R$ ${currentPlan.price}/mês`}
                 </p>
@@ -161,13 +161,13 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
             </div>
             <div className="flex items-center gap-2">
               {statusInfo && (
-                <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full"
+                <span className="text-[10px] font-medium px-2.5 py-1 rounded-full"
                   style={{ background: statusInfo.bg, color: statusInfo.color, border: `1px solid ${statusInfo.color}30` }}>
                   {statusInfo.label}
                 </span>
               )}
               {subscription?.cancel_at_period_end && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full"
                   style={{ background: "rgba(251,191,36,0.08)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.2)" }}>
                   Cancela ao fim do período
                 </span>
@@ -186,7 +186,7 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
               ].map(({ label, value, colored }, i, arr) => (
                 <div key={label} className="flex items-center gap-6">
                   <div className="text-center">
-                    <p className="text-lg font-bold" style={{ color: colored ? "#60a5fa" : "var(--text-1)" }}>{value}</p>
+                    <p className="text-lg font-semibold" style={{ color: colored ? "#60a5fa" : "var(--text-1)" }}>{value}</p>
                     <p className="text-[10px] uppercase tracking-widest mt-0.5" style={{ color: "var(--text-3)" }}>{label}</p>
                   </div>
                   {i < arr.length - 1 && <div className="w-px h-8" style={{ background: "var(--surface-border)" }} />}
@@ -198,7 +198,7 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
 
         {/* Plan picker */}
         <Card>
-          <p className="text-xs font-semibold mb-4" style={{ color: "var(--text-3)" }}>PLANOS DISPONÍVEIS</p>
+          <p className="text-xs font-medium mb-4" style={{ color: "var(--text-3)" }}>PLANOS DISPONÍVEIS</p>
           {plansLoading ? (
             <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="skeleton h-14 rounded-xl" />)}</div>
           ) : (
@@ -213,7 +213,7 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
                       border: isCurrent ? "1px solid rgba(0,212,106,0.2)" : "1px solid var(--surface-border)",
                     }}>
                     <div>
-                      <p className="text-sm font-semibold flex items-center gap-2" style={{ color: isCurrent ? "var(--green)" : "var(--text-1)" }}>
+                      <p className="text-sm font-medium flex items-center gap-2" style={{ color: isCurrent ? "var(--green)" : "var(--text-1)" }}>
                         {plan.name}
                         {isCurrent && <span className="text-[10px] font-normal opacity-60">plano atual</span>}
                       </p>
@@ -227,7 +227,7 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
                       <button
                         onClick={() => checkoutMutation.mutate(plan.id)}
                         disabled={checkoutMutation.isPending}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all disabled:opacity-40"
+                        className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl transition-all disabled:opacity-40"
                         style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)", color: "var(--green)" }}
                         onMouseEnter={e => { e.currentTarget.style.background = "rgba(0,212,106,0.18)"; }}
                         onMouseLeave={e => { e.currentTarget.style.background = "rgba(0,212,106,0.1)"; }}
@@ -285,13 +285,13 @@ function ProfileSection({ session, update, t }: {
           className="space-y-5">
           {/* Avatar */}
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0"
+            <div className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-semibold flex-shrink-0"
               style={{ background: "linear-gradient(135deg, rgba(0,212,106,0.2), rgba(0,212,106,0.05))",
                        boxShadow: "inset 0 0 0 1px rgba(0,212,106,0.25)", color: "var(--green)" }}>
               {name?.[0]?.toUpperCase() || user?.name?.[0]?.toUpperCase() || "U"}
             </div>
             <div>
-              <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>{user?.name}</p>
+              <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{user?.name}</p>
               <p className="text-xs" style={{ color: "var(--text-3)" }}>{user?.email}</p>
             </div>
           </div>
@@ -373,7 +373,7 @@ function SecuritySection() {
           <div className="flex justify-end pt-1">
             <button type="submit"
               disabled={mutation.isPending || !currentPw || !newPw || newPw !== confirmPw}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.2)", color: "#60a5fa" }}
               onMouseEnter={e => { if (!mutation.isPending) e.currentTarget.style.background = "rgba(96,165,250,0.16)"; }}
               onMouseLeave={e => (e.currentTarget.style.background = "rgba(96,165,250,0.1)")}>
@@ -442,7 +442,7 @@ function TwoFactorCard() {
     <Card>
       <div className="flex items-start justify-between gap-4 mb-3">
         <div>
-          <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: "var(--text-1)" }}>
+          <h3 className="text-sm font-medium flex items-center gap-2" style={{ color: "var(--text-1)" }}>
             <Lock className="w-4 h-4" /> Autenticação em duas etapas
           </h3>
           <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
@@ -452,12 +452,12 @@ function TwoFactorCard() {
           </p>
         </div>
         {totpEnabled ? (
-          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap"
             style={{ background: "var(--green-soft)", color: "var(--green)" }}>
             ATIVO
           </span>
         ) : (
-          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap"
             style={{ background: "var(--surface-3)", color: "var(--text-3)" }}>
             INATIVO
           </span>
@@ -466,7 +466,7 @@ function TwoFactorCard() {
 
       {step === "idle" && !totpEnabled && (
         <button onClick={() => setupMut.mutate()} disabled={setupMut.isPending}
-          className="text-xs font-semibold px-3 py-2 rounded-lg inline-flex items-center gap-2"
+          className="text-xs font-medium px-3 py-2 rounded-lg inline-flex items-center gap-2"
           style={{ background: "var(--green)", color: "var(--green-fg)" }}>
           {setupMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
           Ativar 2FA
@@ -475,7 +475,7 @@ function TwoFactorCard() {
 
       {step === "idle" && totpEnabled && (
         <button onClick={() => setStep("disable")}
-          className="text-xs font-semibold px-3 py-2 rounded-lg"
+          className="text-xs font-medium px-3 py-2 rounded-lg"
           style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)", color: "#f87171" }}>
           Desativar 2FA
         </button>
@@ -508,7 +508,7 @@ function TwoFactorCard() {
             <button onClick={() => setStep("idle")} className="text-xs px-3 py-2 rounded-lg"
               style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>Cancelar</button>
             <button onClick={() => enableMut.mutate()} disabled={code.length !== 6 || enableMut.isPending}
-              className="text-xs font-semibold px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-40"
+              className="text-xs font-medium px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-40"
               style={{ background: "var(--green)", color: "var(--green-fg)" }}>
               {enableMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               Confirmar e ativar
@@ -520,7 +520,7 @@ function TwoFactorCard() {
       {step === "backup" && (
         <div className="space-y-3 mt-2">
           <div className="rounded-lg p-3" style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)" }}>
-            <p className="text-xs font-semibold mb-1" style={{ color: "#f59e0b" }}>⚠️ Guarde estes códigos AGORA</p>
+            <p className="text-xs font-medium mb-1" style={{ color: "#f59e0b" }}>⚠️ Guarde estes códigos AGORA</p>
             <p className="text-[11px]" style={{ color: "var(--text-2)" }}>
               São 10 códigos de uso único. Cada um pode substituir o app autenticador caso você perca o acesso. Não serão mostrados novamente.
             </p>
@@ -537,7 +537,7 @@ function TwoFactorCard() {
               <Copy className="w-3.5 h-3.5" /> Copiar todos
             </button>
             <button onClick={() => setStep("idle")}
-              className="text-xs font-semibold px-3 py-2 rounded-lg"
+              className="text-xs font-medium px-3 py-2 rounded-lg"
               style={{ background: "var(--green)", color: "var(--green-fg)" }}>
               Já guardei, fechar
             </button>
@@ -557,7 +557,7 @@ function TwoFactorCard() {
             <button onClick={() => { setStep("idle"); setCode(""); }} className="text-xs px-3 py-2 rounded-lg"
               style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>Cancelar</button>
             <button onClick={() => disableMut.mutate()} disabled={code.length !== 6 || disableMut.isPending}
-              className="text-xs font-semibold px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-40"
+              className="text-xs font-medium px-3 py-2 rounded-lg inline-flex items-center gap-2 disabled:opacity-40"
               style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)", color: "#f87171" }}>
               Desativar
             </button>
@@ -726,7 +726,7 @@ function InviteSection() {
       <Card>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Seus códigos de convite</p>
+            <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Seus códigos de convite</p>
             <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
               {inviteEnabled
                 ? "Compartilhe o código ou link para que novos usuários possam se cadastrar"
@@ -734,7 +734,7 @@ function InviteSection() {
             </p>
           </div>
           <button onClick={generate} disabled={generating}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
             style={{ background: "var(--green)", color: "#03170a" }}>
             {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ticket className="w-4 h-4" />}
             Gerar código
@@ -756,7 +756,7 @@ function InviteSection() {
               <div key={c.id} className="flex items-center justify-between p-3 rounded-xl"
                 style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
                 <div className="flex items-center gap-3 min-w-0">
-                  <code className="text-sm font-mono font-bold shrink-0" style={{ color: "var(--green)" }}>{c.code}</code>
+                  <code className="text-sm font-mono font-semibold shrink-0" style={{ color: "var(--green)" }}>{c.code}</code>
                   {c.used_by ? (
                     <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>Usado</span>
                   ) : (
@@ -794,7 +794,7 @@ export default function SettingsPage() {
     <div className="max-w-5xl">
       {/* Page header */}
       <div className="mb-6 sm:mb-8">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: "var(--text-1)" }}>
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "var(--text-1)" }}>
           {t("settings_title")}
         </h1>
         <p className="text-sm mt-1 hidden sm:block" style={{ color: "var(--text-3)" }}>
@@ -853,7 +853,7 @@ export default function SettingsPage() {
                     <Icon className="w-3.5 h-3.5" style={{ color: isActive ? "var(--green)" : "var(--text-3)" }} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold truncate" style={{ color: isActive ? "var(--green)" : "var(--text-1)" }}>
+                    <p className="text-xs font-medium truncate" style={{ color: isActive ? "var(--green)" : "var(--text-1)" }}>
                       {section.label}
                     </p>
                     <p className="text-[10px] truncate mt-0.5 hidden lg:block" style={{ color: "var(--text-3)" }}>

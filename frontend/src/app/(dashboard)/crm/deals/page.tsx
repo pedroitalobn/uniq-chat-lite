@@ -186,7 +186,7 @@ export default function DealsPage() {
       <header className="border-b px-4 sm:px-6 py-3 sm:py-4 space-y-3" style={{ borderColor: uniq.borderSoft }}>
         {/* Title row + tabs inline */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: uniq.textPrimary }}>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: uniq.textPrimary }}>
             Deals
           </h1>
           <CRMTabs />
@@ -337,7 +337,7 @@ function Metric({ label, value, sub, accent }: { label: string; value: string; s
         style={{ background: accent }}
       />
       <span style={{ color: uniq.textFaint }}>{label}</span>
-      <span className="font-semibold" style={{ color: uniq.textPrimary }}>{value}</span>
+      <span className="font-medium" style={{ color: uniq.textPrimary }}>{value}</span>
       {sub && <span className="text-[10px]" style={{ color: uniq.textFaint }}>· {sub}</span>}
     </div>
   );
@@ -354,7 +354,7 @@ function FunnelSelector({ funnels, activeId, onChange }: {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold"
+        className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium"
         style={{
           background: "var(--surface-2)",
           border: `1px solid ${uniq.borderFaint}`,
@@ -448,7 +448,7 @@ function DealsList({ deals, stages, currency, isLoading }: {
                 <span style={{ color: uniq.textDim }}>{stageMap[d.stage_id] ?? "—"}</span>
               </Td>
               <Td>
-                <span className="font-semibold" style={{ color: uniq.green }}>
+                <span className="font-medium" style={{ color: uniq.green }}>
                   {formatCurrency(d.value, d.currency || currency)}
                 </span>
               </Td>

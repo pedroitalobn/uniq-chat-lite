@@ -85,7 +85,7 @@ export function Logo({ className, height = 32 }: LogoProps) {
 
       {/* ── Wordmark ── */}
       <span
-        className="font-bold leading-none tracking-tight text-[#1a3d2b] dark:text-white"
+        className="font-semibold leading-none tracking-tight text-[#1a3d2b] dark:text-white"
         style={{ fontSize }}
       >
         uniq

@@ -136,7 +136,7 @@ function PlanCard({ plan, onSelect, loading, disabled }: {
     >
       {meta.badge && (
         <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-          <span className="px-3 py-1 rounded-full text-[11px] font-bold tracking-wide"
+          <span className="px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide"
             style={{ background: meta.color, color: "#03170a" }}>
             {meta.badge}
           </span>
@@ -150,7 +150,7 @@ function PlanCard({ plan, onSelect, loading, disabled }: {
           {meta.icon}
         </div>
         <div>
-          <h3 className="text-sm font-bold" style={{ color: "hsl(240 15% 92%)" }}>{plan.name}</h3>
+          <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>{plan.name}</h3>
           {description && (
             <p className="text-[11px] mt-0.5 leading-snug" style={{ color: "hsl(240 8% 46%)" }}>{description}</p>
           )}
@@ -186,7 +186,7 @@ function PlanCard({ plan, onSelect, loading, disabled }: {
       {/* CTA */}
       <button
         disabled={loading || disabled}
-        className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] disabled:opacity-60"
+        className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] disabled:opacity-60"
         style={isPopular
           ? { background: meta.color, color: "#03170a" }
           : { background: `${meta.color}14`, color: meta.color, border: `1px solid ${meta.color}30` }}
@@ -322,10 +322,10 @@ function PlansContent() {
               <span className="absolute right-3.5 top-1/2 -translate-y-1/2">
                 {checkingInvite && <Loader2 className="w-4 h-4 animate-spin" style={{ color: "hsl(240 8% 40%)" }} />}
                 {!checkingInvite && inviteValid === true && (
-                  <span className="text-xs font-semibold text-green-400">Válido</span>
+                  <span className="text-xs font-medium text-green-400">Válido</span>
                 )}
                 {!checkingInvite && inviteValid === false && (
-                  <span className="text-xs font-semibold text-red-400">Inválido</span>
+                  <span className="text-xs font-medium text-red-400">Inválido</span>
                 )}
               </span>
             </div>

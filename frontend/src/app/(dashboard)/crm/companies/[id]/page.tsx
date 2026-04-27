@@ -124,7 +124,7 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-base font-semibold" style={{ color: uniq.textStrong }}>
+          <h1 className="truncate text-base font-medium" style={{ color: uniq.textStrong }}>
             {c.name}
           </h1>
           <p className="truncate text-xs" style={{ color: uniq.textFaint }}>
@@ -204,7 +204,7 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
           )}
 
           {/* Deals */}
-          <h2 className="mt-8 mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color: uniq.textFaint }}>
+          <h2 className="mt-8 mb-3 text-xs font-medium uppercase tracking-widest" style={{ color: uniq.textFaint }}>
             Deals ({dealsQ.data?.length ?? 0})
           </h2>
           {dealsQ.data?.length === 0 && (
@@ -227,7 +227,7 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-0.5">
-                  <span className="text-sm font-semibold" style={{ color: uniq.green }}>
+                  <span className="text-sm font-medium" style={{ color: uniq.green }}>
                     {formatCurrency(d.value, d.currency)}
                   </span>
                   <span
@@ -247,7 +247,7 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
           className="hidden w-80 flex-col border-l overflow-auto p-5 lg:flex"
           style={{ borderColor: uniq.borderSoft, background: uniq.bgElevated }}
         >
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color: uniq.textFaint }}>
+          <h2 className="mb-3 text-xs font-medium uppercase tracking-widest" style={{ color: uniq.textFaint }}>
             Contatos ({contactsQ.data?.length ?? 0})
           </h2>
           <div className="space-y-2">
@@ -299,7 +299,7 @@ function EditOverview({ company, wsId, onClose, onSaved }: {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: uniq.textFaint }}>
+        <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: uniq.textFaint }}>
           Editar
         </h3>
         <button onClick={onClose} className="p-1" style={{ color: uniq.textFaint }}>
@@ -350,7 +350,7 @@ function EditOverview({ company, wsId, onClose, onSaved }: {
         <button
           onClick={() => save.mutate()}
           disabled={save.isPending}
-          className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+          className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
           style={{ background: uniq.green, color: "#03170a" }}
         >
           <Check className="h-3 w-3" />
@@ -376,7 +376,7 @@ function Metric({ icon, label, value, accent }: {
         {icon}
         {label}
       </div>
-      <div className="mt-1 text-sm font-semibold" style={{ color: accent || uniq.textStrong }}>{value}</div>
+      <div className="mt-1 text-sm font-medium" style={{ color: accent || uniq.textStrong }}>{value}</div>
     </div>
   );
 }
@@ -436,7 +436,7 @@ function Avatar({ name, url }: { name: string; url?: string }) {
     .toUpperCase();
   return (
     <div
-      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
+      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-medium"
       style={{ background: "rgba(0,212,106,0.08)", color: uniq.green }}
     >
       {initials || "?"}

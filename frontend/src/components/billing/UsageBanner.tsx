@@ -93,7 +93,7 @@ export function UsageBanner() {
       </div>
       <Link
         href="/settings?section=billing"
-        className="hidden sm:flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full transition-opacity hover:opacity-80"
+        className="hidden sm:flex items-center gap-1 text-xs font-medium px-3 py-1 rounded-full transition-opacity hover:opacity-80"
         style={{ background: fg, color: "#fff" }}
       >
         Ver planos <ArrowRight className="w-3 h-3" />

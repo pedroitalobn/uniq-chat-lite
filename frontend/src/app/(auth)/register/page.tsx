@@ -279,7 +279,7 @@ function RegisterForm() {
           >
             <div className="flex items-center gap-2 mb-1.5">
               <Building2 className="w-3.5 h-3.5" style={{ color: "#00d46a" }} />
-              <span className="text-xs font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+              <span className="text-xs font-medium" style={{ color: "hsl(240 15% 92%)" }}>
                 {wsInvitePreview?.workspace_name || "Convite para workspace"}
               </span>
             </div>
@@ -298,7 +298,7 @@ function RegisterForm() {
           </div>
         ) : (
           <div className="flex items-center justify-center mb-5">
-            <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold"
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium"
               style={{ background: `${meta.color}14`, color: meta.color, border: `1px solid ${meta.color}30` }}>
               <span style={{ color: meta.color }}>{meta.icon}</span>
               Plano {planName} — {meta.label}
@@ -313,7 +313,7 @@ function RegisterForm() {
             boxShadow: "0 0 0 1px hsl(240 12% 13%), 0 24px 64px rgba(0,0,0,0.5)",
           }}>
           <div className="px-5 pt-5 pb-1">
-            <h2 className="text-base font-bold" style={{ color: "hsl(240 15% 90%)" }}>
+            <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
               {workspaceInviteToken ? "Crie sua conta para entrar" : "Criar sua conta"}
             </h2>
             <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 44%)" }}>
@@ -415,7 +415,7 @@ function RegisterForm() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] disabled:opacity-40 mt-1"
+              className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] disabled:opacity-40 mt-1"
               style={{
                 background: meta.color,
                 // Fundo verde/colorido = texto escuro pra contraste. Cinza

@@ -297,7 +297,7 @@ export function MediaViewer({
                   <FileText className="h-8 w-8" />
                 </div>
                 <div className="text-center">
-                  <div className="text-base font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+                  <div className="text-base font-medium" style={{ color: "hsl(240 15% 92%)" }}>
                     {source.filename || "Documento"}
                   </div>
                   <div className="text-xs mt-1" style={{ color: "hsl(240 8% 55%)" }}>
@@ -306,7 +306,7 @@ export function MediaViewer({
                 </div>
                 <button
                   onClick={downloadHandler}
-                  className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors"
+                  className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors"
                   style={{ background: "#00d46a", color: "#0a0a0f" }}
                 >
                   <Download className="h-4 w-4" />

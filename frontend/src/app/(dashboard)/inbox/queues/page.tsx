@@ -49,7 +49,7 @@ export default function QueuesHubPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-4 p-6">
       <header className="mb-2">
-        <h1 className="text-2xl font-semibold">Filas</h1>
+        <h1 className="text-2xl font-medium">Filas</h1>
         <p className="text-sm text-zinc-500">Status ao vivo de cada fila. Clique para abrir.</p>
       </header>
       {isLoading && <div className="text-sm text-zinc-500">Carregando…</div>}
@@ -85,7 +85,7 @@ function QueueCard({ queue, wsId }: { queue: Queue; wsId: string }) {
     >
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-semibold">{queue.name}</h3>
+          <h3 className="font-medium">{queue.name}</h3>
           <p className="text-xs text-zinc-500">
             {queue.department?.name && `${queue.department.name} · `}
             {queue.assignment_strategy}
@@ -112,7 +112,7 @@ function Mini({ icon, label, value, tone }: { icon: React.ReactNode; label: stri
       <div className="flex items-center justify-center gap-1 text-[10px] text-zinc-500">
         {icon} {label}
       </div>
-      <div className={`mt-0.5 text-lg font-semibold ${cls}`}>{value}</div>
+      <div className={`mt-0.5 text-lg font-medium ${cls}`}>{value}</div>
     </div>
   );
 }

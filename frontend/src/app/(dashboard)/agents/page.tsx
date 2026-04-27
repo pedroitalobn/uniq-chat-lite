@@ -393,7 +393,7 @@ export default function AgentPersonalityPage() {
     <div className="space-y-4 sm:space-y-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
-          <h1 className="text-xl sm:text-2xl font-semibold flex items-center gap-2 sm:gap-3" style={{ color: "var(--text-1)" }}>
+          <h1 className="text-xl sm:text-2xl font-medium flex items-center gap-2 sm:gap-3" style={{ color: "var(--text-1)" }}>
             <Bot className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: "var(--green)" }} />
             Agentes
           </h1>
@@ -413,7 +413,7 @@ export default function AgentPersonalityPage() {
           <button
             onClick={() => saveMutation.mutate()}
             disabled={!selectedInstance || saveMutation.isPending}
-            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold"
+            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium"
             style={{ background: "var(--green)", color: "#06210f", opacity: saveMutation.isPending ? 0.7 : 1 }}
           >
             <Save className="w-4 h-4" />
@@ -425,7 +425,7 @@ export default function AgentPersonalityPage() {
       <div className="grid grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)] gap-5">
         <aside className="space-y-4">
           <div className="rounded-3xl p-4" style={cardStyle(true)}>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] mb-2" style={{ color: "var(--text-3)" }}>
+            <p className="text-xs font-medium uppercase tracking-[0.16em] mb-2" style={{ color: "var(--text-3)" }}>
               Instância
             </p>
             <select
@@ -471,7 +471,7 @@ export default function AgentPersonalityPage() {
                     <Icon className="w-4 h-4" style={{ color: active ? "var(--green)" : "var(--text-3)" }} />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold" style={{ color: active ? "var(--green)" : "var(--text-1)" }}>{item.label}</p>
+                    <p className="text-sm font-medium" style={{ color: active ? "var(--green)" : "var(--text-1)" }}>{item.label}</p>
                     <p className="text-xs" style={{ color: "var(--text-3)" }}>{item.description}</p>
                   </div>
                 </button>
@@ -485,7 +485,7 @@ export default function AgentPersonalityPage() {
             <>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div className="rounded-3xl p-5 space-y-4" style={cardStyle()}>
-                  <h2 className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>Identidade</h2>
+                  <h2 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>Identidade</h2>
                   <input
                     value={form.agent_name}
                     onChange={(e) => setForm((prev) => ({ ...prev, agent_name: e.target.value }))}
@@ -507,7 +507,7 @@ export default function AgentPersonalityPage() {
                 </div>
 
                 <div className="rounded-3xl p-5 space-y-4" style={cardStyle()}>
-                  <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: "var(--text-1)" }}>
+                  <h2 className="text-lg font-medium flex items-center gap-2" style={{ color: "var(--text-1)" }}>
                     <Mic2 className="w-4 h-4" style={{ color: "var(--green)" }} />
                     Voz configurada
                   </h2>
@@ -549,7 +549,7 @@ export default function AgentPersonalityPage() {
               </div>
 
               <div className="rounded-3xl p-5 space-y-4" style={cardStyle()}>
-                <h2 className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>Diretrizes e atendimento</h2>
+                <h2 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>Diretrizes e atendimento</h2>
                 <textarea
                   value={form.communication_guidelines}
                   onChange={(e) => setForm((prev) => ({ ...prev, communication_guidelines: e.target.value }))}
@@ -572,7 +572,7 @@ export default function AgentPersonalityPage() {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div className="rounded-3xl p-5" style={cardStyle()}>
-                  <h2 className="text-lg font-semibold mb-4" style={{ color: "var(--text-1)" }}>Variáveis</h2>
+                  <h2 className="text-lg font-medium mb-4" style={{ color: "var(--text-1)" }}>Variáveis</h2>
                   {renderListEditor(
                     form.variables,
                     () => setForm((prev) => ({ ...prev, variables: [...prev.variables, { id: uid(), key: "", value: "", description: "" }] })),
@@ -592,7 +592,7 @@ export default function AgentPersonalityPage() {
                 </div>
 
                 <div className="rounded-3xl p-5" style={cardStyle()}>
-                  <h2 className="text-lg font-semibold mb-4" style={{ color: "var(--text-1)" }}>Prompt compilado</h2>
+                  <h2 className="text-lg font-medium mb-4" style={{ color: "var(--text-1)" }}>Prompt compilado</h2>
                   <textarea readOnly value={form.compiled_prompt} style={{ ...inputStyle(true), minHeight: 360, opacity: 0.85 }} />
                 </div>
               </div>
@@ -604,7 +604,7 @@ export default function AgentPersonalityPage() {
               <div className="rounded-3xl p-5 space-y-4" style={cardStyle()}>
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>Base de conhecimento manual</h2>
+                    <h2 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>Base de conhecimento manual</h2>
                     <p className="text-sm" style={{ color: "var(--text-3)" }}>Informações centrais que o agente deve usar como fonte primária.</p>
                   </div>
                   <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-2)" }}>
@@ -623,7 +623,7 @@ export default function AgentPersonalityPage() {
               <div className="rounded-3xl p-5" style={cardStyle()}>
                 <div className="flex items-center justify-between gap-3 mb-4">
                   <div>
-                    <h2 className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>FAQ personalizado</h2>
+                    <h2 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>FAQ personalizado</h2>
                     <p className="text-sm" style={{ color: "var(--text-3)" }}>Perguntas frequentes e respostas aprovadas.</p>
                   </div>
                 </div>
@@ -647,7 +647,7 @@ export default function AgentPersonalityPage() {
               <div className="rounded-3xl p-5" style={cardStyle()}>
                 <div className="flex items-center justify-between gap-3 mb-4">
                   <div>
-                    <h2 className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>Documentos e arquivos</h2>
+                    <h2 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>Documentos e arquivos</h2>
                     <p className="text-sm" style={{ color: "var(--text-3)" }}>Upload para RAG e referência do agente. Suporta `json`, `txt`, `doc`, `docx`, `pdf` e `pptx`.</p>
                   </div>
                   <div>
@@ -686,7 +686,7 @@ export default function AgentPersonalityPage() {
           {tab === "skills" && (
             <>
               <div className="rounded-3xl p-5" style={cardStyle()}>
-                <h2 className="text-lg font-semibold mb-4" style={{ color: "var(--text-1)" }}>Skills prontas</h2>
+                <h2 className="text-lg font-medium mb-4" style={{ color: "var(--text-1)" }}>Skills prontas</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {PRESET_SKILLS.map((skill) => {
                     const enabled = form.skills.some((item) => item.name === skill.name && item.enabled);
@@ -715,7 +715,7 @@ export default function AgentPersonalityPage() {
                         }}
                       >
                         <div className="flex items-center justify-between gap-3">
-                          <p className="font-semibold" style={{ color: enabled ? "var(--green)" : "var(--text-1)" }}>{skill.name}</p>
+                          <p className="font-medium" style={{ color: enabled ? "var(--green)" : "var(--text-1)" }}>{skill.name}</p>
                           <span className="text-xs px-2 py-1 rounded-full" style={{ background: enabled ? "rgba(0,212,106,0.12)" : "var(--surface-3)", color: enabled ? "var(--green)" : "var(--text-3)" }}>
                             {enabled ? "Ativa" : "Adicionar"}
                           </span>
@@ -730,7 +730,7 @@ export default function AgentPersonalityPage() {
               <div className="rounded-3xl p-5" style={cardStyle()}>
                 <div className="flex items-center justify-between gap-3 mb-4">
                   <div>
-                    <h2 className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>Skills customizadas</h2>
+                    <h2 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>Skills customizadas</h2>
                     <p className="text-sm" style={{ color: "var(--text-3)" }}>Você pode subir arquivos `.md` como skill ou registrar capacidades manuais.</p>
                   </div>
                   <div>
@@ -789,7 +789,7 @@ export default function AgentPersonalityPage() {
             <>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div className="rounded-3xl p-5 space-y-4" style={cardStyle()}>
-                  <h2 className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>LLM e ativação</h2>
+                  <h2 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>LLM e ativação</h2>
                   <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-2)" }}>
                     <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))} />
                     Ativar agente nesta instância
@@ -817,7 +817,7 @@ export default function AgentPersonalityPage() {
                 </div>
 
                 <div className="rounded-3xl p-5 space-y-4" style={cardStyle()}>
-                  <h2 className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>Integrações operacionais</h2>
+                  <h2 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>Integrações operacionais</h2>
                   <input value={form.mcp_server_url} onChange={(e) => setForm((prev) => ({ ...prev, mcp_server_url: e.target.value }))} placeholder="MCP server URL" style={inputStyle()} />
                   <input value={form.webhook_url} onChange={(e) => setForm((prev) => ({ ...prev, webhook_url: e.target.value }))} placeholder="Webhook URL opcional" style={inputStyle()} />
                   <input value={form.webhook_secret} onChange={(e) => setForm((prev) => ({ ...prev, webhook_secret: e.target.value }))} placeholder="Webhook secret opcional" style={inputStyle()} />
@@ -836,7 +836,7 @@ export default function AgentPersonalityPage() {
               <div className="rounded-3xl p-5" style={cardStyle()}>
                 <div className="flex items-center justify-between gap-3 mb-4">
                   <div>
-                    <h2 className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>Apps e acessos disponíveis</h2>
+                    <h2 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>Apps e acessos disponíveis</h2>
                     <p className="text-sm" style={{ color: "var(--text-3)" }}>Cadastre apps que o agente pode usar via MCP, integração, OAuth, API ou webhook.</p>
                   </div>
                 </div>
@@ -867,7 +867,7 @@ export default function AgentPersonalityPage() {
               </div>
 
               <div className="rounded-3xl p-5" style={cardStyle()}>
-                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2" style={{ color: "var(--text-1)" }}>
+                <h2 className="text-lg font-medium mb-4 flex items-center gap-2" style={{ color: "var(--text-1)" }}>
                   <Link2 className="w-4 h-4" style={{ color: "var(--green)" }} />
                   Resumo técnico
                 </h2>

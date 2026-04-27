@@ -134,7 +134,7 @@ function InstanceCard({
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-base leading-tight" style={{ color: "hsl(240 15% 95%)" }}>
+              <h3 className="font-semibold text-base leading-tight" style={{ color: "hsl(240 15% 95%)" }}>
                 {instance.name}
               </h3>
               {profile?.phone_number && profile.phone_number !== instance.name && (
@@ -410,7 +410,7 @@ function InstancesContent() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
+          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
             Instâncias
           </h1>
           <p className="text-sm mt-1.5" style={{ color: "hsl(240 8% 46%)" }}>
@@ -442,7 +442,7 @@ function InstancesContent() {
           )}
           <button
             onClick={() => setCreateOpen(true)}
-            className="inline-flex items-center justify-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-all duration-150 active:scale-[0.97] whitespace-nowrap flex-1 sm:flex-none"
+            className="inline-flex items-center justify-center gap-2 text-sm font-medium px-4 py-2 rounded-xl transition-all duration-150 active:scale-[0.97] whitespace-nowrap flex-1 sm:flex-none"
             style={{
               background: "rgba(0,212,106,0.12)",
               border: "1px solid rgba(0,212,106,0.3)",
@@ -480,7 +480,7 @@ function InstancesContent() {
                 }}
               >
                 {ch === "all" ? "Todos" : meta?.label}
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
                   style={{ background: "var(--surface-2)" }}>
                   {ch === "all"
                     ? instances.length
@@ -533,7 +533,7 @@ function InstancesContent() {
           >
             <Smartphone className="w-6 h-6" style={{ color: "hsl(240 8% 35%)" }} />
           </div>
-          <p className="font-semibold text-sm" style={{ color: "hsl(240 8% 70%)" }}>
+          <p className="font-medium text-sm" style={{ color: "hsl(240 8% 70%)" }}>
             {activeServer ? `Nenhuma instância em "${activeServer.name}"` : "Nenhuma instância ainda"}
           </p>
           <p className="text-sm mt-1.5 mb-6" style={{ color: "hsl(240 8% 42%)" }}>
@@ -541,7 +541,7 @@ function InstancesContent() {
           </p>
           <button
             onClick={() => setCreateOpen(true)}
-            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl transition-all active:scale-[0.97]"
+            className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl transition-all active:scale-[0.97]"
             style={{
               background: "rgba(0,212,106,0.12)",
               border: "1px solid rgba(0,212,106,0.3)",

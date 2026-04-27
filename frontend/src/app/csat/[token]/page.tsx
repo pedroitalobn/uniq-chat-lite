@@ -33,7 +33,7 @@ export default function CSATPage({ params }: { params: Promise<{ token: string }
       <div className="w-full max-w-md">
         {state === "form" && (
           <div className="rounded-2xl bg-white p-8 shadow-lg dark:bg-zinc-950">
-            <h1 className="text-xl font-semibold">Como foi seu atendimento?</h1>
+            <h1 className="text-xl font-medium">Como foi seu atendimento?</h1>
             <p className="mt-1 text-sm text-zinc-500">Sua avaliação nos ajuda a melhorar.</p>
 
             <div className="mt-6 flex items-center justify-center gap-1">
@@ -81,7 +81,7 @@ export default function CSATPage({ params }: { params: Promise<{ token: string }
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500">
               <Check className="h-7 w-7" />
             </div>
-            <h1 className="mt-4 text-xl font-semibold">Obrigado!</h1>
+            <h1 className="mt-4 text-xl font-medium">Obrigado!</h1>
             <p className="mt-1 text-sm text-zinc-500">Sua avaliação foi registrada. Pode fechar esta página.</p>
           </div>
         )}
@@ -91,7 +91,7 @@ export default function CSATPage({ params }: { params: Promise<{ token: string }
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10 text-red-500">
               <X className="h-7 w-7" />
             </div>
-            <h1 className="mt-4 text-xl font-semibold">Não foi possível registrar</h1>
+            <h1 className="mt-4 text-xl font-medium">Não foi possível registrar</h1>
             <p className="mt-1 text-sm text-zinc-500">
               O link pode ter expirado ou já foi respondido. Entre em contato com o atendente caso necessário.
             </p>

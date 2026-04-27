@@ -100,7 +100,7 @@ export function NewDealDialog({
       >
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h2 className="text-base font-semibold" style={{ color: uniq.textStrong }}>
+            <h2 className="text-base font-medium" style={{ color: uniq.textStrong }}>
               Novo deal
             </h2>
             <p className="mt-0.5 text-xs" style={{ color: uniq.textDim }}>
@@ -233,7 +233,7 @@ export function NewDealDialog({
           <button
             onClick={() => create.mutate()}
             disabled={disabled || create.isPending}
-            className="rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+            className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
             style={{ background: uniq.green, color: "#03170a" }}
           >
             {create.isPending ? "Criando…" : "Criar deal"}

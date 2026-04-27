@@ -86,7 +86,7 @@ export function WorkspaceCustomizeDialog({
               <PreviewIcon className="w-5 h-5" style={{ color }} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm font-semibold truncate" style={{ color: "var(--text-1)" }}>{name || "Workspace"}</h3>
+              <h3 className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{name || "Workspace"}</h3>
               <p className="text-[10px]" style={{ color: "var(--text-3)" }}>Personalize aparência</p>
             </div>
           </div>
@@ -98,7 +98,7 @@ export function WorkspaceCustomizeDialog({
         <div className="p-5 space-y-5">
           {/* Name */}
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-widest mb-1.5 block" style={{ color: "var(--text-3)" }}>
+            <label className="text-[11px] font-medium uppercase tracking-widest mb-1.5 block" style={{ color: "var(--text-3)" }}>
               Nome
             </label>
             <input
@@ -113,7 +113,7 @@ export function WorkspaceCustomizeDialog({
 
           {/* Color */}
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-widest mb-1.5 block" style={{ color: "var(--text-3)" }}>
+            <label className="text-[11px] font-medium uppercase tracking-widest mb-1.5 block" style={{ color: "var(--text-3)" }}>
               Cor de destaque
             </label>
             <div className="grid grid-cols-6 gap-2">
@@ -150,7 +150,7 @@ export function WorkspaceCustomizeDialog({
 
           {/* Icon */}
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-widest mb-1.5 block" style={{ color: "var(--text-3)" }}>
+            <label className="text-[11px] font-medium uppercase tracking-widest mb-1.5 block" style={{ color: "var(--text-3)" }}>
               Ícone
             </label>
             <div className="grid grid-cols-8 gap-1.5 max-h-44 overflow-y-auto p-1 rounded-lg" style={{ background: "var(--surface-3)" }}>
@@ -194,7 +194,7 @@ export function WorkspaceCustomizeDialog({
           <button
             onClick={() => saveMutation.mutate()}
             disabled={!isOwner || saveMutation.isPending}
-            className="px-4 py-2 rounded-lg text-sm font-semibold transition-opacity disabled:opacity-50"
+            className="px-4 py-2 rounded-lg text-sm font-medium transition-opacity disabled:opacity-50"
             style={{ background: color, color: "#fff" }}
           >
             {saveMutation.isPending ? "Salvando..." : "Salvar"}

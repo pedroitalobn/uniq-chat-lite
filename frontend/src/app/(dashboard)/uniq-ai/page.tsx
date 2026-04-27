@@ -164,7 +164,7 @@ export default function UniqAIPage() {
         {!sidebarCollapsed && (
           <div className="flex items-center gap-2 min-w-0">
             <Sparkles className="w-4 h-4 flex-shrink-0" style={{ color: "var(--green)" }} />
-            <span className="text-xs font-semibold truncate" style={{ color: "var(--text-1)" }}>Uniq AI</span>
+            <span className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>Uniq AI</span>
           </div>
         )}
         <button
@@ -182,7 +182,7 @@ export default function UniqAIPage() {
         <button
           onClick={startNew}
           className={cn(
-            "flex items-center gap-2 w-full rounded-lg text-xs font-semibold transition-all",
+            "flex items-center gap-2 w-full rounded-lg text-xs font-medium transition-all",
             sidebarCollapsed ? "p-2 justify-center" : "px-3 py-2",
           )}
           style={{ background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.18)", color: "var(--green)" }}

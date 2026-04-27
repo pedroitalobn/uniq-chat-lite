@@ -116,7 +116,7 @@ function CheckoutContent() {
           <div className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: "rgba(0,212,106,0.15)" }}>
             <CheckCircle className="w-10 h-10" style={{ color: "var(--green)" }} />
           </div>
-          <h2 className="text-xl font-bold mb-2" style={{ color: "hsl(240 15% 93%)" }}>Pagamento Realizado!</h2>
+          <h2 className="text-xl font-semibold mb-2" style={{ color: "hsl(240 15% 93%)" }}>Pagamento Realizado!</h2>
           <p className="text-sm mb-6" style={{ color: "hsl(240 8% 46%)" }}>
             Sua assinatura foi ativada com sucesso. Bem-vindo ao {checkoutData?.plan_name}!
           </p>
@@ -163,7 +163,7 @@ function CheckoutContent() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium" style={{ color: "hsl(240 15% 93%)" }}>{checkoutData?.plan_name || "Plano Pro"}</p>
-                    <p className="text-2xl font-bold" style={{ color: "var(--green)" }}>R$ {checkoutData?.plan_price?.toFixed(2) || "99,00"}</p>
+                    <p className="text-2xl font-semibold" style={{ color: "var(--green)" }}>R$ {checkoutData?.plan_price?.toFixed(2) || "99,00"}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>/mês</p>
@@ -261,7 +261,7 @@ function CheckoutContent() {
               {/* Total */}
               <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: "rgba(0,212,106,0.08)" }}>
                 <span className="text-sm" style={{ color: "hsl(240 8% 60%)" }}>Total a pagar</span>
-                <span className="text-lg font-bold" style={{ color: "var(--green)" }}>R$ {checkoutData?.plan_price?.toFixed(2) || "99,00"}</span>
+                <span className="text-lg font-semibold" style={{ color: "var(--green)" }}>R$ {checkoutData?.plan_price?.toFixed(2) || "99,00"}</span>
               </div>
 
               <button

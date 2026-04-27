@@ -103,7 +103,7 @@ export default function QueuePage({ params }: { params: Promise<{ queueId: strin
       <header className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold">{queue?.name ?? "Fila"}</h1>
+            <h1 className="text-xl font-medium">{queue?.name ?? "Fila"}</h1>
             <p className="text-sm text-zinc-500">
               {queue?.department?.name && `${queue.department.name} · `}
               Estratégia <b>{queue?.assignment_strategy ?? "—"}</b>
@@ -150,7 +150,7 @@ function Stat({
     <div className="flex items-center gap-1.5 rounded-md bg-zinc-100 px-2.5 py-1 dark:bg-zinc-800">
       {icon}
       <span className="text-zinc-500">{label}</span>
-      <span className={`font-semibold ${toneCls}`}>{value}</span>
+      <span className={`font-medium ${toneCls}`}>{value}</span>
     </div>
   );
 }

@@ -138,7 +138,7 @@ export default function QueuesPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-8 p-6">
       <header>
-        <h1 className="text-2xl font-semibold">Filas</h1>
+        <h1 className="text-2xl font-medium">Filas</h1>
         <p className="text-sm text-zinc-500">
           Defina como os atendimentos são distribuídos: estratégia, horário, SLA e canais.
         </p>
@@ -307,7 +307,7 @@ function QueueDrawer({
       <div className="flex w-full max-w-xl flex-col bg-white shadow-xl dark:bg-zinc-950">
         <header className="flex items-center justify-between border-b border-zinc-200 p-4 dark:border-zinc-800">
           <div>
-            <h2 className="font-semibold">{queue.name}</h2>
+            <h2 className="font-medium">{queue.name}</h2>
             <p className="text-xs text-zinc-500">
               {queue.department?.name || "Sem departamento"} · {queue.team?.name || "Sem equipe"}
             </p>

@@ -156,7 +156,7 @@ export default function InviteAcceptPage({
         >
           <X className="h-7 w-7" style={{ color: "#f87171" }} />
         </div>
-        <h1 className="text-lg font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+        <h1 className="text-lg font-medium" style={{ color: "hsl(240 15% 92%)" }}>
           Convite indisponível
         </h1>
         <p className="text-sm" style={{ color: "hsl(240 8% 55%)" }}>
@@ -185,7 +185,7 @@ export default function InviteAcceptPage({
     >
       <div className="flex items-center gap-2">
         <Building2 className="h-4 w-4" style={{ color: "#00d46a" }} />
-        <span className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+        <span className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>
           {preview.workspace_name}
         </span>
       </div>
@@ -256,7 +256,7 @@ export default function InviteAcceptPage({
           >
             <Check className="h-7 w-7" style={{ color: "#00d46a" }} />
           </div>
-          <h1 className="text-lg font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+          <h1 className="text-lg font-medium" style={{ color: "hsl(240 15% 92%)" }}>
             Você faz parte de {preview.workspace_name}
           </h1>
           <p className="text-sm" style={{ color: "hsl(240 8% 55%)" }}>
@@ -264,7 +264,7 @@ export default function InviteAcceptPage({
           </p>
           <button
             onClick={go}
-            className="flex items-center gap-2 text-sm font-semibold px-5 py-2.5 mt-2 rounded-xl transition-colors"
+            className="flex items-center gap-2 text-sm font-medium px-5 py-2.5 mt-2 rounded-xl transition-colors"
             style={{ background: "#00d46a", color: "#0a0a0f" }}
           >
             Entrar no workspace
@@ -286,7 +286,7 @@ export default function InviteAcceptPage({
           >
             <Mail className="h-7 w-7" style={{ color: "#fb923c" }} />
           </div>
-          <h1 className="text-lg font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+          <h1 className="text-lg font-medium" style={{ color: "hsl(240 15% 92%)" }}>
             Este convite é para outro email
           </h1>
           <p className="text-sm" style={{ color: "hsl(240 8% 55%)" }}>
@@ -323,7 +323,7 @@ export default function InviteAcceptPage({
         >
           <X className="h-7 w-7" style={{ color: "#f87171" }} />
         </div>
-        <h1 className="text-lg font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+        <h1 className="text-lg font-medium" style={{ color: "hsl(240 15% 92%)" }}>
           Não foi possível aceitar
         </h1>
         <p className="text-sm" style={{ color: "hsl(240 8% 55%)" }}>{errorMsg}</p>

@@ -157,7 +157,7 @@ function ServerModal({
               style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}>
               <ServerIcon className="w-4 h-4" style={{ color: "var(--green)" }} />
             </div>
-            <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>
+            <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>
               {isEdit ? "Editar server" : "Novo server"}
             </h2>
           </div>
@@ -323,7 +323,7 @@ function CreateProxyInline({ onCreated, onCancel }: { onCreated: (proxyId: strin
 
   return (
     <div className="p-3 rounded-xl space-y-3" style={{ background: "hsl(240 12% 8%)", border: "1px solid hsl(240 12% 14%)" }}>
-      <div className="text-xs font-semibold" style={{ color: "hsl(240 15% 85%)" }}>Criar proxy novo</div>
+      <div className="text-xs font-medium" style={{ color: "hsl(240 15% 85%)" }}>Criar proxy novo</div>
       <input className="input-field w-full text-xs" placeholder="Nome (ex: Brightdata BR)"
         value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
       <div className="grid grid-cols-3 gap-2">
@@ -358,7 +358,7 @@ function CreateProxyInline({ onCreated, onCancel }: { onCreated: (proxyId: strin
         <button onClick={doTest} disabled={!valid || testing} className="btn-ghost flex-1 py-2 text-xs">
           {testing ? <Loader2 className="w-3 h-3 animate-spin inline" /> : "Testar"}
         </button>
-        <button onClick={() => submit(true)} disabled={!valid || saving} className="flex-1 py-2 rounded-xl text-xs font-semibold"
+        <button onClick={() => submit(true)} disabled={!valid || saving} className="flex-1 py-2 rounded-xl text-xs font-medium"
           style={{ background: "var(--green)", color: "white", opacity: saving ? 0.7 : 1 }}>
           {saving ? <Loader2 className="w-3 h-3 animate-spin inline" /> : "Salvar e vincular"}
         </button>
@@ -431,7 +431,7 @@ function ServerProxyModal({
               <Shield className="w-4 h-4" style={{ color: "#818cf8" }} />
             </div>
             <div>
-              <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Proxy do Server</h2>
+              <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>Proxy do Server</h2>
               <p className="text-xs" style={{ color: "hsl(240 8% 50%)" }}>{server.name}</p>
             </div>
           </div>
@@ -458,7 +458,7 @@ function ServerProxyModal({
               }}>
               <input type="radio" className="mt-1" checked={selectedId === "none"} onChange={() => setSelectedId("none")} />
               <div>
-                <div className="text-xs font-semibold" style={{ color: "hsl(240 15% 85%)" }}>Sem proxy</div>
+                <div className="text-xs font-medium" style={{ color: "hsl(240 15% 85%)" }}>Sem proxy</div>
                 <div className="text-[11px] opacity-60">Conexão direta do server</div>
               </div>
             </label>
@@ -466,7 +466,7 @@ function ServerProxyModal({
             {/* Catálogo */}
             {catalog.length > 0 && (
               <div className="space-y-1.5">
-                <div className="text-[10px] uppercase font-bold opacity-60">Proxies disponíveis</div>
+                <div className="text-[10px] uppercase font-semibold opacity-60">Proxies disponíveis</div>
                 {catalog.map(p => (
                   <label key={p.id}
                     className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all"
@@ -477,7 +477,7 @@ function ServerProxyModal({
                     <input type="radio" className="mt-1" checked={selectedId === p.id} onChange={() => setSelectedId(p.id)} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-semibold" style={{ color: "hsl(240 15% 85%)" }}>{p.name}</span>
+                        <span className="text-xs font-medium" style={{ color: "hsl(240 15% 85%)" }}>{p.name}</span>
                         {p.country && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "hsl(240 12% 14%)", color: "hsl(240 8% 65%)" }}>
                             {COUNTRY_FLAGS[p.country] || "🌐"} {p.country.toUpperCase()}
@@ -505,7 +505,7 @@ function ServerProxyModal({
             {/* Criar novo */}
             {!showCreate ? (
               <button onClick={() => setShowCreate(true)}
-                className="w-full py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                className="w-full py-2.5 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition-all"
                 style={{ background: "hsl(240 12% 8%)", color: "hsl(240 8% 70%)", border: "1px dashed hsl(240 12% 20%)" }}>
                 <Plus className="w-3.5 h-3.5" /> Criar novo proxy
               </button>
@@ -528,13 +528,13 @@ function ServerProxyModal({
                 }}>
                 {testResult.success ? (
                   <>
-                    <p className="font-semibold" style={{ color: "var(--green)" }}>✓ Proxy funcionando</p>
+                    <p className="font-medium" style={{ color: "var(--green)" }}>✓ Proxy funcionando</p>
                     <p className="mt-1 opacity-80">IP externo: <code>{testResult.external_ip}</code></p>
                     <p className="opacity-60">Latência: {testResult.latency_ms}ms</p>
                   </>
                 ) : (
                   <>
-                    <p className="font-semibold" style={{ color: "#f87171" }}>✗ Teste falhou</p>
+                    <p className="font-medium" style={{ color: "#f87171" }}>✗ Teste falhou</p>
                     <p className="mt-1 opacity-80">{testResult.error}</p>
                   </>
                 )}
@@ -548,7 +548,7 @@ function ServerProxyModal({
                 Testar
               </button>
               <button onClick={save} disabled={saving}
-                className="flex-1 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
+                className="flex-1 py-2 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5"
                 style={{ background: "var(--green)", color: "white", opacity: saving ? 0.7 : 1 }}>
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                 Salvar
@@ -604,7 +604,7 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
             <ServerIcon className="w-4.5 h-4.5" style={{ color: "var(--green)" }} />
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-sm truncate" style={{ color: "hsl(240 15% 90%)" }}>{server.name}</p>
+            <p className="font-medium text-sm truncate" style={{ color: "hsl(240 15% 90%)" }}>{server.name}</p>
             {server.description && (
               <p className="text-xs truncate mt-0.5" style={{ color: "hsl(240 8% 44%)" }}>{server.description}</p>
             )}
@@ -757,13 +757,13 @@ export default function ServersPage() {
       {/* Header */}
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Servers</h1>
+          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Servers</h1>
           <p className="text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
             Workspaces para organizar instâncias por empresa ou projeto
           </p>
         </div>
         <button onClick={() => setShowCreate(true)} 
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
           style={{ 
             background: "rgba(0, 212, 106, 0.12)", 
             border: "1px solid rgba(0, 212, 106, 0.3)", 
@@ -778,7 +778,7 @@ export default function ServersPage() {
       {/* Info box */}
       <div className="rounded-2xl p-4"
         style={{ background: "rgba(96,165,250,0.04)", border: "1px solid rgba(96,165,250,0.12)" }}>
-        <p className="text-xs font-semibold mb-1" style={{ color: "#60a5fa" }}>Como funcionam os Servers</p>
+        <p className="text-xs font-medium mb-1" style={{ color: "#60a5fa" }}>Como funcionam os Servers</p>
         <p className="text-xs" style={{ color: "hsl(240 8% 50%)" }}>
           Cada server tem um slug único que funciona como subdomínio. Agrupe instâncias WhatsApp por empresa, cliente ou projeto —
           ideal para agências e empresas com múltiplas operações.
@@ -802,7 +802,7 @@ export default function ServersPage() {
             Crie seu primeiro server para organizar instâncias por empresa
           </p>
           <button onClick={() => setShowCreate(true)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all"
             style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)", color: "var(--green)" }}
             onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,212,106,0.16)")}
             onMouseLeave={e => (e.currentTarget.style.background = "rgba(0,212,106,0.1)")}>

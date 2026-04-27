@@ -188,7 +188,7 @@ export default function TeamPage() {
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
+            <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
               {workspace?.name || "Team"}
             </h1>
             <p className="text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
@@ -216,7 +216,7 @@ export default function TeamPage() {
               >
                 <Mail className="w-3.5 h-3.5" style={{ color: "#60a5fa" }} />
               </div>
-              <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 88%)" }}>Convidar membro</h2>
+              <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>Convidar membro</h2>
             </div>
             <button
               onClick={() => { setShowInvite(false); setInviteEmail(""); setInviteRoleId(""); }}
@@ -334,7 +334,7 @@ export default function TeamPage() {
       {/* Members */}
       <div className="rounded-2xl overflow-hidden animate-fade-in-up" style={cardStyle}>
         <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid hsl(240 12% 11%)" }}>
-          <h2 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
+          <h2 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
             {members.length} membro{members.length !== 1 ? "s" : ""}
           </h2>
         </div>
@@ -444,7 +444,7 @@ export default function TeamPage() {
       {/* Pending invites */}
       <div className="rounded-2xl overflow-hidden animate-fade-in-up" style={{ ...cardStyle, animationDelay: "50ms", animationFillMode: "both" }}>
         <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid hsl(240 12% 11%)" }}>
-          <h2 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
+          <h2 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
             {invites.filter(i => i.status === "pending").length} convite{invites.filter(i => i.status === "pending").length !== 1 ? "s" : ""} pendente{invites.filter(i => i.status === "pending").length !== 1 ? "s" : ""}
           </h2>
         </div>

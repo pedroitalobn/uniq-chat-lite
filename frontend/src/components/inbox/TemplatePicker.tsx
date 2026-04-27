@@ -116,7 +116,7 @@ export function TemplatePicker({
             style={{ borderBottom: "1px solid hsl(240 12% 16%)" }}
           >
             <Sparkles className="h-4 w-4" style={{ color: "#00d46a" }} />
-            <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 93%)" }}>
+            <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>
               Templates aprovados
             </h2>
           </div>
@@ -205,7 +205,7 @@ export function TemplatePicker({
             style={{ borderBottom: "1px solid hsl(240 12% 16%)" }}
           >
             <div className="min-w-0">
-              <h3 className="truncate text-sm font-semibold" style={{ color: "hsl(240 15% 93%)" }}>
+              <h3 className="truncate text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>
                 {selected?.name ?? "Selecione um template"}
               </h3>
               {selected && (
@@ -247,7 +247,7 @@ export function TemplatePicker({
                     }}
                   >
                     <h4
-                      className="mb-2 text-[10px] font-semibold uppercase tracking-widest"
+                      className="mb-2 text-[10px] font-medium uppercase tracking-widest"
                       style={{ color: "hsl(240 8% 44%)" }}
                     >
                       Variáveis
@@ -301,7 +301,7 @@ export function TemplatePicker({
             <button
               onClick={() => send.mutate()}
               disabled={!canSend || send.isPending}
-              className="rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+              className="rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50"
               style={{ background: "#00d46a", color: "#03170a" }}
             >
               {send.isPending ? "Enviando…" : "Enviar template"}
@@ -335,7 +335,7 @@ function TemplatePreview({ tpl, variables }: { tpl: MetaTemplate; variables: Rec
       }}
     >
       {headerText && (
-        <div className="mb-2 text-sm font-semibold" style={{ color: "#00d46a" }}>
+        <div className="mb-2 text-sm font-medium" style={{ color: "#00d46a" }}>
           {headerText}
         </div>
       )}

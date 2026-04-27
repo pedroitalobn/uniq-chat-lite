@@ -639,7 +639,7 @@ function EndpointCard({
       >
         {/* Linha 1: METHOD + PATH (sempre visível, sem truncate) + auth + chevron */}
         <div className="flex items-center gap-3 px-4 pt-3">
-          <span className="text-xs font-bold px-2 py-0.5 rounded shrink-0 min-w-[52px] text-center" style={{ background: mc.bg, color: mc.text }}>
+          <span className="text-xs font-semibold px-2 py-0.5 rounded shrink-0 min-w-[52px] text-center" style={{ background: mc.bg, color: mc.text }}>
             {ep.method}
           </span>
           <code className="text-sm font-mono flex-1 break-all leading-relaxed" style={{ color: "hsl(240 8% 88%)" }}>
@@ -668,7 +668,7 @@ function EndpointCard({
 
           {ep.auth && ep.auth !== "none" && (
             <div>
-              <p className="text-xs font-semibold uppercase mb-1.5" style={{ color: "hsl(240 8% 40%)" }}>Autenticação</p>
+              <p className="text-xs font-medium uppercase mb-1.5" style={{ color: "hsl(240 8% 40%)" }}>Autenticação</p>
               <code className="text-xs px-3 py-1.5 rounded inline-block" style={{ background: "hsl(240 8% 14%)", color: auth.color }}>
                 {auth.header}
               </code>
@@ -677,7 +677,7 @@ function EndpointCard({
 
           {ep.params && (
             <div>
-              <p className="text-xs font-semibold uppercase mb-1.5" style={{ color: "hsl(240 8% 40%)" }}>Query Params</p>
+              <p className="text-xs font-medium uppercase mb-1.5" style={{ color: "hsl(240 8% 40%)" }}>Query Params</p>
               <pre className="text-xs rounded-lg px-4 py-3" style={{ background: "hsl(240 8% 5%)", color: "#fde68a" }}>
                 {Object.entries(ep.params).map(([k, v]) => `?${k}=${v}`).join("\n")}
               </pre>
@@ -687,7 +687,7 @@ function EndpointCard({
           {ep.body && (
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <p className="text-xs font-semibold uppercase" style={{ color: "hsl(240 8% 40%)" }}>Body (JSON)</p>
+                <p className="text-xs font-medium uppercase" style={{ color: "hsl(240 8% 40%)" }}>Body (JSON)</p>
                 <CopyButton text={JSON.stringify(ep.body, null, 2)} />
               </div>
               <pre className="text-xs rounded-lg px-4 py-3 overflow-x-auto" style={{ background: "hsl(240 8% 5%)", color: "#86efac" }}>
@@ -698,7 +698,7 @@ function EndpointCard({
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <p className="text-xs font-semibold uppercase" style={{ color: "hsl(240 8% 40%)" }}>cURL</p>
+              <p className="text-xs font-medium uppercase" style={{ color: "hsl(240 8% 40%)" }}>cURL</p>
               <CopyButton text={curlCmd} />
             </div>
             <pre className="text-xs rounded-lg px-4 py-3 overflow-x-auto" style={{ background: "hsl(240 8% 5%)", color: "#93c5fd" }}>
@@ -708,7 +708,7 @@ function EndpointCard({
 
           {ep.response && (
             <div>
-              <p className="text-xs font-semibold uppercase mb-1.5" style={{ color: "hsl(240 8% 40%)" }}>Resposta</p>
+              <p className="text-xs font-medium uppercase mb-1.5" style={{ color: "hsl(240 8% 40%)" }}>Resposta</p>
               <pre className="text-xs rounded-lg px-4 py-3 overflow-x-auto" style={{ background: "hsl(240 8% 5%)", color: "#fca5a5" }}>
                 {ep.response}
               </pre>
@@ -840,7 +840,7 @@ export default function ApiDocsPage() {
               )}
             </div>
 
-            <p className="text-xs font-semibold uppercase px-3" style={{ color: "hsl(240 8% 35%)" }}>
+            <p className="text-xs font-medium uppercase px-3" style={{ color: "hsl(240 8% 35%)" }}>
               Recursos
               {searchLower && (
                 <span className="ml-2 normal-case font-normal" style={{ color: "hsl(240 8% 50%)" }}>
@@ -899,7 +899,7 @@ export default function ApiDocsPage() {
                               }}
                             >
                               <span
-                                className="text-[9px] font-bold uppercase shrink-0 w-9 text-center px-1 py-0.5 rounded"
+                                className="text-[9px] font-semibold uppercase shrink-0 w-9 text-center px-1 py-0.5 rounded"
                                 style={{ background: mc.bg, color: mc.text }}
                               >
                                 {ep.method === "DELETE" ? "DEL" : ep.method}
@@ -935,7 +935,7 @@ export default function ApiDocsPage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold" style={{ color: "hsl(240 8% 90%)" }}>{activeS.title}</h1>
+                <h1 className="text-xl font-semibold" style={{ color: "hsl(240 8% 90%)" }}>{activeS.title}</h1>
                 {activeS.badge && (
                   <span className="text-xs px-2 py-0.5 rounded" style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.2)" }}>
                     {activeS.badge}
@@ -949,7 +949,7 @@ export default function ApiDocsPage() {
           {/* Base URL */}
           <div className="flex flex-wrap items-center gap-4 mb-6 px-4 py-3 rounded-xl" style={{ background: "hsl(240 8% 10%)", border: "1px solid hsl(240 8% 16%)" }}>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase" style={{ color: "hsl(240 8% 40%)" }}>Base URL</span>
+              <span className="text-xs font-medium uppercase" style={{ color: "hsl(240 8% 40%)" }}>Base URL</span>
               <code className="text-sm font-mono" style={{ color: "#93c5fd" }}>{BASE}</code>
               <CopyButton text={BASE} />
             </div>
@@ -957,7 +957,7 @@ export default function ApiDocsPage() {
               <>
                 <span style={{ color: "hsl(240 8% 25%)" }}>|</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold uppercase" style={{ color: "hsl(240 8% 40%)" }}>V1 Base</span>
+                  <span className="text-xs font-medium uppercase" style={{ color: "hsl(240 8% 40%)" }}>V1 Base</span>
                   <code className="text-sm font-mono" style={{ color: "#f9a8d4" }}>{V1_BASE}</code>
                   <CopyButton text={V1_BASE} />
                 </div>
@@ -983,7 +983,7 @@ export default function ApiDocsPage() {
 
           {/* Auth legend — explicação detalhada */}
           <div className="mt-8 p-5 rounded-xl space-y-4" style={{ background: "hsl(240 8% 10%)", border: "1px solid hsl(240 8% 16%)" }}>
-            <p className="text-xs font-semibold uppercase" style={{ color: "hsl(240 8% 40%)" }}>Como autenticar</p>
+            <p className="text-xs font-medium uppercase" style={{ color: "hsl(240 8% 40%)" }}>Como autenticar</p>
 
             {/* Instance Token */}
             <div className="space-y-1.5">
@@ -1034,7 +1034,7 @@ Authorization: Bearer inst_abc123xyz...`}
 
             {/* Quando usar qual */}
             <div className="pt-3" style={{ borderTop: "1px solid hsl(240 8% 16%)" }}>
-              <p className="text-xs font-semibold mb-2" style={{ color: "hsl(240 8% 70%)" }}>Qual usar?</p>
+              <p className="text-xs font-medium mb-2" style={{ color: "hsl(240 8% 70%)" }}>Qual usar?</p>
               <ul className="text-xs space-y-1" style={{ color: "hsl(240 8% 60%)" }}>
                 <li>• <strong>Vou enviar mensagens via webhook/n8n/cron?</strong> → Instance Token (ou Global Key se gerencia várias)</li>
                 <li>• <strong>Estou construindo uma UI que o usuário loga?</strong> → JWT</li>

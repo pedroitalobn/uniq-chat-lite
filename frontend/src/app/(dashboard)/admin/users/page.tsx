@@ -69,7 +69,7 @@ function CreateUserModal({ plans, onClose, onCreated }: {
               style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}>
               <Plus className="w-4 h-4" style={{ color: "var(--green)" }} />
             </div>
-            <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Novo usuário</h2>
+            <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>Novo usuário</h2>
           </div>
           <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }}
             onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
@@ -161,7 +161,7 @@ function ResetPasswordModal({ user, onClose }: { user: User; onClose: () => void
             <Lock className="w-4 h-4" style={{ color: "#fbbf24" }} />
           </div>
           <div>
-            <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Redefinir senha</h2>
+            <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>Redefinir senha</h2>
             <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>{user.email}</p>
           </div>
         </div>
@@ -178,7 +178,7 @@ function ResetPasswordModal({ user, onClose }: { user: User; onClose: () => void
           <div className="flex gap-3">
             <button type="button" onClick={onClose} className="btn-ghost flex-1 py-2.5 text-sm">Cancelar</button>
             <button type="submit" disabled={loading || password.length < 8}
-              className="flex-1 py-2.5 text-sm rounded-xl font-semibold transition-all disabled:opacity-40"
+              className="flex-1 py-2.5 text-sm rounded-xl font-medium transition-all disabled:opacity-40"
               style={{ background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.2)", color: "#fbbf24" }}>
               {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Redefinir"}
             </button>
@@ -217,7 +217,7 @@ function BlockModal({ user, onClose, onConfirm }: {
             <Ban className="w-4 h-4 text-red-400" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Bloquear usuário</h2>
+            <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>Bloquear usuário</h2>
             <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>{user.email}</p>
           </div>
         </div>
@@ -261,7 +261,7 @@ function BlockModal({ user, onClose, onConfirm }: {
         <div className="flex gap-3">
           <button onClick={onClose} className="btn-ghost flex-1 py-2.5 text-sm">Cancelar</button>
           <button onClick={confirm}
-            className="flex-1 py-2.5 text-sm rounded-xl font-semibold text-red-400 transition-all"
+            className="flex-1 py-2.5 text-sm rounded-xl font-medium text-red-400 transition-all"
             style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>
             Bloquear
           </button>
@@ -336,7 +336,7 @@ function InviteSystemToggle() {
           <Ticket className="w-5 h-5" style={{ color: enabled ? "var(--green)" : "hsl(240 8% 40%)" }} />
         </div>
         <div>
-          <p className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+          <p className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>
             Sistema de Convites
           </p>
           <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 46%)" }}>
@@ -454,7 +454,7 @@ export default function AdminUsersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Customers</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Customers</h1>
           <p className="text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
             {users.length} usuário{users.length !== 1 ? "s" : ""} cadastrado{users.length !== 1 ? "s" : ""}
           </p>
@@ -463,11 +463,11 @@ export default function AdminUsersPage() {
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
             style={{ background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.15)" }}>
             <Shield className="w-3.5 h-3.5" style={{ color: "#fbbf24" }} />
-            <span className="text-xs font-semibold hidden sm:inline" style={{ color: "#fbbf24" }}>Super Admin</span>
-            <span className="text-xs font-semibold sm:hidden" style={{ color: "#fbbf24" }}>Admin</span>
+            <span className="text-xs font-medium hidden sm:inline" style={{ color: "#fbbf24" }}>Super Admin</span>
+            <span className="text-xs font-medium sm:hidden" style={{ color: "#fbbf24" }}>Admin</span>
           </div>
           <button onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
             style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)", color: "var(--green)" }}
             onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,212,106,0.16)")}
             onMouseLeave={e => (e.currentTarget.style.background = "rgba(0,212,106,0.1)")}>
@@ -492,7 +492,7 @@ export default function AdminUsersPage() {
       {/* Table */}
       <div className="rounded-2xl overflow-hidden animate-fade-in-up"
         style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-        <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-4 px-5 py-3 text-[10px] font-semibold uppercase tracking-widest"
+        <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-4 px-5 py-3 text-[10px] font-medium uppercase tracking-widest"
           style={{ color: "hsl(240 8% 36%)", borderBottom: "1px solid hsl(240 12% 10%)" }}>
           <span>Customer</span>
           <span className="text-center">Plano</span>

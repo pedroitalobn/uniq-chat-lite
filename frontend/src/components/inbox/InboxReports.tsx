@@ -109,7 +109,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
           <Lock className="h-7 w-7" style={{ color: "#fb923c" }} />
         </div>
         <div className="space-y-1.5 max-w-sm">
-          <h3 className="text-base font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
+          <h3 className="text-base font-medium" style={{ color: "hsl(240 15% 90%)" }}>
             Sem acesso aos relatórios
           </h3>
           <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 55%)" }}>
@@ -150,7 +150,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
               <AlertCircle className="h-6 w-6" style={{ color: "#f87171" }} />
             </div>
             <div className="space-y-1">
-              <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 88%)" }}>
+              <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>
                 Não foi possível carregar os relatórios
               </h3>
               <p className="text-xs" style={{ color: "hsl(240 8% 55%)" }}>
@@ -169,7 +169,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
                 csat.refetch();
                 sla.refetch();
               }}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl transition-colors"
+              className="flex items-center gap-1.5 text-xs font-medium px-3.5 py-2 rounded-xl transition-colors"
               style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.25)" }}
             >
               <RefreshCw className="h-3.5 w-3.5" />
@@ -199,7 +199,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
 
         <Card>
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
+            <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
               Criados × Resolvidos por dia
             </h3>
             <div className="flex gap-3 text-xs" style={{ color: "hsl(240 8% 55%)" }}>
@@ -310,7 +310,7 @@ function ReportsHeader({
           <Inbox className="h-4 w-4" style={{ color: "#00d46a" }} />
         </div>
         <div>
-          <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+          <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>
             Relatórios do atendimento
           </h2>
           <p className="text-xs" style={{ color: "hsl(240 8% 50%)" }}>
@@ -471,7 +471,7 @@ function KPI({
         <span>{label}</span>
       </div>
       <div
-        className={`mt-1.5 text-2xl font-semibold tabular-nums transition-opacity ${loading ? "opacity-50" : ""}`}
+        className={`mt-1.5 text-2xl font-medium tabular-nums transition-opacity ${loading ? "opacity-50" : ""}`}
         style={{ color }}
       >
         {value}
@@ -492,7 +492,7 @@ function SLAPanel({
   return (
     <Card>
       <div
-        className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest"
+        className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest"
         style={{ color: "hsl(240 8% 50%)" }}
       >
         <AlertTriangle className="h-3.5 w-3.5" /> SLA
@@ -504,7 +504,7 @@ function SLAPanel({
       ) : (
         <div className={`mt-3 grid grid-cols-2 gap-3 text-center transition-opacity ${loading ? "opacity-50" : ""}`}>
           <div>
-            <div className="text-2xl font-semibold tabular-nums" style={{ color: "#f87171" }}>
+            <div className="text-2xl font-medium tabular-nums" style={{ color: "#f87171" }}>
               {sla?.first_response_breaches ?? 0}
             </div>
             <div className="mt-0.5 text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
@@ -512,7 +512,7 @@ function SLAPanel({
             </div>
           </div>
           <div>
-            <div className="text-2xl font-semibold tabular-nums" style={{ color: "#f87171" }}>
+            <div className="text-2xl font-medium tabular-nums" style={{ color: "#f87171" }}>
               {sla?.resolution_breaches ?? 0}
             </div>
             <div className="mt-0.5 text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
@@ -538,7 +538,7 @@ function CSATPanel({
   return (
     <Card>
       <div
-        className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest"
+        className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest"
         style={{ color: "hsl(240 8% 50%)" }}
       >
         <Star className="h-3.5 w-3.5" /> CSAT
@@ -550,7 +550,7 @@ function CSATPanel({
       ) : (
         <div className={`mt-3 flex items-end gap-4 transition-opacity ${loading ? "opacity-50" : ""}`}>
           <div>
-            <div className="text-2xl font-semibold tabular-nums" style={{ color: "#fbbf24" }}>
+            <div className="text-2xl font-medium tabular-nums" style={{ color: "#fbbf24" }}>
               {(csat?.avg_rating ?? 0).toFixed(2)}
             </div>
             <div className="mt-0.5 text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
@@ -602,7 +602,7 @@ function TableCard({
       style={{ background: CARD_BG, border: CARD_BORDER }}
     >
       <div
-        className="flex items-center gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-widest"
+        className="flex items-center gap-2 px-4 py-3 text-xs font-medium uppercase tracking-widest"
         style={{ color: "hsl(240 8% 50%)", borderBottom: "1px solid hsl(240 12% 11%)" }}
       >
         {icon}

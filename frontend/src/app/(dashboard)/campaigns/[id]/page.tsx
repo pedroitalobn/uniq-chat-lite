@@ -47,7 +47,7 @@ function StatCard({ label, value, sub, color }: { label: string; value: number; 
   return (
     <div className="rounded-xl p-4" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
       <p className="text-xs mb-1" style={{ color: "hsl(240 8% 46%)" }}>{label}</p>
-      <p className="text-2xl font-bold" style={{ color: color || "hsl(240 15% 93%)" }}>{value}</p>
+      <p className="text-2xl font-semibold" style={{ color: color || "hsl(240 15% 93%)" }}>{value}</p>
       {sub && <p className="text-[11px] mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>{sub}</p>}
     </div>
   );
@@ -152,7 +152,7 @@ export default function CampaignDetailPage() {
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
+            <h1 className="text-xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
               {campaign.name}
             </h1>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium"
@@ -166,7 +166,7 @@ export default function CampaignDetailPage() {
         <div className="flex gap-2">
           {(campaign.status === "draft" || campaign.status === "paused") && (
             <button onClick={handleStart}
-              className="flex items-center gap-1.5 text-sm font-semibold px-3.5 py-2 rounded-xl transition-all"
+              className="flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl transition-all"
               style={{ background: "var(--green)", color: "#03170a" }}>
               <Play className="w-3.5 h-3.5" />
               Iniciar
@@ -174,7 +174,7 @@ export default function CampaignDetailPage() {
           )}
           {campaign.status === "running" && (
             <button onClick={handlePause}
-              className="flex items-center gap-1.5 text-sm font-semibold px-3.5 py-2 rounded-xl transition-all"
+              className="flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl transition-all"
               style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.2)", color: "#f59e0b" }}>
               <Pause className="w-3.5 h-3.5" />
               Pausar
@@ -211,7 +211,7 @@ export default function CampaignDetailPage() {
       <div className="rounded-2xl p-5" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
         <div className="flex justify-between items-center mb-3">
           <p className="text-sm font-medium" style={{ color: "hsl(240 15% 90%)" }}>Progresso</p>
-          <span className="text-sm font-bold" style={{ color: "var(--green)" }}>{progress}%</span>
+          <span className="text-sm font-semibold" style={{ color: "var(--green)" }}>{progress}%</span>
         </div>
         <div className="h-2 rounded-full overflow-hidden" style={{ background: "hsl(240 12% 12%)" }}>
           <div className="h-full rounded-full transition-all duration-700"
@@ -285,12 +285,12 @@ export default function CampaignDetailPage() {
 
       {/* Recipients table */}
       <div>
-        <h2 className="text-sm font-semibold mb-3" style={{ color: "hsl(240 15% 90%)" }}>
+        <h2 className="text-sm font-medium mb-3" style={{ color: "hsl(240 15% 90%)" }}>
           Destinatários ({recipients.length})
         </h2>
         <div className="rounded-2xl overflow-hidden" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
           {/* Header */}
-          <div className="grid grid-cols-[1fr_80px_60px_auto] gap-4 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-widest"
+          <div className="grid grid-cols-[1fr_80px_60px_auto] gap-4 px-5 py-2.5 text-[11px] font-medium uppercase tracking-widest"
             style={{ background: "var(--surface-2)", borderBottom: "1px solid hsl(240 12% 11%)", color: "hsl(240 8% 40%)" }}>
             <span>Destinatário</span>
             <span>Status</span>

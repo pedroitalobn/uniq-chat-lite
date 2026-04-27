@@ -60,7 +60,7 @@ export default function CompaniesPage() {
       <header className="flex flex-wrap items-center justify-between gap-3 border-b px-4 sm:px-6 py-3 sm:py-4" style={{ borderColor: uniq.borderSoft }}>
         <div className="flex items-center gap-4 flex-wrap">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: uniq.textStrong }}>
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: uniq.textStrong }}>
               Empresas
             </h1>
             <p className="text-xs" style={{ color: uniq.textFaint }}>
@@ -119,7 +119,7 @@ export default function CompaniesPage() {
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <h3 className="truncate text-sm font-semibold" style={{ color: uniq.textStrong }}>
+                  <h3 className="truncate text-sm font-medium" style={{ color: uniq.textStrong }}>
                     {co.name}
                   </h3>
                   <p className="truncate text-xs" style={{ color: uniq.textFaint }}>
@@ -160,7 +160,7 @@ function StatPill({ icon, value, label, accent }: {
       style={{ background: "var(--surface-2)" }}
     >
       <div
-        className="flex items-center gap-0.5 text-xs font-semibold"
+        className="flex items-center gap-0.5 text-xs font-medium"
         style={{ color: accent ? uniq.green : uniq.textPrimary }}
       >
         {icon}
@@ -231,7 +231,7 @@ function NewCompanyDialog({
         style={{ background: uniq.bg, border: `1px solid ${uniq.border}` }}
       >
         <div className="mb-4 flex items-start justify-between">
-          <h2 className="text-base font-semibold" style={{ color: uniq.textStrong }}>
+          <h2 className="text-base font-medium" style={{ color: uniq.textStrong }}>
             Nova empresa
           </h2>
           <button onClick={onClose} style={{ color: uniq.textFaint }}>
@@ -296,7 +296,7 @@ function NewCompanyDialog({
           <button
             onClick={() => create.mutate()}
             disabled={!name.trim() || create.isPending}
-            className="rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+            className="rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
             style={{ background: uniq.green, color: "#03170a" }}
           >
             Criar

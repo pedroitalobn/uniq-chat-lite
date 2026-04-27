@@ -63,7 +63,7 @@ export default function ApiKeysPage() {
     <div className="space-y-7">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
+        <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
           API Keys
         </h1>
         <p className="text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
@@ -80,7 +80,7 @@ export default function ApiKeysPage() {
           >
             <Key className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
           </div>
-          <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 88%)" }}>Criar nova chave</h2>
+          <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>Criar nova chave</h2>
         </div>
 
         <div className="flex gap-3">
@@ -158,7 +158,7 @@ export default function ApiKeysPage() {
       {/* Keys list */}
       <div className="rounded-2xl overflow-hidden animate-fade-in-up" style={cardStyle}>
         <div className="px-5 py-4" style={{ borderBottom: "1px solid hsl(240 12% 11%)" }}>
-          <h2 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
+          <h2 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
             {keys.length} chave{keys.length !== 1 ? "s" : ""} ativa{keys.length !== 1 ? "s" : ""}
           </h2>
         </div>
@@ -231,7 +231,7 @@ export default function ApiKeysPage() {
 
       {/* Usage docs */}
       <div className="rounded-2xl p-5 space-y-4 animate-fade-in-up" style={{ ...cardStyle, animationDelay: "100ms", animationFillMode: "both" }}>
-        <h2 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
+        <h2 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
           Como usar
         </h2>
         <div className="space-y-4">

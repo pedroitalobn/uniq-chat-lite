@@ -75,7 +75,7 @@ export default function AdminInspectPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-3" style={{ color: "hsl(240 15% 93%)" }}>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight flex items-center gap-3" style={{ color: "hsl(240 15% 93%)" }}>
             <Search className="w-5 h-5" style={{ color: "hsl(240 8% 60%)" }} />
             <span className="hidden sm:inline">Inspect</span>
             <span className="sm:hidden">Suporte</span>
@@ -114,7 +114,7 @@ export default function AdminInspectPage() {
       {/* List */}
       {tab === "servers" && (
         <div className="rounded-2xl overflow-hidden" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-          <div className="grid grid-cols-[1fr_1fr_100px_80px_60px] gap-3 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest"
+          <div className="grid grid-cols-[1fr_1fr_100px_80px_60px] gap-3 px-4 py-2.5 text-[10px] font-medium uppercase tracking-widest"
             style={{ color: "hsl(240 8% 36%)", borderBottom: "1px solid hsl(240 12% 10%)" }}>
             <span>Servidor</span>
             <span>Usuário</span>
@@ -146,7 +146,7 @@ export default function AdminInspectPage() {
 
       {tab === "instances" && (
         <div className="rounded-2xl overflow-hidden" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-          <div className="grid grid-cols-[1fr_1fr_100px_80px_80px] gap-3 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-widest"
+          <div className="grid grid-cols-[1fr_1fr_100px_80px_80px] gap-3 px-4 py-2.5 text-[10px] font-medium uppercase tracking-widest"
             style={{ color: "hsl(240 8% 36%)", borderBottom: "1px solid hsl(240 12% 10%)" }}>
             <span>Instância</span>
             <span>Usuário/Workspace</span>

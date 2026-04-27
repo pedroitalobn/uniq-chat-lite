@@ -55,7 +55,7 @@ export function ConfirmDialog({
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+            <div className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>
               {title}
             </div>
             {body && (
@@ -89,7 +89,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={isPending}
-            className="rounded-md px-4 py-1.5 text-xs font-semibold disabled:opacity-50"
+            className="rounded-md px-4 py-1.5 text-xs font-medium disabled:opacity-50"
             style={{ background: bg, color: fg }}
           >
             {isPending ? "Processando…" : confirmLabel}

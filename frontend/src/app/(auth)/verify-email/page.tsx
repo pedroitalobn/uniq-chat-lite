@@ -89,7 +89,7 @@ function VerifyEmailForm() {
           style={{ background: "var(--green-soft)" }}>
           <Check className="w-6 h-6" style={{ color: "var(--green)" }} />
         </div>
-        <h1 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>
+        <h1 className="text-base font-medium" style={{ color: "var(--text-1)" }}>
           E-mail confirmado
         </h1>
         <p className="text-xs" style={{ color: "var(--text-3)" }}>
@@ -123,7 +123,7 @@ function VerifyEmailForm() {
             placeholder="seu@email.com"
             className="input-field" />
           <button type="submit"
-            className="w-full py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
+            className="w-full py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5"
             style={{ background: "var(--green)", color: "var(--green-fg)" }}>
             <Mail className="w-3.5 h-3.5" />
             Reenviar e-mail

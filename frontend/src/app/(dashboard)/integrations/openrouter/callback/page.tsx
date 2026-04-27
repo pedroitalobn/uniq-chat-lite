@@ -43,14 +43,14 @@ export default function OpenRouterCallbackPage() {
         {status === "loading" && <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin" style={{ color: "var(--green)" }} />}
         {status === "ok"      && <CheckCircle2 className="mx-auto mb-4 h-10 w-10" style={{ color: "var(--green)" }} />}
         {status === "error"   && <XCircle className="mx-auto mb-4 h-10 w-10" style={{ color: "#ef4444" }} />}
-        <h1 className="mb-2 text-lg font-semibold" style={{ color: "hsl(240 15% 93%)" }}>
+        <h1 className="mb-2 text-lg font-medium" style={{ color: "hsl(240 15% 93%)" }}>
           {status === "loading" ? "Conectando OpenRouter…" : status === "ok" ? "Conectado" : "Falha na conexão"}
         </h1>
         <p className="text-sm" style={{ color: "hsl(240 8% 60%)" }}>{message}</p>
         {status === "error" && (
           <button
             onClick={() => router.replace("/integrations")}
-            className="mt-6 rounded-xl px-4 py-2 text-sm font-semibold"
+            className="mt-6 rounded-xl px-4 py-2 text-sm font-medium"
             style={{ background: "var(--green)", color: "#03170a" }}
           >
             Voltar para integrações

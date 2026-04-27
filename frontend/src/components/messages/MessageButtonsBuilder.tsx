@@ -59,7 +59,7 @@ export function MessageButtonsBuilder({
     <div className="rounded-xl p-3 space-y-2.5" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>Botões interativos</h3>
+          <h3 className="text-xs font-medium" style={{ color: "var(--text-1)" }}>Botões interativos</h3>
           <p className="text-[10px]" style={{ color: "var(--text-3)" }}>Até {MAX_BUTTONS} por mensagem</p>
         </div>
         {onClose && (
@@ -86,7 +86,7 @@ export function MessageButtonsBuilder({
             >
               {/* Type pills */}
               <div className="flex items-center gap-1 flex-wrap">
-                <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+                <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
                   {idx + 1}.
                 </span>
                 {TYPES.map((t) => {

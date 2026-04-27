@@ -109,8 +109,8 @@ function FlowNode({ data, selected }: NodeProps) {
           <Icon className="w-3.5 h-3.5" style={{ color: meta.color }} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] uppercase font-bold tracking-wide opacity-60">{meta.label}</p>
-          <p className="text-xs font-semibold truncate" style={{ color: "var(--text-1)" }}>
+          <p className="text-[10px] uppercase font-semibold tracking-wide opacity-60">{meta.label}</p>
+          <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>
             {step.label || meta.label}
           </p>
         </div>
@@ -306,7 +306,7 @@ function StepLibrary({ onAdd }: { onAdd: (type: StepType) => void }) {
   ];
   return (
     <div className="p-3 overflow-y-auto h-full">
-      <p className="text-[10px] uppercase font-bold opacity-60 mb-2 px-1">Adicionar Step</p>
+      <p className="text-[10px] uppercase font-semibold opacity-60 mb-2 px-1">Adicionar Step</p>
       <div className="grid grid-cols-2 gap-1.5">
         {types.map(t => {
           const meta = STEP_META[t];
@@ -322,7 +322,7 @@ function StepLibrary({ onAdd }: { onAdd: (type: StepType) => void }) {
                 style={{ background: meta.bg, border: `1px solid ${meta.color}33` }}>
                 <Icon className="w-4 h-4" style={{ color: meta.color }} />
               </div>
-              <span className="text-[10px] font-semibold" style={{ color: "var(--text-1)" }}>{meta.label}</span>
+              <span className="text-[10px] font-medium" style={{ color: "var(--text-1)" }}>{meta.label}</span>
             </button>
           );
         })}
@@ -368,25 +368,25 @@ function ConfigPanel({
           <meta.icon className="w-4 h-4" style={{ color: meta.color }} />
         </div>
         <div className="flex-1">
-          <p className="text-[10px] uppercase font-bold opacity-60">{meta.label}</p>
-          <p className="text-xs font-semibold">{step.label || meta.label}</p>
+          <p className="text-[10px] uppercase font-semibold opacity-60">{meta.label}</p>
+          <p className="text-xs font-medium">{step.label || meta.label}</p>
         </div>
       </div>
 
       <div>
-        <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Rótulo</label>
+        <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Rótulo</label>
         <input className={txt} style={txtStyle} value={step.label || ""}
           onChange={e => update({ label: e.target.value })} />
       </div>
       <div>
-        <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">ID</label>
+        <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">ID</label>
         <input className={txt} style={{ ...txtStyle, opacity: 0.6 }} value={step.id} disabled />
       </div>
 
       {/* Config fields per type */}
       {(step.type === "message" || step.type === "handoff") && (
         <div>
-          <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Mensagem</label>
+          <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Mensagem</label>
           <textarea className={txt + " min-h-[80px]"} style={txtStyle}
             value={String(cfg.message || "")}
             onChange={e => updateCfg({ message: e.target.value })} />
@@ -397,13 +397,13 @@ function ConfigPanel({
       {step.type === "buttons" && (
         <>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Mensagem</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Mensagem</label>
             <textarea className={txt + " min-h-[60px]"} style={txtStyle}
               value={String(cfg.message || "")}
               onChange={e => updateCfg({ message: e.target.value })} />
           </div>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Botões</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Botões</label>
             {((cfg.buttons as Array<{ id: string; text: string }>) || []).map((b, i) => (
               <div key={i} className="flex gap-1 mb-1">
                 <input className={txt} style={{ ...txtStyle, flex: "0 0 60px" }} value={b.id}
@@ -443,13 +443,13 @@ function ConfigPanel({
       {step.type === "input" && (
         <>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Pergunta</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Pergunta</label>
             <textarea className={txt + " min-h-[60px]"} style={txtStyle}
               value={String(cfg.prompt || "")}
               onChange={e => updateCfg({ prompt: e.target.value })} />
           </div>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Salvar em variável</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Salvar em variável</label>
             <input className={txt} style={txtStyle}
               value={String(cfg.variable_name || "")}
               onChange={e => updateCfg({ variable_name: e.target.value })} />
@@ -459,7 +459,7 @@ function ConfigPanel({
 
       {step.type === "wait" && (
         <div>
-          <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Duração</label>
+          <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Duração</label>
           <input className={txt} style={txtStyle} placeholder="5s, 2m, 1h"
             value={String(cfg.duration || "")}
             onChange={e => updateCfg({ duration: e.target.value })} />
@@ -469,13 +469,13 @@ function ConfigPanel({
       {step.type === "condition" && (
         <>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Valor esquerdo</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Valor esquerdo</label>
             <input className={txt} style={txtStyle}
               value={String(cfg.left || "")} placeholder="{{last_input}}"
               onChange={e => updateCfg({ left: e.target.value })} />
           </div>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Operador</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Operador</label>
             <select className={txt} style={txtStyle}
               value={String(cfg.operator || "eq")}
               onChange={e => updateCfg({ operator: e.target.value })}>
@@ -485,7 +485,7 @@ function ConfigPanel({
             </select>
           </div>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Valor direito</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Valor direito</label>
             <input className={txt} style={txtStyle}
               value={String(cfg.right || "")}
               onChange={e => updateCfg({ right: e.target.value })} />
@@ -496,19 +496,19 @@ function ConfigPanel({
       {step.type === "ai_response" && (
         <>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">System Prompt</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">System Prompt</label>
             <textarea className={txt + " min-h-[60px]"} style={txtStyle}
               value={String(cfg.system_prompt || "")}
               onChange={e => updateCfg({ system_prompt: e.target.value })} />
           </div>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">User Prompt</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">User Prompt</label>
             <textarea className={txt + " min-h-[60px]"} style={txtStyle}
               value={String(cfg.user_prompt || "")}
               onChange={e => updateCfg({ user_prompt: e.target.value })} />
           </div>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Salvar em variável (opcional)</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Salvar em variável (opcional)</label>
             <input className={txt} style={txtStyle}
               value={String(cfg.variable_name || "")}
               onChange={e => updateCfg({ variable_name: e.target.value })} />
@@ -524,32 +524,32 @@ function ConfigPanel({
       {step.type === "http_request" && (
         <>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Método</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Método</label>
             <select className={txt} style={txtStyle} value={String(cfg.method || "GET")}
               onChange={e => updateCfg({ method: e.target.value })}>
               {["GET", "POST", "PUT", "DELETE", "PATCH"].map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">URL</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">URL</label>
             <input className={txt} style={txtStyle}
               value={String(cfg.url || "")}
               onChange={e => updateCfg({ url: e.target.value })} />
           </div>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Body (JSON)</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Body (JSON)</label>
             <textarea className={txt + " min-h-[60px] font-mono"} style={txtStyle}
               value={String(cfg.body || "")}
               onChange={e => updateCfg({ body: e.target.value })} />
           </div>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Salvar resposta em</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Salvar resposta em</label>
             <input className={txt} style={txtStyle}
               value={String(cfg.save_result || "")}
               onChange={e => updateCfg({ save_result: e.target.value })} />
           </div>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Campo JSON (dot-path)</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Campo JSON (dot-path)</label>
             <input className={txt} style={txtStyle} placeholder="data.id"
               value={String(cfg.save_field || "")}
               onChange={e => updateCfg({ save_field: e.target.value })} />
@@ -560,13 +560,13 @@ function ConfigPanel({
       {step.type === "set_variable" && (
         <>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Nome</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Nome</label>
             <input className={txt} style={txtStyle}
               value={String(cfg.name || "")}
               onChange={e => updateCfg({ name: e.target.value })} />
           </div>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Valor</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Valor</label>
             <input className={txt} style={txtStyle}
               value={String(cfg.value || "")}
               onChange={e => updateCfg({ value: e.target.value })} />
@@ -576,7 +576,7 @@ function ConfigPanel({
 
       {(step.type === "add_tag" || step.type === "remove_tag") && (
         <div>
-          <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Tag</label>
+          <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Tag</label>
           <input className={txt} style={txtStyle}
             value={String(cfg.tag || "")}
             onChange={e => updateCfg({ tag: e.target.value })} />
@@ -586,20 +586,20 @@ function ConfigPanel({
       {step.type === "media" && (
         <>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Tipo</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Tipo</label>
             <select className={txt} style={txtStyle} value={String(cfg.media_type || "image")}
               onChange={e => updateCfg({ media_type: e.target.value })}>
               {["image", "video", "audio", "document"].map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">URL</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">URL</label>
             <input className={txt} style={txtStyle}
               value={String(cfg.url || "")}
               onChange={e => updateCfg({ url: e.target.value })} />
           </div>
           <div>
-            <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Legenda</label>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Legenda</label>
             <input className={txt} style={txtStyle}
               value={String(cfg.caption || "")}
               onChange={e => updateCfg({ caption: e.target.value })} />
@@ -610,7 +610,7 @@ function ConfigPanel({
       <div className="pt-3 border-t border-[var(--surface-border)] flex gap-2">
         <button
           onClick={onSetStart}
-          className="flex-1 text-[10px] py-2 rounded-lg font-semibold"
+          className="flex-1 text-[10px] py-2 rounded-lg font-medium"
           style={{ background: "rgba(0,212,106,0.15)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.3)" }}
         >
           {step.is_start_step ? "✓ É início" : "Definir como início"}
@@ -818,7 +818,7 @@ function TriggerPanel({
   return (
     <div className="h-full overflow-y-auto p-4 space-y-3">
       <div>
-        <label className="text-[10px] uppercase tracking-wider font-semibold mb-1 block opacity-60">Nome</label>
+        <label className="text-[10px] uppercase tracking-wider font-medium mb-1 block opacity-60">Nome</label>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -829,7 +829,7 @@ function TriggerPanel({
       </div>
 
       <div>
-        <label className="text-[10px] uppercase tracking-wider font-semibold mb-1 block opacity-60">Tipo de gatilho</label>
+        <label className="text-[10px] uppercase tracking-wider font-medium mb-1 block opacity-60">Tipo de gatilho</label>
         <select
           value={triggerType}
           onChange={(e) => setTriggerType(e.target.value)}
@@ -845,7 +845,7 @@ function TriggerPanel({
 
       {needsKeywords && (
         <div>
-          <label className="text-[10px] uppercase tracking-wider font-semibold mb-1 block opacity-60">
+          <label className="text-[10px] uppercase tracking-wider font-medium mb-1 block opacity-60">
             Palavras-chave (separadas por vírgula)
           </label>
           <input
@@ -860,24 +860,24 @@ function TriggerPanel({
 
       {needsGroup && (
         <div>
-          <label className="text-[10px] uppercase tracking-wider font-semibold mb-1 block opacity-60">Grupo WhatsApp</label>
+          <label className="text-[10px] uppercase tracking-wider font-medium mb-1 block opacity-60">Grupo WhatsApp</label>
           <GroupPicker value={groupJID} onChange={setGroupJID} instanceId={instanceId} />
         </div>
       )}
 
       <div>
-        <label className="text-[10px] uppercase tracking-wider font-semibold mb-1 block opacity-60">Instância WhatsApp</label>
+        <label className="text-[10px] uppercase tracking-wider font-medium mb-1 block opacity-60">Instância WhatsApp</label>
         <InstancePicker value={instanceId} onChange={setInstanceId} />
       </div>
 
       <div>
-        <label className="text-[10px] uppercase tracking-wider font-semibold mb-1 block opacity-60">Resposta padrão</label>
+        <label className="text-[10px] uppercase tracking-wider font-medium mb-1 block opacity-60">Resposta padrão</label>
         <div className="flex gap-1 rounded-lg p-1" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
           {[["private", "Privado"], ["group", "No grupo"]].map(([v, lbl]) => (
             <button
               key={v}
               onClick={() => setResponseMode(v)}
-              className="flex-1 py-1.5 rounded-md text-xs font-semibold transition-colors"
+              className="flex-1 py-1.5 rounded-md text-xs font-medium transition-colors"
               style={{
                 background: responseMode === v ? "var(--green)" : "transparent",
                 color: responseMode === v ? "white" : "var(--text-2)",
@@ -893,7 +893,7 @@ function TriggerPanel({
         <button
           onClick={persist}
           disabled={saving}
-          className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
+          className="flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5"
           style={{ background: "var(--green)", color: "white", opacity: saving ? 0.7 : 1 }}
         >
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
@@ -902,7 +902,7 @@ function TriggerPanel({
         <button
           onClick={toggleStatus}
           disabled={togglingStatus}
-          className="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
+          className="flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5"
           style={{
             background: initial?.status === "active" ? "rgba(239,68,68,0.12)" : "rgba(0,212,106,0.12)",
             color: initial?.status === "active" ? "#ef4444" : "var(--green)",
@@ -942,20 +942,20 @@ function SimulatorPanel({ journeyId }: { journeyId: string }) {
   return (
     <div className="p-4 space-y-3">
       <div>
-        <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Mensagem do usuário</label>
+        <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Mensagem do usuário</label>
         <input className="w-full px-2.5 py-1.5 rounded-lg text-xs outline-none"
           style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
           value={input} onChange={e => setInput(e.target.value)} />
       </div>
       <div>
-        <label className="text-[10px] uppercase font-bold opacity-60 block mb-1">Nome do contato</label>
+        <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Nome do contato</label>
         <input className="w-full px-2.5 py-1.5 rounded-lg text-xs outline-none"
           style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
           value={contact} onChange={e => setContact(e.target.value)} />
       </div>
       <button
         onClick={run} disabled={loading}
-        className="w-full py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2"
+        className="w-full py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-2"
         style={{ background: "var(--green)", color: "white", opacity: loading ? 0.7 : 1 }}
       >
         {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PlayCircle className="w-3.5 h-3.5" />}
@@ -964,13 +964,13 @@ function SimulatorPanel({ journeyId }: { journeyId: string }) {
 
       {events.length > 0 && (
         <div className="mt-2">
-          <p className="text-[10px] uppercase font-bold opacity-60 mb-2">Eventos ({events.length})</p>
+          <p className="text-[10px] uppercase font-semibold opacity-60 mb-2">Eventos ({events.length})</p>
           <div className="space-y-1.5">
             {events.map((ev, i) => (
               <div key={i} className="p-2 rounded-lg text-[10px]"
                 style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
                 <div className="flex items-center justify-between mb-0.5">
-                  <span className="font-bold" style={{ color: "var(--green)" }}>{String(ev.action)}</span>
+                  <span className="font-semibold" style={{ color: "var(--green)" }}>{String(ev.action)}</span>
                   <span className="opacity-50">{String(ev.step_id)}</span>
                 </div>
                 <pre className="opacity-70 whitespace-pre-wrap break-all">
@@ -1259,8 +1259,8 @@ function BuilderCanvas() {
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] uppercase font-bold opacity-60">Flow Builder</p>
-          <p className="text-sm font-semibold truncate">{journey?.name || "Jornada sem nome"}</p>
+          <p className="text-[10px] uppercase font-semibold opacity-60">Flow Builder</p>
+          <p className="text-sm font-medium truncate">{journey?.name || "Jornada sem nome"}</p>
         </div>
         {/* Save state indicator */}
         <div className="text-[10px] px-2 py-1 rounded-md font-medium flex items-center gap-1"
@@ -1281,7 +1281,7 @@ function BuilderCanvas() {
           {journey?.status}
         </div>
         <button onClick={save} disabled={saving || !dirty}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-opacity"
+          className="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-opacity"
           style={{
             background: "var(--green)",
             color: "white",
@@ -1380,7 +1380,7 @@ function BuilderCanvas() {
               <button
                 key={t}
                 onClick={() => setRightTab(t)}
-                className={cn("flex-1 py-2.5 text-xs font-semibold transition-colors",
+                className={cn("flex-1 py-2.5 text-xs font-medium transition-colors",
                   rightTab === t ? "" : "opacity-50")}
                 style={{
                   borderBottom: rightTab === t ? "2px solid var(--green)" : "2px solid transparent",

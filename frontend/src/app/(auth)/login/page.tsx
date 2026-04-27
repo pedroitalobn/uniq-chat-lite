@@ -110,7 +110,7 @@ function Divider({ label }: { label: string }) {
   return (
     <div className="relative flex items-center gap-3 my-1">
       <div className="flex-1 h-px" style={{ background: "hsl(240 12% 13%)" }} />
-      <span className="text-[10px] font-semibold uppercase tracking-widest flex-shrink-0"
+      <span className="text-[10px] font-medium uppercase tracking-widest flex-shrink-0"
         style={{ color: "hsl(240 8% 32%)" }}>{label}</span>
       <div className="flex-1 h-px" style={{ background: "hsl(240 12% 13%)" }} />
     </div>
@@ -283,7 +283,7 @@ function LoginForm({ onSuccess, tr }: { onSuccess: () => void; tr: (typeof LOGIN
           </p>
         </div>
         <button type="submit" disabled={totpCode.length !== 6 || loading}
-          className="w-full py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
+          className="w-full py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-40"
           style={{ background: "var(--green)", color: "var(--green-fg)" }}>
           {loading ? "Verificando..." : "Confirmar"}
         </button>
@@ -336,7 +336,7 @@ function LoginForm({ onSuccess, tr }: { onSuccess: () => void; tr: (typeof LOGIN
       <button
         type="submit"
         disabled={loading || !identifier.trim() || !password.trim()}
-        className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+        className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
         style={{ background: "var(--green)", color: "#03170a" }}
       >
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
@@ -398,7 +398,7 @@ export default function LoginPage() {
 
           {/* Header */}
           <div className="py-3.5 text-center border-b" style={{ borderColor: "hsl(240 12% 11%)" }}>
-            <span className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+            <span className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>
               {tr.tab_login}
             </span>
           </div>

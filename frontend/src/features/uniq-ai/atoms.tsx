@@ -54,7 +54,7 @@ export function TypewriterText({ text }: { text: string }) {
       <ReactMarkdown
         components={{
           p({ children }) { return <p className="mb-2 last:mb-0">{children}</p>; },
-          strong({ children }) { return <strong className="font-bold">{children}</strong>; },
+          strong({ children }) { return <strong className="font-semibold">{children}</strong>; },
           em({ children }) { return <em className="italic opacity-90">{children}</em>; },
           ol({ children }) { return <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>; },
           ul({ children }) { return <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>; },
@@ -101,8 +101,8 @@ export function FlowPreview({ flow, trigger }: { flow?: any; trigger?: string })
           <div className="p-1.5 rounded-full" style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}>
             <Zap className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
           </div>
-          <span className="text-[9px] uppercase font-bold" style={{ color: "var(--text-3)" }}>Gatilho</span>
-          <span className="text-[10px] font-semibold text-center truncate w-full" style={{ color: "var(--text-1)" }}>
+          <span className="text-[9px] uppercase font-semibold" style={{ color: "var(--text-3)" }}>Gatilho</span>
+          <span className="text-[10px] font-medium text-center truncate w-full" style={{ color: "var(--text-1)" }}>
             {trigger || "keyword"}
           </span>
         </div>
@@ -111,8 +111,8 @@ export function FlowPreview({ flow, trigger }: { flow?: any; trigger?: string })
           <div className="p-1.5 rounded-full" style={{ background: "rgba(234,179,8,0.1)", border: "1px solid rgba(234,179,8,0.2)" }}>
             <MessageSquare className="w-3.5 h-3.5" style={{ color: "#eab308" }} />
           </div>
-          <span className="text-[9px] uppercase font-bold" style={{ color: "var(--text-3)" }}>Ação</span>
-          <span className="text-[10px] font-semibold text-center" style={{ color: "var(--text-1)" }}>
+          <span className="text-[9px] uppercase font-semibold" style={{ color: "var(--text-3)" }}>Ação</span>
+          <span className="text-[10px] font-medium text-center" style={{ color: "var(--text-1)" }}>
             Responder
           </span>
         </div>
@@ -126,8 +126,8 @@ export function FlowPreview({ flow, trigger }: { flow?: any; trigger?: string })
         <div className="p-1.5 rounded-full" style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}>
           <Zap className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
         </div>
-        <span className="text-[8px] uppercase font-bold" style={{ color: "var(--text-3)" }}>Gatilho</span>
-        <span className="text-[10px] font-semibold text-center truncate w-full" style={{ color: "var(--text-1)" }}>
+        <span className="text-[8px] uppercase font-semibold" style={{ color: "var(--text-3)" }}>Gatilho</span>
+        <span className="text-[10px] font-medium text-center truncate w-full" style={{ color: "var(--text-1)" }}>
           {trigger || "message"}
         </span>
       </div>
@@ -153,7 +153,7 @@ export function FlowPreview({ flow, trigger }: { flow?: any; trigger?: string })
                step.type === "tag" ? <Tag className="w-3 h-3" style={{ color: "#eab308" }} /> :
                <Bot className="w-3 h-3" style={{ color: "#8b5cf6" }} />}
             </div>
-            <span className="text-[8px] uppercase font-bold" style={{ color: "var(--text-3)" }}>
+            <span className="text-[8px] uppercase font-semibold" style={{ color: "var(--text-3)" }}>
               {step.type === "message" ? "Enviar" : step.type === "wait" ? "Esperar" : step.type === "tag" ? "Tag" : step.type}
             </span>
             <span className="text-[9px] text-center truncate w-full" style={{ color: "var(--text-2)" }}>
@@ -183,7 +183,7 @@ export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: s
         style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}>
         <SparklesIcon className="w-7 h-7 sm:w-8 sm:h-8" style={{ color: "var(--green)" }} />
       </div>
-      <h2 className="text-lg sm:text-xl font-semibold mb-2 text-center" style={{ color: "var(--text-1)" }}>
+      <h2 className="text-lg sm:text-xl font-medium mb-2 text-center" style={{ color: "var(--text-1)" }}>
         Olá, sou o Uniq AI
       </h2>
       <p className="text-sm text-center mb-6 sm:mb-8 max-w-md" style={{ color: "var(--text-3)" }}>
@@ -246,7 +246,7 @@ export function ChatMessage({ message, isNew = false }: { message: Message; isNe
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold mb-1.5" style={{ color: "var(--text-3)" }}>
+        <p className="text-xs font-medium mb-1.5" style={{ color: "var(--text-3)" }}>
           {isUser ? "Você" : "Uniq AI"}
         </p>
         <div className="text-sm leading-relaxed break-words" style={{ color: "var(--text-1)" }}>
@@ -257,7 +257,7 @@ export function ChatMessage({ message, isNew = false }: { message: Message; isNe
               <ReactMarkdown
                 components={{
                   p({ children }) { return <p className="mb-2 last:mb-0">{children}</p>; },
-                  strong({ children }) { return <strong className="font-bold">{children}</strong>; },
+                  strong({ children }) { return <strong className="font-semibold">{children}</strong>; },
                   em({ children }) { return <em className="italic opacity-90">{children}</em>; },
                   ol({ children }) { return <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>; },
                   ul({ children }) { return <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>; },

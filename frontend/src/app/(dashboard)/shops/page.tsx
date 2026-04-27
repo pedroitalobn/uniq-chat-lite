@@ -59,7 +59,7 @@ export default function ShopsPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <ShoppingBag className="w-5 h-5" style={{ color: "var(--green)" }} />
-            <h1 className="text-xl font-bold" style={{ color: "var(--text-1)" }}>
+            <h1 className="text-xl font-semibold" style={{ color: "var(--text-1)" }}>
               Shops
             </h1>
           </div>
@@ -70,7 +70,7 @@ export default function ShopsPage() {
         </div>
         <button
           onClick={() => setCreating(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
           style={{ background: "var(--green)", color: "var(--green-fg)" }}
         >
           <Plus className="w-4 h-4" /> Nova shop
@@ -118,7 +118,7 @@ export default function ShopsPage() {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate" style={{ color: "var(--text-1)" }}>
+                  <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>
                     {shop.name}
                   </p>
                   <p className="text-xs truncate" style={{ color: "var(--text-3)" }}>
@@ -154,7 +154,7 @@ export default function ShopsPage() {
           </p>
           <Link
             href="/integrations?section=shop"
-            className="inline-flex items-center gap-1 text-xs font-semibold"
+            className="inline-flex items-center gap-1 text-xs font-medium"
             style={{ color: "#8b5cf6" }}
           >
             Ver integrações disponíveis <ArrowRight className="w-3 h-3" />
@@ -173,7 +173,7 @@ export default function ShopsPage() {
             style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-bold mb-4" style={{ color: "var(--text-1)" }}>
+            <h3 className="text-lg font-semibold mb-4" style={{ color: "var(--text-1)" }}>
               Nova shop
             </h3>
             <div className="space-y-3 mb-4">
@@ -240,7 +240,7 @@ export default function ShopsPage() {
               <button
                 onClick={() => createMut.mutate(form)}
                 disabled={!form.name.trim() || createMut.isPending}
-                className="flex-1 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center disabled:opacity-50"
                 style={{ background: "var(--green)", color: "var(--green-fg)" }}
               >
                 {createMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Criar"}

@@ -50,7 +50,7 @@ function StatCard({
       <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 sm:mb-4" style={{ background: s.bg, border: `1px solid ${s.border}` }}>
         <Icon className="w-4 h-4" style={{ color: s.icon }} />
       </div>
-      <p className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>{value}</p>
+      <p className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>{value}</p>
       <p className="text-xs sm:text-sm mt-1" style={{ color: "hsl(240 8% 52%)" }}>{label}</p>
       {sub && <p className="text-[10px] sm:text-xs mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>{sub}</p>}
     </div>
@@ -83,7 +83,7 @@ function ShortcutCard({ href, icon: Icon, label, description, color }: {
 function SectionHeader({ title, href, linkText = "Ver todas →" }: { title: string; href?: string; linkText?: string }) {
   return (
     <div className="flex items-center justify-between mb-3">
-      <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 88%)" }}>{title}</h2>
+      <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>{title}</h2>
       {href && (
         <Link href={href} className="text-xs transition-colors" style={{ color: "var(--green)" }}>
           {linkText}
@@ -193,7 +193,7 @@ export default function DashboardPage() {
     <div className="space-y-5 sm:space-y-7">
       {/* Header */}
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Dashboard</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Dashboard</h1>
         <p className="text-xs sm:text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
           Bem-vindo{currentWorkspace ? ` ao workspace ${currentWorkspace.name}` : ""},{" "}
           <span style={{ color: "hsl(240 8% 70%)" }}>{session?.user?.name}</span>
@@ -254,7 +254,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
         <div className="lg:col-span-2 rounded-2xl p-4 sm:p-5 animate-fade-in-up" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
           <div className="flex items-center justify-between mb-4 sm:mb-5">
-            <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 88%)" }}>Atividade de mensagens</h2>
+            <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>Atividade de mensagens</h2>
             <span className="text-xs" style={{ color: "hsl(240 8% 42%)" }}>últimos 7 dias</span>
           </div>
           <ResponsiveContainer width="100%" height={180}>
@@ -284,7 +284,7 @@ export default function DashboardPage() {
                   <Activity className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
                   Em execução
                 </span>
-                <span className="font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
+                <span className="font-medium" style={{ color: "hsl(240 15% 90%)" }}>
                   {journeyStatsQ.data.journeys.active_executions}
                 </span>
               </div>
@@ -293,7 +293,7 @@ export default function DashboardPage() {
                   <TrendingUp className="w-3.5 h-3.5" style={{ color: "#3b82f6" }} />
                   Hoje
                 </span>
-                <span className="font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
+                <span className="font-medium" style={{ color: "hsl(240 15% 90%)" }}>
                   {journeyStatsQ.data.journeys.today_executions}
                 </span>
               </div>
@@ -302,7 +302,7 @@ export default function DashboardPage() {
                   <Wand2 className="w-3.5 h-3.5" style={{ color: "#a78bfa" }} />
                   Total
                 </span>
-                <span className="font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
+                <span className="font-medium" style={{ color: "hsl(240 15% 90%)" }}>
                   {journeyStatsQ.data.journeys.total_executions}
                 </span>
               </div>
@@ -312,7 +312,7 @@ export default function DashboardPage() {
                     <Rocket className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
                     Deals ganhos
                   </span>
-                  <span className="font-semibold" style={{ color: "var(--green)" }}>
+                  <span className="font-medium" style={{ color: "var(--green)" }}>
                     {wonDeals}
                   </span>
                 </div>
@@ -350,7 +350,7 @@ export default function DashboardPage() {
                     <p className="text-xs truncate" style={{ color: "hsl(240 8% 42%)" }}>{d.contact_name || d.contact?.name || "Sem contato"}</p>
                   </div>
                   {d.value > 0 && (
-                    <span className="text-xs font-semibold ml-3 flex-shrink-0" style={{ color: "var(--green)" }}>
+                    <span className="text-xs font-medium ml-3 flex-shrink-0" style={{ color: "var(--green)" }}>
                       R$ {Number(d.value).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
                     </span>
                   )}

@@ -842,7 +842,7 @@ function Playground({ endpoint, apiKey, instanceId }: {
     <div className="space-y-3 pt-2">
       {endpoint.pathParams && endpoint.pathParams.length > 0 && (
         <div className="space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 38%)" }}>Path Params</p>
+          <p className="text-[10px] font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 38%)" }}>Path Params</p>
           {endpoint.pathParams.map((p) => (
             <div key={p} className="flex items-center gap-2">
               <span className="text-xs font-mono w-24 flex-shrink-0" style={{ color: "#fbbf24" }}>:{p}</span>
@@ -855,7 +855,7 @@ function Playground({ endpoint, apiKey, instanceId }: {
 
       {endpoint.body && endpoint.method !== "GET" && (
         <div className="space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 38%)" }}>Body</p>
+          <p className="text-[10px] font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 38%)" }}>Body</p>
           {Object.entries(endpoint.body).map(([key, field]) => (
             <div key={key}>
               <div className="flex items-center gap-1.5 mb-1">
@@ -871,7 +871,7 @@ function Playground({ endpoint, apiKey, instanceId }: {
       )}
 
       <button onClick={run} disabled={loading || !apiKey}
-        className="flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-xl transition-all disabled:opacity-40"
+        className="flex items-center gap-2 text-xs font-medium px-4 py-2 rounded-xl transition-all disabled:opacity-40"
         style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)", color: "var(--green)" }}
         onMouseEnter={e => (e.currentTarget.style.background = "rgba(0,212,106,0.16)")}
         onMouseLeave={e => (e.currentTarget.style.background = "rgba(0,212,106,0.1)")}
@@ -888,7 +888,7 @@ function Playground({ endpoint, apiKey, instanceId }: {
           <div className="flex items-center gap-2 px-3 py-1.5" style={{
             background: result.status >= 200 && result.status < 300 ? "rgba(0,212,106,0.06)" : "rgba(239,68,68,0.06)",
           }}>
-            <span className="text-xs font-bold font-mono" style={{ color: result.status >= 200 && result.status < 300 ? "var(--green)" : "#f87171" }}>
+            <span className="text-xs font-semibold font-mono" style={{ color: result.status >= 200 && result.status < 300 ? "var(--green)" : "#f87171" }}>
               {result.status || "ERR"}
             </span>
             <span className="text-[10px]" style={{ color: "hsl(240 8% 46%)" }}>
@@ -958,7 +958,7 @@ function EndpointRow({ endpoint, apiKey, instanceId }: {
       border: open ? "1px solid hsl(240 12% 13%)" : "1px solid transparent",
     }}>
       <div onClick={() => setOpen(!open)} className="w-full flex items-center gap-3 px-4 py-3 cursor-pointer group select-none">
-        <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded-lg w-16 text-center flex-shrink-0"
+        <span className="text-[11px] font-semibold font-mono px-2 py-0.5 rounded-lg w-16 text-center flex-shrink-0"
           style={{ background: m.bg, color: m.color }}>{endpoint.method}</span>
         <code className="text-xs font-mono flex-1" style={{ color: "hsl(240 15% 75%)" }}>{endpoint.path}</code>
         <span className="text-xs hidden sm:block" style={{ color: "hsl(240 8% 42%)" }}>{endpoint.summary}</span>
@@ -980,14 +980,14 @@ function EndpointRow({ endpoint, apiKey, instanceId }: {
           </div>
           {endpoint.response && (
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Response</p>
+              <p className="text-[10px] font-medium uppercase tracking-widest mb-1.5" style={{ color: "hsl(240 8% 38%)" }}>Response</p>
               <div className="rounded-xl p-3" style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}>
                 <pre className="text-xs font-mono" style={{ color: "#86efac" }}>{endpoint.response}</pre>
               </div>
             </div>
           )}
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: "hsl(240 8% 38%)" }}>Playground</p>
+            <p className="text-[10px] font-medium uppercase tracking-widest mb-2" style={{ color: "hsl(240 8% 38%)" }}>Playground</p>
             <Playground endpoint={endpoint} apiKey={apiKey} instanceId={instanceId} />
           </div>
         </div>
@@ -1069,7 +1069,7 @@ export default function DocsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>API Reference</h1>
+        <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>API Reference</h1>
         <p className="text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
           <span className="font-mono text-xs px-1.5 py-0.5 rounded-md mr-1"
             style={{ background: "rgba(0,212,106,0.08)", color: "var(--green)" }}>{totalEndpoints}</span>
@@ -1084,7 +1084,7 @@ export default function DocsPage() {
       <div className="rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-fade-in-up"
         style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
         <div>
-          <label className="text-[10px] font-semibold uppercase tracking-widest block mb-1.5" style={{ color: "hsl(240 8% 42%)" }}>
+          <label className="text-[10px] font-medium uppercase tracking-widest block mb-1.5" style={{ color: "hsl(240 8% 42%)" }}>
             API Key para Playground
           </label>
           <input type="text" value={selectedKey} onChange={(e) => setSelectedKey(e.target.value)}
@@ -1094,7 +1094,7 @@ export default function DocsPage() {
           </p>
         </div>
         <div>
-          <label className="text-[10px] font-semibold uppercase tracking-widest block mb-1.5" style={{ color: "hsl(240 8% 42%)" }}>
+          <label className="text-[10px] font-medium uppercase tracking-widest block mb-1.5" style={{ color: "hsl(240 8% 42%)" }}>
             Instância padrão (para {`{id}`})
           </label>
           <select value={selectedInstance} onChange={(e) => setSelectedInstance(e.target.value)} className="input-field w-full text-sm">
@@ -1108,7 +1108,7 @@ export default function DocsPage() {
       <div className="space-y-3 animate-fade-in-up">
         <div className="rounded-2xl p-4 space-y-3"
           style={{ background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.14)" }}>
-          <p className="text-xs font-semibold" style={{ color: "#a78bfa" }}>Estrutura da URL — API Pública v1</p>
+          <p className="text-xs font-medium" style={{ color: "#a78bfa" }}>Estrutura da URL — API Pública v1</p>
           <div className="rounded-xl px-3 py-2.5" style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}>
             <code className="text-xs font-mono" style={{ color: "hsl(240 15% 75%)" }}>
               <span style={{ color: "hsl(240 8% 46%)" }}>{API_ROOT}</span>
@@ -1125,7 +1125,7 @@ export default function DocsPage() {
         </div>
         <div className="rounded-2xl p-4 space-y-2"
           style={{ background: "rgba(96,165,250,0.04)", border: "1px solid rgba(96,165,250,0.12)" }}>
-          <p className="text-xs font-semibold" style={{ color: "#60a5fa" }}>Autenticação</p>
+          <p className="text-xs font-medium" style={{ color: "#60a5fa" }}>Autenticação</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
             <div className="rounded-lg px-3 py-2" style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}>
               <span style={{ color: "hsl(240 8% 46%)" }}>v1 (por instância): </span>
@@ -1143,7 +1143,7 @@ export default function DocsPage() {
       <div className="flex gap-1.5 animate-fade-in-up">
         {CHANNEL_TABS.map((tab) => (
           <button key={tab.id} onClick={() => { setChannelTab(tab.id); setActiveSection(tab.id === "instagram" ? "ig-instances" : "instances"); }}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all"
             style={channelTab === tab.id
               ? { background: `${tab.color}18`, color: tab.color, border: `1px solid ${tab.color}40` }
               : { background: "transparent", color: "hsl(240 8% 46%)", border: "1px solid hsl(240 12% 13%)" }}>
@@ -1172,7 +1172,7 @@ export default function DocsPage() {
           ))}
 
           <div className="pt-4">
-            <p className="text-[10px] font-semibold uppercase tracking-widest px-3 mb-2" style={{ color: "hsl(240 8% 36%)" }}>Referência</p>
+            <p className="text-[10px] font-medium uppercase tracking-widest px-3 mb-2" style={{ color: "hsl(240 8% 36%)" }}>Referência</p>
             <button onClick={() => setActiveSection("webhook-events")}
               className={cn("w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all",
                 activeSection === "webhook-events" ? "text-white" : "text-slate-500 hover:text-slate-300")}
@@ -1188,7 +1188,7 @@ export default function DocsPage() {
         <div className="min-w-0">
           {activeSection === "webhook-events" ? (
             <div className="space-y-3 animate-fade-in-up">
-              <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 88%)" }}>Eventos de Webhook</h2>
+              <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>Eventos de Webhook</h2>
               <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>
                 Configure por instância em <code className="font-mono">POST /instances/<code className="font-mono">{'{' + 'id}'}</code>/webhooks</code>.
                 O payload é enviado via <strong>HTTP POST</strong> para a URL configurada.
@@ -1204,7 +1204,7 @@ export default function DocsPage() {
                 ))}
               </div>
               <div className="pt-2">
-                <p className="text-xs font-semibold mb-2" style={{ color: "hsl(240 8% 52%)" }}>Exemplo de payload:</p>
+                <p className="text-xs font-medium mb-2" style={{ color: "hsl(240 8% 52%)" }}>Exemplo de payload:</p>
                 <div className="rounded-xl p-4 overflow-x-auto" style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}>
                   <pre className="text-xs font-mono" style={{ color: "hsl(240 8% 65%)" }}>{`{
   "event": "message.received",
@@ -1224,7 +1224,7 @@ export default function DocsPage() {
             <div className="space-y-2 animate-fade-in-up">
               <div className="flex items-center gap-2 mb-4">
                 <span style={{ color: "var(--green)" }}>{section.icon}</span>
-                <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 88%)" }}>{section.label}</h2>
+                <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>{section.label}</h2>
                 <span className="text-xs" style={{ color: "hsl(240 8% 38%)" }}>
                   {section.endpoints.length} endpoint{section.endpoints.length !== 1 ? "s" : ""}
                 </span>

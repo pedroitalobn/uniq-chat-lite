@@ -139,7 +139,7 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
           </Link>
           <Avatar name={c.name} url={c.avatar_url} size={44} />
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-lg font-semibold" style={{ color: uniq.textStrong }}>
+            <h1 className="truncate text-lg font-medium" style={{ color: uniq.textStrong }}>
               {c.name}
             </h1>
             <div className="flex flex-wrap items-center gap-2 text-xs" style={{ color: uniq.textFaint }}>
@@ -233,7 +233,7 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-0.5">
-                    <span className="text-sm font-semibold" style={{ color: uniq.green }}>
+                    <span className="text-sm font-medium" style={{ color: uniq.green }}>
                       {formatCurrency(d.value, d.currency)}
                     </span>
                     <span
@@ -349,7 +349,7 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-6">
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color: uniq.textFaint }}>
+      <h2 className="mb-3 text-xs font-medium uppercase tracking-widest" style={{ color: uniq.textFaint }}>
         {title}
       </h2>
       {children}
@@ -404,7 +404,7 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
       style={cardStyle}
     >
       <div className="text-[10px] uppercase tracking-widest" style={{ color: uniq.textFaint }}>{label}</div>
-      <div className="mt-1 text-sm font-semibold" style={{ color: accent || uniq.textStrong }}>{value}</div>
+      <div className="mt-1 text-sm font-medium" style={{ color: accent || uniq.textStrong }}>{value}</div>
     </div>
   );
 }
@@ -412,7 +412,7 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
 function SidebarLabel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div
-      className={"text-[10px] font-semibold uppercase tracking-widest " + (className ?? "")}
+      className={"text-[10px] font-medium uppercase tracking-widest " + (className ?? "")}
       style={{ color: uniq.textFaint }}
     >
       {children}
@@ -428,7 +428,7 @@ function Avatar({ name, url, size = 36 }: { name: string; url?: string; size?: n
   const initials = name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
   return (
     <div
-      className="flex flex-shrink-0 items-center justify-center rounded-full font-semibold"
+      className="flex flex-shrink-0 items-center justify-center rounded-full font-medium"
       style={{
         width: size, height: size,
         background: "rgba(0,212,106,0.1)",

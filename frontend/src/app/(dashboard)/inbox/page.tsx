@@ -398,7 +398,7 @@ export default function InboxPage() {
       >
         <div className="flex flex-wrap items-center gap-3">
           <div>
-            <h1 className="text-xl font-semibold" style={{ color: "hsl(240 15% 93%)" }}>
+            <h1 className="text-xl font-medium" style={{ color: "hsl(240 15% 93%)" }}>
               Inbox
             </h1>
             <p className="text-xs" style={{ color: "hsl(240 8% 48%)" }}>
@@ -970,7 +970,7 @@ function DropdownItem({
 function DropdownDivider({ label }: { label?: string }) {
   return (
     <div
-      className="px-3 pb-1 pt-3 text-[9px] font-semibold uppercase tracking-widest"
+      className="px-3 pb-1 pt-3 text-[9px] font-medium uppercase tracking-widest"
       style={{ color: "hsl(240 8% 38%)" }}
     >
       {label ?? ""}
@@ -993,7 +993,7 @@ function BackfillEmptyState({ stats, running, onBackfill }: {
         }}
       >
         <RefreshCw className={`mx-auto h-8 w-8 ${running ? "animate-spin" : ""}`} style={{ color: "#00d46a" }} />
-        <h2 className="mt-3 text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>
+        <h2 className="mt-3 text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>
           Primeira sincronização
         </h2>
         <p className="mt-2 text-sm" style={{ color: "hsl(240 8% 52%)" }}>
@@ -1004,7 +1004,7 @@ function BackfillEmptyState({ stats, running, onBackfill }: {
         <button
           onClick={onBackfill}
           disabled={running}
-          className="mt-4 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+          className="mt-4 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
           style={{ background: "#00d46a", color: "#03170a" }}
         >
           {running ? "Sincronizando…" : "Iniciar sincronização"}
@@ -1135,7 +1135,7 @@ function ErrorState({ error, probe, onRetry }: { error: unknown; probe?: HealthP
           <summary className="cursor-pointer select-none">Detalhes técnicos</summary>
           <div className="mt-2 space-y-2 font-mono">
             <div>
-              <div className="font-semibold" style={{ color: "hsl(240 8% 60%)" }}>
+              <div className="font-medium" style={{ color: "hsl(240 8% 60%)" }}>
                 GET /v1/conversations
               </div>
               {status ? <div>status: {status}</div> : <div>sem resposta HTTP</div>}
@@ -1144,7 +1144,7 @@ function ErrorState({ error, probe, onRetry }: { error: unknown; probe?: HealthP
             </div>
             {probe && (
               <div>
-                <div className="font-semibold" style={{ color: "hsl(240 8% 60%)" }}>
+                <div className="font-medium" style={{ color: "hsl(240 8% 60%)" }}>
                   GET /v1/conversations/health (probe)
                 </div>
                 {probe.ok === true ? (
@@ -1295,7 +1295,7 @@ function InboxMenu({
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="px-3 py-2 text-[10px] font-semibold uppercase tracking-widest"
+      className="px-3 py-2 text-[10px] font-medium uppercase tracking-widest"
       style={{ color: "hsl(240 8% 42%)", borderBottom: "1px solid hsl(240 12% 11%)" }}
     >
       {children}

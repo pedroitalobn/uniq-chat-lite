@@ -104,7 +104,7 @@ export function WebhookDeliveriesDialog({ scope, webhookName, onClose }: Props) 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: "var(--surface-border)" }}>
           <div>
-            <h3 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>Logs de entrega</h3>
+            <h3 className="text-base font-medium" style={{ color: "var(--text-1)" }}>Logs de entrega</h3>
             <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
               {webhookName} · {data?.total ?? 0} entrega(s)
             </p>
@@ -208,7 +208,7 @@ function DeliveryRow({
         className="w-full flex items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-white/5"
       >
         <Icon className="w-4 h-4 shrink-0" style={{ color: statusColor }} />
-        <span className="text-[11px] font-bold tabular-nums shrink-0" style={{ color: statusColor, minWidth: "40px" }}>
+        <span className="text-[11px] font-semibold tabular-nums shrink-0" style={{ color: statusColor, minWidth: "40px" }}>
           {d.status_code || "—"}
         </span>
         <code className="text-xs font-mono flex-1 truncate" style={{ color: "var(--text-1)" }}>
@@ -218,7 +218,7 @@ function DeliveryRow({
           {d.latency_ms}ms
         </span>
         {d.retry_count > 0 && (
-          <span className="text-[9px] px-1.5 py-0.5 rounded font-bold shrink-0" style={{ background: "rgba(139,92,246,0.15)", color: "#8b5cf6" }}>
+          <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold shrink-0" style={{ background: "rgba(139,92,246,0.15)", color: "#8b5cf6" }}>
             R{d.retry_count}
           </span>
         )}
@@ -234,7 +234,7 @@ function DeliveryRow({
         <div className="border-t px-3 py-3 space-y-3" style={{ borderColor: "var(--surface-border)", background: "var(--surface-1)" }}>
           {d.error && (
             <div>
-              <p className="text-[10px] uppercase font-semibold mb-1" style={{ color: "var(--text-3)" }}>Erro de transporte</p>
+              <p className="text-[10px] uppercase font-medium mb-1" style={{ color: "var(--text-3)" }}>Erro de transporte</p>
               <pre className="text-[11px] font-mono whitespace-pre-wrap break-all p-2 rounded" style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444" }}>
                 {d.error}
               </pre>
@@ -242,7 +242,7 @@ function DeliveryRow({
           )}
 
           <div>
-            <p className="text-[10px] uppercase font-semibold mb-1" style={{ color: "var(--text-3)" }}>Payload enviado</p>
+            <p className="text-[10px] uppercase font-medium mb-1" style={{ color: "var(--text-3)" }}>Payload enviado</p>
             <pre className="text-[10px] font-mono whitespace-pre-wrap break-all p-2 rounded max-h-48 overflow-auto" style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
               {prettifyJSON(d.payload)}
             </pre>
@@ -250,7 +250,7 @@ function DeliveryRow({
 
           {d.response_body && (
             <div>
-              <p className="text-[10px] uppercase font-semibold mb-1" style={{ color: "var(--text-3)" }}>Response body</p>
+              <p className="text-[10px] uppercase font-medium mb-1" style={{ color: "var(--text-3)" }}>Response body</p>
               <pre className="text-[10px] font-mono whitespace-pre-wrap break-all p-2 rounded max-h-48 overflow-auto" style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
                 {d.response_body}
               </pre>

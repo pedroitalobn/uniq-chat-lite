@@ -288,7 +288,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
             >
               <QrCode className="w-4 h-4" style={{ color: "var(--green)" }} />
             </div>
-            <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>
+            <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>
               Conectar WhatsApp
             </h2>
           </div>
@@ -310,7 +310,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
               <button
                 key={m}
                 onClick={() => setMode(m)}
-                className="flex-1 text-xs font-semibold py-1.5 rounded-lg transition-all"
+                className="flex-1 text-xs font-medium py-1.5 rounded-lg transition-all"
                 style={mode === m
                   ? { background: "hsl(240 12% 18%)", color: "hsl(240 15% 90%)" }
                   : { color: "hsl(240 8% 40%)" }
@@ -332,7 +332,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
               >
                 <CheckCircle2 className="w-8 h-8" style={{ color: "var(--green)" }} />
               </div>
-              <p className="font-semibold" style={{ color: "hsl(240 15% 93%)" }}>WhatsApp conectado!</p>
+              <p className="font-medium" style={{ color: "hsl(240 15% 93%)" }}>WhatsApp conectado!</p>
               <p className="text-xs text-center" style={{ color: "hsl(240 8% 46%)" }}>Fechando automaticamente...</p>
             </div>
 
@@ -423,7 +423,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
             <div className="w-full space-y-4">
               <div className="rounded-xl p-3 text-xs leading-relaxed"
                 style={{ background: "rgba(96,165,250,0.06)", border: "1px solid rgba(96,165,250,0.12)", color: "hsl(240 8% 56%)" }}>
-                <p className="font-semibold mb-1" style={{ color: "#60a5fa" }}>Como usar:</p>
+                <p className="font-medium mb-1" style={{ color: "#60a5fa" }}>Como usar:</p>
                 <p>1. Informe seu número com DDI</p>
                 <p>2. Clique em Gerar Código</p>
                 <p>3. No WhatsApp: Dispositivos Vinculados → Vincular com número de telefone</p>
@@ -454,7 +454,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
                   <div className="rounded-xl p-4 text-center"
                     style={{ background: "rgba(0,212,106,0.06)", border: "1px solid rgba(0,212,106,0.2)" }}>
                     <p className="text-xs mb-2" style={{ color: "hsl(240 8% 48%)" }}>Código de pareamento</p>
-                    <p className="text-3xl font-bold font-mono tracking-[0.2em]" style={{ color: "var(--green)" }}>
+                    <p className="text-3xl font-semibold font-mono tracking-[0.2em]" style={{ color: "var(--green)" }}>
                       {pairingCode}
                     </p>
                     <p className="text-[10px] mt-2" style={{ color: "hsl(240 8% 38%)" }}>
@@ -487,7 +487,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
                   <button
                     onClick={requestPairingCode}
                     disabled={pairingLoading || !phone.trim()}
-                    className="w-full text-sm font-semibold py-2.5 rounded-xl transition-all disabled:opacity-40"
+                    className="w-full text-sm font-medium py-2.5 rounded-xl transition-all disabled:opacity-40"
                     style={{ background: "var(--green)", color: "#03170a" }}
                     onMouseEnter={e => !pairingLoading && (e.currentTarget.style.filter = "brightness(1.1)")}
                     onMouseLeave={e => (e.currentTarget.style.filter = "none")}

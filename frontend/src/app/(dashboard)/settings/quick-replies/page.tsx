@@ -75,7 +75,7 @@ export default function QuickRepliesPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-8 p-6">
       <header>
-        <h1 className="text-2xl font-semibold">Respostas rápidas</h1>
+        <h1 className="text-2xl font-medium">Respostas rápidas</h1>
         <p className="text-sm text-zinc-500">
           Atalhos que o atendente usa no composer digitando <code className="rounded bg-zinc-100 px-1 text-[11px] dark:bg-zinc-800">/shortcut</code>.
         </p>

@@ -43,7 +43,7 @@ export function TemplatesDialog({
         style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Começar de um template</h2>
+            <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>Começar de um template</h2>
             <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 54%)" }}>
               Modelos prontos com flow configurado. Edite depois no canvas.
             </p>
@@ -73,7 +73,7 @@ export function TemplatesDialog({
                 >
                   <div className="flex items-center gap-2 mb-1.5">
                     <LayoutTemplate className="w-4 h-4" style={{ color: "var(--green)" }} />
-                    <span className="font-semibold text-sm" style={{ color: "hsl(240 15% 93%)" }}>{t.name}</span>
+                    <span className="font-medium text-sm" style={{ color: "hsl(240 15% 93%)" }}>{t.name}</span>
                   </div>
                   {t.description && (
                     <p className="text-xs" style={{ color: "hsl(240 8% 56%)" }}>{t.description}</p>

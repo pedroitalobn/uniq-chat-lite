@@ -194,7 +194,7 @@ function ProxyModal({
       <div className="relative w-full max-w-lg rounded-2xl p-6 space-y-4 animate-fade-in-up"
         style={{ background: "hsl(240 18% 6.5%)", border: "1px solid hsl(240 12% 13%)" }}>
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+          <h3 className="text-lg font-medium" style={{ color: "hsl(240 15% 92%)" }}>
             {proxy?.id ? "Editar Proxy" : "Novo Proxy"}
           </h3>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5">
@@ -272,13 +272,13 @@ function ProxyModal({
 
         <div className="flex gap-2 pt-2">
           <button onClick={handleTest} disabled={testing || !form.host || !form.port}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium"
             style={{ background: "hsl(240 12% 12%)", color: "hsl(240 15% 85%)", opacity: (testing || !form.host || !form.port) ? 0.5 : 1 }}>
             {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <TestTube2 className="w-4 h-4" />}
             Testar
           </button>
           <button onClick={handleSubmit} disabled={saving || (testResult && !testResult.success) || false}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium"
             style={{ background: "var(--green)", color: "#04200f", opacity: saving ? 0.7 : 1 }}>
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {proxy?.id ? "Salvar" : "Criar Proxy"}
@@ -310,7 +310,7 @@ function SetDefaultModal({
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl p-6 space-y-4 animate-fade-in-up"
         style={{ background: "hsl(240 18% 6.5%)", border: "1px solid hsl(240 12% 13%)" }}>
-        <h3 className="text-lg font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+        <h3 className="text-lg font-medium" style={{ color: "hsl(240 15% 92%)" }}>
           Definir Proxy Padrão
         </h3>
         <p className="text-sm" style={{ color: "hsl(240 8% 58%)" }}>
@@ -325,11 +325,11 @@ function SetDefaultModal({
         </select>
 
         <div className="flex gap-2 pt-2">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-medium"
             style={{ background: "hsl(240 12% 15%)", color: "hsl(240 8% 70%)" }}>
             Cancelar
           </button>
-          <button onClick={() => onConfirm(selectedCountry)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+          <button onClick={() => onConfirm(selectedCountry)} className="flex-1 py-2.5 rounded-xl text-sm font-medium"
             style={{ background: "var(--green)", color: "#04200f" }}>
             Confirmar
           </button>
@@ -360,7 +360,7 @@ function DeleteModal({
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl p-6 space-y-4 animate-fade-in-up"
         style={{ background: "hsl(240 18% 6.5%)", border: "1px solid hsl(240 12% 13%)" }}>
-        <h3 className="text-lg font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+        <h3 className="text-lg font-medium" style={{ color: "hsl(240 15% 92%)" }}>
           Excluir Proxy
         </h3>
         <p className="text-sm" style={{ color: "hsl(240 8% 58%)" }}>
@@ -373,11 +373,11 @@ function DeleteModal({
         </label>
 
         <div className="flex gap-2 pt-2">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-medium"
             style={{ background: "hsl(240 12% 15%)", color: "hsl(240 8% 70%)" }}>
             Cancelar
           </button>
-          <button onClick={onConfirm} disabled={!confirming} className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+          <button onClick={onConfirm} disabled={!confirming} className="flex-1 py-2.5 rounded-xl text-sm font-medium"
             style={{ background: "#ef4444", color: "#fff", opacity: confirming ? 1 : 0.5 }}>
             Excluir
           </button>
@@ -492,14 +492,14 @@ export default function AdminProxyPage() {
     <div className="space-y-6 max-w-5xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold" style={{ color: "hsl(240 15% 93%)" }}>Proxy Global</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Proxy Global</h1>
           <p className="text-sm mt-1 hidden sm:block" style={{ color: "hsl(240 8% 46%)" }}>
             Configure proxies residenciais por país para reduzir banimento.
           </p>
         </div>
         <button
           onClick={() => setProxyModal({ open: true, proxy: null })}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
           style={{ background: "var(--green)", color: "#000" }}
         >
           + <span className="hidden sm:inline">Novo Proxy</span>
@@ -515,7 +515,7 @@ export default function AdminProxyPage() {
               <c.icon className="w-4 h-4" style={{ color: "hsl(240 8% 60%)" }} />
               <span className="text-[11px]" style={{ color: "hsl(240 8% 48%)" }}>{c.label}</span>
             </div>
-            <div className="text-xl font-bold" style={{ color: "hsl(240 15% 92%)" }}>{c.value}</div>
+            <div className="text-xl font-semibold" style={{ color: "hsl(240 15% 92%)" }}>{c.value}</div>
           </div>
         ))}
       </div>
@@ -523,7 +523,7 @@ export default function AdminProxyPage() {
       {/* Proxy List */}
       <div className="rounded-2xl p-6" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+          <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 92%)" }}>
             Proxies Configurados
           </h2>
           <span className="text-xs px-2 py-1 rounded-lg" style={{ background: "hsl(240 12% 15%)", color: "hsl(240 8% 60%)" }}>
@@ -594,7 +594,7 @@ export default function AdminProxyPage() {
             <p className="text-sm" style={{ color: "hsl(240 8% 46%)" }}>Nenhum proxy configurado.</p>
             <button
               onClick={() => setProxyModal({ open: true, proxy: null })}
-              className="mt-3 px-4 py-2 rounded-xl text-sm font-semibold"
+              className="mt-3 px-4 py-2 rounded-xl text-sm font-medium"
               style={{ background: "var(--green)", color: "#000" }}
             >
               + Novo Proxy
@@ -606,7 +606,7 @@ export default function AdminProxyPage() {
       {/* Users Using Global Proxy */}
       {stats?.users?.length > 0 && (
         <div className="rounded-2xl p-6" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-          <h2 className="text-base font-semibold mb-3" style={{ color: "hsl(240 15% 92%)" }}>Usuários usando proxy global</h2>
+          <h2 className="text-base font-medium mb-3" style={{ color: "hsl(240 15% 92%)" }}>Usuários usando proxy global</h2>
           <div className="space-y-2">
             {stats.users.map((u) => (
               <div key={u.user_id} className="rounded-lg p-3 flex items-center justify-between"

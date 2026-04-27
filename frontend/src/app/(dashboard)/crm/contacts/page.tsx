@@ -199,7 +199,7 @@ function ContactModal({
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4">
-          <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>
+          <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>
             {contact ? "Editar Contato" : "Novo Contato"}
           </h2>
           <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }} className="hover:opacity-70 transition-opacity">
@@ -326,7 +326,7 @@ function ContactModal({
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 text-sm font-semibold py-2.5 rounded-xl transition-all disabled:opacity-40"
+            className="flex-1 text-sm font-medium py-2.5 rounded-xl transition-all disabled:opacity-40"
             style={{ background: "var(--green)", color: "#03170a" }}
           >
             {saving ? "Salvando..." : "Salvar"}
@@ -365,7 +365,7 @@ function TagManager({ onClose, workspaceId }: { onClose: () => void; workspaceId
       <div className="relative w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-fade-in-up"
         style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Gerenciar Tags</h2>
+          <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>Gerenciar Tags</h2>
           <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }} className="hover:opacity-70 transition-opacity"><X className="w-5 h-5" /></button>
         </div>
         <div className="space-y-3 mb-4">
@@ -383,7 +383,7 @@ function TagManager({ onClose, workspaceId }: { onClose: () => void; workspaceId
             ))}
           </div>
           <button onClick={() => name.trim() && createTag.mutate()} disabled={!name.trim() || createTag.isPending}
-            className="w-full text-sm font-semibold py-2 rounded-xl transition-all disabled:opacity-40"
+            className="w-full text-sm font-medium py-2 rounded-xl transition-all disabled:opacity-40"
             style={{ background: "var(--green)", color: "#03170a" }}>
             Criar Tag
           </button>
@@ -468,7 +468,7 @@ function FunnelManager({ onClose, workspaceId }: { onClose: () => void; workspac
               <GitBranch className="w-4 h-4" style={{ color: "#a78bfa" }} />
             </div>
             <div>
-              <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 93%)" }}>
+              <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>
                 {mode === "list" ? "Funis e Etapas" : editingFunnel ? `Editar ${editingFunnel.name}` : "Novo funil"}
               </h2>
               <p className="text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
@@ -520,7 +520,7 @@ function FunnelList({
     <div className="space-y-3">
       <button
         onClick={onCreate}
-        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all"
         style={{ background: "var(--green, #00d46a)", color: "#0a0a0f" }}
       >
         <Plus className="w-4 h-4" />
@@ -788,7 +788,7 @@ function FunnelForm({
           <button
             type="button"
             onClick={addStage}
-            className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors"
             style={{ background: "rgba(0,212,106,0.08)", color: "var(--green, #00d46a)", border: "1px solid rgba(0,212,106,0.2)" }}
           >
             <Plus className="w-3 h-3" />
@@ -882,7 +882,7 @@ function FunnelForm({
           type="button"
           onClick={() => saveMutation.mutate()}
           disabled={!canSave || saveMutation.isPending}
-          className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl transition-all disabled:opacity-40"
+          className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-xl transition-all disabled:opacity-40"
           style={{ background: "var(--green, #00d46a)", color: "#0a0a0f" }}
         >
           <Check className="w-4 h-4" />
@@ -940,7 +940,7 @@ function FunnelSwitcher({
             style={{ background: "hsl(240 18% 7%)", border: "1px solid hsl(240 12% 14%)" }}
           >
             <div
-              className="px-3 py-2 text-[10px] font-semibold uppercase tracking-widest"
+              className="px-3 py-2 text-[10px] font-medium uppercase tracking-widest"
               style={{ color: "hsl(240 8% 42%)", borderBottom: "1px solid hsl(240 12% 11%)" }}
             >
               Selecionar funil
@@ -1000,7 +1000,7 @@ function FunnelSwitcher({
                 setOpen(false);
                 onManage();
               }}
-              className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold transition-colors hover:bg-white/[0.03]"
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-white/[0.03]"
               style={{ color: "var(--green, #00d46a)", borderTop: "1px solid hsl(240 12% 11%)" }}
             >
               <Plus className="w-3.5 h-3.5" />
@@ -1015,7 +1015,7 @@ function FunnelSwitcher({
 
 function SectionHeading({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
   return (
-    <h3 className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
+    <h3 className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
       <Icon className="w-3 h-3" />
       {children}
     </h3>
@@ -1069,7 +1069,7 @@ function JourneyManager({ onClose }: { onClose: () => void }) {
       <div className="relative w-full max-w-md rounded-2xl p-6 shadow-2xl animate-fade-in-up"
         style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Gerenciar Jornadas</h2>
+          <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>Gerenciar Jornadas</h2>
           <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }} className="hover:opacity-70 transition-opacity"><X className="w-5 h-5" /></button>
         </div>
         <div className="space-y-3 mb-4">
@@ -1086,7 +1086,7 @@ function JourneyManager({ onClose }: { onClose: () => void }) {
               className="w-full bg-transparent text-sm outline-none resize-none" style={{ color: "hsl(240 15% 90%)" }} />
           </div>
           <button onClick={() => prompt.trim() && createJourney.mutate()} disabled={!prompt.trim() || createJourney.isPending}
-            className="w-full text-sm font-semibold py-2 rounded-xl transition-all disabled:opacity-40"
+            className="w-full text-sm font-medium py-2 rounded-xl transition-all disabled:opacity-40"
             style={{ background: "var(--green)", color: "#03170a" }}>
             {createJourney.isPending ? "Criando..." : "Criar Jornada"}
           </button>
@@ -1182,7 +1182,7 @@ function FilterPanel({
         style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Filtros de Pipeline</h3>
+          <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>Filtros de Pipeline</h3>
           <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }} className="hover:opacity-70 transition-opacity">
             <X className="w-4 h-4" />
           </button>
@@ -1410,7 +1410,7 @@ export default function CRMPage() {
       {/* Header — em mobile vira coluna; secondary actions colapsam num kebab */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
         <div className="min-w-0">
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate" style={{ color: "hsl(240 15% 93%)" }}>CRM</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight truncate" style={{ color: "hsl(240 15% 93%)" }}>CRM</h1>
           <p className="text-xs sm:text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
             {contacts.length} contato{contacts.length !== 1 ? "s" : ""}
             {activeFilterCount > 0 && (
@@ -1453,7 +1453,7 @@ export default function CRMPage() {
             <Filter className="w-4 h-4" />
             <span className="hidden sm:inline">Pipeline</span>
             {activeFilterCount > 0 && (
-              <span className="w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center"
+              <span className="w-4 h-4 rounded-full text-[9px] font-semibold flex items-center justify-center"
                 style={{ background: "var(--green)", color: "#03170a" }}>
                 {activeFilterCount}
               </span>
@@ -1547,7 +1547,7 @@ export default function CRMPage() {
               <>
                 <span className="h-4 w-px" style={{ background: "hsl(240 12% 16%)" }} />
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold" style={{ color: "hsl(240 8% 46%)" }}>
+                  <span className="text-xs font-medium" style={{ color: "hsl(240 8% 46%)" }}>
                     Agrupar por
                   </span>
                   <select
@@ -1604,7 +1604,7 @@ export default function CRMPage() {
             style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
             <User className="w-6 h-6" style={{ color: "hsl(240 8% 35%)" }} />
           </div>
-          <p className="font-semibold text-sm" style={{ color: "hsl(240 8% 70%)" }}>Nenhum contato encontrado</p>
+          <p className="font-medium text-sm" style={{ color: "hsl(240 8% 70%)" }}>Nenhum contato encontrado</p>
           <p className="text-sm mt-1.5 mb-6" style={{ color: "hsl(240 8% 42%)" }}>
             {activeFilterCount > 0 || search || activeTagFilter
               ? "Tente ajustar os filtros"
@@ -1612,7 +1612,7 @@ export default function CRMPage() {
           </p>
           {!activeFilterCount && !search && !activeTagFilter && (
             <button onClick={() => setCreateOpen(true)}
-              className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl transition-all active:scale-[0.97]"
+              className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl transition-all active:scale-[0.97]"
               style={{ background: "var(--green)", color: "#03170a" }}>
               <Plus className="w-4 h-4" /> Criar primeiro contato
             </button>
@@ -1627,7 +1627,7 @@ export default function CRMPage() {
               style={{ borderTop: i > 0 ? "1px solid hsl(240 12% 11%)" : undefined }}
             >
               {/* Avatar */}
-              <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold mt-0.5"
+              <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-semibold mt-0.5"
                 style={{
                   background: "linear-gradient(135deg, rgba(0,212,106,0.15), rgba(0,212,106,0.04))",
                   border: "1px solid rgba(0,212,106,0.15)",
@@ -1727,7 +1727,7 @@ export default function CRMPage() {
                       <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "var(--border-default)" }}>
                         <div className="flex items-center gap-2">
                           <span className="inline-block w-2 h-2 rounded-full" style={{ background: col.isNoStage ? "#64748b" : (col.color || "#60a5fa") }} />
-                          <h3 className="text-sm font-semibold truncate" style={{ color: col.isNoStage ? "hsl(240 8% 62%)" : "hsl(240 15% 90%)" }}>
+                          <h3 className="text-sm font-medium truncate" style={{ color: col.isNoStage ? "hsl(240 8% 62%)" : "hsl(240 15% 90%)" }}>
                             {col.label}
                           </h3>
                         </div>
@@ -1764,7 +1764,7 @@ export default function CRMPage() {
                                   >
                                     <div className="flex items-start justify-between gap-2 mb-2">
                                       <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-semibold truncate" style={{ color: "hsl(240 15% 93%)" }}>{contact.name}</p>
+                                        <p className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 93%)" }}>{contact.name}</p>
                                         <p className="text-xs font-mono truncate" style={{ color: "hsl(240 8% 46%)" }}>{contact.phone}</p>
                                       </div>
                                       <GripVertical className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 cursor-grab active:cursor-grabbing" style={{ color: "hsl(240 8% 38%)" }} />
@@ -1836,7 +1836,7 @@ export default function CRMPage() {
                     <div className="px-4 py-3 border-b flex items-center justify-between select-none" style={{ borderColor: "var(--border-default)" }}>
                       <div className="flex items-center gap-2">
                         <GripVertical className="w-4 h-4 opacity-40" style={{ color: "hsl(240 8% 38%)" }} />
-                        <h3 className="text-sm font-semibold truncate" style={{ color: "hsl(240 15% 90%)" }}>
+                        <h3 className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 90%)" }}>
                           {colName}
                         </h3>
                       </div>
@@ -1877,7 +1877,7 @@ export default function CRMPage() {
                                 >
                                   <div className="flex items-start justify-between gap-2 mb-2">
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-semibold truncate" style={{ color: "hsl(240 15% 93%)" }}>{contact.name}</p>
+                                      <p className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 93%)" }}>{contact.name}</p>
                                       <p className="text-xs font-mono truncate" style={{ color: "hsl(240 8% 46%)" }}>{contact.phone}</p>
                                     </div>
                                     <GripVertical className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 cursor-grab active:cursor-grabbing" style={{ color: "hsl(240 8% 38%)" }} />

@@ -220,7 +220,7 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
               <Megaphone className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
             </div>
               <div>
-              <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Nova Campanha</h2>
+              <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>Nova Campanha</h2>
               <p className="text-[11px]" style={{ color: "hsl(240 8% 40%)" }}>Passo {step} de 4 — {stepLabelFull[step - 1]}</p>
               </div>
           </div>
@@ -692,13 +692,13 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
           {step < 4 ? (
             <button onClick={() => setStep(s => s + 1)}
               disabled={step === 1 ? !canNext1 : step === 2 ? !canNext2 : !canNext3}
-              className="flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold py-2.5 rounded-xl transition-all disabled:opacity-40"
+              className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl transition-all disabled:opacity-40"
               style={{ background: "var(--green)", color: "#03170a" }}>
               Próximo <ChevronRight className="w-3.5 h-3.5" />
             </button>
           ) : (
             <button onClick={handleCreate} disabled={saving}
-              className="flex-1 text-sm font-semibold py-2.5 rounded-xl transition-all disabled:opacity-40"
+              className="flex-1 text-sm font-medium py-2.5 rounded-xl transition-all disabled:opacity-40"
               style={{ background: "var(--green)", color: "#03170a" }}>
               {saving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Criar Campanha"}
             </button>
@@ -744,7 +744,7 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <h3 className="font-semibold text-sm truncate" style={{ color: "hsl(240 15% 93%)" }}>{campaign.name}</h3>
+              <h3 className="font-medium text-sm truncate" style={{ color: "hsl(240 15% 93%)" }}>{campaign.name}</h3>
             </div>
             <div className="flex items-center gap-2">
               <span className="flex items-center gap-1 text-[10px]" style={{ color: "hsl(240 8% 40%)" }}>
@@ -868,7 +868,7 @@ export default function CampaignsPage() {
     <div className="space-y-7">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Campanhas</h1>
+          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Campanhas</h1>
           <p className="text-sm mt-1.5" style={{ color: "hsl(240 8% 46%)" }}>
             {campaigns.length} campanha{campaigns.length !== 1 ? "s" : ""}
             {running > 0 && <span> · <span style={{ color: "var(--green)" }}>{running} em execução</span></span>}
@@ -881,7 +881,7 @@ export default function CampaignsPage() {
             🕐 {timezone}
           </span>
           <button onClick={() => setCreateOpen(true)} 
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
             style={{ 
               background: "rgba(0, 212, 106, 0.12)", 
               border: "1px solid rgba(0, 212, 106, 0.3)", 
@@ -905,12 +905,12 @@ export default function CampaignsPage() {
             style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
             <Megaphone className="w-6 h-6" style={{ color: "hsl(240 8% 35%)" }} />
           </div>
-          <p className="font-semibold text-sm" style={{ color: "hsl(240 8% 70%)" }}>Nenhuma campanha ainda</p>
+          <p className="font-medium text-sm" style={{ color: "hsl(240 8% 70%)" }}>Nenhuma campanha ainda</p>
           <p className="text-sm mt-1.5 mb-6" style={{ color: "hsl(240 8% 42%)" }}>
             Envie mensagens em massa para contatos ou grupos com agendamento inteligente
           </p>
           <button onClick={() => setCreateOpen(true)}
-            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl transition-all active:scale-[0.97]"
+            className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl transition-all active:scale-[0.97]"
             style={{ background: "var(--green)", color: "#03170a" }}>
             <Plus className="w-4 h-4" /> Criar primeira campanha
           </button>

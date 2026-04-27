@@ -332,7 +332,7 @@ export function UniqAIChatPanel({
               <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm sm:text-base font-semibold truncate" style={{ color: "var(--text-1)" }}>Uniq AI</h2>
+              <h2 className="text-sm sm:text-base font-medium truncate" style={{ color: "var(--text-1)" }}>Uniq AI</h2>
               <p className="text-[10px] sm:text-xs truncate" style={{ color: "var(--text-3)" }}>Sua plataforma em linguagem natural</p>
             </div>
           </div>
@@ -414,7 +414,7 @@ export function UniqAIChatPanel({
                   <Sparkles className="w-4 h-4 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold mb-1.5" style={{ color: "var(--text-3)" }}>Uniq AI</p>
+                  <p className="text-xs font-medium mb-1.5" style={{ color: "var(--text-3)" }}>Uniq AI</p>
                   <ThinkingDots />
                 </div>
               </motion.div>

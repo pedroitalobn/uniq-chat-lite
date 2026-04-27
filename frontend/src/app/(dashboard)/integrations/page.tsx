@@ -128,7 +128,7 @@ export default function IntegrationsPage() {
               style={{ background: "var(--green-soft)", border: "1px solid var(--green-border)" }}>
               <Plug className="w-4 h-4" style={{ color: "var(--green)" }} />
             </div>
-            <h1 className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>Integrações</h1>
+            <h1 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>Integrações</h1>
           </div>
           <p className="text-xs hidden sm:block" style={{ color: "var(--text-3)" }}>
             LLMs, agentes, webhooks, shop e mais
@@ -225,16 +225,16 @@ function LLMSection({ onConnect }: { onConnect: (p: ProviderId) => void }) {
         {PROVIDERS.map((p) => (
           <button key={p.id} onClick={() => onConnect(p.id)} className="relative flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition-all hover:scale-[1.01]"
             style={{ background: p.bg, borderColor: connectedProviders.has(p.id) ? p.color : p.border }}>
-            {connectedProviders.has(p.id) && <span className="absolute top-3 right-3 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-green-500/20 text-green-400"><CheckCircle2 className="w-2.5 h-2.5" /> conectado</span>}
+            {connectedProviders.has(p.id) && <span className="absolute top-3 right-3 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-green-500/20 text-green-400"><CheckCircle2 className="w-2.5 h-2.5" /> conectado</span>}
             <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${p.color}18` }}><ProviderIcon id={p.id} color={p.color} /></div>
-            <div><p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>{p.name}</p><p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>{p.description}</p></div>
+            <div><p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{p.name}</p><p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>{p.description}</p></div>
             <div className="flex items-center gap-1 text-xs font-medium mt-1" style={{ color: p.color }}><Plus className="w-3 h-3" /> {connectedProviders.has(p.id) ? "Adicionar" : "Conectar"}</div>
           </button>
         ))}
       </div>
       {integrations.length > 0 && (
         <div className="mt-6 space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--text-3)" }}>Integrações conectadas</h3>
+          <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>Integrações conectadas</h3>
           {integrations.map(i => <IntegrationCard key={i.id} integration={i} />)}
         </div>
       )}
@@ -252,11 +252,11 @@ function IntegrationCard({ integration }: { integration: Integration }) {
     <div className="rounded-2xl border p-4 flex items-center gap-4" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
       <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${color}18`, border: `1px solid ${color}30` }}><Plug className="w-5 h-5" style={{ color }} /></div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2"><p className="text-sm font-semibold truncate" style={{ color: "var(--text-1)" }}>{integration.name}</p>
+        <div className="flex items-center gap-2"><p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{integration.name}</p>
           {integration.test_status === "ok" && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}</div>
         <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>{provider?.name} · {integration.models?.length || 0} modelo(s)</p>
       </div>
-      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${integration.is_active ? "text-green-400 bg-green-500/10" : "text-gray-400 bg-gray-500/10"}`}>{integration.is_active ? "Ativo" : "Inativo"}</span>
+      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${integration.is_active ? "text-green-400 bg-green-500/10" : "text-gray-400 bg-gray-500/10"}`}>{integration.is_active ? "Ativo" : "Inativo"}</span>
       <div className="flex gap-1.5"><button onClick={() => test.mutate()} className="p-2 rounded-xl hover:bg-neutral-500/10"><RefreshCw className={`w-4 h-4 ${test.isPending ? "animate-spin" : ""}`} style={{ color: "var(--text-3)" }} /></button><button onClick={() => del.mutate()} className="p-2 rounded-xl hover:bg-red-500/10"><Trash2 className="w-4 h-4" style={{ color: "var(--text-3)" }} /></button></div>
     </div>
   );
@@ -288,7 +288,7 @@ function APIKeysSection() {
           <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.15)" }}>
             <Key className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
           </div>
-          <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 88%)" }}>Criar nova chave</h2>
+          <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>Criar nova chave</h2>
         </div>
 
         <div className="flex gap-3">
@@ -324,7 +324,7 @@ function APIKeysSection() {
       {/* Keys list */}
       <div className="rounded-2xl overflow-hidden" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
         <div className="px-5 py-4" style={{ borderBottom: "1px solid hsl(240 12% 11%)" }}>
-          <h2 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>{data?.length || 0} chave{(data?.length || 0) !== 1 ? "s" : ""} ativa{(data?.length || 0) !== 1 ? "s" : ""}</h2>
+          <h2 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>{data?.length || 0} chave{(data?.length || 0) !== 1 ? "s" : ""} ativa{(data?.length || 0) !== 1 ? "s" : ""}</h2>
         </div>
         {isLoading ? (
           <div className="p-5 space-y-2">{[1, 2].map(i => <div key={i} className="skeleton h-14 rounded-xl" />)}</div>
@@ -345,7 +345,7 @@ function APIKeysSection() {
 
       {/* Usage docs */}
       <div className="rounded-2xl p-5 space-y-4" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-        <h2 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>Como usar</h2>
+        <h2 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>Como usar</h2>
         <div className="space-y-4">
           <div><p className="text-xs mb-2" style={{ color: "hsl(240 8% 42%)" }}>Header de autenticação</p><div className="rounded-xl px-4 py-3" style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}><code className="text-xs font-mono" style={{ color: "var(--green)" }}>Authorization: Bearer sc_...</code></div></div>
           <div><p className="text-xs mb-2" style={{ color: "hsl(240 8% 42%)" }}>Exemplo com curl</p><div className="rounded-xl px-4 py-3" style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}><code className="text-xs font-mono whitespace-pre" style={{ color: "hsl(240 8% 62%)" }}>{`curl -X POST \\\n  http://localhost:8080/instances/:id/messages/text \\\n  -H "Authorization: Bearer sc_..." \\\n  -H "Content-Type: application/json" \\\n  -d '{"to":"5511999999999","text":"Olá!"}'`}</code></div></div>
@@ -452,7 +452,7 @@ function ProxiesSection() {
             <Globe className="w-5 h-5" style={{ color: "#60a5fa" }} />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Proxies customizados</p>
+            <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Proxies customizados</p>
             <p className="text-xs" style={{ color: "var(--text-3)" }}>
               Criados aqui e selecionáveis na tela de cada server. Todas as instâncias do server herdam o proxy.
             </p>
@@ -476,7 +476,7 @@ function ProxiesSection() {
         </div>
       ) : proxies.length > 0 ? (
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--text-3)" }}>Meus proxies</h3>
+          <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>Meus proxies</h3>
           {proxies.map(p => (
             <div key={p.id} className="rounded-xl border p-3 flex items-center gap-3" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(96,165,250,0.1)" }}>
@@ -512,7 +512,7 @@ function ProxiesSection() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "var(--surface-overlay)" }}>
           <div className="w-full max-w-md rounded-2xl border p-5 space-y-4" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold" style={{ color: "var(--text-1)" }}>Novo proxy</h2>
+              <h2 className="font-medium" style={{ color: "var(--text-1)" }}>Novo proxy</h2>
               <button onClick={() => setShowModal(false)} style={{ color: "var(--text-3)" }}>
                 <X className="w-5 h-5" />
               </button>
@@ -664,7 +664,7 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
       <div className="w-full max-w-md rounded-2xl border p-6 space-y-4" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: provider.bg, border: `1px solid ${provider.border}` }}><ProviderIcon id={provider.id} color={provider.color} /></div>
-          <div><h2 className="font-semibold" style={{ color: "var(--text-1)" }}>Conectar {provider.name}</h2><p className="text-xs" style={{ color: "var(--text-3)" }}>{provider.description}</p></div>
+          <div><h2 className="font-medium" style={{ color: "var(--text-1)" }}>Conectar {provider.name}</h2><p className="text-xs" style={{ color: "var(--text-3)" }}>{provider.description}</p></div>
         </div>
 
         {/* Auth mode selector (apenas para providers com supportsOAuth) */}
@@ -673,14 +673,14 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
             <button
               type="button"
               onClick={() => setAuthMode("oauth")}
-              className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+              className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors"
               style={{ background: authMode === "oauth" ? provider.color + "22" : "transparent", color: authMode === "oauth" ? provider.color : "var(--text-3)" }}>
               🔐 Login com {providerId === "openrouter" ? "OpenRouter" : "Claude.ai"}
             </button>
             <button
               type="button"
               onClick={() => setAuthMode("api_key")}
-              className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+              className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors"
               style={{ background: authMode === "api_key" ? "var(--border-default)" : "transparent", color: authMode === "api_key" ? "var(--text-1)" : "var(--text-3)" }}>
               🔑 API Key
             </button>
@@ -750,7 +750,7 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
               <button
                 onClick={startOAuth}
                 disabled={oauthStarting}
-                className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2"
                 style={{ background: provider.color, color: "#0d0d0d" }}>
                 {oauthStarting ? "Gerando link..." : `🚀 Abrir autorização ${providerId === "openrouter" ? "OpenRouter" : "Claude.ai"}`}
               </button>
@@ -856,7 +856,7 @@ function AgentsSection() {
             <Bot className="w-5 h-5" style={{ color: "#8b5cf6" }} />
           </div>
           <div>
-            <h2 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>Apps Agents</h2>
+            <h2 className="text-base font-medium" style={{ color: "var(--text-1)" }}>Apps Agents</h2>
             <p className="text-xs" style={{ color: "var(--text-3)" }}>Conecte apps de IA para consumir a API do Uniq</p>
           </div>
         </div>
@@ -866,7 +866,7 @@ function AgentsSection() {
             <div key={app.id} className="rounded-xl p-4" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-xl">{app.icon}</span>
-                <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>{app.name}</h3>
+                <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{app.name}</h3>
               </div>
               <p className="text-xs mb-3" style={{ color: "var(--text-3)" }}>{app.description}</p>
               <div className="space-y-2">
@@ -888,7 +888,7 @@ function AgentsSection() {
 
       {/* Connection Info */}
       <div className="rounded-2xl p-5" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
-        <h3 className="text-sm font-semibold mb-4" style={{ color: "var(--text-1)" }}>Informações de Conexão</h3>
+        <h3 className="text-sm font-medium mb-4" style={{ color: "var(--text-1)" }}>Informações de Conexão</h3>
         
         <div className="space-y-3">
           <div>
@@ -936,7 +936,7 @@ function MCPSection() {
             <Zap className="w-5 h-5" style={{ color: "#f59e0b" }} />
           </div>
           <div>
-            <h2 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>MCP Server</h2>
+            <h2 className="text-base font-medium" style={{ color: "var(--text-1)" }}>MCP Server</h2>
             <p className="text-xs" style={{ color: "var(--text-3)" }}>Model Context Protocol para ferramentas de IA</p>
           </div>
         </div>
@@ -966,7 +966,7 @@ function MCPSection() {
 
       {/* MCP Config for Claude Desktop */}
       <div className="rounded-2xl p-5" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
-        <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-1)" }}>Configuração Claude Desktop</h3>
+        <h3 className="text-sm font-medium mb-3" style={{ color: "var(--text-1)" }}>Configuração Claude Desktop</h3>
         
         <div className="space-y-3">
           <div>

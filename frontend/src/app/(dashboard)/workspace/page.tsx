@@ -57,7 +57,7 @@ export default function WorkspacePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
+          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
             Workspaces
           </h1>
           <p className="text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
@@ -83,7 +83,7 @@ export default function WorkspacePage() {
             >
               <Building2 className="w-3.5 h-3.5" style={{ color: "#a78bfa" }} />
             </div>
-            <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 88%)" }}>Criar novo workspace</h2>
+            <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>Criar novo workspace</h2>
           </div>
 
           <div className="flex gap-3">
@@ -119,7 +119,7 @@ export default function WorkspacePage() {
       {/* Workspaces list */}
       <div className="rounded-2xl overflow-hidden animate-fade-in-up" style={cardStyle}>
         <div className="px-5 py-4" style={{ borderBottom: "1px solid hsl(240 12% 11%)" }}>
-          <h2 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
+          <h2 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
             {workspaces.length} workspace{workspaces.length !== 1 ? "s" : ""}
           </h2>
         </div>

@@ -100,7 +100,7 @@ export function ShopSection() {
       <div>
         <div className="flex items-center gap-2 mb-1">
           <ShoppingBag className="w-4 h-4" style={{ color: "var(--green)" }} />
-          <h2 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>
+          <h2 className="text-base font-medium" style={{ color: "var(--text-1)" }}>
             Integrações de Shop
           </h2>
         </div>
@@ -150,7 +150,7 @@ export function ShopSection() {
       ) : (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-2)" }}>
+            <p className="text-xs font-medium uppercase tracking-wider" style={{ color: "var(--text-2)" }}>
               Integrações ativas <span className="ml-1 normal-case font-normal" style={{ color: "var(--text-3)" }}>({allIntegrations.length})</span>
             </p>
             <Link
@@ -179,7 +179,7 @@ export function ShopSection() {
             <div key={region}>
               <div className="flex items-center gap-2 mb-2">
                 <MapPin className="w-3.5 h-3.5" style={{ color: REGION_COLORS[region] || "var(--text-3)" }} />
-                <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-2)" }}>
+                <h3 className="text-xs font-medium uppercase tracking-wider" style={{ color: "var(--text-2)" }}>
                   {region}
                 </h3>
                 <span className="text-[10px] tabular-nums" style={{ color: "var(--text-4)" }}>
@@ -210,7 +210,7 @@ function ActiveIntegrationCard({ integration }: { integration: Integration & { s
       style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
     >
       <div
-        className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-semibold shrink-0"
+        className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-medium shrink-0"
         style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
       >
         {integration.name?.charAt(0).toUpperCase() || "?"}
@@ -229,7 +229,7 @@ function ActiveIntegrationCard({ integration }: { integration: Integration & { s
         </p>
       </div>
       <span
-        className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+        className="text-[10px] px-2 py-0.5 rounded-full font-medium"
         style={{
           background: ok ? "var(--green-soft)" : "var(--surface-3)",
           color: ok ? "var(--green)" : "var(--text-3)",
@@ -251,13 +251,13 @@ function ProviderCard({ provider }: { provider: Provider }) {
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
           <div
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-base font-bold shrink-0"
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-base font-semibold shrink-0"
             style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
           >
             {provider.name.charAt(0)}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold truncate" style={{ color: "var(--text-1)" }}>
+            <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>
               {provider.name}
             </p>
             <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
@@ -266,7 +266,7 @@ function ProviderCard({ provider }: { provider: Provider }) {
           </div>
         </div>
         <span
-          className="text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap"
+          className="text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap"
           style={{
             background: ready ? "var(--green-soft)" : "var(--surface-3)",
             color: ready ? "var(--green)" : "var(--text-3)",
@@ -280,7 +280,7 @@ function ProviderCard({ provider }: { provider: Provider }) {
       </p>
       <button
         disabled={!ready}
-        className="text-xs font-semibold py-1.5 rounded-lg flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="text-xs font-medium py-1.5 rounded-lg flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
         style={{
           background: ready ? "var(--green)" : "var(--surface-3)",
           color: ready ? "var(--green-fg)" : "var(--text-3)",

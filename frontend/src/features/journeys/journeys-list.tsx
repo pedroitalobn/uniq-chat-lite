@@ -62,7 +62,7 @@ function EditableName({ value, onSave }: { value: string; onSave: (next: string)
           if (e.key === "Escape") { e.preventDefault(); cancel(); }
         }}
         onBlur={commit}
-        className="text-sm font-semibold bg-transparent outline-none border-b truncate min-w-0 flex-1"
+        className="text-sm font-medium bg-transparent outline-none border-b truncate min-w-0 flex-1"
         style={{ color: "var(--text-1)", borderColor: "var(--green)" }}
       />
     );
@@ -74,7 +74,7 @@ function EditableName({ value, onSave }: { value: string; onSave: (next: string)
         e.stopPropagation();
         setEditing(true);
       }}
-      className="text-sm font-semibold truncate text-left hover:underline decoration-dotted underline-offset-2 min-w-0 flex-1"
+      className="text-sm font-medium truncate text-left hover:underline decoration-dotted underline-offset-2 min-w-0 flex-1"
       style={{ color: "var(--text-1)" }}
       title="Clique pra editar o nome"
     >
@@ -157,7 +157,7 @@ function EditJourneyModal({
               <Edit3 className="w-4 h-4" style={{ color: "#8b5cf6" }} />
             </div>
             <div className="min-w-0">
-              <h3 className="text-sm font-semibold truncate" style={{ color: "var(--text-1)" }}>Editar Jornada</h3>
+              <h3 className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>Editar Jornada</h3>
               <p className="text-[10px] truncate" style={{ color: "var(--text-3)" }}>Descreva alterações em linguagem natural</p>
             </div>
           </div>
@@ -319,7 +319,7 @@ export function JourneysList() {
         <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
           <div className="flex items-center gap-2">
             <Wand2 className="w-4 h-4" style={{ color: "#8b5cf6" }} />
-            <h2 className="text-sm font-bold" style={{ color: "var(--text-1)" }}>Jornadas</h2>
+            <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Jornadas</h2>
           </div>
           <div className="flex-1" />
           {agentStats?.journeys && (
@@ -389,7 +389,7 @@ export function JourneysList() {
         ) : journeys.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center px-4">
             <Wand2 className="w-12 h-12 mb-3 opacity-40" style={{ color: "var(--text-3)" }} />
-            <p className="text-sm font-semibold" style={{ color: "var(--text-2)" }}>Nenhuma jornada ainda</p>
+            <p className="text-sm font-medium" style={{ color: "var(--text-2)" }}>Nenhuma jornada ainda</p>
             <p className="text-xs mt-1 mb-4 max-w-sm" style={{ color: "var(--text-3)" }}>
               Descreva em linguagem natural pelo Uniq AI, comece de um template, ou monte direto no canvas.
             </p>
@@ -404,7 +404,7 @@ export function JourneysList() {
                     toast.error(e?.response?.data?.error || "Falha ao criar jornada");
                   }
                 }}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-2"
+                className="inline-flex items-center gap-1.5 text-xs font-medium rounded-lg px-3 py-2"
                 style={{ background: "var(--green)", color: "white" }}
               >
                 <Plus className="w-3.5 h-3.5" /> Canvas em branco
@@ -489,7 +489,7 @@ export function JourneysList() {
 
                   <div className="flex flex-col sm:flex-row gap-3 mt-3">
                     <div className="flex-1 p-3 rounded-xl" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
-                      <p className="text-[9px] uppercase font-bold mb-1" style={{ color: "var(--text-3)" }}>Palavras-chave</p>
+                      <p className="text-[9px] uppercase font-semibold mb-1" style={{ color: "var(--text-3)" }}>Palavras-chave</p>
                       <div className="flex flex-wrap gap-1">
                         {(() => {
                           try {
@@ -504,7 +504,7 @@ export function JourneysList() {
                       </div>
                     </div>
                     <div className="flex-1 p-3 rounded-xl" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
-                      <p className="text-[9px] uppercase font-bold mb-1" style={{ color: "var(--text-3)" }}>Estatísticas</p>
+                      <p className="text-[9px] uppercase font-semibold mb-1" style={{ color: "var(--text-3)" }}>Estatísticas</p>
                       <div className="text-xs" style={{ color: "var(--text-2)" }}>
                         <div className="flex justify-between"><span>Total:</span><span>{j.invocations || 0}</span></div>
                         <div className="flex justify-between"><span>Completadas:</span><span>{j.completed_executions || 0}</span></div>
@@ -514,7 +514,7 @@ export function JourneysList() {
                   </div>
 
                   <div className="mt-3 p-3 rounded-xl" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
-                    <p className="text-xs font-semibold mb-1" style={{ color: "var(--text-3)" }}>Prompt original</p>
+                    <p className="text-xs font-medium mb-1" style={{ color: "var(--text-3)" }}>Prompt original</p>
                     <p className="text-xs break-words" style={{ color: "var(--text-2)" }}>{j.prompt}</p>
                   </div>
 
@@ -560,12 +560,12 @@ export function JourneysList() {
                 <Trash2 className="w-6 h-6" style={{ color: "#ef4444" }} />
               </div>
               <div>
-                <h3 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Excluir Jornada</h3>
+                <h3 className="text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>Excluir Jornada</h3>
                 <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 46%)" }}>Esta ação não pode ser desfeita</p>
               </div>
             </div>
             <p className="text-sm mb-6" style={{ color: "hsl(240 8% 60%)" }}>
-              Tem certeza que deseja excluir a jornada <span className="font-semibold" style={{ color: "hsl(240 15% 93%)" }}>"{deleteConfirm.name}"</span>?
+              Tem certeza que deseja excluir a jornada <span className="font-medium" style={{ color: "hsl(240 15% 93%)" }}>"{deleteConfirm.name}"</span>?
             </p>
             <div className="flex gap-3">
               <button

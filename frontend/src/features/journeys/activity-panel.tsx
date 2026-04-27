@@ -60,7 +60,7 @@ export function ActivityPanel() {
       <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-2.5 sm:py-3 border-b flex-shrink-0 flex-wrap" style={{ borderColor: "var(--surface-border)", background: "var(--surface-2)" }}>
         <div className="flex items-center gap-2">
           <Activity className="w-4 h-4" style={{ color: "#10b981" }} />
-          <h2 className="text-sm font-bold" style={{ color: "var(--text-1)" }}>Atividade</h2>
+          <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Atividade</h2>
         </div>
         <div className="flex-1" />
         {stats && (
@@ -108,7 +108,7 @@ export function ActivityPanel() {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="text-sm font-semibold truncate" style={{ color: "var(--text-1)" }}>
+                        <span className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>
                           {item.journey_name || "Jornada"}
                         </span>
                         <span className="text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0" style={{ background: statusConfig.bg, color: statusConfig.color }}>

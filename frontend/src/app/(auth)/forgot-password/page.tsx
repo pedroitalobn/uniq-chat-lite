@@ -79,7 +79,7 @@ export default function ForgotPasswordPage() {
               >
                 <Check className="h-7 w-7" style={{ color: "#00d46a" }} />
               </div>
-              <h1 className="text-base font-bold" style={{ color: "hsl(240 15% 90%)" }}>
+              <h1 className="text-base font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
                 Verifique seu email
               </h1>
               <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 55%)" }}>
@@ -104,7 +104,7 @@ export default function ForgotPasswordPage() {
           ) : (
             <>
               <div className="px-5 pt-5 pb-1">
-                <h1 className="text-base font-bold" style={{ color: "hsl(240 15% 90%)" }}>
+                <h1 className="text-base font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
                   Esqueceu sua senha?
                 </h1>
                 <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 44%)" }}>
@@ -156,7 +156,7 @@ export default function ForgotPasswordPage() {
                 <button
                   type="submit"
                   disabled={loading || !email.trim()}
-                  className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ background: "#00d46a", color: "#0a0a0f" }}
                 >
                   {loading ? (

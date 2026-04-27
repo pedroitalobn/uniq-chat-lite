@@ -81,7 +81,7 @@ function SuccessContent() {
 
         <div className="rounded-2xl p-5 mb-6 space-y-3"
           style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-          <p className="text-xs font-semibold" style={{ color: "hsl(240 15% 75%)" }}>
+          <p className="text-xs font-medium" style={{ color: "hsl(240 15% 75%)" }}>
             O que acontece agora?
           </p>
           {[
@@ -100,7 +100,7 @@ function SuccessContent() {
 
         <button
           onClick={() => router.push("/instances")}
-          className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98]"
+          className="w-full py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98]"
           style={{ background: "#00d46a", color: "#03170a" }}
         >
           <span>Ir para o Dashboard</span>

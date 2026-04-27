@@ -58,7 +58,7 @@ function ResetPasswordForm() {
         >
           <Check className="h-7 w-7" style={{ color: "#00d46a" }} />
         </div>
-        <h1 className="text-base font-bold" style={{ color: "hsl(240 15% 90%)" }}>
+        <h1 className="text-base font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
           Senha redefinida
         </h1>
         <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 55%)" }}>
@@ -66,7 +66,7 @@ function ResetPasswordForm() {
         </p>
         <button
           onClick={() => router.push("/login")}
-          className="mt-2 flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
+          className="mt-2 flex items-center gap-2 text-sm font-medium px-5 py-2.5 rounded-xl transition-colors"
           style={{ background: "#00d46a", color: "#0a0a0f" }}
         >
           Ir para o login
@@ -85,7 +85,7 @@ function ResetPasswordForm() {
         >
           <X className="h-7 w-7" style={{ color: "#f87171" }} />
         </div>
-        <h1 className="text-base font-bold" style={{ color: "hsl(240 15% 90%)" }}>
+        <h1 className="text-base font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
           Link inválido
         </h1>
         <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 55%)" }}>
@@ -109,7 +109,7 @@ function ResetPasswordForm() {
   return (
     <>
       <div className="px-5 pt-5 pb-1">
-        <h1 className="text-base font-bold" style={{ color: "hsl(240 15% 90%)" }}>
+        <h1 className="text-base font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
           Criar nova senha
         </h1>
         <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 44%)" }}>
@@ -152,7 +152,7 @@ function ResetPasswordForm() {
         <button
           type="submit"
           disabled={loading || !password || !confirm}
-          className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
           style={{ background: "#00d46a", color: "#0a0a0f" }}
         >
           {loading ? (

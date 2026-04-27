@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { instancesApi, webhooksApi, messagesApi, settingsApi, mcpApi, recoveryApi, tiktokApi, globalWebhooksApi, type WebhookPayload } from "@/lib/api";
+import { instancesApi, webhooksApi, messagesApi, settingsApi, mcpApi, recoveryApi, tiktokApi, globalWebhooksApi, mediaUploadApi, type WebhookPayload } from "@/lib/api";
 import {
   Smartphone, ArrowLeft, Globe, AlertTriangle,
   QrCode, Power, Trash2, Plus, X, Send, ChevronRight,
@@ -11,7 +11,7 @@ import {
   RefreshCw, Bot, ChevronDown, ChevronUp, Image, FileText, Music,
   Video, MapPin, User, Smile, BarChart2, Sticker, MessageSquareText,
   MousePointerClick, ShieldAlert, Camera, Users, Phone, RotateCcw, Download,
-  Eye, EyeOff, Lock, LogIn, List, LayoutGrid, Banknote,
+  Eye, EyeOff, Lock, LogIn, List, LayoutGrid, Banknote, Upload, Paperclip,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -108,7 +108,7 @@ function BridgeToggle({ label, color, enabled, onToggle, children }: {
     <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${enabled ? color + "30" : "hsl(240 12% 13%)"}` }}>
       <div className="flex items-center justify-between px-3 py-2.5"
         style={{ background: enabled ? color + "08" : "var(--surface-2)" }}>
-        <span className="text-xs font-semibold" style={{ color: enabled ? color : "hsl(240 8% 42%)" }}>{label}</span>
+        <span className="text-xs font-medium" style={{ color: enabled ? color : "hsl(240 8% 42%)" }}>{label}</span>
         <button onClick={onToggle}
           className="relative flex-shrink-0 rounded-full transition-colors"
           style={{ background: enabled ? color : "hsl(240 12% 18%)", width: "2rem", height: "1.125rem" }}>
@@ -180,12 +180,12 @@ function WebhookCard({ wh, instanceId, onDelete }: { wh: Webhook; instanceId: st
       <div className="flex items-start gap-3 p-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            {wh.name && <span className="text-sm font-semibold" style={{ color: "hsl(240 15% 88%)" }}>{wh.name}</span>}
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+            {wh.name && <span className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>{wh.name}</span>}
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider"
               style={{ background: "rgba(96,165,250,0.08)", color: "#60a5fa" }}>HTTP</span>
-            {wh.rabbitmq_enabled && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase" style={{ background: "rgba(249,115,22,0.08)", color: "#fb923c" }}>RMQ</span>}
-            {wh.nats_enabled && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase" style={{ background: "rgba(167,139,250,0.08)", color: "#a78bfa" }}>NATS</span>}
-            {wh.ws_enabled && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase" style={{ background: "rgba(52,211,153,0.08)", color: "#34d399" }}>WS</span>}
+            {wh.rabbitmq_enabled && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase" style={{ background: "rgba(249,115,22,0.08)", color: "#fb923c" }}>RMQ</span>}
+            {wh.nats_enabled && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase" style={{ background: "rgba(167,139,250,0.08)", color: "#a78bfa" }}>NATS</span>}
+            {wh.ws_enabled && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase" style={{ background: "rgba(52,211,153,0.08)", color: "#34d399" }}>WS</span>}
           </div>
           <p className="text-xs font-mono truncate" style={{ color: "hsl(240 8% 44%)" }}>{wh.url}</p>
           <div className="flex flex-wrap gap-1 mt-1.5">
@@ -234,7 +234,7 @@ function WebhookCard({ wh, instanceId, onDelete }: { wh: Webhook; instanceId: st
       {/* Expanded bridge config */}
       {expanded && (
         <div className="px-4 pb-4 space-y-2 border-t" style={{ borderColor: "hsl(240 12% 11%)" }}>
-          <p className="text-[10px] font-semibold uppercase tracking-wider mt-3 mb-2" style={{ color: "hsl(240 8% 36%)" }}>
+          <p className="text-[10px] font-medium uppercase tracking-wider mt-3 mb-2" style={{ color: "hsl(240 8% 36%)" }}>
             Bridges — também enviar para:
           </p>
 
@@ -380,7 +380,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
       <div>
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 85%)" }}>Webhooks da Instância</h3>
+            <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 85%)" }}>Webhooks da Instância</h3>
             <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 40%)" }}>
               Receba eventos específicos desta instância (mensagens, status, conexões)
             </p>
@@ -391,7 +391,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
             </a>
             <button
               onClick={() => setCreating(true)}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all"
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl transition-all"
               style={{ background: "var(--green)", color: "#03170a" }}
               onMouseEnter={e => (e.currentTarget.style.filter = "brightness(1.1)")}
               onMouseLeave={e => (e.currentTarget.style.filter = "none")}
@@ -410,7 +410,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
         {creating && (
           <div className="rounded-2xl p-5 space-y-4 mb-3 animate-fade-in-up" style={cardStyle}>
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold" style={{ color: "hsl(240 15% 90%)" }}>Novo Webhook</h4>
+              <h4 className="text-sm font-medium" style={{ color: "hsl(240 15% 90%)" }}>Novo Webhook</h4>
               <button onClick={() => setCreating(false)} style={{ color: "hsl(240 8% 42%)" }}>
                 <X className="w-4 h-4" />
               </button>
@@ -442,7 +442,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
                     <div key={group.label}>
                       <div className="flex items-center justify-between mb-2">
                         <button onClick={() => toggleGroup(group.events)}
-                          className="text-[11px] font-semibold uppercase tracking-wider px-2 py-1 rounded-lg transition-all"
+                          className="text-[11px] font-medium uppercase tracking-wider px-2 py-1 rounded-lg transition-all"
                           style={{ 
                             background: allSel ? "var(--green)" : noneSel ? "hsl(240 12% 12%)" : "rgba(251,191,36,0.15)", 
                             color: allSel ? "#03170a" : noneSel ? "hsl(240 8% 48)" : "#fbbf24" 
@@ -508,7 +508,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
         <div className="flex items-center gap-2 mb-3">
           <Bot className="w-4 h-4" style={{ color: "hsl(240 8% 50%)" }} />
           <div className="flex-1">
-            <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 85%)" }}>MCP para IA</h3>
+            <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 85%)" }}>MCP para IA</h3>
             <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 40%)" }}>
               Conecte IAs (Claude, GPT, etc.) ao WhatsApp via Model Context Protocol
             </p>
@@ -527,7 +527,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
           <div className="rounded-2xl p-4 space-y-4" style={cardStyle}>
             {/* SSE Endpoint */}
             <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: "hsl(240 8% 40%)" }}>
+              <label className="text-[10px] font-medium uppercase tracking-wider block mb-1.5" style={{ color: "hsl(240 8% 40%)" }}>
                 Endpoint SSE
               </label>
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
@@ -545,14 +545,14 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
             {/* Tools list */}
             {tools && (tools.tools as Array<{ name: string; description: string }>).length > 0 && (
               <div>
-                <label className="text-[10px] font-semibold uppercase tracking-wider block mb-2" style={{ color: "hsl(240 8% 40%)" }}>
+                <label className="text-[10px] font-medium uppercase tracking-wider block mb-2" style={{ color: "hsl(240 8% 40%)" }}>
                   Ferramentas disponíveis
                 </label>
                 <div className="space-y-1.5">
                   {(tools.tools as Array<{ name: string; description: string }>).map(t => (
                     <div key={t.name} className="flex items-start gap-2 px-2 py-1.5 rounded-lg"
                       style={{ background: "var(--surface-2)" }}>
-                      <code className="text-[10px] font-mono font-semibold flex-shrink-0" style={{ color: "#a78bfa" }}>{t.name}</code>
+                      <code className="text-[10px] font-mono font-medium flex-shrink-0" style={{ color: "#a78bfa" }}>{t.name}</code>
                       <span className="text-[10px]" style={{ color: "hsl(240 8% 44%)" }}>{t.description}</span>
                     </div>
                   ))}
@@ -562,7 +562,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
 
             {/* Claude Desktop config */}
             <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: "hsl(240 8% 40%)" }}>
+              <label className="text-[10px] font-medium uppercase tracking-wider block mb-1.5" style={{ color: "hsl(240 8% 40%)" }}>
                 Config Claude Desktop / claude_desktop_config.json
               </label>
               <pre className="text-[9px] p-3 rounded-xl overflow-x-auto font-mono"
@@ -1131,7 +1131,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
             </div>
           )}
           <div>
-            <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 93%)" }}>{instance.name}</h3>
+            <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>{instance.name}</h3>
             <p className="text-xs font-mono mt-0.5" style={{ color: "hsl(240 8% 52%)" }}>
               {isWhatsApp ? (profile?.phone_number || instance.phone_number || "Sem número") :
                isInstagram ? `@${instance.name}` :
@@ -1144,7 +1144,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
             )}
           </div>
         </div>
-        <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
+        <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
           Informações
         </h3>
         <div className="grid grid-cols-2 gap-x-6 gap-y-4">
@@ -1188,7 +1188,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
 
         {/* API Credentials */}
         <div className="space-y-2.5">
-          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
+          <p className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
             API v1 — Credenciais
           </p>
 
@@ -1294,7 +1294,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
 
         {isWhatsApp && instance.status === "connected" && (
           <div className="space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
+            <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
               Consulta rápida
             </h3>
             <div className="rounded-2xl p-4 space-y-3" style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}>
@@ -1308,7 +1308,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                 <button
                   onClick={() => contactInfoMutation.mutate(lookupTarget)}
                   disabled={!lookupTarget.trim() || contactInfoMutation.isPending}
-                  className="px-3 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-40"
+                  className="px-3 py-2 rounded-xl text-xs font-medium transition-all disabled:opacity-40"
                   style={{ background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.25)", color: "#60a5fa" }}
                 >
                   {contactInfoMutation.isPending ? "Consultando..." : "Consultar info"}
@@ -1316,7 +1316,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                 <button
                   onClick={() => contactAvatarMutation.mutate(lookupTarget)}
                   disabled={!lookupTarget.trim() || contactAvatarMutation.isPending}
-                  className="px-3 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-40"
+                  className="px-3 py-2 rounded-xl text-xs font-medium transition-all disabled:opacity-40"
                   style={{ background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.22)", color: "#34d399" }}
                 >
                   {contactAvatarMutation.isPending ? "Buscando..." : "Buscar avatar"}
@@ -1337,11 +1337,11 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                   )}
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-semibold" style={{ color: "hsl(240 15% 88%)" }}>
+                      <span className="text-xs font-medium" style={{ color: "hsl(240 15% 88%)" }}>
                         {contactLookup.push_name || contactLookup.name || "Contato sem nome disponível"}
                       </span>
                       <span
-                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                        className="text-[10px] font-medium px-2 py-0.5 rounded-full"
                         style={contactLookup.exists
                           ? { background: "rgba(0,212,106,0.1)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.2)" }
                           : { background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.2)" }}
@@ -1377,7 +1377,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
 
       {/* Actions */}
       <div className="rounded-2xl p-5 space-y-3" style={cardStyle}>
-        <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>Ações</h3>
+        <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>Ações</h3>
         <div className="grid grid-cols-2 gap-2">
           {isWhatsApp && instance.status !== "connected" && (
             <button
@@ -1443,7 +1443,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
       {/* Quick send */}
       {instance.status === "connected" && (
         <div className="rounded-2xl p-5 space-y-4" style={cardStyle}>
-          <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
+          <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
             Envio rápido
           </h3>
 
@@ -1493,8 +1493,19 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
           )}
           {(msgType === "image" || msgType === "audio" || msgType === "video" || msgType === "sticker") && (
             <div className="space-y-2">
-              <input value={mediaUrl} onChange={e => setMediaUrl(e.target.value)}
-                placeholder="URL da mídia (https://...)" className="input-field w-full" />
+              <MediaUrlInput
+                instanceId={instanceId}
+                value={mediaUrl}
+                onChange={setMediaUrl}
+                accept={
+                  msgType === "image" ? "image/*"
+                  : msgType === "video" ? "video/*"
+                  : msgType === "audio" ? "audio/*"
+                  : "image/webp,image/png"
+                }
+                onAutoFilename={(name) => { if (!filename) setFilename(name); }}
+                placeholder="URL da mídia (ou clique pra fazer upload)"
+              />
               {(msgType === "image" || msgType === "video") && (
                 <input value={mediaCaption} onChange={e => setMediaCaption(e.target.value)}
                   placeholder="Legenda (opcional)" className="input-field w-full" />
@@ -1503,8 +1514,14 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
           )}
           {msgType === "document" && (
             <div className="space-y-2">
-              <input value={mediaUrl} onChange={e => setMediaUrl(e.target.value)}
-                placeholder="URL do documento (https://...)" className="input-field w-full" />
+              <MediaUrlInput
+                instanceId={instanceId}
+                value={mediaUrl}
+                onChange={setMediaUrl}
+                accept="*"
+                onAutoFilename={(name) => setFilename(name)}
+                placeholder="URL do documento (ou clique pra fazer upload)"
+              />
               <input value={filename} onChange={e => setFilename(e.target.value)}
                 placeholder="Nome do arquivo (ex: relatorio.pdf)" className="input-field w-full" />
               <input value={mediaCaption} onChange={e => setMediaCaption(e.target.value)}
@@ -1637,7 +1654,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
           )}
 
           <button onClick={handleSend} disabled={sending || !canSend()}
-            className="w-full flex items-center justify-center gap-2 text-sm font-semibold py-2.5 rounded-xl transition-all disabled:opacity-40"
+            className="w-full flex items-center justify-center gap-2 text-sm font-medium py-2.5 rounded-xl transition-all disabled:opacity-40"
             style={{ background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.2)", color: "#60a5fa" }}
             onMouseEnter={e => (e.currentTarget.style.background = "rgba(96,165,250,0.16)")}
             onMouseLeave={e => (e.currentTarget.style.background = "rgba(96,165,250,0.1)")}
@@ -1650,7 +1667,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
 
       {/* Advanced settings */}
       <div className="rounded-2xl p-5 space-y-1" style={cardStyle}>
-        <h3 className="text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: "hsl(240 8% 42%)" }}>
+        <h3 className="text-xs font-medium uppercase tracking-widest mb-4" style={{ color: "hsl(240 8% 42%)" }}>
           Configurações Avançadas
         </h3>
         {([
@@ -1717,7 +1734,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                   <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
                 </svg>
               </div>
-              <h2 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Login no Instagram</h2>
+              <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>Login no Instagram</h2>
               <p className="text-xs mt-1 text-center" style={{ color: "hsl(240 8% 48%)" }}>
                 Digite as credenciais da conta que deseja conectar
               </p>
@@ -1767,7 +1784,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                 <button
                   onClick={() => instagramLoginMutation.mutate({ username: igUsername.trim(), password: igPassword })}
                   disabled={!igUsername.trim() || !igPassword.trim() || instagramLoginMutation.isPending}
-                  className="w-full text-sm font-semibold py-3 rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2 mt-2"
+                  className="w-full text-sm font-medium py-3 rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2 mt-2"
                   style={{ background: "#e1306c", color: "white" }}
                 >
                   {instagramLoginMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
@@ -1794,7 +1811,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold mb-0.5" style={{ color: "#e1306c" }}>
+                      <p className="text-xs font-medium mb-0.5" style={{ color: "#e1306c" }}>
                         {igChallenge.external_verification ? "Verificação externa necessária" : "Código de verificação necessário"}
                       </p>
                       <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 62%)" }}>
@@ -1826,7 +1843,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                       <button
                         type="button"
                         onClick={() => { setIgChallenge(null); setIgChallengeCode(""); }}
-                        className="w-full text-sm font-semibold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2"
+                        className="w-full text-sm font-medium py-2.5 rounded-xl transition-all flex items-center justify-center gap-2"
                         style={{ background: "var(--surface-3)", color: "hsl(240 15% 90%)" }}
                       >
                         <RotateCcw className="w-4 h-4" />
@@ -1920,7 +1937,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                       <button
                         onClick={() => instagramChallengeMutation.mutate({ api_path: igChallenge.api_path, code: igChallengeCode, method: igChallengeMethod })}
                         disabled={igChallengeCode.length < 6 || instagramChallengeMutation.isPending || igChallengeLoading}
-                        className="w-full text-sm font-semibold py-3 rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                        className="w-full text-sm font-medium py-3 rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2"
                         style={{ background: "#e1306c", color: "white" }}
                       >
                         {instagramChallengeMutation.isPending || igChallengeLoading ? (
@@ -2038,7 +2055,7 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
           style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
           <ShieldAlert className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: "#ef4444" }} />
           <div>
-            <p className="font-semibold text-sm" style={{ color: "#ef4444" }}>Número banido pelo WhatsApp</p>
+            <p className="font-medium text-sm" style={{ color: "#ef4444" }}>Número banido pelo WhatsApp</p>
             <p className="text-xs mt-0.5" style={dimText}>
               Conecte um novo número para retomar as conversas. Seu histórico de mensagens e grupos salvos permanecem intactos.
             </p>
@@ -2071,7 +2088,7 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
       <div className="rounded-2xl" style={cardStyle}>
         <div className="p-4 flex items-center gap-2" style={{ borderBottom: "1px solid hsl(240 12% 13%)" }}>
           <RotateCcw className="w-4 h-4" style={{ color: "#f59e0b" }} />
-          <span className="font-semibold text-sm" style={valText}>Backup automático de grupos</span>
+          <span className="font-medium text-sm" style={valText}>Backup automático de grupos</span>
         </div>
         <div className="p-4 grid grid-cols-3 gap-2">
           {scheduleOptions.map(opt => {
@@ -2108,7 +2125,7 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
             <div className="p-4 flex items-center justify-between" style={{ borderBottom: "1px solid hsl(240 12% 13%)" }}>
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4" style={{ color: "#60a5fa" }} />
-                <span className="font-semibold text-sm" style={valText}>Grupos salvos</span>
+                <span className="font-medium text-sm" style={valText}>Grupos salvos</span>
                 {data?.groups?.length ? (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-md font-mono" style={{ background: "rgba(96,165,250,0.1)", color: "#60a5fa" }}>
                     {data.groups.length}
@@ -2167,7 +2184,7 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
           <div className="rounded-2xl" style={cardStyle}>
             <div className="p-4 flex items-center gap-2" style={{ borderBottom: "1px solid hsl(240 12% 13%)" }}>
               <Phone className="w-4 h-4" style={{ color: "#a78bfa" }} />
-              <span className="font-semibold text-sm" style={valText}>Histórico de contatos</span>
+              <span className="font-medium text-sm" style={valText}>Histórico de contatos</span>
               {data?.contacts?.length ? (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-md font-mono" style={{ background: "rgba(167,139,250,0.1)", color: "#a78bfa" }}>
                   {data.contacts.length}
@@ -2342,7 +2359,7 @@ export default function InstanceDetailPage() {
               >
                 <Smartphone className="w-4 h-4" style={{ color: isConnected ? "var(--green)" : "hsl(240 8% 38%)" }} />
               </div>
-              <h1 className="text-xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
+              <h1 className="text-xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
                 {instance.name}
               </h1>
               <StatusBadge status={instance.status} />
@@ -2465,7 +2482,7 @@ function DMTab({ instance }: { instance: Instance }) {
 
   return (
     <div className="rounded-2xl p-5 space-y-5" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-      <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: "hsl(240 15% 93%)" }}>
+      <h3 className="text-sm font-medium flex items-center gap-2" style={{ color: "hsl(240 15% 93%)" }}>
         <MessageSquareText className="w-4 h-4" style={{ color: channel === "instagram" ? "#e1306c" : "#ff0050" }} />
         Enviar DM
       </h3>
@@ -2523,7 +2540,7 @@ function ActionsTab({ instance }: { instance: Instance }) {
 
   return (
     <div className="rounded-2xl p-5 space-y-5" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-      <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: "hsl(240 15% 93%)" }}>
+      <h3 className="text-sm font-medium flex items-center gap-2" style={{ color: "hsl(240 15% 93%)" }}>
         <Users className="w-4 h-4" style={{ color: channel === "instagram" ? "#e1306c" : "#ff0050" }} />
         Ações de Seguimento
       </h3>
@@ -2595,7 +2612,7 @@ function ScrapingTab({ instance }: { instance: Instance }) {
 
   return (
     <div className="rounded-2xl p-5 space-y-5" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-      <h3 className="text-sm font-semibold flex items-center gap-2" style={{ color: "hsl(240 15% 93%)" }}>
+      <h3 className="text-sm font-medium flex items-center gap-2" style={{ color: "hsl(240 15% 93%)" }}>
         <Download className="w-4 h-4" style={{ color: channel === "instagram" ? "#e1306c" : "#ff0050" }} />
         Scraping de Perfis
       </h3>
@@ -2835,6 +2852,92 @@ function MediaTab({ instance }: { instance: Instance }) {
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MediaUrlInput ─────────────────────────────────────────────────────────
+// Input que aceita URL OU upload direto pro bucket (rota
+// /v1/instances/:id/media/upload). Após upload, popula o campo com a URL
+// retornada e mantém readonly até o user limpar manualmente.
+function MediaUrlInput({
+  instanceId, value, onChange, accept, placeholder, onAutoFilename,
+}: {
+  instanceId: string;
+  value: string;
+  onChange: (v: string) => void;
+  accept: string;
+  placeholder: string;
+  onAutoFilename?: (name: string) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const inputRef = (typeof document !== "undefined")
+    ? { current: null as HTMLInputElement | null }
+    : null;
+
+  const handleFile = async (file: File) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const r = await mediaUploadApi.upload(instanceId, file);
+      const data = r.data as { url?: string; signed_url?: string };
+      const url = data.url || data.signed_url || "";
+      if (!url) throw new Error("Sem URL no retorno");
+      onChange(url);
+      if (onAutoFilename) onAutoFilename(file.name);
+      toast.success(`${file.name} pronto pra envio`);
+    } catch {
+      toast.error("Falha no upload");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="flex gap-2">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="input-field flex-1"
+      />
+      <label
+        className="flex items-center justify-center px-3 rounded-md cursor-pointer transition-colors text-xs font-medium gap-1.5 whitespace-nowrap"
+        style={{
+          background: uploading ? "var(--surface-3)" : "var(--green-soft)",
+          color: "var(--green)",
+          border: "1px solid var(--green-border)",
+          opacity: uploading ? 0.6 : 1,
+        }}
+        title="Fazer upload do arquivo"
+      >
+        {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+        {uploading ? "Enviando..." : "Upload"}
+        <input
+          ref={(el) => { if (inputRef) inputRef.current = el; }}
+          type="file"
+          accept={accept}
+          className="hidden"
+          disabled={uploading}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleFile(f);
+            e.target.value = ""; // permite re-upload do mesmo arquivo
+          }}
+        />
+      </label>
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          className="px-2 rounded-md"
+          style={{ background: "var(--surface-3)", color: "var(--text-3)" }}
+          title="Limpar"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
       )}
     </div>
   );

@@ -55,7 +55,7 @@ export function DealCard({ deal, isDragging = false }: { deal: DealCardData; isD
         )}
       </div>
 
-      <div className="mt-2 flex items-center gap-1.5 text-sm font-semibold" style={{ color: uniq.green }}>
+      <div className="mt-2 flex items-center gap-1.5 text-sm font-medium" style={{ color: uniq.green }}>
         {formatCurrency(deal.value, deal.currency)}
         {typeof deal.probability === "number" && deal.probability > 0 && (
           <span className="flex items-center gap-0.5 text-[10px] font-normal" style={{ color: uniq.textFaint }}>

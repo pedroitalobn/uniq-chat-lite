@@ -278,7 +278,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
           {/* Header */}
           <div className="flex items-center justify-between p-5 border-b flex-shrink-0" style={{ borderColor: "hsl(240 12% 15%)" }}>
             <div>
-              <h2 className="text-lg font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
+              <h2 className="text-lg font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
                 {isEditing ? "Editar Plano" : "Novo Plano"}
               </h2>
               {isEditing && <p className="text-[10px] text-zinc-500 font-mono mt-0.5">{p!.id}</p>}
@@ -294,7 +294,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className="px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors"
+                className="px-4 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors"
                 style={{
                   color: activeTab === tab.id ? "var(--green)" : "hsl(240 8% 46%)",
                   borderColor: activeTab === tab.id ? "var(--green)" : "transparent"
@@ -481,10 +481,10 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
         {/* Identity Title */}
         <div className="min-w-[140px] flex-shrink-0 sm:w-[180px]">
           <div className="flex items-center gap-2 mb-0.5">
-            <h3 className="font-bold text-base truncate" style={{ color: "hsl(240 15% 93%)" }}>{plan.name}</h3>
+            <h3 className="font-semibold text-base truncate" style={{ color: "hsl(240 15% 93%)" }}>{plan.name}</h3>
             {plan.is_active ? 
-              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0" style={{ background: "rgba(0,212,106,0.08)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.15)" }}>Ativo</span> : 
-              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0" style={{ background: "rgba(239,68,68,0.08)", color: "#f87171", border: "1px solid rgba(239,68,68,0.15)" }}>Inativo</span>}
+              <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0" style={{ background: "rgba(0,212,106,0.08)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.15)" }}>Ativo</span> : 
+              <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0" style={{ background: "rgba(239,68,68,0.08)", color: "#f87171", border: "1px solid rgba(239,68,68,0.15)" }}>Inativo</span>}
           </div>
           <p className="text-sm font-medium truncate" style={{ color: style.accent }}>
             {plan.price === 0 ? "Gratuito" : `R$ ${plan.price}/mês`}
@@ -495,24 +495,24 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
         <div className="flex-1 flex flex-wrap gap-2 w-full lg:pr-10 min-w-[200px]">
            <div className="flex-1 min-w-[90px] rounded-xl p-3 flex flex-col justify-center" style={{ background: "rgba(0,0,0,0.2)" }}>
               <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 38%)" }}>Workspaces</p>
-              <p className="text-lg font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_workspaces === -1 ? "∞" : plan.max_workspaces}</p>
+              <p className="text-lg font-semibold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_workspaces === -1 ? "∞" : plan.max_workspaces}</p>
            </div>
            <div className="flex-1 min-w-[90px] rounded-xl p-3 flex flex-col justify-center" style={{ background: "rgba(0,0,0,0.2)" }}>
               <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 38%)" }}>Instâncias</p>
-              <p className="text-lg font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_instances === -1 ? "∞" : plan.max_instances}</p>
+              <p className="text-lg font-semibold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_instances === -1 ? "∞" : plan.max_instances}</p>
            </div>
            <div className="flex-1 min-w-[90px] rounded-xl p-3 flex flex-col justify-center" style={{ background: "rgba(0,0,0,0.2)" }}>
               <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 38%)" }}>Usuários</p>
-              <p className="text-lg font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_users === -1 ? "∞" : plan.max_users}</p>
+              <p className="text-lg font-semibold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_users === -1 ? "∞" : plan.max_users}</p>
            </div>
            <div className="flex-1 min-w-[90px] rounded-xl p-3 flex flex-col justify-center" style={{ background: "rgba(0,0,0,0.2)" }}>
               <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 38%)" }}>Msgs/dia</p>
-              <p className="text-lg font-bold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_messages_per_day === -1 ? "∞" : plan.max_messages_per_day.toLocaleString("pt-BR")}</p>
+              <p className="text-lg font-semibold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_messages_per_day === -1 ? "∞" : plan.max_messages_per_day.toLocaleString("pt-BR")}</p>
            </div>
            
            <div className="flex-[1.5] min-w-[110px] rounded-xl p-3 flex items-center justify-center gap-2" style={{ background: plan.allow_proxy ? "rgba(96,165,250,0.06)" : "rgba(0,0,0,0.15)", border: plan.allow_proxy ? "1px solid rgba(96,165,250,0.12)" : "1px solid transparent" }}>
             <Globe className="w-4 h-4 hidden sm:block" style={{ color: plan.allow_proxy ? "#60a5fa" : "hsl(240 8% 28%)" }} />
-            <span className="text-[10px] font-bold uppercase tracking-wider text-center" style={{ color: plan.allow_proxy ? "#93c5fd" : "hsl(240 8% 36%)" }}>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-center" style={{ color: plan.allow_proxy ? "#93c5fd" : "hsl(240 8% 36%)" }}>
               Proxy {plan.allow_proxy ? "On" : "Off"}
             </span>
           </div>
@@ -570,7 +570,7 @@ export default function AdminPlansPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
             Planos
           </h1>
           <p className="text-sm mt-1 hidden sm:block" style={{ color: "hsl(240 8% 46%)" }}>
@@ -580,7 +580,7 @@ export default function AdminPlansPage() {
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => setActivePlanDrawer("new")}
-            className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-all duration-150 active:scale-[0.97]"
+            className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl transition-all duration-150 active:scale-[0.97]"
             style={{ color: "var(--green)", background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}
             onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.18)" }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.1)" }}
@@ -591,7 +591,7 @@ export default function AdminPlansPage() {
           </button>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
             <Shield className="w-3.5 h-3.5 text-amber-500" />
-            <span className="text-xs font-semibold text-amber-500 hidden sm:inline">Admin</span>
+            <span className="text-xs font-medium text-amber-500 hidden sm:inline">Admin</span>
           </div>
         </div>
       </div>
@@ -619,7 +619,7 @@ export default function AdminPlansPage() {
 
       {/* Notes */}
       <div className="rounded-2xl p-5 space-y-3" style={cardStyle}>
-        <h3 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "hsl(240 8% 46%)" }}>
+        <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 46%)" }}>
           Notas da Engenharia
         </h3>
         <ul className="space-y-2">

@@ -151,7 +151,7 @@ function StageHeader({
     >
       <div>
         <div className="flex items-center gap-1.5">
-          <span className="text-sm font-semibold" style={{ color: uniq.textPrimary }}>
+          <span className="text-sm font-medium" style={{ color: uniq.textPrimary }}>
             {stage.name}
           </span>
           <span
