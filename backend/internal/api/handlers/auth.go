@@ -585,9 +585,12 @@ func (h *AuthHandler) loginWithCredentials(c *fiber.Ctx, identifier, password st
 		})
 	}
 
-	// Record last login time
+	// Record last login time + audit.
 	now := time.Now()
 	h.db.Model(&user).Update("last_login_at", now)
+	c.Locals("user", &user) // p/ LogAudit pegar actor
+	LogAudit(h.db, c, "auth.login_success",
+		AuditTarget{Type: "user", ID: &user.ID}, nil)
 
 	accessToken, err := middleware.GenerateAccessToken(&user)
 	if err != nil {

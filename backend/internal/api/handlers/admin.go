@@ -488,6 +488,9 @@ func (h *AdminHandler) DeleteUser(c *fiber.Ctx) error {
 			"detail": err.Error(),
 		})
 	}
+	LogAudit(h.db, c, "user.delete",
+		AuditTarget{Type: "user", ID: &userID},
+		map[string]any{"cascade": true, "deleted": cleaned})
 	return c.JSON(fiber.Map{
 		"message": "usuário removido em cascata",
 		"deleted": cleaned,

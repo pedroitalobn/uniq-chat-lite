@@ -97,6 +97,8 @@ func (h *AuthHandler) Enable2FA(c *fiber.Ctx) error {
 	}).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao ativar"})
 	}
+	LogAudit(h.db, c, "2fa.enable",
+		AuditTarget{Type: "user", ID: &user.ID}, nil)
 	return c.JSON(fiber.Map{
 		"enabled":      true,
 		"backup_codes": codes,
@@ -129,6 +131,8 @@ func (h *AuthHandler) Disable2FA(c *fiber.Ctx) error {
 	}).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao desativar"})
 	}
+	LogAudit(h.db, c, "2fa.disable",
+		AuditTarget{Type: "user", ID: &user.ID}, nil)
 	return c.JSON(fiber.Map{"disabled": true})
 }
 

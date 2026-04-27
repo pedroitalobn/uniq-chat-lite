@@ -1192,6 +1192,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	admin.Get("/media/health", mediaH.Check)
 	// Rotas específicas primeiro (sem parâmetros)
 	admin.Get("/stats", adminH.Stats)
+	admin.Get("/audit-logs", adminH.ListAuditLogs)
 	admin.Get("/users", adminH.ListUsers)
 	admin.Post("/users", adminH.CreateUser)
 	admin.Get("/plans", adminH.ListPlans)

@@ -203,6 +203,10 @@ func main() {
 	asaasCron := services.NewAsaasCron(db)
 	asaasCron.Start()
 
+	// Security cleanup cron — deleta contas não-verificadas após 14d.
+	cleanupCron := services.NewCleanupCron(db)
+	cleanupCron.Start()
+
 	// Ticketing periodic jobs: unsnoozer, presence sweep, pending redispatch,
 	// resolve auto-close.
 	ticketingScheduler := services.NewTicketingScheduler(db, services.NewDispatchService(db))
@@ -319,6 +323,8 @@ func autoMigrate(db *gorm.DB) error {
 		// Sprint billing — usage counters
 		&models.UsageCounter{},
 		&models.PlanChangeLog{},
+		// Audit log de ações sensíveis (auth/admin/billing)
+		&models.AuditLog{},
 		// Módulo Shop (Fase 1)
 		&models.Shop{},
 		&models.Product{},

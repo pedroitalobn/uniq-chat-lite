@@ -409,6 +409,13 @@ const SECTIONS: Section[] = [
       { method: "POST",   path: "/v1/conversations/bulk", description: "Ações em lote (até 200 ids). Actions: resolve, close, reopen, snooze, unsnooze, read, unread, assign, unassign, transfer, archive, unarchive, pin, unpin, mute, unmute", auth: "bearer", body: { ids: ["<uuid>", "<uuid>"], action: "transfer", queue_id: "<uuid>", note: "Triagem" } },
       { method: "GET",    path: "/v1/conversations/{id}/shop-context", description: "Contexto comercial do contato: últimos 10 pedidos + totais (gasto, ticket médio, qtde, último pedido)", auth: "bearer" },
       { method: "GET",    path: "/v1/contacts/{id}/orders", description: "Pedidos paginados de um contato (limit/offset)", auth: "bearer" },
+      { method: "POST",   path: "/v1/auth/verify-email", description: "Confirma e-mail via token enviado no signup (24h)", auth: "none", body: { token: "verify_..." } },
+      { method: "POST",   path: "/v1/auth/resend-verification", description: "Re-emite o link de verificação. Resposta neutra (anti-enumeração)", auth: "none", body: { email: "user@example.com" } },
+      { method: "POST",   path: "/v1/auth/2fa/setup", description: "Inicia ativação 2FA — retorna secret + otpauth_url pra renderizar QR", auth: "bearer" },
+      { method: "POST",   path: "/v1/auth/2fa/enable", description: "Confirma código TOTP e ativa 2FA. Retorna 10 backup codes (uma vez)", auth: "bearer", body: { code: "123456" } },
+      { method: "POST",   path: "/v1/auth/2fa/disable", description: "Desativa 2FA (precisa do código atual)", auth: "bearer", body: { code: "123456" } },
+      { method: "POST",   path: "/v1/auth/2fa/verify", description: "Troca challenge_token + código por access_token (segundo passo do login)", auth: "none", body: { challenge_token: "...", code: "123456" } },
+      { method: "GET",    path: "/v1/admin/audit-logs", description: "Lista audit logs (filtros: actor_user_id, action, target_type, target_id, since, until, limit)", auth: "bearer" },
     ],
   },
   {

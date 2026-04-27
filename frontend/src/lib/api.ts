@@ -204,6 +204,8 @@ export const authApi = {
     api.post("/auth/change-password", { current_password, new_password }),
   logout: () => api.post("/auth/logout"),
   refresh: () => api.post("/auth/refresh"),
+  resendVerification: (email: string) =>
+    api.post("/auth/resend-verification", { email }),
   // 2FA TOTP
   setup2FA: () => api.post("/auth/2fa/setup"),
   enable2FA: (code: string) => api.post("/auth/2fa/enable", { code }),
