@@ -1545,23 +1545,11 @@ func (ic *InstanceClient) SendPixMessage(to string, data PixData) (string, error
 		},
 	}
 
-	// PIX usa flow type "review_and_pay".
-	pixNodes := []waBinary.Node{
-		{
-			Tag: "biz",
-			Content: []waBinary.Node{{
-				Tag: "interactive",
-				Attrs: waBinary.Attrs{
-					"type": "native_flow",
-					"v":    "1",
-				},
-				Content: []waBinary.Node{{
-					Tag:   "native_flow",
-					Attrs: waBinary.Attrs{"v": "9", "name": "review_and_pay"},
-				}},
-			}},
-		},
-	}
+	// Reusa "mixed" — único flow name que passa o gate anti-spam pra
+	// recipients pessoais. "review_and_pay" específico era rejeitado
+	// com 405. ButtonParamsJSON com payment_info continua igual; só o
+	// nome do native_flow muda.
+	pixNodes := buildButtonsBizNodes(true)
 
 	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
 		AdditionalNodes: &pixNodes,
@@ -1752,22 +1740,8 @@ func (ic *InstanceClient) SendListMessage(to, title, description, buttonText, fo
 		},
 	}
 
-	bizNodes := []waBinary.Node{
-		{
-			Tag: "biz",
-			Content: []waBinary.Node{{
-				Tag: "interactive",
-				Attrs: waBinary.Attrs{
-					"type": "native_flow",
-					"v":    "1",
-				},
-				Content: []waBinary.Node{{
-					Tag:   "native_flow",
-					Attrs: waBinary.Attrs{"v": "2", "name": "product_list"},
-				}},
-			}},
-		},
-	}
+	// Mesma razão de PIX: "product_list" rejeitado com 405. "mixed" passa.
+	bizNodes := buildButtonsBizNodes(true)
 
 	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
 		AdditionalNodes: &bizNodes,
