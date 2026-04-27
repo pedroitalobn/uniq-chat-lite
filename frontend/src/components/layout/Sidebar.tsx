@@ -94,6 +94,7 @@ export function Sidebar() {
     { href: "/servers",      label: t("nav_servers"),      icon: Server,          exact: false, show: canSeeServers },
     { href: "/instances",    label: t("nav_instances"),    icon: Smartphone,      exact: false, show: canSeeInstances },
     { href: "/integrations", label: t("nav_integrations"), icon: Plug,            exact: false, show: canSeeIntegrations },
+    { href: "/plans",        label: "Planos",              icon: CreditCard,      exact: false, show: true },
     { href: "/settings",     label: "Conta",               icon: Settings,        exact: false, show: true },
   ];
   const visibleNavItems = navItems.filter((n) => n.show);

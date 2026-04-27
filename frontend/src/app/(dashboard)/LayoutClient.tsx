@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { authApi, instancesApi } from "@/lib/api";
+import { UsageBanner } from "@/components/billing/UsageBanner";
 
 export function LayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -123,8 +124,9 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
 
   if (isFullWidth) {
     return (
-      <main className="flex-1 overflow-hidden">
-        <div className="px-4 sm:px-6 py-6 lg:py-8 pt-16 lg:pt-8 h-full overflow-y-auto">
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <UsageBanner />
+        <div className="flex-1 px-4 sm:px-6 py-6 lg:py-8 pt-16 lg:pt-8 overflow-y-auto">
           {children}
         </div>
       </main>
@@ -135,8 +137,9 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
   // breakpoints. Laterais ganham espaço; conteúdo que precisa de leitura
   // confortável usa max-w no próprio componente (ex: settings forms).
   return (
-    <main className="flex-1 overflow-hidden">
-      <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pt-16 lg:pt-8 h-full overflow-y-auto">
+    <main className="flex-1 overflow-hidden flex flex-col">
+      <UsageBanner />
+      <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pt-16 lg:pt-8 overflow-y-auto">
         {children}
       </div>
     </main>
