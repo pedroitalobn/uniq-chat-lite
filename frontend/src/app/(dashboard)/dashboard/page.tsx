@@ -1,19 +1,23 @@
 "use client";
 
-// Dashboard executivo — visão consolidada da operação. Agrega contadores
-// de campanhas, jornadas, CRM (deals/contatos/empresas) e instâncias,
-// mais a atividade recente. Layout responsivo (mobile-first).
+// Dashboard executivo unificado — pills no topo selecionam visão:
+//   Geral · Campanhas · Inbox/SLA · Shop · Agentes
+// Cada visão consome endpoints já existentes; a rota /reports antiga
+// é mantida via tab Inbox/SLA (deeplink ?tab=inbox).
 
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   adminApi, agentsApi, campaignsApi, companiesApi, crmApi, dealsApi,
-  instancesApi, journeysApi,
+  instancesApi, journeysApi, conversationsApi,
 } from "@/lib/api";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import api from "@/lib/api";
 import {
   Activity, ArrowRight, Building2, Contact as ContactIcon, Megaphone,
   MessageSquare, Rocket, Smartphone, Sparkles, TrendingUp, Wand2, Wifi,
+  LayoutDashboard, ShoppingBag, Bot, Inbox as InboxIcon,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -189,17 +193,35 @@ export default function DashboardPage() {
     .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
     .slice(0, 5);
 
+  type Tab = "geral" | "campaigns" | "inbox" | "shop" | "agents";
+  const [tab, setTab] = useState<Tab>("geral");
+
   return (
     <div className="space-y-5 sm:space-y-7">
       {/* Header */}
       <div>
-        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Dashboard</h1>
+        <h1 className="text-xl sm:text-2xl font-medium tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Dashboard</h1>
         <p className="text-xs sm:text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
           Bem-vindo{currentWorkspace ? ` ao workspace ${currentWorkspace.name}` : ""},{" "}
           <span style={{ color: "hsl(240 8% 70%)" }}>{session?.user?.name}</span>
         </p>
       </div>
 
+      {/* Pills de tabs */}
+      <div className="flex flex-wrap gap-1.5 -mb-1">
+        <DashTab id="geral"     label="Geral"      icon={LayoutDashboard} tab={tab} setTab={setTab} />
+        <DashTab id="campaigns" label="Campanhas"  icon={Megaphone}        tab={tab} setTab={setTab} />
+        <DashTab id="inbox"     label="Inbox / SLA" icon={InboxIcon}       tab={tab} setTab={setTab} />
+        <DashTab id="shop"      label="Shop"       icon={ShoppingBag}      tab={tab} setTab={setTab} />
+        <DashTab id="agents"    label="Agentes"    icon={Bot}              tab={tab} setTab={setTab} />
+      </div>
+
+      {tab === "campaigns" && <CampaignsView wsId={wsId} />}
+      {tab === "inbox" && <InboxStatsView wsId={wsId} />}
+      {tab === "shop" && <ShopStatsView wsId={wsId} />}
+      {tab === "agents" && <AgentsStatsView />}
+      {tab === "geral" && (
+      <>
       {/* Stats grid — 2 cols mobile, 3 tablet, 6 desktop */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         <StatCard
@@ -431,6 +453,156 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+      </>
+      )}
+    </div>
+  );
+}
+
+// ─── Tab pill ────────────────────────────────────────────────────────────────
+function DashTab({ id, label, icon: Icon, tab, setTab }: {
+  id: "geral" | "campaigns" | "inbox" | "shop" | "agents";
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  tab: string;
+  setTab: (t: any) => void;
+}) {
+  const active = tab === id;
+  return (
+    <button
+      onClick={() => setTab(id)}
+      className="px-3 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition-all"
+      style={active
+        ? { background: "var(--green-soft)", border: "1px solid var(--green-border)", color: "var(--green)" }
+        : { background: "var(--surface-3)", border: "1px solid transparent", color: "var(--text-3)" }}
+    >
+      <Icon className="w-3.5 h-3.5" />
+      {label}
+    </button>
+  );
+}
+
+// ─── Tab views ───────────────────────────────────────────────────────────────
+function StatBlock({ label, value, sub, color = "var(--green)" }: {
+  label: string; value: string | number; sub?: string; color?: string;
+}) {
+  return (
+    <div className="rounded-2xl p-4" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+      <p className="text-[11px] uppercase tracking-wider font-medium" style={{ color: "var(--text-3)" }}>{label}</p>
+      <p className="text-2xl font-medium mt-1" style={{ color }}>{value}</p>
+      {sub && <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>{sub}</p>}
+    </div>
+  );
+}
+
+function CampaignsView({ wsId }: { wsId?: string }) {
+  const q = useQuery({
+    queryKey: ["dash-campaigns", wsId],
+    queryFn: () => campaignsApi.list(wsId).then((r) => r.data),
+    enabled: !!wsId,
+  });
+  const list: any[] = Array.isArray(q.data) ? q.data : (q.data as any)?.data || [];
+  const totals = useMemo(() => {
+    const byStatus: Record<string, number> = {};
+    let totalSent = 0, totalFailed = 0;
+    for (const c of list) {
+      byStatus[c.status] = (byStatus[c.status] || 0) + 1;
+      totalSent += Number(c.sent_count || 0);
+      totalFailed += Number(c.failed_count || 0);
+    }
+    return { byStatus, totalSent, totalFailed };
+  }, [list]);
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatBlock label="Total" value={list.length} />
+        <StatBlock label="Rodando" value={totals.byStatus.running || 0} color="#60a5fa" />
+        <StatBlock label="Enviadas" value={totals.totalSent.toLocaleString("pt-BR")} />
+        <StatBlock label="Falhas" value={totals.totalFailed.toLocaleString("pt-BR")} color="#f87171" />
+      </div>
+      <Link href="/campaigns" className="text-xs underline" style={{ color: "var(--green)" }}>
+        Gerenciar campanhas →
+      </Link>
+    </div>
+  );
+}
+
+function InboxStatsView({ wsId }: { wsId?: string }) {
+  const counts = useQuery({
+    queryKey: ["dash-conv-count", wsId],
+    queryFn: () => conversationsApi.count(wsId as string).then(r => r.data as Record<string, number>),
+    enabled: !!wsId,
+  });
+  const c = counts.data ?? {};
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatBlock label="Abertos" value={c.open ?? 0} />
+        <StatBlock label="Pendentes" value={c.pending ?? 0} color="#fbbf24" />
+        <StatBlock label="Sem atribuição" value={c.unassigned_open ?? 0} color="#60a5fa" />
+        <StatBlock label="Resolvidos" value={c.resolved ?? 0} color="var(--text-3)" />
+      </div>
+      <Link href="/inbox" className="text-xs underline" style={{ color: "var(--green)" }}>
+        Ver inbox →
+      </Link>
+    </div>
+  );
+}
+
+function ShopStatsView({ wsId }: { wsId?: string }) {
+  const headers = wsId ? { "X-Workspace-ID": wsId } : undefined;
+  const shopsQ = useQuery({
+    queryKey: ["dash-shops", wsId],
+    queryFn: () => api.get("/v1/shops", { headers }).then(r => r.data),
+    enabled: !!wsId,
+  });
+  const shops: any[] = (shopsQ.data as any)?.data ?? [];
+  const productsQ = useQuery({
+    queryKey: ["dash-products-count", wsId, shops.map((s: any) => s.id).join(",")],
+    queryFn: async () => {
+      let total = 0;
+      await Promise.all(shops.map(async (s: any) => {
+        try {
+          const r = await api.get(`/v1/shops/${s.id}/products`, { headers, params: { limit: 1 } });
+          total += (r.data?.total ?? (r.data?.data?.length ?? 0));
+        } catch {}
+      }));
+      return total;
+    },
+    enabled: shops.length > 0,
+  });
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <StatBlock label="Lojas" value={shops.length} />
+        <StatBlock label="Produtos" value={productsQ.data ?? 0} />
+        <StatBlock label="Lojas ativas" value={shops.filter((s: any) => s.is_active).length} color="var(--green)" />
+      </div>
+      <Link href="/shops" className="text-xs underline" style={{ color: "var(--green)" }}>
+        Gerenciar lojas →
+      </Link>
+    </div>
+  );
+}
+
+function AgentsStatsView() {
+  const q = useQuery({
+    queryKey: ["dash-agent-stats"],
+    queryFn: () => agentsApi.stats().then(r => r.data),
+    refetchInterval: 60_000,
+  });
+  const s: any = q.data || {};
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatBlock label="Agentes ativos" value={s.active_agents ?? 0} />
+        <StatBlock label="Conversas tratadas" value={s.handled_conversations ?? s.conversations_handled ?? 0} />
+        <StatBlock label="Mensagens IA" value={s.ai_messages ?? 0} />
+        <StatBlock label="Taxa resolução" value={s.resolution_rate != null ? `${Math.round(s.resolution_rate * 100)}%` : "—"} />
+      </div>
+      <Link href="/agents" className="text-xs underline" style={{ color: "var(--green)" }}>
+        Gerenciar agentes →
+      </Link>
     </div>
   );
 }
