@@ -2,9 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Design tokens — inspirado em:
+  - Spotify (dark surface ladder de 4 níveis sem borda, hover sobe um degrau)
+  - Wise (warm-neutrals: borders rgba(14,15,12,*) em vez de pure black; body
+    text #454745, não cinza puro)
+  - Mintlify (radius scale, single shadow scale com alpha-only)
+
+  Regra de ouro: TUDO usa var(--token). Cor solid em componentes (#fff,
+  #000, rgba(0,0,0,*)) é bug — quebra light mode.
+*/
+
 @layer base {
-  /* ── Dark theme (default) ──────────────────────── */
+  /* ── Dark theme (default) ──────────────────────────────────────── */
   :root, .dark {
+    /* shadcn HSL tokens (mantidos pra retrocompat com botões/inputs) */
     --background: 240 20% 4%;
     --foreground: 240 15% 93%;
     --card: 240 18% 6%;
@@ -25,62 +37,129 @@
     --input: 240 12% 10%;
     --ring: 148 100% 41%;
     --radius: 0.75rem;
+
+    /* Brand */
     --green: #00d46a;
-    --green-dim: rgba(0, 212, 106, 0.1);
-    --green-border: rgba(0, 212, 106, 0.2);
-    /* surface tokens (used by settings & new components) */
-    --surface-1: hsl(240 20% 4%);
-    --surface-2: hsl(240 18% 6%);
-    --surface-3: hsl(240 12% 10%);
+    --green-strong: #00ff7f;
+    --green-soft: rgba(0, 212, 106, 0.12);
+    --green-dim: rgba(0, 212, 106, 0.08);
+    --green-border: rgba(0, 212, 106, 0.22);
+    --green-fg: #03170a; /* texto sobre o verde */
+
+    /* Surface ladder — 4 níveis (Spotify-style). hover = sobe 1 degrau. */
+    --surface-0: hsl(240 22% 3%);   /* page bg */
+    --surface-1: hsl(240 20% 5%);   /* card padrão */
+    --surface-2: hsl(240 18% 7%);   /* card elevado / hover */
+    --surface-3: hsl(240 14% 10%);  /* input / chip */
+    --surface-4: hsl(240 12% 14%);  /* dropdown / popover elevated */
+    /* alias mantido pra código legacy */
     --surface-border: hsl(240 12% 13%);
-    --text-1: hsl(240 15% 93%);
-    --text-2: hsl(240 8% 62%);
-    --text-3: hsl(240 8% 44%);
-    --sidebar-bg: hsl(240 20% 3.2%);
+
+    /* Borders — alpha sobre branco (warm-ish) */
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-default: rgba(255, 255, 255, 0.10);
+    --border-strong: rgba(255, 255, 255, 0.16);
+
+    /* Text levels */
+    --text-1: hsl(240 15% 96%);  /* primary (titles, labels emphasis) */
+    --text-2: hsl(240 8% 70%);   /* body */
+    --text-3: hsl(240 8% 52%);   /* secondary / hint */
+    --text-4: hsl(240 8% 38%);   /* tertiary / placeholder */
+
+    /* Semantic */
+    --success: #22c55e;
+    --success-soft: rgba(34, 197, 94, 0.12);
+    --danger: #ef4444;
+    --danger-soft: rgba(239, 68, 68, 0.12);
+    --warning: #f59e0b;
+    --warning-soft: rgba(245, 158, 11, 0.12);
+    --info: #3b82f6;
+    --info-soft: rgba(59, 130, 246, 0.12);
+
+    /* Sidebar */
+    --sidebar-bg: hsl(240 22% 3.2%);
     --sidebar-border: hsl(240 12% 10%);
+
+    /* Shadows — single scale, alpha-only (Mintlify-style) */
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.30);
+    --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-3: 0 8px 32px rgba(0, 0, 0, 0.45);
+
+    /* Hero gradient — usado em landing surfaces de feature */
+    --hero-gradient: radial-gradient(80% 60% at 50% 0%, rgba(0, 212, 106, 0.12) 0%, transparent 60%);
   }
 
-  /* ── Light theme ───────────────────────────────── */
+  /* ── Light theme — warm neutrals (Wise-inspired) ───────────────── */
   .light {
-    --background: 220 20% 97%;
-    --foreground: 240 15% 12%;
+    --background: 30 20% 98%;
+    --foreground: 60 6% 8%;
     --card: 0 0% 100%;
-    --card-foreground: 240 15% 12%;
+    --card-foreground: 60 6% 8%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 15% 12%;
-    --primary: 148 70% 36%;
+    --popover-foreground: 60 6% 8%;
+    --primary: 148 80% 32%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 92%;
-    --secondary-foreground: 240 15% 12%;
-    --muted: 220 14% 92%;
-    --muted-foreground: 240 8% 46%;
-    --accent: 220 14% 91%;
-    --accent-foreground: 240 15% 12%;
-    --destructive: 0 75% 55%;
+    --secondary: 30 12% 94%;
+    --secondary-foreground: 60 6% 18%;
+    --muted: 30 12% 94%;
+    --muted-foreground: 60 4% 38%;
+    --accent: 30 12% 92%;
+    --accent-foreground: 60 6% 12%;
+    --destructive: 0 75% 50%;
     --destructive-foreground: 0 0% 99%;
-    --border: 220 13% 86%;
-    --input: 220 14% 92%;
-    --ring: 148 70% 36%;
-    --radius: 0.75rem;
+    --border: 60 6% 90%;
+    --input: 30 12% 96%;
+    --ring: 148 80% 32%;
+
     --green: #009a4e;
-    --green-dim: rgba(0, 154, 78, 0.1);
+    --green-strong: #00b85c;
+    --green-soft: rgba(0, 154, 78, 0.12);
+    --green-dim: rgba(0, 154, 78, 0.06);
     --green-border: rgba(0, 154, 78, 0.25);
-    --surface-1: hsl(220 20% 97%);
-    --surface-2: hsl(0 0% 100%);
-    --surface-3: hsl(220 14% 92%);
-    --surface-border: hsl(220 13% 86%);
-    --text-1: hsl(240 15% 12%);
-    --text-2: hsl(240 8% 38%);
-    --text-3: hsl(240 8% 52%);
-    --sidebar-bg: hsl(220 20% 94%);
-    --sidebar-border: hsl(220 13% 86%);
+    --green-fg: #ffffff;
+
+    /* Surface ladder light — 4 níveis (Mintlify+Wise warmth) */
+    --surface-0: #ffffff;             /* page bg */
+    --surface-1: #fafaf9;             /* card padrão (warm off-white) */
+    --surface-2: #f5f5f3;             /* card hover / nested card */
+    --surface-3: #efedea;             /* input / chip — slight warm gray */
+    --surface-4: #e8e6e0;             /* dropdown / popover elevated */
+    --surface-border: rgba(14, 15, 12, 0.10);
+
+    /* Borders — alpha sobre warm-near-black (não pure black) */
+    --border-subtle: rgba(14, 15, 12, 0.05);
+    --border-default: rgba(14, 15, 12, 0.10);
+    --border-strong: rgba(14, 15, 12, 0.16);
+
+    /* Text levels — warm dark (#0e0f0c base, não #000) */
+    --text-1: #0e0f0c;
+    --text-2: #454745;
+    --text-3: #7a7a78;
+    --text-4: #a8a8a6;
+
+    /* Semantic — desaturados pra contraste em fundo claro */
+    --success: #054d28;
+    --success-soft: rgba(5, 77, 40, 0.10);
+    --danger: #c0252c;
+    --danger-soft: rgba(192, 37, 44, 0.10);
+    --warning: #b45309;
+    --warning-soft: rgba(180, 83, 9, 0.10);
+    --info: #1e40af;
+    --info-soft: rgba(30, 64, 175, 0.10);
+
+    --sidebar-bg: #fafaf9;
+    --sidebar-border: rgba(14, 15, 12, 0.08);
+
+    --shadow-1: 0 1px 2px rgba(14, 15, 12, 0.05);
+    --shadow-2: 0 4px 12px rgba(14, 15, 12, 0.08);
+    --shadow-3: 0 8px 32px rgba(14, 15, 12, 0.12);
+
+    --hero-gradient: radial-gradient(80% 60% at 50% 0%, rgba(0, 154, 78, 0.08) 0%, transparent 60%);
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
   body {
     @apply bg-background text-foreground;
     /* Inter:
@@ -90,123 +169,191 @@
        - rlig + calt: ligaduras tipográficas e alternativas contextuais. */
     font-feature-settings: "rlig" 1, "calt" 1, "kern" 1, "lnum" 1, "pnum" 1, "ss01" 1, "cv11" 1;
     font-weight: 400;
-    letter-spacing: -0.011em; /* Inter rende bem com leve tracking negativo. */
+    letter-spacing: -0.011em;
   }
-  /* Hierarquia de pesos por nível semântico — pode ser sobrescrito por classes Tailwind. */
+
+  /* Hierarquia de pesos por nível semântico */
   h1 { font-weight: 700; letter-spacing: -0.02em; }
   h2 { font-weight: 600; letter-spacing: -0.015em; }
   h3 { font-weight: 600; letter-spacing: -0.01em; }
   h4, h5, h6 { font-weight: 600; }
-  /* Numerais tabulares globais em campos que usam tabular-nums já vêm OK; */
-  /* esta extensão garante que <kbd>/<code>/.tabular-nums sempre alinhem. */
-  .tabular-nums, kbd, code, time { font-variant-numeric: tabular-nums lining-nums; }
+
+  .tabular-nums, kbd, code, time {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  /* Selection — usa o verde do tema atual */
   ::selection {
-    background: rgba(0, 212, 106, 0.18);
-    color: #00d46a;
-  }
-  ::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: hsl(var(--border));
-    border-radius: 99px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.3);
+    background: var(--green-soft);
+    color: var(--green);
   }
 }
 
 @layer components {
-  /* ── Status badges ─────────────────────────────── */
+  /* ── Display / Hero typography ─────────────────────────────────────
+     Inspirado no Wise: 80px / 900 / line-height 0.85 — mas com clamp
+     responsivo. Usado em landing surfaces, empty states de feature,
+     onboarding. Para títulos de página, prefira .text-display-page. */
+  .text-display-hero {
+    font-size: clamp(2.75rem, 7vw, 5rem); /* 44px → 80px */
+    font-weight: 900;
+    line-height: 0.88;
+    letter-spacing: -0.04em;
+    color: var(--text-1);
+  }
+  .text-display-page {
+    font-size: clamp(2rem, 4vw, 2.75rem); /* 32 → 44 */
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    color: var(--text-1);
+  }
+  .text-display-section {
+    font-size: clamp(1.5rem, 3vw, 2rem); /* 24 → 32 */
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.018em;
+    color: var(--text-1);
+  }
+  /* Eyebrow uppercase mono — pequeno rótulo acima de hero (Mintlify) */
+  .text-eyebrow {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+
+  /* ── Surface ladder utilities ────────────────────────────────────── */
+  .surface-0 { background: var(--surface-0); }
+  .surface-1 { background: var(--surface-1); }
+  .surface-2 { background: var(--surface-2); }
+  .surface-3 { background: var(--surface-3); }
+  .surface-4 { background: var(--surface-4); }
+
+  /* Card padrão — sobe um degrau no hover (Spotify-style) */
+  .surface {
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    border-radius: 1rem;
+    transition: background 160ms ease, border-color 160ms ease;
+  }
+  .surface-hoverable:hover {
+    background: var(--surface-2);
+    border-color: var(--border-strong);
+  }
+
+  /* ── Status badges — agora cor-aware ─────────────────────────────── */
   .status-badge {
     @apply inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border;
   }
   .status-connected {
-    background: rgba(0, 212, 106, 0.08);
-    color: #00d46a;
-    border-color: rgba(0, 212, 106, 0.18);
+    background: var(--green-soft);
+    color: var(--green);
+    border-color: var(--green-border);
   }
   .status-disconnected {
-    background: hsl(var(--muted));
-    color: hsl(var(--muted-foreground));
-    border-color: hsl(var(--border));
+    background: var(--surface-3);
+    color: var(--text-3);
+    border-color: var(--border-default);
   }
   .status-connecting {
-    @apply bg-amber-500/[0.08] text-amber-400 border-amber-500/[0.18];
+    background: var(--warning-soft);
+    color: var(--warning);
+    border-color: var(--warning-soft);
   }
   .status-banned {
-    @apply bg-red-500/[0.08] text-red-400 border-red-500/[0.18];
+    background: var(--danger-soft);
+    color: var(--danger);
+    border-color: var(--danger-soft);
   }
 
-  /* ── Skeleton shimmer ──────────────────────────── */
+  /* ── Skeleton shimmer ─────────────────────────────────────────────── */
   .skeleton {
     background: linear-gradient(
       90deg,
-      hsl(var(--card)) 25%,
-      hsl(var(--muted)) 50%,
-      hsl(var(--card)) 75%
+      var(--surface-1) 25%,
+      var(--surface-3) 50%,
+      var(--surface-1) 75%
     );
     background-size: 200% 100%;
     @apply animate-shimmer rounded-xl;
   }
 
-  /* ── Input base ────────────────────────────────── */
+  /* ── Input base — radius 10px (Wise) por padrão ───────────────────── */
   .input-field {
-    @apply w-full bg-secondary border border-border rounded-xl px-3.5 py-2.5 text-sm
-    text-foreground placeholder-muted-foreground outline-none
-    transition-all duration-200
-    focus:border-white/20 focus:ring-1 focus:ring-white/10;
+    width: 100%;
+    background: var(--surface-3);
+    border: 1px solid var(--border-default);
+    border-radius: 0.625rem; /* 10px */
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    color: var(--text-1);
+    outline: none;
+    transition: all 200ms ease;
+  }
+  .input-field::placeholder { color: var(--text-4); }
+  .input-field:focus {
+    border-color: var(--green);
+    box-shadow: 0 0 0 1px var(--green);
   }
 
-  /* ── Card base ─────────────────────────────────── */
-  .surface {
-    @apply bg-card border border-border rounded-2xl;
-  }
-
-  /* ── Buttons ───────────────────────────────────── */
+  /* ── Buttons ──────────────────────────────────────────────────────── */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 text-sm font-semibold
     px-4 py-2.5 rounded-xl transition-all duration-150
     active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed;
     background: var(--green);
-    color: #03170a;
+    color: var(--green-fg);
   }
   .btn-primary:hover:not(:disabled) {
-    filter: brightness(1.1);
+    filter: brightness(1.08);
   }
 
   .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 text-sm font-medium
-    px-4 py-2.5 rounded-xl border border-border bg-card text-slate-300
-    hover:bg-secondary hover:text-foreground transition-all duration-150
+    px-4 py-2.5 rounded-xl transition-all duration-150
     active:scale-[0.97] disabled:opacity-40;
+    background: var(--surface-1);
+    border: 1px solid var(--border-default);
+    color: var(--text-2);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--surface-2);
+    color: var(--text-1);
   }
 
   .btn-danger {
     @apply inline-flex items-center justify-center gap-2 text-sm font-medium
-    px-4 py-2.5 rounded-xl border border-red-500/20 bg-red-500/[0.06] text-red-400
-    hover:bg-red-500/[0.12] hover:border-red-500/30 transition-all duration-150
+    px-4 py-2.5 rounded-xl transition-all duration-150
     active:scale-[0.97] disabled:opacity-40;
+    background: var(--danger-soft);
+    border: 1px solid var(--danger-soft);
+    color: var(--danger);
+  }
+  .btn-danger:hover:not(:disabled) {
+    filter: brightness(1.08);
   }
 }
 
 @layer utilities {
   /* Dot grid texture */
   .bg-dot-grid {
-    background-image: radial-gradient(circle, hsl(var(--border) / 0.6) 1px, transparent 1px);
+    background-image: radial-gradient(circle, var(--border-default) 1px, transparent 1px);
     background-size: 28px 28px;
+  }
+
+  /* Hero gradient — radial verde discreto, theme-aware */
+  .bg-hero-gradient {
+    background: var(--hero-gradient);
   }
 
   /* Glow effects */
   .glow-green {
-    box-shadow: 0 0 30px rgba(0, 212, 106, 0.12), 0 0 60px rgba(0, 212, 106, 0.04);
+    box-shadow: 0 0 30px var(--green-soft), 0 0 60px var(--green-dim);
   }
   .glow-green-sm {
-    box-shadow: 0 0 12px rgba(0, 212, 106, 0.15);
+    box-shadow: 0 0 12px var(--green-soft);
   }
 
   /* Gradient top border trick */
@@ -223,11 +370,22 @@
 
   /* Text gradient */
   .text-gradient-green {
-    background: linear-gradient(135deg, #00d46a 0%, #00a854 100%);
+    background: linear-gradient(135deg, var(--green) 0%, var(--green-strong) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+
+  /* Text shortcuts pro novo sistema (texto via var) */
+  .text-strong { color: var(--text-1); }
+  .text-soft   { color: var(--text-2); }
+  .text-muted-2 { color: var(--text-3); }
+  .text-faint  { color: var(--text-4); }
+
+  /* Elevation shortcuts */
+  .elev-1 { box-shadow: var(--shadow-1); }
+  .elev-2 { box-shadow: var(--shadow-2); }
+  .elev-3 { box-shadow: var(--shadow-3); }
 
   /* Staggered animation delays */
   .delay-75  { animation-delay: 75ms; }
@@ -237,29 +395,100 @@
   .delay-300 { animation-delay: 300ms; }
 }
 
-/* ── Light theme overrides for pages that use inline dark colors ── */
-.light main {
-  background-color: hsl(var(--background));
+/* ── Light theme overrides para superfícies legadas ──────────────────
+   Compat layer: muitos componentes ainda usam classes Tailwind dark-
+   hardcoded (bg-zinc-900, text-white) que ignoram o tema. Em vez de
+   refatorar todos os arquivos de uma vez, esses overrides fazem o
+   light mode "funcionar" remapeando pras cores corretas.
+   Quando o componente for refatorado pra usar var(--surface-1) etc,
+   o shim deixa de aplicar (porque a classe sai do markup).        */
+.light main { background-color: hsl(var(--background)); }
+
+/* Backgrounds escuros → surface ladder light */
+.light .bg-black,
+.light .bg-zinc-950,
+.light .bg-zinc-900,
+.light .bg-slate-950,
+.light .bg-slate-900,
+.light .bg-neutral-950,
+.light .bg-neutral-900,
+.light .bg-gray-950,
+.light .bg-gray-900 {
+  background-color: var(--surface-1) !important;
 }
-.light .surface,
-.light [class*="rounded-2xl"],
-.light [class*="rounded-xl"] {
-  color: hsl(var(--foreground));
+.light .bg-zinc-800,
+.light .bg-zinc-850,
+.light .bg-slate-800,
+.light .bg-neutral-800,
+.light .bg-gray-800 {
+  background-color: var(--surface-2) !important;
 }
+.light .bg-zinc-700,
+.light .bg-slate-700,
+.light .bg-neutral-700,
+.light .bg-gray-700 {
+  background-color: var(--surface-3) !important;
+}
+
+/* Texto branco → text-1 (warm dark). text-white é o pior offender. */
+.light .text-white {
+  color: var(--text-1) !important;
+}
+.light .text-zinc-100,
+.light .text-zinc-200,
+.light .text-slate-100,
+.light .text-slate-200,
+.light .text-neutral-100,
+.light .text-neutral-200,
+.light .text-gray-100,
+.light .text-gray-200 {
+  color: var(--text-1) !important;
+}
+.light .text-zinc-300,
+.light .text-zinc-400,
+.light .text-slate-300,
+.light .text-slate-400,
+.light .text-neutral-300,
+.light .text-neutral-400,
+.light .text-gray-300,
+.light .text-gray-400 {
+  color: var(--text-2) !important;
+}
+.light .text-zinc-500,
+.light .text-slate-500,
+.light .text-neutral-500,
+.light .text-gray-500 {
+  color: var(--text-3) !important;
+}
+
+/* Bordas escuras → border-default light */
+.light .border-zinc-800,
+.light .border-zinc-900,
+.light .border-slate-800,
+.light .border-neutral-800,
+.light .border-gray-800,
+.light .border-white\/10,
+.light .border-white\/20,
+.light [class*="border-white\\/"] {
+  border-color: var(--border-default) !important;
+}
+
+/* Inline styles com rgba(0,0,0,*) ou white/* não passam por aqui;
+   esses casos exigem refactor manual no componente. Lista de
+   ofensores conhecidos (ver TODO acima): inbox, settings/queues,
+   settings/teams, instances/[id]. */
 
 /* Connected ring pulse */
 @keyframes pulse-ring {
-  0%   { box-shadow: 0 0 0 0 rgba(0, 212, 106, 0.4); }
-  100% { box-shadow: 0 0 0 6px rgba(0, 212, 106, 0); }
+  0%   { box-shadow: 0 0 0 0 var(--green-soft); }
+  100% { box-shadow: 0 0 0 6px transparent; }
 }
-
 .ring-pulse {
   animation: pulse-ring 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
 /* ─── UX transitions: suavização padrão da Uniq ─────────────────────────── */
 
-/* Modal / drawer entrada */
 @keyframes uniq-fade-in {
   from { opacity: 0; }
   to   { opacity: 1; }
@@ -291,8 +520,7 @@
 .uniq-slide-up   { animation: uniq-slide-up   180ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .uniq-slide-right{ animation: uniq-slide-right 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 
-/* Press feedback global — ao clicar um botão/linha, encolhe ligeiramente
-   e retorna quando solta. Evita UI "dura".                        */
+/* Press feedback global */
 button, a, [role="button"] {
   transition: transform 120ms cubic-bezier(0.22, 1, 0.36, 1),
               background-color 140ms ease,
@@ -307,53 +535,51 @@ a:active:not([aria-disabled="true"]),
   transform: scale(0.97);
 }
 
-/* Hover lift genérico para cards clicáveis — use .uniq-lift na classe */
+/* Hover lift genérico para cards clicáveis */
 .uniq-lift {
   transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
               box-shadow 200ms ease,
-              border-color 160ms ease;
+              border-color 160ms ease,
+              background-color 160ms ease;
 }
 .uniq-lift:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 24px -8px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-2);
+  background: var(--surface-2);
 }
 
-/* Focus ring padronizado em verde Uniq */
+/* Focus ring padronizado em verde Uniq — agora theme-aware */
 *:focus-visible {
-  outline: 2px solid rgba(0, 212, 106, 0.6);
+  outline: 2px solid var(--green);
   outline-offset: 1px;
   border-radius: 6px;
 }
 
-/* Scrollbar discreto e na paleta Uniq */
+/* Scrollbar — agora theme-aware (era hsl fixo escuro) */
 *::-webkit-scrollbar { width: 8px; height: 8px; }
 *::-webkit-scrollbar-track { background: transparent; }
 *::-webkit-scrollbar-thumb {
-  background: hsl(240 12% 16%);
+  background: var(--border-default);
   border-radius: 99px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: hsl(240 12% 22%);
+  background: var(--border-strong);
 }
 * {
   scrollbar-width: thin;
-  scrollbar-color: hsl(240 12% 16%) transparent;
+  scrollbar-color: var(--border-default) transparent;
 }
 
-/* ─── App-like polish: tudo que faz a UI parecer um app nativo ────────── */
+/* ─── App-like polish ─────────────────────────────────────────────── */
 
-/* iOS Safari: remove o highlight cinza do tap; só nosso :active scale fica */
 html, body, button, a, input, textarea, select, [role="button"] {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Evita o double-tap-zoom nos inputs/botões em mobile sem matar pinch-zoom */
 button, a, [role="button"], [role="tab"], [role="link"], input[type="button"], input[type="submit"] {
   touch-action: manipulation;
 }
 
-/* Hover só pra dispositivos que realmente fazem hover (mouse) — em touch
-   o hover gruda no último elemento tocado e fica feio. */
 @media (hover: none) {
   .uniq-lift:hover {
     transform: none;
@@ -361,7 +587,6 @@ button, a, [role="button"], [role="tab"], [role="link"], input[type="button"], i
   }
 }
 
-/* Press feedback no scale no toque é exagerado — diminui em touch */
 @media (hover: none) {
   button:active:not(:disabled),
   a:active:not([aria-disabled="true"]),
@@ -370,10 +595,7 @@ button, a, [role="button"], [role="tab"], [role="link"], input[type="button"], i
   }
 }
 
-/* Smooth scroll em links com âncora + scroll-snap em containers que usam */
-html {
-  scroll-behavior: smooth;
-}
+html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .uniq-fade-in, .uniq-scale-in, .uniq-slide-down, .uniq-slide-up, .uniq-slide-right {
@@ -381,16 +603,12 @@ html {
   }
 }
 
-/* Safe-area pra iOS notch: aplica em qualquer container com .uniq-safe */
 .uniq-safe {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Stagger list animation — adicione .uniq-stagger no UL e ele anima cada
-   filho com 30ms de delay sequencial. Usado em listas que mudam no
-   filtro/refresh pra dar uma sensação de "preenchendo". */
 .uniq-stagger > * {
   animation: uniq-fade-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -404,13 +622,10 @@ html {
 .uniq-stagger > *:nth-child(8)  { animation-delay: 210ms; }
 .uniq-stagger > *:nth-child(n+9){ animation-delay: 240ms; }
 
-/* Page transition wrapper — wraps em um container com .uniq-page e ele
-   fade-in suave no mount (mudança de rota). */
 .uniq-page {
   animation: uniq-fade-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Truncate multi-line em N linhas — utilitário comum em cards de lista */
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -424,17 +639,13 @@ html {
   overflow: hidden;
 }
 
-/* Prevenir overscroll/bounce que parece bug em containers com scroll
-   próprio (inbox list, chat timeline). */
 .uniq-no-bounce {
   overscroll-behavior: contain;
 }
 
-/* Container responsivo: mobile full-bleed com padding mínimo, desktop
-   confortável. Use em headers de página. */
 .uniq-page-pad {
   padding-left: 1rem;
   padding-right: 1rem;
 }
-@media (min-width: 640px) { .uniq-page-pad { padding-left: 1.5rem; padding-right: 1.5rem; } }
-@media (min-width: 1024px) { .uniq-page-pad { padding-left: 2rem; padding-right: 2rem; } }
+@media (min-width: 640px)  { .uniq-page-pad { padding-left: 1.5rem; padding-right: 1.5rem; } }
+@media (min-width: 1024px) { .uniq-page-pad { padding-left: 2rem;   padding-right: 2rem;   } }
