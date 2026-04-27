@@ -487,9 +487,11 @@ const METHOD_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 const AUTH_LABELS: Record<string, { label: string; color: string; header: string }> = {
-  token:  { label: "API Key",    color: "#eab308", header: "apikey: <token>" },
-  bearer: { label: "Bearer JWT", color: "#3b82f6", header: "Authorization: Bearer <token>" },
-  none:   { label: "Público",    color: "#6b7280", header: "" },
+  // "Token" = instance token OU global API key (sk_*) — ambos vão no mesmo
+  // header `apikey:`. NÃO confundir com JWT — ver seção "Autenticação".
+  token:  { label: "Instance Token", color: "#eab308", header: "apikey: <instance_token>" },
+  bearer: { label: "JWT (humano)",   color: "#3b82f6", header: "Authorization: Bearer <jwt>" },
+  none:   { label: "Público",        color: "#6b7280", header: "" },
 };
 
 function CopyButton({ text }: { text: string }) {
@@ -513,7 +515,7 @@ function EndpointCard({ ep }: { ep: Endpoint }) {
 
   const curlBody = ep.body ? ` \\\n  -H "Content-Type: application/json" \\\n  -d '${JSON.stringify(ep.body)}'` : "";
   const curlAuth = ep.auth === "token"
-    ? `\\\n  -H "apikey: SUA_API_KEY" `
+    ? `\\\n  -H "apikey: SEU_INSTANCE_TOKEN" `
     : ep.auth === "bearer"
     ? `\\\n  -H "Authorization: Bearer SEU_JWT" `
     : "";
@@ -712,22 +714,66 @@ export default function ApiDocsPage() {
             {activeS.endpoints.map((ep, i) => <EndpointCard key={i} ep={ep} />)}
           </div>
 
-          {/* Auth legend */}
-          <div className="mt-8 p-4 rounded-xl space-y-2" style={{ background: "hsl(240 8% 10%)", border: "1px solid hsl(240 8% 16%)" }}>
-            <p className="text-xs font-semibold uppercase mb-3" style={{ color: "hsl(240 8% 40%)" }}>Tipos de Autenticação</p>
-            <div className="flex flex-wrap gap-4">
+          {/* Auth legend — explicação detalhada */}
+          <div className="mt-8 p-5 rounded-xl space-y-4" style={{ background: "hsl(240 8% 10%)", border: "1px solid hsl(240 8% 16%)" }}>
+            <p className="text-xs font-semibold uppercase" style={{ color: "hsl(240 8% 40%)" }}>Como autenticar</p>
+
+            {/* Instance Token */}
+            <div className="space-y-1.5">
               <div className="flex items-center gap-2">
-                <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(59,130,246,0.12)", color: "#3b82f6" }}>Bearer JWT</span>
-                <span className="text-xs" style={{ color: "hsl(240 8% 50%)" }}>Authorization: Bearer &lt;token&gt; — obtido no login</span>
+                <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(234,179,8,0.12)", color: "#eab308" }}>Instance Token</span>
+                <span className="text-xs font-medium" style={{ color: "hsl(240 8% 80%)" }}>endpoints de mensagem / instância</span>
               </div>
+              <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 60%)" }}>
+                Token único por instância. <strong>Não expira</strong> (só sai quando a instância é deletada ou o token regenerado). Pegue em <code className="text-[11px] px-1 py-0.5 rounded" style={{ background: "hsl(240 8% 14%)", color: "#93c5fd" }}>app.uniq.chat → Instâncias → [sua instância] → Token</code>.
+              </p>
+              <pre className="text-[11px] font-mono p-2 rounded mt-1 overflow-x-auto" style={{ background: "hsl(240 8% 6%)", color: "hsl(240 8% 75%)" }}>
+{`# Header canônico (recomendado)
+apikey: inst_abc123xyz...
+
+# Aliases aceitos (legacy):
+X-Instance-Token: inst_abc123xyz...
+Authorization: Bearer inst_abc123xyz...`}
+              </pre>
+              <p className="text-[11px]" style={{ color: "hsl(240 8% 45%)" }}>
+                Apesar do header se chamar <code>apikey</code>, o valor é o <strong>instance token</strong>, não a JWT da sessão.
+              </p>
+            </div>
+
+            {/* Global API Key */}
+            <div className="space-y-1.5 pt-3" style={{ borderTop: "1px solid hsl(240 8% 16%)" }}>
               <div className="flex items-center gap-2">
-                <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(234,179,8,0.12)", color: "#eab308" }}>API Key</span>
-                <span className="text-xs" style={{ color: "hsl(240 8% 50%)" }}>apikey: &lt;token&gt; — token da instância ou API key do usuário</span>
+                <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(234,179,8,0.12)", color: "#eab308" }}>Global API Key</span>
+                <span className="text-xs font-medium" style={{ color: "hsl(240 8% 80%)" }}>n8n / SDK gerenciando várias instâncias</span>
               </div>
+              <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 60%)" }}>
+                Chave começando com <code>sk_</code> que abre TODAS as instâncias do dono. Útil quando 1 integração orquestra múltiplas conexões. Crie em <code className="text-[11px] px-1 py-0.5 rounded" style={{ background: "hsl(240 8% 14%)", color: "#93c5fd" }}>app.uniq.chat → API Keys</code>. Vai no mesmo header <code>apikey:</code>. Não expira.
+              </p>
+            </div>
+
+            {/* JWT Bearer */}
+            <div className="space-y-1.5 pt-3" style={{ borderTop: "1px solid hsl(240 8% 16%)" }}>
               <div className="flex items-center gap-2">
-                <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(107,114,128,0.12)", color: "#9ca3af" }}>Público</span>
-                <span className="text-xs" style={{ color: "hsl(240 8% 50%)" }}>Sem autenticação necessária</span>
+                <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(59,130,246,0.12)", color: "#3b82f6" }}>JWT (humano)</span>
+                <span className="text-xs font-medium" style={{ color: "hsl(240 8% 80%)" }}>UI / fluxo logado</span>
               </div>
+              <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 60%)" }}>
+                Token de sessão obtido em <code>POST /auth/login</code>. <strong>Expira em 24h</strong>; renove com <code>/auth/refresh</code>. Usado pelos endpoints de CRM, workspace, dashboard — onde o request precisa identificar o usuário humano que clicou.
+              </p>
+              <pre className="text-[11px] font-mono p-2 rounded mt-1 overflow-x-auto" style={{ background: "hsl(240 8% 6%)", color: "hsl(240 8% 75%)" }}>
+{`Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`}
+              </pre>
+            </div>
+
+            {/* Quando usar qual */}
+            <div className="pt-3" style={{ borderTop: "1px solid hsl(240 8% 16%)" }}>
+              <p className="text-xs font-semibold mb-2" style={{ color: "hsl(240 8% 70%)" }}>Qual usar?</p>
+              <ul className="text-xs space-y-1" style={{ color: "hsl(240 8% 60%)" }}>
+                <li>• <strong>Vou enviar mensagens via webhook/n8n/cron?</strong> → Instance Token (ou Global Key se gerencia várias)</li>
+                <li>• <strong>Estou construindo uma UI que o usuário loga?</strong> → JWT</li>
+                <li>• <strong>Endpoint da doc tem badge amarelo &quot;Instance Token&quot;?</strong> → use o token da instância</li>
+                <li>• <strong>Endpoint da doc tem badge azul &quot;JWT&quot;?</strong> → use o JWT do login</li>
+              </ul>
             </div>
           </div>
         </main>
