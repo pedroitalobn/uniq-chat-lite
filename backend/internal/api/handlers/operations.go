@@ -651,3 +651,313 @@ func parseInt64(s string) (int64, error) {
 	}
 	return n, nil
 }
+
+// ─── Sprint 6: extras whatsmeow ───────────────────────────────────
+
+func (h *MessageHandler) GetBusinessProfile(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	jid := strings.TrimSpace(c.Params("jid"))
+	if jid == "" {
+		jid = strings.TrimSpace(c.Query("jid"))
+	}
+	if jid == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "informe :jid no path ou ?jid=<jid>"})
+	}
+	profile, err := client.GetBusinessProfile(jid)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(profile)
+}
+
+func (h *MessageHandler) SetDisappearing(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	var req struct {
+		ChatJID    string `json:"chat_jid"`
+		DurationMs int64  `json:"duration_ms"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.ChatJID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'chat_jid' é obrigatório"})
+	}
+	dur := time.Duration(req.DurationMs) * time.Millisecond
+	if err := client.SetDisappearingTimer(req.ChatJID, dur); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "ok", "duration_ms": req.DurationMs})
+}
+
+func (h *MessageHandler) SetDisappearingDefault(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	var req struct {
+		DurationMs int64 `json:"duration_ms"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+	dur := time.Duration(req.DurationMs) * time.Millisecond
+	if err := client.SetDefaultDisappearingTimer(dur); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "ok"})
+}
+
+func (h *MessageHandler) JoinGroupViaInvite(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	var req struct {
+		GroupJID   string `json:"group_jid"`
+		InviterJID string `json:"inviter_jid"`
+		Code       string `json:"code"`
+		Expiration int64  `json:"expiration"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.GroupJID == "" || req.InviterJID == "" || req.Code == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campos 'group_jid', 'inviter_jid' e 'code' são obrigatórios"})
+	}
+	if err := client.JoinGroupWithInvite(req.GroupJID, req.InviterJID, req.Code, req.Expiration); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "joined"})
+}
+
+func (h *MessageHandler) PreviewGroupInvite(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	var req struct {
+		GroupJID   string `json:"group_jid"`
+		InviterJID string `json:"inviter_jid"`
+		Code       string `json:"code"`
+		Expiration int64  `json:"expiration"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.GroupJID == "" || req.InviterJID == "" || req.Code == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campos 'group_jid', 'inviter_jid' e 'code' são obrigatórios"})
+	}
+	info, err := client.GetGroupInfoFromInvite(req.GroupJID, req.InviterJID, req.Code, req.Expiration)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(info)
+}
+
+func (h *MessageHandler) PreviewGroupLink(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	code := strings.TrimSpace(c.Query("code"))
+	if code == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "?code=<código do link> é obrigatório"})
+	}
+	info, err := client.GetGroupInfoFromLink(code)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(info)
+}
+
+func (h *MessageHandler) ListGroupRequests(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	jid := strings.TrimSpace(c.Params("jid"))
+	if jid == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "parâmetro :jid é obrigatório"})
+	}
+	reqs, err := client.GetGroupRequestParticipants(jid)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"requests": reqs})
+}
+
+func (h *MessageHandler) UpdateGroupRequests(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	jid := strings.TrimSpace(c.Params("jid"))
+	if jid == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "parâmetro :jid é obrigatório"})
+	}
+	var req struct {
+		Participants []string `json:"participants"`
+		Action       string   `json:"action"`
+	}
+	if err := c.BodyParser(&req); err != nil || len(req.Participants) == 0 || req.Action == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campos 'participants' (array) e 'action' (approve|reject) são obrigatórios"})
+	}
+	parts, err := client.UpdateGroupRequestParticipants(jid, req.Participants, req.Action)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"updated": parts})
+}
+
+func (h *MessageHandler) ListCommunityParticipants(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	jid := strings.TrimSpace(c.Params("jid"))
+	if jid == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "parâmetro :jid é obrigatório"})
+	}
+	jids, err := client.GetLinkedGroupsParticipants(jid)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"participants": jids})
+}
+
+func (h *MessageHandler) NewsletterMarkViewed(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	jid := strings.TrimSpace(c.Params("jid"))
+	if jid == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "parâmetro :jid é obrigatório"})
+	}
+	var req struct {
+		ServerIDs []int64 `json:"server_ids"`
+	}
+	if err := c.BodyParser(&req); err != nil || len(req.ServerIDs) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'server_ids' (array de int) é obrigatório"})
+	}
+	if err := client.NewsletterMarkViewed(jid, req.ServerIDs); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "ok"})
+}
+
+func (h *MessageHandler) NewsletterReact(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	jid := strings.TrimSpace(c.Params("jid"))
+	if jid == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "parâmetro :jid é obrigatório"})
+	}
+	var req struct {
+		ServerID  int64  `json:"server_id"`
+		Reaction  string `json:"reaction"`
+		MessageID string `json:"message_id"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.MessageID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campos 'server_id', 'message_id' e 'reaction' (vazio remove) são obrigatórios"})
+	}
+	if err := client.NewsletterSendReaction(jid, req.ServerID, req.Reaction, req.MessageID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "ok"})
+}
+
+func (h *MessageHandler) NewsletterMute(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	jid := strings.TrimSpace(c.Params("jid"))
+	if jid == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "parâmetro :jid é obrigatório"})
+	}
+	var req struct {
+		Mute *bool `json:"mute"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.Mute == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'mute' (bool) é obrigatório"})
+	}
+	if err := client.NewsletterToggleMute(jid, *req.Mute); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "ok", "mute": *req.Mute})
+}
+
+func (h *MessageHandler) AcceptTOS(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	var req struct {
+		NoticeID string `json:"notice_id"`
+		Stage    string `json:"stage"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.NoticeID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'notice_id' é obrigatório"})
+	}
+	if err := client.AcceptTOSNotice(req.NoticeID, req.Stage); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "accepted"})
+}
+
+func (h *MessageHandler) GetStatusPrivacy(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	settings, err := client.GetStatusPrivacy()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"status_privacy": settings})
+}
+
+func (h *MessageHandler) ResolveBusinessLink(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	code := strings.TrimSpace(c.Query("code"))
+	if code == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "?code=<código do link wa.me/message/...> é obrigatório"})
+	}
+	target, err := client.ResolveBusinessMessageLink(code)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(target)
+}
+
+func (h *MessageHandler) ResolveContactQR(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	code := strings.TrimSpace(c.Query("code"))
+	if code == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "?code=<código do link wa.me/qr/...> é obrigatório"})
+	}
+	target, err := client.ResolveContactQRLink(code)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(target)
+}
+
+func (h *MessageHandler) GetSelfQRLink(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	revoke := c.QueryBool("revoke", false)
+	link, err := client.GetContactQRLink(revoke)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"link": link, "revoked": revoke})
+}

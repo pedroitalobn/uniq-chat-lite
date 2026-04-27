@@ -398,6 +398,25 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 
 	v1inst.Post("/calls/reject", msgH.RejectCall)
 
+	// Extras whatsmeow no SDK público
+	v1inst.Get("/business-profile/:jid", msgH.GetBusinessProfile)
+	v1inst.Post("/disappearing", msgH.SetDisappearing)
+	v1inst.Post("/disappearing/default", msgH.SetDisappearingDefault)
+	v1inst.Post("/groups/join-with-invite", msgH.JoinGroupViaInvite)
+	v1inst.Post("/groups/preview-invite", msgH.PreviewGroupInvite)
+	v1inst.Get("/groups/preview-link", msgH.PreviewGroupLink)
+	v1inst.Get("/groups/:jid/requests", msgH.ListGroupRequests)
+	v1inst.Post("/groups/:jid/requests", msgH.UpdateGroupRequests)
+	v1inst.Get("/communities/:jid/participants", msgH.ListCommunityParticipants)
+	v1newsletters.Post("/:jid/mark-viewed", msgH.NewsletterMarkViewed)
+	v1newsletters.Post("/:jid/react", msgH.NewsletterReact)
+	v1newsletters.Post("/:jid/mute", msgH.NewsletterMute)
+	v1inst.Post("/tos/accept", msgH.AcceptTOS)
+	v1inst.Get("/status-privacy", msgH.GetStatusPrivacy)
+	v1inst.Get("/resolve/business-link", msgH.ResolveBusinessLink)
+	v1inst.Get("/resolve/contact-qr", msgH.ResolveContactQR)
+	v1inst.Get("/qr-link", msgH.GetSelfQRLink)
+
 	v1inst.Post("/media/upload", msgH.UploadMedia)
 	v1inst.Get("/chats", msgH.GetChats)
 	v1inst.Get("/contacts", msgH.GetContacts)
@@ -633,6 +652,27 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 
 	// Calls
 	instance.Post("/calls/reject", msgH.RejectCall)
+
+	// ─── Extras whatsmeow (nem Evo-Go expõe) ──────────────────────
+	// Business profile + disappearing + group invites avançados +
+	// newsletter advanced + TOS + QR resolvers.
+	instance.Get("/business-profile/:jid", msgH.GetBusinessProfile)
+	instance.Post("/disappearing", msgH.SetDisappearing)
+	instance.Post("/disappearing/default", msgH.SetDisappearingDefault)
+	instance.Post("/groups/join-with-invite", msgH.JoinGroupViaInvite)
+	instance.Post("/groups/preview-invite", msgH.PreviewGroupInvite)
+	instance.Get("/groups/preview-link", msgH.PreviewGroupLink)
+	instance.Get("/groups/:jid/requests", msgH.ListGroupRequests)
+	instance.Post("/groups/:jid/requests", msgH.UpdateGroupRequests)
+	instance.Get("/communities/:jid/participants", msgH.ListCommunityParticipants)
+	newsletters.Post("/:jid/mark-viewed", msgH.NewsletterMarkViewed)
+	newsletters.Post("/:jid/react", msgH.NewsletterReact)
+	newsletters.Post("/:jid/mute", msgH.NewsletterMute)
+	instance.Post("/tos/accept", msgH.AcceptTOS)
+	instance.Get("/status-privacy", msgH.GetStatusPrivacy)
+	instance.Get("/resolve/business-link", msgH.ResolveBusinessLink)
+	instance.Get("/resolve/contact-qr", msgH.ResolveContactQR)
+	instance.Get("/qr-link", msgH.GetSelfQRLink)
 
 	// Recovery
 	recovery := instance.Group("/recovery")

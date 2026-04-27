@@ -538,6 +538,63 @@ export const instanceOpsApi = {
     api.post(`/v1/instances/${id}/calls/reject`, data),
 };
 
+// Sprint 6 — extras whatsmeow (nem Evo-Go expõe).
+// Business profile, disappearing messages, group invite preview,
+// approve/reject join requests, newsletter avançado, TOS, QR resolvers.
+export const whatsmeowExtrasApi = {
+  // Catálogo + horário + email + website + descrição de uma conta business
+  businessProfile: (id: string, jid: string) =>
+    api.get(`/v1/instances/${id}/business-profile/${encodeURIComponent(jid)}`),
+
+  // Mensagens efêmeras: 0=off, 86400000=24h, 604800000=7d, 7776000000=90d
+  setDisappearing: (id: string, data: { chat_jid: string; duration_ms: number }) =>
+    api.post(`/v1/instances/${id}/disappearing`, data),
+  setDisappearingDefault: (id: string, durationMs: number) =>
+    api.post(`/v1/instances/${id}/disappearing/default`, { duration_ms: durationMs }),
+
+  // Convites de grupo (preview sem entrar / entrar via código)
+  previewGroupInvite: (id: string, data: { group_jid: string; inviter_jid: string; code: string; expiration?: number }) =>
+    api.post(`/v1/instances/${id}/groups/preview-invite`, data),
+  previewGroupLink: (id: string, code: string) =>
+    api.get(`/v1/instances/${id}/groups/preview-link`, { params: { code } }),
+  joinGroupViaInvite: (id: string, data: { group_jid: string; inviter_jid: string; code: string; expiration?: number }) =>
+    api.post(`/v1/instances/${id}/groups/join-with-invite`, data),
+
+  // Aprovação/rejeição de pedidos de entrada
+  listGroupRequests: (id: string, jid: string) =>
+    api.get(`/v1/instances/${id}/groups/${encodeURIComponent(jid)}/requests`),
+  updateGroupRequests: (id: string, jid: string, data: { participants: string[]; action: "approve" | "reject" }) =>
+    api.post(`/v1/instances/${id}/groups/${encodeURIComponent(jid)}/requests`, data),
+
+  // Participantes únicos de TODOS os subgrupos da comunidade
+  communityParticipants: (id: string, jid: string) =>
+    api.get(`/v1/instances/${id}/communities/${encodeURIComponent(jid)}/participants`),
+
+  // Newsletter avançado
+  newsletterMarkViewed: (id: string, jid: string, serverIds: number[]) =>
+    api.post(`/v1/instances/${id}/newsletters/${encodeURIComponent(jid)}/mark-viewed`, { server_ids: serverIds }),
+  newsletterReact: (id: string, jid: string, data: { server_id: number; reaction: string; message_id: string }) =>
+    api.post(`/v1/instances/${id}/newsletters/${encodeURIComponent(jid)}/react`, data),
+  newsletterMute: (id: string, jid: string, mute: boolean) =>
+    api.post(`/v1/instances/${id}/newsletters/${encodeURIComponent(jid)}/mute`, { mute }),
+
+  // TOS notice (quando WhatsApp pede pra aceitar termos)
+  acceptTOS: (id: string, data: { notice_id: string; stage?: string }) =>
+    api.post(`/v1/instances/${id}/tos/accept`, data),
+
+  // Privacy específico de status
+  statusPrivacy: (id: string) =>
+    api.get(`/v1/instances/${id}/status-privacy`),
+
+  // Resolvers de wa.me/* links
+  resolveBusinessLink: (id: string, code: string) =>
+    api.get(`/v1/instances/${id}/resolve/business-link`, { params: { code } }),
+  resolveContactQR: (id: string, code: string) =>
+    api.get(`/v1/instances/${id}/resolve/contact-qr`, { params: { code } }),
+  getSelfQRLink: (id: string, revoke = false) =>
+    api.get(`/v1/instances/${id}/qr-link`, { params: { revoke } }),
+};
+
 // inboxApi foi removido da aplicação. As rotas /v1/instances/:id/inbox/*
 // continuam registradas no backend para clientes externos via API key, mas
 // nenhuma página do dashboard consome essas URLs diretamente — tudo passa

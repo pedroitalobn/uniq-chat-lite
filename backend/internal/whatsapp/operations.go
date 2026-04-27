@@ -397,3 +397,182 @@ func (ic *InstanceClient) RejectCall(callerJID, callID string) error {
 	}
 	return ic.client.RejectCall(context.Background(), jid, callID)
 }
+
+// ─── Sprint 6: extras whatsmeow que ninguém expõe ─────────────────
+
+// GetBusinessProfile retorna catálogo/horário/website/email/descrição
+// de um contato business. Útil pra enriquecer leads no CRM.
+func (ic *InstanceClient) GetBusinessProfile(contactJID string) (*types.BusinessProfile, error) {
+	jid, err := types.ParseJID(normalizeJID(contactJID))
+	if err != nil {
+		return nil, fmt.Errorf("invalid JID: %w", err)
+	}
+	return ic.client.GetBusinessProfile(context.Background(), jid)
+}
+
+// SetDisappearingTimer ativa mensagens efêmeras em um chat específico.
+// timer aceita 0 (off), 24h, 7d, 90d. settingTS = agora.
+func (ic *InstanceClient) SetDisappearingTimer(chatJID string, timer time.Duration) error {
+	jid, err := types.ParseJID(normalizeJID(chatJID))
+	if err != nil {
+		return fmt.Errorf("invalid JID: %w", err)
+	}
+	return ic.client.SetDisappearingTimer(context.Background(), jid, timer, time.Now())
+}
+
+// SetDefaultDisappearingTimer altera o default global da conta pra
+// novos chats criados a partir daí (chats antigos ficam como estão).
+func (ic *InstanceClient) SetDefaultDisappearingTimer(timer time.Duration) error {
+	return ic.client.SetDefaultDisappearingTimer(context.Background(), timer)
+}
+
+// JoinGroupWithInvite entra em grupo via código de convite (mais
+// robusto que link público — funciona com convites privados).
+func (ic *InstanceClient) JoinGroupWithInvite(groupJID, inviterJID, code string, expiration int64) error {
+	gJid, err := types.ParseJID(normalizeJID(groupJID))
+	if err != nil {
+		return fmt.Errorf("invalid group JID: %w", err)
+	}
+	iJid, err := types.ParseJID(normalizeJID(inviterJID))
+	if err != nil {
+		return fmt.Errorf("invalid inviter JID: %w", err)
+	}
+	return ic.client.JoinGroupWithInvite(context.Background(), gJid, iJid, code, expiration)
+}
+
+// GetGroupInfoFromInvite faz preview do grupo via convite SEM entrar.
+// Útil pra mostrar nome/foto/qtd antes de aceitar.
+func (ic *InstanceClient) GetGroupInfoFromInvite(groupJID, inviterJID, code string, expiration int64) (*types.GroupInfo, error) {
+	gJid, err := types.ParseJID(normalizeJID(groupJID))
+	if err != nil {
+		return nil, fmt.Errorf("invalid group JID: %w", err)
+	}
+	iJid, err := types.ParseJID(normalizeJID(inviterJID))
+	if err != nil {
+		return nil, fmt.Errorf("invalid inviter JID: %w", err)
+	}
+	return ic.client.GetGroupInfoFromInvite(context.Background(), gJid, iJid, code, expiration)
+}
+
+// GetGroupInfoFromLink resolve um link público (chat.whatsapp.com/...)
+// pro GroupInfo correspondente, SEM entrar.
+func (ic *InstanceClient) GetGroupInfoFromLink(code string) (*types.GroupInfo, error) {
+	return ic.client.GetGroupInfoFromLink(context.Background(), code)
+}
+
+// GetGroupRequestParticipants lista pedidos pendentes de entrada
+// em grupo com aprovação obrigatória.
+func (ic *InstanceClient) GetGroupRequestParticipants(groupJID string) ([]types.GroupParticipantRequest, error) {
+	jid, err := types.ParseJID(normalizeJID(groupJID))
+	if err != nil {
+		return nil, fmt.Errorf("invalid JID: %w", err)
+	}
+	return ic.client.GetGroupRequestParticipants(context.Background(), jid)
+}
+
+// UpdateGroupRequestParticipants aprova ou rejeita pedidos pendentes.
+// action aceita "approve" ou "reject".
+func (ic *InstanceClient) UpdateGroupRequestParticipants(groupJID string, participantJIDs []string, action string) ([]types.GroupParticipant, error) {
+	gJid, err := types.ParseJID(normalizeJID(groupJID))
+	if err != nil {
+		return nil, fmt.Errorf("invalid group JID: %w", err)
+	}
+	jids := make([]types.JID, 0, len(participantJIDs))
+	for _, p := range participantJIDs {
+		j, perr := types.ParseJID(normalizeJID(p))
+		if perr != nil {
+			return nil, fmt.Errorf("invalid participant JID %s: %w", p, perr)
+		}
+		jids = append(jids, j)
+	}
+	var change whatsmeow.ParticipantRequestChange
+	switch strings.ToLower(strings.TrimSpace(action)) {
+	case "approve", "accept":
+		change = whatsmeow.ParticipantChangeApprove
+	case "reject", "deny":
+		change = whatsmeow.ParticipantChangeReject
+	default:
+		return nil, fmt.Errorf("action inválida: use 'approve' ou 'reject'")
+	}
+	return ic.client.UpdateGroupRequestParticipants(context.Background(), gJid, jids, change)
+}
+
+// GetLinkedGroupsParticipants retorna todos os participantes únicos
+// de TODOS os subgrupos da comunidade (deduplicado).
+func (ic *InstanceClient) GetLinkedGroupsParticipants(communityJID string) ([]string, error) {
+	jid, err := types.ParseJID(normalizeJID(communityJID))
+	if err != nil {
+		return nil, fmt.Errorf("invalid JID: %w", err)
+	}
+	jids, err := ic.client.GetLinkedGroupsParticipants(context.Background(), jid)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(jids))
+	for _, j := range jids {
+		out = append(out, j.String())
+	}
+	return out, nil
+}
+
+// NewsletterMarkViewed marca msgs do canal como vistas.
+func (ic *InstanceClient) NewsletterMarkViewed(newsletterJID string, serverIDs []int64) error {
+	jid, err := types.ParseJID(normalizeJID(newsletterJID))
+	if err != nil {
+		return fmt.Errorf("invalid JID: %w", err)
+	}
+	ids := make([]types.MessageServerID, len(serverIDs))
+	for i, n := range serverIDs {
+		ids[i] = types.MessageServerID(n)
+	}
+	return ic.client.NewsletterMarkViewed(context.Background(), jid, ids)
+}
+
+// NewsletterSendReaction reage a uma mensagem de canal.
+// reaction="" remove reação anterior.
+func (ic *InstanceClient) NewsletterSendReaction(newsletterJID string, serverID int64, reaction, messageID string) error {
+	jid, err := types.ParseJID(normalizeJID(newsletterJID))
+	if err != nil {
+		return fmt.Errorf("invalid JID: %w", err)
+	}
+	return ic.client.NewsletterSendReaction(context.Background(), jid, types.MessageServerID(serverID), reaction, messageID)
+}
+
+// NewsletterToggleMute silencia/desilencia notificações de um canal.
+func (ic *InstanceClient) NewsletterToggleMute(newsletterJID string, mute bool) error {
+	jid, err := types.ParseJID(normalizeJID(newsletterJID))
+	if err != nil {
+		return fmt.Errorf("invalid JID: %w", err)
+	}
+	return ic.client.NewsletterToggleMute(context.Background(), jid, mute)
+}
+
+// AcceptTOSNotice aceita um Termo de Serviço pendente do WhatsApp
+// (de tempos em tempos o servidor exige aceitação pra continuar
+// recebendo features). noticeID e stage vêm no evento de notice.
+func (ic *InstanceClient) AcceptTOSNotice(noticeID, stage string) error {
+	return ic.client.AcceptTOSNotice(context.Background(), noticeID, stage)
+}
+
+// GetStatusPrivacy retorna a config específica de privacidade dos
+// status (separada das settings gerais).
+func (ic *InstanceClient) GetStatusPrivacy() ([]types.StatusPrivacy, error) {
+	return ic.client.GetStatusPrivacy(context.Background())
+}
+
+// ResolveBusinessMessageLink resolve um link wa.me/message/<code>
+// pro destino + texto pré-preenchido.
+func (ic *InstanceClient) ResolveBusinessMessageLink(code string) (*types.BusinessMessageLinkTarget, error) {
+	return ic.client.ResolveBusinessMessageLink(context.Background(), code)
+}
+
+// ResolveContactQRLink resolve um link wa.me/qr/<code> pro contato.
+func (ic *InstanceClient) ResolveContactQRLink(code string) (*types.ContactQRLinkTarget, error) {
+	return ic.client.ResolveContactQRLink(context.Background(), code)
+}
+
+// GetContactQRLink retorna (ou regera, se revoke=true) o link QR
+// público da própria conta.
+func (ic *InstanceClient) GetContactQRLink(revoke bool) (string, error) {
+	return ic.client.GetContactQRLink(context.Background(), revoke)
+}
