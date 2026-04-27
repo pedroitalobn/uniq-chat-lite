@@ -32,6 +32,56 @@ func canonicalEmail(email string) string {
 	return local + "@" + domain
 }
 
+// suspiciousSignupName detecta nomes claramente gerados por bot.
+//
+// Bots ativos no /register em 2026-04-27 usaram exatamente este padrão:
+//   "LooWGMQeRIodGtJtmdHmUJlN", "SvafpmFWbjGMOFkVHi", "tIwVSUbGUEiUjhybDcAIdx"
+//
+// Heurística: nome sem espaço (single token) com >= 12 chars e proporção
+// alta de alternância maiúscula/minúscula (humano escreve "Leonardo Lyra",
+// não "tIwVSUbGUEiUjhybDcAIdx"). Pra evitar falsos positivos com "John",
+// só barra quando os 3 sinais batem juntos.
+func suspiciousSignupName(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ""
+	}
+	// Tem espaço → assume humano (Nome Sobrenome).
+	if strings.ContainsAny(name, " \t") {
+		return ""
+	}
+	if len(name) < 12 {
+		return ""
+	}
+	// Conta transições case e proporção de letras.
+	transitions := 0
+	letters := 0
+	prevUpper := -1
+	for _, r := range name {
+		switch {
+		case r >= 'A' && r <= 'Z':
+			if prevUpper == 0 {
+				transitions++
+			}
+			prevUpper = 1
+			letters++
+		case r >= 'a' && r <= 'z':
+			if prevUpper == 1 {
+				transitions++
+			}
+			prevUpper = 0
+			letters++
+		default:
+			prevUpper = -1
+		}
+	}
+	// >= 6 transições caseMix em <= 24 chars sem espaço = não é nome humano.
+	if transitions >= 6 && letters >= 12 {
+		return "nome inválido — preencha seu nome real"
+	}
+	return ""
+}
+
 // suspiciousSignupEmail rejeita padrões clássicos de signup automatizado
 // observados em ataques de massa. Retorna mensagem explicativa se barrar.
 //

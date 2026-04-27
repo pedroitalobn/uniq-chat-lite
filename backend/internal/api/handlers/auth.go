@@ -112,6 +112,9 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		if reason := suspiciousSignupEmail(req.Email); reason != "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": reason})
 		}
+		if reason := suspiciousSignupName(req.Name); reason != "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": reason})
+		}
 		// Captcha Turnstile — bypass automático em dev (sem TURNSTILE_SECRET_KEY).
 		if err := verifyTurnstile(c.Context(), req.TurnstileToken, c.IP()); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
