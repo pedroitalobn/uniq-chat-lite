@@ -49,6 +49,11 @@ type Plan struct {
 	AllowGlobalWebhook bool `gorm:"default:false" json:"allow_global_webhook"` // /webhooks/system (workspace-wide)
 
 	// Proxy
+	AllowShop          bool `gorm:"default:false" json:"allow_shop"`           // módulo /shops + /products
+	MaxShops           int  `gorm:"default:0" json:"max_shops"`                // -1 ilimitado, 0 bloqueado
+	MaxProducts        int  `gorm:"default:0" json:"max_products"`             // total de produtos por workspace
+	MaxShopIntegrations int  `gorm:"default:0" json:"max_shop_integrations"`   // ex: Shopify + ML simultâneo
+
 	AllowProxy            bool `gorm:"default:false" json:"allow_proxy"`             // proxy padrão
 	AllowProxyResidencial bool `gorm:"default:false" json:"allow_proxy_residencial"` // residencial premium
 	MaxInstancesPerProxy  int  `gorm:"default:0" json:"max_instances_per_proxy"`     // instâncias por entry
@@ -87,6 +92,7 @@ const (
 	FeatureGlobalWebhook FeatureKey = "global_webhook"
 	FeatureProxy         FeatureKey = "proxy"
 	FeatureProxyResidencial FeatureKey = "proxy_residencial"
+	FeatureShop          FeatureKey = "shop"
 )
 
 // HasFeature retorna true se o plano libera a feature.
@@ -128,6 +134,8 @@ func (p *Plan) HasFeature(key FeatureKey) bool {
 		return p.AllowProxy
 	case FeatureProxyResidencial:
 		return p.AllowProxyResidencial
+	case FeatureShop:
+		return p.AllowShop
 	}
 	return false
 }
@@ -149,6 +157,8 @@ func (p *Plan) LimitFor(key FeatureKey) int {
 		return p.MaxTriggers
 	case FeatureGlobalWebhook:
 		return p.MaxWebhooks
+	case FeatureShop:
+		return p.MaxShops
 	}
 	return -1
 }

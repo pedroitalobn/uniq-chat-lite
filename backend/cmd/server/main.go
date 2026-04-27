@@ -319,6 +319,15 @@ func autoMigrate(db *gorm.DB) error {
 		// Sprint billing — usage counters
 		&models.UsageCounter{},
 		&models.PlanChangeLog{},
+		// Módulo Shop (Fase 1)
+		&models.Shop{},
+		&models.Product{},
+		&models.ProductVariant{},
+		&models.ProductImage{},
+		&models.ProductCategory{},
+		&models.ShopIntegration{},
+		&models.Order{},
+		&models.Cart{},
 	)
 }
 

@@ -966,6 +966,30 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	campaigns.Post("/:id/clear-sent", campaignH.ClearSent)
 	campaigns.Get("/:id/messages", campaignH.ListMessageStatus)
 
+	// ─── Shop module (Fase 1) ─────────────────────────────────────────
+	shopH := handlers.NewShopHandler(db)
+	// Catálogo público de providers — antes do gate pra UI poder listar
+	// sem ainda ter plano (mostrar "faça upgrade pra conectar").
+	api.Get("/shops/integrations/providers", shopH.ListProviders)
+	api.Get("/shop/providers", shopH.ListProviders) // alias mais curto
+
+	shops := api.Group("/shops", middleware.RequireFeature(db, models.FeatureShop))
+	shops.Get("/", shopH.ListShops)
+	shops.Post("/", shopH.CreateShop)
+	shops.Get("/categories", shopH.ListCategories)
+	shops.Post("/categories", shopH.CreateCategory)
+	shops.Get("/:id", shopH.GetShop)
+	shops.Patch("/:id", shopH.UpdateShop)
+	shops.Delete("/:id", shopH.DeleteShop)
+	shops.Get("/:shopId/products", shopH.ListProducts)
+	shops.Post("/:shopId/products", shopH.CreateProduct)
+	shops.Get("/:shopId/products/:id", shopH.GetProduct)
+	shops.Patch("/:shopId/products/:id", shopH.UpdateProduct)
+	shops.Delete("/:shopId/products/:id", shopH.DeleteProduct)
+	shops.Get("/:shopId/integrations", shopH.ListIntegrations)
+	shops.Post("/:shopId/integrations", shopH.CreateIntegration)
+	shops.Delete("/:shopId/integrations/:id", shopH.DeleteIntegration)
+
 	// Sprint 8 — keyword triggers (autoresponder simples gap UazAPI)
 	triggers := api.Group("/triggers", middleware.RequireFeature(db, models.FeatureTriggers))
 	triggers.Get("/", triggerH.List)

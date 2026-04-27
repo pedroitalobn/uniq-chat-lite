@@ -6,8 +6,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plug, Plus, Trash2, RefreshCw, CheckCircle2,
   Eye, EyeOff, Zap, Globe, Bot, Webhook,
-  Key, FileJson, ExternalLink, Loader2, Link2, Copy, X,
+  Key, FileJson, ExternalLink, Loader2, Link2, Copy, X, ShoppingBag,
 } from "lucide-react";
+import { ShopSection } from "@/components/integrations/ShopSection";
 import { motion } from "framer-motion";
 import { integrationsApi, apiKeysApi, proxiesApi, adminApi, instancesApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -77,7 +78,7 @@ interface Integration {
   created_at: string;
 }
 
-type Section = "llm" | "agents" | "api" | "webhook" | "mcp" | "docs";
+type Section = "llm" | "agents" | "api" | "webhook" | "mcp" | "shop" | "docs";
 
 const VALID_SECTIONS: Section[] = ["llm", "agents", "api", "webhook", "mcp", "docs"];
 
@@ -112,6 +113,7 @@ export default function IntegrationsPage() {
     { id: "agents" as const, label: "Agents", icon: Zap, color: "#8b5cf6" },
     { id: "mcp" as const, label: "MCPs", icon: Link2, color: "#f59e0b" },
     { id: "webhook" as const, label: "Webhooks", icon: Webhook, color: "#10b981" },
+    { id: "shop" as const, label: "Shop", icon: ShoppingBag, color: "#22c55e" },
     { id: "api" as const, label: "API Keys", icon: Key, color: "#f59e0b" },
     { id: "docs" as const, label: "API Docs", icon: FileJson, color: "#64748b" },
   ];
@@ -142,6 +144,7 @@ export default function IntegrationsPage() {
         {section === "agents" && <AgentsSection />}
         {section === "mcp" && <MCPSection />}
         {section === "webhook" && <WebhooksPanel />}
+        {section === "shop" && <ShopSection />}
         {section === "api" && <APIKeysSection />}
         {section === "docs" && <DocsSection />}
       </div>
