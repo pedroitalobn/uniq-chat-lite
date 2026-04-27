@@ -183,7 +183,13 @@ func (h *AuthHandler) Verify2FA(c *fiber.Ctx) error {
 		"token_type":   "Bearer",
 		"expires_in":   900,
 		"user": fiber.Map{
-			"id": user.ID, "email": user.Email, "name": user.Name,
+			"id":       user.ID,
+			"name":     user.Name,
+			"email":    user.Email,
+			"username": user.Username,
+			"role":     user.Role,
+			"is_beta":  user.IsBeta,
+			"plan":     user.Plan,
 		},
 	})
 }
