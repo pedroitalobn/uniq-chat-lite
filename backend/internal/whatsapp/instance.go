@@ -422,7 +422,48 @@ func (ic *InstanceClient) resolveRecipient(ctx context.Context, jid types.JID) t
 		}
 	}
 
+	// Fallback BR: número móvel brasileiro tem o "9" extra que foi adicionado
+	// pelo governo em 2012, mas muitos contatos no WhatsApp ainda têm o JID
+	// antigo de 12 dígitos (55+DD+XXXXXXXX) em vez de 13 (55+DD+9XXXXXXXX).
+	// Se o input tem 13 dígitos com prefixo BR mobile (9 após DDD), também
+	// tenta a variante sem o 9 — se ela tiver LID/cache hit, usa ela. Caso
+	// contrário mantém a forma original.
+	if alt := brazilianMobileVariant(jid); !alt.IsEmpty() {
+		ic.recipientCacheMu.RLock()
+		altCached, altOK := ic.recipientCache[alt.String()]
+		ic.recipientCacheMu.RUnlock()
+		if altOK && !altCached.IsEmpty() {
+			ic.cacheRecipient(jid, altCached)
+			return altCached
+		}
+		if ic.client.Store != nil && ic.client.Store.LIDs != nil {
+			if lid, err := ic.client.Store.LIDs.GetLIDForPN(ctx, alt); err == nil && !lid.IsEmpty() {
+				ic.cacheRecipient(jid, lid)
+				return lid
+			}
+		}
+	}
+
 	return jid
+}
+
+// brazilianMobileVariant retorna a variante "sem 9" de um número BR mobile
+// (55 + DDD + 9XXXXXXXX → 55 + DDD + XXXXXXXX). Se o JID não casa esse
+// padrão, retorna empty. Útil pra fallback de contatos antigos no WhatsApp
+// que ainda usam o JID de 12 dígitos.
+func brazilianMobileVariant(jid types.JID) types.JID {
+	user := jid.User
+	// 55 (BR) + 2 dígitos DDD + 9 + 8 dígitos = 13 caracteres totais
+	if len(user) != 13 || !strings.HasPrefix(user, "55") {
+		return types.JID{}
+	}
+	// 5° dígito (índice 4) tem que ser '9' (prefixo móvel)
+	if user[4] != '9' {
+		return types.JID{}
+	}
+	// Remove o '9' na posição 4
+	altUser := user[:4] + user[5:]
+	return types.JID{User: altUser, Server: types.DefaultUserServer}
 }
 
 func (ic *InstanceClient) cacheRecipient(phoneJID, resolved types.JID) {
@@ -1114,19 +1155,15 @@ func (ic *InstanceClient) SendListFallbackMessage(to, title, description, button
 
 // SendButtonsMessage envia uma mensagem com botões interativos.
 //
-// Implementa o protocolo atual do WhatsApp (Apr/26) descoberto no PR
-// EvolutionAPI/evolution-go#40 — o método antigo via HydratedTemplate
-// (que estava aqui antes) parou de renderizar em iOS recente e Android
-// atualizado, então mudamos pra:
+// Sempre usa InteractiveMessage (NativeFlowMessage) com tipos
+// quick_reply/cta_url/cta_call/cta_copy. ButtonsMessage legado (com
+// HeaderType e Buttons[].Type=RESPONSE) parou de renderizar em accounts
+// modernas — caía em fallback texto com emojis numerados ❌.
 //
-//  1. Reply-only → ButtonsMessage envolto em DocumentWithCaptionMessage
-//  2. URL/CALL/COPY → InteractiveMessage (NativeFlowMessage) envolto
-//     em DocumentWithCaptionMessage
-//  3. MessageSecret aleatório de 32 bytes — required pra iOS renderizar
-//  4. AdditionalNodes biz/bot — required pelo protocolo de stanza atual
+// Stack: NativeFlowMessage → MessageContextInfo (secret 32B) →
+// DocumentWithCaptionMessage wrap → AdditionalNodes biz native_flow.
 //
-// Em caso de erro, faz fallback pro texto formatado com emojis numerados
-// (mantém UX coerente em accounts onde botões não funcionam).
+// Em caso de erro real (não rate-limit), faz fallback pro texto formatado.
 func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []ButtonItem) (string, error) {
 	if len(buttons) == 0 {
 		return "", fmt.Errorf("no buttons provided")
@@ -1139,10 +1176,20 @@ func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []
 	if err != nil {
 		return "", fmt.Errorf("invalid JID: %w", err)
 	}
+	recipient = ic.resolveRecipient(context.Background(), recipient)
 
-	// Decide o estilo da mensagem: se TODOS os botões são reply, usa
-	// ButtonsMessage nativo (renderiza melhor). Se há qualquer URL/CALL/
-	// COPY, troca pra InteractiveMessage que aceita os 4 tipos.
+	secret := make([]byte, 32)
+	_, _ = cryptorand.Read(secret)
+
+	inner := buildInteractiveButtonsInner(body, footer, buttons, secret)
+	msg := &waE2E.Message{
+		DocumentWithCaptionMessage: &waE2E.FutureProofMessage{
+			Message: inner,
+		},
+	}
+
+	// Decide flowType pelos botões: misto se algum é URL/CALL/COPY, else
+	// quick_reply. Igual ao PR Evolution.
 	hasNonReply := false
 	for _, b := range buttons {
 		t := strings.ToLower(strings.TrimSpace(b.Type))
@@ -1153,33 +1200,8 @@ func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []
 			break
 		}
 	}
-
-	// MessageSecret 32 bytes — required pra iOS. Se randomização falhar
-	// (cenário super improvável), seguimos sem o secret e o iOS pode não
-	// renderizar — mas Android ainda vê.
-	secret := make([]byte, 32)
-	_, _ = cryptorand.Read(secret)
-
-	var inner *waE2E.Message
-	if !hasNonReply {
-		inner = buildReplyButtonsInner(body, footer, buttons, secret)
-	} else {
-		inner = buildInteractiveButtonsInner(body, footer, buttons, secret)
-	}
-
-	// Wrap in DocumentWithCaptionMessage (FutureProofMessage) — required
-	// pelo protocolo atual pra que botões apareçam in-chat.
-	msg := &waE2E.Message{
-		DocumentWithCaptionMessage: &waE2E.FutureProofMessage{
-			Message: inner,
-		},
-	}
-
-	// AdditionalNodes biz: <biz><interactive type="native_flow" v="1">...
 	bizNodes := buildButtonsBizNodes(hasNonReply)
 
-	// Mensagens interativas exigem LID do destinatário cacheado. Falta de LID
-	// causa "no LID found for X@s.whatsapp.net from server" no encrypt.
 	if err := ic.ensureLID(recipient); err != nil {
 		log.Warn().Str("instance", ic.ID).Err(err).Msg("ensureLID failed before button send")
 	}
@@ -1188,42 +1210,22 @@ func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []
 		AdditionalNodes: &bizNodes,
 	})
 	if err != nil {
-		log.Warn().Str("instance", ic.ID).Err(err).Msg("interactive button send failed, falling back to text")
+		// Erro 405 do server = conta pessoal sem permissão pra biz/interactive.
+		// Não é bug — é limitação. Loga em info pra não poluir, e cai em texto.
+		if strings.Contains(err.Error(), "error 405") {
+			log.Info().
+				Str("instance", ic.ID).
+				Msg("interactive não suportado nesta conta (405) — usando fallback texto. Para habilitar botões interativos, use uma conta WhatsApp Business")
+		} else {
+			log.Warn().
+				Str("instance", ic.ID).
+				Str("to", recipient.String()).
+				Err(err).
+				Msg("interactive button send failed, falling back to text")
+		}
 		return ic.SendButtonsFallbackMessage(to, body, footer, buttons)
 	}
 	return res.ID, nil
-}
-
-// buildReplyButtonsInner monta o waE2E.Message interno (sem o wrapping
-// DocumentWithCaptionMessage) usando ButtonsMessage nativo — caminho ideal
-// quando todos os botões são tipo "reply" (quick reply). É o que renderiza
-// como botões "limpos" na UI do app sem o card cinza.
-func buildReplyButtonsInner(body, footer string, buttons []ButtonItem, secret []byte) *waE2E.Message {
-	replyButtons := make([]*waE2E.ButtonsMessage_Button, 0, len(buttons))
-	for i, b := range buttons {
-		id := strings.TrimSpace(b.ID)
-		if id == "" {
-			id = fmt.Sprintf("btn_%d", i)
-		}
-		replyButtons = append(replyButtons, &waE2E.ButtonsMessage_Button{
-			ButtonID: proto.String(id),
-			ButtonText: &waE2E.ButtonsMessage_Button_ButtonText{
-				DisplayText: proto.String(strings.TrimSpace(b.Text)),
-			},
-			Type: waE2E.ButtonsMessage_Button_RESPONSE.Enum(),
-		})
-	}
-	return &waE2E.Message{
-		ButtonsMessage: &waE2E.ButtonsMessage{
-			ContentText: proto.String(body),
-			FooterText:  proto.String(footer),
-			HeaderType:  waE2E.ButtonsMessage_EMPTY.Enum(),
-			Buttons:     replyButtons,
-		},
-		MessageContextInfo: &waE2E.MessageContextInfo{
-			MessageSecret: secret,
-		},
-	}
 }
 
 // buildInteractiveButtonsInner monta o waE2E.Message interno usando
@@ -1572,7 +1574,11 @@ func (ic *InstanceClient) SendPixMessage(to string, data PixData) (string, error
 		AdditionalNodes: &pixNodes,
 	})
 	if err != nil {
-		log.Warn().Str("instance", ic.ID).Err(err).Msg("PIX send failed, falling back to text")
+		if strings.Contains(err.Error(), "error 405") {
+			log.Info().Str("instance", ic.ID).Msg("PIX não suportado nesta conta (405) — usando fallback texto. Para habilitar PIX interativo, use conta WhatsApp Business")
+		} else {
+			log.Warn().Str("instance", ic.ID).Err(err).Msg("PIX send failed, falling back to text")
+		}
 		fallback := fmt.Sprintf("*%s*\n\n%s\n\n💳 *Pagamento PIX*\nFavor: %s\nChave (%s): `%s`",
 			data.HeaderTitle, data.BodyText, data.MerchantName, keyType, data.PixKey)
 		if footer := strings.TrimSpace(data.FooterText); footer != "" {
@@ -1785,7 +1791,11 @@ func (ic *InstanceClient) SendListMessage(to, title, description, buttonText, fo
 		AdditionalNodes: &bizNodes,
 	})
 	if err != nil {
-		log.Warn().Str("instance", ic.ID).Err(err).Msg("interactive list send failed, falling back to text")
+		if strings.Contains(err.Error(), "error 405") {
+			log.Info().Str("instance", ic.ID).Msg("Lista interativa não suportada nesta conta (405) — usando fallback texto. Para habilitar listas, use conta WhatsApp Business")
+		} else {
+			log.Warn().Str("instance", ic.ID).Err(err).Msg("interactive list send failed, falling back to text")
+		}
 		return ic.SendListFallbackMessage(to, title, description, buttonText, footer, sections)
 	}
 	return res.ID, nil
