@@ -668,9 +668,9 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
   const [listFooter, setListFooter] = useState("");
   const [listChoices, setListChoices] = useState("[Seção 1]\nItem 1|id1|Descrição 1\nItem 2|id2|Descrição 2\n[Seção 2]\nItem 3|id3");
   // carousel
-  const [carouselText, setCarouselText] = useState("");
-  const [carouselFooter, setCarouselFooter] = useState("");
-  const [carouselChoices, setCarouselChoices] = useState("[Cartão 1]\n{https://exemplo.com/imagem1.jpg}\nVer mais|https://exemplo.com\n[Cartão 2]\n{https://exemplo.com/imagem2.jpg}\nComprar|https://loja.exemplo.com");
+  const [carouselText, setCarouselText] = useState("Conheça nossos planos — escolha o que cabe no seu time");
+  const [carouselFooter, setCarouselFooter] = useState("Uniq Chat • Atendimento omnichannel");
+  const [carouselChoices, setCarouselChoices] = useState("[Plano Starter]\n{https://picsum.photos/seed/uniq-starter/720/480}\nConhecer Starter|https://uniq.chat/precos\nFalar com vendas|call:+551140002025\n[Plano Pro]\n{https://picsum.photos/seed/uniq-pro/720/480}\nAssinar Pro|https://uniq.chat/checkout/pro\nAgendar demo|https://uniq.chat/demo");
   const [lookupTarget, setLookupTarget] = useState("");
   const [contactLookup, setContactLookup] = useState<InstanceContactLookup | null>(null);
 
@@ -974,6 +974,8 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
               if (!text) continue;
               if (/^https?:\/\//i.test(value)) {
                 current.buttons.push({ text, type: "url", url: value });
+              } else if (value.startsWith("call:")) {
+                current.buttons.push({ text, type: "call", phone: value.slice(5).trim() });
               } else if (value.startsWith("+") || /^\d{10,}$/.test(value)) {
                 current.buttons.push({ text, type: "call", phone: value });
               } else if (value.startsWith("reply:")) {
@@ -1595,7 +1597,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
               <input value={carouselFooter} onChange={e => setCarouselFooter(e.target.value)}
                 placeholder="Rodapé (opcional)" className="input-field w-full" />
               <textarea value={carouselChoices} onChange={e => setCarouselChoices(e.target.value)}
-                rows={8} placeholder={"[Cartão 1 - Título]\n{https://exemplo.com/imagem.jpg}\nVer mais|https://exemplo.com\nComprar|call:+5511999999999\n[Cartão 2]\n{https://exemplo.com/img2.jpg}\nInfo|https://loja.exemplo.com"} className="input-field w-full resize-none font-mono text-xs" />
+                rows={8} placeholder={"[Plano Starter]\n{https://picsum.photos/seed/uniq-starter/720/480}\nConhecer|https://uniq.chat/precos\nFalar com vendas|call:+551140002025\n[Plano Pro]\n{https://picsum.photos/seed/uniq-pro/720/480}\nAssinar Pro|https://uniq.chat/checkout/pro"} className="input-field w-full resize-none font-mono text-xs" />
               <div className="rounded-lg p-2.5" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.2)" }}>
                 <p className="text-[10px]" style={{ color: "hsl(271, 91%, 75%)" }}>
                   Formato via <span className="font-mono">/messages/menu</span>: <span className="font-mono">[Título]</span> para cartão, <span className="font-mono">{"{url}"}</span> para imagem e <span className="font-mono">texto|url</span> ou <span className="font-mono">texto|call:numero</span> para ações.

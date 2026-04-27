@@ -500,6 +500,76 @@ func (ic *InstanceClient) resolveRecipient(ctx context.Context, jid types.JID) t
 	return jid
 }
 
+// resolveBRPhone faz APENAS a normalização BR-9 (com/sem nono dígito) sem
+// consultar Store.LIDs. Usado em mensagens interativas (buttons/pix/list/
+// carousel) onde o servidor WhatsApp rejeita LID com 405 — precisamos
+// manter o JID em PN, mas ainda assim descobrir qual variante (12 ou 13
+// dig) é a que existe na conta. Lógica:
+//
+//  1. Se já está no cache de recipients e o resolved é PN, usa.
+//  2. Se brazilianMobileVariants retorna alternativas, pergunta ao
+//     servidor via IsOnWhatsApp qual está cadastrada.
+//  3. Cacheia o resultado pra próximo envio ser instantâneo.
+//
+// Nunca converte PN→LID, mesmo que Store.LIDs tenha mapping. Se nada
+// funciona, retorna o JID original (whatsmeow tenta enviar e o pior caso
+// é 200 OK + silent drop, que é o comportamento atual sem normalização).
+func (ic *InstanceClient) resolveBRPhone(ctx context.Context, jid types.JID) types.JID {
+	if jid.Server != types.DefaultUserServer {
+		return jid
+	}
+	variants := brazilianMobileVariants(jid)
+	if len(variants) == 0 {
+		return jid
+	}
+
+	// Cache hit pro JID original (apenas se cached é PN, não LID).
+	ic.recipientCacheMu.RLock()
+	cached, ok := ic.recipientCache[jid.String()]
+	ic.recipientCacheMu.RUnlock()
+	if ok && !cached.IsEmpty() && cached.Server == types.DefaultUserServer {
+		return cached
+	}
+	// Cache hit por uma das variantes (alguém já enviou pra variante e
+	// o servidor confirmou qual era a real).
+	for _, alt := range variants {
+		ic.recipientCacheMu.RLock()
+		altCached, altOK := ic.recipientCache[alt.String()]
+		ic.recipientCacheMu.RUnlock()
+		if altOK && !altCached.IsEmpty() && altCached.Server == types.DefaultUserServer {
+			ic.cacheRecipient(jid, altCached)
+			return altCached
+		}
+	}
+
+	// Pergunta ao servidor qual variante existe. UMA query usync por
+	// destinatário novo, depois cache hit.
+	all := append([]types.JID{jid}, variants...)
+	phones := make([]string, 0, len(all))
+	for _, j := range all {
+		phones = append(phones, "+"+j.User)
+	}
+	isOnCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	results, err := ic.client.IsOnWhatsApp(isOnCtx, phones)
+	if err != nil {
+		log.Debug().Str("instance", ic.ID).Err(err).Msg("BR-9 IsOnWhatsApp failed; using original JID")
+		return jid
+	}
+	for _, r := range results {
+		if r.IsIn && !r.JID.IsEmpty() && r.JID.Server == types.DefaultUserServer {
+			ic.cacheRecipient(jid, r.JID)
+			for _, j := range all {
+				if j.String() != r.JID.String() {
+					ic.cacheRecipient(j, r.JID)
+				}
+			}
+			return r.JID
+		}
+	}
+	return jid
+}
+
 // brazilianMobileVariants retorna as variantes BR (com 9 / sem 9) que
 // devem ser testadas como alternativas ao JID original. Cobre os 2 casos:
 //
@@ -1248,7 +1318,11 @@ func (ic *InstanceClient) SendButtonsMessage(to, body, footer string, buttons []
 		return "", fmt.Errorf("invalid JID: %w", err)
 	}
 	// NÃO chamamos resolveRecipient aqui: ele converteria PN→LID, e o
-	// servidor WhatsApp rejeita interactive em LID com 405. Mantemos PN.
+	// servidor WhatsApp rejeita interactive em LID com 405. Mas
+	// normalizamos BR-9 (com/sem nono dígito) via resolveBRPhone — sem
+	// isso, mensagens enviadas pra "5585992502010" quando o contato é
+	// "558592502010" (ou vice-versa) ficam em pending/timeout.
+	recipient = ic.resolveBRPhone(context.Background(), recipient)
 
 	nfButtons := buildNativeFlowButtons(buttons)
 	if len(nfButtons) == 0 {
@@ -1493,6 +1567,9 @@ func (ic *InstanceClient) SendPixMessage(to string, data PixData) (string, error
 	if err != nil {
 		return "", fmt.Errorf("invalid JID: %w", err)
 	}
+	// BR-9: descobre se contato existe com/sem nono dígito sem
+	// converter pra LID (LID é rejeitado em interactive com 405).
+	recipient = ic.resolveBRPhone(context.Background(), recipient)
 
 	// Payload review_and_pay — formato esperado pelo WhatsApp 2.x.
 	// Valor default é 1 centavo (offset=100 → "0,01") porque o protocolo
@@ -1682,6 +1759,9 @@ func (ic *InstanceClient) SendListMessage(to, title, description, buttonText, fo
 	if err != nil {
 		return "", fmt.Errorf("invalid JID: %w", err)
 	}
+	// BR-9: descobre se contato existe com/sem nono dígito sem
+	// converter pra LID (LID é rejeitado em interactive com 405).
+	recipient = ic.resolveBRPhone(context.Background(), recipient)
 
 	// Converte ListSection do nosso formato pro proto whatsmeow.
 	protoSections := make([]*waE2E.ListMessage_Section, 0, len(sections))
@@ -1785,6 +1865,11 @@ func (ic *InstanceClient) SendCarouselMessage(to string, cards []CarouselCard) (
 	if err != nil {
 		return "", fmt.Errorf("invalid JID: %w", err)
 	}
+	// BR-9: descobre se contato existe com/sem nono dígito sem
+	// converter pra LID (LID é rejeitado em interactive com 405).
+	// Esse é o motivo de envios pra número com 9 (quando contato é sem
+	// 9 ou vice-versa) ficarem em pending/timeout no carrossel.
+	recipient = ic.resolveBRPhone(context.Background(), recipient)
 
 	protoCards := make([]*waE2E.InteractiveMessage, 0, len(cards))
 	for _, card := range cards {
