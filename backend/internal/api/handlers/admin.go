@@ -523,20 +523,60 @@ func cascadeDeleteByFK(tx *gorm.DB, parentTable, parentCol string, ids []string,
 	if err := tx.Raw(q, parentTable, parentCol).Scan(&fks).Error; err != nil {
 		return err
 	}
+	// Retry-with-progress: ordem arbitrária do pg_catalog não respeita
+	// cadeias (ex: user_workspaces refs roles refs workspaces). Em vez de
+	// topo-sort, fazemos múltiplas passadas com SAVEPOINT — cada DELETE
+	// que falha por FK volta nessa fila pra próxima rodada. Para quando
+	// uma passada inteira sem nenhum DELETE bem-sucedido.
+	pending := make([]fk, 0, len(fks))
 	for _, f := range fks {
-		// Skip self-reference (would re-include parent).
 		if f.Table == parentTable {
 			continue
 		}
-		stmt := `DELETE FROM "` + f.Table + `" WHERE "` + f.Column + `" = ANY($1)`
-		res := tx.Exec(stmt, ids)
-		if res.Error != nil {
-			return res.Error
+		pending = append(pending, f)
+	}
+	for pass := 0; pass < 6 && len(pending) > 0; pass++ {
+		next := pending[:0]
+		progress := false
+		for _, f := range pending {
+			stmt := `DELETE FROM "` + f.Table + `" WHERE "` + f.Column + `" = ANY($1)`
+			// Savepoint pra que erro não aborte a transaction-mãe.
+			sp := "sp_" + f.Table + "_" + f.Column
+			if err := tx.Exec("SAVEPOINT " + sp).Error; err != nil {
+				return err
+			}
+			res := tx.Exec(stmt, ids)
+			if res.Error != nil {
+				_ = tx.Exec("ROLLBACK TO SAVEPOINT " + sp).Error
+				next = append(next, f)
+				continue
+			}
+			_ = tx.Exec("RELEASE SAVEPOINT " + sp).Error
+			counts[f.Table] += res.RowsAffected
+			progress = true
 		}
-		counts[f.Table] += res.RowsAffected
+		pending = next
+		if !progress {
+			break
+		}
+	}
+	if len(pending) > 0 {
+		tables := make([]string, 0, len(pending))
+		for _, f := range pending {
+			tables = append(tables, f.Table+"."+f.Column)
+		}
+		return errPendingFK(tables)
 	}
 	return nil
 }
+
+type pendingFKError []string
+
+func (p pendingFKError) Error() string {
+	return "FKs não resolvidos após retries: " + strings.Join(p, ", ")
+}
+
+func errPendingFK(tables []string) error { return pendingFKError(tables) }
 
 // --- Plans ---
 
