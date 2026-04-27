@@ -140,6 +140,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	msgH := handlers.NewMessageHandler(db, manager)
 	webhookH := handlers.NewWebhookHandler(db, manager)
 	globalWebhookH := handlers.NewGlobalWebhookHandler(db)
+	webhookLogsH := handlers.NewWebhookLogsHandler(db)
 	apiKeyH := handlers.NewAPIKeyHandler(db)
 	adminH := handlers.NewAdminHandler(db, emailSvc)
 	adminH.SetManager(manager) // permite propagar mudanças de proxy global às instâncias em runtime
@@ -492,11 +493,14 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Global System Webhooks
 	systemWebhooks := api.Group("/webhooks/system")
 	systemWebhooks.Get("/events", globalWebhookH.ListEvents)
+	systemWebhooks.Get("/events/:eventID/preview", webhookLogsH.PreviewEvent)
 	systemWebhooks.Get("/", globalWebhookH.List)
 	systemWebhooks.Post("/", globalWebhookH.Create)
 	systemWebhooks.Put("/:id", globalWebhookH.Update)
 	systemWebhooks.Delete("/:id", globalWebhookH.Delete)
-	systemWebhooks.Post("/:id/test", globalWebhookH.Test)
+	systemWebhooks.Post("/:id/test", webhookLogsH.TestGlobalWebhook) // versão nova com event_id
+	systemWebhooks.Get("/:id/deliveries", webhookLogsH.ListGlobalDeliveries)
+	systemWebhooks.Post("/:id/deliveries/:deliveryId/retry", webhookLogsH.RetryGlobalDelivery)
 
 	// Permissions (global)
 	api.Get("/permissions", roleH.ListPermissions)
@@ -719,6 +723,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	webhooks.Post("/", webhookH.Create)
 	webhooks.Put("/:webhookId", webhookH.Update)
 	webhooks.Delete("/:webhookId", webhookH.Delete)
+	webhooks.Get("/:webhookId/deliveries", webhookLogsH.ListInstanceDeliveries)
+	webhooks.Post("/:webhookId/deliveries/:deliveryId/retry", webhookLogsH.RetryInstanceDelivery)
+	webhooks.Post("/:webhookId/test", webhookLogsH.TestInstanceWebhook)
 
 	// ─── TikTok routes ──────────────────────────────────────────────────────
 	tk := api.Group("/tiktok")

@@ -885,6 +885,7 @@ func (m *Manager) loadWebhooks(instanceID string) []webhookEntry {
 	for _, wh := range webhooks {
 		evs := parseEventsJSON(wh.Events)
 		entries = append(entries, webhookEntry{
+			ID:            wh.ID.String(),
 			Events:        evs,
 			IgnoreGroups:  wh.IgnoreGroups,
 			IgnoreSelf:    wh.IgnoreSelf,

@@ -72,3 +72,51 @@ func (w *GlobalWebhook) BeforeCreate(tx *gorm.DB) error {
 	}
 	return nil
 }
+
+// WebhookDeliveryStatus reflete o resultado da entrega.
+type WebhookDeliveryStatus string
+
+const (
+	DeliveryPending WebhookDeliveryStatus = "pending"
+	DeliverySuccess WebhookDeliveryStatus = "success"
+	DeliveryFailed  WebhookDeliveryStatus = "failed"
+	DeliverySkipped WebhookDeliveryStatus = "skipped"
+)
+
+// WebhookDelivery registra cada tentativa de entrega de webhook.
+//
+// Por que existe: hoje a gente dispara webhook e perde a memória — se
+// o cliente reclama "não recebi o evento X", não temos como provar.
+// Esse log resolve: persiste status code, latência, response body
+// (truncado), erro, retry count. Acessível em /webhooks/:id/deliveries.
+//
+// WebhookID OU GlobalWebhookID será preenchido (nunca os dois). Os 2
+// indexed pra lookup rápido por webhook.
+type WebhookDelivery struct {
+	ID              uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
+	WebhookID       *uuid.UUID `gorm:"type:uuid;index" json:"webhook_id,omitempty"`
+	GlobalWebhookID *uuid.UUID `gorm:"type:uuid;index" json:"global_webhook_id,omitempty"`
+
+	Event   string `gorm:"type:varchar(60);not null;index" json:"event"`
+	URL     string `gorm:"type:text;not null" json:"url"`
+	Payload string `gorm:"type:text" json:"payload"` // JSON serializado
+
+	Status       WebhookDeliveryStatus `gorm:"type:varchar(12);not null;default:'pending';index" json:"status"`
+	StatusCode   int                   `gorm:"default:0" json:"status_code"`        // 200/404/500/etc, 0 = sem resposta (timeout)
+	LatencyMs    int64                 `json:"latency_ms"`                          // medido client-side
+	ResponseBody string                `gorm:"type:text" json:"response_body"`      // truncado a 4KB
+	Error        string                `gorm:"type:text" json:"error,omitempty"`    // mensagem de erro de transporte
+	RetryCount   int                   `gorm:"default:0" json:"retry_count"`        // 0 na primeira tentativa, >0 em retries
+
+	CreatedAt time.Time `gorm:"index" json:"created_at"`
+}
+
+func (d *WebhookDelivery) BeforeCreate(tx *gorm.DB) error {
+	if d.ID == uuid.Nil {
+		d.ID = uuid.New()
+	}
+	if d.Status == "" {
+		d.Status = DeliveryPending
+	}
+	return nil
+}

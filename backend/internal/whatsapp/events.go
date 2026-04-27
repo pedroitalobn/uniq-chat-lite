@@ -2,9 +2,6 @@ package whatsapp
 
 import (
 	"bytes"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -25,39 +22,15 @@ type WebhookPayload struct {
 
 // ─── HTTP dispatch ────────────────────────────────────────────────────────────
 
-// DispatchWebhook sends the payload to an HTTP webhook URL.
+// DispatchWebhook é o wrapper fire-and-forget mantido pra retrocompat
+// (RabbitMQ/NATS dispatchers ainda usam). Nova lógica deve chamar
+// DispatchWebhookSync (em delivery.go) e gravar via RecordDelivery.
 func DispatchWebhook(webhookURL, secret string, payload WebhookPayload) {
-	body, err := json.Marshal(payload)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to marshal webhook payload")
-		return
-	}
-
-	req, err := http.NewRequest(http.MethodPost, webhookURL, bytes.NewReader(body))
-	if err != nil {
-		log.Error().Err(err).Str("url", webhookURL).Msg("failed to create webhook request")
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "UniqChatWebhook/1.0")
-
-	if secret != "" {
-		mac := hmac.New(sha256.New, []byte(secret))
-		mac.Write(body)
-		sig := hex.EncodeToString(mac.Sum(nil))
-		req.Header.Set("X-Webhook-Signature", "sha256="+sig)
-	}
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Warn().Err(err).Str("url", webhookURL).Msg("webhook delivery failed")
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		log.Warn().Str("url", webhookURL).Int("status", resp.StatusCode).Msg("webhook returned error")
+	res := DispatchWebhookSync(webhookURL, secret, payload)
+	if res.Error != "" {
+		log.Warn().Str("url", webhookURL).Str("err", res.Error).Msg("webhook delivery failed")
+	} else if res.StatusCode >= 400 {
+		log.Warn().Str("url", webhookURL).Int("status", res.StatusCode).Msg("webhook returned error")
 	}
 }
 
@@ -186,10 +159,21 @@ func DispatchWSClient(wsURL, token string, payload WebhookPayload) {
 
 // ─── Unified dispatch ─────────────────────────────────────────────────────────
 
-// dispatchToEntry sends a payload to all enabled targets of a webhook entry.
+// dispatchToEntry sends a payload to all enabled targets of a webhook
+// entry. Pra HTTP, agora roda síncrono pra capturar status/latência e
+// gravar WebhookDelivery — em goroutine separada pra não bloquear o
+// caller (já estamos num goroutine spawned por dispatchEvent).
 func dispatchToEntry(hook webhookEntry, payload WebhookPayload) {
 	if hook.URL != "" {
-		go DispatchWebhook(hook.URL, hook.Secret, payload)
+		go func(url, secret, id string) {
+			result := DispatchWebhookSync(url, secret, payload)
+			if result.Error != "" {
+				log.Warn().Str("url", url).Str("err", result.Error).Msg("webhook delivery failed")
+			} else if result.StatusCode >= 400 {
+				log.Warn().Str("url", url).Int("status", result.StatusCode).Msg("webhook returned error")
+			}
+			RecordDelivery(id, "", payload.Event, url, payload, result, 0)
+		}(hook.URL, hook.Secret, hook.ID)
 	}
 	if hook.RabbitMQEnabled && hook.AMQPURL != "" {
 		go DispatchRabbitMQ(hook.AMQPURL, hook.Exchange, hook.RoutingKey, payload)

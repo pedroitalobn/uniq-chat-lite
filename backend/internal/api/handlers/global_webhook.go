@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -23,58 +24,157 @@ func NewGlobalWebhookHandler(db *gorm.DB) *GlobalWebhookHandler {
 }
 
 // SystemEventItem é o shape retornado pela API (lista de eventos disponíveis).
+// AdminOnly=true esconde o evento de não-admins (ex: pagamento, billing,
+// plan changes — informação financeira que workspace owner não deve ver
+// por padrão sem ser super admin).
 type SystemEventItem struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Category    string `json:"category"`
+	AdminOnly   bool   `json:"admin_only,omitempty"`
+	// Scope indica se é evento de instância (instance.* / message.* /
+	// chat.* etc — fica disponível em webhooks de instância) ou se é
+	// global-only (CRM, journey, deal, billing — só global webhook).
+	// "both" disponível nos dois.
+	Scope string `json:"scope"` // "instance" | "global" | "both"
 }
 
-// SystemEvents — fonte única da verdade para eventos disponíveis.
-// Adicione aqui antes de referenciar na UI.
+// SystemEvents — fonte única da verdade. Cobertura completa do que o
+// backend emite hoje. Antes era só ~20; agora ~70 cobrindo todos os
+// módulos. Eventos AdminOnly são filtrados pra usuários comuns.
 var SystemEvents = []SystemEventItem{
-	// User events
-	{ID: "user.registered", Name: "Usuário Registrado", Description: "Quando um novo usuário se registra", Category: "Usuário"},
-	{ID: "user.login", Name: "Login", Description: "Quando um usuário faz login", Category: "Usuário"},
-	{ID: "user.logout", Name: "Logout", Description: "Quando um usuário faz logout", Category: "Usuário"},
+	// ─── Connection / Instance ─────────────────────────────────────
+	{ID: "instance.created", Name: "Instância criada", Description: "Nova instância foi criada", Category: "Instância", Scope: "global"},
+	{ID: "instance.deleted", Name: "Instância deletada", Description: "Instância foi removida", Category: "Instância", Scope: "global", AdminOnly: true},
+	{ID: "instance.connected", Name: "Instância conectada", Description: "Pareou com WhatsApp e ficou online", Category: "Instância", Scope: "both"},
+	{ID: "instance.disconnected", Name: "Instância desconectada", Description: "Perdeu conexão / logout", Category: "Instância", Scope: "both"},
+	{ID: "instance.qr", Name: "QR Code emitido", Description: "Pairing QR atualizado", Category: "Instância", Scope: "instance"},
+	{ID: "instance.pairing_code", Name: "Código de pareamento", Description: "Pairing code emitido", Category: "Instância", Scope: "instance"},
+	{ID: "instance.banned", Name: "Instância banida", Description: "WhatsApp baniu o número", Category: "Instância", Scope: "both"},
 
-	// Instance events
-	{ID: "instance.created", Name: "Instância Criada", Description: "Quando uma nova instância é criada", Category: "Instância"},
-	{ID: "instance.connected", Name: "Instância Conectada", Description: "Quando uma instância conecta ao WhatsApp", Category: "Instância"},
-	{ID: "instance.disconnected", Name: "Instância Desconectada", Description: "Quando uma instância desconecta", Category: "Instância"},
+	// ─── Messages (in/out) ─────────────────────────────────────────
+	{ID: "message.received", Name: "Mensagem recebida", Description: "Inbound de qualquer tipo", Category: "Mensagem", Scope: "both"},
+	{ID: "message.sent", Name: "Mensagem enviada", Description: "Outbound entregue ao servidor", Category: "Mensagem", Scope: "both"},
+	{ID: "message.text", Name: "Texto recebido/enviado", Description: "Granular: só msgs de texto", Category: "Mensagem", Scope: "instance"},
+	{ID: "message.image", Name: "Imagem", Description: "Granular: foto", Category: "Mensagem", Scope: "instance"},
+	{ID: "message.video", Name: "Vídeo", Description: "Granular: vídeo", Category: "Mensagem", Scope: "instance"},
+	{ID: "message.audio", Name: "Áudio", Description: "Granular: áudio/voz", Category: "Mensagem", Scope: "instance"},
+	{ID: "message.document", Name: "Documento", Description: "Granular: arquivo", Category: "Mensagem", Scope: "instance"},
+	{ID: "message.sticker", Name: "Sticker", Description: "Granular: figurinha", Category: "Mensagem", Scope: "instance"},
+	{ID: "message.location", Name: "Localização", Description: "Granular: GPS", Category: "Mensagem", Scope: "instance"},
+	{ID: "message.contact", Name: "Contato (vCard)", Description: "Granular: contato compartilhado", Category: "Mensagem", Scope: "instance"},
+	{ID: "message.reaction", Name: "Reação", Description: "Emoji em cima de mensagem", Category: "Mensagem", Scope: "instance"},
+	{ID: "message.edited", Name: "Mensagem editada", Description: "Edit de mensagem (janela 15min)", Category: "Mensagem", Scope: "instance"},
+	{ID: "message.deleted", Name: "Mensagem apagada", Description: "Revoke (apagar pra todos)", Category: "Mensagem", Scope: "instance"},
+	{ID: "message.status", Name: "Status (delivered/read)", Description: "Receipt de entrega ou leitura", Category: "Mensagem", Scope: "both"},
+	{ID: "message.receipt", Name: "Recibo bruto", Description: "Receipt sem agregação (advanced)", Category: "Mensagem", Scope: "instance"},
+	{ID: "message.button_response", Name: "Botão clicado", Description: "Resposta de NativeFlow buttons", Category: "Mensagem", Scope: "instance"},
+	{ID: "message.list_response", Name: "Item de lista selecionado", Description: "Resposta de ListMessage", Category: "Mensagem", Scope: "instance"},
+	{ID: "message.poll_vote", Name: "Voto em enquete", Description: "Cliente votou na poll", Category: "Mensagem", Scope: "instance"},
 
-	// Message events
-	{ID: "message.received", Name: "Mensagem Recebida", Description: "Quando uma mensagem é recebida", Category: "Mensagem"},
-	{ID: "message.sent", Name: "Mensagem Enviada", Description: "Quando uma mensagem é enviada", Category: "Mensagem"},
+	// ─── Chat / Presence ──────────────────────────────────────────
+	{ID: "chat.presence", Name: "Presença em chat", Description: "Typing/recording indicator", Category: "Conversa", Scope: "instance"},
+	{ID: "presence.update", Name: "Presença geral", Description: "Online/offline do contato", Category: "Conversa", Scope: "instance"},
+	{ID: "contact.pushname", Name: "Push name atualizado", Description: "Mudou nome de exibição", Category: "Conversa", Scope: "instance"},
+	{ID: "contact.update", Name: "Contato atualizado", Description: "Foto/business info mudou", Category: "Conversa", Scope: "instance"},
 
-	// Workspace events
-	{ID: "workspace.created", Name: "Workspace Criado", Description: "Quando um novo workspace é criado", Category: "Workspace"},
-	{ID: "workspace.member_added", Name: "Membro Adicionado", Description: "Quando um membro é adicionado a um workspace", Category: "Workspace"},
-	{ID: "workspace.member_removed", Name: "Membro Removido", Description: "Quando um membro é removido de um workspace", Category: "Workspace"},
+	// ─── Conversations / Ticketing ────────────────────────────────
+	{ID: "conversation.created", Name: "Conversa criada", Description: "Novo ticket aberto", Category: "Atendimento", Scope: "global"},
+	{ID: "conversation.assigned", Name: "Conversa atribuída", Description: "Distribuída pra agente/fila", Category: "Atendimento", Scope: "global"},
+	{ID: "conversation.transferred", Name: "Conversa transferida", Description: "Trocou de agente/fila", Category: "Atendimento", Scope: "global"},
+	{ID: "conversation.resolved", Name: "Conversa resolvida", Description: "Marcada como resolvida", Category: "Atendimento", Scope: "global"},
+	{ID: "conversation.reopened", Name: "Conversa reaberta", Description: "Reaberta após resolved", Category: "Atendimento", Scope: "global"},
+	{ID: "conversation.closed", Name: "Conversa fechada", Description: "Encerrada definitivamente", Category: "Atendimento", Scope: "global"},
+	{ID: "conversation.snoozed", Name: "Conversa adiada", Description: "Snooze ativado", Category: "Atendimento", Scope: "global"},
+	{ID: "conversation.note_added", Name: "Nota interna", Description: "Comentário interno entre agentes", Category: "Atendimento", Scope: "global"},
 
-	// CRM events
-	{ID: "crm.contact.created", Name: "Contato Criado", Description: "Quando um novo contato é criado no CRM", Category: "CRM"},
-	{ID: "crm.contact.updated", Name: "Contato Atualizado", Description: "Quando um contato é atualizado no CRM", Category: "CRM"},
-	{ID: "crm.contact.deleted", Name: "Contato Deletado", Description: "Quando um contato é deletado do CRM", Category: "CRM"},
-	{ID: "crm.tag.created", Name: "Tag Criada", Description: "Quando uma nova tag é criada", Category: "CRM"},
-	{ID: "crm.tag.assigned", Name: "Tag Atribuída", Description: "Quando uma tag é atribuída a um contato", Category: "CRM"},
-	{ID: "crm.stage.assigned", Name: "Stage Atribuído", Description: "Quando um stage é atribuído a um contato", Category: "CRM"},
-	{ID: "crm.funnel.assigned", Name: "Funil Atribuído", Description: "Quando um funil é atribuído a um contato", Category: "CRM"},
+	// ─── Calls ────────────────────────────────────────────────────
+	{ID: "call.received", Name: "Ligação recebida", Description: "Voice/video call inbound", Category: "Conversa", Scope: "instance"},
+	{ID: "call.rejected", Name: "Ligação rejeitada", Description: "Auto/manualmente rejeitada", Category: "Conversa", Scope: "instance"},
 
-	// Campaign events
-	{ID: "campaign.created", Name: "Campanha Criada", Description: "Quando uma nova campanha é criada", Category: "Campanha"},
-	{ID: "campaign.started", Name: "Campanha Iniciada", Description: "Quando uma campanha é iniciada", Category: "Campanha"},
-	{ID: "campaign.paused", Name: "Campanha Pausada", Description: "Quando uma campanha é pausada", Category: "Campanha"},
-	{ID: "campaign.completed", Name: "Campanha Finalizada", Description: "Quando uma campanha é finalizada", Category: "Campanha"},
-	{ID: "campaign.failed", Name: "Campanha Falhou", Description: "Quando uma campanha falha", Category: "Campanha"},
+	// ─── Groups / Communities ─────────────────────────────────────
+	{ID: "group.update", Name: "Grupo atualizado", Description: "Nome/foto/descrição/announce mudou", Category: "Grupo", Scope: "instance"},
+	{ID: "group.participants", Name: "Participantes alterados", Description: "Add/remove/promote/demote", Category: "Grupo", Scope: "instance"},
+	{ID: "group.join_request", Name: "Pedido de entrada em grupo", Description: "Approval mode ativo", Category: "Grupo", Scope: "instance"},
 
-	// Payment events
-	{ID: "payment.success", Name: "Pagamento Succedido", Description: "Quando um pagamento é confirmado", Category: "Pagamento"},
-	{ID: "payment.failed", Name: "Pagamento Falhou", Description: "Quando um pagamento falha", Category: "Pagamento"},
-	{ID: "payment.refunded", Name: "Pagamento Estornado", Description: "Quando um pagamento é estornado", Category: "Pagamento"},
+	// ─── Newsletter (channels) ────────────────────────────────────
+	{ID: "newsletter.message", Name: "Mensagem em canal", Description: "Recebida num newsletter inscrito", Category: "Canal", Scope: "instance"},
+	{ID: "newsletter.update", Name: "Canal atualizado", Description: "Metadados/ícone mudaram", Category: "Canal", Scope: "instance"},
 
-	// Webhook events
-	{ID: "webhook.test", Name: "Teste de Webhook", Description: "Evento de teste disparado manualmente", Category: "Sistema"},
+	// ─── CRM ──────────────────────────────────────────────────────
+	{ID: "crm.contact.created", Name: "Contato criado", Description: "Novo lead/contato no CRM", Category: "CRM", Scope: "global"},
+	{ID: "crm.contact.updated", Name: "Contato atualizado", Description: "Edit em campos do contato", Category: "CRM", Scope: "global"},
+	{ID: "crm.contact.deleted", Name: "Contato deletado", Description: "Remoção do CRM", Category: "CRM", Scope: "global"},
+	{ID: "crm.tag.created", Name: "Tag criada", Description: "Nova tag no workspace", Category: "CRM", Scope: "global"},
+	{ID: "crm.tag.assigned", Name: "Tag atribuída", Description: "Tag aplicada a contato", Category: "CRM", Scope: "global"},
+	{ID: "crm.tag.removed", Name: "Tag removida", Description: "Tag desvinculada do contato", Category: "CRM", Scope: "global"},
+	{ID: "crm.stage.assigned", Name: "Stage atribuído", Description: "Contato moveu de etapa do funil", Category: "CRM", Scope: "global"},
+	{ID: "crm.funnel.assigned", Name: "Funil atribuído", Description: "Contato vinculado a funil", Category: "CRM", Scope: "global"},
+
+	// ─── Deals ────────────────────────────────────────────────────
+	{ID: "deal.created", Name: "Deal criado", Description: "Nova oportunidade no pipeline", Category: "Deals", Scope: "global"},
+	{ID: "deal.updated", Name: "Deal atualizado", Description: "Edit em valor/título/owner", Category: "Deals", Scope: "global"},
+	{ID: "deal.moved", Name: "Deal moveu de stage", Description: "Mudança de etapa do pipeline", Category: "Deals", Scope: "global"},
+	{ID: "deal.won", Name: "Deal ganho", Description: "Fechamento positivo", Category: "Deals", Scope: "global"},
+	{ID: "deal.lost", Name: "Deal perdido", Description: "Fechamento negativo", Category: "Deals", Scope: "global"},
+	{ID: "deal.deleted", Name: "Deal deletado", Description: "Removido do pipeline", Category: "Deals", Scope: "global"},
+
+	// ─── Campaigns ────────────────────────────────────────────────
+	{ID: "campaign.created", Name: "Campanha criada", Description: "Nova campanha em draft", Category: "Campanha", Scope: "global"},
+	{ID: "campaign.started", Name: "Campanha iniciada", Description: "Disparo começou", Category: "Campanha", Scope: "global"},
+	{ID: "campaign.paused", Name: "Campanha pausada", Description: "Pause do disparo", Category: "Campanha", Scope: "global"},
+	{ID: "campaign.resumed", Name: "Campanha retomada", Description: "Resume após pause", Category: "Campanha", Scope: "global"},
+	{ID: "campaign.completed", Name: "Campanha finalizada", Description: "Todos recipients processados", Category: "Campanha", Scope: "global"},
+	{ID: "campaign.failed", Name: "Campanha falhou", Description: "Erro irrecuperável", Category: "Campanha", Scope: "global"},
+	{ID: "campaign.recipient.sent", Name: "Recipient enviado", Description: "Mensagem entregue a 1 destinatário", Category: "Campanha", Scope: "global"},
+	{ID: "campaign.recipient.failed", Name: "Recipient falhou", Description: "Falha pra 1 destinatário", Category: "Campanha", Scope: "global"},
+
+	// ─── Journeys (automação) ─────────────────────────────────────
+	{ID: "journey.started", Name: "Jornada iniciada", Description: "Execução criada pra um contato", Category: "Jornada", Scope: "global"},
+	{ID: "journey.step", Name: "Step executado", Description: "Cada passo da journey emite", Category: "Jornada", Scope: "global"},
+	{ID: "journey.completed", Name: "Jornada finalizada", Description: "Chegou ao fim sem erro", Category: "Jornada", Scope: "global"},
+	{ID: "journey.failed", Name: "Jornada falhou", Description: "Erro durante execução", Category: "Jornada", Scope: "global"},
+	{ID: "journey.aborted", Name: "Jornada abortada", Description: "Interrompida manualmente", Category: "Jornada", Scope: "global"},
+
+	// ─── AI Agents ────────────────────────────────────────────────
+	{ID: "agent.response", Name: "Resposta do agente", Description: "Bot respondeu ao cliente", Category: "Agente IA", Scope: "global"},
+	{ID: "agent.handoff", Name: "Handoff humano", Description: "Bot escalou pra agente humano", Category: "Agente IA", Scope: "global"},
+
+	// ─── Triggers (Sprint 8) ──────────────────────────────────────
+	{ID: "trigger.fired", Name: "Trigger disparou", Description: "Keyword bateu e ação foi executada", Category: "Triggers", Scope: "global"},
+
+	// ─── Warmup (Sprint 7) ────────────────────────────────────────
+	{ID: "warmup.started", Name: "Warmup iniciado", Description: "Sessão de aquecimento começou", Category: "Anti-ban", Scope: "instance"},
+	{ID: "warmup.completed", Name: "Warmup finalizado", Description: "Curva de 14 dias completou", Category: "Anti-ban", Scope: "instance"},
+
+	// ─── CSAT ─────────────────────────────────────────────────────
+	{ID: "csat.requested", Name: "CSAT solicitado", Description: "Pesquisa de satisfação enviada", Category: "CSAT", Scope: "global"},
+	{ID: "csat.submitted", Name: "CSAT respondido", Description: "Cliente enviou nota+comentário", Category: "CSAT", Scope: "global"},
+
+	// ─── Workspace / RBAC ─────────────────────────────────────────
+	{ID: "workspace.created", Name: "Workspace criado", Description: "Novo workspace", Category: "Workspace", Scope: "global"},
+	{ID: "workspace.member_added", Name: "Membro adicionado", Description: "Convite aceito", Category: "Workspace", Scope: "global"},
+	{ID: "workspace.member_removed", Name: "Membro removido", Description: "Saiu do workspace", Category: "Workspace", Scope: "global"},
+
+	// ─── Auth ─────────────────────────────────────────────────────
+	{ID: "user.registered", Name: "Usuário registrado", Description: "Sign-up novo", Category: "Usuário", Scope: "global"},
+	{ID: "user.login", Name: "Login", Description: "Sessão iniciada", Category: "Usuário", Scope: "global"},
+	{ID: "user.logout", Name: "Logout", Description: "Sessão encerrada", Category: "Usuário", Scope: "global"},
+
+	// ─── Pagamento / Billing — ADMIN ONLY ─────────────────────────
+	{ID: "payment.success", Name: "Pagamento confirmado", Description: "Stripe/Asaas confirmou", Category: "Pagamento", Scope: "global", AdminOnly: true},
+	{ID: "payment.failed", Name: "Pagamento falhou", Description: "Cartão/boleto recusado", Category: "Pagamento", Scope: "global", AdminOnly: true},
+	{ID: "payment.refunded", Name: "Pagamento estornado", Description: "Refund processado", Category: "Pagamento", Scope: "global", AdminOnly: true},
+	{ID: "subscription.created", Name: "Assinatura criada", Description: "Trial/checkout completou", Category: "Pagamento", Scope: "global", AdminOnly: true},
+	{ID: "subscription.cancelled", Name: "Assinatura cancelada", Description: "Cliente cancelou plano", Category: "Pagamento", Scope: "global", AdminOnly: true},
+	{ID: "subscription.renewed", Name: "Assinatura renovada", Description: "Renovação bem-sucedida", Category: "Pagamento", Scope: "global", AdminOnly: true},
+	{ID: "plan.changed", Name: "Plano alterado", Description: "Upgrade/downgrade", Category: "Pagamento", Scope: "global", AdminOnly: true},
+	{ID: "billing.invoice_created", Name: "Fatura emitida", Description: "Nova invoice pendente", Category: "Pagamento", Scope: "global", AdminOnly: true},
+	{ID: "billing.invoice_paid", Name: "Fatura paga", Description: "Pagamento de invoice OK", Category: "Pagamento", Scope: "global", AdminOnly: true},
+
+	// ─── Sistema ──────────────────────────────────────────────────
+	{ID: "webhook.test", Name: "Teste de webhook", Description: "Disparo manual via UI", Category: "Sistema", Scope: "both"},
 }
 
 // validEventIDs retorna um set com todos os IDs válidos (para validar input).
@@ -111,8 +211,39 @@ func resolveWebhookUserID(c *fiber.Ctx) (uuid.UUID, error) {
 }
 
 // ListEvents GET /webhooks/system/events
+//
+// Query params (opcionais):
+//   ?scope=instance|global|both — filtra por escopo (default: tudo)
+//   ?include_admin=1            — força incluir admin-only (super admin)
+//
+// Eventos AdminOnly são sempre filtrados pra usuários comuns. Pra super
+// admin, ?include_admin=1 destrava (e o middleware de admin valida).
 func (h *GlobalWebhookHandler) ListEvents(c *fiber.Ctx) error {
-	return c.JSON(SystemEvents)
+	wantScope := strings.ToLower(strings.TrimSpace(c.Query("scope")))
+	includeAdmin := c.QueryBool("include_admin", false)
+
+	// Detecta se o caller é super admin via Locals (setado pelo middleware
+	// RequireAdmin se aplicável; senão, false).
+	isAdmin := false
+	if u, ok := c.Locals("user").(*models.User); ok && u != nil {
+		isAdmin = u.Role == models.RoleSuperAdmin
+	} else if u, ok := c.Locals("user").(models.User); ok {
+		isAdmin = u.Role == models.RoleSuperAdmin
+	}
+
+	out := make([]SystemEventItem, 0, len(SystemEvents))
+	for _, e := range SystemEvents {
+		// Filtra admin-only pra não-admin (a não ser que admin pediu inclusivo)
+		if e.AdminOnly && !(isAdmin && includeAdmin) {
+			continue
+		}
+		// Filtra por scope quando solicitado.
+		if wantScope != "" && wantScope != "both" && e.Scope != wantScope && e.Scope != "both" {
+			continue
+		}
+		out = append(out, e)
+	}
+	return c.JSON(out)
 }
 
 // webhookResponse é o shape exposto pela API (esconde secret etc).

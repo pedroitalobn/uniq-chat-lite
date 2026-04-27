@@ -150,6 +150,7 @@ func main() {
 
 	// WhatsApp Manager
 	manager := whatsapp.NewManager(cfg.SessionDir, db)
+	whatsapp.SetDeliveryDB(db) // habilita log de WebhookDelivery
 	manager.LoadAll()
 
 	// Connect hub to manager for bulk actions
@@ -222,6 +223,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.APIKey{},
 		&models.Webhook{},
 		&models.GlobalWebhook{},
+		&models.WebhookDelivery{},
 		&models.MessageLog{},
 		&models.MessageReceipt{},
 		&models.LinkPreview{},

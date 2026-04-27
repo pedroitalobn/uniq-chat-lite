@@ -114,6 +114,7 @@ type wsConn struct {
 }
 
 type webhookEntry struct {
+	ID            string // UUID do Webhook (vazio se não vier do DB) — usado pra log de delivery
 	Events        []string
 	IgnoreGroups  bool
 	IgnoreSelf    bool
