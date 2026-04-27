@@ -1485,28 +1485,53 @@ func (ic *InstanceClient) SendPixMessage(to string, data PixData) (string, error
 		return "", fmt.Errorf("falha ao serializar payload pix: %w", err)
 	}
 
-	// Paritário com Evolution-Go main (linhas 1769-1779): PIX é
-	// InteractiveMessage com SOMENTE NativeFlowMessage payment_info.
-	// SEM Body/Header/Footer/ContextInfo. SEM wrap. SEM biz nodes.
-	// Quando o WhatsApp vê esse formato cru, renderiza o card "Pagar".
+	// Mesma stack que SendButtonsMessage: wrap em DocumentWithCaption +
+	// AdditionalNodes biz native_flow. Confirmado em prod que esse combo é
+	// o que faz a UI nativa renderizar (template começou a chegar quando
+	// passou a usar essa stack).
 	templateID := fmt.Sprintf("%d", time.Now().UnixNano()/1_000_000)
 	messageParamsJSON := fmt.Sprintf(`{"from":"api","templateId":"%s"}`, templateID)
 
+	secret := make([]byte, 32)
+	_, _ = cryptorand.Read(secret)
+
+	interactive := &waE2E.InteractiveMessage{
+		Header: &waE2E.InteractiveMessage_Header{
+			Title:              proto.String(data.HeaderTitle),
+			HasMediaAttachment: proto.Bool(false),
+		},
+		Body: &waE2E.InteractiveMessage_Body{Text: proto.String(data.BodyText)},
+		InteractiveMessage: &waE2E.InteractiveMessage_NativeFlowMessage_{
+			NativeFlowMessage: &waE2E.InteractiveMessage_NativeFlowMessage{
+				Buttons: []*waE2E.InteractiveMessage_NativeFlowMessage_NativeFlowButton{{
+					Name:             proto.String("payment_info"),
+					ButtonParamsJSON: proto.String(string(paymentJSON)),
+				}},
+				MessageParamsJSON: proto.String(messageParamsJSON),
+				MessageVersion:    proto.Int32(1),
+			},
+		},
+		ContextInfo: &waE2E.ContextInfo{},
+	}
+	if footer := strings.TrimSpace(data.FooterText); footer != "" {
+		interactive.Footer = &waE2E.InteractiveMessage_Footer{Text: proto.String(footer)}
+	}
+
 	msg := &waE2E.Message{
-		InteractiveMessage: &waE2E.InteractiveMessage{
-			InteractiveMessage: &waE2E.InteractiveMessage_NativeFlowMessage_{
-				NativeFlowMessage: &waE2E.InteractiveMessage_NativeFlowMessage{
-					Buttons: []*waE2E.InteractiveMessage_NativeFlowMessage_NativeFlowButton{{
-						Name:             proto.String("payment_info"),
-						ButtonParamsJSON: proto.String(string(paymentJSON)),
-					}},
-					MessageParamsJSON: proto.String(messageParamsJSON),
+		DocumentWithCaptionMessage: &waE2E.FutureProofMessage{
+			Message: &waE2E.Message{
+				InteractiveMessage: interactive,
+				MessageContextInfo: &waE2E.MessageContextInfo{
+					MessageSecret: secret,
 				},
 			},
 		},
 	}
+	bizNodes := buildButtonsBizNodes(true)
 
-	res, err := ic.client.SendMessage(context.Background(), recipient, msg)
+	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
+		AdditionalNodes: &bizNodes,
+	})
 	if err != nil {
 		log.Warn().Str("instance", ic.ID).Err(err).Msg("PIX send failed, falling back to text")
 		fallback := fmt.Sprintf("*%s*\n\n%s\n\n💳 *Pagamento PIX*\nFavor: %s\nChave (%s): `%s`",
@@ -1606,8 +1631,9 @@ func (ic *InstanceClient) SendListMessage(to, title, description, buttonText, fo
 		})
 	}
 
-	// Paritário com Evolution-Go main (linhas 1992-2010): ListMessage direto
-	// SEM wrap, SEM biz nodes, SEM AdditionalNodes. Aceita iOS/Android/Web.
+	// Mesma stack confirmada em prod (Buttons/Template renderizam): wrap +
+	// AdditionalNodes biz native_flow. Lista CRUA (sem wrap) não chegava no
+	// recipient, mesmo com 200 OK na stanza.
 	listType := waE2E.ListMessage_SINGLE_SELECT
 	listMsg := &waE2E.ListMessage{
 		Title:       proto.String(title),
@@ -1618,9 +1644,24 @@ func (ic *InstanceClient) SendListMessage(to, title, description, buttonText, fo
 		Sections:    protoSections,
 	}
 
-	msg := &waE2E.Message{ListMessage: listMsg}
+	secret := make([]byte, 32)
+	_, _ = cryptorand.Read(secret)
 
-	res, err := ic.client.SendMessage(context.Background(), recipient, msg)
+	msg := &waE2E.Message{
+		DocumentWithCaptionMessage: &waE2E.FutureProofMessage{
+			Message: &waE2E.Message{
+				ListMessage: listMsg,
+				MessageContextInfo: &waE2E.MessageContextInfo{
+					MessageSecret: secret,
+				},
+			},
+		},
+	}
+	bizNodes := buildButtonsBizNodes(true)
+
+	res, err := ic.client.SendMessage(context.Background(), recipient, msg, whatsmeow.SendRequestExtra{
+		AdditionalNodes: &bizNodes,
+	})
 	if err != nil {
 		log.Warn().Str("instance", ic.ID).Err(err).Msg("interactive list send failed, falling back to text")
 		return ic.SendListFallbackMessage(to, title, description, buttonText, footer, sections)
