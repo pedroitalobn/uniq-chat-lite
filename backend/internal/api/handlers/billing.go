@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -11,6 +12,7 @@ import (
 	stripesub "github.com/stripe/stripe-go/v76/subscription"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/models"
+	"github.com/uniq-chat/backend/internal/services"
 	"gorm.io/gorm"
 )
 
@@ -23,19 +25,40 @@ import (
 //   POST /billing/resume         — desfaz cancelamento agendado
 //   GET  /billing/preview/:plan  — calcula proration sem aplicar (preview)
 type BillingHandler struct {
-	db *gorm.DB
+	db    *gorm.DB
+	asaas *services.AsaasClient
 }
 
 func NewBillingHandler(db *gorm.DB) *BillingHandler {
-	return &BillingHandler{db: db}
+	return &BillingHandler{
+		db:    db,
+		asaas: services.NewAsaasClient(db),
+	}
+}
+
+// resolveProvider escolhe Stripe ou Asaas baseado em qual subscription
+// o user tem ativa. Se nenhum, retorna "" (cliente vai pro checkout).
+//
+// Ordem de prioridade: Stripe > Asaas. Em produção um user só tem 1
+// subscription ativa por vez (não é caso comum ter os dois).
+func (h *BillingHandler) resolveProvider(user *models.User) string {
+	if user == nil {
+		return ""
+	}
+	if user.StripeSubscriptionID != "" {
+		return "stripe"
+	}
+	if user.AsaasSubscriptionID != "" {
+		return "asaas"
+	}
+	return ""
 }
 
 // PreviewUpgrade — GET /v1/billing/preview/:planId
 //
-// Calcula quanto o user pagará HOJE pra trocar pro plano alvo, usando
-// proration_behavior="create_prorations" do Stripe. Retorna o valor
-// em centavos pra UI mostrar "Você pagará R$ X agora pelos Y dias
-// restantes do ciclo. Próximo mês: R$ Z".
+// Calcula quanto o user pagará HOJE pra trocar pro plano alvo. Usa
+// proration nativo do Stripe (Invoices.Upcoming) ou cálculo local
+// pra Asaas (não tem proration nativo).
 func (h *BillingHandler) PreviewUpgrade(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 	if user == nil {
@@ -49,18 +72,24 @@ func (h *BillingHandler) PreviewUpgrade(c *fiber.Ctx) error {
 	if err := h.db.First(&newPlan, "id = ?", planID).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "plano não encontrado"})
 	}
-	if newPlan.StripePriceID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "plano sem stripe_price_id"})
-	}
-	if user.StripeSubscriptionID == "" {
+	provider := h.resolveProvider(user)
+	if provider == "" {
 		// Sem subscription ativa: não tem proration — vai pra checkout normal.
 		return c.JSON(fiber.Map{
 			"has_active_subscription": false,
 			"action":                  "checkout",
 			"new_plan":                newPlan.Name,
 			"new_price":               newPlan.Price,
-			"message":                 "Você não tem assinatura ativa. Use /stripe/checkout pra criar uma.",
+			"message":                 "Você não tem assinatura ativa. Use /stripe/checkout ou /asaas/checkout pra criar.",
 		})
+	}
+
+	if provider == "asaas" {
+		return h.previewAsaasUpgrade(c, user, &newPlan)
+	}
+	// Stripe
+	if newPlan.StripePriceID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "plano sem stripe_price_id"})
 	}
 
 	// Stripe Invoices.Upcoming com items modificados — calcula proration
@@ -122,8 +151,8 @@ func (h *BillingHandler) PreviewUpgrade(c *fiber.Ctx) error {
 //
 // Body: { "plan_id": "<uuid>" }
 //
-// Aplica a troca de plano na subscription Stripe existente com proration
-// automática. Se não tem sub ativa, retorna 400 sugerindo /stripe/checkout.
+// Aplica a troca de plano. Stripe usa proration nativo (subscription.Update);
+// Asaas calcula local + emite payment avulso da diferença.
 func (h *BillingHandler) Upgrade(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 	if user == nil {
@@ -145,17 +174,22 @@ func (h *BillingHandler) Upgrade(c *fiber.Ctx) error {
 	if err := h.db.First(&newPlan, "id = ?", planID).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "plano não encontrado"})
 	}
-	if newPlan.StripePriceID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "plano sem stripe_price_id"})
-	}
 
-	// Sem subscription ativa: client deve usar /stripe/checkout pra criar.
-	if user.StripeSubscriptionID == "" {
+	provider := h.resolveProvider(user)
+	if provider == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error":           "no_active_subscription",
-			"message":         "Crie uma assinatura via /stripe/checkout primeiro.",
+			"error":             "no_active_subscription",
+			"message":           "Crie uma assinatura via /stripe/checkout ou /asaas/checkout primeiro.",
 			"checkout_endpoint": "/v1/stripe/checkout",
 		})
+	}
+
+	if provider == "asaas" {
+		return h.upgradeAsaas(c, user, &newPlan)
+	}
+	// Stripe
+	if newPlan.StripePriceID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "plano sem stripe_price_id"})
 	}
 
 	// Recupera a sub atual pra achar o item ID e o plano antigo (audit).
@@ -240,7 +274,8 @@ func (h *BillingHandler) Cancel(c *fiber.Ctx) error {
 	if user == nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
 	}
-	if user.StripeSubscriptionID == "" {
+	provider := h.resolveProvider(user)
+	if provider == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "sem assinatura ativa"})
 	}
 	var req struct {
@@ -248,12 +283,28 @@ func (h *BillingHandler) Cancel(c *fiber.Ctx) error {
 	}
 	_ = c.BodyParser(&req)
 
+	if provider == "asaas" {
+		// Asaas só tem DELETE imediato. "cancel at period end" não é nativo —
+		// simulamos guardando flag local + cron limpa no nextDueDate.
+		// Por enquanto: imediate=true cancela já; immediate=false cancela
+		// também (sem distinção real até termos cron de billing).
+		if err := h.asaas.DeleteSubscription(user.AsaasSubscriptionID); err != nil {
+			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+		}
+		h.db.Model(user).Updates(map[string]any{
+			"asaas_subscription_id":     "",
+			"asaas_subscription_status": "CANCELLED",
+		})
+		return c.JSON(fiber.Map{"success": true, "cancelled": "immediate", "provider": "asaas"})
+	}
+
+	// Stripe
 	if req.Immediate {
 		_, err := stripesub.Cancel(user.StripeSubscriptionID, nil)
 		if err != nil {
 			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
 		}
-		return c.JSON(fiber.Map{"success": true, "cancelled": "immediate"})
+		return c.JSON(fiber.Map{"success": true, "cancelled": "immediate", "provider": "stripe"})
 	}
 	updated, err := stripesub.Update(user.StripeSubscriptionID, &stripe.SubscriptionParams{
 		CancelAtPeriodEnd: stripe.Bool(true),
@@ -264,17 +315,27 @@ func (h *BillingHandler) Cancel(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"success":           true,
 		"cancelled":         "at_period_end",
+		"provider":          "stripe",
 		"current_period_end": time.Unix(updated.CurrentPeriodEnd, 0),
 	})
 }
 
 // Resume — POST /v1/billing/resume
 //
-// Desfaz um cancelamento agendado (cancel_at_period_end=false).
+// Desfaz um cancelamento agendado (Stripe: cancel_at_period_end=false).
+// Asaas não tem cancelamento agendado por isso resume não se aplica —
+// retorna 400.
 func (h *BillingHandler) Resume(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 	if user == nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+	}
+	provider := h.resolveProvider(user)
+	if provider == "asaas" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "asaas_no_resume",
+			"message": "Asaas não suporta retomar cancelamento. Crie nova assinatura via /asaas/checkout.",
+		})
 	}
 	if user.StripeSubscriptionID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "sem assinatura ativa"})
@@ -289,6 +350,121 @@ func (h *BillingHandler) Resume(c *fiber.Ctx) error {
 		"success":             true,
 		"subscription_status": updated.Status,
 	})
+}
+
+// ─── Asaas implementations ────────────────────────────────────────────
+
+// previewAsaasUpgrade calcula proration local usando dias restantes do
+// ciclo atual contra a próxima data de vencimento da subscription.
+func (h *BillingHandler) previewAsaasUpgrade(c *fiber.Ctx, user *models.User, newPlan *models.Plan) error {
+	sub, err := h.asaas.GetSubscription(user.AsaasSubscriptionID)
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+	}
+	nextDue, _ := time.Parse("2006-01-02", sub.NextDueDate)
+	prorationCents := services.CalculateAsaasProration(sub.Value, newPlan.Price, nextDue)
+	daysRemaining := int(time.Until(nextDue).Hours() / 24)
+	if daysRemaining < 0 {
+		daysRemaining = 0
+	}
+
+	return c.JSON(fiber.Map{
+		"has_active_subscription": true,
+		"provider":                "asaas",
+		"new_plan":                newPlan.Name,
+		"new_price":               newPlan.Price,
+		"old_price":               sub.Value,
+		"current_period_end":      nextDue,
+		"days_remaining":          daysRemaining,
+		"amount_due_now":          prorationCents,             // centavos. Negativo = crédito.
+		"next_charge_amount":      int64(newPlan.Price * 100),
+		"currency":                "brl",
+		"note":                    "Asaas não tem proration nativo — cobramos a diferença prorated num boleto/PIX avulso. Próximo ciclo: valor cheio do plano novo.",
+	})
+}
+
+// upgradeAsaas executa a troca: 1) calcula proration; 2) atualiza
+// subscription com novo Value mantendo nextDueDate (preserva ciclo);
+// 3) cria payment avulso da diferença.
+func (h *BillingHandler) upgradeAsaas(c *fiber.Ctx, user *models.User, newPlan *models.Plan) error {
+	sub, err := h.asaas.GetSubscription(user.AsaasSubscriptionID)
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+	}
+	nextDue, _ := time.Parse("2006-01-02", sub.NextDueDate)
+	prorationCents := services.CalculateAsaasProration(sub.Value, newPlan.Price, nextDue)
+	prorationValue := float64(prorationCents) / 100.0
+
+	// Captura plano anterior pra audit log.
+	var oldPlan models.Plan
+	if user.PlanID != nil {
+		_ = h.db.First(&oldPlan, "id = ?", *user.PlanID).Error
+	}
+
+	// 1) Atualiza subscription com novo Value (mantém nextDueDate — ciclo
+	// continua igual). Próxima fatura sai com valor novo.
+	newPrice := newPlan.Price
+	_, err = h.asaas.UpdateSubscription(user.AsaasSubscriptionID, services.AsaasSubscriptionUpdate{
+		Value:       &newPrice,
+		Description: fmt.Sprintf("Plano %s — Uniq Chat", newPlan.Name),
+	})
+	if err != nil {
+		log.Error().Err(err).Str("sub", user.AsaasSubscriptionID).Msg("billing/asaas: update sub failed")
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "asaas update sub: " + err.Error()})
+	}
+
+	// 2) Cria payment avulso da diferença prorated. Só se for upgrade
+	// (positivo). Downgrade vira crédito que será compensado no próximo
+	// ciclo (Asaas não credita cartão automaticamente).
+	var paymentResp *services.AsaasPaymentResponse
+	if prorationCents > 0 {
+		paymentResp, err = h.asaas.CreatePayment(services.AsaasPaymentRequest{
+			Customer:          user.AsaasCustomerID,
+			BillingType:       "UNDEFINED", // user escolhe boleto/pix/cartão na hora de pagar
+			Value:             prorationValue,
+			DueDate:           time.Now().AddDate(0, 0, 3).Format("2006-01-02"), // 3 dias pra pagar
+			Description:       fmt.Sprintf("Diferença upgrade %s → %s (proration de %d dias)", oldPlan.Name, newPlan.Name, int(time.Until(nextDue).Hours()/24)),
+			ExternalReference: user.ID.String(),
+		})
+		if err != nil {
+			// Sub já foi atualizada — só logamos. Suporte pode emitir manual.
+			log.Warn().Err(err).Msg("billing/asaas: proration payment failed")
+		}
+	}
+
+	// 3) Atualiza plano local e audit.
+	now := time.Now()
+	h.db.Model(user).Updates(map[string]any{
+		"plan_id":    newPlan.ID,
+		"updated_at": now,
+	})
+
+	logEntry := models.PlanChangeLog{
+		UserID:           user.ID,
+		FromPlanID:       user.PlanID,
+		ToPlanID:         &newPlan.ID,
+		FromPlanName:     oldPlan.Name,
+		ToPlanName:       newPlan.Name,
+		Source:           models.PlanChangeSourceAsaas,
+		ActorID:          &user.ID,
+		ActorEmail:       user.Email,
+		ProrationAmount:  prorationCents,
+		Notes:            "Asaas upgrade — sub atualizada + payment avulso de proration.",
+	}
+	h.db.Create(&logEntry)
+
+	resp := fiber.Map{
+		"success":          true,
+		"provider":         "asaas",
+		"new_plan":         newPlan.Name,
+		"proration_amount": prorationCents,
+	}
+	if paymentResp != nil {
+		resp["payment_id"] = paymentResp.ID
+		resp["invoice_url"] = paymentResp.InvoiceURL
+		resp["bank_slip_url"] = paymentResp.BankSlipURL
+	}
+	return c.JSON(resp)
 }
 
 // Status — GET /v1/billing/status
