@@ -212,6 +212,10 @@ func main() {
 	computedCron := services.NewComputedCron(db)
 	computedCron.Start()
 
+	// Journey Event Dispatcher — singleton global pra outros services
+	// emitirem eventos de Goal/ExitConditions (shop.order_paid, deal.won, …).
+	services.NewJourneyEventDispatcher(db)
+
 	// Ticketing periodic jobs: unsnoozer, presence sweep, pending redispatch,
 	// resolve auto-close.
 	ticketingScheduler := services.NewTicketingScheduler(db, services.NewDispatchService(db))

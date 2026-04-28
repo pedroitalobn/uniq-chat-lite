@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Contact, Briefcase, Building2, Filter, Upload } from "lucide-react";
+import { Contact, Briefcase, Building2, Filter, Upload, GitMerge } from "lucide-react";
 
 // CRMTabs — pílulas de navegação entre Contatos / Deals / Empresas.
 // Componente standalone pra cada página posicionar onde fizer sentido
@@ -15,7 +15,8 @@ const TABS = [
   { href: "/crm/contacts",  label: "Contatos",  icon: Contact,    match: (p: string) => p.startsWith("/crm/contacts") },
   { href: "/crm/companies", label: "Empresas",  icon: Building2,  match: (p: string) => p.startsWith("/crm/companies") },
   { href: "/crm/segments",  label: "Segmentos", icon: Filter,     match: (p: string) => p.startsWith("/crm/segments") },
-  { href: "/crm/import",    label: "Importar",  icon: Upload,     match: (p: string) => p.startsWith("/crm/import") },
+  { href: "/crm/import",     label: "Importar",   icon: Upload,    match: (p: string) => p.startsWith("/crm/import") },
+  { href: "/crm/duplicates", label: "Duplicatas", icon: GitMerge,  match: (p: string) => p.startsWith("/crm/duplicates") },
 ];
 
 export function CRMTabs({ className }: { className?: string }) {
