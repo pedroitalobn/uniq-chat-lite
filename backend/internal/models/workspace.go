@@ -165,6 +165,16 @@ var (
 	PermCRMEdit   = "crm:edit"
 	PermCRMDelete = "crm:delete"
 
+	// Scope de visibilidade de contatos. Escolha UMA das três por papel:
+	//   contacts:view_all     → todos os contatos do workspace
+	//   contacts:view_team    → contatos cujo owner é membro do mesmo team
+	//   contacts:view_dept    → contatos cujo owner é membro do mesmo department
+	// Sem nenhum desses → só vê contatos onde owner_id = self (default).
+	// Owner do workspace e super admin sempre veem tudo.
+	PermContactsViewAll  = "contacts:view_all"
+	PermContactsViewTeam = "contacts:view_team"
+	PermContactsViewDept = "contacts:view_department"
+
 	// Team permissions
 	PermTeamView   = "team:view"
 	PermTeamInvite = "team:invite"
@@ -272,6 +282,9 @@ func GetAllPermissions() []Permission {
 		{Key: PermCRMCreate, Name: "Criar Contatos", Category: "crm"},
 		{Key: PermCRMEdit, Name: "Editar Contatos", Category: "crm"},
 		{Key: PermCRMDelete, Name: "Excluir Contatos", Category: "crm"},
+		{Key: PermContactsViewAll, Name: "Ver TODOS contatos do workspace", Category: "crm"},
+		{Key: PermContactsViewTeam, Name: "Ver contatos da minha equipe", Category: "crm"},
+		{Key: PermContactsViewDept, Name: "Ver contatos do meu departamento", Category: "crm"},
 
 		// Team
 		{Key: PermTeamView, Name: "Visualizar Equipe", Category: "team"},

@@ -3,6 +3,7 @@ package handlers
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -55,6 +56,9 @@ func (h *ContactHandler) ListContacts(c *fiber.Ctx) error {
 	if workspaceID != "" {
 		if wid, err := uuid.Parse(workspaceID); err == nil {
 			query = query.Where("workspace_id = ?", wid)
+			// Aplica RBAC scope DENTRO do workspace selecionado. Owner do
+			// workspace e super admin pulam o scope (veem tudo).
+			query = h.applyContactScopeRBAC(c, query, wid, userID)
 		}
 	}
 	if search != "" {
@@ -639,4 +643,93 @@ func (h *ContactHandler) ListFunnelOptions(c *fiber.Ctx) error {
 	cq.Distinct("funnel").Pluck("funnel", &legacy)
 
 	return c.JSON(mergeUnique(funnelNames, legacy))
+}
+
+// applyContactScopeRBAC aplica o filtro de visibilidade do CRM baseado nas
+// permissions do user no workspace.
+//
+// Hierarquia (mais permissivo ganha):
+//   1. Workspace owner / super admin       → vê TUDO (sem filtro)
+//   2. Permission contacts:view_all        → vê TUDO do workspace
+//   3. Permission contacts:view_department → contatos cujo owner está no
+//      mesmo department (via team membership)
+//   4. Permission contacts:view_team       → contatos cujo owner está no
+//      mesmo team
+//   5. Default                             → só contatos onde owner_id = self
+//      OU sem owner (sem owner = visível pra quem criou, via user_id já
+//      filtrado acima)
+func (h *ContactHandler) applyContactScopeRBAC(c *fiber.Ctx, q *gorm.DB, ws uuid.UUID, userID uuid.UUID) *gorm.DB {
+	user := middleware.GetCurrentUser(c)
+	if user == nil {
+		return q
+	}
+	// Super admin bypass
+	if user.Role == models.RoleSuperAdmin {
+		return q
+	}
+
+	// Verifica se é owner do workspace
+	var uw models.UserWorkspace
+	if err := h.db.Where("user_id = ? AND workspace_id = ?", userID, ws).First(&uw).Error; err != nil {
+		// Sem membership: bloqueia tudo (não deveria chegar aqui — middleware
+		// já validou — mas por segurança).
+		return q.Where("1 = 0")
+	}
+	if uw.IsOwner {
+		return q
+	}
+
+	// Resolve permissions do role
+	permKeys := map[string]bool{}
+	if uw.RoleID != nil {
+		var perms []models.Permission
+		h.db.Model(&models.Permission{}).
+			Joins("JOIN role_permissions rp ON rp.permission_id = permissions.id").
+			Where("rp.role_id = ?", *uw.RoleID).
+			Find(&perms)
+		for _, p := range perms {
+			permKeys[p.Key] = true
+		}
+	}
+
+	if permKeys[models.PermContactsViewAll] {
+		return q
+	}
+
+	if permKeys[models.PermContactsViewDept] {
+		// Owner_id pertencer a algum user em algum team do mesmo department
+		// que o user atual está. Resolve em SQL pra evitar N+1:
+		//   teams_meus = (SELECT team_id FROM team_members WHERE user_id = me)
+		//   depts_meus = (SELECT department_id FROM teams WHERE id IN teams_meus)
+		//   users_dept = (SELECT user_id FROM team_members WHERE team_id IN
+		//                 (SELECT id FROM teams WHERE department_id IN depts_meus))
+		return q.Where(`(
+			contacts.owner_id IS NULL
+			OR contacts.owner_id = ?
+			OR contacts.owner_id IN (
+				SELECT tm.user_id FROM team_members tm
+				WHERE tm.team_id IN (
+					SELECT id FROM teams WHERE department_id IN (
+						SELECT department_id FROM teams
+						WHERE id IN (SELECT team_id FROM team_members WHERE user_id = ?)
+					)
+				)
+			)
+		)`, userID, userID)
+	}
+
+	if permKeys[models.PermContactsViewTeam] {
+		// Owner_id pertencer a algum user no mesmo team que o user atual.
+		return q.Where(`(
+			contacts.owner_id IS NULL
+			OR contacts.owner_id = ?
+			OR contacts.owner_id IN (
+				SELECT user_id FROM team_members
+				WHERE team_id IN (SELECT team_id FROM team_members WHERE user_id = ?)
+			)
+		)`, userID, userID)
+	}
+
+	// Default: só contatos próprios (owner = self) ou sem owner
+	return q.Where("contacts.owner_id IS NULL OR contacts.owner_id = ?", userID)
 }
