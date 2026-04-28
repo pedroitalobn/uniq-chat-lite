@@ -20,6 +20,7 @@ import { CheckCircle2, Loader2, MessageSquare, Sparkles, X } from "lucide-react"
 import { UniqAIChatPanel } from "@/features/uniq-ai/chat-panel";
 import type { Message } from "@/features/uniq-ai/atoms";
 import { useUniqAIIsland } from "./island-context";
+import { useConversationWS } from "@/hooks/useConversationWS";
 
 function shouldHide(pathname: string, isMobile: boolean): boolean {
   // /uniq-ai já é o chat full-screen, não faz sentido sobrepor.
@@ -43,7 +44,47 @@ function useIsMobile(): boolean {
 }
 
 export function UniqAIIsland() {
-  const { state, open, close } = useUniqAIIsland();
+  const { state, open, close, dismissNotification, pushNotification } = useUniqAIIsland();
+
+  // Realtime subscriber: nova mensagem inbound + venda + campanha viram
+  // notificações inline. Cada página pode também chamar pushNotification
+  // direto via context.
+  useConversationWS({
+    prefixes: ["conversation.message_inbound", "shop.order_paid", "campaign."],
+    onEvent: (evt) => {
+      const t = evt.type || "";
+      if (t === "conversation.message_inbound") {
+        const data = (evt.payload || {}) as { from_name?: string; preview?: string; conversation_id?: string };
+        pushNotification({
+          kind: "message",
+          title: data.from_name ? `${data.from_name}` : "Nova mensagem",
+          subtitle: data.preview?.slice(0, 60),
+          actions: data.conversation_id
+            ? [{ label: "Abrir", href: `/inbox?c=${data.conversation_id}` }]
+            : undefined,
+        });
+      } else if (t === "shop.order_paid") {
+        const data = (evt.payload || {}) as { customer?: string; total?: number; order_id?: string };
+        pushNotification({
+          kind: "sale",
+          title: `Venda confirmada${data.total ? ` · R$ ${data.total.toFixed(2)}` : ""}`,
+          subtitle: data.customer,
+          actions: [{ label: "Ver", href: data.order_id ? `/shops?order=${data.order_id}` : "/shops" }],
+        });
+      } else if (t.startsWith("campaign.")) {
+        const data = (evt.payload || {}) as { name?: string; campaign_id?: string };
+        const verb = t === "campaign.completed" ? "finalizada" : t === "campaign.paused" ? "pausada" : "atualizada";
+        pushNotification({
+          kind: "campaign",
+          title: `Campanha ${verb}`,
+          subtitle: data.name,
+          actions: data.campaign_id
+            ? [{ label: "Ver", href: `/campaigns/${data.campaign_id}` }]
+            : undefined,
+        });
+      }
+    },
+  });
   const pathname = usePathname() || "";
   const isMobile = useIsMobile();
   // Scratch chat efêmero — a ilha não persiste conversa nem se mistura
@@ -132,9 +173,11 @@ export function UniqAIIsland() {
   }
 
   // Desktop: TOPO central. Pill compacta que cresce LEVEMENTE pra receber
-  // comando — inspirado em https://skiper-ui.com/v1/skiper2 e iOS Dynamic
-  // Island. SEM modal, SEM backdrop. Resultado aparece inline na pill.
+  // comando — inspirado em https://skiper-ui.com/v1/skiper2 + cult-ui +
+  // iOS Live Activities. SEM modal, SEM backdrop. Resultado e
+  // notificações realtime aparecem inline na pill.
   const isExpanded = state.mode === "expanded";
+  const isNotif = state.mode === "notification";
   const islandSpring = { type: "spring" as const, stiffness: 420, damping: 36, mass: 0.7 };
   const [prompt, setPrompt] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -158,13 +201,15 @@ export function UniqAIIsland() {
     <motion.div
       layout
       transition={islandSpring}
-      onClick={isExpanded ? undefined : open}
-      role={isExpanded ? undefined : "button"}
-      aria-label={isExpanded ? undefined : "Abrir Uniq AI"}
-      className={`fixed top-3 left-1/2 -translate-x-1/2 z-[90] overflow-hidden ${
+      onClick={isExpanded || isNotif ? undefined : open}
+      role={isExpanded || isNotif ? undefined : "button"}
+      aria-label={isExpanded || isNotif ? undefined : "Abrir Uniq AI"}
+      className={`fixed top-3 left-1/2 lg:left-[calc(50%+7rem)] -translate-x-1/2 z-[90] overflow-hidden ${
         isExpanded
           ? "w-[min(560px,calc(100vw-2rem))] h-12 rounded-full flex items-center gap-2 px-3 cursor-default"
-          : "h-9 rounded-full flex items-center gap-2 px-3 cursor-pointer"
+          : isNotif
+            ? "w-[min(520px,calc(100vw-2rem))] h-12 rounded-full flex items-center gap-2 px-3 cursor-default"
+            : "h-9 rounded-full flex items-center gap-2 px-3 cursor-pointer"
       }`}
       style={{
         background: "rgba(10, 12, 14, 0.94)",
@@ -176,17 +221,25 @@ export function UniqAIIsland() {
       {/* Avatar — sempre presente (compacto na pill, idem no expandido) */}
       <div
         className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
-        style={{ background: "var(--green)" }}
+        style={{
+          background: isNotif
+            ? notifKindColor(state.mode === "notification" ? state.notification.kind : "info")
+            : "var(--green)",
+        }}
       >
-        {state.mode === "executing"
-          ? <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
-          : state.mode === "result"
-            ? <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-            : <Sparkles className="w-3.5 h-3.5 text-white" />}
+        {state.mode === "executing" ? (
+          <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+        ) : state.mode === "result" ? (
+          <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+        ) : state.mode === "notification" ? (
+          notifKindIcon(state.notification.kind)
+        ) : (
+          <Sparkles className="w-3.5 h-3.5 text-white" />
+        )}
       </div>
 
       {/* Pill colapsada: label clicável */}
-      {!isExpanded && (
+      {!isExpanded && !isNotif && (
         <motion.div layout="position" className="flex items-center gap-2 flex-1 min-w-0">
           <span className="text-xs font-medium text-white/90 whitespace-nowrap truncate">
             {state.mode === "executing"
@@ -196,6 +249,47 @@ export function UniqAIIsland() {
                 : "Pergunte ao Uniq AI"}
           </span>
           <span className="text-[10px] text-white/40 font-mono ml-auto hidden sm:inline">⌘K</span>
+        </motion.div>
+      )}
+
+      {/* Pill em modo notification: title + subtitle + até 2 actions inline */}
+      {isNotif && state.mode === "notification" && (
+        <motion.div
+          initial={{ opacity: 0, x: -8 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.18 }}
+          className="flex items-center gap-2 flex-1 min-w-0"
+        >
+          <div className="flex-1 min-w-0 flex flex-col leading-tight">
+            <span className="text-xs font-medium text-white truncate">
+              {state.notification.title}
+            </span>
+            {state.notification.subtitle && (
+              <span className="text-[10px] text-white/55 truncate">
+                {state.notification.subtitle}
+              </span>
+            )}
+          </div>
+          {(state.notification.actions || []).slice(0, 2).map((a, i) => (
+            a.href ? (
+              <a key={i} href={a.href} onClick={dismissNotification}
+                className="text-[11px] font-medium px-2.5 py-1 rounded-full whitespace-nowrap"
+                style={{ background: "rgba(255,255,255,0.12)", color: "white" }}>
+                {a.label}
+              </a>
+            ) : (
+              <button key={i} onClick={() => { a.onClick?.(); dismissNotification(); }}
+                className="text-[11px] font-medium px-2.5 py-1 rounded-full whitespace-nowrap"
+                style={{ background: "rgba(255,255,255,0.12)", color: "white" }}>
+                {a.label}
+              </button>
+            )
+          ))}
+          <button onClick={dismissNotification}
+            className="w-6 h-6 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors"
+            style={{ color: "rgba(255,255,255,0.5)" }} aria-label="Fechar">
+            <X className="w-3.5 h-3.5" />
+          </button>
         </motion.div>
       )}
 
@@ -245,4 +339,26 @@ export function UniqAIIsland() {
 // Mantenho o ícone exportado pro caso de qualquer outra superfície querer
 // disparar o "abrir DI" via botão próprio (header de uma página, etc).
 export { MessageSquare as UniqAIIconAlt };
+
+// ─── Notification kind → icon + cor ──────────────────────────────────
+function notifKindColor(kind: string): string {
+  switch (kind) {
+    case "message":  return "#60a5fa";
+    case "sale":     return "var(--green)";
+    case "campaign": return "#f59e0b";
+    case "journey":  return "#a78bfa";
+    default:         return "#6b7280";
+  }
+}
+
+function notifKindIcon(kind: string) {
+  // Mantém icons inline (não depende de lazy). Importação no topo.
+  switch (kind) {
+    case "message":  return <MessageSquare className="w-3.5 h-3.5 text-white" />;
+    case "sale":     return <CheckCircle2 className="w-3.5 h-3.5 text-white" />;
+    case "campaign": return <Sparkles className="w-3.5 h-3.5 text-white" />;
+    case "journey":  return <Sparkles className="w-3.5 h-3.5 text-white" />;
+    default:         return <MessageSquare className="w-3.5 h-3.5 text-white" />;
+  }
+}
 

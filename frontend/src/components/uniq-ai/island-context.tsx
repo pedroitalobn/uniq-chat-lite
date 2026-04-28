@@ -26,11 +26,25 @@ type IslandResult = {
   at: number;
 };
 
+// Notification — evento realtime que estoura inline na pill (msg nova,
+// venda, campanha finalizada). Inspirado em iOS Live Activities.
+// Auto-dismiss em 6s; click numa action segue pro href + fecha.
+export type IslandNotification = {
+  id: string;
+  kind: "message" | "sale" | "campaign" | "journey" | "info";
+  title: string;
+  subtitle?: string;
+  // até 2 ações inline. href absoluta ou relativa; onClick opcional.
+  actions?: Array<{ label: string; href?: string; onClick?: () => void }>;
+  at: number;
+};
+
 type IslandState =
   | { mode: "idle" }
   | { mode: "expanded" }
   | { mode: "executing"; preview?: string }
-  | { mode: "result"; result: IslandResult };
+  | { mode: "result"; result: IslandResult }
+  | { mode: "notification"; notification: IslandNotification };
 
 type IslandContextValue = {
   state: IslandState;
@@ -41,6 +55,8 @@ type IslandContextValue = {
   toggle: () => void;
   flashExecuting: (preview?: string) => void;
   flashResult: (text: string) => void;
+  pushNotification: (n: Omit<IslandNotification, "id" | "at">) => void;
+  dismissNotification: () => void;
 };
 
 const IslandContext = createContext<IslandContextValue | null>(null);
@@ -50,6 +66,7 @@ export function UniqAIIslandProvider({ children }: { children: ReactNode }) {
   const [manualOpen, setManualOpen] = useState(false);
   const [executing, setExecuting] = useState<{ preview?: string } | null>(null);
   const [result, setResult] = useState<IslandResult | null>(null);
+  const [notification, setNotification] = useState<IslandNotification | null>(null);
   const pageContextRef = useRef(pageContext);
   pageContextRef.current = pageContext;
 
@@ -59,6 +76,13 @@ export function UniqAIIslandProvider({ children }: { children: ReactNode }) {
     const t = setTimeout(() => setResult(null), 3500);
     return () => clearTimeout(t);
   }, [result]);
+
+  // Notification auto-dismiss após 6s (mais tempo pra user clicar action).
+  useEffect(() => {
+    if (!notification) return;
+    const t = setTimeout(() => setNotification(null), 6000);
+    return () => clearTimeout(t);
+  }, [notification]);
 
   // Atalho Cmd/Ctrl+K → toggle ilha. Ignora quando user está em input/textarea.
   useEffect(() => {
@@ -86,17 +110,23 @@ export function UniqAIIslandProvider({ children }: { children: ReactNode }) {
     setExecuting(null);
     setResult({ id: String(Date.now()), text, at: Date.now() });
   }, []);
+  const pushNotification = useCallback((n: Omit<IslandNotification, "id" | "at">) => {
+    setNotification({ ...n, id: String(Date.now()), at: Date.now() });
+  }, []);
+  const dismissNotification = useCallback(() => setNotification(null), []);
 
   const state = useMemo<IslandState>(() => {
-    if (result) return { mode: "result", result };
+    // Manual open tem prioridade — user quer interagir.
     if (manualOpen) return { mode: "expanded" };
+    if (notification) return { mode: "notification", notification };
+    if (result) return { mode: "result", result };
     if (executing) return { mode: "executing", preview: executing.preview };
     return { mode: "idle" };
-  }, [result, manualOpen, executing]);
+  }, [manualOpen, notification, result, executing]);
 
   const value = useMemo<IslandContextValue>(
-    () => ({ state, pageContext, registerPage, open, close, toggle, flashExecuting, flashResult }),
-    [state, pageContext, registerPage, open, close, toggle, flashExecuting, flashResult],
+    () => ({ state, pageContext, registerPage, open, close, toggle, flashExecuting, flashResult, pushNotification, dismissNotification }),
+    [state, pageContext, registerPage, open, close, toggle, flashExecuting, flashResult, pushNotification, dismissNotification],
   );
 
   return <IslandContext.Provider value={value}>{children}</IslandContext.Provider>;
