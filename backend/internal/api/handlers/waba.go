@@ -50,12 +50,14 @@ type MetaTokenResponse struct {
 	TokenType   string `json:"token_type"`
 }
 
+type MetaBusiness struct {
+	BusinessID string `json:"id"`
+	Name       string `json:"name"`
+}
+
 type MetaWABAResponse struct {
-	ID         string `json:"id"`
-	Businesses []struct {
-		BusinessID string `json:"id"`
-		Name       string `json:"name"`
-	} `json:"businesses"`
+	ID         string         `json:"id"`
+	Businesses []MetaBusiness `json:"businesses"`
 }
 
 type MetaPhoneNumberResponse struct {
@@ -270,10 +272,18 @@ func (h *WABAHandler) exchangeCodeForToken(code, redirectURI string) (*MetaToken
 	return &tokenData, nil
 }
 
+// getWABAInfo extrai o WABA ID via /debug_token. Esse endpoint retorna os
+// "granular_scopes" associados ao token, e dentro de whatsapp_business_management
+// vêm os target_ids — IDs das WABAs autorizadas no Embedded Signup.
+//
+// Não usamos /me/businesses porque exige business_management, que NÃO faz
+// parte do escopo do Tech Provider Embedded Signup (whatsapp_business_*).
 func (h *WABAHandler) getWABAInfo(accessToken string) (*MetaWABAResponse, error) {
+	appAccessToken := config.AppConfig.MetaAppID + "|" + config.AppConfig.MetaAppSecret
+
 	reqURL := fmt.Sprintf(
-		"https://graph.facebook.com/v18.0/me?fields=businesses&access_token=%s",
-		accessToken,
+		"https://graph.facebook.com/v18.0/debug_token?input_token=%s&access_token=%s",
+		accessToken, appAccessToken,
 	)
 
 	resp, err := http.Get(reqURL)
@@ -282,21 +292,50 @@ func (h *WABAHandler) getWABAInfo(accessToken string) (*MetaWABAResponse, error)
 	}
 	defer resp.Body.Close()
 
+	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to get WABA info: %s", string(body))
+		return nil, fmt.Errorf("failed to debug_token: %s", string(body))
 	}
 
-	var wabaData MetaWABAResponse
-	if err := json.NewDecoder(resp.Body).Decode(&wabaData); err != nil {
-		return nil, err
+	var debug struct {
+		Data struct {
+			GranularScopes []struct {
+				Scope     string   `json:"scope"`
+				TargetIDs []string `json:"target_ids"`
+			} `json:"granular_scopes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &debug); err != nil {
+		return nil, fmt.Errorf("failed to parse debug_token: %w", err)
 	}
 
-	if len(wabaData.Businesses) == 0 {
-		return nil, fmt.Errorf("no business found")
+	var wabaIDs []string
+	for _, gs := range debug.Data.GranularScopes {
+		if gs.Scope == "whatsapp_business_management" || gs.Scope == "whatsapp_business_messaging" {
+			wabaIDs = append(wabaIDs, gs.TargetIDs...)
+		}
 	}
 
-	return &wabaData, nil
+	if len(wabaIDs) == 0 {
+		return nil, fmt.Errorf("no WABA found in token granular_scopes — verifique se o user concluiu o Embedded Signup")
+	}
+
+	// Dedup
+	seen := map[string]bool{}
+	var unique []string
+	for _, id := range wabaIDs {
+		if !seen[id] {
+			seen[id] = true
+			unique = append(unique, id)
+		}
+	}
+
+	// MetaWABAResponse foi modelado pra /me/businesses — adapta usando o
+	// primeiro WABA ID como business_id (no Tech Provider flow, são equivalentes).
+	wabaData := &MetaWABAResponse{
+		Businesses: []MetaBusiness{{BusinessID: unique[0]}},
+	}
+	return wabaData, nil
 }
 
 func (h *WABAHandler) getPhoneNumbers(accessToken, businessID string) (*MetaPhoneNumberResponse, error) {
