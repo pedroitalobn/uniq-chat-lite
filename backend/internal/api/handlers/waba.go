@@ -79,11 +79,14 @@ func (h *WABAHandler) GetAuthURL(c *fiber.Ctx) error {
 	frontendURL := config.AppConfig.FrontendURL
 	redirectURI := frontendURL + "/api/waba/callback"
 
+	extras := url.QueryEscape(`{"sessionInfoVersion":"3","version":"v4","setup":{}}`)
+
 	authURL := fmt.Sprintf(
-		"https://www.facebook.com/v18.0/dialog/oauth?client_id=%s&redirect_uri=%s&response_type=code&config_id=%s&override_default_response_type= true",
+		"https://www.facebook.com/v18.0/dialog/oauth?client_id=%s&redirect_uri=%s&response_type=code&config_id=%s&override_default_response_type=true&extras=%s",
 		config.AppConfig.MetaAppID,
 		url.QueryEscape(redirectURI),
 		config.AppConfig.MetaWhatsAppConfigID,
+		extras,
 	)
 
 	return c.JSON(fiber.Map{"auth_url": authURL})
