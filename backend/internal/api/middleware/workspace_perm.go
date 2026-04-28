@@ -11,6 +11,8 @@ import (
 //  1. URL path param `:workspace_id` or `:id` when the route lives under /workspaces/
 //  2. Header `X-Workspace-ID`
 //  3. Query `workspace_id`
+//  4. c.Locals("workspace_id") — pode ter sido setado por outro middleware
+//     (ex.: instance_token middleware seta o workspace da instância)
 //
 // Returns uuid.Nil if none was provided. Not an error — lets routes that
 // don't require a workspace continue.
@@ -27,6 +29,38 @@ func ResolveWorkspaceID(c *fiber.Ctx) uuid.UUID {
 		if id, err := uuid.Parse(raw); err == nil {
 			return id
 		}
+	}
+	// Fallback: locals já tem (set por outro middleware)
+	if id, ok := c.Locals("workspace_id").(uuid.UUID); ok && id != uuid.Nil {
+		return id
+	}
+	return uuid.Nil
+}
+
+// ResolveWorkspaceIDWithFallback é como ResolveWorkspaceID, mas se nenhum
+// for explícito tenta resolver pelo workspace padrão do user autenticado:
+//   - Se user tem só 1 workspace, usa esse (resolução natural)
+//   - Se user tem múltiplos, retorna o primeiro onde é owner (default)
+//
+// Útil pra integrações via API key onde o cliente n8n/Zapier não quer
+// declarar workspace explicitamente em cada chamada.
+func ResolveWorkspaceIDWithFallback(c *fiber.Ctx, db *gorm.DB) uuid.UUID {
+	if id := ResolveWorkspaceID(c); id != uuid.Nil {
+		return id
+	}
+	user := GetCurrentUser(c)
+	if user == nil {
+		return uuid.Nil
+	}
+	// Tenta workspace onde é owner primeiro, ordenado por joined_at
+	var uw models.UserWorkspace
+	if err := db.Where("user_id = ? AND is_owner = ?", user.ID, true).
+		Order("joined_at ASC").First(&uw).Error; err == nil {
+		return uw.WorkspaceID
+	}
+	if err := db.Where("user_id = ?", user.ID).
+		Order("joined_at ASC").First(&uw).Error; err == nil {
+		return uw.WorkspaceID
 	}
 	return uuid.Nil
 }
@@ -46,16 +80,20 @@ func RequireWorkspacePermission(db *gorm.DB, permissionKey string) fiber.Handler
 
 		// Super-admin bypass
 		if user.Role == models.RoleSuperAdmin {
-			wsID := ResolveWorkspaceID(c)
+			wsID := ResolveWorkspaceIDWithFallback(c, db)
 			if wsID != uuid.Nil {
 				c.Locals("workspace_id", wsID)
 			}
 			return c.Next()
 		}
 
-		wsID := ResolveWorkspaceID(c)
+		// Resolução agora cai pro workspace padrão do user se nenhum for
+		// explícito — integrações via API key não precisam declarar workspace
+		// quando o user só tem um (caso comum). Se tem múltiplos, usa o que
+		// é owner (estável).
+		wsID := ResolveWorkspaceIDWithFallback(c, db)
 		if wsID == uuid.Nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "workspace_id é obrigatório (X-Workspace-ID, query ?workspace_id=, ou path)"})
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "workspace_id não pôde ser resolvido (passe X-Workspace-ID, ?workspace_id= ou path; ou crie um workspace pra esse usuário)"})
 		}
 
 		var uw models.UserWorkspace

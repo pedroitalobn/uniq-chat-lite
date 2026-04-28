@@ -1620,10 +1620,8 @@ func (h *ConversationHandler) Unassign(c *fiber.Ctx) error {
 // Body: { queue_id?, team_id?, user_id?, note }
 func (h *ConversationHandler) Transfer(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
-	id, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
-	}
+	rawID := c.Params("id")
+
 	var body struct {
 		QueueID      string `json:"queue_id"`
 		TeamID       string `json:"team_id"`
@@ -1633,9 +1631,24 @@ func (h *ConversationHandler) Transfer(c *fiber.Ctx) error {
 	}
 	c.BodyParser(&body)
 
+	// Resolve a conversa por UUID OU channel_key (JID/lid) — n8n e webhooks
+	// recebem JID/lid em vez do UUID interno; essa flexibilidade evita
+	// pipeline duplicado pra "lookup conversation by JID first".
 	var conv models.Conversation
-	if err := h.db.Where("workspace_id = ? AND id = ?", ws, id).First(&conv).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
+	if id, err := uuid.Parse(rawID); err == nil {
+		if err := h.db.Where("workspace_id = ? AND id = ?", ws, id).First(&conv).Error; err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
+		}
+	} else {
+		// Fallback: trata o param como channel_key (JID/lid). Pega a conversa
+		// mais recente nesse canal dentro do workspace.
+		if err := h.db.Where("workspace_id = ? AND channel_key = ?", ws, rawID).
+			Order("updated_at DESC").
+			First(&conv).Error; err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "atendimento não encontrado pelo id/channel_key fornecido",
+			})
+		}
 	}
 
 	updates := map[string]any{}
@@ -1681,7 +1694,7 @@ func (h *ConversationHandler) Transfer(c *fiber.Ctx) error {
 
 	actor := middleware.GetCurrentUserID(c)
 	h.db.Create(&models.ConversationAssignment{
-		ConversationID: id,
+		ConversationID: conv.ID,
 		WorkspaceID:    ws,
 		FromUserID:     conv.AssignedUserID,
 		ToUserID:       toUser,
@@ -1692,7 +1705,7 @@ func (h *ConversationHandler) Transfer(c *fiber.Ctx) error {
 		Note:           body.Note,
 	})
 	h.appendEvent(&conv, models.ConvEventTransferred, actor, map[string]any{"to_queue_id": toQueue, "to_user_id": toUser, "note": body.Note})
-	h.db.Where("id = ?", id).First(&conv)
+	h.db.Where("id = ?", conv.ID).First(&conv)
 	h.broadcast(&conv, "conversation.transferred", map[string]any{"to_queue_id": toQueue, "to_user_id": toUser})
 	return c.JSON(conv)
 }
@@ -2539,4 +2552,24 @@ func (h *ConversationHandler) populateReplyTo(ctx context.Context, messages []mo
 		}
 		messages[i].ReplyTo = preview
 	}
+}
+
+// resolveConvByIDOrKey aceita UUID OU channel_key (JID/lid) e devolve a
+// conversa correspondente dentro do workspace. Útil pra integradores
+// externos (n8n, webhooks downstream) que recebem channel_key e não têm
+// o UUID interno do Uniq.
+func (h *ConversationHandler) resolveConvByIDOrKey(rawID string, ws uuid.UUID) (*models.Conversation, error) {
+	var conv models.Conversation
+	if id, err := uuid.Parse(rawID); err == nil {
+		if err := h.db.Where("workspace_id = ? AND id = ?", ws, id).First(&conv).Error; err != nil {
+			return nil, err
+		}
+		return &conv, nil
+	}
+	if err := h.db.Where("workspace_id = ? AND channel_key = ?", ws, rawID).
+		Order("updated_at DESC").
+		First(&conv).Error; err != nil {
+		return nil, err
+	}
+	return &conv, nil
 }
