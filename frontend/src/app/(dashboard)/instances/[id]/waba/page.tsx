@@ -374,6 +374,42 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
   const [footerText, setFooterText] = useState("");
   const [examples, setExamples] = useState<string[]>([]);
 
+  // Header: tipo + conteúdo (texto OU exemplo de mídia via URL)
+  const [headerType, setHeaderType] = useState<"NONE" | "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | "LOCATION">("NONE");
+  const [headerText, setHeaderText] = useState("");
+  const [headerExampleURL, setHeaderExampleURL] = useState("");
+
+  // Buttons: array com até 10 items. Tipos suportados pela Meta:
+  //   QUICK_REPLY (resposta rápida) — só texto, max 25 chars
+  //   URL (acessar site) — texto + url (pode ter {{1}} dinâmico)
+  //   PHONE_NUMBER (ligar) — texto + phone_number
+  //   COPY_CODE (copiar código) — só example com o código pré-aprovado
+  type ButtonType = "QUICK_REPLY" | "URL" | "PHONE_NUMBER" | "COPY_CODE";
+  interface TemplateButton {
+    id: string;
+    type: ButtonType;
+    text: string;
+    url?: string;
+    phone_number?: string;
+    example?: string;
+  }
+  const [buttons, setButtons] = useState<TemplateButton[]>([]);
+
+  const addButton = (type: ButtonType) => {
+    if (buttons.length >= 10) {
+      toast.error("Máximo 10 botões");
+      return;
+    }
+    setButtons((prev) => [
+      ...prev,
+      { id: Math.random().toString(36).slice(2, 8), type, text: "", url: "", phone_number: "", example: "" },
+    ]);
+  };
+  const updateButton = (id: string, patch: Partial<TemplateButton>) => {
+    setButtons((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+  };
+  const removeButton = (id: string) => setButtons((prev) => prev.filter((b) => b.id !== id));
+
   // Detecta variáveis no body. Meta suporta DOIS formatos:
   //   - Posicionais: {{1}}, {{2}}  → example: { body_text: [["valor1", "valor2"]] }
   //   - Nomeadas:    {{customer}}, {{order}} → example: { body_text_named_params: [{param_name, example}] }
@@ -404,6 +440,26 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
     mutationFn: () => {
       const components: Array<Record<string, unknown>> = [];
 
+      // HEADER (opcional)
+      if (headerType !== "NONE") {
+        const headerComp: Record<string, unknown> = { type: "HEADER", format: headerType };
+        if (headerType === "TEXT") {
+          headerComp.text = headerText;
+          // Header text pode ter UMA variável {{1}}
+          const headerVars = Array.from(headerText.matchAll(/\{\{(\d+)\}\}/g)).map((m) => m[1]);
+          if (headerVars.length > 0) {
+            headerComp.example = { header_text: [headerExampleURL || "exemplo"] };
+          }
+        } else if (headerType === "IMAGE" || headerType === "VIDEO" || headerType === "DOCUMENT") {
+          // Pra mídia, Meta exige um example com URL pública (handle ou link).
+          if (headerExampleURL) {
+            headerComp.example = { header_handle: [headerExampleURL] };
+          }
+        }
+        components.push(headerComp);
+      }
+
+      // BODY (sempre)
       const bodyComp: Record<string, unknown> = { type: "BODY", text: bodyText };
       if (variables.length > 0) {
         if (isNamed) {
@@ -419,8 +475,34 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
       }
       components.push(bodyComp);
 
+      // FOOTER (opcional)
       if (footerText.trim()) {
         components.push({ type: "FOOTER", text: footerText.trim() });
+      }
+
+      // BUTTONS (opcional, até 10)
+      if (buttons.length > 0) {
+        components.push({
+          type: "BUTTONS",
+          buttons: buttons.map((b) => {
+            const out: Record<string, unknown> = { type: b.type };
+            if (b.type === "QUICK_REPLY") {
+              out.text = b.text;
+            } else if (b.type === "URL") {
+              out.text = b.text;
+              out.url = b.url || "";
+              if (b.url && b.url.includes("{{1}}")) {
+                out.example = [b.example || ""];
+              }
+            } else if (b.type === "PHONE_NUMBER") {
+              out.text = b.text;
+              out.phone_number = b.phone_number || "";
+            } else if (b.type === "COPY_CODE") {
+              out.example = b.example || "";
+            }
+            return out;
+          }),
+        });
       }
 
       return wabaApi.createTemplate(instanceId, {
@@ -450,8 +532,8 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
-      <div className="rounded-2xl w-full max-w-lg p-5"
-        style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>
+      <div className="rounded-2xl w-full max-w-lg p-5 overflow-y-auto"
+        style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)", maxHeight: "90vh" }}>
         <h3 className="text-sm font-medium mb-4" style={{ color: "var(--text-1)" }}>Criar template HSM</h3>
         <form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} className="space-y-3">
           <div>
@@ -472,12 +554,57 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
             <div>
               <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-2)" }}>Categoria</label>
               <select value={category} onChange={(e) => setCategory(e.target.value as any)} className="input-field w-full">
-                <option value="UTILITY">UTILITY</option>
-                <option value="MARKETING">MARKETING</option>
-                <option value="AUTHENTICATION">AUTHENTICATION</option>
+                <option value="UTILITY">UTILITY — confirmações, alertas, atualizações</option>
+                <option value="MARKETING">MARKETING — promoções, novidades, ofertas</option>
+                <option value="AUTHENTICATION">AUTHENTICATION — códigos OTP, 2FA</option>
               </select>
             </div>
           </div>
+
+          {/* HEADER opcional */}
+          <div className="rounded-lg p-3 space-y-2" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium" style={{ color: "var(--text-2)" }}>
+                Cabeçalho (opcional)
+              </label>
+              <select value={headerType} onChange={(e) => setHeaderType(e.target.value as any)}
+                className="input-field text-xs" style={{ width: "auto" }}>
+                <option value="NONE">— Sem cabeçalho —</option>
+                <option value="TEXT">Texto</option>
+                <option value="IMAGE">Imagem</option>
+                <option value="VIDEO">Vídeo</option>
+                <option value="DOCUMENT">Documento</option>
+                <option value="LOCATION">Localização</option>
+              </select>
+            </div>
+            {headerType === "TEXT" && (
+              <input value={headerText} onChange={(e) => setHeaderText(e.target.value)}
+                placeholder="Ex: Olá {{1}} ou texto fixo (max 60 chars)"
+                maxLength={60}
+                className="input-field w-full text-sm" />
+            )}
+            {(headerType === "IMAGE" || headerType === "VIDEO" || headerType === "DOCUMENT") && (
+              <>
+                <input value={headerExampleURL} onChange={(e) => setHeaderExampleURL(e.target.value)}
+                  placeholder={
+                    headerType === "IMAGE" ? "https://exemplo.com/imagem.jpg"
+                      : headerType === "VIDEO" ? "https://exemplo.com/video.mp4"
+                      : "https://exemplo.com/arquivo.pdf"
+                  }
+                  className="input-field w-full text-xs font-mono" />
+                <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
+                  Meta usa essa URL apenas durante a revisão (precisa estar pública).
+                  Na hora de enviar a mensagem você passa a mídia real por destinatário.
+                </p>
+              </>
+            )}
+            {headerType === "LOCATION" && (
+              <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+                Localização não tem conteúdo aqui — você passa lat/long no envio.
+              </p>
+            )}
+          </div>
+
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-medium" style={{ color: "var(--text-2)" }}>
@@ -560,6 +687,81 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
               className="input-field w-full" />
           </div>
 
+          {/* BOTÕES (até 10) */}
+          <div className="rounded-lg p-3 space-y-2" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium" style={{ color: "var(--text-2)" }}>
+                Botões (opcional, até 10)
+              </label>
+              <span className="text-[10px]" style={{ color: "var(--text-3)" }}>{buttons.length}/10</span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              <button type="button" onClick={() => addButton("QUICK_REPLY")} disabled={buttons.length >= 10}
+                className="text-[10px] px-2 py-1 rounded-md disabled:opacity-40"
+                style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
+                + Resposta rápida
+              </button>
+              <button type="button" onClick={() => addButton("URL")} disabled={buttons.length >= 10}
+                className="text-[10px] px-2 py-1 rounded-md disabled:opacity-40"
+                style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
+                + Acessar site
+              </button>
+              <button type="button" onClick={() => addButton("PHONE_NUMBER")} disabled={buttons.length >= 10}
+                className="text-[10px] px-2 py-1 rounded-md disabled:opacity-40"
+                style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
+                + Ligar
+              </button>
+              <button type="button" onClick={() => addButton("COPY_CODE")} disabled={buttons.length >= 10}
+                className="text-[10px] px-2 py-1 rounded-md disabled:opacity-40"
+                style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
+                + Copiar código
+              </button>
+            </div>
+            {buttons.map((b, idx) => (
+              <div key={b.id} className="rounded-md p-2 space-y-1.5"
+                style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>
+                <div className="flex items-center justify-between text-[10px]" style={{ color: "var(--text-3)" }}>
+                  <span className="font-medium">
+                    #{idx + 1} ·{" "}
+                    {b.type === "QUICK_REPLY" ? "Resposta rápida"
+                      : b.type === "URL" ? "Acessar site"
+                      : b.type === "PHONE_NUMBER" ? "Ligar"
+                      : "Copiar código"}
+                  </span>
+                  <button type="button" onClick={() => removeButton(b.id)}
+                    className="rounded p-0.5" style={{ color: "#f87171" }}>
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+                {(b.type === "QUICK_REPLY" || b.type === "URL" || b.type === "PHONE_NUMBER") && (
+                  <input value={b.text} onChange={(e) => updateButton(b.id, { text: e.target.value })}
+                    placeholder="Texto do botão (max 25 chars)" maxLength={25}
+                    className="input-field w-full text-xs" />
+                )}
+                {b.type === "URL" && (
+                  <input value={b.url || ""} onChange={(e) => updateButton(b.id, { url: e.target.value })}
+                    placeholder="https://exemplo.com/oferta ou https://site.com/{{1}}"
+                    className="input-field w-full text-xs font-mono" />
+                )}
+                {b.type === "URL" && b.url?.includes("{{1}}") && (
+                  <input value={b.example || ""} onChange={(e) => updateButton(b.id, { example: e.target.value })}
+                    placeholder="Exemplo de valor pra {{1}} (ex: produto-123)"
+                    className="input-field w-full text-xs" />
+                )}
+                {b.type === "PHONE_NUMBER" && (
+                  <input value={b.phone_number || ""} onChange={(e) => updateButton(b.id, { phone_number: e.target.value })}
+                    placeholder="+5511999999999 (E.164)"
+                    className="input-field w-full text-xs font-mono" />
+                )}
+                {b.type === "COPY_CODE" && (
+                  <input value={b.example || ""} onChange={(e) => updateButton(b.id, { example: e.target.value })}
+                    placeholder="Código de exemplo (ex: PROMO20)"
+                    className="input-field w-full text-xs font-mono" />
+                )}
+              </div>
+            ))}
+          </div>
+
           {/* Preview tipo WhatsApp */}
           {bodyText && (
             <div className="rounded-lg p-3" style={{ background: "#0b1f0e" }}>
@@ -567,6 +769,15 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
                 Preview
               </p>
               <div className="rounded-lg p-3 max-w-[280px]" style={{ background: "#1f2c34", color: "#e9edef" }}>
+                {headerType === "TEXT" && headerText && (
+                  <p className="text-sm font-bold mb-1.5">{headerText.replace(/\{\{1\}\}/g, headerExampleURL || "[var]")}</p>
+                )}
+                {(headerType === "IMAGE" || headerType === "VIDEO" || headerType === "DOCUMENT") && (
+                  <div className="mb-1.5 rounded h-20 flex items-center justify-center text-[10px] uppercase tracking-wider"
+                    style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)" }}>
+                    [{headerType.toLowerCase()}]
+                  </div>
+                )}
                 <p className="text-sm whitespace-pre-wrap">
                   {bodyText.replace(/\{\{([a-zA-Z0-9_]+)\}\}/g, (_, n) => {
                     const i = variables.indexOf(n);
@@ -577,6 +788,19 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
                   <p className="text-[11px] mt-1.5" style={{ color: "rgba(255,255,255,0.5)" }}>
                     {footerText}
                   </p>
+                )}
+                {buttons.length > 0 && (
+                  <div className="mt-2 -mx-3 -mb-3 border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+                    {buttons.map((b) => (
+                      <div key={b.id} className="px-3 py-2 text-center text-[13px] font-medium border-b last:border-b-0"
+                        style={{ color: "#53bdeb", borderColor: "rgba(255,255,255,0.06)" }}>
+                        {b.type === "PHONE_NUMBER" && "📞 "}
+                        {b.type === "URL" && "🔗 "}
+                        {b.type === "COPY_CODE" && "📋 "}
+                        {b.text || (b.type === "COPY_CODE" ? `Copiar ${b.example || "código"}` : "(sem texto)")}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
