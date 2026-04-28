@@ -409,8 +409,7 @@ export default function InboxPage() {
           </div>
 
           {viewMode === "conversations" && (
-          <div className="ml-auto flex flex-wrap items-center gap-1.5 sm:gap-2 max-w-full overflow-x-auto"
-            style={{ maxWidth: "min(100%, 640px)" }}>
+          <div className="ml-auto flex flex-nowrap items-center gap-1.5 sm:gap-2 min-w-0">
             {/* GlobalSearchButton removido — ficava redundante com o input
                 "Buscar…" local. Quem quer busca full-text de mensagens
                 pode usar /v1/conversations/messages/search via DevTools/API. */}
@@ -459,7 +458,7 @@ export default function InboxPage() {
 
             {/* Channels (multi) — esconde em mobile pra economizar largura.
                 User abre via "Mais filtros" (futuro) ou usa /inbox direto. */}
-            <div className="hidden sm:block">
+            <div className="shrink-0">
               <MultiSelectDropdown
                 icon={<Radio className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />}
                 label={channelLabel}
@@ -475,7 +474,7 @@ export default function InboxPage() {
             </div>
 
             {/* Instances (multi) — idem channels, hidden em xs */}
-            <div className="hidden sm:block">
+            <div className="shrink-0">
               <MultiSelectDropdown
                 icon={<Smartphone className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />}
                 label={instanceLabel}
@@ -592,12 +591,20 @@ export default function InboxPage() {
             <button
               onClick={() => backfill.mutate()}
               disabled={backfill.isPending}
-              className="ml-auto flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium disabled:opacity-50"
+              className="ml-auto relative flex h-7 w-7 items-center justify-center rounded-full disabled:opacity-50"
               style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.25)" }}
-              title={`${statsQ.data.pending_backfill} mensagens antigas sem ticket`}
+              title={`Sincronizar histórico · ${statsQ.data.pending_backfill} mensagens antigas pendentes`}
+              aria-label="Sincronizar histórico"
             >
-              <RefreshCw className={`h-3 w-3 ${backfill.isPending ? "animate-spin" : ""}`} />
-              Sincronizar histórico · {statsQ.data.pending_backfill}
+              <RefreshCw className={`h-3.5 w-3.5 ${backfill.isPending ? "animate-spin" : ""}`} />
+              {statsQ.data.pending_backfill > 0 && (
+                <span
+                  className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-1 rounded-full text-[9px] font-semibold flex items-center justify-center"
+                  style={{ background: "#00d46a", color: "#03170a" }}
+                >
+                  {statsQ.data.pending_backfill > 99 ? "99+" : statsQ.data.pending_backfill}
+                </span>
+              )}
             </button>
           )}
         </div>
