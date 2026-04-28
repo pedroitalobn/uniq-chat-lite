@@ -41,6 +41,25 @@ const REGION_COLORS: Record<string, string> = {
   "Global":         "#8b5cf6",
 };
 
+// Cores oficiais de marca pra cada provider — usadas como background do
+// "logo box" do card. Quando logo PNG/SVG não está disponível, esse box
+// colorido + iniciais funciona como brand mark consistente.
+const PROVIDER_BRAND: Record<string, { bg: string; fg: string; mark?: string }> = {
+  shopify:           { bg: "#95BF47", fg: "#FFFFFF", mark: "S" },
+  mercado_livre:     { bg: "#FFE600", fg: "#003F8D", mark: "ML" },
+  vtex:              { bg: "#F71963", fg: "#FFFFFF", mark: "V" },
+  magalu:            { bg: "#0086FF", fg: "#FFFFFF", mark: "ML" },
+  shopee:            { bg: "#EE4D2D", fg: "#FFFFFF", mark: "S" },
+  amazon:            { bg: "#FF9900", fg: "#232F3E", mark: "a" },
+  ebay:              { bg: "#E53238", fg: "#FFFFFF", mark: "e" },
+  woocommerce:       { bg: "#7F54B3", fg: "#FFFFFF", mark: "Wc" },
+  bigcommerce:       { bg: "#121118", fg: "#34313F", mark: "BC" },
+  whatsapp_catalog:  { bg: "#25D366", fg: "#FFFFFF", mark: "Wa" },
+  tray:              { bg: "#0066FF", fg: "#FFFFFF", mark: "T" },
+  bling:             { bg: "#FBBF24", fg: "#0F172A", mark: "B" },
+  nuvemshop:         { bg: "#001A36", fg: "#FFC633", mark: "Ns" },
+};
+
 export function ShopSection() {
   const { currentWorkspace } = useWorkspace();
   const wsId = currentWorkspace?.id;
@@ -186,7 +205,7 @@ export function ShopSection() {
                   {list.length}
                 </span>
               </div>
-              <div className="grid sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {list.map((p) => (
                   <ProviderCard key={p.id} provider={p} />
                 ))}
@@ -243,44 +262,54 @@ function ActiveIntegrationCard({ integration }: { integration: Integration & { s
 
 function ProviderCard({ provider }: { provider: Provider }) {
   const ready = provider.status === "ready";
+  const brand = PROVIDER_BRAND[provider.id] || {
+    bg: "var(--surface-3)",
+    fg: "var(--text-1)",
+    mark: provider.name.charAt(0),
+  };
+
   return (
     <div
-      className="rounded-xl p-4 flex flex-col"
+      className="group relative rounded-2xl p-4 flex flex-col items-center text-center transition-all hover:scale-[1.02]"
       style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <div
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-base font-semibold shrink-0"
-            style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
-          >
-            {provider.name.charAt(0)}
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>
-              {provider.name}
-            </p>
-            <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
-              {provider.region}
-            </p>
-          </div>
-        </div>
-        <span
-          className="text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap"
-          style={{
-            background: ready ? "var(--green-soft)" : "var(--surface-3)",
-            color: ready ? "var(--green)" : "var(--text-3)",
-          }}
-        >
-          {ready ? "Disponível" : "Em breve"}
-        </span>
+      {/* Status badge canto superior direito */}
+      <span
+        className="absolute top-2 right-2 text-[9px] px-1.5 py-0.5 rounded-full font-semibold uppercase tracking-wider"
+        style={{
+          background: ready ? "rgba(34,197,94,0.12)" : "rgba(148,163,184,0.12)",
+          color: ready ? "#22c55e" : "var(--text-3)",
+        }}
+      >
+        {ready ? "Disponível" : "Em breve"}
+      </span>
+
+      {/* Logo box centralizado com cor de marca */}
+      <div
+        className="w-14 h-14 rounded-2xl flex items-center justify-center font-bold mb-3 mt-1"
+        style={{
+          background: brand.bg,
+          color: brand.fg,
+          fontSize: brand.mark && brand.mark.length > 1 ? "14px" : "22px",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+        }}
+      >
+        {brand.mark || provider.name.charAt(0)}
       </div>
-      <p className="text-xs flex-1 mb-3" style={{ color: "var(--text-2)" }}>
+
+      <p className="text-sm font-medium leading-tight" style={{ color: "var(--text-1)" }}>
+        {provider.name}
+      </p>
+      <p className="text-[10px] mt-0.5 mb-2" style={{ color: "var(--text-3)" }}>
+        {provider.region}
+      </p>
+      <p className="text-[11px] leading-relaxed flex-1 mb-3 line-clamp-2" style={{ color: "var(--text-2)" }}>
         {provider.description}
       </p>
+
       <button
         disabled={!ready}
-        className="text-xs font-medium py-1.5 rounded-lg flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="w-full text-xs font-medium py-2 rounded-lg inline-flex items-center justify-center gap-1.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         style={{
           background: ready ? "var(--green)" : "var(--surface-3)",
           color: ready ? "var(--green-fg)" : "var(--text-3)",

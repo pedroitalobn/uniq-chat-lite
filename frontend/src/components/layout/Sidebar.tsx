@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
@@ -182,22 +182,14 @@ export function Sidebar() {
           </button>
           <div className="flex-1 min-w-0">
             {workspaces.length > 1 ? (
-              <div className="relative">
-                <select
-                  value={currentWorkspace?.id || ""}
-                  onChange={(e) => {
-                    const ws = workspaces.find(w => w.id === e.target.value);
-                    if (ws) setCurrentWorkspace(ws);
-                  }}
-                  className="w-full appearance-none bg-transparent text-xs font-medium truncate pr-5 cursor-pointer"
-                  style={{ color: "var(--text-1)" }}
-                >
-                  {workspaces.map(ws => (
-                    <option key={ws.id} value={ws.id} style={{ background: "var(--surface-2)", color: "var(--text-1)" }}>{ws.name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: "var(--text-3)" }} />
-              </div>
+              <WorkspaceDropdown
+                workspaces={workspaces}
+                currentId={currentWorkspace?.id || ""}
+                onSelect={(ws) => {
+                  const full = workspaces.find((w) => w.id === ws.id);
+                  if (full) setCurrentWorkspace(full);
+                }}
+              />
             ) : (
               <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>
                 {currentWorkspace?.name || "Selecione workspace"}
@@ -416,5 +408,107 @@ export function Sidebar() {
         />
       )}
     </>
+  );
+}
+
+// Dropdown custom pra workspaces — substitui <select> nativo que renderiza
+// com tema do OS (branco no macOS) ignorando dark theme da Uniq.
+// Inclui ícone + cor + role (Owner/Member) por workspace.
+function WorkspaceDropdown({
+  workspaces,
+  currentId,
+  onSelect,
+}: {
+  workspaces: Array<{ id: string; name: string; color?: string; icon?: string; is_owner?: boolean }>;
+  currentId: string;
+  onSelect: (ws: { id: string; name: string; color?: string; icon?: string; is_owner?: boolean }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const current = workspaces.find((w) => w.id === currentId);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-1 text-xs font-medium truncate text-left"
+        style={{ color: "var(--text-1)" }}
+      >
+        <span className="truncate flex-1">{current?.name || "Selecione"}</span>
+        <ChevronDown className="w-3 h-3 shrink-0" style={{ color: "var(--text-3)" }} />
+      </button>
+      {open && (
+        <div
+          className="absolute left-0 top-full mt-1 z-50 rounded-lg overflow-hidden uniq-fade-in"
+          style={{
+            width: "max-content",
+            minWidth: "100%",
+            maxWidth: "260px",
+            background: "var(--surface-1)",
+            border: "1px solid var(--surface-border)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+          }}
+        >
+          <div className="py-1 max-h-72 overflow-y-auto">
+            {workspaces.map((ws) => {
+              const Icon = resolveWorkspaceIcon(ws.icon);
+              const active = ws.id === currentId;
+              return (
+                <button
+                  key={ws.id}
+                  type="button"
+                  onClick={() => {
+                    onSelect(ws);
+                    setOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-white/5"
+                  style={{
+                    background: active ? "rgba(0,212,106,0.08)" : undefined,
+                  }}
+                >
+                  <span
+                    className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
+                    style={{
+                      background: `${ws.color || "#7c3aed"}22`,
+                      border: `1px solid ${ws.color || "#7c3aed"}44`,
+                    }}
+                  >
+                    <Icon className="w-3 h-3" style={{ color: ws.color || "#7c3aed" }} />
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>
+                      {ws.name}
+                    </span>
+                    <span className="block text-[10px]" style={{ color: ws.is_owner ? "#fbbf24" : "var(--text-3)" }}>
+                      {ws.is_owner ? "Proprietário" : "Membro"}
+                    </span>
+                  </span>
+                  {active && (
+                    <span className="text-[10px] shrink-0" style={{ color: "var(--green)" }}>✓</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
