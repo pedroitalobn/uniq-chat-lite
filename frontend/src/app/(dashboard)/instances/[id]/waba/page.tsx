@@ -140,10 +140,10 @@ export default function WABAManagePage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="space-y-5 px-4 sm:px-6 py-6 lg:py-8">
-      <Link href={`/instances/${id}`}
+      <Link href="/instances"
         className="inline-flex items-center gap-1.5 text-xs"
         style={{ color: "var(--text-3)" }}>
-        <ArrowLeft className="w-3.5 h-3.5" /> Voltar pra instância
+        <ArrowLeft className="w-3.5 h-3.5" /> Voltar para instâncias
       </Link>
 
       {/* Header */}
