@@ -62,6 +62,19 @@ func (h *InstanceHandler) resolveLiveStatus(inst *models.Instance) models.Instan
 	// canais cloud-only): DB é fonte da verdade. Sem isso a função retornava
 	// disconnected porque manager.IsRunning() é sempre false pra eles.
 	if inst.Channel == models.ChannelWABA {
+		// Defesa extra: se Instance.status diz disconnected mas existe uma
+		// WABAInstance ativa pra ela, sincroniza (pode acontecer com fluxos
+		// antigos onde o callback não persistiu o status corretamente).
+		if inst.Status != models.StatusConnected {
+			var wabaCount int64
+			h.db.Model(&models.WABAInstance{}).
+				Where("instance_id = ? AND status = ?", inst.ID, "active").
+				Count(&wabaCount)
+			if wabaCount > 0 {
+				h.db.Model(inst).Update("status", models.StatusConnected)
+				return models.StatusConnected
+			}
+		}
 		return inst.Status
 	}
 	id := inst.ID.String()

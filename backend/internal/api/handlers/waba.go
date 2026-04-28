@@ -388,6 +388,17 @@ func (h *WABAHandler) GetWABA(c *fiber.Ctx) error {
 		})
 	}
 
+	// Auto-sync: se WABAInstance está active mas Instance.status ficou em
+	// disconnected (provável fluxo antigo onde o callback não persistiu o
+	// status correto), corrige no read. Sem isso a lista /instances mostra
+	// como desconectado mesmo com WABA ativa.
+	if waba.Status == "active" && instance.Status != models.StatusConnected {
+		log.Info().Str("instance_id", instance.ID.String()).
+			Str("from", string(instance.Status)).
+			Msg("waba: auto-sync Instance.status → connected")
+		h.db.Model(&instance).Update("status", models.StatusConnected)
+	}
+
 	return c.JSON(WABAResponse{
 		ID:             waba.ID,
 		InstanceID:     waba.InstanceID,
