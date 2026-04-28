@@ -353,6 +353,15 @@ func (e *JourneyExecutor) HandleIncoming(instanceID, messageID, fromJID, fromNam
 				Msg("journey: trigger NÃO bateu — ver campo skipped_because")
 			continue
 		}
+		// Re-entry rule: never / always / after_days:N
+		if !e.canReEnter(j, fromJID) {
+			log.Info().
+				Str("journey", j.ID).
+				Str("rule", j.ReEntryRule).
+				Str("from", fromJID).
+				Msg("journey: re-entry bloqueado pela regra")
+			continue
+		}
 		log.Info().
 			Str("journey", j.ID).
 			Str("name", j.Name).
@@ -363,6 +372,36 @@ func (e *JourneyExecutor) HandleIncoming(instanceID, messageID, fromJID, fromNam
 		go e.startNew(j, fromJID, fromName, groupJID, messageText)
 	}
 	return triggered
+}
+
+// canReEnter aplica Journey.ReEntryRule. Default "never" (1 vez por contato).
+func (e *JourneyExecutor) canReEnter(j *models.Journey, fromJID string) bool {
+	rule := j.ReEntryRule
+	if rule == "" || rule == "never" {
+		var count int64
+		e.db.Model(&models.JourneyExecution{}).
+			Where("journey_id = ? AND contact_jid = ?", j.ID, fromJID).
+			Count(&count)
+		return count == 0
+	}
+	if rule == "always" {
+		return true
+	}
+	if strings.HasPrefix(rule, "after_days:") {
+		var days int
+		fmt.Sscanf(rule, "after_days:%d", &days)
+		if days <= 0 {
+			return true
+		}
+		var last models.JourneyExecution
+		err := e.db.Where("journey_id = ? AND contact_jid = ?", j.ID, fromJID).
+			Order("started_at DESC").First(&last).Error
+		if err != nil {
+			return true // never ran → permitir
+		}
+		return time.Since(last.StartedAt) > time.Duration(days)*24*time.Hour
+	}
+	return true
 }
 
 func (e *JourneyExecutor) handleReservedCommand(action, instanceID, fromJID, fromName string) bool {

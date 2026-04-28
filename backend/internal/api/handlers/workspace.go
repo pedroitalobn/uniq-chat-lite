@@ -164,9 +164,14 @@ func (h *WorkspaceHandler) Update(c *fiber.Ctx) error {
 	// Usamos pointers pra distinguir "não enviado" de "enviar string vazia".
 	// String vazia explícita → reseta pro default no frontend.
 	var req struct {
-		Name  string  `json:"name"`
-		Color *string `json:"color,omitempty"`
-		Icon  *string `json:"icon,omitempty"`
+		Name             string  `json:"name"`
+		Color            *string `json:"color,omitempty"`
+		Icon             *string `json:"icon,omitempty"`
+		Timezone         *string `json:"timezone,omitempty"`
+		QuietHours       *string `json:"quiet_hours,omitempty"`
+		FreqCapPerHour   *int    `json:"freq_cap_per_hour,omitempty"`
+		FreqCapPerDay    *int    `json:"freq_cap_per_day,omitempty"`
+		FreqCapPerWeek   *int    `json:"freq_cap_per_week,omitempty"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "dados inválidos"})
@@ -181,6 +186,21 @@ func (h *WorkspaceHandler) Update(c *fiber.Ctx) error {
 	}
 	if req.Icon != nil {
 		updates["icon"] = *req.Icon
+	}
+	if req.Timezone != nil {
+		updates["timezone"] = *req.Timezone
+	}
+	if req.QuietHours != nil {
+		updates["quiet_hours"] = *req.QuietHours
+	}
+	if req.FreqCapPerHour != nil {
+		updates["freq_cap_per_hour"] = *req.FreqCapPerHour
+	}
+	if req.FreqCapPerDay != nil {
+		updates["freq_cap_per_day"] = *req.FreqCapPerDay
+	}
+	if req.FreqCapPerWeek != nil {
+		updates["freq_cap_per_week"] = *req.FreqCapPerWeek
 	}
 	if len(updates) > 0 {
 		h.db.Model(&models.Workspace{}).Where("id = ?", workspaceID).Updates(updates)
