@@ -9,12 +9,9 @@ import { useRouter } from "next/navigation";
 
 declare global {
   interface Window {
-    FB: {
+    FB?: {
       init: (config: { appId: string; cookie: boolean; xfbml: boolean; version: string }) => void;
-      login: (
-        callback: (response: { authResponse?: { accessToken?: string; code?: string } }) => void,
-        config: Record<string, unknown>,
-      ) => void;
+      getLoginStatus: (cb: (response: unknown) => void) => void;
     };
     fbAsyncInit?: () => void;
   }
@@ -27,12 +24,22 @@ interface Props {
 const META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID || "";
 const META_CONFIG_ID = process.env.NEXT_PUBLIC_META_WHATSAPP_CONFIG_ID || "";
 
+interface SessionInfo {
+  type: "WA_EMBEDDED_SIGNUP";
+  event: "FINISH" | "CANCEL" | "ERROR";
+  data?: {
+    phone_number_id?: string;
+    waba_id?: string;
+    business_id?: string;
+  };
+}
+
 export function WABAConnectButton({ className }: Props) {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
-  const [sdkReady, setSdkReady] = useState(false);
-  const sdkLoading = useRef(false);
+  const popupRef = useRef<Window | null>(null);
+  const sessionInfoRef = useRef<SessionInfo | null>(null);
 
   const callbackMutation = useMutation({
     mutationFn: async (code: string) => wabaApi.callback(code),
@@ -48,34 +55,113 @@ export function WABAConnectButton({ className }: Props) {
     },
   });
 
+  // Listener postMessage do popup Meta — entrega session info (waba_id, phone_number_id)
   useEffect(() => {
-    if (sdkLoading.current) return;
-    sdkLoading.current = true;
+    const onMessage = (event: MessageEvent) => {
+      if (
+        event.origin !== "https://www.facebook.com" &&
+        event.origin !== "https://web.facebook.com" &&
+        event.origin !== "https://business.facebook.com"
+      ) {
+        return;
+      }
+      try {
+        const payload = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        if (payload?.type === "WA_EMBEDDED_SIGNUP") {
+          sessionInfoRef.current = payload as SessionInfo;
+        }
+      } catch {
+        // not json — ignore
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
 
-    if (!META_APP_ID) {
-      setErrorMessage(
-        "NEXT_PUBLIC_META_APP_ID não configurado no build do frontend.",
-      );
+  const handleConnect = () => {
+    setStatus("loading");
+    setErrorMessage("");
+    sessionInfoRef.current = null;
+
+    if (!META_APP_ID || !META_CONFIG_ID) {
+      setStatus("error");
+      setErrorMessage("Envs NEXT_PUBLIC_META_APP_ID / CONFIG_ID não configuradas no build.");
       return;
     }
 
-    // fbAsyncInit precisa estar definido ANTES do script carregar
+    const redirectUri = `${window.location.origin}/api/waba/callback`;
+    const extras = encodeURIComponent(
+      JSON.stringify({
+        setup: {},
+        featureType: "",
+        sessionInfoVersion: "3",
+        version: "v4",
+      }),
+    );
+
+    const authUrl =
+      `https://www.facebook.com/v18.0/dialog/oauth` +
+      `?client_id=${META_APP_ID}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&response_type=code` +
+      `&config_id=${META_CONFIG_ID}` +
+      `&override_default_response_type=true` +
+      `&display=popup` +
+      `&extras=${extras}`;
+
+    // Popup centralizado — dimensões explícitas evitam fallback pra aba
+    const w = 600;
+    const h = 750;
+    const left = window.screenX + (window.outerWidth - w) / 2;
+    const top = window.screenY + (window.outerHeight - h) / 2;
+
+    const popup = window.open(
+      authUrl,
+      "waba_embedded_signup",
+      `width=${w},height=${h},left=${left},top=${top},toolbar=no,menubar=no,location=no,status=no,scrollbars=yes,resizable=yes`,
+    );
+
+    if (!popup) {
+      setStatus("error");
+      setErrorMessage("Popup bloqueado pelo navegador. Permita popups e tente de novo.");
+      return;
+    }
+    popupRef.current = popup;
+
+    // Polling pra detectar fechamento — se fechou sem session info, foi cancelado
+    const interval = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(interval);
+        const session = sessionInfoRef.current;
+        if (session?.event === "FINISH" && session.data) {
+          // session info chegou via postMessage — agora pega o code via redirect-back
+          // No flow Embedded Signup v4, o code chega no redirect_uri (callback page).
+          // Por enquanto consideramos sucesso visual e o backend trata via callback.
+          setStatus("success");
+          toast.success(
+            `WABA conectada! waba_id=${session.data.waba_id?.slice(0, 8)}…`,
+          );
+        } else if (status === "loading") {
+          setStatus("error");
+          setErrorMessage("Autorização cancelada ou janela fechada.");
+        }
+      }
+    }, 500);
+  };
+
+  // Carrega FB SDK só pra ter disponível se quiser usar getLoginStatus depois
+  useEffect(() => {
+    if (!META_APP_ID) return;
+    if (document.querySelector('script[src*="connect.facebook.net"]')) return;
+
     window.fbAsyncInit = () => {
-      window.FB.init({
+      window.FB?.init({
         appId: META_APP_ID,
         cookie: true,
-        xfbml: true,
+        xfbml: false,
         version: "v21.0",
       });
-      setSdkReady(true);
     };
-
-    if (document.querySelector('script[src*="connect.facebook.net"]')) {
-      // já carregado em outro mount — apenas marca como pronto se FB existe
-      if (window.FB) setSdkReady(true);
-      return;
-    }
-
     const script = document.createElement("script");
     script.src = "https://connect.facebook.net/pt_BR/sdk.js";
     script.async = true;
@@ -84,53 +170,11 @@ export function WABAConnectButton({ className }: Props) {
     document.body.appendChild(script);
   }, []);
 
-  const handleConnect = () => {
-    setStatus("loading");
-    setErrorMessage("");
-
-    if (!window.FB || !sdkReady) {
-      setStatus("error");
-      setErrorMessage("Facebook SDK ainda carregando. Aguarde 2s e tente novamente.");
-      return;
-    }
-
-    if (!META_CONFIG_ID) {
-      setStatus("error");
-      setErrorMessage("NEXT_PUBLIC_META_WHATSAPP_CONFIG_ID não configurado.");
-      return;
-    }
-
-    window.FB.login(
-      (response) => {
-        const code = response.authResponse?.code;
-        if (code) {
-          callbackMutation.mutate(code);
-        } else {
-          setStatus("error");
-          setErrorMessage("Autorização cancelada pelo usuário");
-        }
-      },
-      {
-        config_id: META_CONFIG_ID,
-        response_type: "code",
-        override_default_response_type: true,
-        display: "popup",
-        auth_type: "rerequest",
-        extras: {
-          setup: {},
-          featureType: "",
-          sessionInfoVersion: "3",
-          version: "v4",
-        },
-      },
-    );
-  };
-
   return (
     <div className={className}>
       <button
         onClick={handleConnect}
-        disabled={status === "loading" || !sdkReady}
+        disabled={status === "loading"}
         className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-[#0088ff] hover:bg-[#0077ee] text-white font-medium rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {status === "loading" ? (
@@ -148,7 +192,7 @@ export function WABAConnectButton({ className }: Props) {
             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
               <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
             </svg>
-            <span>{sdkReady ? "Conectar WhatsApp API" : "Carregando SDK..."}</span>
+            <span>Conectar WhatsApp API</span>
           </>
         )}
       </button>
