@@ -19,7 +19,7 @@ const FALLBACK_CHANNELS = (isSuperAdmin: boolean): ChannelInfo[] => [
   { id: "whatsapp",     label: "WhatsApp Business", color: "#25d366", description: "Não-oficial via QR ou código de pareamento (whatsmeow)", available: true },
   { id: "waba",         label: "WhatsApp API",      color: "#0088ff", description: "Cloud API oficial Meta — templates HSM + Embedded Signup", available: isSuperAdmin },
   { id: "instagram",    label: "Instagram Profile", color: "#e1306c", description: isSuperAdmin ? "Login não-oficial — DMs, scraping, follow/unfollow" : "Em breve", available: isSuperAdmin || false },
-  { id: "instagram_api", label: "Instagram API",    color: "#cc2366", description: isSuperAdmin ? "API oficial Meta — Messaging Graph API" : "Em breve", available: isSuperAdmin || false },
+  { id: "instagram_api", label: "Instagram API",    color: "#cc2366", description: "Em breve — API oficial Meta (Messaging Graph API)", available: false },
   { id: "tiktok",       label: "TikTok",            color: "#ff0050", description: isSuperAdmin ? "DMs, scraping, follow/unfollow" : "Em breve", available: isSuperAdmin || false },
   { id: "facebook",     label: "Facebook",          color: "#1877f2", description: isSuperAdmin ? "Facebook Messenger" : "Em breve", available: isSuperAdmin || false },
   { id: "telegram",     label: "Telegram",          color: "#229ed9", description: isSuperAdmin ? "Bots via Telegram API" : "Em breve", available: isSuperAdmin || false },
