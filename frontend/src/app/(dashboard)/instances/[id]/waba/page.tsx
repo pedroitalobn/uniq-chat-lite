@@ -217,8 +217,9 @@ export default function WABAManagePage({ params }: { params: Promise<{ id: strin
             <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>2. Register phone (2FA)</h3>
           </div>
           <p className="text-xs mb-3" style={{ color: "var(--text-3)" }}>
-            Ativa o número pra envio. Defina um PIN de 6 dígitos na sua conta Meta Business
-            (Settings → 2FA → SMS PIN) e cole abaixo.
+            Escolha um PIN de 6 dígitos. Ele é registrado na Meta como 2FA do
+            número e ativa o envio na Cloud API. Anote — vai precisar se for
+            reconectar o número no futuro.
           </p>
           <div className="flex gap-2">
             <input
