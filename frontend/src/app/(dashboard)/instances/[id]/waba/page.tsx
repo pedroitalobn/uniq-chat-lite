@@ -387,9 +387,26 @@ function TestSendSection({ instanceId }: { instanceId: string }) {
   const [to, setTo] = useState("");
   const [text, setText] = useState("Olá! Mensagem de teste enviada via Uniq Chat.");
   const [sentId, setSentId] = useState("");
+  const [mode, setMode] = useState<"text" | "template">("template");
+  const [templateName, setTemplateName] = useState("hello_world");
+  const [templateLang, setTemplateLang] = useState("en_US");
 
   const send = useMutation({
-    mutationFn: () => wabaApi.sendMessage(instanceId, { to, type: "text", text }),
+    mutationFn: () =>
+      mode === "text"
+        ? wabaApi.sendMessage(instanceId, {
+            to,
+            type: "text",
+            text: { body: text },
+          })
+        : wabaApi.sendMessage(instanceId, {
+            to,
+            type: "template",
+            template: {
+              name: templateName,
+              language: { code: templateLang },
+            },
+          }),
     onSuccess: (r: any) => {
       const msgId = r.data?.messages?.[0]?.id || r.data?.id || "";
       setSentId(msgId);
@@ -405,15 +422,51 @@ function TestSendSection({ instanceId }: { instanceId: string }) {
         <Send className="w-4 h-4" style={{ color: "var(--green)" }} />
         <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Enviar mensagem de teste</h3>
       </div>
+      <div className="flex gap-2 mb-2 text-xs">
+        <button
+          onClick={() => setMode("template")}
+          className="px-2.5 py-1 rounded-md font-medium"
+          style={{
+            background: mode === "template" ? "var(--green)" : "var(--surface-3)",
+            color: mode === "template" ? "var(--green-fg)" : "var(--text-2)",
+          }}>
+          Template (1º envio)
+        </button>
+        <button
+          onClick={() => setMode("text")}
+          className="px-2.5 py-1 rounded-md font-medium"
+          style={{
+            background: mode === "text" ? "var(--green)" : "var(--surface-3)",
+            color: mode === "text" ? "var(--green-fg)" : "var(--text-2)",
+          }}>
+          Texto livre (janela 24h)
+        </button>
+      </div>
       <div className="grid sm:grid-cols-3 gap-2">
         <input value={to} onChange={(e) => setTo(e.target.value)}
           placeholder="+5511987654321" className="input-field" />
-        <input value={text} onChange={(e) => setText(e.target.value)}
-          placeholder="Texto" className="input-field sm:col-span-2" />
+        {mode === "text" ? (
+          <input value={text} onChange={(e) => setText(e.target.value)}
+            placeholder="Texto" className="input-field sm:col-span-2" />
+        ) : (
+          <>
+            <input value={templateName} onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="hello_world" className="input-field" />
+            <input value={templateLang} onChange={(e) => setTemplateLang(e.target.value)}
+              placeholder="en_US" className="input-field" />
+          </>
+        )}
       </div>
+      {mode === "template" && (
+        <p className="text-[11px] mt-1" style={{ color: "var(--text-3)" }}>
+          Para o primeiro contato fora da janela de 24h, use template aprovado.
+          Padrão: <code className="font-mono">hello_world</code> (en_US) — vem
+          pré-aprovado em todas as WABAs novas.
+        </p>
+      )}
       <button
         onClick={() => send.mutate()}
-        disabled={!to || !text || send.isPending}
+        disabled={!to || (mode === "text" && !text) || (mode === "template" && !templateName) || send.isPending}
         className="mt-3 text-xs font-medium px-3 py-2 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50"
         style={{ background: "var(--green)", color: "var(--green-fg)" }}>
         {send.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}

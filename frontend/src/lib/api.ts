@@ -764,8 +764,23 @@ export const wabaApi = {
     api.post(`/v1/instances/${instanceId}/waba/register`, { pin }),
   subscribe: (instanceId: string) =>
     api.post(`/v1/instances/${instanceId}/waba/subscribe`),
-  sendMessage: (instanceId: string, data: { to: string; type: string; text?: string; template?: any }) =>
-    api.post(`/v1/instances/${instanceId}/waba/messages`, data),
+  sendMessage: (
+    instanceId: string,
+    data: {
+      to: string;
+      type: "text" | "template" | "image" | "document" | "audio" | "video";
+      text?: { body: string; preview_url?: boolean };
+      template?: {
+        name: string;
+        language: { code: string };
+        components?: Array<Record<string, unknown>>;
+      };
+      image?: { link?: string; id?: string; caption?: string };
+      document?: { link?: string; id?: string; filename?: string; caption?: string };
+      audio?: { link?: string; id?: string };
+      video?: { link?: string; id?: string; caption?: string };
+    },
+  ) => api.post(`/v1/instances/${instanceId}/waba/messages`, data),
 };
 
 export interface WebhookPayload {

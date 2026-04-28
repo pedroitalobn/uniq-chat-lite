@@ -447,16 +447,22 @@ func (h *WABAHandler) SendMessage(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		To   string `json:"to"`
-		Body string `json:"body"`
-		Type string `json:"type"`
+		To       string                 `json:"to"`
+		Type     string                 `json:"type"`
+		Body     string                 `json:"body,omitempty"`     // legacy flat
+		Text     map[string]interface{} `json:"text,omitempty"`     // {body: "..."}
+		Template map[string]interface{} `json:"template,omitempty"` // {name, language, components}
+		Image    map[string]interface{} `json:"image,omitempty"`
+		Document map[string]interface{} `json:"document,omitempty"`
+		Audio    map[string]interface{} `json:"audio,omitempty"`
+		Video    map[string]interface{} `json:"video,omitempty"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request"})
 	}
 
-	if req.To == "" || req.Body == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "to and body are required"})
+	if req.To == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "to is required"})
 	}
 
 	if req.Type == "" {
@@ -469,8 +475,28 @@ func (h *WABAHandler) SendMessage(c *fiber.Ctx) error {
 		"type":              req.Type,
 	}
 
-	if req.Type == "text" {
-		messageData["text"] = map[string]string{"body": req.Body}
+	switch req.Type {
+	case "text":
+		if req.Text != nil {
+			messageData["text"] = req.Text
+		} else if req.Body != "" {
+			messageData["text"] = map[string]string{"body": req.Body}
+		} else {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "text.body is required"})
+		}
+	case "template":
+		if req.Template == nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "template object is required"})
+		}
+		messageData["template"] = req.Template
+	case "image":
+		messageData["image"] = req.Image
+	case "document":
+		messageData["document"] = req.Document
+	case "audio":
+		messageData["audio"] = req.Audio
+	case "video":
+		messageData["video"] = req.Video
 	}
 
 	jsonData, _ := json.Marshal(messageData)
