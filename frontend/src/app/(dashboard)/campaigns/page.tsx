@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { campaignsApi, instancesApi, groupsApi } from "@/lib/api";
+import { campaignsApi, instancesApi, groupsApi, wabaApi } from "@/lib/api";
 import { Campaign, Instance } from "@/types";
 import {
   Plus, Megaphone, Play, Pause, X, Trash2, Clock, CheckCircle2,
@@ -102,6 +102,11 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
   const [file, setFile]         = useState<File | null>(null);
   const fileRef                 = useRef<HTMLInputElement>(null);
 
+  // Step 3 – WABA template (usado quando selectedInstance.channel = "waba")
+  const [tplKey, setTplKey] = useState<string>(""); // "name|language"
+  const [tplVars, setTplVars] = useState<Record<string, string>>({});
+  const [tplHeaderURL, setTplHeaderURL] = useState("");
+
   // Step 4 – schedule
   const [startDate, setStartDate]       = useState("");
   const [endDate, setEndDate]           = useState("");
@@ -117,12 +122,41 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
     queryFn: () => instancesApi.list(undefined, currentWorkspace?.id).then((r) => r.data),
   });
   const connectedInstances = instances.filter((i) => i.status === "connected");
+  const selectedInstance = instances.find((i) => i.id === instanceId);
+  const isWABA = selectedInstance?.channel === "waba";
 
   const { data: groups = [], isLoading: groupsLoading } = useQuery<Group[]>({
     queryKey: ["groups", instanceId],
     queryFn: () => groupsApi.list(instanceId).then((r) => r.data.groups ?? []),
     enabled: !!instanceId && recipientType === "groups",
   });
+
+  // Templates aprovados da WABA — só busca quando instância é WABA
+  const { data: wabaTemplatesRes } = useQuery<{ items: Array<{ name: string; language: string; status: string; category: string; components: any[] }> }>({
+    queryKey: ["waba-templates", instanceId],
+    queryFn: () => wabaApi.templates(instanceId).then((r) => r.data),
+    enabled: !!instanceId && isWABA,
+  });
+  const approvedTemplates = (wabaTemplatesRes?.items || []).filter((t) => t.status === "APPROVED");
+  const selectedTpl = approvedTemplates.find(
+    (t) => `${t.name}|${t.language}` === tplKey,
+  );
+
+  // Detecta variáveis do body do template selecionado
+  const tplBodyText: string = (() => {
+    if (!selectedTpl) return "";
+    const body = selectedTpl.components?.find((c: any) => c.type === "BODY");
+    return body?.text || "";
+  })();
+  const tplBodyVars = Array.from(tplBodyText.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g))
+    .map((m) => m[1])
+    .filter((v, i, a) => a.indexOf(v) === i);
+
+  const tplHasMediaHeader: boolean = (() => {
+    if (!selectedTpl) return false;
+    const h = selectedTpl.components?.find((c: any) => c.type === "HEADER");
+    return h && ["IMAGE", "VIDEO", "DOCUMENT"].includes(h.format);
+  })();
 
   // CRM segment options
   const { data: segmentOptions } = useQuery({
@@ -154,7 +188,9 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
   const canNext2 = recipientType === "contacts" ? parseContacts().length > 0 :
                    recipientType === "groups" ? selectedGroups.length > 0 :
                    true; // CRM always valid (filters can be empty = all contacts)
-  const canNext3 = msgType === "text" ? msgText.trim().length > 0 : !!file;
+  const canNext3 = isWABA
+    ? !!selectedTpl && tplBodyVars.every((v) => (tplVars[v] || "").trim().length > 0) && (!tplHasMediaHeader || !!tplHeaderURL)
+    : msgType === "text" ? msgText.trim().length > 0 : !!file;
 
   const handleCreate = async () => {
     setSaving(true);
@@ -172,17 +208,22 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
         ? parseContacts()
         : selectedGroups.map((g) => ({ phone: g.jid, name: g.name }));
 
+      const [tplName, tplLang] = (tplKey || "|").split("|");
       await campaignsApi.create({
         workspace_id:   currentWorkspace?.id,
         instance_id:    instanceId,
         name:           name.trim(),
         recipient_type: recipientType,
-        message_type:   msgType,
-        message_text:   msgText.trim(),
-        caption:        caption.trim() || undefined,
+        message_type:   isWABA ? "template" : msgType,
+        message_text:   isWABA ? "" : msgText.trim(),
+        caption:        isWABA ? undefined : (caption.trim() || undefined),
         media_base64:   mediaBase64,
         media_mime:     mediaMime,
         media_name:     mediaName,
+        template_name:     isWABA ? tplName : undefined,
+        template_language: isWABA ? tplLang : undefined,
+        template_variables: isWABA ? tplVars : undefined,
+        template_header_url: isWABA && tplHasMediaHeader ? tplHeaderURL : undefined,
         start_date:     startDate ? new Date(startDate).toISOString() : undefined,
         end_date:       endDate   ? new Date(endDate).toISOString()   : undefined,
         times_total:    timesTotal,
@@ -564,6 +605,82 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
           {/* ── Step 3: Message ── */}
           {step === 3 && (
             <>
+              {isWABA ? (
+                <div className="space-y-3">
+                  <div className="rounded-lg p-3 text-xs" style={{ background: "rgba(0,136,255,0.08)", border: "1px solid rgba(0,136,255,0.25)", color: "hsl(240 8% 75%)" }}>
+                    <strong style={{ color: "#0088ff" }}>Canal WhatsApp API:</strong> mensagens precisam ser
+                    enviadas via <strong>template aprovado</strong> pela Meta (regra obrigatória da Cloud API
+                    fora da janela 24h).
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>Template *</label>
+                    <select value={tplKey} onChange={(e) => { setTplKey(e.target.value); setTplVars({}); }}
+                      className="input-field w-full">
+                      <option value="">— Selecione um template aprovado —</option>
+                      {approvedTemplates.map((t) => (
+                        <option key={`${t.name}|${t.language}`} value={`${t.name}|${t.language}`}>
+                          {t.name} ({t.language}) · {t.category}
+                        </option>
+                      ))}
+                    </select>
+                    {approvedTemplates.length === 0 && (
+                      <p className="text-[11px] mt-1.5" style={{ color: "#fbbf24" }}>
+                        ⚠️ Nenhum template APPROVED encontrado. Crie um em /instances/[id]/waba antes.
+                      </p>
+                    )}
+                  </div>
+
+                  {selectedTpl && tplBodyText && (
+                    <div className="rounded-lg p-3" style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 14%)" }}>
+                      <p className="text-[10px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 50%)" }}>
+                        Body do template
+                      </p>
+                      <p className="text-xs whitespace-pre-wrap" style={{ color: "hsl(240 15% 80%)" }}>
+                        {tplBodyText}
+                      </p>
+                    </div>
+                  )}
+
+                  {tplBodyVars.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium" style={{ color: "hsl(240 8% 70%)" }}>
+                        Mapeamento de variáveis
+                      </p>
+                      <p className="text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
+                        Use Liquid pra puxar do CRM: <code className="font-mono">{`{{contact.name}}`}</code>,{" "}
+                        <code className="font-mono">{`{{contact.phone}}`}</code> ou texto fixo.
+                      </p>
+                      {tplBodyVars.map((v) => (
+                        <div key={v} className="flex items-center gap-2">
+                          <code className="text-[11px] font-mono shrink-0" style={{ color: "hsl(240 8% 70%)", minWidth: "5rem" }}>
+                            {`{{${v}}}`}
+                          </code>
+                          <input value={tplVars[v] || ""}
+                            onChange={(e) => setTplVars((prev) => ({ ...prev, [v]: e.target.value }))}
+                            placeholder={v === "1" || v === "name" ? "{{contact.name}}" : "valor ou {{contact.xxx}}"}
+                            className="input-field flex-1 text-xs font-mono" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {tplHasMediaHeader && (
+                    <div>
+                      <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>
+                        URL da mídia do header (image/video/document) *
+                      </label>
+                      <input value={tplHeaderURL} onChange={(e) => setTplHeaderURL(e.target.value)}
+                        placeholder="https://exemplo.com/imagem.jpg"
+                        className="input-field w-full text-xs font-mono" />
+                      <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 50%)" }}>
+                        URL pública da mídia que será exibida no header do template.
+                        Pode usar Liquid: <code className="font-mono">{`{{contact.custom.banner}}`}</code>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+              <>
               <div>
                 <label className="text-xs font-medium block mb-2" style={{ color: "hsl(240 8% 50%)" }}>Tipo de mensagem</label>
                 <div className="grid grid-cols-4 gap-2">
@@ -628,6 +745,8 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
                     placeholder="Texto que aparece abaixo da imagem..." rows={2}
                     className="input-field w-full resize-none" />
                 </div>
+              )}
+              </>
               )}
             </>
           )}

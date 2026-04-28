@@ -42,13 +42,23 @@ type Campaign struct {
 	// CRM segmentation filters (JSON)
 	SegmentFilter string `gorm:"type:text;default:'{}'" json:"segment_filter,omitempty"`
 
-	// Message
-	MessageType string `gorm:"type:varchar(20);default:'text'" json:"message_type"` // text|image|audio|document
+	// Message — para canais texto livre (whatsmeow, IG)
+	MessageType string `gorm:"type:varchar(20);default:'text'" json:"message_type"` // text|image|audio|document|template
 	MessageText string `gorm:"type:text" json:"message_text"`
 	Caption     string `gorm:"type:text" json:"caption,omitempty"` // for image/video
 	MediaB64    string `gorm:"type:text" json:"-"`
 	MediaMime   string `gorm:"type:varchar(100)" json:"media_mime,omitempty"`
 	MediaName   string `gorm:"type:varchar(255)" json:"media_name,omitempty"`
+
+	// WABA template — usado quando MessageType="template" (obrigatório pra
+	// canal waba). TemplateVariables é JSON map de nome → valor (Liquid),
+	// ex: {"1":"{{contact.name}}", "2":"PROMO20"}.
+	TemplateName      string `gorm:"type:varchar(120)" json:"template_name,omitempty"`
+	TemplateLanguage  string `gorm:"type:varchar(20)" json:"template_language,omitempty"`
+	TemplateVariables string `gorm:"type:text;default:'{}'" json:"template_variables,omitempty"`
+	// URL pública pra header de mídia (image/video/document). Pode ser
+	// fixa ou ter variável Liquid (ex: {{contact.custom.banner_url}}).
+	TemplateHeaderURL string `gorm:"type:text" json:"template_header_url,omitempty"`
 
 	// Scheduling window
 	StartDate *time.Time `json:"start_date,omitempty"`

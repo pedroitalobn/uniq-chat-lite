@@ -964,6 +964,11 @@ export const campaignsApi = {
     media_base64?: string;
     media_mime?: string;
     media_name?: string;
+    // WABA template campaign (message_type="template")
+    template_name?: string;
+    template_language?: string;
+    template_variables?: Record<string, string>;
+    template_header_url?: string;
     start_date?: string;
     end_date?: string;
     times_total?: number;

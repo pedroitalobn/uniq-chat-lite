@@ -1,7 +1,11 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -100,6 +104,19 @@ func inScheduleHours(hoursJSON string, hour int) bool {
 
 // processCampaign sends one batch for this tick — up to timesPerDay for each recipient.
 func (h *CampaignHandler) processCampaign(c models.Campaign, today string) {
+	// Resolve canal da instância antes de tentar engajar manager.
+	var inst models.Instance
+	if err := h.db.Select("id, channel").First(&inst, c.InstanceID).Error; err != nil {
+		log.Warn().Err(err).Str("campaign", c.ID.String()).Msg("campaign: instance not found")
+		return
+	}
+
+	// WABA usa Meta Cloud API, não passa pelo whatsmeow manager.
+	if inst.Channel == models.ChannelWABA {
+		h.processCampaignWABA(c, today)
+		return
+	}
+
 	client := h.manager.GetInstance(c.InstanceID.String())
 	if client == nil || !client.IsConnected() {
 		log.Warn().Str("campaign", c.ID.String()).Msg("campaign: instance not connected, skipping tick")
@@ -292,12 +309,17 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		InstanceID    string     `json:"instance_id"`
 		Name          string     `json:"name"`
 		RecipientType string     `json:"recipient_type"` // "contacts" | "groups" | "crm" | "segment"
-		MessageType   string     `json:"message_type"`   // "text" | "image" | "audio" | "document"
+		MessageType   string     `json:"message_type"`   // "text" | "image" | "audio" | "document" | "template"
 		MessageText   string     `json:"message_text"`
 		Caption       string     `json:"caption"`
 		MediaB64      string     `json:"media_base64"`
 		MediaMime     string     `json:"media_mime"`
 		MediaName     string     `json:"media_name"`
+		// WABA template fields (usados quando message_type=template)
+		TemplateName      string            `json:"template_name"`
+		TemplateLanguage  string            `json:"template_language"`
+		TemplateVariables map[string]string `json:"template_variables"`
+		TemplateHeaderURL string            `json:"template_header_url"`
 		StartDate     *time.Time `json:"start_date"`
 		EndDate       *time.Time `json:"end_date"`
 		TimesTotal    int        `json:"times_total"`
@@ -372,25 +394,37 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		segmentJSON = string(b)
 	}
 
+	// Serializa template_variables como JSON
+	tplVarsJSON := "{}"
+	if len(req.TemplateVariables) > 0 {
+		if b, err := json.Marshal(req.TemplateVariables); err == nil {
+			tplVarsJSON = string(b)
+		}
+	}
+
 	campaign := models.Campaign{
-		UserID:        user.ID,
-		InstanceID:    instanceID,
-		Name:          req.Name,
-		RecipientType: recipientType,
-		SegmentFilter: segmentJSON,
-		MessageType:   msgType,
-		MessageText:   req.MessageText,
-		Caption:       req.Caption,
-		MediaB64:      req.MediaB64,
-		MediaMime:     req.MediaMime,
-		MediaName:     req.MediaName,
-		StartDate:     req.StartDate,
-		EndDate:       req.EndDate,
-		TimesTotal:    timesTotal,
-		TimesPerDay:   timesPerDay,
-		ScheduleHours: schedHours,
-		DelaySeconds:  delay,
-		Status:        status,
+		UserID:            user.ID,
+		InstanceID:        instanceID,
+		Name:              req.Name,
+		RecipientType:     recipientType,
+		SegmentFilter:     segmentJSON,
+		MessageType:       msgType,
+		MessageText:       req.MessageText,
+		Caption:           req.Caption,
+		MediaB64:          req.MediaB64,
+		MediaMime:         req.MediaMime,
+		MediaName:         req.MediaName,
+		TemplateName:      req.TemplateName,
+		TemplateLanguage:  req.TemplateLanguage,
+		TemplateVariables: tplVarsJSON,
+		TemplateHeaderURL: req.TemplateHeaderURL,
+		StartDate:         req.StartDate,
+		EndDate:           req.EndDate,
+		TimesTotal:        timesTotal,
+		TimesPerDay:       timesPerDay,
+		ScheduleHours:     schedHours,
+		DelaySeconds:      delay,
+		Status:            status,
 	}
 	if req.WorkspaceID != "" {
 		if wid, err := uuid.Parse(req.WorkspaceID); err == nil {
@@ -744,4 +778,268 @@ func (h *CampaignHandler) SegmentPreview(c *fiber.Ctx) error {
 		"total":  count,
 		"sample": sample,
 	})
+}
+
+// processCampaignWABA — caminho de envio dedicado pra instâncias WABA.
+//
+// Diferenças vs whatsmeow:
+//   - Sempre usa template aprovado (Meta exige fora da janela 24h)
+//   - HTTP direto pra Meta Cloud API, sem queue/whatsmeow
+//   - Variáveis renderizadas via Liquid pra cada destinatário (suporta
+//     {{contact.name}}, custom fields, etc)
+//   - Header de mídia opcional (template tem que ter HEADER format=IMAGE/VIDEO/DOCUMENT)
+//   - Respeita opt-out, freq cap e horário tranquilo igual whatsmeow
+func (h *CampaignHandler) processCampaignWABA(c models.Campaign, today string) {
+	if c.TemplateName == "" || c.TemplateLanguage == "" {
+		log.Warn().Str("campaign", c.ID.String()).Msg("campaign WABA: template não configurado")
+		h.db.Model(&c).Updates(map[string]any{
+			"status": models.CampaignStatusFailed,
+		})
+		return
+	}
+
+	var waba models.WABAInstance
+	if err := h.db.Where("instance_id = ?", c.InstanceID).First(&waba).Error; err != nil {
+		log.Warn().Err(err).Str("campaign", c.ID.String()).Msg("campaign WABA: WABAInstance não encontrada")
+		return
+	}
+	if waba.AccessToken == "" || waba.PhoneNumberID == "" {
+		log.Warn().Str("campaign", c.ID.String()).Msg("campaign WABA: credenciais ausentes (re-conecte a instância)")
+		return
+	}
+
+	var recipients []models.CampaignRecipient
+	h.db.Where("campaign_id = ? AND status = ?", c.ID, models.RecipientStatusPending).Find(&recipients)
+
+	if len(recipients) == 0 {
+		completedAt := time.Now()
+		h.db.Model(&c).Updates(map[string]any{
+			"status":       models.CampaignStatusCompleted,
+			"completed_at": &completedAt,
+		})
+		return
+	}
+
+	// Parse template_variables: { "1": "{{contact.name}}", "2": "PROMO20", ... }
+	var varMap map[string]string
+	_ = json.Unmarshal([]byte(c.TemplateVariables), &varMap)
+
+	// Delay entre envios (rate limit Meta — começa baixo, sobe com quality)
+	delay := time.Duration(c.DelaySeconds) * time.Second
+	if delay < 1*time.Second {
+		delay = 1 * time.Second
+	}
+
+	for i := range recipients {
+		r := &recipients[i]
+
+		// Status check (campanha pode ter sido pausada)
+		var fresh models.Campaign
+		h.db.Select("status").First(&fresh, c.ID)
+		if fresh.Status == models.CampaignStatusPaused || fresh.Status == models.CampaignStatusFailed {
+			return
+		}
+
+		// Reset diário
+		if r.LastSentDate != today {
+			r.SentToday = 0
+			r.LastSentDate = today
+		}
+		if r.SentToday >= c.TimesPerDay {
+			continue
+		}
+
+		// Compliance checks (mesmas regras whatsmeow)
+		if c.WorkspaceID != nil {
+			ws := *c.WorkspaceID
+			if models.IsSuppressed(h.db, ws, r.Phone, "whatsapp") {
+				h.db.Model(r).Updates(map[string]any{
+					"status": models.RecipientStatusFailed,
+					"error":  "suppressed",
+				})
+				continue
+			}
+			var contact models.Contact
+			h.db.Select("id").Where("(workspace_id = ? OR user_id = ?) AND phone = ?",
+				ws, c.UserID, r.Phone).First(&contact)
+			if contact.ID != uuid.Nil {
+				if freqcap.IsQuietNow(ws, contact.ID, h.db) {
+					continue
+				}
+				if okFC, reason := freqcap.Check(h.db, ws, contact.ID); !okFC {
+					log.Debug().Str("phone", r.Phone).Str("reason", reason).Msg("campaign WABA: freq cap")
+					continue
+				}
+			}
+		}
+
+		// Renderiza variáveis com Liquid pra esse destinatário
+		liquidVars := map[string]any{
+			"contact": map[string]any{
+				"phone": r.Phone,
+				"name":  r.Name,
+			},
+		}
+
+		// Monta components do template
+		components := []map[string]any{}
+		if c.TemplateHeaderURL != "" {
+			headerURL := templatesvc.MustRender(c.TemplateHeaderURL, liquidVars)
+			// Detecta tipo de header pela extensão da URL (heurística simples)
+			headerType := "image"
+			low := strings.ToLower(headerURL)
+			switch {
+			case strings.HasSuffix(low, ".mp4"), strings.HasSuffix(low, ".3gp"):
+				headerType = "video"
+			case strings.HasSuffix(low, ".pdf"):
+				headerType = "document"
+			}
+			components = append(components, map[string]any{
+				"type": "header",
+				"parameters": []map[string]any{
+					{
+						"type":     headerType,
+						headerType: map[string]any{"link": headerURL},
+					},
+				},
+			})
+		}
+
+		// Body parameters em ordem (Meta espera array posicional mesmo pra
+		// templates com variáveis nomeadas — backend Cloud API converte).
+		bodyParams := []map[string]any{}
+		// Itera em ordem 1, 2, 3... pra posicionais OU pelas keys nomeadas.
+		// Se tiver chaves numéricas usa ordem; senão ordem de inserção do JSON
+		// (Go maps são unordered → ordenamos por chave).
+		keys := make([]string, 0, len(varMap))
+		for k := range varMap {
+			keys = append(keys, k)
+		}
+		// Ordena: numéricas primeiro por valor inteiro, depois nomeadas alfabético
+		sortStringsNumeric(keys)
+		for _, k := range keys {
+			rendered := templatesvc.MustRender(varMap[k], liquidVars)
+			bodyParams = append(bodyParams, map[string]any{
+				"type": "text",
+				"text": rendered,
+			})
+		}
+		if len(bodyParams) > 0 {
+			components = append(components, map[string]any{
+				"type":       "body",
+				"parameters": bodyParams,
+			})
+		}
+
+		payload := map[string]any{
+			"messaging_product": "whatsapp",
+			"to":                r.Phone,
+			"type":              "template",
+			"template": map[string]any{
+				"name":     c.TemplateName,
+				"language": map[string]any{"code": c.TemplateLanguage},
+				"components": components,
+			},
+		}
+		body, _ := json.Marshal(payload)
+
+		url := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/messages", waba.PhoneNumberID)
+		req, _ := http.NewRequest("POST", url, bytes.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+waba.AccessToken)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+
+		if err != nil {
+			log.Warn().Err(err).Str("phone", r.Phone).Msg("campaign WABA: HTTP failed")
+			h.db.Model(r).Updates(map[string]any{
+				"status": models.RecipientStatusFailed,
+				"error":  err.Error(),
+			})
+			h.db.Model(&c).Update("failed_count", gorm.Expr("failed_count + 1"))
+			continue
+		}
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if resp.StatusCode >= 400 {
+			errMsg := string(respBody)
+			if len(errMsg) > 300 {
+				errMsg = errMsg[:300]
+			}
+			log.Warn().Int("status", resp.StatusCode).Str("phone", r.Phone).
+				Str("body", errMsg).Msg("campaign WABA: Meta retornou erro")
+			h.db.Model(r).Updates(map[string]any{
+				"status": models.RecipientStatusFailed,
+				"error":  errMsg,
+			})
+			h.db.Model(&c).Update("failed_count", gorm.Expr("failed_count + 1"))
+			continue
+		}
+
+		// Sucesso
+		var metaResp struct {
+			Messages []struct {
+				ID string `json:"id"`
+			} `json:"messages"`
+		}
+		_ = json.Unmarshal(respBody, &metaResp)
+		messageID := ""
+		if len(metaResp.Messages) > 0 {
+			messageID = metaResp.Messages[0].ID
+		}
+
+		h.db.Model(r).Updates(map[string]any{
+			"status":         models.RecipientStatusSent,
+			"sent_at":        time.Now(),
+			"sent_today":     r.SentToday + 1,
+			"last_sent_date": today,
+			"message_id":     messageID,
+		})
+		h.db.Model(&c).Update("sent_count", gorm.Expr("sent_count + 1"))
+
+		// Spread between sends
+		time.Sleep(delay)
+	}
+
+	// Verifica fim
+	var pending int64
+	h.db.Model(&models.CampaignRecipient{}).
+		Where("campaign_id = ? AND status = ?", c.ID, models.RecipientStatusPending).
+		Count(&pending)
+	if pending == 0 {
+		completedAt := time.Now()
+		h.db.Model(&c).Updates(map[string]any{
+			"status":       models.CampaignStatusCompleted,
+			"completed_at": &completedAt,
+		})
+	}
+}
+
+// sortStringsNumeric ordena strings: numéricas primeiro por valor numérico
+// (1, 2, 10 não 1, 10, 2), depois nomeadas alfabético.
+func sortStringsNumeric(keys []string) {
+	// quicksort manual pra evitar import sort
+	if len(keys) < 2 {
+		return
+	}
+	cmp := func(a, b string) bool {
+		var ai, bi int
+		_, errA := fmt.Sscanf(a, "%d", &ai)
+		_, errB := fmt.Sscanf(b, "%d", &bi)
+		if errA == nil && errB == nil {
+			return ai < bi
+		}
+		if errA == nil {
+			return true
+		}
+		if errB == nil {
+			return false
+		}
+		return a < b
+	}
+	for i := 1; i < len(keys); i++ {
+		for j := i; j > 0 && cmp(keys[j], keys[j-1]); j-- {
+			keys[j], keys[j-1] = keys[j-1], keys[j]
+		}
+	}
 }
