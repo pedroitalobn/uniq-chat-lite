@@ -55,28 +55,60 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // API_URL aponta pro backend dentro da rede docker (http://uniqchat-backend:8080)
-  // Em dev local cai pro NEXT_PUBLIC_API_URL externo.
-  const apiBase =
-    process.env.API_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    "http://uniqchat-backend:8080";
+  // Tenta primeiro o internal docker (http://uniqchat-backend:8080) e
+  // cai pro público (https://api.uniq.chat) se DNS interno falhar.
+  // Algumas configs de Dokploy/Compose não compartilham network entre
+  // serviços, então o fallback é importante.
+  const candidates = [
+    process.env.API_URL,
+    process.env.NEXT_PUBLIC_API_URL,
+    "https://api.uniq.chat",
+    "http://uniqchat-backend:8080",
+  ].filter((u): u is string => !!u);
+
+  const fetchOpts = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      code,
+      instance_id: stateInstanceId || undefined,
+      // Manda o redirect_uri exato usado no popup pra exchange não falhar
+      // por mismatch entre origem real e FRONTEND_URL do .env.
+      redirect_uri: `${origin}/api/waba/callback`,
+    }),
+  };
+
+  let res: Response | null = null;
+  let lastErr: unknown = null;
+  for (const base of candidates) {
+    try {
+      res = await fetch(`${base}/v1/waba/callback`, fetchOpts);
+      console.log("[waba/callback] reached backend at", base, res.status);
+      break;
+    } catch (e) {
+      lastErr = e;
+      console.warn(
+        "[waba/callback] failed",
+        base,
+        e instanceof Error ? e.message : e,
+      );
+    }
+  }
+
+  if (!res) {
+    const msg = lastErr instanceof Error ? lastErr.message : "all backends unreachable";
+    return htmlBridge({
+      type: "error",
+      message: `Backend inalcançável: ${msg}`,
+      target: `/instances?waba_error=network&detail=${encodeURIComponent(msg)}`,
+      origin,
+    });
+  }
 
   try {
-    const res = await fetch(`${apiBase}/v1/waba/callback`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        code,
-        instance_id: stateInstanceId || undefined,
-        // Manda o redirect_uri exato usado no popup pra exchange não falhar
-        // por mismatch entre origem real e FRONTEND_URL do .env.
-        redirect_uri: `${origin}/api/waba/callback`,
-      }),
-    });
 
     const bodyText = await res.text();
     if (!res.ok) {
