@@ -1365,13 +1365,17 @@ func (h *JourneyHandler) UpdateTrigger(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		Name          *string  `json:"name,omitempty"`
-		TriggerType   *string  `json:"trigger_type,omitempty"`
-		TriggerFilter *string  `json:"trigger_filter,omitempty"`
-		Keywords      []string `json:"keywords,omitempty"`
-		GroupJID      *string  `json:"group_jid,omitempty"`
-		InstanceID    *string  `json:"instance_id,omitempty"`
-		ResponseMode  *string  `json:"response_mode,omitempty"`
+		Name           *string  `json:"name,omitempty"`
+		TriggerType    *string  `json:"trigger_type,omitempty"`
+		TriggerFilter  *string  `json:"trigger_filter,omitempty"`
+		Keywords       []string `json:"keywords,omitempty"`
+		GroupJID       *string  `json:"group_jid,omitempty"`
+		InstanceID     *string  `json:"instance_id,omitempty"`
+		ResponseMode   *string  `json:"response_mode,omitempty"`
+		// Customer.io-inspired
+		GoalEvent      *string  `json:"goal_event,omitempty"`
+		ExitConditions *string  `json:"exit_conditions,omitempty"`
+		ReEntryRule    *string  `json:"re_entry_rule,omitempty"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "requisição inválida"})
@@ -1400,6 +1404,15 @@ func (h *JourneyHandler) UpdateTrigger(c *fiber.Ctx) error {
 	}
 	if req.ResponseMode != nil {
 		updates["response_mode"] = *req.ResponseMode
+	}
+	if req.GoalEvent != nil {
+		updates["goal_event"] = *req.GoalEvent
+	}
+	if req.ExitConditions != nil {
+		updates["exit_conditions"] = *req.ExitConditions
+	}
+	if req.ReEntryRule != nil {
+		updates["re_entry_rule"] = *req.ReEntryRule
 	}
 
 	if len(updates) == 0 {

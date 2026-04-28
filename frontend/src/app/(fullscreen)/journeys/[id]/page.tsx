@@ -38,7 +38,10 @@ type StepType =
   | "message" | "buttons" | "list" | "input" | "wait" | "condition"
   | "ai_response" | "http_request" | "media" | "handoff" | "goto"
   | "randomize" | "set_variable" | "add_tag" | "remove_tag"
-  | "update_stage" | "end";
+  | "update_stage" | "end"
+  | "product_search" | "product_carousel"
+  // Customer.io-inspired
+  | "wait_until" | "multivariate" | "send_in_timezone" | "unsubscribe";
 
 interface FlowStep {
   id: string;
@@ -82,6 +85,14 @@ const STEP_META: Record<StepType, {
   remove_tag:  { label: "Rem Tag",     color: "#94a3b8", bg: "rgba(148,163,184,0.12)", icon: Tag,           defaultConfig: { tag: "" } },
   update_stage:{ label: "Estágio CRM", color: "#14b8a6", bg: "rgba(20,184,166,0.12)",  icon: GitBranch,     defaultConfig: { stage_id: "" } },
   end:         { label: "Fim",         color: "#6b7280", bg: "rgba(107,114,128,0.12)", icon: X,             defaultConfig: {} },
+  // Shop nodes (Fase 10)
+  product_search:    { label: "Buscar produtos", color: "#22c55e", bg: "rgba(34,197,94,0.12)",  icon: Tag, defaultConfig: { query: "{{last_input}}", limit: 5, save_to_var: "products" } },
+  product_carousel:  { label: "Carousel produtos", color: "#22c55e", bg: "rgba(34,197,94,0.12)", icon: ListTree, defaultConfig: { header: "Produtos pra você", message: "Confira:", products_var: "products", button_text: "Ver" } },
+  // Customer.io-inspired
+  wait_until:        { label: "Aguardar evento", color: "#f59e0b", bg: "rgba(245,158,11,0.12)", icon: Clock, defaultConfig: { event: "shop.order_paid", timeout_minutes: 1440 } },
+  multivariate:      { label: "A/B/C split", color: "#a855f7", bg: "rgba(168,85,247,0.12)", icon: GitBranch, defaultConfig: { branches: [{ weight: 50, next: "", label: "A" }, { weight: 50, next: "", label: "B" }] } },
+  send_in_timezone:  { label: "Janela horária", color: "#f59e0b", bg: "rgba(245,158,11,0.12)", icon: Clock, defaultConfig: { window_start_hour: 9, window_end_hour: 18 } },
+  unsubscribe:       { label: "Unsubscribe (LGPD)", color: "#ef4444", bg: "rgba(239,68,68,0.12)", icon: X, defaultConfig: { channel: "all", reason: "user_optout" } },
 };
 
 // ─── Custom node ──────────────────────────────────────────────────────────────
@@ -747,6 +758,10 @@ function TriggerPanel({
   const [responseMode, setResponseMode] = useState(initial?.response_mode ?? "private");
   const [saving, setSaving] = useState(false);
   const [togglingStatus, setTogglingStatus] = useState(false);
+  // Customer.io-inspired: goal tracking + exit conditions + re-entry rule
+  const [goalEvent, setGoalEvent] = useState(initial?.goal_event ?? "");
+  const [exitConditionsRaw, setExitConditionsRaw] = useState(initial?.exit_conditions ?? "[]");
+  const [reEntryRule, setReEntryRule] = useState(initial?.re_entry_rule ?? "never");
 
   // Re-sync quando a jornada externa recarrega
   useEffect(() => {
@@ -759,6 +774,9 @@ function TriggerPanel({
     setInstanceId(initial.instance_id ?? "");
     setGroupJID(initial.group_jid ?? "");
     setResponseMode(initial.response_mode ?? "private");
+    setGoalEvent(initial.goal_event ?? "");
+    setExitConditionsRaw(initial.exit_conditions ?? "[]");
+    setReEntryRule(initial.re_entry_rule ?? "never");
   }, [initial]);
 
   const needsKeywords = triggerType === "group_keyword" || triggerType === "private_keyword" || triggerType === "user_command";
@@ -777,7 +795,10 @@ function TriggerPanel({
         group_jid: needsGroup ? groupJID : "",
         instance_id: instanceId,
         response_mode: responseMode,
-      });
+        goal_event: goalEvent.trim() || "",
+        exit_conditions: exitConditionsRaw,
+        re_entry_rule: reEntryRule,
+      } as any);
       toast.success("Gatilho salvo ✓");
       onSaved({
         name: res.data?.name,
@@ -886,6 +907,47 @@ function TriggerPanel({
               {lbl}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* ─── Goals & Lifecycle (Customer.io-inspired) ─────────────── */}
+      <div className="pt-3 mt-2 border-t" style={{ borderColor: "var(--surface-border)" }}>
+        <p className="text-[10px] uppercase tracking-wider font-medium mb-2 opacity-60">Goals & Lifecycle</p>
+
+        <div className="mb-2">
+          <label className="text-[10px] block mb-1 opacity-60">Goal event (incrementa contagem quando ocorre)</label>
+          <input value={goalEvent} onChange={(e) => setGoalEvent(e.target.value)}
+            placeholder="ex: deal.won, shop.order_paid, tag.added:vip"
+            className="w-full rounded-lg px-2.5 py-1.5 text-sm font-mono outline-none"
+            style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }} />
+          <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
+            Conversões: <span className="font-mono">{initial?.goal_count ?? 0}</span>
+          </p>
+        </div>
+
+        <div className="mb-2">
+          <label className="text-[10px] block mb-1 opacity-60">Re-entry rule</label>
+          <select value={reEntryRule} onChange={(e) => setReEntryRule(e.target.value)}
+            className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none"
+            style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}>
+            <option value="never">Apenas uma vez por contato</option>
+            <option value="always">Sempre (entra de novo a cada trigger)</option>
+            <option value="after_days:7">Após 7 dias do último run</option>
+            <option value="after_days:30">Após 30 dias do último run</option>
+            <option value="after_days:90">Após 90 dias do último run</option>
+          </select>
+        </div>
+
+        <div className="mb-2">
+          <label className="text-[10px] block mb-1 opacity-60">
+            Exit conditions (JSON array — encerra execução)
+          </label>
+          <textarea value={exitConditionsRaw}
+            onChange={(e) => setExitConditionsRaw(e.target.value)}
+            rows={3}
+            placeholder='[{"event":"deal.won"},{"event_prefix":"tag.added:cliente"}]'
+            className="w-full rounded-lg px-2.5 py-1.5 text-xs font-mono outline-none"
+            style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }} />
         </div>
       </div>
 
@@ -1024,6 +1086,11 @@ interface JourneyMeta {
   group_jid?: string;
   instance_id?: string;
   response_mode?: string;
+  // Customer.io-inspired
+  goal_event?: string;
+  goal_count?: number;
+  exit_conditions?: string;
+  re_entry_rule?: string;
 }
 
 function BuilderCanvas() {

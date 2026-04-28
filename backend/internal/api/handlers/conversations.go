@@ -2023,6 +2023,25 @@ func (h *ConversationHandler) AddTag(c *fiber.Ctx) error {
 	h.db.Exec(`INSERT INTO conversation_tags (conversation_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING`, id, tagID)
 	actor := middleware.GetCurrentUserID(c)
 	h.appendEvent(&models.Conversation{ID: id, WorkspaceID: ws}, models.ConvEventTagAdded, actor, map[string]any{"tag_id": tagID})
+
+	// Goal/Exit hooks pra Journey: tag.added:{tag_name} pro contato.
+	var tag models.Tag
+	if h.db.First(&tag, "id = ?", tagID).Error == nil {
+		var conv models.Conversation
+		h.db.Select("contact_id").First(&conv, "id = ?", id)
+		if conv.ContactID != nil {
+			var contact models.Contact
+			if h.db.First(&contact, "id = ?", *conv.ContactID).Error == nil && contact.Phone != "" {
+				jid := contact.Phone + "@s.whatsapp.net"
+				services.DispatchJourneyEvent("tag.added:"+tag.Name, jid, map[string]any{
+					"tag_id": tagID.String(), "tag_name": tag.Name,
+				})
+				services.DispatchJourneyEvent("tag.added", jid, map[string]any{
+					"tag_id": tagID.String(), "tag_name": tag.Name,
+				})
+			}
+		}
+	}
 	return c.JSON(fiber.Map{"ok": true})
 }
 

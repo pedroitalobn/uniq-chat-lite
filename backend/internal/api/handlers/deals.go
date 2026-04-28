@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/models"
+	"github.com/uniq-chat/backend/internal/services"
 	"gorm.io/gorm"
 )
 
@@ -336,6 +337,20 @@ func (h *DealHandler) finalize(c *fiber.Ctx, status models.DealStatus, activity 
 	h.db.Model(&d).Updates(update)
 	h.activity(&d, activity, "", nil, middleware.GetCurrentUserID(c))
 	h.db.Preload("Contact").Preload("Company").Preload("Owner").First(&d, "id = ?", id)
+
+	// Goal/Exit hooks pra Journey: dispara evento "deal.won" / "deal.lost"
+	// pro contato. JourneyEventDispatcher trata goal counter + exit.
+	if d.Contact != nil && d.Contact.Phone != "" {
+		eventName := "deal." + string(status)
+		jid := d.Contact.Phone + "@s.whatsapp.net"
+		services.DispatchJourneyEvent(eventName, jid, map[string]any{
+			"deal_id":   d.ID.String(),
+			"funnel_id": d.FunnelID.String(),
+			"value":     d.Value,
+			"currency":  d.Currency,
+			"reason":    body.Reason,
+		})
+	}
 	return c.JSON(d)
 }
 
