@@ -23,6 +23,29 @@ func NewServerHandler(db *gorm.DB, hub *whatsapp.Hub) *ServerHandler {
 // List godoc
 // GET /servers
 // Query params: workspace_id (optional)
+// resolveEffectivePlan retorna (ownerID, plan) que devem ser usados pra
+// validar limites de plano em ações dentro de um workspace. Membros de
+// workspace herdam o Plan do DONO do workspace — só caem no plano pessoal
+// quando wsUUID é nil (criação fora de qualquer workspace).
+//
+// Esse helper é reusado em instances/shops/agents/journeys pra evitar o
+// bug onde um membro com plano free é bloqueado em ações no workspace de
+// um owner com plano Pro.
+func resolveEffectivePlan(db *gorm.DB, user *models.User, wsUUID *uuid.UUID) (uuid.UUID, *models.Plan) {
+	if wsUUID == nil || *wsUUID == uuid.Nil {
+		return user.ID, user.Plan
+	}
+	var ws models.Workspace
+	if err := db.Preload("Owner.Plan").First(&ws, "id = ?", *wsUUID).Error; err != nil {
+		return user.ID, user.Plan
+	}
+	plan := user.Plan
+	if ws.Owner != nil && ws.Owner.Plan != nil {
+		plan = ws.Owner.Plan
+	}
+	return ws.OwnerID, plan
+}
+
 // resolveDefaultWorkspaceID devolve o workspace padrão do usuário — o primeiro
 // onde ele é owner. Se o usuário não tem workspace ainda (cenário legado),
 // retorna uuid.Nil e o caller deixa workspace_id como NULL.

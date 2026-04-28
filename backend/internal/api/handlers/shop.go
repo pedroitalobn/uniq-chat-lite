@@ -127,33 +127,32 @@ func (h *ShopHandler) CreateShop(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
 	}
 
-	// Super admin nunca é gateado.
-	// Pra demais users: AllowShop=true desbloqueia o módulo. MaxShops
-	// regula quantidade (-1 ilimitado, 0 default = ilimitado quando o
-	// flag AllowShop tá ligado — admin pode setar quota explícita).
-	if user.Role != models.RoleSuperAdmin && user.Plan != nil {
-		if !user.Plan.AllowShop {
-			return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
-				"error":       "feature_locked",
-				"message":     "Seu plano não inclui criar lojas. Faça upgrade.",
-				"upgrade_url": "/settings?section=billing",
-			})
-		}
-		if user.Plan.MaxShops > 0 {
-			// Limite é por CONTA (soma todas shops de todos workspaces do user),
-			// não por workspace. Antes contava só do workspace atual e o user
-			// driblava criando workspaces extras.
-			var count int64
-			h.db.Model(&models.Shop{}).
-				Where("workspace_id IN (SELECT workspace_id FROM user_workspaces WHERE user_id = ?)", user.ID).
-				Count(&count)
-			if int(count) >= user.Plan.MaxShops {
+	// Super admin nunca é gateado. Demais users: usa o plano do DONO do
+	// workspace (membro herda plano do workspace).
+	if user.Role != models.RoleSuperAdmin {
+		ownerID, plan := resolveEffectivePlan(h.db, user, &wsID)
+		if plan != nil {
+			if !plan.AllowShop {
 				return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
-					"error":       "limit_reached",
-					"limit":       user.Plan.MaxShops,
-					"message":     "Você atingiu o limite de lojas do plano.",
+					"error":       "feature_locked",
+					"message":     "O plano do workspace não inclui criar lojas.",
 					"upgrade_url": "/settings?section=billing",
 				})
+			}
+			if plan.MaxShops > 0 {
+				// Conta TODAS shops dos workspaces que o owner é dono.
+				var count int64
+				h.db.Model(&models.Shop{}).
+					Where("workspace_id IN (SELECT id FROM workspaces WHERE owner_id = ?)", ownerID).
+					Count(&count)
+				if int(count) >= plan.MaxShops {
+					return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
+						"error":       "limit_reached",
+						"limit":       plan.MaxShops,
+						"message":     "Você atingiu o limite de lojas do plano do workspace.",
+						"upgrade_url": "/settings?section=billing",
+					})
+				}
 			}
 		}
 	}

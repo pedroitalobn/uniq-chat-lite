@@ -53,17 +53,31 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 		return err
 	}
 
-	// Limite de jornadas por CONTA (soma todos workspaces). Super admin
-	// edita o limite via Plan.MaxJourneys (0 = ilimitado).
+	// Limite de jornadas por CONTA. Membros herdam plano do dono do workspace
+	// (resolveEffectivePlan). Sem workspace context aqui (jornadas têm
+	// instance_id, não workspace_id direto), inferimos pelo workspace da
+	// instância referenciada — primeiro carregamos o user pra ter Plan default.
 	var user models.User
-	if err := h.db.Preload("Plan").First(&user, userID).Error; err == nil && user.Plan != nil && user.Plan.MaxJourneys > 0 {
-		var count int64
-		h.db.Model(&models.Journey{}).Where("user_id = ?", userID.String()).Count(&count)
-		if int(count) >= user.Plan.MaxJourneys {
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"error": "limite de jornadas atingido para o seu plano",
-				"limit": user.Plan.MaxJourneys,
-			})
+	if err := h.db.Preload("Plan").First(&user, userID).Error; err == nil {
+		// Tenta resolver workspace pelo header ou fallback pro default do user
+		var wsUUID *uuid.UUID
+		if def := resolveDefaultWorkspaceID(h.db, userID); def != uuid.Nil {
+			wsUUID = &def
+		}
+		ownerID, plan := resolveEffectivePlan(h.db, &user, wsUUID)
+		if plan != nil && plan.MaxJourneys > 0 {
+			var count int64
+			// Conta jornadas em todos workspaces que o owner é dono
+			h.db.Model(&models.Journey{}).
+				Where("user_id = ? OR instance_id IN (SELECT id::text FROM instances WHERE workspace_id IN (SELECT id FROM workspaces WHERE owner_id = ?))",
+					ownerID.String(), ownerID).
+				Count(&count)
+			if int(count) >= plan.MaxJourneys {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+					"error": "limite de jornadas atingido para o plano do workspace",
+					"limit": plan.MaxJourneys,
+				})
+			}
 		}
 	}
 

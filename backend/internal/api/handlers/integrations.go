@@ -614,21 +614,24 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		agent.RAGEnabled = *req.RAGEnabled
 	}
 	if req.IsActive != nil {
-		// Limite de agentes ATIVOS por conta (soma de todos workspaces).
-		// Super admin edita via Plan.MaxAgents (0 = ilimitado).
+		// Limite de agentes ATIVOS — membro herda plano do dono do workspace
+		// da instância (resolveEffectivePlan via instance.WorkspaceID).
 		if *req.IsActive && !agent.IsActive {
 			user := middleware.GetCurrentUser(c)
-			if user != nil && user.Plan != nil && user.Plan.MaxAgents > 0 {
-				var count int64
-				h.db.Model(&models.InstanceAgent{}).
-					Joins("JOIN instances ON instances.id = instance_agents.instance_id").
-					Where("instances.user_id = ? AND instance_agents.is_active = ?", user.ID, true).
-					Count(&count)
-				if int(count) >= user.Plan.MaxAgents {
-					return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-						"error": "limite de agentes ativos atingido para o seu plano",
-						"limit": user.Plan.MaxAgents,
-					})
+			if user != nil {
+				ownerID, plan := resolveEffectivePlan(h.db, user, inst.WorkspaceID)
+				if plan != nil && plan.MaxAgents > 0 {
+					var count int64
+					h.db.Model(&models.InstanceAgent{}).
+						Joins("JOIN instances ON instances.id = instance_agents.instance_id").
+						Where("instances.workspace_id IN (SELECT id FROM workspaces WHERE owner_id = ?) AND instance_agents.is_active = ?", ownerID, true).
+						Count(&count)
+					if int(count) >= plan.MaxAgents {
+						return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+							"error": "limite de agentes ativos atingido para o plano do workspace",
+							"limit": plan.MaxAgents,
+						})
+					}
 				}
 			}
 		}

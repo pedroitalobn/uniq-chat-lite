@@ -221,21 +221,9 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 	}
 
 	// Check plan limits — membros de workspace herdam o plano do DONO do
-	// workspace, não usam o próprio. Antes, um admin/membro com plano free
-	// criando instância no workspace de um owner com plano Pro caía no
-	// limite do free e era bloqueado. Agora resolve owner da workspace e
-	// aplica o plano dele; sem workspace, cai pro plano do user direto.
-	planOwnerID := user.ID
-	planOwnerPlan := user.Plan
-	if wsUUID != nil {
-		var ws models.Workspace
-		if err := h.db.Preload("Owner.Plan").First(&ws, "id = ?", *wsUUID).Error; err == nil {
-			planOwnerID = ws.OwnerID
-			if ws.Owner != nil && ws.Owner.Plan != nil {
-				planOwnerPlan = ws.Owner.Plan
-			}
-		}
-	}
+	// workspace, não usam o próprio. Helper compartilhado entre instances
+	// /shops/agents/journeys.
+	planOwnerID, planOwnerPlan := resolveEffectivePlan(h.db, user, wsUUID)
 
 	if planOwnerPlan != nil && !planOwnerPlan.IsUnlimitedInstances() {
 		var count int64
