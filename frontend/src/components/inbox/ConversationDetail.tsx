@@ -1280,25 +1280,28 @@ function MessageBubble({
     (m.type === "sticker" && !!parsed.url);
 
   if (isPureMedia) {
+    // Audio já vem com pill estilizada estilo WhatsApp pelo AudioPlayer —
+    // dispensar a borda gradiente externa pra não ficar bubble dentro de bubble.
+    const isAudioOnly = m.type === "audio";
     return (
       <div className={`group relative flex ${isOut ? "justify-end" : "justify-start"}`}>
         <div
           className="relative max-w-[80%] uniq-slide-up"
-          style={{
-            // Borda colorida fina indica direção sem precisar do bubble inteiro
-            borderRadius: 14,
-            padding: 3,
-            background: isOut
-              ? "linear-gradient(135deg, rgba(0,212,106,0.35), rgba(0,212,106,0.15))"
-              : "linear-gradient(135deg, var(--border-strong), var(--border-default))",
-          }}
+          style={
+            isAudioOnly
+              ? undefined
+              : {
+                  borderRadius: 14,
+                  padding: 3,
+                  background: isOut
+                    ? "linear-gradient(135deg, rgba(0,212,106,0.35), rgba(0,212,106,0.15))"
+                    : "linear-gradient(135deg, var(--border-strong), var(--border-default))",
+                }
+          }
         >
           <div
-            className="overflow-hidden"
-            style={{
-              borderRadius: 12,
-              background: "hsl(240 18% 5%)",
-            }}
+            className={isAudioOnly ? "" : "overflow-hidden"}
+            style={isAudioOnly ? undefined : { borderRadius: 12, background: "hsl(240 18% 5%)" }}
           >
             <MediaBody type={m.type} parsed={parsed} onOpenViewer={onOpenViewer} wsId={wsId} isOut={isOut} />
           </div>
