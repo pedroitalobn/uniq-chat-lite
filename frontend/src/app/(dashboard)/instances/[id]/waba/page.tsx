@@ -248,7 +248,7 @@ export default function WABAManagePage({ params }: { params: Promise<{ id: strin
       <TemplatesSection instanceId={id} templates={templates} qc={qc} />
 
       {/* Test send */}
-      <TestSendSection instanceId={id} wabaStatus={waba.status} />
+      <TestSendSection instanceId={id} wabaStatus={waba.status} templates={templates} />
 
       {/* Diagnóstico Meta */}
       <div className="rounded-xl p-3 flex items-start gap-2"
@@ -601,13 +601,21 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
   );
 }
 
-function TestSendSection({ instanceId }: { instanceId: string; wabaStatus?: string }) {
+function TestSendSection({ instanceId, templates = [] }: {
+  instanceId: string;
+  wabaStatus?: string;
+  templates?: Template[];
+}) {
+  const approved = templates.filter((t) => t.status === "APPROVED");
   const [to, setTo] = useState("");
   const [text, setText] = useState("Olá! Mensagem de teste enviada via Uniq Chat.");
   const [sentId, setSentId] = useState("");
   const [mode, setMode] = useState<"text" | "template">("template");
-  const [templateName, setTemplateName] = useState("hello_world");
-  const [templateLang, setTemplateLang] = useState("en_US");
+  // selecionado como "name|language" pra cobrir templates do mesmo nome em idiomas diferentes
+  const [templateKey, setTemplateKey] = useState<string>(
+    approved[0] ? `${approved[0].name}|${approved[0].language}` : "",
+  );
+  const [templateName, templateLang] = templateKey.split("|");
 
   const send = useMutation({
     mutationFn: () =>
@@ -689,25 +697,34 @@ function TestSendSection({ instanceId }: { instanceId: string; wabaStatus?: stri
         {mode === "text" ? (
           <input value={text} onChange={(e) => setText(e.target.value)}
             placeholder="Texto" className="input-field sm:col-span-2" />
+        ) : approved.length === 0 ? (
+          <div className="sm:col-span-2 input-field flex items-center text-xs" style={{ color: "var(--text-3)" }}>
+            Nenhum template APPROVED ainda — crie um na seção Templates acima.
+          </div>
         ) : (
-          <>
-            <input value={templateName} onChange={(e) => setTemplateName(e.target.value)}
-              placeholder="hello_world" className="input-field" />
-            <input value={templateLang} onChange={(e) => setTemplateLang(e.target.value)}
-              placeholder="en_US" className="input-field" />
-          </>
+          <select
+            value={templateKey}
+            onChange={(e) => setTemplateKey(e.target.value)}
+            className="input-field sm:col-span-2"
+          >
+            <option value="">— Selecione um template —</option>
+            {approved.map((t) => (
+              <option key={`${t.name}|${t.language}`} value={`${t.name}|${t.language}`}>
+                {t.name} ({t.language}) · {t.category}
+              </option>
+            ))}
+          </select>
         )}
       </div>
-      {mode === "template" && (
+      {mode === "template" && approved.length > 0 && (
         <p className="text-[11px] mt-1" style={{ color: "var(--text-3)" }}>
-          Para o primeiro contato fora da janela de 24h, use template aprovado.
-          Padrão: <code className="font-mono">hello_world</code> (en_US) — vem
-          pré-aprovado em todas as WABAs novas.
+          Apenas templates com status <span style={{ color: "var(--green)" }}>APPROVED</span> aparecem.
+          Os <span style={{ color: "#fbbf24" }}>PENDING</span> não podem ser enviados ainda.
         </p>
       )}
       <button
         onClick={() => send.mutate()}
-        disabled={!to || (mode === "text" && !text) || (mode === "template" && !templateName) || send.isPending}
+        disabled={!to || (mode === "text" && !text) || (mode === "template" && (!templateName || !templateLang)) || send.isPending}
         className="mt-3 text-xs font-medium px-3 py-2 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50"
         style={{ background: "var(--green)", color: "var(--green-fg)" }}>
         {send.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
