@@ -157,10 +157,22 @@ func (r *Registry) sendWhatsApp(inst *models.Instance, msg OutboundMessage) (*Se
 			}
 			return &SendResult{ExternalID: id, Status: models.MessageStatusSent}, nil
 		case "audio":
-			// ptt flag: se mime explicita "ogg" / caption marcada como "ptt",
-			// envia como Push-To-Talk. Caso contrário áudio normal.
-			isPTT := strings.Contains(strings.ToLower(mime), "ogg")
-			id, err := client.SendAudioMessage(msg.To, data, mime, isPTT)
+			// WhatsApp recebe áudio via codec Opus; aceita containers
+			// webm/opus e ogg/opus indistintamente porque decoda pelo
+			// codec (não pelo container). Browser MediaRecorder produz
+			// webm/opus em Chrome e mp4/aac em Safari. Forçamos mime
+			// "audio/ogg; codecs=opus" + PTT=true pra mensagens curtas
+			// virarem voice notes nativos. Áudios maiores (anexo
+			// arrastado pelo paperclip, m4a/mp3) mantêm PTT=false.
+			low := strings.ToLower(mime)
+			isOpus := strings.Contains(low, "opus") || strings.Contains(low, "webm") || strings.Contains(low, "ogg")
+			outMime := mime
+			isPTT := false
+			if isOpus {
+				outMime = "audio/ogg; codecs=opus"
+				isPTT = true
+			}
+			id, err := client.SendAudioMessage(msg.To, data, outMime, isPTT)
 			if err != nil {
 				return nil, err
 			}

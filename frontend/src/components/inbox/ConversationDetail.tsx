@@ -1592,7 +1592,7 @@ function MediaBody({
     if (audioURL) {
       return (
         <div className="flex flex-col gap-1.5">
-          <AudioPlayer url={audioURL} />
+          <AudioPlayer url={audioURL} variant={isOut ? "out" : "in"} />
           {error && <ErrorLine text={error} />}
         </div>
       );
@@ -1670,7 +1670,7 @@ function MediaBody({
       if (mimeType?.startsWith("audio/")) {
         return (
           <div className="flex flex-col gap-1.5">
-            <AudioPlayer url={url} />
+            <AudioPlayer url={url} variant={isOut ? "out" : "in"} />
             {filename && (
               <span className="text-[10px] truncate" style={{ color: "hsl(240 8% 50%)" }}>
                 📎 {filename}

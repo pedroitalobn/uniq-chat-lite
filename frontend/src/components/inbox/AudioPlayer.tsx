@@ -1,55 +1,94 @@
 "use client";
 
-// Player de áudio compacto que mostra a duração CORRETAMENTE desde o
-// primeiro frame — corrige o bug do <audio controls> nativo onde
-// arquivos opus/webm enviados pelo WhatsApp aparecem com duração
-// 0:00 ou Infinity até a primeira reprodução completa.
+// Player de áudio estilo WhatsApp — pill verde com waveform sintético
+// (barras decorativas baseadas em hash do URL pra manter visual estável
+// entre renders sem precisar processar o áudio inteiro).
 //
-// Workaround conhecido: forçar audio.currentTime pra um valor enorme
-// → o browser computa o duration real → seta currentTime de volta a 0.
+// Workaround duração: muitos áudios opus/webm aparecem com duration
+// Infinity até primeira reprodução — fix via seek-to-end.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Play, Pause } from "lucide-react";
 
 interface Props {
   url: string;
   className?: string;
+  /** Cor do bubble pra ajustar contraste do player. "out" usa verde escuro
+   * (mensagem do agente), "in" usa cinza padrão WhatsApp. */
+  variant?: "in" | "out";
 }
 
-export function AudioPlayer({ url, className }: Props) {
+const BAR_COUNT = 28;
+
+// Hash simples de string → número [0, 1]. Usado pra gerar barras
+// determinísticas por URL (mesma URL = mesmo waveform).
+function hashStr(s: string): number {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+function generateBars(url: string): number[] {
+  // PRNG determinístico baseado no hash da URL — barras estáveis.
+  let seed = hashStr(url);
+  return Array.from({ length: BAR_COUNT }, () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    const v = seed / 233280;
+    // Curva pra ficar mais bonito (centro mais alto que pontas)
+    return 0.25 + Math.pow(v, 1.5) * 0.75;
+  });
+}
+
+export function AudioPlayer({ url, className, variant = "in" }: Props) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [duration, setDuration] = useState<number | null>(null);
   const [current, setCurrent] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [seekFixed, setSeekFixed] = useState(false);
 
+  const bars = useMemo(() => generateBars(url), [url]);
+
+  // Cores estilo WhatsApp:
+  // - bubble entrante: cinza com play verde
+  // - bubble saindo: verde escuro com play branco
+  const colors = variant === "out"
+    ? {
+        bg: "#005c4b",
+        playBg: "#ffffff",
+        playFg: "#005c4b",
+        barIdle: "rgba(255,255,255,0.35)",
+        barActive: "#ffffff",
+        text: "rgba(255,255,255,0.85)",
+      }
+    : {
+        bg: "#1f2c34",
+        playBg: "#00a884",
+        playFg: "#ffffff",
+        barIdle: "rgba(255,255,255,0.25)",
+        barActive: "#53bdeb",
+        text: "rgba(255,255,255,0.7)",
+      };
+
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
 
     const onMetadata = () => {
-      // Se duration veio finito e válido, usa direto.
       if (Number.isFinite(el.duration) && el.duration > 0) {
         setDuration(el.duration);
         return;
       }
-      // Fallback: força browser a "ler" até o final pra computar duration.
-      // O hack: setar currentTime pra um número absurdo → browser ajusta
-      // pra duração real → escutamos e voltamos pra 0.
       if (!seekFixed) {
         setSeekFixed(true);
         el.currentTime = 1e10;
       }
     };
-
     const onDurationChange = () => {
       if (Number.isFinite(el.duration) && el.duration > 0) {
         setDuration(el.duration);
       }
     };
-
     const onTimeUpdate = () => {
-      // Após o seek-hack reportar duração real, volta currentTime pra 0
       if (seekFixed && Number.isFinite(el.duration) && el.duration > 0 && el.currentTime > el.duration) {
         el.currentTime = 0;
         setDuration(el.duration);
@@ -58,7 +97,6 @@ export function AudioPlayer({ url, className }: Props) {
         setCurrent(el.currentTime);
       }
     };
-
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onEnded = () => {
@@ -90,12 +128,12 @@ export function AudioPlayer({ url, className }: Props) {
     else el.pause();
   };
 
-  const seek = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onBarClick = (idx: number) => {
     const el = audioRef.current;
     if (!el || !duration) return;
-    const v = parseFloat(e.target.value);
-    el.currentTime = v;
-    setCurrent(v);
+    const t = (idx / BAR_COUNT) * duration;
+    el.currentTime = t;
+    setCurrent(t);
   };
 
   const fmt = (s: number) => {
@@ -105,36 +143,59 @@ export function AudioPlayer({ url, className }: Props) {
     return `${m}:${r.toString().padStart(2, "0")}`;
   };
 
+  const progress = duration ? current / duration : 0;
+  const activeBarIdx = Math.round(progress * BAR_COUNT);
+
   return (
     <div
-      className={`flex items-center gap-2 rounded-full px-2 py-1.5 transition-colors ${className || ""}`}
-      style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", maxWidth: 260 }}
+      className={`flex items-center gap-3 rounded-2xl px-3 py-2 ${className || ""}`}
+      style={{ background: colors.bg, maxWidth: 320 }}
     >
       <audio ref={audioRef} src={url} preload="metadata" />
       <button
         type="button"
         onClick={toggle}
-        className="flex h-7 w-7 items-center justify-center rounded-full transition-transform active:scale-95"
-        style={{ background: "var(--green)", color: "var(--green-fg)" }}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95"
+        style={{ background: colors.playBg, color: colors.playFg }}
         title={playing ? "Pausar" : "Tocar"}
       >
-        {playing ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current pl-0.5" />}
+        {playing ? (
+          <Pause className="h-4 w-4 fill-current" />
+        ) : (
+          <Play className="h-4 w-4 fill-current pl-0.5" />
+        )}
       </button>
-      <input
-        type="range"
-        min={0}
-        max={duration ?? 0}
-        step={0.1}
-        value={current}
-        onChange={seek}
-        className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
-        style={{
-          background: `linear-gradient(to right, var(--green) 0%, var(--green) ${duration ? (current / duration) * 100 : 0}%, var(--surface-3) ${duration ? (current / duration) * 100 : 0}%, var(--surface-3) 100%)`,
-        }}
-      />
-      <span className="text-[10px] font-mono tabular-nums shrink-0" style={{ color: "var(--text-3)" }}>
-        {duration ? fmt(playing || current > 0 ? current : duration) : "—:—"}
-      </span>
+
+      <div className="flex-1 flex flex-col gap-1 min-w-0">
+        <div
+          className="flex items-end gap-[2px] h-7 cursor-pointer"
+          onClick={(e) => {
+            // mapeia clique horizontal pra barra
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const idx = Math.floor((x / rect.width) * BAR_COUNT);
+            onBarClick(idx);
+          }}
+        >
+          {bars.map((h, i) => (
+            <span
+              key={i}
+              className="flex-1 rounded-full transition-colors"
+              style={{
+                height: `${Math.round(h * 28)}px`,
+                background: i < activeBarIdx ? colors.barActive : colors.barIdle,
+                minWidth: 2,
+              }}
+            />
+          ))}
+        </div>
+        <span
+          className="text-[10px] font-mono tabular-nums leading-none"
+          style={{ color: colors.text }}
+        >
+          {duration ? fmt(playing || current > 0 ? current : duration) : "—:—"}
+        </span>
+      </div>
     </div>
   );
 }

@@ -161,7 +161,13 @@ func (h *ContactHandler) GetContact(c *fiber.Ctx) error {
 	}
 	contactID := c.Params("id")
 	var contact models.Contact
-	if err := h.db.Preload("Tags").Where("id = ? AND user_id = ?", contactID, userID).First(&contact).Error; err != nil {
+	q := h.db.Preload("Tags").Where("id = ? AND user_id = ?", contactID, userID)
+	// Aplica RBAC: se user passou workspace_id e contato pertence ao ws,
+	// scope decide se enxerga. Se contato não tem workspace, libera (pré-RBAC).
+	if ws := middleware.GetWorkspaceID(c); ws != uuid.Nil {
+		q = h.applyContactScopeRBAC(c, q, ws, userID)
+	}
+	if err := q.First(&contact).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "contato não encontrado"})
 	}
 	return c.JSON(contact)
@@ -176,7 +182,11 @@ func (h *ContactHandler) UpdateContact(c *fiber.Ctx) error {
 	}
 	contactID := c.Params("id")
 	var contact models.Contact
-	if err := h.db.Where("id = ? AND user_id = ?", contactID, userID).First(&contact).Error; err != nil {
+	q := h.db.Where("id = ? AND user_id = ?", contactID, userID)
+	if ws := middleware.GetWorkspaceID(c); ws != uuid.Nil {
+		q = h.applyContactScopeRBAC(c, q, ws, userID)
+	}
+	if err := q.First(&contact).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "contato não encontrado"})
 	}
 	// Pointer fields para distinguir "não enviado" de "enviado vazio".
@@ -244,7 +254,16 @@ func (h *ContactHandler) DeleteContact(c *fiber.Ctx) error {
 		return err
 	}
 	contactID := c.Params("id")
-	if err := h.db.Where("id = ? AND user_id = ?", contactID, userID).Delete(&models.Contact{}).Error; err != nil {
+	// Verifica acesso via RBAC antes de deletar
+	q := h.db.Where("id = ? AND user_id = ?", contactID, userID)
+	if ws := middleware.GetWorkspaceID(c); ws != uuid.Nil {
+		q = h.applyContactScopeRBAC(c, q, ws, userID)
+	}
+	var existing models.Contact
+	if err := q.First(&existing).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "contato não encontrado"})
+	}
+	if err := h.db.Delete(&existing).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao deletar contato"})
 	}
 	return c.SendStatus(fiber.StatusNoContent)
