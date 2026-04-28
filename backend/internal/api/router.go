@@ -1259,5 +1259,13 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	crmImport.Post("/companies/import", importH.ImportCompanies)
 	crmImport.Post("/deals/import", importH.ImportDeals)
 
+	// Identity Resolution — merge contatos duplicados
+	api.Get("/contacts/duplicates", conversationH.FindDuplicates)
+	api.Post("/contacts/merge", conversationH.MergeContacts)
+
+	// MCP server (Uniq tools via JSON-RPC pra Claude Desktop / Cursor / n8n)
+	uniqMCP := handlers.NewUniqMCPHandler(db, toolsH)
+	api.Post("/mcp", uniqMCP.HandleRPC)
+
 	return app
 }
