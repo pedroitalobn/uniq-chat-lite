@@ -23,6 +23,17 @@ type Workspace struct {
 	PlanID    *uuid.UUID `gorm:"type:uuid" json:"plan_id"`
 	Plan      *Plan      `gorm:"foreignKey:PlanID" json:"plan,omitempty"`
 	IsActive  bool       `gorm:"default:true" json:"is_active"`
+	// Anti-ban / LGPD — limites operacionais do workspace.
+	// Quiet hours em horário local do CONTATO (Contact.timezone preferido,
+	// fallback Workspace.Timezone, fallback America/Sao_Paulo).
+	// Formato: "HH:MM-HH:MM" (ex: "20:00-08:00" silencia da noite até manhã).
+	QuietHours        string `gorm:"type:varchar(20);default:''" json:"quiet_hours,omitempty"`
+	Timezone          string `gorm:"type:varchar(50);default:'America/Sao_Paulo'" json:"timezone,omitempty"`
+	// Frequency caps — máximo de mensagens outbound por contato em janela.
+	// 0 = sem limite. Aplicado no inbound_pipeline antes de enviar.
+	FreqCapPerHour    int `gorm:"default:0" json:"freq_cap_per_hour"`
+	FreqCapPerDay     int `gorm:"default:0" json:"freq_cap_per_day"`
+	FreqCapPerWeek    int `gorm:"default:0" json:"freq_cap_per_week"`
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 }

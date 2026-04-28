@@ -325,6 +325,15 @@ func autoMigrate(db *gorm.DB) error {
 		&models.PlanChangeLog{},
 		// Audit log de ações sensíveis (auth/admin/billing)
 		&models.AuditLog{},
+		// Customer.io-inspired: suppression, subscription, segments, identity, computed
+		&models.Suppression{},
+		&models.SubscriptionTopic{},
+		&models.ContactSubscription{},
+		&models.PreferenceLink{},
+		&models.ContactComputed{},
+		&models.Segment{},
+		&models.SegmentMember{},
+		&models.ContactAlias{},
 		// Módulo Shop (Fase 1)
 		&models.Shop{},
 		&models.Product{},

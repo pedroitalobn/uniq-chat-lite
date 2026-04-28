@@ -29,6 +29,19 @@ type Journey struct {
 	Invocations     int        `gorm:"not null;default:0" json:"invocations"`
 	CompletedCount  int        `gorm:"not null;default:0" json:"completed_count"`
 	LastRunAt       *time.Time `json:"last_run_at"`
+	// Goal — evento que conta como conversão. Quando ocorrer durante a
+	// jornada, marca o run como "achieved" pra atribution analytics.
+	// Ex: "shop.order_paid", "deal.won", "journey.tag_added:vip".
+	GoalEvent       string     `gorm:"type:varchar(120)" json:"goal_event,omitempty"`
+	GoalCount       int        `gorm:"default:0" json:"goal_count"`
+	// ExitConditions — JSON array de condições (ex: tag added, status changed)
+	// que removem contato da jornada antecipadamente. Ex:
+	// [{"event":"tag_added","tag":"cliente"}, {"event":"deal_won"}]
+	ExitConditions  string     `gorm:"type:text;default:'[]'" json:"exit_conditions"`
+	// ReEntry — controla se o mesmo contato pode entrar de novo.
+	// "never": só uma vez. "always": cada vez que o trigger bate.
+	// "after_days:N": só depois de N dias do último run.
+	ReEntryRule     string     `gorm:"type:varchar(40);default:'never'" json:"re_entry_rule"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 }
@@ -369,6 +382,11 @@ const (
 	// Shop / Products integration nodes
 	StepTypeProductSearch   StepType = "product_search"   // busca produtos por keyword/categoria → var
 	StepTypeProductCarousel StepType = "product_carousel" // envia lista interativa de produtos do shop
+	// Customer.io-inspired control flow
+	StepTypeWaitUntil       StepType = "wait_until"       // aguarda evento específico ou timeout
+	StepTypeMultivariate    StepType = "multivariate"     // A/B/C com pesos percentuais
+	StepTypeSendInTimezone  StepType = "send_in_timezone" // wait até janela horária do contato
+	StepTypeUnsubscribe     StepType = "unsubscribe"      // adiciona à suppression list (LGPD)
 )
 
 type FlowStep struct {
