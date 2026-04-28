@@ -13,6 +13,7 @@ import {
   UserPlus, MessageSquare, ListChecks, CornerUpLeft, CornerUpRight,
   Pencil, Trash2, Search, Info, Bell, BellOff,
 } from "lucide-react";
+import { AudioRecorderButton } from "@/components/inbox/AudioRecorderButton";
 import { MediaViewer, type MediaViewerSource } from "@/components/inbox/MediaViewer";
 import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi, crmContactsApi, linkPreviewApi } from "@/lib/api";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -3436,7 +3437,7 @@ function Composer({
                 ? "Instância não disponível"
                 : !allowsType("image")
                   ? "Canal não aceita anexos"
-                  : "Anexar arquivo"
+                  : "Anexar arquivo (foto, vídeo, áudio, doc)"
             }
             className="flex h-10 w-10 items-center justify-center rounded-md transition-colors disabled:opacity-40"
             style={{
@@ -3447,6 +3448,19 @@ function Composer({
           >
             <Paperclip className="h-4 w-4" />
           </button>
+
+          {/* Gravar áudio direto da plataforma — entrega como anexo pendente */}
+          <AudioRecorderButton
+            disabled={!canSend || mode !== "message" || !instanceId || uploading || !allowsType("audio")}
+            onRecorded={(file) => acceptFiles([file])}
+            title={
+              !instanceId
+                ? "Instância não disponível"
+                : !allowsType("audio")
+                  ? "Canal não aceita áudio"
+                  : "Gravar áudio"
+            }
+          />
 
           <div className="relative">
             <button
