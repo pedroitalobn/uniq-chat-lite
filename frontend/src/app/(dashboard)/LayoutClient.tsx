@@ -10,20 +10,24 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const qc = useQueryClient();
-  // Full-width: rotas que precisam do espaço todo (inbox messenger-style,
-  // CRM com kanban/laterais, etc). Demais páginas seguem o padding padrão
-  // mas sem o cap de max-w-6xl — laterais ganham espaço pra reorganizar
-  // conteúdo ao invés de ficar tudo empilhado verticalmente.
-  // /uniq-ai e /journeys ocupam viewport inteiro pra render do chat
-  // estilo Claude e da lista/atividade lado-a-lado sem max-w cap.
+  // Full-width SEM box: viewport inteiro (sem padding, sem card).
+  // Inbox messenger e canvas de Journey precisam disso.
   const isFullWidth =
     pathname === "/uniq-ai" ||
-    pathname === "/journeys" ||
-    pathname.startsWith("/journeys/") ||
+    pathname.startsWith("/journeys/") || // editor canvas (não a lista)
     pathname === "/inbox" ||
-    pathname.startsWith("/inbox/") ||
-    pathname === "/crm" ||
-    pathname.startsWith("/crm/");
+    pathname.startsWith("/inbox/");
+
+  // Boxed: rotas operacionais ganham card surface-2 + border + radius
+  // pra ficarem agrupadas visualmente, SEM max-width (usa toda largura
+  // disponível depois do sidebar).
+  const isBoxed =
+    pathname === "/servers" || pathname.startsWith("/servers/") ||
+    pathname === "/instances" || pathname.startsWith("/instances/") ||
+    pathname === "/agents" || pathname.startsWith("/agents/") ||
+    pathname === "/journeys" ||
+    pathname === "/campaigns" || pathname.startsWith("/campaigns/") ||
+    pathname === "/crm" || pathname.startsWith("/crm/");
 
   // Fetch session and load instances on mount
   const { data: sessionData, isLoading: sessionLoading } = useQuery({
@@ -128,6 +132,30 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
         <UsageBanner />
         <div className="flex-1 px-4 sm:px-6 py-6 lg:py-8 pt-16 lg:pt-8 overflow-y-auto">
           {children}
+        </div>
+      </main>
+    );
+  }
+
+  if (isBoxed) {
+    // Boxed: card surface-2 com radius. Sem max-w cap — usa toda largura
+    // disponível. Pages internas mantêm seu próprio padding (px-4..6 py-6),
+    // box só dá borda + radius + bg distinto pra delimitar visualmente.
+    return (
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <UsageBanner />
+        <div className="flex-1 px-3 sm:px-4 lg:px-6 py-3 lg:py-4 pt-16 lg:pt-4 overflow-hidden">
+          <div
+            className="rounded-2xl overflow-hidden h-full"
+            style={{
+              background: "var(--surface-1)",
+              border: "1px solid var(--surface-border)",
+            }}
+          >
+            <div className="h-full overflow-y-auto">
+              {children}
+            </div>
+          </div>
         </div>
       </main>
     );

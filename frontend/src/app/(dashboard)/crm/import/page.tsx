@@ -25,7 +25,7 @@ const HINTS: Record<Entity, { title: string; cols: string[]; icon: typeof Contac
 
 export default function CRMImportPage() {
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 lg:py-8 space-y-5">
+    <div className="px-4 sm:px-6 py-6 lg:py-8 space-y-5">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-medium" style={{ color: "var(--text-1)" }}>Importar CSV</h1>

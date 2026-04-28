@@ -87,7 +87,7 @@ export default function CRMSegmentsPage() {
   }, [conds, op]);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 lg:py-8 space-y-5">
+    <div className="px-4 sm:px-6 py-6 lg:py-8 space-y-5">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-medium" style={{ color: "var(--text-1)" }}>Segmentações</h1>
