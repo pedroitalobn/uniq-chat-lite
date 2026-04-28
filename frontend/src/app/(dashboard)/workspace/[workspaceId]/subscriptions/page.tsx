@@ -3,11 +3,12 @@
 // Subscription Topics admin — CRUD de tópicos de comunicação do
 // workspace. Inspirado em Customer.io subscription groups.
 
-import { useState } from "react";
+import { use, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus, Trash2, Mail, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { subscriptionTopicsApi } from "@/lib/api";
+import { WorkspaceTabs } from "@/components/workspace/WorkspaceTabs";
 
 interface Topic {
   id: string;
@@ -19,7 +20,8 @@ interface Topic {
   is_active: boolean;
 }
 
-export default function SubscriptionsPage() {
+export default function SubscriptionsPage({ params }: { params: Promise<{ workspaceId: string }> }) {
+  const { workspaceId } = use(params);
   const qc = useQueryClient();
   const [editing, setEditing] = useState<Topic | "new" | null>(null);
 
@@ -47,6 +49,10 @@ export default function SubscriptionsPage() {
             Tópicos <strong>obrigatórios</strong> (transacionais) não podem ser desligados pelo cliente.
           </p>
         </div>
+        <WorkspaceTabs workspaceId={workspaceId} />
+      </div>
+
+      <div className="flex items-center justify-end">
         <button onClick={() => setEditing("new")}
           className="text-xs font-medium px-3 py-2 rounded-lg inline-flex items-center gap-1.5"
           style={{ background: "var(--green)", color: "var(--green-fg)" }}>

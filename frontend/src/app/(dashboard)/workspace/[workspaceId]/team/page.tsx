@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useParams } from "next/navigation";
 import { workspacesApi, rolesApi } from "@/lib/api";
+import { WorkspaceTabs } from "@/components/workspace/WorkspaceTabs";
 import { Users, Plus, Mail, Loader2, Crown, X, Copy, Check, UserMinus, ChevronLeft, Send } from "lucide-react";
 import { toast } from "sonner";
 import { showConfirm } from "@/lib/confirm";
@@ -196,13 +197,16 @@ export default function TeamPage() {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setShowInvite(true)}
-          className="btn-primary flex items-center gap-2 text-sm px-4 py-2.5"
-        >
-          <Mail className="w-4 h-4" />
-          Convidar
-        </button>
+        <div className="flex items-center gap-2">
+          <WorkspaceTabs workspaceId={workspaceId} />
+          <button
+            onClick={() => setShowInvite(true)}
+            className="btn-primary flex items-center gap-2 text-sm px-4 py-2.5"
+          >
+            <Mail className="w-4 h-4" />
+            Convidar
+          </button>
+        </div>
       </div>
 
       {/* Invite form */}

@@ -3,11 +3,12 @@
 // Suppression List admin — visualiza e remove bloqueios outbound por
 // contato. Inspirado em Customer.io suppression lists.
 
-import { useState } from "react";
+import { use, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus, Trash2, ShieldOff, Search } from "lucide-react";
 import { toast } from "sonner";
 import { suppressionsApi } from "@/lib/api";
+import { WorkspaceTabs } from "@/components/workspace/WorkspaceTabs";
 
 interface Suppression {
   id: string;
@@ -18,7 +19,8 @@ interface Suppression {
   created_at: string;
 }
 
-export default function SuppressionsPage() {
+export default function SuppressionsPage({ params }: { params: Promise<{ workspaceId: string }> }) {
+  const { workspaceId } = use(params);
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
@@ -66,6 +68,10 @@ export default function SuppressionsPage() {
             Aplicado em jornadas e campanhas antes do envio.
           </p>
         </div>
+        <WorkspaceTabs workspaceId={workspaceId} />
+      </div>
+
+      <div className="flex items-center justify-end">
         <button onClick={() => setCreating(true)}
           className="text-xs font-medium px-3 py-2 rounded-lg inline-flex items-center gap-1.5"
           style={{ background: "var(--green)", color: "var(--green-fg)" }}>

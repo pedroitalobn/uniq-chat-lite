@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Save, Clock, Shield, Info } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
+import { WorkspaceTabs } from "@/components/workspace/WorkspaceTabs";
 
 interface Workspace {
   id: string;
@@ -80,13 +81,16 @@ export default function WorkspaceMessagingPage({ params }: { params: Promise<{ w
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 lg:py-8 space-y-5">
-      <div>
-        <h1 className="text-xl font-medium" style={{ color: "var(--text-1)" }}>Mensageria</h1>
-        <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
-          Limites e janelas que protegem suas instâncias e seus contatos. Aplicados em
-          jornadas e campanhas antes de cada envio.
-        </p>
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 lg:py-8 space-y-5">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-xl font-medium" style={{ color: "var(--text-1)" }}>Mensageria</h1>
+          <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
+            Limites e janelas que protegem suas instâncias e seus contatos. Aplicados em
+            jornadas e campanhas antes de cada envio.
+          </p>
+        </div>
+        <WorkspaceTabs workspaceId={workspaceId} />
       </div>
 
       <form onSubmit={(e) => { e.preventDefault(); saveMut.mutate(); }} className="space-y-5">
