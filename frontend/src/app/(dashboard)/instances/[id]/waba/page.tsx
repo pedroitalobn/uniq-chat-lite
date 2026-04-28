@@ -100,9 +100,12 @@ export default function WABAManagePage({ params }: { params: Promise<{ id: strin
           </p>
         </div>
 
-        <div className="rounded-2xl p-6"
+        <div className="rounded-2xl p-6 space-y-3"
           style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
           <WABAConnectButton instanceId={id} />
+          <p className="text-[11px] text-center" style={{ color: "var(--text-3)" }}>
+            Já tentou e falhou? Você pode <button onClick={() => qc.invalidateQueries({ queryKey: ["waba", id] })} className="underline" style={{ color: "var(--text-2)" }}>recarregar a página</button> ou clicar em &quot;Conectar&quot; novamente.
+          </p>
         </div>
 
         <div className="rounded-xl p-4 text-xs leading-relaxed space-y-1.5"
@@ -128,19 +131,25 @@ export default function WABAManagePage({ params }: { params: Promise<{ id: strin
       </Link>
 
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <h1 className="text-xl font-medium" style={{ color: "var(--text-1)" }}>
-            WhatsApp API
-          </h1>
-          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-            style={{ background: "rgba(0,136,255,0.12)", color: "#0088ff" }}>
-            CLOUD API OFICIAL META
-          </span>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="text-xl font-medium" style={{ color: "var(--text-1)" }}>
+              WhatsApp API
+            </h1>
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+              style={{ background: "rgba(0,136,255,0.12)", color: "#0088ff" }}>
+              CLOUD API OFICIAL META
+            </span>
+          </div>
+          <p className="text-xs" style={{ color: "var(--text-3)" }}>
+            {waba.verified_name} · {waba.phone_number}
+          </p>
         </div>
-        <p className="text-xs" style={{ color: "var(--text-3)" }}>
-          {waba.verified_name} · {waba.phone_number}
-        </p>
+
+        <div className="flex items-center gap-2">
+          <ReconnectButton instanceId={id} />
+        </div>
       </div>
 
       {/* Status cards */}
@@ -516,6 +525,17 @@ function TestSendSection({ instanceId }: { instanceId: string }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// Reconectar = abre o popup de Embedded Signup novamente.
+// Útil quando o token expirou, o WABA foi reassociado ou houve qualquer
+// erro durante o flow inicial. Reusa WABAConnectButton em modo botão.
+function ReconnectButton({ instanceId }: { instanceId: string }) {
+  return (
+    <div className="inline-block">
+      <WABAConnectButton instanceId={instanceId} className="[&>button]:!py-2 [&>button]:!px-3 [&>button]:!text-xs [&>button>span]:!text-xs" />
     </div>
   );
 }

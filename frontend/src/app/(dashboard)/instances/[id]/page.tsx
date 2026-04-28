@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { instancesApi, webhooksApi, messagesApi, settingsApi, mcpApi, recoveryApi, tiktokApi, globalWebhooksApi, mediaUploadApi, type WebhookPayload } from "@/lib/api";
@@ -2251,6 +2251,15 @@ export default function InstanceDetailPage() {
       return 10_000;
     },
   });
+
+  // WABA tem manager dedicado (Cloud API da Meta) — redireciona pra
+  // /instances/[id]/waba pra evitar mostrar UI de QR/pairing/whatsmeow
+  // que não se aplica.
+  useEffect(() => {
+    if (instance?.channel === "waba") {
+      router.replace(`/instances/${instanceId}/waba`);
+    }
+  }, [instance?.channel, instanceId, router]);
 
   const handleDelete = async () => {
     if (!await showConfirm(`Remover a instância "${instance?.name}"? Esta ação é irreversível.`, { title: "Remover instância", confirmLabel: "Remover" })) return;
