@@ -115,23 +115,13 @@ export function WABAConnectButton({ className }: Props) {
     const left = window.screenX + (window.outerWidth - w) / 2;
     const top = window.screenY + (window.outerHeight - h) / 2;
 
-    // popup=yes é a flag explícita do Chrome 100+ pra forçar popup mini
-    // sobreposto em vez de aba. Sem ela, Chrome abre como aba mesmo com w/h.
-    const features = [
-      "popup=yes",
-      `width=${w}`,
-      `height=${h}`,
-      `left=${left}`,
-      `top=${top}`,
-      "toolbar=no",
-      "menubar=no",
-      "location=no",
-      "status=no",
-      "scrollbars=yes",
-      "resizable=yes",
-      "noopener=no",
-    ].join(",");
-
+    // Cross-browser popup window:
+    // - Chrome/Edge 100+: precisam de popup=yes (sem isso ignoram dimensões e abrem aba)
+    // - Firefox: só com width+height já abre como popup
+    // - Safari: width+height funcionam; flags toolbar/menubar/location confundem Safari
+    //   e fazem abrir como "tool window" (menor e sem chrome). Removidas.
+    // - Mobile: SEMPRE abre como aba (não existe popup mini em mobile, é limitação do OS)
+    const features = `popup=yes,width=${w},height=${h},left=${left},top=${top}`;
     const popup = window.open(authUrl, "waba_embedded_signup", features);
 
     if (!popup) {
