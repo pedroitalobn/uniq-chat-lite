@@ -28,7 +28,7 @@ export default function NewWABAPage() {
               </svg>
             </div>
             <h1 className="text-2xl font-semibold text-white mb-2">
-              Conectar WhatsApp Business
+              Conectar WhatsApp API
             </h1>
             <p className="text-gray-400">
               Configure o WhatsApp Business API (WABA) para enviar e receber mensagens

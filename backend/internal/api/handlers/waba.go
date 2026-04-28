@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -149,12 +152,43 @@ func (h *WABAHandler) Callback(c *fiber.Ctx) error {
 	}
 	h.db.Create(&wabaInstance)
 
+	// Tech Provider flow exige chamar /subscribed_apps no WABA pra Meta
+	// começar a entregar webhooks. Best-effort: log o erro mas não falha o
+	// callback (user pode re-disparar via UI).
+	subscribeErr := h.autoSubscribe(&wabaInstance)
+
 	return c.JSON(fiber.Map{
 		"instance_id":   instanceID.String(),
 		"waba_id":       wabaData.Businesses[0].BusinessID,
 		"phone_number":  phoneNumber.DisplayNumber,
 		"verified_name": verifiedName,
+		"subscribed":    subscribeErr == nil,
+		"subscribe_error": func() string {
+			if subscribeErr != nil {
+				return subscribeErr.Error()
+			}
+			return ""
+		}(),
+		"next_step": "register", // user precisa setar PIN 2FA + chamar /register
 	})
+}
+
+// autoSubscribe — chama POST /v18.0/<WABA_ID>/subscribed_apps logo após
+// callback. Best-effort: não falha o flow se Meta retornar erro.
+func (h *WABAHandler) autoSubscribe(waba *models.WABAInstance) error {
+	url := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/subscribed_apps", waba.WABABusinessID)
+	req, _ := http.NewRequest("POST", url, nil)
+	req.Header.Set("Authorization", "Bearer "+waba.AccessToken)
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("subscribed_apps %d: %s", resp.StatusCode, string(body))
+	}
+	return nil
 }
 
 func (h *WABAHandler) exchangeCodeForToken(code, redirectURI string) (*MetaTokenResponse, error) {
@@ -353,6 +387,17 @@ func (h *WABAHandler) Webhook(c *fiber.Ctx) error {
 		return c.SendString(challenge)
 	}
 
+	// HMAC SHA256 validation — Meta envia X-Hub-Signature-256 com hash
+	// HMAC do BODY usando MetaAppSecret. Sem isso, qualquer um pode forjar
+	// eventos. Skip se MetaAppSecret está vazio (dev local).
+	if secret := config.AppConfig.MetaAppSecret; secret != "" {
+		sig := c.Get("X-Hub-Signature-256")
+		body := c.Body()
+		if !verifyMetaSignature(sig, body, secret) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "invalid signature"})
+		}
+	}
+
 	var webhookReq WebhookRequest
 	if err := c.BodyParser(&webhookReq); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request"})
@@ -517,6 +562,166 @@ func (h *WABAHandler) ListTemplates(c *fiber.Ctx) error {
 		}
 	}
 	return c.JSON(fiber.Map{"items": approved})
+}
+
+// ─── HMAC verification ─────────────────────────────────────────────────
+// Meta envia "sha256=<hex>" no header X-Hub-Signature-256, calculado
+// como HMAC-SHA256(app_secret, raw_body). Sem essa validação, qualquer
+// IP poderia forjar eventos de mensagem inbound.
+func verifyMetaSignature(header string, body []byte, appSecret string) bool {
+	if !strings.HasPrefix(header, "sha256=") {
+		return false
+	}
+	expectedHex := strings.TrimPrefix(header, "sha256=")
+	mac := hmac.New(sha256.New, []byte(appSecret))
+	mac.Write(body)
+	actual := hex.EncodeToString(mac.Sum(nil))
+	return hmac.Equal([]byte(expectedHex), []byte(actual))
+}
+
+// ─── Subscribe app to WABA webhooks ────────────────────────────────────
+// Após Embedded Signup, é OBRIGATÓRIO chamar /subscribed_apps no WABA
+// pra Meta começar a enviar eventos. Sem isso, webhooks ficam mudos.
+//
+// POST /v1/instances/:id/waba/subscribe — chamado uma vez logo depois do
+// callback. Idempotente do lado da Meta.
+func (h *WABAHandler) SubscribeApp(c *fiber.Ctx) error {
+	instanceID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var waba models.WABAInstance
+	if err := h.db.Where("instance_id = ?", instanceID).First(&waba).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "WABA não encontrado"})
+	}
+
+	url := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/subscribed_apps", waba.WABABusinessID)
+	req, _ := http.NewRequest("POST", url, nil)
+	req.Header.Set("Authorization", "Bearer "+waba.AccessToken)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "subscribe falhou: " + err.Error()})
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return c.Status(resp.StatusCode).JSON(fiber.Map{"error": "Meta: " + string(body)})
+	}
+	return c.JSON(fiber.Map{"success": true})
+}
+
+// ─── Register phone number (ativa pra envio) ───────────────────────────
+// POST /v1/instances/:id/waba/register
+// Body: { pin: "123456" }  (PIN de 6 dígitos definido no Meta)
+//
+// Após Embedded Signup, o número precisa ser registrado pra ativar
+// envio. Reference: https://developers.facebook.com/docs/whatsapp/cloud-api/reference/registration
+func (h *WABAHandler) RegisterPhone(c *fiber.Ctx) error {
+	instanceID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var body struct {
+		PIN string `json:"pin"`
+	}
+	if err := c.BodyParser(&body); err != nil || len(body.PIN) != 6 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "PIN de 6 dígitos obrigatório"})
+	}
+	var waba models.WABAInstance
+	if err := h.db.Where("instance_id = ?", instanceID).First(&waba).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "WABA não encontrado"})
+	}
+	url := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/register", waba.PhoneNumberID)
+	payload := map[string]any{"messaging_product": "whatsapp", "pin": body.PIN}
+	jsonBody, _ := json.Marshal(payload)
+	req, _ := http.NewRequest("POST", url, strings.NewReader(string(jsonBody)))
+	req.Header.Set("Authorization", "Bearer "+waba.AccessToken)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return c.Status(resp.StatusCode).JSON(fiber.Map{"error": "Meta: " + string(respBody)})
+	}
+	return c.JSON(fiber.Map{"success": true})
+}
+
+// ─── Create message template (HSM) ─────────────────────────────────────
+// POST /v1/instances/:id/waba/templates
+// Body: { name, language, category, components: [...] }
+//
+// Cria template para aprovação na Meta. Reference:
+// https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates
+func (h *WABAHandler) CreateTemplate(c *fiber.Ctx) error {
+	instanceID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var req struct {
+		Name       string         `json:"name"`
+		Language   string         `json:"language"`
+		Category   string         `json:"category"` // MARKETING / UTILITY / AUTHENTICATION
+		Components []any          `json:"components"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.Name == "" || req.Language == "" || req.Category == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name, language e category obrigatórios"})
+	}
+	var waba models.WABAInstance
+	if err := h.db.Where("instance_id = ?", instanceID).First(&waba).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "WABA não encontrado"})
+	}
+	url := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/message_templates", waba.WABABusinessID)
+	jsonBody, _ := json.Marshal(req)
+	httpReq, _ := http.NewRequest("POST", url, strings.NewReader(string(jsonBody)))
+	httpReq.Header.Set("Authorization", "Bearer "+waba.AccessToken)
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(httpReq)
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return c.Status(resp.StatusCode).JSON(fiber.Map{"error": "Meta: " + string(respBody), "raw": string(respBody)})
+	}
+	var out map[string]any
+	_ = json.Unmarshal(respBody, &out)
+	return c.JSON(out)
+}
+
+// ─── Delete template ───────────────────────────────────────────────────
+// DELETE /v1/instances/:id/waba/templates/:name
+func (h *WABAHandler) DeleteTemplate(c *fiber.Ctx) error {
+	instanceID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	name := c.Params("name")
+	if name == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name obrigatório"})
+	}
+	var waba models.WABAInstance
+	if err := h.db.Where("instance_id = ?", instanceID).First(&waba).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "WABA não encontrado"})
+	}
+	url := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/message_templates?name=%s",
+		waba.WABABusinessID, name)
+	req, _ := http.NewRequest("DELETE", url, nil)
+	req.Header.Set("Authorization", "Bearer "+waba.AccessToken)
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return c.Status(resp.StatusCode).JSON(fiber.Map{"error": "Meta: " + string(respBody)})
+	}
+	return c.JSON(fiber.Map{"success": true})
 }
 
 func init() {

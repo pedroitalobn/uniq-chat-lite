@@ -55,7 +55,7 @@ interface Conversation {
 function channelChipStyle(channel?: string): { label: string; bg: string; color: string; border: string } {
   switch ((channel || "").toLowerCase()) {
     case "whatsapp":  return { label: "WhatsApp",  bg: "rgba(37,211,102,0.08)", color: "#25d366", border: "rgba(37,211,102,0.2)" };
-    case "waba":      return { label: "WhatsApp Business", bg: "rgba(37,211,102,0.06)", color: "#25d366", border: "rgba(37,211,102,0.18)" };
+    case "waba":      return { label: "WhatsApp API", bg: "rgba(0,136,255,0.08)", color: "#0088ff", border: "rgba(0,136,255,0.22)" };
     case "instagram": return { label: "Instagram", bg: "rgba(225,48,108,0.08)", color: "#e1306c", border: "rgba(225,48,108,0.2)" };
     case "facebook":  return { label: "Facebook",  bg: "rgba(24,119,242,0.08)", color: "#1877f2", border: "rgba(24,119,242,0.2)" };
     case "telegram":  return { label: "Telegram",  bg: "rgba(34,158,217,0.08)", color: "#229ed9", border: "rgba(34,158,217,0.2)" };

@@ -740,12 +740,32 @@ export const linkPreviewApi = {
   get: (url: string) => api.get<LinkPreview>(`/v1/link-preview`, { params: { url } }),
 };
 
-// WABA (Meta WhatsApp Cloud API) — templates aprovados para o
-// business. Usados quando a janela de 24h de atendimento humano fechou e
-// o operador precisa iniciar conversa via HSM.
+// WABA (WhatsApp API / Cloud API oficial Meta) — Tech Provider flow.
+// Endpoints: get embedded signup URL, callback, listar/criar/deletar
+// templates, register phone (PIN), subscribe webhooks.
 export const wabaApi = {
+  getAuthURL: () => api.get(`/v1/waba/auth-url`),
+  callback: (code: string) => api.post(`/v1/waba/callback`, { code }),
+  get: (instanceId: string) => api.get(`/v1/instances/${instanceId}/waba`),
+  delete: (instanceId: string) => api.delete(`/v1/instances/${instanceId}/waba`),
+  phoneNumbers: (instanceId: string) =>
+    api.get(`/v1/instances/${instanceId}/waba/phone-numbers`),
   templates: (instanceId: string) =>
     api.get(`/v1/instances/${instanceId}/waba/templates`),
+  createTemplate: (instanceId: string, data: {
+    name: string;
+    language: string;
+    category: "MARKETING" | "UTILITY" | "AUTHENTICATION";
+    components: any[];
+  }) => api.post(`/v1/instances/${instanceId}/waba/templates`, data),
+  deleteTemplate: (instanceId: string, name: string) =>
+    api.delete(`/v1/instances/${instanceId}/waba/templates/${name}`),
+  register: (instanceId: string, pin: string) =>
+    api.post(`/v1/instances/${instanceId}/waba/register`, { pin }),
+  subscribe: (instanceId: string) =>
+    api.post(`/v1/instances/${instanceId}/waba/subscribe`),
+  sendMessage: (instanceId: string, data: { to: string; type: string; text?: string; template?: any }) =>
+    api.post(`/v1/instances/${instanceId}/waba/messages`, data),
 };
 
 export interface WebhookPayload {

@@ -36,13 +36,15 @@ var ChannelMeta = map[ChannelType]struct {
 	Color       string
 	Description string
 }{
-	ChannelWhatsApp:  {Label: "WhatsApp", Color: "#25d366", Description: "Conecte números WhatsApp via QR ou código de pareamento"},
+	// Convenção: "WhatsApp Business" = via whatsmeow (QR/código).
+	//             "WhatsApp API"      = via Cloud API oficial (Meta WABA).
+	ChannelWhatsApp:  {Label: "WhatsApp Business", Color: "#25d366", Description: "Conecte números WhatsApp via QR ou código de pareamento"},
 	ChannelInstagram: {Label: "Instagram", Color: "#e1306c", Description: "Conecte Instagram e gerencie DMs via instagram-private-api"},
 	ChannelTelegram:  {Label: "Telegram", Color: "#229ed9", Description: "Crie bots e gerencie mensagens via Telegram Bot API"},
 	ChannelLinkedIn:  {Label: "LinkedIn", Color: "#0a66c2", Description: "Automatize mensagens e InMails via LinkedIn API"},
 	ChannelTikTok:    {Label: "TikTok", Color: "#ff0050", Description: "Mensagens diretas e comentários via TikTok"},
 	ChannelKwai:      {Label: "Kwai", Color: "#ff6600", Description: "Mensagens e interações via Kwai"},
-	ChannelWABA:      {Label: "WhatsApp Business", Color: "#25d366", Description: "Conecte números via WhatsApp Business API (WABA) com Embedded Signup"},
+	ChannelWABA:      {Label: "WhatsApp API", Color: "#0088ff", Description: "Cloud API oficial da Meta (Embedded Signup) — templates HSM, alta entregabilidade"},
 }
 
 type InstanceStatus string

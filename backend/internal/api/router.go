@@ -93,7 +93,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 			{ID: "telegram", Label: "Telegram", Color: "#229ed9", Description: "Crie bots e gerencie mensagens via Telegram Bot API", Available: false},
 			{ID: "linkedin", Label: "LinkedIn", Color: "#0a66c2", Description: "Automatize mensagens e InMails via LinkedIn API", Available: false},
 			{ID: "kwai", Label: "Kwai", Color: "#ff6600", Description: "Gerencie mensagens e interações via Kwai", Available: false},
-			{ID: "waba", Label: "WhatsApp Business", Color: "#25d366", Description: "Conecte números via WhatsApp Business API (WABA)", Available: true},
+			{ID: "waba", Label: "WhatsApp API", Color: "#0088ff", Description: "Cloud API oficial Meta (WABA) com Embedded Signup + templates HSM", Available: true},
 		}
 		return c.JSON(channels)
 	}
@@ -590,7 +590,13 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	instanceWaba.Delete("/", wabaH.DeleteWABA)
 	instanceWaba.Get("/phone-numbers", wabaH.ListPhoneNumbers)
 	instanceWaba.Get("/templates", wabaH.ListTemplates)
+	instanceWaba.Post("/templates", wabaH.CreateTemplate)
+	instanceWaba.Delete("/templates/:name", wabaH.DeleteTemplate)
 	instanceWaba.Post("/messages", wabaH.SendMessage)
+	// Tech Provider flow — chamados após Embedded Signup pra ativar
+	// recebimento de mensagens (subscribe) e envio (register).
+	instanceWaba.Post("/subscribe", wabaH.SubscribeApp)
+	instanceWaba.Post("/register", wabaH.RegisterPhone)
 
 	// Global WebSocket for real-time events
 	app.Get("/ws/events", wsH.EventsWS)

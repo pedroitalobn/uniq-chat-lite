@@ -16,8 +16,8 @@ interface Props {
 }
 
 const FALLBACK_CHANNELS = (isSuperAdmin: boolean): ChannelInfo[] => [
-  { id: "whatsapp",  label: "WhatsApp",  color: "#25d366", description: "Conecte números WhatsApp via QR ou código de pareamento", available: true },
-  { id: "waba",     label: "WABA",     color: "#0088ff", description: "Conecte via WhatsApp Business API (Embedded Signup)", available: isSuperAdmin },
+  { id: "whatsapp",  label: "WhatsApp Business",  color: "#25d366", description: "Não-oficial via QR ou código de pareamento (whatsmeow)", available: true },
+  { id: "waba",     label: "WhatsApp API",     color: "#0088ff", description: "Cloud API oficial Meta — templates HSM + Embedded Signup", available: isSuperAdmin },
   { id: "instagram", label: "Instagram", color: "#e1306c", description: isSuperAdmin ? "DMs, scraping, follow/unfollow" : "Em breve", available: isSuperAdmin || false },
   { id: "tiktok",    label: "TikTok",    color: "#ff0050", description: isSuperAdmin ? "DMs, scraping, follow/unfollow" : "Em breve", available: isSuperAdmin || false },
   { id: "facebook",  label: "Facebook",  color: "#1877f2", description: isSuperAdmin ? "Facebook Messenger" : "Em breve", available: isSuperAdmin || false },
