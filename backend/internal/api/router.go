@@ -1,7 +1,9 @@
 package api
 
 import (
+	"context"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -15,6 +17,7 @@ import (
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/outbound"
 	"github.com/uniq-chat/backend/internal/services"
+	"github.com/uniq-chat/backend/internal/storage"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
 )
@@ -202,6 +205,29 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	app.Get("/v1/stripe/plans", paymentH.ListPlans)
 	app.Get("/v1/asaas/plans", paymentH.ListPlans)
 	app.Get("/v1/payments/plans", paymentH.ListPlans)
+
+	// Media by key — redireciona pra signed URL (TTL curto). Usado pelo
+	// frontend quando o resolver server-side não conseguiu embedar a URL
+	// resolvida no payload da mensagem (presign falhou, mídia muito antiga,
+	// etc.). É público pra <audio src>/<img src> não precisar de auth header.
+	mediaHandler := func(c *fiber.Ctx) error {
+		key := c.Params("key")
+		if key == "" {
+			return c.Status(fiber.StatusBadRequest).SendString("missing key")
+		}
+		if storage.GlobalStorage == nil {
+			return c.Status(fiber.StatusServiceUnavailable).SendString("storage não inicializado")
+		}
+		ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
+		defer cancel()
+		signed, err := storage.GlobalStorage.PresignURL(ctx, key, 30*time.Minute)
+		if err != nil {
+			return c.Status(fiber.StatusNotFound).SendString("media not found")
+		}
+		return c.Redirect(signed, fiber.StatusFound)
+	}
+	app.Get("/v1/media/:key", mediaHandler)
+	app.Get("/media/:key", mediaHandler)
 
 	// Stripe webhook (public — must receive raw body, Stripe signature verified internally)
 	app.Post("/stripe/webhook", stripeH.Webhook)

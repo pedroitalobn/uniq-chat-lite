@@ -1585,16 +1585,24 @@ function MediaBody({
   }
 
   if (type === "audio") {
-    if (url) {
-      // Player inline. Sem botão fullscreen (UX: áudio não precisa).
+    // Tenta resolver URL: 1) url direto, 2) constrói via mediaKey + storage
+    // público. Áudios devem SEMPRE renderizar player — IconFallback só
+    // aparece se não houver nenhuma forma de obter o áudio + houver erro.
+    const audioURL = url || (mediaKey ? buildMediaURL(mediaKey) : "");
+    if (audioURL) {
       return (
         <div className="flex flex-col gap-1.5">
-          <AudioPlayer url={url} />
+          <AudioPlayer url={audioURL} />
           {error && <ErrorLine text={error} />}
         </div>
       );
     }
-    return <IconFallback icon={<Mic className="h-4 w-4" />} label={body || "Áudio"} />;
+    return (
+      <div className="flex flex-col gap-1.5">
+        <IconFallback icon={<Mic className="h-4 w-4" />} label={body || "Áudio"} />
+        {error && <ErrorLine text={error} />}
+      </div>
+    );
   }
 
   if (type === "document") {
@@ -2634,6 +2642,15 @@ function LinkPreviewCard({ url }: { url: string }) {
       </div>
     </a>
   );
+}
+
+// Quando o backend não devolve url resolvida (presign falhou, bucket privado,
+// migração de storage, etc.) mas tem media_key, tentamos construir uma URL
+// via endpoint público do backend que faz o presign on-demand.
+function buildMediaURL(mediaKey: string): string {
+  if (!mediaKey) return "";
+  const base = process.env.NEXT_PUBLIC_API_URL || "";
+  return `${base}/v1/media/${encodeURIComponent(mediaKey)}`;
 }
 
 function IconFallback({ icon, label }: { icon: React.ReactNode; label: string }) {
