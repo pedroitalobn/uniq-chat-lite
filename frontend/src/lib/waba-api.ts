@@ -15,34 +15,32 @@ export interface WABAMessageRequest {
 
 const wabaApi = {
   getAuthURL: async () => {
-    const res = await api.get<{ auth_url: string }>("/waba/auth-url");
+    const res = await api.get<{ auth_url: string }>("/v1/waba/auth-url");
     return res.data;
   },
 
   callback: async (code: string) => {
-    const res = await api.post<{ instance: { id: string } }>("/waba/callback", { code }, {
-      params: { code },
-    });
+    const res = await api.post<{ instance: { id: string } }>("/v1/waba/callback", { code });
     return res.data;
   },
 
   getWABA: async (instanceId: string) => {
-    const res = await api.get<{ data: WABAInstance }>(`/instances/${instanceId}/waba`);
+    const res = await api.get<{ data: WABAInstance }>(`/v1/instances/${instanceId}/waba`);
     return res.data;
   },
 
   deleteWABA: async (instanceId: string) => {
-    const res = await api.delete(`/instances/${instanceId}/waba`);
+    const res = await api.delete(`/v1/instances/${instanceId}/waba`);
     return res.data;
   },
 
   listPhoneNumbers: async (instanceId: string) => {
-    const res = await api.get<{ phone_numbers: WABAPhoneNumber[] }>(`/instances/${instanceId}/waba/phone-numbers`);
+    const res = await api.get<{ phone_numbers: WABAPhoneNumber[] }>(`/v1/instances/${instanceId}/waba/phone-numbers`);
     return res.data;
   },
 
   sendMessage: async (instanceId: string, data: WABAMessageRequest) => {
-    const res = await api.post(`/instances/${instanceId}/waba/messages`, data);
+    const res = await api.post(`/v1/instances/${instanceId}/waba/messages`, data);
     return res.data;
   },
 };
