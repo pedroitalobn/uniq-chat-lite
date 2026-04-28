@@ -207,6 +207,11 @@ func main() {
 	cleanupCron := services.NewCleanupCron(db)
 	cleanupCron.Start()
 
+	// Computed Attributes cron — recalcula contact_computed (LTV, orders,
+	// conversations, deals) a cada hora pra Segments + Liquid templates.
+	computedCron := services.NewComputedCron(db)
+	computedCron.Start()
+
 	// Ticketing periodic jobs: unsnoozer, presence sweep, pending redispatch,
 	// resolve auto-close.
 	ticketingScheduler := services.NewTicketingScheduler(db, services.NewDispatchService(db))

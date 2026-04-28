@@ -17,6 +17,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/senders"
+	"github.com/uniq-chat/backend/internal/services/template"
 	"gorm.io/gorm"
 )
 
@@ -858,6 +859,14 @@ func (e *JourneyExecutor) executeStep(ctx *execCtx, step *models.FlowStep) (*mod
 		return e.stepProductSearch(ctx, step)
 	case models.StepTypeProductCarousel:
 		return e.stepProductCarousel(ctx, step)
+	case models.StepTypeWaitUntil:
+		return e.stepWaitUntil(ctx, step)
+	case models.StepTypeMultivariate:
+		return e.stepMultivariate(ctx, step)
+	case models.StepTypeSendInTimezone:
+		return e.stepSendInTimezone(ctx, step)
+	case models.StepTypeUnsubscribe:
+		return e.stepUnsubscribe(ctx, step)
 	case models.StepTypeEnd:
 		return nil, false, nil
 	default:
@@ -1382,6 +1391,22 @@ var reVar = regexp.MustCompile(`\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}`)
 func (e *JourneyExecutor) interpolate(s string, vars *models.ExecutionVars) string {
 	if s == "" || vars == nil {
 		return s
+	}
+	// Caminho Liquid: se o template tem {% (lógica) ou |  filter, usa o
+	// engine completo. Caso contrário, fica no atalho regex (retrocompat
+	// com templates simples {{var}}).
+	if strings.Contains(s, "{%") || strings.Contains(s, "| ") {
+		ctx := map[string]any{
+			"contact":    vars.Contact,
+			"flow":       vars.Flow,
+			"last_input": vars.LastInput,
+			"vars":       vars.Flow,
+		}
+		out, err := template.Render(s, ctx)
+		if err == nil {
+			return out
+		}
+		// Fallback pro regex se Liquid falhar.
 	}
 	return reVar.ReplaceAllStringFunc(s, func(m string) string {
 		sub := reVar.FindStringSubmatch(m)

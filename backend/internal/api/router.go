@@ -1220,5 +1220,44 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	admin.Post("/invites/toggle", inviteH.ToggleSystem)
 	admin.Get("/invites", inviteH.AdminList)
 
+	// ─── Customer.io / Close-inspired modules ──────────────────────────
+	segH := handlers.NewSegmentHandler(db)
+	supH := handlers.NewSuppressionHandler(db)
+	subH := handlers.NewSubscriptionHandler(db)
+	importH := handlers.NewCRMImportHandler(db)
+
+	// Segments (CRM)
+	segs := api.Group("/segments", middleware.RequireFeature(db, models.FeatureCRM))
+	segs.Get("/", segH.List)
+	segs.Post("/", segH.Create)
+	segs.Patch("/:id", segH.Update)
+	segs.Delete("/:id", segH.Delete)
+	segs.Post("/preview", segH.Preview)
+	segs.Post("/overlap", segH.Overlap)
+	segs.Post("/:id/import-csv", segH.CSVImport)
+
+	// Suppression list (LGPD opt-out global)
+	supps := api.Group("/suppressions")
+	supps.Get("/", supH.List)
+	supps.Post("/", supH.Create)
+	supps.Delete("/:id", supH.Delete)
+
+	// Subscription topics + Preference Center
+	subs := api.Group("/subscription-topics")
+	subs.Get("/", subH.ListTopics)
+	subs.Post("/", subH.CreateTopic)
+	subs.Patch("/:id", subH.UpdateTopic)
+	subs.Delete("/:id", subH.DeleteTopic)
+	api.Post("/contacts/:id/preference-link", subH.GeneratePreferenceLink)
+	// Preference Center público (sem auth)
+	app.Get("/p/preferences/:token", subH.PublicGet)
+	app.Post("/p/preferences/:token", subH.PublicUpdate)
+
+	// CRM Import (CSV) — contatos / empresas / deals
+	crmImport := api.Group("/crm", middleware.RequireFeature(db, models.FeatureCRM))
+	crmImport.Post("/contacts/import", importH.ImportContacts)
+	crmImport.Post("/companies/import", importH.ImportCompanies)
+	crmImport.Post("/deals/import", importH.ImportDeals)
+
 	return app
 }
