@@ -95,7 +95,7 @@ export default function CRMSegmentsPage() {
             Recortes de contatos por critérios cruzados — usados em campanhas, jornadas e relatórios.
           </p>
         </div>
-        <CRMTabs />
+
       </div>
 
       <div className="rounded-2xl p-5 space-y-4"

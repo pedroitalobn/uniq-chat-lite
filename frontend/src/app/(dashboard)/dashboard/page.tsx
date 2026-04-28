@@ -207,8 +207,9 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Pills de tabs */}
-      <div className="flex flex-wrap gap-1.5 -mb-1">
+      {/* Pills de tabs — mesmo padrão dos outros menus pill (CRMTabs, etc) */}
+      <div className="flex items-center gap-0.5 rounded-2xl p-1 self-start overflow-x-auto"
+        style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
         <DashTab id="geral"     label="Geral"      icon={LayoutDashboard} tab={tab} setTab={setTab} />
         <DashTab id="campaigns" label="Campanhas"  icon={Megaphone}        tab={tab} setTab={setTab} />
         <DashTab id="inbox"     label="Inbox / SLA" icon={InboxIcon}       tab={tab} setTab={setTab} />
@@ -471,13 +472,13 @@ function DashTab({ id, label, icon: Icon, tab, setTab }: {
   return (
     <button
       onClick={() => setTab(id)}
-      className="px-3 py-1.5 rounded-full text-xs font-medium inline-flex items-center gap-1.5 transition-all"
+      className="flex items-center gap-2 rounded-xl px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium transition-all duration-150 whitespace-nowrap"
       style={active
-        ? { background: "var(--green-soft)", border: "1px solid var(--green-border)", color: "var(--green)" }
-        : { background: "var(--surface-3)", border: "1px solid transparent", color: "var(--text-3)" }}
+        ? { background: "rgba(0,212,106,0.12)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.25)" }
+        : { background: "transparent", color: "hsl(240 8% 55%)", border: "1px solid transparent" }}
     >
       <Icon className="w-3.5 h-3.5" />
-      {label}
+      <span className="hidden xs:inline sm:inline">{label}</span>
     </button>
   );
 }

@@ -189,7 +189,7 @@ export default function DealsPage() {
           <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: uniq.textPrimary }}>
             Deals
           </h1>
-          <CRMTabs />
+
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <FunnelSelector

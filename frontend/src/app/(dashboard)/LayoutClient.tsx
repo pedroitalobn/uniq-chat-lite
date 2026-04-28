@@ -22,6 +22,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
   // pra ficarem agrupadas visualmente, SEM max-width (usa toda largura
   // disponível depois do sidebar).
   const isBoxed =
+    pathname === "/dashboard" ||
     pathname === "/servers" || pathname.startsWith("/servers/") ||
     pathname === "/instances" || pathname.startsWith("/instances/") ||
     pathname === "/agents" || pathname.startsWith("/agents/") ||

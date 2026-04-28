@@ -67,7 +67,7 @@ export default function CompaniesPage() {
               {listQ.data?.total ?? 0} empresas cadastradas
             </p>
           </div>
-          <CRMTabs />
+
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative">

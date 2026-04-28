@@ -1485,7 +1485,7 @@ export default function CRMPage() {
       {/* Tabs + Search + tag filters — todos na mesma linha em desktop;
           em mobile, tabs ficam acima do search (mas ABAIXO do título) */}
       <div className="flex gap-3 flex-wrap items-center">
-        <CRMTabs className="flex-shrink-0 order-1" />
+
         <div className="flex items-center gap-2 rounded-xl px-3 py-2 flex-1 min-w-48 order-3 sm:order-2"
           style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
           <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }} />

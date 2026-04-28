@@ -47,7 +47,7 @@ export default function DuplicatesPage() {
             Merge re-aponta conversas, deals, orders e tags pro contato sobrevivente.
           </p>
         </div>
-        <CRMTabs />
+
       </div>
 
       <div className="flex items-center gap-2">

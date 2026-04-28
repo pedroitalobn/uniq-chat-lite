@@ -411,7 +411,9 @@ export default function InboxPage() {
           {viewMode === "conversations" && (
           <div className="ml-auto flex flex-wrap items-center gap-1.5 sm:gap-2 max-w-full overflow-x-auto"
             style={{ maxWidth: "min(100%, 640px)" }}>
-            <GlobalSearchButton wsId={wsId} />
+            {/* GlobalSearchButton removido — ficava redundante com o input
+                "Buscar…" local. Quem quer busca full-text de mensagens
+                pode usar /v1/conversations/messages/search via DevTools/API. */}
             <button
               type="button"
               onClick={() => {

@@ -180,9 +180,36 @@ export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: s
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mb-5 sm:mb-6"
-        style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}>
-        <SparklesIcon className="w-7 h-7 sm:w-8 sm:h-8" style={{ color: "var(--green)" }} />
+      {/* Aura animada — orb pulsante simulando IA ativa. */}
+      <div className="relative w-20 h-20 sm:w-24 sm:h-24 mb-5 sm:mb-6 flex items-center justify-center">
+        <motion.div
+          className="absolute inset-0 rounded-full"
+          style={{
+            background: "radial-gradient(circle at 30% 30%, rgba(0,212,106,0.55), rgba(0,212,106,0.18) 40%, transparent 70%)",
+            filter: "blur(12px)",
+          }}
+          animate={{ scale: [1, 1.18, 1], opacity: [0.55, 0.85, 0.55] }}
+          transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.div
+          className="absolute inset-2 rounded-full"
+          style={{
+            background: "conic-gradient(from 0deg, rgba(0,212,106,0.45), rgba(0,255,127,0.25), rgba(0,212,106,0.45))",
+            filter: "blur(8px)",
+          }}
+          animate={{ rotate: 360 }}
+          transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+        />
+        <div
+          className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center"
+          style={{
+            background: "rgba(0,212,106,0.18)",
+            border: "1px solid rgba(0,212,106,0.45)",
+            boxShadow: "0 0 20px rgba(0,212,106,0.35)",
+          }}
+        >
+          <SparklesIcon className="w-6 h-6 sm:w-7 sm:h-7" style={{ color: "var(--green)" }} />
+        </div>
       </div>
       <h2 className="text-lg sm:text-xl font-medium mb-2 text-center" style={{ color: "var(--text-1)" }}>
         Olá, sou o Uniq AI

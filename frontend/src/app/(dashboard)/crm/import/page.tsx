@@ -33,7 +33,7 @@ export default function CRMImportPage() {
             Bulk import de Contatos, Empresas e Deals. Idempotente — re-import atualiza ao invés de duplicar.
           </p>
         </div>
-        <CRMTabs />
+
       </div>
 
       <div className="grid sm:grid-cols-3 gap-4">
