@@ -426,19 +426,19 @@ func (h *WABAHandler) ListPhoneNumbers(c *fiber.Ctx) error {
 	}
 
 	type phoneNumber struct {
-		ID            string `json:"id"`
-		DisplayNumber string `json:"display_number"`
-		VerifiedName  string `json:"verified_name"`
-		CodeVerified  bool   `json:"code_verified"`
+		ID                     string `json:"id"`
+		DisplayNumber          string `json:"display_number"`
+		VerifiedName           string `json:"verified_name"`
+		CodeVerificationStatus string `json:"code_verification_status"`
 	}
 
 	numbers := make([]phoneNumber, len(phoneData.Data))
 	for i, p := range phoneData.Data {
 		numbers[i] = phoneNumber{
-			ID:            p.ID,
-			DisplayNumber: p.DisplayNumber,
-			VerifiedName:  p.VerifiedName,
-			CodeVerified:  p.CodeVerified,
+			ID:                     p.ID,
+			DisplayNumber:          p.DisplayNumber,
+			VerifiedName:           p.VerifiedName,
+			CodeVerificationStatus: p.CodeVerificationStatus,
 		}
 	}
 
