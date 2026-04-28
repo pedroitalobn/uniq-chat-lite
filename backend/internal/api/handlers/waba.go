@@ -15,6 +15,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/models"
 	"gorm.io/gorm"
@@ -445,20 +446,72 @@ func (h *WABAHandler) ListPhoneNumbers(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"phone_numbers": numbers})
 }
 
-type WebhookEntry struct {
+// Estruturas oficiais da Cloud API (object: "whatsapp_business_account").
+// Cada entry contém um array de "changes"; cada change tem um value com
+// "messages" (inbound) e/ou "statuses" (delivery updates pra mensagens
+// que NÓS enviamos).
+type WebhookValueMessage struct {
+	From      string `json:"from"`
 	ID        string `json:"id"`
-	Messaging []struct {
-		Sender struct {
-			ID string `json:"id"`
-		} `json:"sender"`
-		Recipient struct {
-			ID string `json:"id"`
-		} `json:"recipient"`
-		Message struct {
-			ID   string `json:"id"`
-			Text string `json:"text"`
-		} `json:"message"`
-	} `json:"messaging"`
+	Timestamp string `json:"timestamp"`
+	Type      string `json:"type"`
+	Text      *struct {
+		Body string `json:"body"`
+	} `json:"text,omitempty"`
+	Image    *map[string]interface{} `json:"image,omitempty"`
+	Audio    *map[string]interface{} `json:"audio,omitempty"`
+	Video    *map[string]interface{} `json:"video,omitempty"`
+	Document *map[string]interface{} `json:"document,omitempty"`
+	Sticker  *map[string]interface{} `json:"sticker,omitempty"`
+	Location *map[string]interface{} `json:"location,omitempty"`
+}
+
+type WebhookValueStatus struct {
+	ID           string `json:"id"`
+	Status       string `json:"status"` // sent | delivered | read | failed
+	Timestamp    string `json:"timestamp"`
+	RecipientID  string `json:"recipient_id"`
+	Conversation *struct {
+		ID                  string `json:"id"`
+		ExpirationTimestamp string `json:"expiration_timestamp,omitempty"`
+		Origin              *struct {
+			Type string `json:"type"` // marketing | utility | authentication | service
+		} `json:"origin,omitempty"`
+	} `json:"conversation,omitempty"`
+	Pricing *struct {
+		Billable     bool   `json:"billable"`
+		PricingModel string `json:"pricing_model"`
+		Category     string `json:"category"`
+	} `json:"pricing,omitempty"`
+	Errors []struct {
+		Code    int    `json:"code"`
+		Title   string `json:"title"`
+		Message string `json:"message,omitempty"`
+	} `json:"errors,omitempty"`
+}
+
+type WebhookValue struct {
+	MessagingProduct string `json:"messaging_product"`
+	Metadata         struct {
+		DisplayPhoneNumber string `json:"display_phone_number"`
+		PhoneNumberID      string `json:"phone_number_id"`
+	} `json:"metadata"`
+	Contacts []struct {
+		Profile struct {
+			Name string `json:"name"`
+		} `json:"profile"`
+		WaID string `json:"wa_id"`
+	} `json:"contacts,omitempty"`
+	Messages []WebhookValueMessage `json:"messages,omitempty"`
+	Statuses []WebhookValueStatus  `json:"statuses,omitempty"`
+}
+
+type WebhookEntry struct {
+	ID      string `json:"id"`
+	Changes []struct {
+		Value WebhookValue `json:"value"`
+		Field string       `json:"field"` // "messages" | outras
+	} `json:"changes"`
 }
 
 type WebhookRequest struct {
@@ -500,35 +553,136 @@ func (h *WABAHandler) Webhook(c *fiber.Ctx) error {
 	}
 
 	for _, entry := range webhookReq.Entry {
-		for _, msg := range entry.Messaging {
-			if msg.Message.Text == "" {
+		for _, change := range entry.Changes {
+			if change.Field != "messages" {
 				continue
 			}
-
-			phoneNumberID := msg.Recipient.ID
+			val := change.Value
+			phoneNumberID := val.Metadata.PhoneNumberID
 
 			var waba models.WABAInstance
 			if err := h.db.Where("phone_number_id = ?", phoneNumberID).First(&waba).Error; err != nil {
+				log.Warn().Str("phone_number_id", phoneNumberID).Msg("waba webhook: WABAInstance não encontrada")
 				continue
 			}
 
-			contactPhone := strings.ReplaceAll(msg.Sender.ID, "+", "")
-
-			messageLog := models.MessageLog{
-				ID:          uuid.New(),
-				InstanceID:  waba.InstanceID,
-				Direction:   models.DirectionIn,
-				Type:        "text",
-				ToJID:       phoneNumberID + "@waba",
-				ContactName: contactPhone,
-				Content:     msg.Message.Text,
-				Status:      models.MessageStatusDelivered,
+			// 1. Mensagens INBOUND
+			for _, msg := range val.Messages {
+				h.processInboundMessage(&waba, &msg, val.Contacts)
 			}
-			h.db.Create(&messageLog)
+
+			// 2. STATUS UPDATES (sent/delivered/read/failed) das mensagens
+			//    que NÓS enviamos — atualiza CampaignRecipient + MessageLog.
+			for _, st := range val.Statuses {
+				h.processStatusUpdate(&waba, &st)
+			}
 		}
 	}
 
 	return c.JSON(fiber.Map{"success": true})
+}
+
+// processInboundMessage salva mensagem recebida no MessageLog.
+func (h *WABAHandler) processInboundMessage(
+	waba *models.WABAInstance,
+	msg *WebhookValueMessage,
+	contacts []struct {
+		Profile struct {
+			Name string `json:"name"`
+		} `json:"profile"`
+		WaID string `json:"wa_id"`
+	},
+) {
+	contactName := msg.From
+	for _, c := range contacts {
+		if c.WaID == msg.From {
+			if c.Profile.Name != "" {
+				contactName = c.Profile.Name
+			}
+			break
+		}
+	}
+
+	body := ""
+	if msg.Text != nil {
+		body = msg.Text.Body
+	}
+
+	// Conteúdo serializado pra ficar compatível com parseMessageContent do front.
+	contentMap := map[string]any{"text": body, "type": msg.Type}
+	if msg.Image != nil {
+		contentMap["image"] = *msg.Image
+	}
+	if msg.Audio != nil {
+		contentMap["audio"] = *msg.Audio
+	}
+	if msg.Video != nil {
+		contentMap["video"] = *msg.Video
+	}
+	if msg.Document != nil {
+		contentMap["document"] = *msg.Document
+	}
+	contentJSON, _ := json.Marshal(contentMap)
+
+	messageLog := models.MessageLog{
+		ID:          uuid.New(),
+		InstanceID:  waba.InstanceID,
+		Direction:   models.DirectionIn,
+		Type:        msg.Type,
+		ToJID:       msg.From,
+		ContactName: contactName,
+		Content:     string(contentJSON),
+		Status:      models.MessageStatusDelivered,
+		ExternalMessageID: msg.ID,
+	}
+	h.db.Create(&messageLog)
+}
+
+// processStatusUpdate aplica o status novo do Meta:
+//   - Atualiza MessageLog.status pelo external_id (wamid)
+//   - Atualiza CampaignRecipient.status quando o message_id bate
+func (h *WABAHandler) processStatusUpdate(waba *models.WABAInstance, st *WebhookValueStatus) {
+	// Mapeamento Meta → nosso enum
+	var msgStatus models.MessageStatus
+	switch st.Status {
+	case "sent":
+		msgStatus = models.MessageStatusSent
+	case "delivered":
+		msgStatus = models.MessageStatusDelivered
+	case "read":
+		msgStatus = models.MessageStatusRead
+	case "failed":
+		msgStatus = models.MessageStatusFailed
+	default:
+		return
+	}
+
+	// 1. MessageLog correspondente (outbound salvo com external_message_id = wamid)
+	h.db.Model(&models.MessageLog{}).
+		Where("external_message_id = ?", st.ID).
+		Update("status", msgStatus)
+
+	// 2. CampaignRecipient — se essa mensagem foi de uma campanha
+	updates := map[string]any{}
+	switch st.Status {
+	case "delivered":
+		updates["status"] = models.RecipientStatusSent // já estava sent; mantém pra não regredir
+		now := time.Now()
+		updates["delivered_at"] = &now
+	case "read":
+		now := time.Now()
+		updates["read_at"] = &now
+	case "failed":
+		updates["status"] = models.RecipientStatusFailed
+		if len(st.Errors) > 0 {
+			updates["error"] = fmt.Sprintf("Meta %d: %s", st.Errors[0].Code, st.Errors[0].Title)
+		}
+	}
+	if len(updates) > 0 {
+		h.db.Model(&models.CampaignRecipient{}).
+			Where("message_id = ?", st.ID).
+			Updates(updates)
+	}
 }
 
 func (h *WABAHandler) SendMessage(c *fiber.Ctx) error {

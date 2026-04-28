@@ -302,15 +302,29 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
               </div>
 
               <div>
-                <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>Instância WhatsApp *</label>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>Instância *</label>
                 <select value={instanceId} onChange={(e) => setInstanceId(e.target.value)} className="input-field w-full">
                   <option value="">Selecione uma instância conectada</option>
-                  {connectedInstances.map((i) => (
-                    <option key={i.id} value={i.id}>{i.name}{i.phone_number ? ` (${i.phone_number})` : ""}</option>
-                  ))}
+                  {connectedInstances.map((i) => {
+                    const ch = i.channel === "waba" ? "WABA · Cloud API"
+                      : i.channel === "whatsapp" || !i.channel ? "WhatsApp Business"
+                      : i.channel === "instagram" ? "Instagram"
+                      : i.channel === "tiktok" ? "TikTok"
+                      : i.channel;
+                    return (
+                      <option key={i.id} value={i.id}>
+                        [{ch}] {i.name}{i.phone_number ? ` · ${i.phone_number}` : ""}
+                      </option>
+                    );
+                  })}
                 </select>
                 {connectedInstances.length === 0 && (
                   <p className="text-xs mt-1" style={{ color: "#f87171" }}>Nenhuma instância conectada</p>
+                )}
+                {isWABA && (
+                  <p className="text-[11px] mt-1.5" style={{ color: "#0088ff" }}>
+                    📡 WABA selecionada — campanha enviará via templates aprovados Meta.
+                  </p>
                 )}
               </div>
 

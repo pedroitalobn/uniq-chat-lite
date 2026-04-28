@@ -116,10 +116,12 @@ type CampaignRecipient struct {
 	SentToday    int    `gorm:"default:0" json:"sent_today"`
 	LastSentDate string `gorm:"type:varchar(10)" json:"last_sent_date,omitempty"` // "2006-01-02"
 
-	MessageID string     `gorm:"type:varchar(100)" json:"message_id,omitempty"`
-	Error     string     `gorm:"type:text" json:"error,omitempty"`
-	SentAt    *time.Time `json:"sent_at,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
+	MessageID   string     `gorm:"type:varchar(120);index" json:"message_id,omitempty"`
+	Error       string     `gorm:"type:text" json:"error,omitempty"`
+	SentAt      *time.Time `json:"sent_at,omitempty"`
+	DeliveredAt *time.Time `json:"delivered_at,omitempty"` // webhook delivered (WABA)
+	ReadAt      *time.Time `json:"read_at,omitempty"`      // webhook read (WABA)
+	CreatedAt   time.Time  `json:"created_at"`
 }
 
 func (r *CampaignRecipient) BeforeCreate(tx *gorm.DB) error {
