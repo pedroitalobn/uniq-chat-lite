@@ -20,6 +20,10 @@ export interface ConversationRow {
   assigned_user_id?: string | null;
   contact?: { name: string; avatar_url?: string; phone?: string } | null;
   last_message_from_me?: boolean;
+  // Routing — preloaded pelo backend em /v1/workspaces/:ws/conversations
+  department?: { id: string; name: string; color?: string } | null;
+  team?: { id: string; name: string } | null;
+  queue?: { id: string; name: string } | null;
 }
 
 // isGroupChannelKey — true quando o channel_key parece um grupo do WhatsApp

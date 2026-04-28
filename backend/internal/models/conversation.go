@@ -38,11 +38,14 @@ type Conversation struct {
 	ChannelKey  string `gorm:"type:varchar(190);index" json:"channel_key"`
 	ThreadKey   string `gorm:"type:varchar(190);index" json:"thread_key,omitempty"`
 
-	QueueID        *uuid.UUID `gorm:"type:uuid;index" json:"queue_id,omitempty"`
-	DepartmentID   *uuid.UUID `gorm:"type:uuid;index" json:"department_id,omitempty"`
-	TeamID         *uuid.UUID `gorm:"type:uuid;index" json:"team_id,omitempty"`
-	AssignedUserID *uuid.UUID `gorm:"type:uuid;index" json:"assigned_user_id,omitempty"`
-	AssignedUser   *User      `gorm:"foreignKey:AssignedUserID" json:"assigned_user,omitempty"`
+	QueueID        *uuid.UUID  `gorm:"type:uuid;index" json:"queue_id,omitempty"`
+	Queue          *Queue      `gorm:"foreignKey:QueueID" json:"queue,omitempty"`
+	DepartmentID   *uuid.UUID  `gorm:"type:uuid;index" json:"department_id,omitempty"`
+	Department     *Department `gorm:"foreignKey:DepartmentID" json:"department,omitempty"`
+	TeamID         *uuid.UUID  `gorm:"type:uuid;index" json:"team_id,omitempty"`
+	Team           *Team       `gorm:"foreignKey:TeamID" json:"team,omitempty"`
+	AssignedUserID *uuid.UUID  `gorm:"type:uuid;index" json:"assigned_user_id,omitempty"`
+	AssignedUser   *User       `gorm:"foreignKey:AssignedUserID" json:"assigned_user,omitempty"`
 
 	Status    ConversationStatus   `gorm:"type:varchar(20);default:'open';index" json:"status"`
 	Priority  ConversationPriority `gorm:"type:varchar(10);default:'normal'" json:"priority"`

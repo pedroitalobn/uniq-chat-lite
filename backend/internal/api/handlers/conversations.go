@@ -161,6 +161,9 @@ func (h *ConversationHandler) List(c *fiber.Ctx) error {
 	// e no header sem precisar de query extra. Select só campos seguros
 	// (não vaza Token de instance).
 	err := q.Preload("Contact").Preload("AssignedUser").
+		Preload("Department", func(tx *gorm.DB) *gorm.DB { return tx.Select("id, name, color") }).
+		Preload("Team", func(tx *gorm.DB) *gorm.DB { return tx.Select("id, name") }).
+		Preload("Queue", func(tx *gorm.DB) *gorm.DB { return tx.Select("id, name") }).
 		Preload("Instance", func(tx *gorm.DB) *gorm.DB {
 			return tx.Select("id, name, channel, phone_number")
 		}).
@@ -224,6 +227,9 @@ func (h *ConversationHandler) Count(c *fiber.Ctx) error {
 func (h *ConversationHandler) Get(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
 	q := h.db.Preload("Contact").Preload("AssignedUser").
+		Preload("Department", func(tx *gorm.DB) *gorm.DB { return tx.Select("id, name, color") }).
+		Preload("Team", func(tx *gorm.DB) *gorm.DB { return tx.Select("id, name") }).
+		Preload("Queue", func(tx *gorm.DB) *gorm.DB { return tx.Select("id, name") }).
 		Preload("Instance", func(tx *gorm.DB) *gorm.DB {
 			return tx.Select("id, name, channel, phone_number")
 		})
@@ -1632,8 +1638,17 @@ func (h *ConversationHandler) Transfer(c *fiber.Ctx) error {
 		}
 	}
 
+	// Snapshot do estado ATUAL antes do update — usado pra responder com
+	// from_* + to_* e pra registrar o evento detalhado.
+	fromQueueID := conv.QueueID
+	fromDeptID := conv.DepartmentID
+	fromTeamID := conv.TeamID
+	fromUserID := conv.AssignedUserID
+
 	updates := map[string]any{}
 	var toQueue *uuid.UUID
+	var toDept *uuid.UUID
+	var toTeam *uuid.UUID
 	if body.QueueID != "" {
 		if qid, err := uuid.Parse(body.QueueID); err == nil {
 			updates["queue_id"] = qid
@@ -1642,17 +1657,21 @@ func (h *ConversationHandler) Transfer(c *fiber.Ctx) error {
 			if h.db.First(&q, "id = ?", qid).Error == nil {
 				updates["department_id"] = q.DepartmentID
 				updates["team_id"] = q.TeamID
+				toDept = q.DepartmentID
+				toTeam = q.TeamID
 			}
 		}
 	}
 	if body.DepartmentID != "" {
 		if did, err := uuid.Parse(body.DepartmentID); err == nil {
 			updates["department_id"] = did
+			toDept = &did
 		}
 	}
 	if body.TeamID != "" {
 		if tid, err := uuid.Parse(body.TeamID); err == nil {
 			updates["team_id"] = tid
+			toTeam = &tid
 		}
 	}
 	var toUser *uuid.UUID
@@ -1662,7 +1681,6 @@ func (h *ConversationHandler) Transfer(c *fiber.Ctx) error {
 			toUser = &uid
 		}
 	} else if _, ok := updates["queue_id"]; ok {
-		// Transferring to a queue drops the current assignee
 		updates["assigned_user_id"] = nil
 		if conv.Status == models.ConversationStatusOpen {
 			updates["status"] = models.ConversationStatusPending
@@ -1677,18 +1695,80 @@ func (h *ConversationHandler) Transfer(c *fiber.Ctx) error {
 	h.db.Create(&models.ConversationAssignment{
 		ConversationID: conv.ID,
 		WorkspaceID:    ws,
-		FromUserID:     conv.AssignedUserID,
+		FromUserID:     fromUserID,
 		ToUserID:       toUser,
-		FromQueueID:    conv.QueueID,
+		FromQueueID:    fromQueueID,
 		ToQueueID:      toQueue,
 		Reason:         "transfer",
 		ActorUserID:    &actor,
 		Note:           body.Note,
 	})
-	h.appendEvent(&conv, models.ConvEventTransferred, actor, map[string]any{"to_queue_id": toQueue, "to_user_id": toUser, "note": body.Note})
+
+	// Resolve nomes (origem + destino) pra enriquecer response e WS event.
+	type ref struct {
+		ID   *uuid.UUID `json:"id"`
+		Name string     `json:"name,omitempty"`
+	}
+	resolveDept := func(id *uuid.UUID) ref {
+		r := ref{ID: id}
+		if id != nil && *id != uuid.Nil {
+			var d models.Department
+			if h.db.Select("name").First(&d, "id = ?", *id).Error == nil {
+				r.Name = d.Name
+			}
+		}
+		return r
+	}
+	resolveTeam := func(id *uuid.UUID) ref {
+		r := ref{ID: id}
+		if id != nil && *id != uuid.Nil {
+			var t models.Team
+			if h.db.Select("name").First(&t, "id = ?", *id).Error == nil {
+				r.Name = t.Name
+			}
+		}
+		return r
+	}
+	resolveQueue := func(id *uuid.UUID) ref {
+		r := ref{ID: id}
+		if id != nil && *id != uuid.Nil {
+			var q models.Queue
+			if h.db.Select("name").First(&q, "id = ?", *id).Error == nil {
+				r.Name = q.Name
+			}
+		}
+		return r
+	}
+	resolveUser := func(id *uuid.UUID) ref {
+		r := ref{ID: id}
+		if id != nil && *id != uuid.Nil {
+			var u models.User
+			if h.db.Select("name").First(&u, "id = ?", *id).Error == nil {
+				r.Name = u.Name
+			}
+		}
+		return r
+	}
+
+	transferDetails := map[string]any{
+		"from_department": resolveDept(fromDeptID),
+		"to_department":   resolveDept(toDept),
+		"from_team":       resolveTeam(fromTeamID),
+		"to_team":         resolveTeam(toTeam),
+		"from_queue":      resolveQueue(fromQueueID),
+		"to_queue":        resolveQueue(toQueue),
+		"from_user":       resolveUser(fromUserID),
+		"to_user":         resolveUser(toUser),
+		"note":            body.Note,
+	}
+	h.appendEvent(&conv, models.ConvEventTransferred, actor, transferDetails)
 	h.db.Where("id = ?", conv.ID).First(&conv)
-	h.broadcast(&conv, "conversation.transferred", map[string]any{"to_queue_id": toQueue, "to_user_id": toUser})
-	return c.JSON(conv)
+	h.broadcast(&conv, "conversation.transferred", transferDetails)
+
+	return c.JSON(fiber.Map{
+		"conversation": conv,
+		"transfer":     transferDetails,
+	})
 }
 
 // Resolve POST /v1/conversations/:id/resolve  { reason?, send_csat? }
