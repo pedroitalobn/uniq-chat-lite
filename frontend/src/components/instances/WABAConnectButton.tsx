@@ -114,6 +114,8 @@ export function WABAConnectButton({ className }: Props) {
         config_id: META_CONFIG_ID,
         response_type: "code",
         override_default_response_type: true,
+        display: "popup",
+        auth_type: "rerequest",
         extras: {
           setup: {},
           featureType: "",
