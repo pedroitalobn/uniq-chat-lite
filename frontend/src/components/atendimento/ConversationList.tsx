@@ -36,34 +36,45 @@ function isGroupChannelKey(key?: string): boolean {
   );
 }
 
-// isNewsletterChannelKey — true quando o JID termina em @newsletter.
-// Canais (ex: WhatsApp Channels) têm JID nesse formato e devem ser
-// renderizados de forma distinta de chat 1-1.
+// isNewsletterChannelKey — true quando JID/key indica canal/newsletter
+// (WhatsApp Channels). Detecta múltiplos formatos que vimos na prática:
+//   @newsletter, @broadcast, @broadcast.whatsapp.net, prefixo "newsletter:"
 function isNewsletterChannelKey(key?: string): boolean {
   if (!key) return false;
-  return key.toLowerCase().endsWith("@newsletter");
+  const k = key.toLowerCase();
+  return (
+    k.endsWith("@newsletter") ||
+    k.endsWith("@broadcast") ||
+    k.includes("@broadcast.") ||
+    k.startsWith("newsletter:") ||
+    k.startsWith("channel:")
+  );
+}
+
+// Formata número internacional pra exibição amigável.
+// 5511999999999 → +55 (11) 99999-9999  /  +1 999 999 9999
+function formatPhoneNumber(num: string): string {
+  const digits = num.replace(/\D/g, "");
+  if (digits.length < 8) return num;
+  if (digits.startsWith("55") && digits.length >= 12) {
+    const ddd = digits.slice(2, 4);
+    const rest = digits.slice(4);
+    const half = rest.length === 9 ? 5 : 4;
+    return `+55 (${ddd}) ${rest.slice(0, half)}-${rest.slice(half)}`;
+  }
+  if (digits.startsWith("1") && digits.length === 11) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  return `+${digits}`;
 }
 
 // Formata o channel_key de um chat sem nome conhecido pra display amigável.
-// - Newsletter: "📢 Canal" (ou subject se houver)
-// - Grupo: usa subject (ConversationList já trata)
-// - 1-1: extrai número do JID (5511...@s.whatsapp.net → +55 11 ...)
 function formatChannelKey(key?: string): string {
-  if (!key) return "Contato";
+  if (!key) return "Contato sem nome";
   if (isNewsletterChannelKey(key)) return "📢 Canal";
-  // Extrai número do prefixo antes de @
-  const num = key.split("@")[0];
-  if (/^\d{10,15}$/.test(num)) {
-    // Formata BR-style: +55 11 99999-9999
-    if (num.startsWith("55") && num.length >= 12) {
-      const ddd = num.slice(2, 4);
-      const rest = num.slice(4);
-      const half = Math.ceil(rest.length / 2);
-      return `+55 ${ddd} ${rest.slice(0, half)}-${rest.slice(half)}`;
-    }
-    return `+${num}`;
-  }
-  return key;
+  const num = key.split("@")[0]?.split(":").pop() || "";
+  if (/^\d{8,15}$/.test(num)) return formatPhoneNumber(num);
+  return key.length > 30 ? key.slice(0, 28) + "…" : key;
 }
 
 // initialsOf — pega 1-2 letras pro avatar fallback
@@ -288,12 +299,21 @@ export function ConversationList({
         // Prioridade: nome do contato → subject → JID formatado (newsletter
         // vira 📢 Canal, número vira +55 11 ...). Antes mostrava JID cru
         // tipo 5511...@s.whatsapp.net quando não tinha contato cadastrado.
+        // Cascade pra resolver nome legível:
+        //   1. nome do contato (CRM)
+        //   2. subject da conversa (set pelo backend ao criar)
+        //   3. telefone formatado (se contato existe sem nome)
+        //   4. JID formatado (último recurso)
+        // Trim previne string só com espaços passando como "nome válido".
+        const contactName = conv.contact?.name?.trim();
+        const subject = conv.subject?.trim();
+        const contactPhone = conv.contact?.phone?.trim();
         const baseName =
-          conv.contact?.name ||
-          conv.subject ||
+          contactName ||
+          subject ||
+          (contactPhone ? formatPhoneNumber(contactPhone) : "") ||
           formatChannelKey(conv.channel_key);
         // Newsletter sempre prefixado com 📢 pra diferenciar visualmente
-        // do chat 1-1 e grupos.
         const displayName = isNewsletter && !baseName.startsWith("📢")
           ? `📢 ${baseName}`
           : baseName;
