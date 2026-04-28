@@ -88,6 +88,11 @@ services:
       SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL}
       SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD}
       SUPER_ADMIN_NAME: ${SUPER_ADMIN_NAME:-Admin}
+      # ── Meta WhatsApp Cloud API (WABA Tech Provider) ────────────────────
+      META_APP_ID: ${META_APP_ID}
+      META_APP_SECRET: ${META_APP_SECRET}
+      META_WHATSAPP_CONFIG_ID: ${META_WHATSAPP_CONFIG_ID}
+      META_WEBHOOK_VERIFY_TOKEN: ${META_WEBHOOK_VERIFY_TOKEN}
     volumes:
       - sessions_data:/app/sessions
     ports:
