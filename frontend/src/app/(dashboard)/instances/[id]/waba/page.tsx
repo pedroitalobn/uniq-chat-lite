@@ -381,7 +381,10 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
   // Os formatos NÃO podem ser misturados no mesmo template.
   const rawMatches = Array.from(bodyText.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g)).map((m) => m[1]);
   const uniqueVars = rawMatches.filter((v, i, a) => a.indexOf(v) === i);
-  const isNamed = uniqueVars.length > 0 && uniqueVars.some((v) => !/^\d+$/.test(v));
+  const hasPositional = uniqueVars.some((v) => /^\d+$/.test(v));
+  const hasNamed = uniqueVars.some((v) => !/^\d+$/.test(v));
+  const isMixed = hasPositional && hasNamed;
+  const isNamed = hasNamed && !hasPositional;
   // Pra posicionais ordena numericamente; pra nomeadas mantém ordem de aparição
   const variables = isNamed
     ? uniqueVars
@@ -477,20 +480,55 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-2)" }}>
-              Body (use {`{{1}}`}, {`{{2}}`} pra variáveis)
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium" style={{ color: "var(--text-2)" }}>
+                Body
+              </label>
+              <div className="flex items-center gap-1 text-[10px]" style={{ color: "var(--text-3)" }}>
+                <span>Aceita</span>
+                <button
+                  type="button"
+                  onClick={() => setBodyText((t) => t + (t && !t.endsWith(" ") ? " " : "") + `{{${(uniqueVars.filter(v => /^\d+$/.test(v)).length || 0) + 1}}}`)}
+                  className="px-1.5 py-0.5 rounded font-mono hover:brightness-110"
+                  style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
+                  {`{{1}}`}
+                </button>
+                <span>ou</span>
+                <button
+                  type="button"
+                  onClick={() => setBodyText((t) => t + (t && !t.endsWith(" ") ? " " : "") + `{{nome}}`)}
+                  className="px-1.5 py-0.5 rounded font-mono hover:brightness-110"
+                  style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
+                  {`{{nome}}`}
+                </button>
+              </div>
+            </div>
             <textarea required rows={4} value={bodyText}
               onChange={(e) => setBodyText(e.target.value)}
-              placeholder="Olá {{1}}, sua compra foi confirmada!"
-              className="input-field w-full" />
+              placeholder="Olá {{1}}, sua compra foi confirmada!  —  ou  —  Olá {{nome}}, sua compra foi confirmada!"
+              className="input-field w-full"
+              style={isMixed ? { borderColor: "#f87171" } : undefined} />
+            {isMixed && (
+              <p className="text-[11px] mt-1" style={{ color: "#f87171" }}>
+                ⚠️ Não misture {`{{1}}`} (posicional) com {`{{nome}}`} (nomeado) no mesmo template — Meta rejeita. Escolha um dos formatos.
+              </p>
+            )}
           </div>
 
-          {variables.length > 0 && (
+          {variables.length > 0 && !isMixed && (
             <div className="space-y-2 rounded-lg p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
-              <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
-                Variáveis detectadas ({isNamed ? "nomeadas" : "posicionais"}). A Meta exige um exemplo pra cada — não misture {`{{1}}`} com {`{{nome}}`} no mesmo template.
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+                  {variables.length} variável{variables.length > 1 ? "is" : ""} {isNamed ? "nomeada" : "posicional"}{variables.length > 1 ? "s" : ""} — preencha um exemplo pra cada (Meta exige na revisão)
+                </p>
+                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full uppercase shrink-0"
+                  style={{
+                    background: isNamed ? "rgba(168,85,247,0.15)" : "rgba(34,197,94,0.15)",
+                    color: isNamed ? "#a855f7" : "#22c55e",
+                  }}>
+                  {isNamed ? "Nomeado" : "Posicional"}
+                </span>
+              </div>
               {variables.map((v, i) => (
                 <div key={v} className="flex items-center gap-2">
                   <code className="text-[11px] font-mono shrink-0" style={{ color: "var(--text-2)", minWidth: "5.5rem" }}>
@@ -550,11 +588,11 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
               style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
               Cancelar
             </button>
-            <button type="submit" disabled={create.isPending}
-              className="text-xs font-medium px-3 py-2 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50"
+            <button type="submit" disabled={create.isPending || isMixed}
+              className="text-xs font-medium px-3 py-2 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ background: "var(--green)", color: "var(--green-fg)" }}>
               {create.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-              Enviar pra aprovação
+              {isMixed ? "Conserte as variáveis" : "Enviar pra aprovação"}
             </button>
           </div>
         </form>
