@@ -248,7 +248,7 @@ export default function WABAManagePage({ params }: { params: Promise<{ id: strin
       <TemplatesSection instanceId={id} templates={templates} qc={qc} />
 
       {/* Test send */}
-      <TestSendSection instanceId={id} />
+      <TestSendSection instanceId={id} wabaStatus={waba.status} />
 
       {/* Diagnóstico Meta */}
       <div className="rounded-xl p-3 flex items-start gap-2"
@@ -444,7 +444,7 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
   );
 }
 
-function TestSendSection({ instanceId }: { instanceId: string }) {
+function TestSendSection({ instanceId }: { instanceId: string; wabaStatus?: string }) {
   const [to, setTo] = useState("");
   const [text, setText] = useState("Olá! Mensagem de teste enviada via Uniq Chat.");
   const [sentId, setSentId] = useState("");
@@ -473,7 +473,19 @@ function TestSendSection({ instanceId }: { instanceId: string }) {
       setSentId(msgId);
       toast.success("Mensagem enviada — confira o WhatsApp do destinatário");
     },
-    onError: (e: any) => toast.error(e?.response?.data?.error || "Falha ao enviar"),
+    onError: (e: any) => {
+      const raw = e?.response?.data?.error || "";
+      // Detecta erros comuns da Cloud API e dá instrução clara
+      if (raw.includes("133010") || raw.includes("Account not registered")) {
+        toast.error("Número não registrado. Use o card '2. Register phone' acima com seu PIN 2FA antes de enviar.", { duration: 8000 });
+      } else if (raw.includes("131056") || raw.includes("Pair not allowed")) {
+        toast.error("Destinatário não está na lista de testes da Meta. Adicione em Meta Business → WhatsApp → API Setup → 'To'.", { duration: 8000 });
+      } else if (raw.includes("132000") || raw.includes("template")) {
+        toast.error("Template inválido ou não aprovado pela Meta. Verifique nome/idioma exato.", { duration: 6000 });
+      } else {
+        toast.error(raw || "Falha ao enviar");
+      }
+    },
   });
 
   return (
