@@ -1139,14 +1139,23 @@ export const agentsApi = {
       original_input: extras?.original_input,
       mentions: extras?.mentions,
     }),
-  stats: () => api.get("/v1/agent/stats"),
-  activity: (limit?: number) => api.get("/v1/agent/activity", { params: limit ? { limit } : undefined }),
-  instances: () => api.get("/v1/agent/instances"),
+  stats: (workspaceId?: string) =>
+    api.get("/v1/agent/stats", { params: workspaceId ? { workspace_id: workspaceId } : undefined }),
+  activity: (limit?: number, workspaceId?: string) =>
+    api.get("/v1/agent/activity", {
+      params: {
+        ...(limit ? { limit } : {}),
+        ...(workspaceId ? { workspace_id: workspaceId } : {}),
+      },
+    }),
+  instances: (workspaceId?: string) =>
+    api.get("/v1/agent/instances", { params: workspaceId ? { workspace_id: workspaceId } : undefined }),
   stopExecution: (executionId: string) => api.post(`/v1/agent/executions/${executionId}/stop`),
 };
 
 export const journeysApi = {
-  list: () => api.get("/v1/journeys"),
+  list: (workspaceId?: string) =>
+    api.get("/v1/journeys", { params: workspaceId ? { workspace_id: workspaceId } : undefined }),
   create: (
     prompt: string,
     integrationId?: string,

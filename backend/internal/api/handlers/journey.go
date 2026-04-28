@@ -53,6 +53,20 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 		return err
 	}
 
+	// Limite de jornadas por CONTA (soma todos workspaces). Super admin
+	// edita o limite via Plan.MaxJourneys (0 = ilimitado).
+	var user models.User
+	if err := h.db.Preload("Plan").First(&user, userID).Error; err == nil && user.Plan != nil && user.Plan.MaxJourneys > 0 {
+		var count int64
+		h.db.Model(&models.Journey{}).Where("user_id = ?", userID.String()).Count(&count)
+		if int(count) >= user.Plan.MaxJourneys {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "limite de jornadas atingido para o seu plano",
+				"limit": user.Plan.MaxJourneys,
+			})
+		}
+	}
+
 	var req struct {
 		Prompt        string    `json:"prompt"`
 		IntegrationID string    `json:"integration_id"`
@@ -735,8 +749,22 @@ func (h *JourneyHandler) ListJourneys(c *fiber.Ctx) error {
 		return err
 	}
 
+	// Filtra por workspace quando passado — sem isso o user via jornadas
+	// de TODOS os workspaces dele, vazando dados entre tenants.
+	wsParam := c.Query("workspace_id")
+
+	q := h.db.Where("user_id = ?", userID.String())
+	if wsParam != "" {
+		if wsID, err := uuid.Parse(wsParam); err == nil {
+			// Journey não tem WorkspaceID direto — filtra via JOIN nas
+			// instances daquele workspace + journey sem instance_id
+			// (jornadas globais ficam sempre visíveis).
+			q = q.Where("instance_id = '' OR instance_id IS NULL OR instance_id IN (SELECT id::text FROM instances WHERE workspace_id = ?)", wsID)
+		}
+	}
+
 	var journeys []models.Journey
-	if err := h.db.Where("user_id = ?", userID.String()).Order("created_at DESC").Find(&journeys).Error; err != nil {
+	if err := q.Order("created_at DESC").Find(&journeys).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar jornadas"})
 	}
 

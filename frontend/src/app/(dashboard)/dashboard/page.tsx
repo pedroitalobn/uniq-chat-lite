@@ -120,14 +120,14 @@ export default function DashboardPage() {
 
   const journeysQ = useQuery({
     queryKey: ["journeys"],
-    queryFn: () => journeysApi.list().then((r) => r.data as any[]),
+    queryFn: () => journeysApi.list(wsId).then((r) => r.data as any[]),
   });
   const journeys = journeysQ.data ?? [];
   const activeJourneys = journeys.filter((j) => j.status === "active").length;
 
   const journeyStatsQ = useQuery({
     queryKey: ["agent-stats"],
-    queryFn: () => agentsApi.stats().then((r) => r.data),
+    queryFn: () => agentsApi.stats(wsId).then((r) => r.data),
     refetchInterval: 60_000,
   });
 
@@ -587,9 +587,11 @@ function ShopStatsView({ wsId }: { wsId?: string }) {
 }
 
 function AgentsStatsView() {
+  const { currentWorkspace } = useWorkspace();
+  const wsId = currentWorkspace?.id;
   const q = useQuery({
-    queryKey: ["dash-agent-stats"],
-    queryFn: () => agentsApi.stats().then(r => r.data),
+    queryKey: ["dash-agent-stats", wsId],
+    queryFn: () => agentsApi.stats(wsId).then(r => r.data),
     refetchInterval: 60_000,
   });
   const s: any = q.data || {};

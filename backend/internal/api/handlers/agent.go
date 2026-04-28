@@ -34,17 +34,45 @@ func (h *AgentHandler) GetStats(c *fiber.Ctx) error {
 		return err
 	}
 
+	// Filtra por workspace quando o frontend envia ?workspace_id — sem isso
+	// o dashboard mostrava agregados de TODOS workspaces do user (vazamento
+	// entre tenants). Cascade aplicada em todas queries abaixo via journeyIDQ.
+	wsParam := c.Query("workspace_id")
+
+	// Subquery base: journeys do user, filtradas por workspace via instance.
+	journeyIDQ := h.db.Model(&models.Journey{}).Where("user_id = ?", userID.String())
+	instanceIDQ := h.db.Model(&models.Instance{}).Where("user_id = ?", userID.String())
+	if wsParam != "" {
+		if wsID, err := uuid.Parse(wsParam); err == nil {
+			// Journey: aceita instance_id vazio (jornada global) ou pertencente
+			// a uma instância do workspace.
+			journeyIDQ = journeyIDQ.Where(
+				"instance_id = '' OR instance_id IS NULL OR instance_id IN (SELECT id::text FROM instances WHERE workspace_id = ?)",
+				wsID,
+			)
+			instanceIDQ = instanceIDQ.Where("workspace_id = ?", wsID)
+		}
+	}
+
 	var totalJourneys, activeJourneys, pausedJourneys int64
 	var totalExecs, activeExecs, completedExecs, failedExecs, todayExecs, totalMessages int64
 
-	h.db.Model(&models.Journey{}).Where("user_id = ?", userID.String()).Count(&totalJourneys)
-	h.db.Model(&models.Journey{}).Where("user_id = ? AND status = 'active'", userID.String()).Count(&activeJourneys)
-	h.db.Model(&models.Journey{}).Where("user_id = ? AND status = 'paused'", userID.String()).Count(&pausedJourneys)
+	journeyIDQ.Session(&gorm.Session{}).Count(&totalJourneys)
+	journeyIDQ.Session(&gorm.Session{}).Where("status = 'active'").Count(&activeJourneys)
+	journeyIDQ.Session(&gorm.Session{}).Where("status = 'paused'").Count(&pausedJourneys)
 
-	// Contabilizar execuções relacionadas às jornadas do usuário
-	execQ := h.db.Model(&models.JourneyExecution{}).
-		Where("journey_id IN (SELECT id FROM journeys WHERE user_id = ?)", userID.String())
-	execQ.Count(&totalExecs)
+	// Execuções: limita aos journey_ids resolvidos pelo filtro acima.
+	var journeyIDs []string
+	journeyIDQ.Session(&gorm.Session{}).Pluck("id", &journeyIDs)
+
+	execQ := h.db.Model(&models.JourneyExecution{})
+	if len(journeyIDs) > 0 {
+		execQ = execQ.Where("journey_id IN ?", journeyIDs)
+	} else {
+		// Sem jornadas: zero tudo
+		execQ = execQ.Where("1 = 0")
+	}
+	execQ.Session(&gorm.Session{}).Count(&totalExecs)
 	execQ.Session(&gorm.Session{}).Where("status = 'active'").Count(&activeExecs)
 	execQ.Session(&gorm.Session{}).Where("status = 'completed'").Count(&completedExecs)
 	execQ.Session(&gorm.Session{}).Where("status = 'failed'").Count(&failedExecs)
@@ -53,21 +81,21 @@ func (h *AgentHandler) GetStats(c *fiber.Ctx) error {
 	execQ.Session(&gorm.Session{}).Where("started_at >= ?", startOfDay).Count(&todayExecs)
 
 	// Total de mensagens geradas pelas execuções (agregado via COUNT das invocações)
-	h.db.Model(&models.Journey{}).
-		Where("user_id = ?", userID.String()).
+	journeyIDQ.Session(&gorm.Session{}).
 		Select("COALESCE(SUM(invocations),0)").
 		Row().Scan(&totalMessages)
 
-	// Instâncias ativas
+	// Instâncias ativas (do workspace filtrado)
 	var instancesActive int64
-	h.db.Model(&models.Instance{}).Where("user_id = ? AND status = 'connected'", userID.String()).Count(&instancesActive)
+	instanceIDQ.Session(&gorm.Session{}).Where("status = 'connected'").Count(&instancesActive)
 
 	// Atividade recente (última hora)
 	var recentActivity int64
-	h.db.Model(&models.JourneyExecution{}).
-		Where("journey_id IN (SELECT id FROM journeys WHERE user_id = ?) AND started_at >= ?",
-			userID.String(), time.Now().Add(-time.Hour)).
-		Count(&recentActivity)
+	if len(journeyIDs) > 0 {
+		h.db.Model(&models.JourneyExecution{}).
+			Where("journey_id IN ? AND started_at >= ?", journeyIDs, time.Now().Add(-time.Hour)).
+			Count(&recentActivity)
+	}
 
 	execRate := 0.0
 	if totalExecs > 0 {

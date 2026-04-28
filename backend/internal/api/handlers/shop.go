@@ -140,8 +140,13 @@ func (h *ShopHandler) CreateShop(c *fiber.Ctx) error {
 			})
 		}
 		if user.Plan.MaxShops > 0 {
+			// Limite é por CONTA (soma todas shops de todos workspaces do user),
+			// não por workspace. Antes contava só do workspace atual e o user
+			// driblava criando workspaces extras.
 			var count int64
-			h.db.Model(&models.Shop{}).Where("workspace_id = ?", wsID).Count(&count)
+			h.db.Model(&models.Shop{}).
+				Where("workspace_id IN (SELECT workspace_id FROM user_workspaces WHERE user_id = ?)", user.ID).
+				Count(&count)
 			if int(count) >= user.Plan.MaxShops {
 				return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
 					"error":       "limit_reached",

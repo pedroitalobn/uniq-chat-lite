@@ -614,6 +614,24 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		agent.RAGEnabled = *req.RAGEnabled
 	}
 	if req.IsActive != nil {
+		// Limite de agentes ATIVOS por conta (soma de todos workspaces).
+		// Super admin edita via Plan.MaxAgents (0 = ilimitado).
+		if *req.IsActive && !agent.IsActive {
+			user := middleware.GetCurrentUser(c)
+			if user != nil && user.Plan != nil && user.Plan.MaxAgents > 0 {
+				var count int64
+				h.db.Model(&models.InstanceAgent{}).
+					Joins("JOIN instances ON instances.id = instance_agents.instance_id").
+					Where("instances.user_id = ? AND instance_agents.is_active = ?", user.ID, true).
+					Count(&count)
+				if int(count) >= user.Plan.MaxAgents {
+					return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+						"error": "limite de agentes ativos atingido para o seu plano",
+						"limit": user.Plan.MaxAgents,
+					})
+				}
+			}
+		}
 		agent.IsActive = *req.IsActive
 	}
 	if req.WebhookURL != nil {
