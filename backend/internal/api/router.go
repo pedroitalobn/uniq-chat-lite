@@ -580,9 +580,13 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	waba.Get("/auth-url", wabaH.GetAuthURL)
 	waba.Post("/callback", wabaH.Callback)
 
-	// Public webhook (no auth required)
-	wabaPost := app.Group("/waba/webhook")
-	wabaPost.Post("/", wabaH.Webhook)
+	// Public webhook (no auth required) — Meta envia GET para validar (hub.challenge)
+	// e POST com eventos. Registra ambos métodos em "/waba/webhook" e "/waba/webhook/".
+	wabaWebhook := app.Group("/waba/webhook")
+	wabaWebhook.Get("/", wabaH.Webhook)
+	wabaWebhook.Post("/", wabaH.Webhook)
+	app.Get("/waba/webhook", wabaH.Webhook)
+	app.Post("/waba/webhook", wabaH.Webhook)
 
 	// Instance-specific WABA routes
 	instanceWaba := instance.Group("/waba")
