@@ -11,7 +11,7 @@
 //      no app WhatsApp do destinatário.
 //   2. whatsapp_business_management → "Criar template" cria HSM novo.
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { wabaApi, instancesApi } from "@/lib/api";
+import { wabaApi, instancesApi, mediaUploadApi } from "@/lib/api";
 import { WABAConnectButton } from "@/components/instances/WABAConnectButton";
 
 interface WABAData {
@@ -362,6 +362,95 @@ function TemplatesSection({ instanceId, templates, qc }: {
   );
 }
 
+function HeaderMediaUploader({
+  instanceId, headerType, value, onChange,
+}: {
+  instanceId: string;
+  headerType: "IMAGE" | "VIDEO" | "DOCUMENT";
+  value: string;
+  onChange: (url: string) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [filename, setFilename] = useState<string>("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const accept = {
+    IMAGE: "image/jpeg,image/png",
+    VIDEO: "video/mp4,video/3gpp",
+    DOCUMENT: "application/pdf",
+  }[headerType];
+
+  const limitMB = { IMAGE: 5, VIDEO: 16, DOCUMENT: 100 }[headerType];
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > limitMB * 1024 * 1024) {
+      toast.error(`Arquivo maior que ${limitMB}MB — limite Meta para ${headerType.toLowerCase()}`);
+      return;
+    }
+    setUploading(true);
+    try {
+      const r = await mediaUploadApi.upload(instanceId, file);
+      const url = (r.data as { url?: string })?.url;
+      if (!url) throw new Error("upload sem url");
+      onChange(url);
+      setFilename(file.name);
+      toast.success("Mídia enviada");
+    } catch (err) {
+      const e = err as { message?: string };
+      toast.error(e.message || "Falha no upload");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <input ref={inputRef} type="file" hidden accept={accept} onChange={onFile} />
+      {value ? (
+        <div className="flex items-center gap-2 rounded-md p-2"
+          style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>
+          {headerType === "IMAGE" ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={value} alt="preview" className="w-12 h-12 rounded object-cover" />
+          ) : (
+            <div className="w-12 h-12 rounded flex items-center justify-center text-[10px] uppercase"
+              style={{ background: "var(--surface-3)", color: "var(--text-3)" }}>
+              {headerType === "VIDEO" ? "VID" : "DOC"}
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs truncate" style={{ color: "var(--text-2)" }}>
+              {filename || "Mídia carregada"}
+            </p>
+            <p className="text-[10px] truncate font-mono" style={{ color: "var(--text-3)" }}>
+              {value}
+            </p>
+          </div>
+          <button type="button" onClick={() => { onChange(""); setFilename(""); }}
+            className="rounded p-1 shrink-0" style={{ color: "#f87171" }}>
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading}
+          className="w-full rounded-md py-3 text-xs font-medium border-2 border-dashed disabled:opacity-50"
+          style={{ borderColor: "var(--surface-border)", color: "var(--text-3)", background: "var(--surface-1)" }}>
+          {uploading ? (
+            <span className="inline-flex items-center gap-1.5">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Enviando...
+            </span>
+          ) : (
+            <>📎 Selecionar {headerType === "IMAGE" ? "imagem (JPG/PNG)" : headerType === "VIDEO" ? "vídeo (MP4)" : "documento (PDF)"} · max {limitMB}MB</>
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function CreateTemplateModal({ instanceId, onClose, onCreated }: {
   instanceId: string;
   onClose: () => void;
@@ -532,10 +621,22 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
-      <div className="rounded-2xl w-full max-w-lg p-5 overflow-y-auto"
-        style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)", maxHeight: "90vh" }}>
-        <h3 className="text-sm font-medium mb-4" style={{ color: "var(--text-1)" }}>Criar template HSM</h3>
-        <form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} className="space-y-3">
+      <div className="rounded-2xl w-full max-w-2xl flex flex-col"
+        style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)", maxHeight: "92vh" }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b shrink-0"
+          style={{ borderColor: "var(--surface-border)" }}>
+          <div>
+            <h3 className="text-base font-medium" style={{ color: "var(--text-1)" }}>Criar template HSM</h3>
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
+              Será enviado pra revisão da Meta após criar
+            </p>
+          </div>
+          <button type="button" onClick={onClose}
+            className="rounded-md p-1" style={{ color: "var(--text-3)" }}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <form onSubmit={(e) => { e.preventDefault(); create.mutate(); }} className="space-y-4 px-5 py-4 overflow-y-auto">
           <div>
             <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-2)" }}>Nome (lowercase, _)</label>
             <input required value={name}
@@ -584,19 +685,12 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
                 className="input-field w-full text-sm" />
             )}
             {(headerType === "IMAGE" || headerType === "VIDEO" || headerType === "DOCUMENT") && (
-              <>
-                <input value={headerExampleURL} onChange={(e) => setHeaderExampleURL(e.target.value)}
-                  placeholder={
-                    headerType === "IMAGE" ? "https://exemplo.com/imagem.jpg"
-                      : headerType === "VIDEO" ? "https://exemplo.com/video.mp4"
-                      : "https://exemplo.com/arquivo.pdf"
-                  }
-                  className="input-field w-full text-xs font-mono" />
-                <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
-                  Meta usa essa URL apenas durante a revisão (precisa estar pública).
-                  Na hora de enviar a mensagem você passa a mídia real por destinatário.
-                </p>
-              </>
+              <HeaderMediaUploader
+                instanceId={instanceId}
+                headerType={headerType}
+                value={headerExampleURL}
+                onChange={setHeaderExampleURL}
+              />
             )}
             {headerType === "LOCATION" && (
               <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
@@ -805,20 +899,24 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
               </div>
             </div>
           )}
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose}
-              className="text-xs px-3 py-2 rounded-lg"
-              style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
-              Cancelar
-            </button>
-            <button type="submit" disabled={create.isPending || isMixed}
-              className="text-xs font-medium px-3 py-2 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: "var(--green)", color: "var(--green-fg)" }}>
-              {create.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-              {isMixed ? "Conserte as variáveis" : "Enviar pra aprovação"}
-            </button>
-          </div>
         </form>
+        <div className="flex justify-end gap-2 px-5 py-3 border-t shrink-0"
+          style={{ borderColor: "var(--surface-border)", background: "var(--surface-1)" }}>
+          <button type="button" onClick={onClose}
+            className="text-xs px-3 py-2 rounded-lg"
+            style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => create.mutate()}
+            disabled={create.isPending || isMixed || !name.trim() || !bodyText.trim()}
+            className="text-xs font-medium px-4 py-2 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ background: "var(--green)", color: "var(--green-fg)" }}>
+            {create.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+            {isMixed ? "Conserte as variáveis" : "Enviar pra aprovação"}
+          </button>
+        </div>
       </div>
     </div>
   );
