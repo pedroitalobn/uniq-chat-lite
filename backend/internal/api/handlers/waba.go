@@ -675,15 +675,11 @@ func (h *WABAHandler) ListTemplates(c *fiber.Ctx) error {
 		Data []map[string]any `json:"data"`
 	}
 	_ = json.Unmarshal(body, &meta)
-	// Só expomos APPROVED — evita UI oferecer template que Meta vai rejeitar.
-	approved := make([]map[string]any, 0, len(meta.Data))
-	for _, t := range meta.Data {
-		status, _ := t["status"].(string)
-		if strings.EqualFold(status, "APPROVED") {
-			approved = append(approved, t)
-		}
-	}
-	return c.JSON(fiber.Map{"items": approved})
+	// Retorna todos os templates (APPROVED, PENDING, REJECTED, PAUSED). UI
+	// mostra status pra cada um — PENDING precisa aparecer pra user saber
+	// que a submissão chegou na Meta. Filtragem pra envio (só APPROVED) é
+	// feita no frontend.
+	return c.JSON(fiber.Map{"items": meta.Data})
 }
 
 // ─── HMAC verification ─────────────────────────────────────────────────

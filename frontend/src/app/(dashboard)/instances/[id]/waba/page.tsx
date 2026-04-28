@@ -324,9 +324,10 @@ function TemplatesSection({ instanceId, templates, qc }: {
       </div>
       {templates.length === 0 ? (
         <div className="text-center py-8 px-4">
-          <p className="text-sm" style={{ color: "var(--text-3)" }}>Nenhum template aprovado ainda.</p>
+          <p className="text-sm" style={{ color: "var(--text-3)" }}>Nenhum template ainda.</p>
           <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
-            Crie um pra começar conversas fora da janela de 24h.
+            Crie um pra começar conversas fora da janela de 24h. Templates novos
+            aparecem aqui como <span style={{ color: "#fbbf24" }}>PENDING</span> até a Meta aprovar.
           </p>
         </div>
       ) : (
@@ -374,25 +375,28 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
   const [footerText, setFooterText] = useState("");
   const [examples, setExamples] = useState<string[]>([]);
 
-  // Detecta variáveis {{1}}, {{2}}... no body — Meta exige array de exemplos
-  // pra revisão. Sem isso, retorna 400 'Body text contains variables but no
-  // examples were provided'.
-  const variables = Array.from(bodyText.matchAll(/\{\{(\d+)\}\}/g))
-    .map((m) => parseInt(m[1]))
-    .filter((v, i, a) => a.indexOf(v) === i)
-    .sort((a, b) => a - b);
+  // Detecta variáveis no body. Meta suporta DOIS formatos:
+  //   - Posicionais: {{1}}, {{2}}  → example: { body_text: [["valor1", "valor2"]] }
+  //   - Nomeadas:    {{customer}}, {{order}} → example: { body_text_named_params: [{param_name, example}] }
+  // Os formatos NÃO podem ser misturados no mesmo template.
+  const rawMatches = Array.from(bodyText.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g)).map((m) => m[1]);
+  const uniqueVars = rawMatches.filter((v, i, a) => a.indexOf(v) === i);
+  const isNamed = uniqueVars.length > 0 && uniqueVars.some((v) => !/^\d+$/.test(v));
+  // Pra posicionais ordena numericamente; pra nomeadas mantém ordem de aparição
+  const variables = isNamed
+    ? uniqueVars
+    : uniqueVars.sort((a, b) => parseInt(a) - parseInt(b));
 
   useEffect(() => {
     setExamples((prev) => {
       const next = variables.map((_, i) => prev[i] || "");
-      // só atualiza se realmente mudou (evita re-render desnecessário)
       if (next.length !== prev.length || next.some((v, i) => v !== prev[i])) {
         return next;
       }
       return prev;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [variables.length]);
+  }, [variables.length, isNamed]);
 
   const create = useMutation({
     mutationFn: () => {
@@ -400,7 +404,16 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
 
       const bodyComp: Record<string, unknown> = { type: "BODY", text: bodyText };
       if (variables.length > 0) {
-        bodyComp.example = { body_text: [examples] };
+        if (isNamed) {
+          bodyComp.example = {
+            body_text_named_params: variables.map((name, i) => ({
+              param_name: name,
+              example: examples[i] || "",
+            })),
+          };
+        } else {
+          bodyComp.example = { body_text: [examples] };
+        }
       }
       components.push(bodyComp);
 
@@ -476,12 +489,12 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
           {variables.length > 0 && (
             <div className="space-y-2 rounded-lg p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
               <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
-                A Meta exige um exemplo pra cada variável detectada (usado na revisão):
+                Variáveis detectadas ({isNamed ? "nomeadas" : "posicionais"}). A Meta exige um exemplo pra cada — não misture {`{{1}}`} com {`{{nome}}`} no mesmo template.
               </p>
-              {variables.map((n, i) => (
-                <div key={n} className="flex items-center gap-2">
-                  <code className="text-[11px] font-mono w-12" style={{ color: "var(--text-2)" }}>
-                    {`{{${n}}}`}
+              {variables.map((v, i) => (
+                <div key={v} className="flex items-center gap-2">
+                  <code className="text-[11px] font-mono shrink-0" style={{ color: "var(--text-2)", minWidth: "5.5rem" }}>
+                    {`{{${v}}}`}
                   </code>
                   <input
                     required
@@ -491,7 +504,7 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
                       next[i] = e.target.value;
                       setExamples(next);
                     }}
-                    placeholder={`Exemplo p/ var ${n}`}
+                    placeholder={isNamed ? `Exemplo p/ ${v}` : `Exemplo p/ var ${v}`}
                     className="input-field flex-1 text-xs"
                   />
                 </div>
@@ -518,9 +531,9 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
               </p>
               <div className="rounded-lg p-3 max-w-[280px]" style={{ background: "#1f2c34", color: "#e9edef" }}>
                 <p className="text-sm whitespace-pre-wrap">
-                  {bodyText.replace(/\{\{(\d+)\}\}/g, (_, n) => {
-                    const i = variables.indexOf(parseInt(n));
-                    return examples[i] || `[var ${n}]`;
+                  {bodyText.replace(/\{\{([a-zA-Z0-9_]+)\}\}/g, (_, n) => {
+                    const i = variables.indexOf(n);
+                    return examples[i] || `[${n}]`;
                   })}
                 </p>
                 {footerText && (
