@@ -36,6 +36,36 @@ function isGroupChannelKey(key?: string): boolean {
   );
 }
 
+// isNewsletterChannelKey — true quando o JID termina em @newsletter.
+// Canais (ex: WhatsApp Channels) têm JID nesse formato e devem ser
+// renderizados de forma distinta de chat 1-1.
+function isNewsletterChannelKey(key?: string): boolean {
+  if (!key) return false;
+  return key.toLowerCase().endsWith("@newsletter");
+}
+
+// Formata o channel_key de um chat sem nome conhecido pra display amigável.
+// - Newsletter: "📢 Canal" (ou subject se houver)
+// - Grupo: usa subject (ConversationList já trata)
+// - 1-1: extrai número do JID (5511...@s.whatsapp.net → +55 11 ...)
+function formatChannelKey(key?: string): string {
+  if (!key) return "Contato";
+  if (isNewsletterChannelKey(key)) return "📢 Canal";
+  // Extrai número do prefixo antes de @
+  const num = key.split("@")[0];
+  if (/^\d{10,15}$/.test(num)) {
+    // Formata BR-style: +55 11 99999-9999
+    if (num.startsWith("55") && num.length >= 12) {
+      const ddd = num.slice(2, 4);
+      const rest = num.slice(4);
+      const half = Math.ceil(rest.length / 2);
+      return `+55 ${ddd} ${rest.slice(0, half)}-${rest.slice(half)}`;
+    }
+    return `+${num}`;
+  }
+  return key;
+}
+
 // initialsOf — pega 1-2 letras pro avatar fallback
 function initialsOf(name?: string, channelKey?: string): string {
   const source = (name || channelKey || "?").trim();
@@ -253,8 +283,20 @@ export function ConversationList({
         const status = STATUS_STYLES[conv.status] ?? STATUS_STYLES.open;
         const isSelected = selectedId === conv.id;
         const isGroup = isGroupChannelKey(conv.channel_key);
+        const isNewsletter = isNewsletterChannelKey(conv.channel_key);
         const href = getHref ? getHref(conv) : `/inbox/${conv.id}`;
-        const displayName = conv.contact?.name || conv.subject || conv.channel_key || "Contato";
+        // Prioridade: nome do contato → subject → JID formatado (newsletter
+        // vira 📢 Canal, número vira +55 11 ...). Antes mostrava JID cru
+        // tipo 5511...@s.whatsapp.net quando não tinha contato cadastrado.
+        const baseName =
+          conv.contact?.name ||
+          conv.subject ||
+          formatChannelKey(conv.channel_key);
+        // Newsletter sempre prefixado com 📢 pra diferenciar visualmente
+        // do chat 1-1 e grupos.
+        const displayName = isNewsletter && !baseName.startsWith("📢")
+          ? `📢 ${baseName}`
+          : baseName;
         const hasUnread = conv.agent_unread_count > 0;
         const rowInner = (
           <div
