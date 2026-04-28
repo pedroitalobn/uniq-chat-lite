@@ -172,8 +172,11 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nome é obrigatório"})
 	}
 
-	// Server is required
-	if req.ServerID == "" {
+	// Server é obrigatório só pros canais que rodam em VPS própria
+	// (whatsmeow, instagram, tiktok). WABA usa Cloud API da Meta direto,
+	// não tem servidor; idem outros canais cloud-only futuros.
+	channelNeedsServer := req.Channel != "waba"
+	if channelNeedsServer && req.ServerID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "server é obrigatório"})
 	}
 
