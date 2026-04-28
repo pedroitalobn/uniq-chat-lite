@@ -223,17 +223,12 @@ func (h *ConversationHandler) Count(c *fiber.Ctx) error {
 
 func (h *ConversationHandler) Get(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
-	id, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
-	}
-	var conv models.Conversation
-	if err := h.db.Preload("Contact").Preload("AssignedUser").
+	q := h.db.Preload("Contact").Preload("AssignedUser").
 		Preload("Instance", func(tx *gorm.DB) *gorm.DB {
 			return tx.Select("id, name, channel, phone_number")
-		}).
-		Where("workspace_id = ? AND id = ?", ws, id).
-		First(&conv).Error; err != nil {
+		})
+	conv, err := h.resolveConvByIDOrKey(c.Params("id"), ws, q)
+	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
 	}
 	// last_message_preview pode conter JSON com URL pública de mídia.
@@ -247,13 +242,11 @@ func (h *ConversationHandler) Get(c *fiber.Ctx) error {
 // chronological feed.
 func (h *ConversationHandler) Timeline(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
-	id, err := uuid.Parse(c.Params("id"))
+	conv, err := h.resolveConvByIDOrKey(c.Params("id"), ws, nil)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
 	}
-	if err := h.assertAccess(ws, id); err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
-	}
+	id := conv.ID
 
 	limit := atoiDefault(c.Query("limit"), 100)
 	if limit > 500 {
@@ -315,14 +308,13 @@ func (h *ConversationHandler) Timeline(c *fiber.Ctx) error {
 // Accepts: subject, priority, sub_status, is_archived, funnel_id, stage_id
 func (h *ConversationHandler) Patch(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
-	id, err := uuid.Parse(c.Params("id"))
+	convPtr, err := h.resolveConvByIDOrKey(c.Params("id"), ws, nil)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
-	}
-	var conv models.Conversation
-	if err := h.db.Where("workspace_id = ? AND id = ?", ws, id).First(&conv).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
 	}
+	conv := *convPtr
+	id := conv.ID
+	_ = id
 
 	var body struct {
 		Subject    *string `json:"subject"`
@@ -390,10 +382,11 @@ func (h *ConversationHandler) Patch(c *fiber.Ctx) error {
 //   - document: { type: "document", media_url, media_mime, filename? }
 func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
-	id, err := uuid.Parse(c.Params("id"))
+	convResolved, err := h.resolveConvByIDOrKey(c.Params("id"), ws, nil)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
 	}
+	id := convResolved.ID
 	var body struct {
 		Body               string           `json:"body"`
 		Type               string           `json:"type"`
@@ -1297,19 +1290,15 @@ func (h *ConversationHandler) GetMessageReceipts(c *fiber.Ctx) error {
 // implementa; outros canais viram no-op silencioso).
 func (h *ConversationHandler) Typing(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
-	id, err := uuid.Parse(c.Params("id"))
+	convPtr, err := h.resolveConvByIDOrKey(c.Params("id"), ws, h.db.Select("id, instance_id, channel_key, workspace_id"))
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
 	}
+	conv := *convPtr
 	var body struct {
 		Typing bool `json:"typing"`
 	}
 	c.BodyParser(&body)
-	var conv models.Conversation
-	if err := h.db.Select("instance_id, channel_key").
-		Where("workspace_id = ? AND id = ?", ws, id).First(&conv).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
-	}
 	if h.manager != nil {
 		if client := h.manager.GetInstance(conv.InstanceID.String()); client != nil && client.IsConnected() {
 			_ = client.SendTyping(conv.ChannelKey, body.Typing)
@@ -1328,13 +1317,11 @@ func truncate(s string, n int) string {
 // MarkRead POST /v1/conversations/:id/read
 func (h *ConversationHandler) MarkRead(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
-	id, err := uuid.Parse(c.Params("id"))
+	convPtr, err := h.resolveConvByIDOrKey(c.Params("id"), ws, nil)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
 	}
-	if err := h.assertAccess(ws, id); err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
-	}
+	id := convPtr.ID
 	h.db.Model(&models.Conversation{}).Where("id = ?", id).Updates(map[string]any{
 		"unread_count":       0,
 		"agent_unread_count": 0,
@@ -1347,13 +1334,11 @@ func (h *ConversationHandler) MarkRead(c *fiber.Ctx) error {
 // Reseta o agent_unread pra 1 (sinaliza atenção sem inflar contador).
 func (h *ConversationHandler) MarkUnread(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
-	id, err := uuid.Parse(c.Params("id"))
+	convPtr, err := h.resolveConvByIDOrKey(c.Params("id"), ws, nil)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
 	}
-	if err := h.assertAccess(ws, id); err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
-	}
+	id := convPtr.ID
 	h.db.Model(&models.Conversation{}).Where("id = ?", id).Update("agent_unread_count", 1)
 	h.broadcast(&models.Conversation{ID: id, WorkspaceID: ws}, "conversation.unread", map[string]any{"by_user_id": middleware.GetCurrentUserID(c), "at": time.Now()})
 	return c.JSON(fiber.Map{"ok": true})
@@ -1524,10 +1509,12 @@ func (h *ConversationHandler) Bulk(c *fiber.Ctx) error {
 // actor has tickets:view_all (supervisor reassignment).
 func (h *ConversationHandler) Assign(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
-	id, err := uuid.Parse(c.Params("id"))
+	convPtr, err := h.resolveConvByIDOrKey(c.Params("id"), ws, nil)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
 	}
+	conv := *convPtr
+	id := conv.ID
 	var body struct {
 		UserID string `json:"user_id"`
 	}
@@ -1539,12 +1526,6 @@ func (h *ConversationHandler) Assign(c *fiber.Ctx) error {
 		if u, err := uuid.Parse(body.UserID); err == nil {
 			target = u
 		}
-	}
-
-	// Fetch current state
-	var conv models.Conversation
-	if err := h.db.Where("workspace_id = ? AND id = ?", ws, id).First(&conv).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
 	}
 
 	prev := conv.AssignedUserID
@@ -2012,13 +1993,9 @@ func (h *ConversationHandler) findConversationForOutbound(ctx context.Context, w
 // We implement the M2M ad-hoc via a `conversation_tags` table auto-migrated
 // through AddTag's raw SQL to avoid a schema change here.
 func (h *ConversationHandler) AddTag(c *fiber.Ctx) error {
-	ws := middleware.GetWorkspaceID(c)
-	id, err := uuid.Parse(c.Params("id"))
+	id, ws, err := h.resolveIDOrKey(c)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
-	}
-	if err := h.assertAccess(ws, id); err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
 	}
 	var body struct{ TagID string `json:"tag_id"` }
 	c.BodyParser(&body)
@@ -2060,17 +2037,13 @@ func (h *ConversationHandler) AddTag(c *fiber.Ctx) error {
 
 // RemoveTag DELETE /v1/conversations/:id/tags/:tagId
 func (h *ConversationHandler) RemoveTag(c *fiber.Ctx) error {
-	ws := middleware.GetWorkspaceID(c)
-	id, err := uuid.Parse(c.Params("id"))
+	id, ws, err := h.resolveIDOrKey(c)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
 	}
 	tagID, err := uuid.Parse(c.Params("tagId"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "tagId inválido"})
-	}
-	if err := h.assertAccess(ws, id); err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
 	}
 	h.ensureConversationTagsTable()
 	h.db.Exec(`DELETE FROM conversation_tags WHERE conversation_id = ? AND tag_id = ?`, id, tagID)
@@ -2081,13 +2054,9 @@ func (h *ConversationHandler) RemoveTag(c *fiber.Ctx) error {
 
 // ListTags GET /v1/conversations/:id/tags
 func (h *ConversationHandler) ListTags(c *fiber.Ctx) error {
-	ws := middleware.GetWorkspaceID(c)
-	id, err := uuid.Parse(c.Params("id"))
+	id, _, err := h.resolveIDOrKey(c)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
-	}
-	if err := h.assertAccess(ws, id); err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
 	}
 	h.ensureConversationTagsTable()
 	var tags []models.Tag
@@ -2367,16 +2336,35 @@ func (h *ConversationHandler) assertAccess(workspaceID, id uuid.UUID) error {
 	return nil
 }
 
-func (h *ConversationHandler) setStatus(c *fiber.Ctx, status models.ConversationStatus, mutator func(*models.Conversation)) error {
+// resolveIDOrKey é o atalho pros endpoints que só precisam do UUID (não
+// da conv inteira). Tenta UUID; cai pra channel_key se falhar; valida
+// access via workspace.
+func (h *ConversationHandler) resolveIDOrKey(c *fiber.Ctx) (uuid.UUID, uuid.UUID, error) {
 	ws := middleware.GetWorkspaceID(c)
-	id, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	rawID := c.Params("id")
+	if id, err := uuid.Parse(rawID); err == nil {
+		if err := h.assertAccess(ws, id); err != nil {
+			return uuid.Nil, ws, err
+		}
+		return id, ws, nil
 	}
 	var conv models.Conversation
-	if err := h.db.Where("workspace_id = ? AND id = ?", ws, id).First(&conv).Error; err != nil {
+	if err := h.db.Select("id").
+		Where("workspace_id = ? AND channel_key = ?", ws, rawID).
+		Order("updated_at DESC").
+		First(&conv).Error; err != nil {
+		return uuid.Nil, ws, fiber.NewError(fiber.StatusNotFound, "atendimento não encontrado")
+	}
+	return conv.ID, ws, nil
+}
+
+func (h *ConversationHandler) setStatus(c *fiber.Ctx, status models.ConversationStatus, mutator func(*models.Conversation)) error {
+	ws := middleware.GetWorkspaceID(c)
+	convPtr, err := h.resolveConvByIDOrKey(c.Params("id"), ws, nil)
+	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
 	}
+	conv := *convPtr
 	prev := conv.Status
 	conv.Status = status
 	if mutator != nil {
@@ -2558,15 +2546,21 @@ func (h *ConversationHandler) populateReplyTo(ctx context.Context, messages []mo
 // conversa correspondente dentro do workspace. Útil pra integradores
 // externos (n8n, webhooks downstream) que recebem channel_key e não têm
 // o UUID interno do Uniq.
-func (h *ConversationHandler) resolveConvByIDOrKey(rawID string, ws uuid.UUID) (*models.Conversation, error) {
+//
+// O parâmetro opcional `q` permite passar uma query customizada com
+// preloads. Se nil, usa h.db direto.
+func (h *ConversationHandler) resolveConvByIDOrKey(rawID string, ws uuid.UUID, q *gorm.DB) (*models.Conversation, error) {
+	if q == nil {
+		q = h.db
+	}
 	var conv models.Conversation
 	if id, err := uuid.Parse(rawID); err == nil {
-		if err := h.db.Where("workspace_id = ? AND id = ?", ws, id).First(&conv).Error; err != nil {
+		if err := q.Where("workspace_id = ? AND id = ?", ws, id).First(&conv).Error; err != nil {
 			return nil, err
 		}
 		return &conv, nil
 	}
-	if err := h.db.Where("workspace_id = ? AND channel_key = ?", ws, rawID).
+	if err := q.Where("workspace_id = ? AND channel_key = ?", ws, rawID).
 		Order("updated_at DESC").
 		First(&conv).Error; err != nil {
 		return nil, err
