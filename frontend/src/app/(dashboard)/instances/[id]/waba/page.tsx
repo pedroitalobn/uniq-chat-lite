@@ -480,8 +480,19 @@ function TestSendSection({ instanceId }: { instanceId: string; wabaStatus?: stri
         toast.error("Número não registrado. Use o card '2. Register phone' acima com seu PIN 2FA antes de enviar.", { duration: 8000 });
       } else if (raw.includes("131056") || raw.includes("Pair not allowed")) {
         toast.error("Destinatário não está na lista de testes da Meta. Adicione em Meta Business → WhatsApp → API Setup → 'To'.", { duration: 8000 });
+      } else if (raw.includes("131058") || raw.includes("Hello World templates can only")) {
+        toast.error(
+          "hello_world só funciona em número de teste da Meta. Pro seu número, crie um template próprio (botão 'Criar template' acima) e aguarde aprovação.",
+          { duration: 10000 },
+        );
+      } else if (raw.includes("132001") || raw.includes("Template name does not exist")) {
+        toast.error("Template não existe nessa WABA ou está com nome/idioma errado.", { duration: 8000 });
       } else if (raw.includes("132000") || raw.includes("template")) {
         toast.error("Template inválido ou não aprovado pela Meta. Verifique nome/idioma exato.", { duration: 6000 });
+      } else if (raw.includes("131026") || raw.includes("Message undeliverable")) {
+        toast.error("Mensagem não entregue. Verifique se o destinatário tem WhatsApp ativo.", { duration: 6000 });
+      } else if (raw.includes("131051")) {
+        toast.error("Tipo de mensagem não suportado.", { duration: 6000 });
       } else {
         toast.error(raw || "Falha ao enviar");
       }
