@@ -86,14 +86,15 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 			Available   bool   `json:"available"`
 		}
 		channels := []channelInfo{
-			{ID: "whatsapp", Label: "WhatsApp", Color: "#25d366", Description: "Conecte números WhatsApp via QR ou código de pareamento", Available: true},
-			{ID: "instagram", Label: "Instagram", Color: "#e1306c", Description: "DMs, follow/unfollow, publicação de conteúdo", Available: true},
-			{ID: "tiktok", Label: "TikTok", Color: "#ff0050", Description: "DMs, scraping, follow/unfollow, interação com conteúdo", Available: false},
-			{ID: "facebook", Label: "Facebook", Color: "#1877f2", Description: "Gerencie mensagens do Facebook Messenger via Meta API", Available: false},
-			{ID: "telegram", Label: "Telegram", Color: "#229ed9", Description: "Crie bots e gerencie mensagens via Telegram Bot API", Available: false},
-			{ID: "linkedin", Label: "LinkedIn", Color: "#0a66c2", Description: "Automatize mensagens e InMails via LinkedIn API", Available: false},
-			{ID: "kwai", Label: "Kwai", Color: "#ff6600", Description: "Gerencie mensagens e interações via Kwai", Available: false},
+			{ID: "whatsapp", Label: "WhatsApp Business", Color: "#25d366", Description: "Não-oficial via QR ou código de pareamento (whatsmeow)", Available: true},
 			{ID: "waba", Label: "WhatsApp API", Color: "#0088ff", Description: "Cloud API oficial Meta (WABA) com Embedded Signup + templates HSM", Available: true},
+			{ID: "instagram", Label: "Instagram Profile", Color: "#e1306c", Description: "Login não-oficial — DMs, scraping, follow/unfollow", Available: true},
+			{ID: "instagram_api", Label: "Instagram API", Color: "#cc2366", Description: "Em breve — API oficial Meta (Messaging Graph API)", Available: false},
+			{ID: "tiktok", Label: "TikTok", Color: "#ff0050", Description: "DMs, scraping, follow/unfollow", Available: false},
+			{ID: "facebook", Label: "Facebook", Color: "#1877f2", Description: "Facebook Messenger via Meta API", Available: false},
+			{ID: "telegram", Label: "Telegram", Color: "#229ed9", Description: "Bots via Telegram Bot API", Available: false},
+			{ID: "linkedin", Label: "LinkedIn", Color: "#0a66c2", Description: "Mensagens via LinkedIn API", Available: false},
+			{ID: "kwai", Label: "Kwai", Color: "#ff6600", Description: "Mensagens via Kwai", Available: false},
 		}
 		return c.JSON(channels)
 	}
