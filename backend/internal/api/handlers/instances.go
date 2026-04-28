@@ -215,9 +215,9 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 		channel = models.ChannelWhatsApp
 	}
 	switch channel {
-	case models.ChannelWhatsApp, models.ChannelInstagram, models.ChannelTelegram, models.ChannelLinkedIn:
+	case models.ChannelWhatsApp, models.ChannelWABA, models.ChannelInstagram, models.ChannelTelegram, models.ChannelLinkedIn, models.ChannelTikTok, models.ChannelKwai:
 	default:
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "canal inválido: use whatsapp, instagram, telegram ou linkedin"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "canal inválido"})
 	}
 
 	instance := models.Instance{
