@@ -137,24 +137,15 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // Boxed (= /integrations style): max-w-7xl mx-auto centralizado.
+  // Aplicado via wrapper interno; pages dentro mantêm seu próprio padding.
   if (isBoxed) {
-    // Boxed: card surface-2 com radius. Sem max-w cap — usa toda largura
-    // disponível. Pages internas mantêm seu próprio padding (px-4..6 py-6),
-    // box só dá borda + radius + bg distinto pra delimitar visualmente.
     return (
       <main className="flex-1 overflow-hidden flex flex-col">
         <UsageBanner />
-        <div className="flex-1 px-3 sm:px-4 lg:px-6 py-3 lg:py-4 pt-16 lg:pt-4 overflow-hidden">
-          <div
-            className="rounded-2xl overflow-hidden h-full"
-            style={{
-              background: "var(--surface-1)",
-              border: "1px solid var(--surface-border)",
-            }}
-          >
-            <div className="h-full overflow-y-auto">
-              {children}
-            </div>
+        <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pt-16 lg:pt-8 overflow-y-auto">
+          <div className="max-w-7xl mx-auto">
+            {children}
           </div>
         </div>
       </main>

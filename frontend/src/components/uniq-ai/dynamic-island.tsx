@@ -197,26 +197,35 @@ export function UniqAIIsland() {
     setPrompt("");
   };
 
+  // Blueprint por estado — padrão cult-ui. Cada estado tem width/height
+  // explícitos; framer-motion `animate` interpola simétrico do centro.
+  const blueprint = {
+    idle:         { width: 220, height: 36 },
+    expanded:     { width: 560, height: 48 },
+    notification: { width: 520, height: 48 },
+    executing:    { width: 280, height: 36 },
+    result:       { width: 320, height: 36 },
+  } as const;
+  const target = blueprint[state.mode] ?? blueprint.idle;
+
   return (
     <motion.div
-      layout
-      transition={islandSpring}
       onClick={isExpanded || isNotif ? undefined : open}
       role={isExpanded || isNotif ? undefined : "button"}
       aria-label={isExpanded || isNotif ? undefined : "Abrir Uniq AI"}
-      className={`fixed top-3 z-[90] overflow-hidden ${
-        isExpanded
-          ? "w-[min(560px,calc(100vw-2rem))] h-12 rounded-full flex items-center gap-2 px-3 cursor-default"
-          : isNotif
-            ? "w-[min(520px,calc(100vw-2rem))] h-12 rounded-full flex items-center gap-2 px-3 cursor-default"
-            : "h-9 rounded-full flex items-center gap-2 px-3 cursor-pointer"
+      animate={{ width: target.width, height: target.height }}
+      transition={islandSpring}
+      className={`fixed top-3 z-[90] overflow-hidden rounded-full flex items-center gap-2 px-3 ${
+        isExpanded || isNotif ? "cursor-default" : "cursor-pointer"
       }`}
       style={{
-        // Centro da pill = centro do content area. CSS var --sidebar-w-offset
-        // setada pelo Sidebar (metade da largura do sidebar em desktop, 0 em
-        // mobile). transformX(-50%) faz crescer simétrico.
+        // Centro fixo: top-3 + left calculado via CSS var (sidebar offset).
+        // animate={{ width, height }} interpola SIMÉTRICO via spring.
+        // transform: translateX(-50%) mantém pivot no centro.
+        // maxWidth garante que mobile não estoura viewport.
         left: "calc(50% + var(--sidebar-w-offset, 0px))",
         transform: "translateX(-50%)",
+        maxWidth: "calc(100vw - 2rem)",
         background: "rgba(10, 12, 14, 0.94)",
         backdropFilter: "blur(12px)",
         border: "1px solid var(--border-default)",
