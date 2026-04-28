@@ -82,6 +82,7 @@ func (h *ShopHandler) GetShop(c *fiber.Ctx) error {
 	}
 	user := getUserFromCtx(c)
 	q := h.db.Where("id = ?", id)
+	bypass := false
 	// Super-admin: ignora workspace gate (suporte/admin precisa enxergar
 	// shops de qualquer workspace pra debug). User comum: filtra workspace.
 	if user == nil || user.Role != models.RoleSuperAdmin {
@@ -90,10 +91,27 @@ func (h *ShopHandler) GetShop(c *fiber.Ctx) error {
 			return err
 		}
 		q = q.Where("workspace_id = ?", wsID)
+	} else {
+		bypass = true
 	}
 	var shop models.Shop
 	if err := q.First(&shop).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "shop não encontrado"})
+		// Log diagnóstico: ajuda a entender 404s misteriosos quando
+		// shop existe mas o query não bate (RBAC mismatch, soft delete, etc).
+		userEmail := ""
+		userRole := ""
+		if user != nil {
+			userEmail = user.Email
+			userRole = string(user.Role)
+		}
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error":         "shop não encontrado",
+			"shop_id":       id.String(),
+			"super_bypass":  bypass,
+			"actor_email":   userEmail,
+			"actor_role":    userRole,
+			"workspace_hdr": c.Get("X-Workspace-ID"),
+		})
 	}
 	return c.JSON(shop)
 }
