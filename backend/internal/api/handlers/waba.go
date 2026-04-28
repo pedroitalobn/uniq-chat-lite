@@ -64,8 +64,9 @@ type MetaPhoneNumberResponse struct {
 	Data []struct {
 		DisplayNumber string `json:"display_phone_number"`
 		VerifiedName  string `json:"verified_name"`
-		CodeVerified  bool   `json:"code_verification_status"`
-		ID            string `json:"id"`
+		// Meta retorna string ("VERIFIED" / "NOT_VERIFIED" / "EXPIRED"), não bool
+		CodeVerificationStatus string `json:"code_verification_status"`
+		ID                     string `json:"id"`
 	} `json:"data"`
 }
 
@@ -193,7 +194,11 @@ func (h *WABAHandler) Callback(c *fiber.Ctx) error {
 	wabaInstance.AccessToken = tokenData.AccessToken
 	wabaInstance.Status = "active"
 	wabaInstance.VerifiedName = verifiedName
-	wabaInstance.CodeVerification = "VERIFIED"
+	if phoneNumber.CodeVerificationStatus != "" {
+		wabaInstance.CodeVerification = phoneNumber.CodeVerificationStatus
+	} else {
+		wabaInstance.CodeVerification = "VERIFIED"
+	}
 	if wabaErr != nil {
 		wabaInstance.ID = uuid.New()
 		h.db.Create(&wabaInstance)
