@@ -371,19 +371,66 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
   const [language, setLanguage] = useState("pt_BR");
   const [category, setCategory] = useState<"MARKETING" | "UTILITY" | "AUTHENTICATION">("UTILITY");
   const [bodyText, setBodyText] = useState("");
+  const [footerText, setFooterText] = useState("");
+  const [examples, setExamples] = useState<string[]>([]);
+
+  // Detecta variáveis {{1}}, {{2}}... no body — Meta exige array de exemplos
+  // pra revisão. Sem isso, retorna 400 'Body text contains variables but no
+  // examples were provided'.
+  const variables = Array.from(bodyText.matchAll(/\{\{(\d+)\}\}/g))
+    .map((m) => parseInt(m[1]))
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .sort((a, b) => a - b);
+
+  useEffect(() => {
+    setExamples((prev) => {
+      const next = variables.map((_, i) => prev[i] || "");
+      // só atualiza se realmente mudou (evita re-render desnecessário)
+      if (next.length !== prev.length || next.some((v, i) => v !== prev[i])) {
+        return next;
+      }
+      return prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variables.length]);
 
   const create = useMutation({
-    mutationFn: () => wabaApi.createTemplate(instanceId, {
-      name: name.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_"),
-      language,
-      category,
-      components: [{ type: "BODY", text: bodyText }],
-    }),
+    mutationFn: () => {
+      const components: Array<Record<string, unknown>> = [];
+
+      const bodyComp: Record<string, unknown> = { type: "BODY", text: bodyText };
+      if (variables.length > 0) {
+        bodyComp.example = { body_text: [examples] };
+      }
+      components.push(bodyComp);
+
+      if (footerText.trim()) {
+        components.push({ type: "FOOTER", text: footerText.trim() });
+      }
+
+      return wabaApi.createTemplate(instanceId, {
+        name: name.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+        language,
+        category,
+        components,
+      });
+    },
     onSuccess: () => {
-      toast.success("Template enviado pra aprovação Meta");
+      toast.success("Template enviado pra aprovação Meta — status PENDING (5min a 24h)");
       onCreated();
     },
-    onError: (e: any) => toast.error(e?.response?.data?.error || "Falha ao criar"),
+    onError: (e: any) => {
+      const raw = e?.response?.data?.error || "";
+      if (raw.includes("Body text contains variables but no examples")) {
+        toast.error("Preencha os exemplos pra cada variável {{N}} no body.", { duration: 8000 });
+      } else if (raw.includes("does not match")) {
+        toast.error("Nome inválido — use apenas letras minúsculas, números e _", { duration: 6000 });
+      } else if (raw.includes("already exists")) {
+        toast.error("Já existe um template com esse nome+idioma. Use outro nome ou exclua o anterior.", { duration: 8000 });
+      } else {
+        toast.error(raw || "Falha ao criar template");
+      }
+    },
   });
 
   return (
@@ -425,6 +472,65 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
               placeholder="Olá {{1}}, sua compra foi confirmada!"
               className="input-field w-full" />
           </div>
+
+          {variables.length > 0 && (
+            <div className="space-y-2 rounded-lg p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+              <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+                A Meta exige um exemplo pra cada variável detectada (usado na revisão):
+              </p>
+              {variables.map((n, i) => (
+                <div key={n} className="flex items-center gap-2">
+                  <code className="text-[11px] font-mono w-12" style={{ color: "var(--text-2)" }}>
+                    {`{{${n}}}`}
+                  </code>
+                  <input
+                    required
+                    value={examples[i] || ""}
+                    onChange={(e) => {
+                      const next = [...examples];
+                      next[i] = e.target.value;
+                      setExamples(next);
+                    }}
+                    placeholder={`Exemplo p/ var ${n}`}
+                    className="input-field flex-1 text-xs"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-2)" }}>
+              Footer (opcional, max 60 chars)
+            </label>
+            <input value={footerText}
+              maxLength={60}
+              onChange={(e) => setFooterText(e.target.value)}
+              placeholder="Uniq Chat • Atendimento 24/7"
+              className="input-field w-full" />
+          </div>
+
+          {/* Preview tipo WhatsApp */}
+          {bodyText && (
+            <div className="rounded-lg p-3" style={{ background: "#0b1f0e" }}>
+              <p className="text-[10px] uppercase mb-1" style={{ color: "rgba(255,255,255,0.5)" }}>
+                Preview
+              </p>
+              <div className="rounded-lg p-3 max-w-[280px]" style={{ background: "#1f2c34", color: "#e9edef" }}>
+                <p className="text-sm whitespace-pre-wrap">
+                  {bodyText.replace(/\{\{(\d+)\}\}/g, (_, n) => {
+                    const i = variables.indexOf(parseInt(n));
+                    return examples[i] || `[var ${n}]`;
+                  })}
+                </p>
+                {footerText && (
+                  <p className="text-[11px] mt-1.5" style={{ color: "rgba(255,255,255,0.5)" }}>
+                    {footerText}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose}
               className="text-xs px-3 py-2 rounded-lg"
