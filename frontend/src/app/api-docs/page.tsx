@@ -814,7 +814,34 @@ export default function ApiDocsPage() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-6 py-10 flex gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10 flex flex-col lg:flex-row gap-4 sm:gap-8">
+        {/* Mobile: section selector dropdown + search */}
+        <div className="lg:hidden space-y-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "hsl(240 8% 40%)" }} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar endpoint..."
+              className="w-full text-sm rounded-lg pl-9 pr-3 py-2 outline-none"
+              style={{ background: "hsl(240 8% 10%)", border: "1px solid hsl(240 8% 16%)", color: "hsl(240 8% 85%)" }}
+            />
+          </div>
+          <select
+            value={activeSection}
+            onChange={(e) => { setActiveSection(e.target.value); setActiveAnchor(null); }}
+            className="w-full text-sm rounded-lg px-3 py-2 outline-none"
+            style={{ background: "hsl(240 8% 10%)", border: "1px solid hsl(240 8% 16%)", color: "hsl(240 8% 85%)" }}
+          >
+            {SECTIONS.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.title} ({s.endpoints.length})
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Sidebar — Mintlify-style: 2 níveis (seção → endpoints), busca global */}
         <aside className="w-72 shrink-0 hidden lg:block">
           <div className="sticky top-24 space-y-3">

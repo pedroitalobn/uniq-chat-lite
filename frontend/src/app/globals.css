@@ -60,10 +60,10 @@
     --border-default: rgba(255, 255, 255, 0.10);
     --border-strong: rgba(255, 255, 255, 0.16);
 
-    /* Text levels */
-    --text-1: hsl(240 15% 96%);  /* primary (titles, labels emphasis) */
-    --text-2: hsl(240 8% 70%);   /* body */
-    --text-3: hsl(240 8% 52%);   /* secondary / hint */
+    /* Text levels — evita pure white pra reduzir contraste agressivo. */
+    --text-1: hsl(240 15% 90%);  /* primary (titles, labels emphasis) */
+    --text-2: hsl(240 8% 68%);   /* body */
+    --text-3: hsl(240 8% 50%);   /* secondary / hint */
     --text-4: hsl(240 8% 38%);   /* tertiary / placeholder */
 
     /* Semantic */

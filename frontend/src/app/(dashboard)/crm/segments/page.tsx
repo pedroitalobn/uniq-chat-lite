@@ -124,44 +124,46 @@ export default function CRMSegmentsPage() {
 
         <div className="space-y-2">
           {conds.map((c, idx) => (
-            <div key={c.id} className="flex items-center gap-2 rounded-lg p-2"
+            <div key={c.id} className="rounded-lg p-2"
               style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
-              {idx > 0 && (
-                <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded"
-                  style={{ background: "var(--green-soft)", color: "var(--green)" }}>
-                  {op === "and" ? "E" : "OU"}
-                </span>
-              )}
-              <select value={c.field}
-                onChange={(e) => updateCond(c.id, { field: e.target.value as Field, value: "" })}
-                className="input-field text-xs flex-shrink-0" style={{ minWidth: 240 }}>
-                {Array.from(new Set(FIELDS.map((f) => f.group))).map((g) => (
-                  <optgroup key={g} label={g}>
-                    {FIELDS.filter((f) => f.group === g).map((f) => (
-                      <option key={f.value} value={f.value}>{f.label}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                {idx > 0 && (
+                  <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded shrink-0"
+                    style={{ background: "var(--green-soft)", color: "var(--green)" }}>
+                    {op === "and" ? "E" : "OU"}
+                  </span>
+                )}
+                <select value={c.field}
+                  onChange={(e) => updateCond(c.id, { field: e.target.value as Field, value: "" })}
+                  className="input-field text-xs flex-1 min-w-0 sm:flex-none sm:w-60">
+                  {Array.from(new Set(FIELDS.map((f) => f.group))).map((g) => (
+                    <optgroup key={g} label={g}>
+                      {FIELDS.filter((f) => f.group === g).map((f) => (
+                        <option key={f.value} value={f.value}>{f.label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
 
-              {FIELD_BY[c.field].type === "boolean" ? (
-                <span className="text-xs" style={{ color: "var(--text-3)" }}>
-                  (true)
-                </span>
-              ) : (
-                <input
-                  type={FIELD_BY[c.field].type === "number" ? "number" : FIELD_BY[c.field].type === "date" ? "date" : "text"}
-                  value={c.value}
-                  onChange={(e) => updateCond(c.id, { value: e.target.value })}
-                  placeholder="valor"
-                  className="input-field text-xs flex-1"
-                />
-              )}
-              <button onClick={() => removeCond(c.id)} disabled={conds.length === 1}
-                className="p-1.5 rounded-md disabled:opacity-30" style={{ color: "#f87171" }}
-                title="Remover condição">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+                {FIELD_BY[c.field].type === "boolean" ? (
+                  <span className="text-xs" style={{ color: "var(--text-3)" }}>
+                    (true)
+                  </span>
+                ) : (
+                  <input
+                    type={FIELD_BY[c.field].type === "number" ? "number" : FIELD_BY[c.field].type === "date" ? "date" : "text"}
+                    value={c.value}
+                    onChange={(e) => updateCond(c.id, { value: e.target.value })}
+                    placeholder="valor"
+                    className="input-field text-xs flex-1 min-w-0"
+                  />
+                )}
+                <button onClick={() => removeCond(c.id)} disabled={conds.length === 1}
+                  className="p-1.5 rounded-md disabled:opacity-30 shrink-0" style={{ color: "#f87171" }}
+                  title="Remover condição">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           ))}
         </div>

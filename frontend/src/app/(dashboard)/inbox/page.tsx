@@ -409,7 +409,8 @@ export default function InboxPage() {
           </div>
 
           {viewMode === "conversations" && (
-          <div className="ml-auto flex flex-wrap items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-1.5 sm:gap-2 max-w-full overflow-x-auto"
+            style={{ maxWidth: "min(100%, 640px)" }}>
             <GlobalSearchButton wsId={wsId} />
             <button
               type="button"
@@ -454,34 +455,39 @@ export default function InboxPage() {
               currentLabel={agentLabel}
             />
 
-            {/* Channels (multi) */}
-            <MultiSelectDropdown
-              icon={<Radio className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />}
-              label={channelLabel}
-              items={availableChannels.map((c) => ({
-                id: c.id,
-                label: c.label,
-                hint: c.color,
-              }))}
-              selected={channelFilter}
-              onChange={setChannelFilter}
-              emptyMsg="Nenhum canal disponível"
-            />
+            {/* Channels (multi) — esconde em mobile pra economizar largura.
+                User abre via "Mais filtros" (futuro) ou usa /inbox direto. */}
+            <div className="hidden sm:block">
+              <MultiSelectDropdown
+                icon={<Radio className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />}
+                label={channelLabel}
+                items={availableChannels.map((c) => ({
+                  id: c.id,
+                  label: c.label,
+                  hint: c.color,
+                }))}
+                selected={channelFilter}
+                onChange={setChannelFilter}
+                emptyMsg="Nenhum canal disponível"
+              />
+            </div>
 
-            {/* Instances (multi) */}
-            <MultiSelectDropdown
-              icon={<Smartphone className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />}
-              label={instanceLabel}
-              items={connectedInstances.map((inst) => ({
-                id: inst.id,
-                label: inst.name,
-                hint: inst.phone_number || inst.channel,
-                sub: inst.channel,
-              }))}
-              selected={instanceFilter}
-              onChange={setInstanceFilter}
-              emptyMsg="Nenhuma instância conectada"
-            />
+            {/* Instances (multi) — idem channels, hidden em xs */}
+            <div className="hidden sm:block">
+              <MultiSelectDropdown
+                icon={<Smartphone className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />}
+                label={instanceLabel}
+                items={connectedInstances.map((inst) => ({
+                  id: inst.id,
+                  label: inst.name,
+                  hint: inst.phone_number || inst.channel,
+                  sub: inst.channel,
+                }))}
+                selected={instanceFilter}
+                onChange={setInstanceFilter}
+                emptyMsg="Nenhuma instância conectada"
+              />
+            </div>
 
             {/* Queue */}
             <SingleSelectDropdown
