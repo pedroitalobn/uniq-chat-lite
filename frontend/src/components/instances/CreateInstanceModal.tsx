@@ -107,7 +107,35 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
 
   const handleCreate = async () => {
     if (isWABA) {
-      window.location.href = "/instances/new-waba";
+      if (!name.trim()) {
+        toast.error("Dê um nome à instância antes de continuar");
+        return;
+      }
+      setCreating(true);
+      try {
+        // Cria shell de instância WABA em estado disconnected — fica na lista
+        // mesmo se user desistir do Embedded Signup. O Connect na página da
+        // instância completa o fluxo (atualiza esta mesma instância).
+        const resp = await instancesApi.create(
+          name.trim(),
+          "waba",
+          undefined,
+          undefined,
+          workspaceId,
+        );
+        const newId = resp?.data?.id as string | undefined;
+        if (!newId) throw new Error("falha ao criar instância");
+        toast.success("Instância criada — agora conecte ao WhatsApp API");
+        reset();
+        onCreated();
+        onClose();
+        window.location.href = `/instances/${newId}/waba`;
+      } catch (err) {
+        const e = err as { response?: { data?: { error?: string } }; message?: string };
+        toast.error(e?.response?.data?.error || e?.message || "Erro ao criar instância");
+      } finally {
+        setCreating(false);
+      }
       return;
     }
 

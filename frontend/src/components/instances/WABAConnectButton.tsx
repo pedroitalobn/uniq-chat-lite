@@ -19,6 +19,7 @@ declare global {
 
 interface Props {
   className?: string;
+  instanceId?: string;
 }
 
 const META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID || "";
@@ -34,7 +35,7 @@ interface SessionInfo {
   };
 }
 
-export function WABAConnectButton({ className }: Props) {
+export function WABAConnectButton({ className, instanceId }: Props) {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -99,6 +100,11 @@ export function WABAConnectButton({ className }: Props) {
       }),
     );
 
+    // state codifica o instance_id pra qual a WABA deve ser vinculada.
+    // OAuth state é devolvido pela Meta no redirect → /api/waba/callback
+    // → backend usa pra atualizar a instance existente em vez de criar nova.
+    const state = instanceId ? encodeURIComponent(`instance:${instanceId}`) : "";
+
     const authUrl =
       `https://www.facebook.com/v18.0/dialog/oauth` +
       `?client_id=${META_APP_ID}` +
@@ -107,7 +113,8 @@ export function WABAConnectButton({ className }: Props) {
       `&config_id=${META_CONFIG_ID}` +
       `&override_default_response_type=true` +
       `&display=popup` +
-      `&extras=${extras}`;
+      `&extras=${extras}` +
+      (state ? `&state=${state}` : "");
 
     // Popup centralizado — dimensões explícitas evitam fallback pra aba
     const w = 600;

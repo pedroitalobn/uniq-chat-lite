@@ -6,9 +6,14 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(req: NextRequest) {
   const { searchParams, origin } = new URL(req.url);
   const code = searchParams.get("code");
+  const state = searchParams.get("state") || "";
   const error = searchParams.get("error");
   const errorReason = searchParams.get("error_reason");
   const errorDescription = searchParams.get("error_description");
+
+  // state vem como "instance:<uuid>" — extrai instanceId pra atualizar
+  // a WABA existente em vez de criar uma nova.
+  const stateInstanceId = state.startsWith("instance:") ? state.slice(9) : "";
 
   if (error) {
     const params = new URLSearchParams({
@@ -34,7 +39,7 @@ export async function GET(req: NextRequest) {
         "Content-Type": "application/json",
         cookie: cookieHeader,
       },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, instance_id: stateInstanceId || undefined }),
     });
 
     if (!res.ok) {

@@ -93,7 +93,19 @@ func (h *WABAHandler) GetAuthURL(c *fiber.Ctx) error {
 }
 
 func (h *WABAHandler) Callback(c *fiber.Ctx) error {
+	// Aceita code via query (legado) OU body (rota nova do frontend route handler)
 	code := c.Query("code")
+	var existingInstanceID string
+	if code == "" {
+		var body struct {
+			Code       string `json:"code"`
+			InstanceID string `json:"instance_id"`
+		}
+		if err := c.BodyParser(&body); err == nil {
+			code = body.Code
+			existingInstanceID = body.InstanceID
+		}
+	}
 	if code == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "code is required"})
 	}
@@ -130,30 +142,54 @@ func (h *WABAHandler) Callback(c *fiber.Ctx) error {
 
 	workspaceID, _ := c.Locals("workspace_id").(*uuid.UUID)
 
-	instanceID := uuid.New()
-	instance := models.Instance{
-		ID:          instanceID,
-		UserID:      userID,
-		WorkspaceID: workspaceID,
-		Name:        verifiedName + " - WABA",
-		Channel:     models.ChannelWABA,
-		PhoneNumber: phoneNumber.DisplayNumber,
-		Status:      models.StatusConnected,
+	// Se veio instance_id do state OAuth, atualiza a shell-instance criada
+	// pelo modal "Criar instância" (que estava em status disconnected).
+	// Caso contrário, cria nova instância (legado / fluxo direto).
+	var instanceID uuid.UUID
+	if existingInstanceID != "" {
+		parsed, err := uuid.Parse(existingInstanceID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid instance_id"})
+		}
+		var existing models.Instance
+		if err := h.db.Where("id = ? AND user_id = ?", parsed, userID).First(&existing).Error; err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instance not found"})
+		}
+		existing.PhoneNumber = phoneNumber.DisplayNumber
+		existing.Status = models.StatusConnected
+		h.db.Save(&existing)
+		instanceID = existing.ID
+	} else {
+		instanceID = uuid.New()
+		instance := models.Instance{
+			ID:          instanceID,
+			UserID:      userID,
+			WorkspaceID: workspaceID,
+			Name:        verifiedName + " - WABA",
+			Channel:     models.ChannelWABA,
+			PhoneNumber: phoneNumber.DisplayNumber,
+			Status:      models.StatusConnected,
+		}
+		h.db.Create(&instance)
 	}
-	h.db.Create(&instance)
 
-	wabaInstance := models.WABAInstance{
-		ID:               uuid.New(),
-		InstanceID:       instanceID,
-		WABABusinessID:   wabaData.Businesses[0].BusinessID,
-		PhoneNumberID:    phoneNumberID,
-		PhoneNumber:      phoneNumber.DisplayNumber,
-		AccessToken:      tokenData.AccessToken,
-		Status:           "active",
-		VerifiedName:     verifiedName,
-		CodeVerification: "VERIFIED",
+	// Upsert WABAInstance pra essa instance_id
+	var wabaInstance models.WABAInstance
+	wabaErr := h.db.Where("instance_id = ?", instanceID).First(&wabaInstance).Error
+	wabaInstance.InstanceID = instanceID
+	wabaInstance.WABABusinessID = wabaData.Businesses[0].BusinessID
+	wabaInstance.PhoneNumberID = phoneNumberID
+	wabaInstance.PhoneNumber = phoneNumber.DisplayNumber
+	wabaInstance.AccessToken = tokenData.AccessToken
+	wabaInstance.Status = "active"
+	wabaInstance.VerifiedName = verifiedName
+	wabaInstance.CodeVerification = "VERIFIED"
+	if wabaErr != nil {
+		wabaInstance.ID = uuid.New()
+		h.db.Create(&wabaInstance)
+	} else {
+		h.db.Save(&wabaInstance)
 	}
-	h.db.Create(&wabaInstance)
 
 	// Tech Provider flow exige chamar /subscribed_apps no WABA pra Meta
 	// começar a entregar webhooks. Best-effort: log o erro mas não falha o

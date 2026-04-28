@@ -19,6 +19,7 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 import { wabaApi } from "@/lib/api";
+import { WABAConnectButton } from "@/components/instances/WABAConnectButton";
 
 interface WABAData {
   id: string;
@@ -77,8 +78,38 @@ export default function WABAManagePage({ params }: { params: Promise<{ id: strin
 
   if (!waba) {
     return (
-      <div className="text-center py-12">
-        <p className="text-sm" style={{ color: "var(--text-3)" }}>WABA não configurado para essa instância.</p>
+      <div className="space-y-5 px-4 sm:px-6 py-6 lg:py-8 max-w-2xl mx-auto">
+        <Link href="/instances"
+          className="inline-flex items-center gap-1.5 text-xs"
+          style={{ color: "var(--text-3)" }}>
+          <ArrowLeft className="w-3.5 h-3.5" /> Voltar para instâncias
+        </Link>
+
+        <div>
+          <h1 className="text-xl font-medium mb-1" style={{ color: "var(--text-1)" }}>
+            Conectar WhatsApp API
+          </h1>
+          <p className="text-sm" style={{ color: "var(--text-3)" }}>
+            Faça o Embedded Signup com a Meta para vincular sua conta WhatsApp
+            Business e número de telefone a esta instância.
+          </p>
+        </div>
+
+        <div className="rounded-2xl p-6"
+          style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+          <WABAConnectButton instanceId={id} />
+        </div>
+
+        <div className="rounded-xl p-4 text-xs leading-relaxed space-y-1.5"
+          style={{ background: "var(--surface-2)", border: "1px dashed var(--surface-border)", color: "var(--text-3)" }}>
+          <p className="font-medium" style={{ color: "var(--text-2)" }}>
+            O que vai acontecer:
+          </p>
+          <p>1. Popup da Meta abre — login Facebook + seleciona Business Manager</p>
+          <p>2. Cria/seleciona conta WhatsApp Business e número de telefone</p>
+          <p>3. Verifica número via SMS/voz e define PIN 2FA</p>
+          <p>4. Esta instância passa para status &quot;Conectada&quot;</p>
+        </div>
       </div>
     );
   }
