@@ -56,6 +56,7 @@ var reservedV1Namespaces = map[string]bool{
 	"tags":                true,
 	"teams":               true,
 	"triggers":            true,
+	"waba":                true,
 	"warmup":              true,
 	"webhook-config":      true,
 	"webhooks":            true,
