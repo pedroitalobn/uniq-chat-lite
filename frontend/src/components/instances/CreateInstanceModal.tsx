@@ -105,9 +105,12 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
 
   const availableChannels = channels || FALLBACK_CHANNELS(isBeta);
 
+  // Servers filtrados por workspace — sem o param o backend devolve servers
+  // de TODOS os workspaces do user, e o usuário poderia atachar server
+  // de outro workspace na instância.
   const { data: servers = [] } = useQuery<ServerType[]>({
-    queryKey: ["servers"],
-    queryFn: () => serversApi.list().then((r) => r.data),
+    queryKey: ["servers", workspaceId],
+    queryFn: () => serversApi.list(workspaceId).then((r) => r.data),
     enabled: open && step === "config",
   });
 

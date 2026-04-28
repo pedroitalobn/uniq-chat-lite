@@ -220,14 +220,38 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 		}
 	}
 
-	// Check plan limits
-	if user.Plan != nil && !user.Plan.IsUnlimitedInstances() {
+	// Check plan limits — membros de workspace herdam o plano do DONO do
+	// workspace, não usam o próprio. Antes, um admin/membro com plano free
+	// criando instância no workspace de um owner com plano Pro caía no
+	// limite do free e era bloqueado. Agora resolve owner da workspace e
+	// aplica o plano dele; sem workspace, cai pro plano do user direto.
+	planOwnerID := user.ID
+	planOwnerPlan := user.Plan
+	if wsUUID != nil {
+		var ws models.Workspace
+		if err := h.db.Preload("Owner.Plan").First(&ws, "id = ?", *wsUUID).Error; err == nil {
+			planOwnerID = ws.OwnerID
+			if ws.Owner != nil && ws.Owner.Plan != nil {
+				planOwnerPlan = ws.Owner.Plan
+			}
+		}
+	}
+
+	if planOwnerPlan != nil && !planOwnerPlan.IsUnlimitedInstances() {
 		var count int64
-		h.db.Model(&models.Instance{}).Where("user_id = ?", user.ID).Count(&count)
-		if int(count) >= user.Plan.MaxInstances {
+		// Conta TODAS as instâncias dos workspaces do owner (criadas por
+		// qualquer membro). Sem isso, members criavam instâncias com seus
+		// user_id pessoais e não eram contabilizadas no limite do workspace.
+		h.db.Model(&models.Instance{}).
+			Where(
+				"workspace_id IN (SELECT id FROM workspaces WHERE owner_id = ?) OR (workspace_id IS NULL AND user_id = ?)",
+				planOwnerID, planOwnerID,
+			).
+			Count(&count)
+		if int(count) >= planOwnerPlan.MaxInstances {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"error": "limite de instâncias atingido para o seu plano",
-				"limit": user.Plan.MaxInstances,
+				"error": "limite de instâncias atingido para o plano do workspace",
+				"limit": planOwnerPlan.MaxInstances,
 			})
 		}
 	}
@@ -252,16 +276,26 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 
 	log.Debug().Str("user", user.ID.String()).Str("name", req.Name).Msg("creating new instance with status=disconnected")
 
-	// Link to server if provided (and accessible by user)
+	// Link to server if provided. Validação ESTRITA por workspace:
+	// server precisa pertencer ao MESMO workspace que a instância (ou ter
+	// workspace_id NULL, caso legado/global). Antes aceitava também
+	// "server_user_id == user_id" — o que permitia o user usar server de
+	// outro workspace dele mesmo (vazamento entre workspaces).
 	if req.ServerID != "" {
 		if sid, err := uuid.Parse(req.ServerID); err == nil {
 			var srv models.Server
-			// Check server ownership OR workspace membership
 			if h.db.First(&srv, "id = ?", sid).Error == nil {
-				// Server must be in same workspace or owned by user
-				if srv.UserID == user.ID || (srv.WorkspaceID != nil && wsUUID != nil && *srv.WorkspaceID == *wsUUID) {
+				sameWS := wsUUID != nil && srv.WorkspaceID != nil && *srv.WorkspaceID == *wsUUID
+				legacyGlobal := srv.WorkspaceID == nil && srv.UserID == user.ID
+				if sameWS || legacyGlobal {
 					instance.ServerID = &sid
+				} else {
+					return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+						"error": "server pertence a outro workspace",
+					})
 				}
+			} else {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "server não encontrado"})
 			}
 		}
 	}
