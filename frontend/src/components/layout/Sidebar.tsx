@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
-  Bot, Building2, Calendar, ChevronDown, Contact, CreditCard, Globe, Hash, HelpCircle, Home,
+  Bot, Building2, Calendar, ChevronDown, ChevronLeft, ChevronRight, Contact,
+  CreditCard, Globe, Hash, HelpCircle, Home,
   Info, KanbanSquare, Layers, LayoutDashboard, Link2, List, Loader2, LogOut,
   Mail, MapPin, Megaphone, Menu, MessageSquare, Minus, MoreHorizontal,
   MoreVertical, Phone, Plug, Plus, Search, Send, Settings, Shield, Smartphone,
@@ -26,6 +27,37 @@ export function Sidebar() {
   const { t } = usePreferences();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  // Collapsed state — persistido em localStorage. Sidebar fica w-14 (só
+  // ícones), centro do conteúdo passa a coincidir com viewport.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    const saved = typeof window !== "undefined" ? localStorage.getItem("uniq-sidebar-collapsed") : null;
+    if (saved === "true") setCollapsed(true);
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("uniq-sidebar-collapsed", collapsed ? "true" : "false");
+    // CSS vars pra outros componentes lerem (Dynamic Island, etc.):
+    // --sidebar-w-offset = metade da largura, usada pra centralizar
+    // a Dynamic Island no content area. Em mobile zeramos via JS quando
+    // viewport < lg breakpoint (sidebar vira drawer, fora do flow).
+    const isLg = window.matchMedia("(min-width: 1024px)").matches;
+    const half = isLg ? (collapsed ? "1.75rem" : "7rem") : "0px";
+    document.documentElement.style.setProperty("--sidebar-w", collapsed ? "3.5rem" : "14rem");
+    document.documentElement.style.setProperty("--sidebar-w-offset", half);
+  }, [collapsed]);
+
+  // Re-set offset quando viewport muda (mobile <-> desktop).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => {
+      const half = mq.matches ? (collapsed ? "1.75rem" : "7rem") : "0px";
+      document.documentElement.style.setProperty("--sidebar-w-offset", half);
+    };
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, [collapsed]);
   const { currentWorkspace, setCurrentWorkspace, workspaces } = useWorkspace();
   // Cor + ícone do workspace atual (com fallbacks). Defaults:
   // roxo (#7c3aed) e Building2 — aplicados quando o user ainda
@@ -110,13 +142,22 @@ export function Sidebar() {
   const closeMobile = () => setMobileOpen(false);
 
   const sidebarContent = (
-    <aside className="w-56 flex flex-col h-full border-r shrink-0"
+    <aside className={cn("flex flex-col h-full border-r shrink-0 transition-[width] duration-200",
+      collapsed ? "w-14" : "w-56")}
       style={{ background: "var(--sidebar-bg)", borderColor: "var(--sidebar-border)" }}>
 
-      {/* Logo */}
-      <div className="flex items-center justify-between px-4 h-14 border-b"
+      {/* Logo + toggle */}
+      <div className="flex items-center justify-between px-3 h-14 border-b"
         style={{ borderColor: "var(--sidebar-border)" }}>
-        <Logo height={38} />
+        {!collapsed && <Logo height={38} />}
+        <button
+          onClick={() => setCollapsed((c) => !c)}
+          className="hidden lg:flex p-1.5 rounded-lg transition-colors hover:bg-white/5"
+          style={{ color: "var(--text-3)", marginLeft: collapsed ? "auto" : 0, marginRight: collapsed ? "auto" : 0 }}
+          title={collapsed ? "Expandir menu" : "Recolher menu"}
+        >
+          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
         <button
           onClick={closeMobile}
           className="lg:hidden p-1 rounded-lg transition-colors"
@@ -126,7 +167,8 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Workspace info */}
+      {/* Workspace info — escondido em modo colapsado pra economizar espaço */}
+      {!collapsed && (
       <div className="px-3 py-3 border-b" style={{ borderColor: "var(--sidebar-border)" }}>
         <div className="flex items-center gap-2 mb-2">
           <button
@@ -179,17 +221,20 @@ export function Sidebar() {
           Gerenciar workspaces
         </button>
       </div>
+      )}
 
       {/* Nav */}
-      <nav className="flex-1 px-2.5 py-3 space-y-0.5 overflow-y-auto">
+      <nav className={cn("flex-1 py-3 space-y-0.5 overflow-y-auto", collapsed ? "px-1.5" : "px-2.5")}>
         {visibleNavItems.map((item) => {
           const active = item.exact
             ? pathname === item.href
             : pathname === item.href || pathname.startsWith(item.href + "/");
           return (
             <Link key={item.href} href={item.href} onClick={closeMobile}
+              title={collapsed ? item.label : undefined}
               className={cn(
-                "group relative flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150",
+                "group relative flex items-center rounded-xl text-sm font-medium transition-all duration-150",
+                collapsed ? "justify-center px-2 py-2" : "gap-2.5 px-3 py-2",
                 active ? "text-white" : "hover:opacity-80"
               )}
               style={active
@@ -200,8 +245,8 @@ export function Sidebar() {
             >
               <item.icon className="w-4 h-4 flex-shrink-0 transition-colors"
                 style={active ? { color: "var(--green)" } : undefined} />
-              <span>{item.label}</span>
-              {active && (
+              {!collapsed && <span>{item.label}</span>}
+              {!collapsed && active && (
                 <span className="ml-auto w-1.5 h-1.5 rounded-full"
                   style={{ background: "var(--green)", boxShadow: "0 0 6px var(--green)" }} />
               )}

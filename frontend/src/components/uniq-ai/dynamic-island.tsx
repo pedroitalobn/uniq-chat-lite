@@ -204,7 +204,7 @@ export function UniqAIIsland() {
       onClick={isExpanded || isNotif ? undefined : open}
       role={isExpanded || isNotif ? undefined : "button"}
       aria-label={isExpanded || isNotif ? undefined : "Abrir Uniq AI"}
-      className={`fixed top-3 left-1/2 lg:left-[calc(50%+7rem)] -translate-x-1/2 z-[90] overflow-hidden ${
+      className={`fixed top-3 z-[90] overflow-hidden ${
         isExpanded
           ? "w-[min(560px,calc(100vw-2rem))] h-12 rounded-full flex items-center gap-2 px-3 cursor-default"
           : isNotif
@@ -212,6 +212,11 @@ export function UniqAIIsland() {
             : "h-9 rounded-full flex items-center gap-2 px-3 cursor-pointer"
       }`}
       style={{
+        // Centro da pill = centro do content area. CSS var --sidebar-w-offset
+        // setada pelo Sidebar (metade da largura do sidebar em desktop, 0 em
+        // mobile). transformX(-50%) faz crescer simétrico.
+        left: "calc(50% + var(--sidebar-w-offset, 0px))",
+        transform: "translateX(-50%)",
         background: "rgba(10, 12, 14, 0.94)",
         backdropFilter: "blur(12px)",
         border: "1px solid var(--border-default)",
