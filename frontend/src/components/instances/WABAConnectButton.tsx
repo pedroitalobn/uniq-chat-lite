@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import wabaApi from "@/lib/waba-api";
 import { Loader2, MessageCircle, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -37,6 +37,7 @@ interface SessionInfo {
 
 export function WABAConnectButton({ className, instanceId }: Props) {
   const router = useRouter();
+  const qc = useQueryClient();
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
   const popupRef = useRef<Window | null>(null);
@@ -92,8 +93,20 @@ export function WABAConnectButton({ className, instanceId }: Props) {
           if (payload.status === "success") {
             setStatus("success");
             toast.success("WhatsApp API conectado!");
-            const target = payload.instance_id
-              ? `/instances/${payload.instance_id}/waba?waba_connected=1`
+
+            // Invalida caches relevantes pra UI re-renderizar com dados frescos:
+            //   - waba detail (manager page) — pode passar de connected:false → dados completos
+            //   - instances list — status muda pra connected
+            //   - instance detail
+            const id = payload.instance_id;
+            if (id) {
+              qc.invalidateQueries({ queryKey: ["waba", id] });
+              qc.invalidateQueries({ queryKey: ["instance", id] });
+            }
+            qc.invalidateQueries({ queryKey: ["instances"] });
+
+            const target = id
+              ? `/instances/${id}/waba?waba_connected=1`
               : "/instances?waba_connected=1";
             router.push(target);
             router.refresh();
@@ -107,7 +120,7 @@ export function WABAConnectButton({ className, instanceId }: Props) {
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [router]);
+  }, [router, qc]);
 
   const handleConnect = () => {
     setStatus("loading");

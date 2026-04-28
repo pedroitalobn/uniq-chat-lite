@@ -11,8 +11,9 @@
 //      no app WhatsApp do destinatário.
 //   2. whatsapp_business_management → "Criar template" cria HSM novo.
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, CheckCircle2, Loader2, Phone, Plus, Send, Trash2, Webhook, Sparkles, AlertCircle, Copy,
 } from "lucide-react";
@@ -43,6 +44,21 @@ interface Template {
 export default function WABAManagePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const qc = useQueryClient();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Quando voltamos do callback OAuth com ?waba_connected=1 pode ser que
+  // ainda tenhamos cache stale de connected:false. Invalida e limpa o param.
+  useEffect(() => {
+    if (searchParams.get("waba_connected") === "1") {
+      qc.invalidateQueries({ queryKey: ["waba", id] });
+      qc.invalidateQueries({ queryKey: ["instance", id] });
+      qc.invalidateQueries({ queryKey: ["instances"] });
+      toast.success("WhatsApp API conectado!");
+      router.replace(`/instances/${id}/waba`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   const { data: wabaResp, isLoading } = useQuery<WABAData | { connected: false; instance_id: string }>({
     queryKey: ["waba", id],
