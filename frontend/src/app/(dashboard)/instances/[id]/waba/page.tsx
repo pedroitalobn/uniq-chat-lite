@@ -15,11 +15,11 @@ import { use, useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
-  ArrowLeft, CheckCircle2, Loader2, Phone, Plus, Send, Trash2, Webhook, Sparkles, AlertCircle, Copy,
+  ArrowLeft, CheckCircle2, Loader2, Phone, Plus, Send, Trash2, Webhook, Sparkles, AlertCircle, Copy, Pencil, Check, X,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { wabaApi } from "@/lib/api";
+import { wabaApi, instancesApi } from "@/lib/api";
 import { WABAConnectButton } from "@/components/instances/WABAConnectButton";
 
 interface WABAData {
@@ -148,14 +148,12 @@ export default function WABAManagePage({ params }: { params: Promise<{ id: strin
 
       {/* Header */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-xl font-medium" style={{ color: "var(--text-1)" }}>
-              WhatsApp API
-            </h1>
-            <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <EditableInstanceName instanceId={id} />
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0"
               style={{ background: "rgba(0,136,255,0.12)", color: "#0088ff" }}>
-              CLOUD API OFICIAL META
+              WABA
             </span>
           </div>
           <p className="text-xs" style={{ color: "var(--text-3)" }}>
@@ -163,7 +161,7 @@ export default function WABAManagePage({ params }: { params: Promise<{ id: strin
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <ReconnectButton instanceId={id} />
         </div>
       </div>
@@ -738,6 +736,74 @@ function TestSendSection({ instanceId, templates = [] }: {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// Edição inline do nome da instância. Click no Pencil → input + Check/X.
+function EditableInstanceName({ instanceId }: { instanceId: string }) {
+  const qc = useQueryClient();
+  const { data: inst } = useQuery<{ id: string; name: string }>({
+    queryKey: ["instance", instanceId],
+    queryFn: () => instancesApi.get(instanceId).then((r) => r.data),
+  });
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const save = useMutation({
+    mutationFn: () => instancesApi.update(instanceId, { name: draft.trim() }),
+    onSuccess: () => {
+      toast.success("Nome atualizado");
+      qc.invalidateQueries({ queryKey: ["instance", instanceId] });
+      qc.invalidateQueries({ queryKey: ["instances"] });
+      setEditing(false);
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Falha ao renomear"),
+  });
+
+  if (!inst) {
+    return <h1 className="text-xl font-medium" style={{ color: "var(--text-1)" }}>WhatsApp API</h1>;
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") save.mutate();
+            if (e.key === "Escape") setEditing(false);
+          }}
+          maxLength={80}
+          className="text-xl font-medium bg-transparent border-b outline-none px-1"
+          style={{ color: "var(--text-1)", borderColor: "var(--green)" }}
+        />
+        <button onClick={() => save.mutate()} disabled={save.isPending || !draft.trim()}
+          className="rounded p-1 disabled:opacity-50" style={{ color: "var(--green)" }}>
+          {save.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+        </button>
+        <button onClick={() => setEditing(false)}
+          className="rounded p-1" style={{ color: "var(--text-3)" }}>
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 group">
+      <h1 className="text-xl font-medium truncate" style={{ color: "var(--text-1)" }}>
+        {inst.name}
+      </h1>
+      <button
+        onClick={() => { setDraft(inst.name); setEditing(true); }}
+        className="opacity-0 group-hover:opacity-100 rounded p-1 transition-opacity"
+        title="Editar nome"
+        style={{ color: "var(--text-3)" }}>
+        <Pencil className="w-3.5 h-3.5" />
+      </button>
     </div>
   );
 }

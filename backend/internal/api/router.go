@@ -573,6 +573,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Instance-specific routes (with ownership check)
 	instance := instances.Group("/:id", middleware.OwnsInstance(db))
 	instance.Get("/", instanceH.Get)
+	instance.Patch("/", instanceH.Patch)
 	instance.Delete("/", instanceH.Delete)
 	instance.Get("/qr", instanceH.GetQR)
 	instance.Post("/pairing-code", instanceH.GetPairingCode)

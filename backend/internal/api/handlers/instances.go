@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -55,6 +58,12 @@ func NewInstanceHandler(db *gorm.DB, manager *whatsapp.Manager) *InstanceHandler
 //     disconnected e persiste pra a UI oferecer reconectar.
 //   - Caso contrário usa o status do DB.
 func (h *InstanceHandler) resolveLiveStatus(inst *models.Instance) models.InstanceStatus {
+	// Canais que não rodam no whatsmeow manager (WABA Cloud API, futuros
+	// canais cloud-only): DB é fonte da verdade. Sem isso a função retornava
+	// disconnected porque manager.IsRunning() é sempre false pra eles.
+	if inst.Channel == models.ChannelWABA {
+		return inst.Status
+	}
 	id := inst.ID.String()
 	if h.manager.IsRunning(id) {
 		client := h.manager.GetInstance(id)
@@ -292,6 +301,40 @@ func (h *InstanceHandler) Get(c *fiber.Ctx) error {
 	return c.JSON(instance)
 }
 
+// Patch atualiza campos editáveis da instância (atualmente: name).
+// PATCH /instances/:id  Body: { "name": "Novo nome" }
+func (h *InstanceHandler) Patch(c *fiber.Ctx) error {
+	instance, ok := c.Locals("instance").(*models.Instance)
+	if !ok {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	var req struct {
+		Name *string `json:"name"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
+	}
+	updates := map[string]interface{}{}
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if name == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nome não pode ser vazio"})
+		}
+		if len(name) > 80 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nome máximo 80 caracteres"})
+		}
+		updates["name"] = name
+		instance.Name = name
+	}
+	if len(updates) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nada pra atualizar"})
+	}
+	if err := h.db.Model(instance).Updates(updates).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(instance)
+}
+
 // RegenerateToken godoc
 // POST /instances/:id/regenerate-token
 func (h *InstanceHandler) RegenerateToken(c *fiber.Ctx) error {
@@ -313,6 +356,17 @@ func (h *InstanceHandler) Delete(c *fiber.Ctx) error {
 	instance, ok := c.Locals("instance").(*models.Instance)
 	if !ok {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	// WABA: avisa Meta antes de apagar registros locais. Sem isso, Meta
+	// continua mandando webhooks pra um phone_number_id que não existe
+	// mais aqui (logs poluídos + risco de bug futuro). Best-effort: se
+	// falhar, loga warn e prossegue com a remoção local mesmo assim.
+	if instance.Channel == models.ChannelWABA {
+		var waba models.WABAInstance
+		if err := h.db.Where("instance_id = ?", instance.ID).First(&waba).Error; err == nil {
+			h.unsubscribeWABA(&waba)
+		}
 	}
 
 	// Clear session data BEFORE stopping (while client still exists)
@@ -1063,3 +1117,36 @@ func generateDeviceID(username string) string {
 
 // suppress unused import
 var _ = uuid.Nil
+
+// unsubscribeWABA — chamado antes do Delete da instância WABA pra:
+//   1. DELETE /{waba_id}/subscribed_apps  (Meta para de mandar webhooks)
+//
+// Best-effort: erros são logados mas não bloqueiam a deleção local.
+func (h *InstanceHandler) unsubscribeWABA(waba *models.WABAInstance) {
+	if waba == nil || waba.WABABusinessID == "" || waba.AccessToken == "" {
+		return
+	}
+	url := fmt.Sprintf(
+		"https://graph.facebook.com/v18.0/%s/subscribed_apps",
+		waba.WABABusinessID,
+	)
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		log.Warn().Err(err).Str("waba", waba.WABABusinessID).Msg("waba unsubscribe: build request failed")
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+waba.AccessToken)
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	if err != nil {
+		log.Warn().Err(err).Str("waba", waba.WABABusinessID).Msg("waba unsubscribe: HTTP failed")
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		log.Warn().Int("status", resp.StatusCode).Str("body", string(body)).
+			Str("waba", waba.WABABusinessID).Msg("waba unsubscribe: Meta retornou erro (continuando deleção local)")
+		return
+	}
+	log.Info().Str("waba", waba.WABABusinessID).Msg("waba unsubscribe: ok")
+}

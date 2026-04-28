@@ -294,6 +294,8 @@ export const instancesApi = {
       workspace_id: workspaceId || undefined,
     }),
   delete: (id: string) => api.delete(`/v1/instances/${id}`),
+  update: (id: string, data: { name?: string }) =>
+    api.patch(`/v1/instances/${id}`, data),
   getQR: (id: string) => api.get(`/v1/instances/${id}/qr`),
   getPairingCode: (id: string, phoneNumber: string) =>
     api.post(`/v1/instances/${id}/pairing-code`, { phone_number: phoneNumber }),
