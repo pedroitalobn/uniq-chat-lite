@@ -13,6 +13,7 @@ import {
   UserPlus, MessageSquare, ListChecks, CornerUpLeft, CornerUpRight,
   Pencil, Trash2, Search, Info, Bell, BellOff,
 } from "lucide-react";
+import { AudioPlayer } from "@/components/inbox/AudioPlayer";
 import { AudioRecorderButton } from "@/components/inbox/AudioRecorderButton";
 import { MediaViewer, type MediaViewerSource } from "@/components/inbox/MediaViewer";
 import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi, crmContactsApi, linkPreviewApi } from "@/lib/api";
@@ -557,7 +558,14 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     if (!scroller) return;
     // Próximo frame pra garantir que o DOM já mediu altura final.
     requestAnimationFrame(() => {
+      // Desliga scroll suave pro jump inicial (chat abre direto no fim).
+      const original = scroller.style.scrollBehavior;
+      scroller.style.scrollBehavior = "auto";
       scroller.scrollTop = scroller.scrollHeight;
+      // Reativa pra scrolls subsequentes serem suaves.
+      requestAnimationFrame(() => {
+        scroller.style.scrollBehavior = original || "smooth";
+      });
       didInitialScrollRef.current = true;
     });
   }, [timeline.length, conversationId]);
@@ -733,9 +741,10 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
         </header>
 
         <div
+          key={conversationId}
           ref={scrollRef}
-          className="flex-1 overflow-auto px-5 py-6"
-          style={{ background: "hsl(240 18% 5.5%)" }}
+          className="flex-1 overflow-auto px-5 py-6 uniq-fade-in"
+          style={{ background: "hsl(240 18% 5.5%)", scrollBehavior: "smooth" }}
         >
           {timeline.length === 0 ? (
             <div
@@ -1577,24 +1586,10 @@ function MediaBody({
 
   if (type === "audio") {
     if (url) {
-      // Áudio fica inline (player nativo é compacto e funcional).
-      // Botão pequeno expande pro lightbox quem quiser.
-       return (
-         <div className="flex flex-col gap-1.5">
-           <div className="flex items-center gap-2">
-             <audio src={url} controls preload="auto" className="max-w-[260px]" />
-             <button
-              type="button"
-              onClick={() =>
-                onOpenViewer({ type: "audio", url, mediaKey, filename, mimeType, caption: body })
-              }
-              title="Abrir em tela cheia"
-              className="rounded-md p-1 transition-colors hover:bg-white/5"
-              style={{ color: "hsl(240 8% 50%)" }}
-            >
-              <Maximize2Icon className="h-3.5 w-3.5" />
-            </button>
-          </div>
+      // Player inline. Sem botão fullscreen (UX: áudio não precisa).
+      return (
+        <div className="flex flex-col gap-1.5">
+          <AudioPlayer url={url} />
           {error && <ErrorLine text={error} />}
         </div>
       );
@@ -1667,7 +1662,7 @@ function MediaBody({
       if (mimeType?.startsWith("audio/")) {
         return (
           <div className="flex flex-col gap-1.5">
-            <audio src={url} controls preload="auto" className="max-w-[260px]" />
+            <AudioPlayer url={url} />
             {filename && (
               <span className="text-[10px] truncate" style={{ color: "hsl(240 8% 50%)" }}>
                 📎 {filename}
