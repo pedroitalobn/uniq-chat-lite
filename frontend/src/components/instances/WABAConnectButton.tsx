@@ -115,11 +115,24 @@ export function WABAConnectButton({ className }: Props) {
     const left = window.screenX + (window.outerWidth - w) / 2;
     const top = window.screenY + (window.outerHeight - h) / 2;
 
-    const popup = window.open(
-      authUrl,
-      "waba_embedded_signup",
-      `width=${w},height=${h},left=${left},top=${top},toolbar=no,menubar=no,location=no,status=no,scrollbars=yes,resizable=yes`,
-    );
+    // popup=yes é a flag explícita do Chrome 100+ pra forçar popup mini
+    // sobreposto em vez de aba. Sem ela, Chrome abre como aba mesmo com w/h.
+    const features = [
+      "popup=yes",
+      `width=${w}`,
+      `height=${h}`,
+      `left=${left}`,
+      `top=${top}`,
+      "toolbar=no",
+      "menubar=no",
+      "location=no",
+      "status=no",
+      "scrollbars=yes",
+      "resizable=yes",
+      "noopener=no",
+    ].join(",");
+
+    const popup = window.open(authUrl, "waba_embedded_signup", features);
 
     if (!popup) {
       setStatus("error");
