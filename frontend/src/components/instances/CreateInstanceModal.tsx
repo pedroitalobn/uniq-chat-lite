@@ -461,8 +461,8 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
               </>
             )}
 
-            {/* Server (optional for WhatsApp) */}
-            {!isSocial && (
+            {/* Server — não aplicável para WABA (Cloud API da Meta) nem social */}
+            {!isSocial && !isWABA && (
               <div>
                 <label className="text-xs font-medium flex items-center gap-1.5 mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
                   <Server className="w-3 h-3" /> Server (opcional)
@@ -476,20 +476,30 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
               </div>
             )}
 
-            {/* Custom token (optional) */}
-            <div>
-              <label className="text-xs font-medium flex items-center gap-1.5 mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
-                <Key className="w-3 h-3" /> Token personalizado (opcional)
-              </label>
-              <input
-                type="text"
-                value={customToken}
-                onChange={(e) => setCustomToken(e.target.value)}
-                placeholder="Gerado automaticamente se omitido"
-                className="input-field w-full font-mono text-xs"
-                maxLength={128}
-              />
-            </div>
+            {/* Custom token (optional) — não aplicável para WABA (token vem do OAuth) */}
+            {!isWABA && (
+              <div>
+                <label className="text-xs font-medium flex items-center gap-1.5 mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+                  <Key className="w-3 h-3" /> Token personalizado (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={customToken}
+                  onChange={(e) => setCustomToken(e.target.value)}
+                  placeholder="Gerado automaticamente se omitido"
+                  className="input-field w-full font-mono text-xs"
+                  maxLength={128}
+                />
+              </div>
+            )}
+
+            {isWABA && (
+              <div className="rounded-lg p-3 text-xs" style={{ background: "rgba(0,136,255,0.08)", border: "1px solid rgba(0,136,255,0.25)", color: "hsl(240 8% 70%)" }}>
+                Após criar, você será redirecionado para o Embedded Signup da Meta.
+                Lá você seleciona/cria sua conta WhatsApp Business e número de telefone.
+                Token e credenciais são geridos pela Meta — não há configuração manual aqui.
+              </div>
+            )}
 
             <div className="flex gap-3 pt-1">
               <button type="button" onClick={() => setStep("channel")} className="btn-ghost flex-1 py-2.5 text-sm">
