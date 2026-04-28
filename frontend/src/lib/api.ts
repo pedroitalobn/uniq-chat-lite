@@ -954,6 +954,64 @@ export const campaignsApi = {
   delete: (id: string) => api.delete(`/v1/campaigns/${id}`),
 };
 
+// ─── Customer.io / Close-inspired modules ──────────────────────────
+export const segmentsApi = {
+  list: () => api.get("/v1/segments"),
+  create: (data: { name: string; description?: string; type?: "dynamic" | "manual"; filter?: any; trigger_journey_id?: string }) =>
+    api.post("/v1/segments", data),
+  update: (id: string, data: any) => api.patch(`/v1/segments/${id}`, data),
+  delete: (id: string) => api.delete(`/v1/segments/${id}`),
+  preview: (filter: any) => api.post("/v1/segments/preview", { filter }),
+  overlap: (ids: string[]) => api.post("/v1/segments/overlap", { ids }),
+  importCSV: (id: string, file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return api.post(`/v1/segments/${id}/import-csv`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+};
+
+export const suppressionsApi = {
+  list: (params?: { channel?: string; q?: string }) =>
+    api.get("/v1/suppressions", { params }),
+  create: (data: { key: string; channel?: string; reason: string; note?: string }) =>
+    api.post("/v1/suppressions", data),
+  delete: (id: string) => api.delete(`/v1/suppressions/${id}`),
+};
+
+export const subscriptionTopicsApi = {
+  list: () => api.get("/v1/subscription-topics"),
+  create: (data: { slug: string; name: string; description?: string; is_required?: boolean; default_opt_in?: boolean }) =>
+    api.post("/v1/subscription-topics", data),
+  update: (id: string, data: any) => api.patch(`/v1/subscription-topics/${id}`, data),
+  delete: (id: string) => api.delete(`/v1/subscription-topics/${id}`),
+  generateLink: (contactId: string) =>
+    api.post(`/v1/contacts/${contactId}/preference-link`),
+};
+
+export const crmImportApi = {
+  contacts: (file: File) => {
+    const fd = new FormData(); fd.append("file", file);
+    return api.post("/v1/crm/contacts/import", fd, { headers: { "Content-Type": "multipart/form-data" } });
+  },
+  companies: (file: File) => {
+    const fd = new FormData(); fd.append("file", file);
+    return api.post("/v1/crm/companies/import", fd, { headers: { "Content-Type": "multipart/form-data" } });
+  },
+  deals: (file: File) => {
+    const fd = new FormData(); fd.append("file", file);
+    return api.post("/v1/crm/deals/import", fd, { headers: { "Content-Type": "multipart/form-data" } });
+  },
+};
+
+export const contactsMergeApi = {
+  duplicates: (by: "phone" | "email" = "phone") =>
+    api.get("/v1/contacts/duplicates", { params: { by } }),
+  merge: (survivor_id: string, looser_ids: string[]) =>
+    api.post("/v1/contacts/merge", { survivor_id, looser_ids }),
+};
+
 export const integrationsApi = {
   list: () => api.get("/v1/integrations"),
   create: (data: {

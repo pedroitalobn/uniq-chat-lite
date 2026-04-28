@@ -9,8 +9,11 @@
 // /v1/segments).
 
 import { useState, useMemo } from "react";
-import { Plus, Trash2, Filter as FilterIcon, Save, Search, Layers, ChevronRight, X } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Plus, Trash2, Filter as FilterIcon, Save, Search, Layers, ChevronRight, Loader2, Users } from "lucide-react";
+import { toast } from "sonner";
 import { CRMTabs } from "@/components/crm/CRMTabs";
+import { segmentsApi } from "@/lib/api";
 
 type Op = "and" | "or";
 type Field =
@@ -169,22 +172,11 @@ export default function CRMSegmentsPage() {
             style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
             <Plus className="w-3.5 h-3.5" /> Adicionar condição
           </button>
-          <div className="flex items-center gap-2">
-            <button
-              className="text-xs px-3 py-2 rounded-lg inline-flex items-center gap-1.5"
-              style={{ background: "var(--surface-3)", color: "var(--text-2)" }}
-              onClick={() => alert("Preview de contatos — pendente de endpoint /v1/segments/preview")}>
-              <Search className="w-3.5 h-3.5" /> Pré-visualizar
-            </button>
-            <button
-              className="text-xs font-medium px-3 py-2 rounded-lg inline-flex items-center gap-1.5"
-              style={{ background: "var(--green)", color: "var(--green-fg)" }}
-              onClick={() => alert("Persistência de segmentos — pendente. Usa o JSON abaixo em campanhas.")}>
-              <Save className="w-3.5 h-3.5" /> Salvar segmento
-            </button>
-          </div>
+          <SegmentActions name={name} previewJson={previewJson} />
         </div>
       </div>
+
+      <SegmentList />
 
       <details className="rounded-2xl"
         style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
@@ -198,17 +190,106 @@ export default function CRMSegmentsPage() {
         </pre>
       </details>
 
-      <div className="rounded-2xl p-4 flex items-start gap-3"
-        style={{ background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.18)" }}>
-        <FilterIcon className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#60a5fa" }} />
-        <div className="text-xs" style={{ color: "var(--text-2)" }}>
-          <p className="font-medium mb-0.5" style={{ color: "var(--text-1)" }}>Em construção</p>
-          <p>
-            Builder visual já gera o JSON compatível com <code>segment_filter</code> de campanhas (Fase 10 do roadmap).
-            Persistência em /v1/segments e preview de contatos chegam na próxima iteração — por enquanto, copie o
-            JSON acima e cole ao criar uma campanha por <strong>recipient_type=segment</strong>.
-          </p>
-        </div>
+    </div>
+  );
+}
+
+// ─── SegmentActions ──────────────────────────────────────────────────
+function SegmentActions({ name, previewJson }: { name: string; previewJson: any }) {
+  const qc = useQueryClient();
+  const [previewing, setPreviewing] = useState<{ total: number; sample: any[] } | null>(null);
+
+  const previewMut = useMutation({
+    mutationFn: () => segmentsApi.preview(previewJson).then((r) => r.data),
+    onSuccess: (data: any) => setPreviewing({ total: data.total, sample: data.sample || [] }),
+    onError: () => toast.error("Erro ao prever"),
+  });
+
+  const saveMut = useMutation({
+    mutationFn: () => segmentsApi.create({
+      name: name.trim() || "Segmento sem nome",
+      type: "dynamic",
+      filter: previewJson,
+    }),
+    onSuccess: () => {
+      toast.success("Segmento salvo");
+      qc.invalidateQueries({ queryKey: ["segments"] });
+    },
+    onError: () => toast.error("Erro ao salvar"),
+  });
+
+  return (
+    <div className="flex items-center gap-2">
+      {previewing && (
+        <span className="text-xs" style={{ color: "var(--text-3)" }}>
+          {previewing.total} contato{previewing.total !== 1 ? "s" : ""}
+        </span>
+      )}
+      <button onClick={() => previewMut.mutate()} disabled={previewMut.isPending}
+        className="text-xs px-3 py-2 rounded-lg inline-flex items-center gap-1.5"
+        style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
+        {previewMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+        Pré-visualizar
+      </button>
+      <button onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !name.trim()}
+        className="text-xs font-medium px-3 py-2 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50"
+        style={{ background: "var(--green)", color: "var(--green-fg)" }}>
+        {saveMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+        Salvar segmento
+      </button>
+    </div>
+  );
+}
+
+// ─── SegmentList ─────────────────────────────────────────────────────
+function SegmentList() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["segments"],
+    queryFn: () => segmentsApi.list().then((r) => r.data?.data ?? []),
+  });
+  const list: any[] = data || [];
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => segmentsApi.delete(id),
+    onSuccess: () => {
+      toast.success("Segmento removido");
+      qc.invalidateQueries({ queryKey: ["segments"] });
+    },
+  });
+
+  if (isLoading) {
+    return <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--text-3)" }} /></div>;
+  }
+  if (list.length === 0) {
+    return null;
+  }
+  return (
+    <div className="rounded-2xl"
+      style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+      <div className="flex items-center gap-2 px-5 py-3 border-b" style={{ borderColor: "var(--surface-border)" }}>
+        <Users className="w-4 h-4" style={{ color: "var(--text-3)" }} />
+        <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
+          Segmentos salvos ({list.length})
+        </h3>
+      </div>
+      <div className="divide-y" style={{ borderColor: "var(--surface-border)" }}>
+        {list.map((s: any) => (
+          <div key={s.id} className="flex items-center justify-between px-5 py-3 gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{s.name}</p>
+              <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+                {s.type === "dynamic" ? "Dinâmico" : "Manual"}
+                {typeof s.member_count === "number" && s.member_count > 0 && ` · ${s.member_count} contatos`}
+              </p>
+            </div>
+            <button
+              onClick={() => { if (confirm(`Remover "${s.name}"?`)) deleteMut.mutate(s.id); }}
+              className="p-1.5 rounded-md" style={{ color: "#f87171" }}>
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );

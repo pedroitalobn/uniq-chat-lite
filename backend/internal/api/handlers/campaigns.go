@@ -11,6 +11,8 @@ import (
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/queue"
+	"github.com/uniq-chat/backend/internal/services/freqcap"
+	templatesvc "github.com/uniq-chat/backend/internal/services/template"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
 )
@@ -147,6 +149,42 @@ func (h *CampaignHandler) processCampaign(c models.Campaign, today string) {
 		// Skip if daily limit reached
 		if r.SentToday >= c.TimesPerDay {
 			continue
+		}
+
+		// Safety checks: suppression list + freq cap + quiet hours.
+		// Falham fechado em ws_id ausente (broadcast legado) — não checa.
+		if c.WorkspaceID != nil {
+			ws := *c.WorkspaceID
+			// 1. Suppression: contato pediu pra não receber.
+			if models.IsSuppressed(h.db, ws, r.Phone, "whatsapp") {
+				h.db.Model(r).Updates(map[string]any{
+					"status": models.RecipientStatusFailed,
+					"error":  "suppressed",
+				})
+				continue
+			}
+			// 2. Resolve contact pra TZ + freq cap.
+			var contact models.Contact
+			h.db.Select("id").Where("(workspace_id = ? OR user_id = ?) AND phone = ?",
+				ws, c.UserID, r.Phone).First(&contact)
+			if contact.ID != uuid.Nil {
+				if freqcap.IsQuietNow(ws, contact.ID, h.db) {
+					continue // tenta de novo no próximo tick
+				}
+				if okFC, reason := freqcap.Check(h.db, ws, contact.ID); !okFC {
+					log.Debug().Str("phone", r.Phone).Str("reason", reason).Msg("campaign: freq cap")
+					continue
+				}
+			}
+		}
+
+		// Liquid render no texto + caption (suporta {{contact.name}}, {% if %})
+		liquidVars := map[string]any{"contact": map[string]any{"phone": r.Phone, "name": r.Name}}
+		if c.MessageText != "" {
+			c.MessageText = templatesvc.MustRender(c.MessageText, liquidVars)
+		}
+		if c.Caption != "" {
+			c.Caption = templatesvc.MustRender(c.Caption, liquidVars)
 		}
 
 		// Build job

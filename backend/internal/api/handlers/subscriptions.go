@@ -176,7 +176,7 @@ func (h *SubscriptionHandler) PublicUpdate(c *fiber.Ctx) error {
 			})
 		}
 	}
-	h.db.Model(&link).Update("used_count", gormExpr("used_count + 1"))
+	h.db.Model(&link).Update("used_count", gorm.Expr("used_count + 1"))
 	return c.JSON(fiber.Map{"ok": true})
 }
 
@@ -190,6 +190,3 @@ func generateOpaqueToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-func gormExpr(s string) gorm.Expr {
-	return gorm.Expr(s)
-}

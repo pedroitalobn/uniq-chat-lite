@@ -89,7 +89,7 @@ func (h *CRMImportHandler) ImportContacts(c *fiber.Ctx) error {
 		if companyName != "" {
 			var company models.Company
 			if h.db.Where("workspace_id = ? AND LOWER(name) = ?", wsID, strings.ToLower(companyName)).First(&company).Error != nil {
-				company = models.Company{WorkspaceID: wsID, UserID: user.ID, Name: companyName}
+				company = models.Company{WorkspaceID: wsID, OwnerID: &user.ID, Name: companyName}
 				if err := h.db.Create(&company).Error; err == nil {
 					companyID = &company.ID
 				}
@@ -144,7 +144,7 @@ func (h *CRMImportHandler) ImportContacts(c *fiber.Ctx) error {
 				}
 				var tag models.Tag
 				if h.db.Where("workspace_id = ? AND LOWER(name) = ?", wsID, strings.ToLower(tname)).First(&tag).Error != nil {
-					tag = models.Tag{WorkspaceID: wsID, UserID: user.ID, Name: tname}
+					tag = models.Tag{WorkspaceID: &wsID, UserID: user.ID, Name: tname}
 					if h.db.Create(&tag).Error != nil {
 						continue
 					}
@@ -203,7 +203,7 @@ func (h *CRMImportHandler) ImportCompanies(c *fiber.Ctx) error {
 			stats.Updated++
 			continue
 		}
-		company = models.Company{WorkspaceID: wsID, UserID: user.ID, Name: name}
+		company = models.Company{WorkspaceID: wsID, OwnerID: &user.ID, Name: name}
 		setCompanyFieldsFromRow(&company, row, idx)
 		if err := h.db.Create(&company).Error; err != nil {
 			stats.Errors = append(stats.Errors, "falhou: "+name)

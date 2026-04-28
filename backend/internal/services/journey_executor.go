@@ -888,6 +888,13 @@ func (e *JourneyExecutor) stepMessage(ctx *execCtx, step *models.FlowStep) (*mod
 
 	ctx.emit(step.ID, string(step.Type), "send_text", map[string]interface{}{"to": jid, "text": text})
 	if !ctx.simulate {
+		// Safety: suppression list + freq cap (silenciamento via TZ tratado em send_in_timezone).
+		if wsID, err := e.workspaceFromCtx(ctx); err == nil {
+			if models.IsSuppressed(e.db, wsID, jid, "whatsapp") {
+				log.Info().Str("to", jid).Msg("journey: skipped (suppressed)")
+				return ctx.flow.FindStep(step.NextStepID), false, nil
+			}
+		}
 		log.Info().
 			Str("journey", ctx.journey.ID).
 			Str("step", step.ID).
