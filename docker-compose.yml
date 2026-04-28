@@ -109,6 +109,8 @@ services:
         # NEXT_PUBLIC_* são build-time no Next.js — obrigatório passar via args
         NEXT_PUBLIC_API_URL: https://api.uniq.chat
         NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
+        NEXT_PUBLIC_META_APP_ID: ${META_APP_ID}
+        NEXT_PUBLIC_META_WHATSAPP_CONFIG_ID: ${META_WHATSAPP_CONFIG_ID}
     container_name: uniqchat-frontend
     restart: unless-stopped
     depends_on:

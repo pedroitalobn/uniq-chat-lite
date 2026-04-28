@@ -11,9 +11,12 @@ declare global {
   interface Window {
     FB: {
       init: (config: { appId: string; cookie: boolean; xfbml: boolean; version: string }) => void;
-      login: (callback: (response: { authResponse?: { accessToken: string; code?: string } }) => void, config: { config_id: string; redirect_uri: string }) => void;
+      login: (
+        callback: (response: { authResponse?: { accessToken?: string; code?: string } }) => void,
+        config: Record<string, unknown>,
+      ) => void;
     };
-    fbAsyncInit: () => void;
+    fbAsyncInit?: () => void;
   }
 }
 
@@ -21,17 +24,18 @@ interface Props {
   className?: string;
 }
 
+const META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID || "";
+const META_CONFIG_ID = process.env.NEXT_PUBLIC_META_WHATSAPP_CONFIG_ID || "";
+
 export function WABAConnectButton({ className }: Props) {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
-  const fbLoaded = useRef(false);
+  const [sdkReady, setSdkReady] = useState(false);
+  const sdkLoading = useRef(false);
 
   const callbackMutation = useMutation({
-    mutationFn: async (code: string) => {
-      const result = await wabaApi.callback(code);
-      return result;
-    },
+    mutationFn: async (code: string) => wabaApi.callback(code),
     onSuccess: () => {
       setStatus("success");
       toast.success("WhatsApp API conectado com sucesso!");
@@ -45,75 +49,86 @@ export function WABAConnectButton({ className }: Props) {
   });
 
   useEffect(() => {
-    if (fbLoaded.current) return;
-    fbLoaded.current = true;
+    if (sdkLoading.current) return;
+    sdkLoading.current = true;
+
+    if (!META_APP_ID) {
+      setErrorMessage(
+        "NEXT_PUBLIC_META_APP_ID não configurado no build do frontend.",
+      );
+      return;
+    }
+
+    // fbAsyncInit precisa estar definido ANTES do script carregar
+    window.fbAsyncInit = () => {
+      window.FB.init({
+        appId: META_APP_ID,
+        cookie: true,
+        xfbml: true,
+        version: "v21.0",
+      });
+      setSdkReady(true);
+    };
+
+    if (document.querySelector('script[src*="connect.facebook.net"]')) {
+      // já carregado em outro mount — apenas marca como pronto se FB existe
+      if (window.FB) setSdkReady(true);
+      return;
+    }
 
     const script = document.createElement("script");
     script.src = "https://connect.facebook.net/pt_BR/sdk.js";
     script.async = true;
     script.defer = true;
-    script.setAttribute("crossorigin", "anonymous");
-    script.onload = () => {
-      window.fbAsyncInit = () => {
-        window.FB.init({
-          appId: process.env.NEXT_PUBLIC_META_APP_ID || "",
-          cookie: true,
-          xfbml: true,
-          version: "v21.0",
-        });
-      };
-    };
+    script.crossOrigin = "anonymous";
     document.body.appendChild(script);
-
-    return () => {
-      const existingScript = document.querySelector('script[src*="connect.facebook.net"]');
-      if (existingScript) {
-        existingScript.remove();
-      }
-    };
   }, []);
 
-  const handleConnect = async () => {
+  const handleConnect = () => {
     setStatus("loading");
     setErrorMessage("");
 
-    try {
-      const { auth_url } = await wabaApi.getAuthURL();
-      const authUrl = auth_url;
-
-      if (!window.FB) {
-        setStatus("error");
-        setErrorMessage("Facebook SDK não carregou. Recarregue a página.");
-        return;
-      }
-
-      window.FB.login(
-        (response) => {
-          if (response.authResponse?.code) {
-            callbackMutation.mutate(response.authResponse.code);
-          } else {
-            setStatus("error");
-            setErrorMessage("Autorização cancelada pelo usuário");
-          }
-        },
-        {
-          config_id: authUrl.match(/config_id=(\d+)/)?.[1] || "",
-          redirect_uri: window.location.origin + "/v1/waba/callback",
-        }
-      );
-    } catch (error) {
+    if (!window.FB || !sdkReady) {
       setStatus("error");
-      const err = error as Error;
-      setErrorMessage(err.message || "Erro ao obter URL de autorização");
-      toast.error(err.message || "Erro ao conectar");
+      setErrorMessage("Facebook SDK ainda carregando. Aguarde 2s e tente novamente.");
+      return;
     }
+
+    if (!META_CONFIG_ID) {
+      setStatus("error");
+      setErrorMessage("NEXT_PUBLIC_META_WHATSAPP_CONFIG_ID não configurado.");
+      return;
+    }
+
+    window.FB.login(
+      (response) => {
+        const code = response.authResponse?.code;
+        if (code) {
+          callbackMutation.mutate(code);
+        } else {
+          setStatus("error");
+          setErrorMessage("Autorização cancelada pelo usuário");
+        }
+      },
+      {
+        config_id: META_CONFIG_ID,
+        response_type: "code",
+        override_default_response_type: true,
+        extras: {
+          setup: {},
+          featureType: "",
+          sessionInfoVersion: "3",
+          version: "v4",
+        },
+      },
+    );
   };
 
   return (
     <div className={className}>
       <button
         onClick={handleConnect}
-        disabled={status === "loading"}
+        disabled={status === "loading" || !sdkReady}
         className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-[#0088ff] hover:bg-[#0077ee] text-white font-medium rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {status === "loading" ? (
@@ -129,9 +144,9 @@ export function WABAConnectButton({ className }: Props) {
         ) : (
           <>
             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
-              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
             </svg>
-            <span>Conectar WhatsApp API</span>
+            <span>{sdkReady ? "Conectar WhatsApp API" : "Carregando SDK..."}</span>
           </>
         )}
       </button>
