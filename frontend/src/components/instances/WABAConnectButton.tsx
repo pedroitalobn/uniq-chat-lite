@@ -56,28 +56,58 @@ export function WABAConnectButton({ className, instanceId }: Props) {
     },
   });
 
-  // Listener postMessage do popup Meta — entrega session info (waba_id, phone_number_id)
+  // Listener postMessage:
+  //   - WA_EMBEDDED_SIGNUP (origem facebook.com): session info da Meta durante o flow
+  //   - WABA_CALLBACK (origem própria): nosso route handler /api/waba/callback
+  //     avisa que troca de token deu certo (ou erro) e fecha o popup
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
+      // Mensagens da Meta
       if (
-        event.origin !== "https://www.facebook.com" &&
-        event.origin !== "https://web.facebook.com" &&
-        event.origin !== "https://business.facebook.com"
+        event.origin === "https://www.facebook.com" ||
+        event.origin === "https://web.facebook.com" ||
+        event.origin === "https://business.facebook.com"
       ) {
+        try {
+          const payload = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+          if (payload?.type === "WA_EMBEDDED_SIGNUP") {
+            sessionInfoRef.current = payload as SessionInfo;
+          }
+        } catch {
+          // not json
+        }
         return;
       }
-      try {
-        const payload = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-        if (payload?.type === "WA_EMBEDDED_SIGNUP") {
-          sessionInfoRef.current = payload as SessionInfo;
+
+      // Mensagens do próprio domínio (callback handler)
+      if (event.origin === window.location.origin) {
+        const payload = event.data as {
+          type?: string;
+          status?: "success" | "error";
+          instance_id?: string;
+          next_step?: string;
+          error?: string;
+        };
+        if (payload?.type === "WABA_CALLBACK") {
+          if (payload.status === "success") {
+            setStatus("success");
+            toast.success("WhatsApp API conectado!");
+            const target = payload.instance_id
+              ? `/instances/${payload.instance_id}/waba?waba_connected=1`
+              : "/instances?waba_connected=1";
+            router.push(target);
+            router.refresh();
+          } else {
+            setStatus("error");
+            setErrorMessage(payload.error || "Falha na conexão com Meta");
+            toast.error(payload.error || "Falha na conexão");
+          }
         }
-      } catch {
-        // not json — ignore
       }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, []);
+  }, [router]);
 
   const handleConnect = () => {
     setStatus("loading");
@@ -138,24 +168,22 @@ export function WABAConnectButton({ className, instanceId }: Props) {
     }
     popupRef.current = popup;
 
-    // Polling pra detectar fechamento — se fechou sem session info, foi cancelado
+    // Polling: detecta apenas cancelamento. Sucesso é capturado via
+    // postMessage WABA_CALLBACK (handler acima). Damos uma janela de
+    // tolerância de 1s pra mensagem chegar antes de marcar como cancelado.
     const interval = setInterval(() => {
-      if (popup.closed) {
-        clearInterval(interval);
-        const session = sessionInfoRef.current;
-        if (session?.event === "FINISH" && session.data) {
-          // session info chegou via postMessage — agora pega o code via redirect-back
-          // No flow Embedded Signup v4, o code chega no redirect_uri (callback page).
-          // Por enquanto consideramos sucesso visual e o backend trata via callback.
-          setStatus("success");
-          toast.success(
-            `WABA conectada! waba_id=${session.data.waba_id?.slice(0, 8)}…`,
-          );
-        } else if (status === "loading") {
-          setStatus("error");
-          setErrorMessage("Autorização cancelada ou janela fechada.");
-        }
-      }
+      if (!popup.closed) return;
+      clearInterval(interval);
+      setTimeout(() => {
+        // Se status já mudou pra success/error via postMessage, não mexe
+        setStatus((prev) => {
+          if (prev === "loading") {
+            setErrorMessage("Autorização cancelada ou janela fechada.");
+            return "error";
+          }
+          return prev;
+        });
+      }, 1000);
     }, 500);
   };
 

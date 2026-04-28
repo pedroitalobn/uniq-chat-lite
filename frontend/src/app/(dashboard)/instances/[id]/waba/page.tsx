@@ -44,10 +44,15 @@ export default function WABAManagePage({ params }: { params: Promise<{ id: strin
   const { id } = use(params);
   const qc = useQueryClient();
 
-  const { data: waba, isLoading } = useQuery<WABAData>({
+  const { data: wabaResp, isLoading } = useQuery<WABAData | { connected: false; instance_id: string }>({
     queryKey: ["waba", id],
     queryFn: () => wabaApi.get(id).then((r) => r.data),
+    retry: false,
   });
+  const waba: WABAData | undefined =
+    wabaResp && "connected" in wabaResp && wabaResp.connected === false
+      ? undefined
+      : (wabaResp as WABAData | undefined);
 
   const { data: templatesRes } = useQuery<{ items: Template[] }>({
     queryKey: ["waba-templates", id],

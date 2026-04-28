@@ -96,21 +96,29 @@ func (h *WABAHandler) Callback(c *fiber.Ctx) error {
 	// Aceita code via query (legado) OU body (rota nova do frontend route handler)
 	code := c.Query("code")
 	var existingInstanceID string
+	var clientRedirectURI string
 	if code == "" {
 		var body struct {
-			Code       string `json:"code"`
-			InstanceID string `json:"instance_id"`
+			Code        string `json:"code"`
+			InstanceID  string `json:"instance_id"`
+			RedirectURI string `json:"redirect_uri"`
 		}
 		if err := c.BodyParser(&body); err == nil {
 			code = body.Code
 			existingInstanceID = body.InstanceID
+			clientRedirectURI = body.RedirectURI
 		}
 	}
 	if code == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "code is required"})
 	}
 
-	redirectURI := config.AppConfig.FrontendURL + "/api/waba/callback"
+	// redirect_uri do exchange precisa bater EXATO com o usado no auth URL.
+	// Frontend pode informar via body — caso contrário cai pro FRONTEND_URL.
+	redirectURI := clientRedirectURI
+	if redirectURI == "" {
+		redirectURI = config.AppConfig.FrontendURL + "/api/waba/callback"
+	}
 
 	tokenData, err := h.exchangeCodeForToken(code, redirectURI)
 	if err != nil {
@@ -327,7 +335,12 @@ func (h *WABAHandler) GetWABA(c *fiber.Ctx) error {
 
 	var waba models.WABAInstance
 	if err := h.db.Where("instance_id = ?", instanceID).First(&waba).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "WABA instance not found"})
+		// Retorna 200 com connected=false em vez de 404 — frontend usa isso
+		// pra decidir mostrar Connect button (sem retry-loop do react-query).
+		return c.JSON(fiber.Map{
+			"connected":   false,
+			"instance_id": instanceID,
+		})
 	}
 
 	return c.JSON(WABAResponse{
