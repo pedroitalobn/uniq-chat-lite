@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { instancesApi, serversApi, channelsApi, tiktokApi } from "@/lib/api";
-import { X, Server, Key, ChevronRight, Check, Eye, EyeOff, User, Lock, Loader2, ExternalLink } from "lucide-react";
+import { X, Server, Key, Check, Eye, EyeOff, User, Lock, Loader2, ExternalLink } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import type { Server as ServerType, ChannelInfo } from "@/types";
@@ -16,14 +16,15 @@ interface Props {
 }
 
 const FALLBACK_CHANNELS = (isSuperAdmin: boolean): ChannelInfo[] => [
-  { id: "whatsapp",  label: "WhatsApp Business",  color: "#25d366", description: "Não-oficial via QR ou código de pareamento (whatsmeow)", available: true },
-  { id: "waba",     label: "WhatsApp API",     color: "#0088ff", description: "Cloud API oficial Meta — templates HSM + Embedded Signup", available: isSuperAdmin },
-  { id: "instagram", label: "Instagram", color: "#e1306c", description: isSuperAdmin ? "DMs, scraping, follow/unfollow" : "Em breve", available: isSuperAdmin || false },
-  { id: "tiktok",    label: "TikTok",    color: "#ff0050", description: isSuperAdmin ? "DMs, scraping, follow/unfollow" : "Em breve", available: isSuperAdmin || false },
-  { id: "facebook",  label: "Facebook",  color: "#1877f2", description: isSuperAdmin ? "Facebook Messenger" : "Em breve", available: isSuperAdmin || false },
-  { id: "telegram",  label: "Telegram",  color: "#229ed9", description: isSuperAdmin ? "Bots via Telegram API" : "Em breve", available: isSuperAdmin || false },
-  { id: "linkedin",  label: "LinkedIn",  color: "#0a66c2", description: isSuperAdmin ? "Mensagens via LinkedIn API" : "Em breve", available: isSuperAdmin || false },
-  { id: "kwai",      label: "Kwai",      color: "#ff6600", description: isSuperAdmin ? "Mensagens via Kwai" : "Em breve", available: isSuperAdmin || false },
+  { id: "whatsapp",     label: "WhatsApp Business", color: "#25d366", description: "Não-oficial via QR ou código de pareamento (whatsmeow)", available: true },
+  { id: "waba",         label: "WhatsApp API",      color: "#0088ff", description: "Cloud API oficial Meta — templates HSM + Embedded Signup", available: isSuperAdmin },
+  { id: "instagram",    label: "Instagram Profile", color: "#e1306c", description: isSuperAdmin ? "Login não-oficial — DMs, scraping, follow/unfollow" : "Em breve", available: isSuperAdmin || false },
+  { id: "instagram_api", label: "Instagram API",    color: "#cc2366", description: isSuperAdmin ? "API oficial Meta — Messaging Graph API" : "Em breve", available: isSuperAdmin || false },
+  { id: "tiktok",       label: "TikTok",            color: "#ff0050", description: isSuperAdmin ? "DMs, scraping, follow/unfollow" : "Em breve", available: isSuperAdmin || false },
+  { id: "facebook",     label: "Facebook",          color: "#1877f2", description: isSuperAdmin ? "Facebook Messenger" : "Em breve", available: isSuperAdmin || false },
+  { id: "telegram",     label: "Telegram",          color: "#229ed9", description: isSuperAdmin ? "Bots via Telegram API" : "Em breve", available: isSuperAdmin || false },
+  { id: "linkedin",     label: "LinkedIn",          color: "#0a66c2", description: isSuperAdmin ? "Mensagens via LinkedIn API" : "Em breve", available: isSuperAdmin || false },
+  { id: "kwai",         label: "Kwai",              color: "#ff6600", description: isSuperAdmin ? "Mensagens via Kwai" : "Em breve", available: isSuperAdmin || false },
 ];
 
 const CHANNEL_ICONS: Record<string, React.ReactNode> = {
@@ -33,6 +34,11 @@ const CHANNEL_ICONS: Record<string, React.ReactNode> = {
     </svg>
   ),
   instagram: (
+    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+    </svg>
+  ),
+  instagram_api: (
     <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
       <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
     </svg>
@@ -252,9 +258,9 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
           </button>
         </div>
 
-        {/* Step 1: Channel selector */}
+        {/* Step 1: Channel selector — grid 4×2 desktop, 1col mobile */}
         {step === "channel" && (
-          <div className="px-6 pb-6 space-y-2">
+          <div className="px-6 pb-6 grid grid-cols-2 sm:grid-cols-3 gap-2.5">
             {availableChannels.map((channel) => (
               <button
                 key={channel.id}
@@ -264,7 +270,8 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
                   setStep("config");
                 }}
                 disabled={!channel.available}
-                className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-150 text-left group"
+                title={channel.description}
+                className="relative flex flex-col items-center justify-center gap-2 px-3 py-5 rounded-xl transition-all duration-150"
                 style={{
                   background: selectedChannel === channel.id
                     ? `${channel.color}12`
@@ -276,38 +283,24 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
                   cursor: channel.available ? "pointer" : "not-allowed",
                 }}
               >
-                {/* Icon */}
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center"
                   style={{ background: `${channel.color}15`, color: channel.color }}>
                   {CHANNEL_ICONS[channel.id]}
                 </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium" style={{ color: "hsl(240 15% 90%)" }}>
-                      {channel.label}
-                    </span>
-                    {(channel.id === "instagram" || channel.id === "tiktok") && channel.available && (
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                        style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)" }}>
-                        Beta
-                      </span>
-                    )}
-                    {!channel.available && (
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
-                        style={{ background: "var(--surface-2)", color: "hsl(240 8% 50%)" }}>
-                        Em breve
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs mt-0.5 truncate" style={{ color: "hsl(240 8% 44%)" }}>
-                    {channel.description}
-                  </p>
-                </div>
-
-                {channel.available && (
-                  <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: "hsl(240 8% 42%)" }} />
+                <span className="text-xs font-medium text-center leading-tight" style={{ color: "hsl(240 15% 90%)" }}>
+                  {channel.label}
+                </span>
+                {(channel.id === "instagram" || channel.id === "tiktok") && channel.available && (
+                  <span className="absolute top-1.5 right-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
+                    style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)" }}>
+                    Beta
+                  </span>
+                )}
+                {!channel.available && (
+                  <span className="absolute top-1.5 right-1.5 text-[9px] font-medium px-1.5 py-0.5 rounded-full"
+                    style={{ background: "var(--surface-3)", color: "hsl(240 8% 60%)" }}>
+                    Em breve
+                  </span>
                 )}
               </button>
             ))}

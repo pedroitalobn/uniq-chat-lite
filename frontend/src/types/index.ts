@@ -109,7 +109,7 @@ export interface Plan {
   stripe_price_id?: string;
 }
 
-export type ChannelType = "whatsapp" | "instagram" | "facebook" | "telegram" | "linkedin" | "tiktok" | "kwai" | "waba";
+export type ChannelType = "whatsapp" | "instagram" | "instagram_api" | "facebook" | "telegram" | "linkedin" | "tiktok" | "kwai" | "waba";
 
 export interface ChannelInfo {
   id: ChannelType;

@@ -12,14 +12,15 @@ import type { Instance, Server, ChannelType } from "@/types";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 const CHANNEL_META: Record<ChannelType, { label: string; color: string }> = {
-  whatsapp:  { label: "WhatsApp Business",  color: "#25d366" },
-  instagram: { label: "Instagram",           color: "#e1306c" },
-  facebook:  { label: "Facebook",            color: "#1877f2" },
-  telegram:  { label: "Telegram",            color: "#229ed9" },
-  linkedin:  { label: "LinkedIn",            color: "#0a66c2" },
-  tiktok:    { label: "TikTok",              color: "#ff0050" },
-  kwai:      { label: "Kwai",                color: "#ff6600" },
-  waba:      { label: "WhatsApp API",        color: "#0088ff" },
+  whatsapp:      { label: "WhatsApp Business",  color: "#25d366" },
+  waba:          { label: "WhatsApp API",       color: "#0088ff" },
+  instagram:     { label: "Instagram Profile",  color: "#e1306c" },
+  instagram_api: { label: "Instagram API",      color: "#cc2366" },
+  facebook:      { label: "Facebook",           color: "#1877f2" },
+  telegram:      { label: "Telegram",           color: "#229ed9" },
+  linkedin:      { label: "LinkedIn",           color: "#0a66c2" },
+  tiktok:        { label: "TikTok",             color: "#ff0050" },
+  kwai:          { label: "Kwai",               color: "#ff6600" },
 };
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
