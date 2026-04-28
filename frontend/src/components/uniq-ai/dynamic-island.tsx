@@ -13,7 +13,7 @@
 // Visibilidade: oculta em /uniq-ai (já é o chat full-screen) e em
 // /inbox/[id] no mobile (conflita com input do messenger).
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, Loader2, MessageSquare, Sparkles, X } from "lucide-react";
@@ -131,104 +131,114 @@ export function UniqAIIsland() {
     );
   }
 
-  // Desktop: TOPO central. Mesmo motion.div pro pill e pro chat expandido
-  // — Framer Motion tween automaticamente width/height/borderRadius/posição
-  // entre os dois layouts via layoutId. É o "morph" do iPhone Dynamic
-  // Island: a pill cresce in-place pra virar o chat e volta colapsando.
+  // Desktop: TOPO central. Pill compacta que cresce LEVEMENTE pra receber
+  // comando — inspirado em https://skiper-ui.com/v1/skiper2 e iOS Dynamic
+  // Island. SEM modal, SEM backdrop. Resultado aparece inline na pill.
   const isExpanded = state.mode === "expanded";
-  const islandSpring = { type: "spring" as const, stiffness: 380, damping: 32, mass: 0.8 };
+  const islandSpring = { type: "spring" as const, stiffness: 420, damping: 36, mass: 0.7 };
+  const [prompt, setPrompt] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isExpanded) {
+      // Foca o input após a animação de morph terminar.
+      setTimeout(() => inputRef.current?.focus(), 220);
+    } else {
+      setPrompt("");
+    }
+  }, [isExpanded]);
+
+  const submitPrompt = () => {
+    if (!prompt.trim()) return;
+    setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: "user", content: prompt }]);
+    setPrompt("");
+  };
 
   return (
-    <>
-      {/* Backdrop (só no expanded). Click fora fecha. */}
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            onClick={close}
-            className="fixed inset-0 z-[89] bg-black/40 backdrop-blur-sm"
-          />
-        )}
-      </AnimatePresence>
-
-      {/* A "ilha". Width/height/border-radius animam via layout, dando o
-          efeito de pill esticando até virar o chat. */}
-      <motion.div
-        layout
-        transition={islandSpring}
-        onClick={isExpanded ? undefined : open}
-        role={isExpanded ? undefined : "button"}
-        aria-label={isExpanded ? undefined : "Abrir Uniq AI"}
-        className={`fixed top-3 left-1/2 -translate-x-1/2 z-[90] overflow-hidden shadow-2xl ${
-          isExpanded
-            ? "w-[min(480px,calc(100vw-2rem))] h-[min(540px,calc(100vh-2.5rem))] rounded-3xl flex flex-col cursor-default"
-            : "h-9 rounded-full flex items-center gap-2 px-3 cursor-pointer"
-        }`}
-        style={{
-          background: isExpanded ? "var(--surface-1)" : "rgba(10, 12, 14, 0.92)",
-          backdropFilter: isExpanded ? undefined : "blur(12px)",
-          border: isExpanded ? "1px solid var(--surface-border)" : "1px solid var(--border-default)",
-          boxShadow: isExpanded
-            ? "0 24px 80px rgba(0,0,0,0.55)"
-            : "0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 1px var(--border-default)",
-        }}
+    <motion.div
+      layout
+      transition={islandSpring}
+      onClick={isExpanded ? undefined : open}
+      role={isExpanded ? undefined : "button"}
+      aria-label={isExpanded ? undefined : "Abrir Uniq AI"}
+      className={`fixed top-3 left-1/2 -translate-x-1/2 z-[90] overflow-hidden ${
+        isExpanded
+          ? "w-[min(560px,calc(100vw-2rem))] h-12 rounded-full flex items-center gap-2 px-3 cursor-default"
+          : "h-9 rounded-full flex items-center gap-2 px-3 cursor-pointer"
+      }`}
+      style={{
+        background: "rgba(10, 12, 14, 0.94)",
+        backdropFilter: "blur(12px)",
+        border: "1px solid var(--border-default)",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 1px var(--border-default)",
+      }}
+    >
+      {/* Avatar — sempre presente (compacto na pill, idem no expandido) */}
+      <div
+        className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+        style={{ background: "var(--green)" }}
       >
-        {!isExpanded && (
-          // Conteúdo da pill (compacto). AnimatePresence interno faz fade
-          // entre os estados (idle/executing/result) sem reabrir a ilha.
-          <motion.div
-            layout="position"
-            className="flex items-center gap-2 w-full"
-          >
-            <div
-              className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ background: "var(--green)" }}
-            >
-              {state.mode === "executing"
-                ? <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
-                : state.mode === "result"
-                  ? <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                  : <Sparkles className="w-3.5 h-3.5 text-white" />}
-            </div>
-            <span className="text-xs font-medium text-white/90 whitespace-nowrap">
-              {state.mode === "executing"
-                ? (state.preview || "Processando…")
-                : state.mode === "result"
-                  ? state.result.text.slice(0, 60)
-                  : "Pergunte ao Uniq AI"}
-            </span>
-            <span className="text-[10px] text-white/40 font-mono ml-1 hidden sm:inline">⌘K</span>
-          </motion.div>
-        )}
+        {state.mode === "executing"
+          ? <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+          : state.mode === "result"
+            ? <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+            : <Sparkles className="w-3.5 h-3.5 text-white" />}
+      </div>
 
-        {isExpanded && (
-          // Conteúdo expandido — fade-in suave. layout="position" preserva
-          // o posicionamento durante o morph.
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.22, delay: 0.1 }}
-            className="flex-1 min-h-0 flex flex-col relative"
+      {/* Pill colapsada: label clicável */}
+      {!isExpanded && (
+        <motion.div layout="position" className="flex items-center gap-2 flex-1 min-w-0">
+          <span className="text-xs font-medium text-white/90 whitespace-nowrap truncate">
+            {state.mode === "executing"
+              ? (state.preview || "Processando…")
+              : state.mode === "result"
+                ? state.result.text.slice(0, 60)
+                : "Pergunte ao Uniq AI"}
+          </span>
+          <span className="text-[10px] text-white/40 font-mono ml-auto hidden sm:inline">⌘K</span>
+        </motion.div>
+      )}
+
+      {/* Pill expandida: input inline + send + close. SEM modal, SEM backdrop. */}
+      {isExpanded && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.18, delay: 0.08 }}
+          className="flex items-center gap-2 flex-1 min-w-0"
+        >
+          <input
+            ref={inputRef}
+            type="text"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submitPrompt();
+              if (e.key === "Escape") close();
+            }}
+            placeholder="Pergunte, crie jornada, agende disparo…"
+            className="flex-1 min-w-0 bg-transparent text-sm text-white placeholder:text-white/40 outline-none"
+          />
+          <button
+            onClick={submitPrompt}
+            disabled={!prompt.trim()}
+            className="w-7 h-7 rounded-full flex items-center justify-center disabled:opacity-30 transition-opacity"
+            style={{ background: "var(--green)" }}
+            aria-label="Enviar"
           >
-            <button
-              onClick={close}
-              className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
-              style={{ background: "var(--surface-3)", color: "var(--text-2)" }}
-              aria-label="Fechar"
-            >
-              <X className="w-4 h-4" />
-            </button>
-            <IslandQuickActions />
-            <div className="flex-1 min-h-0">
-              <UniqAIChatPanel compact messages={messages} onMessagesChange={setMessages} />
-            </div>
-          </motion.div>
-        )}
-      </motion.div>
-    </>
+            <Sparkles className="w-3.5 h-3.5 text-white" />
+          </button>
+          <button
+            onClick={close}
+            className="w-6 h-6 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors"
+            style={{ color: "rgba(255,255,255,0.5)" }}
+            aria-label="Fechar"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </motion.div>
+      )}
+    </motion.div>
   );
 }
 
@@ -236,36 +246,3 @@ export function UniqAIIsland() {
 // disparar o "abrir DI" via botão próprio (header de uma página, etc).
 export { MessageSquare as UniqAIIconAlt };
 
-// IslandQuickActions — strip de notificações/ações rápidas no topo da
-// ilha expandida. Discreto, navegável por teclado, agiliza tarefas
-// comuns sem precisar abrir o chat completo.
-//
-// Próxima iteração: pollar /v1/conversations/inbox-stats + WS subscriber
-// pra puxar eventos reais (mensagem nova, venda concluída, campanha
-// finalizada). Aqui é a estrutura.
-import Link from "next/link";
-import { Inbox, ShoppingBag, Megaphone, Bot } from "lucide-react";
-
-function IslandQuickActions() {
-  const items = [
-    { href: "/inbox", icon: Inbox, label: "Inbox", color: "var(--green)" },
-    { href: "/shops", icon: ShoppingBag, label: "Shop", color: "#fbbf24" },
-    { href: "/campaigns", icon: Megaphone, label: "Campanhas", color: "#60a5fa" },
-    { href: "/agents", icon: Bot, label: "Agentes", color: "#a78bfa" },
-  ];
-  return (
-    <div className="px-3 pt-3 pb-2 flex items-center gap-1.5 border-b" style={{ borderColor: "var(--surface-border)" }}>
-      {items.map((it) => (
-        <Link
-          key={it.href}
-          href={it.href}
-          className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-medium transition-colors"
-          style={{ background: "var(--surface-3)", color: "var(--text-2)" }}
-        >
-          <it.icon className="w-3.5 h-3.5" style={{ color: it.color }} />
-          <span className="hidden sm:inline">{it.label}</span>
-        </Link>
-      ))}
-    </div>
-  );
-}
