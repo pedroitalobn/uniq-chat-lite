@@ -30,6 +30,32 @@ const nextConfig: NextConfig = {
       { source: "/reports/:path*", destination: "/inbox?view=reports", permanent: false },
     ];
   },
+  // Cache headers — HTML dinâmico nunca pode ficar cacheado pelo browser
+  // (chunks no HTML mudam a cada deploy; cache de 1h faz user ver "page
+  // failed to load" até dar refresh manual). Assets estáticos com hash no
+  // path permanecem com cache imutável.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-store, no-cache, must-revalidate, max-age=0",
+          },
+        ],
+      },
+      {
+        source: "/_next/static/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
