@@ -2335,6 +2335,17 @@ export default function InstanceDetailPage() {
     );
   }
 
+  // WABA → manager dedicado (Cloud API). Mostra skeleton enquanto o
+  // useEffect dispara o router.replace, evitando flicker da UI whatsmeow.
+  if (instance?.channel === "waba") {
+    return (
+      <div className="space-y-6">
+        <div className="skeleton h-9 w-56 rounded-xl" />
+        <div className="skeleton h-64 rounded-2xl" />
+      </div>
+    );
+  }
+
   const isConnected = instance.status === "connected";
 
   return (
