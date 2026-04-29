@@ -1487,6 +1487,14 @@ export const conversationsApi = {
   disableBot: (workspaceId: string, id: string) =>
     api.post(`/v1/conversations/${id}/bot/disable`, {}, { headers: wsHeaders(workspaceId) }),
 
+  // Agent State
+  getAgentState: (workspaceId: string, id: string) =>
+    api.get(`/v1/conversations/${id}/agent-state`, { headers: wsHeaders(workspaceId) }),
+  setAgentState: (workspaceId: string, id: string, data: { mode: "active" | "observing" | "disabled"; agent_id?: string; handoff_reason?: string }) =>
+    api.patch(`/v1/conversations/${id}/agent-state`, data, { headers: wsHeaders(workspaceId) }),
+  suggestAgentReply: (workspaceId: string, id: string) =>
+    api.post(`/v1/conversations/${id}/agent/suggest`, {}, { headers: wsHeaders(workspaceId) }),
+
   // Notes
   listNotes: (workspaceId: string, id: string) =>
     api.get(`/v1/conversations/${id}/notes`, { headers: wsHeaders(workspaceId) }),

@@ -180,7 +180,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	outboundReg := outbound.NewRegistry(db, manager, igSvc, taktikSvc)
 	// Shared pipeline reference so the backfill endpoint can run it on demand.
 	conversationPipeline := services.NewInboundPipeline(db, whatsapp.GetHub())
-	conversationH := handlers.NewConversationHandler(db, manager, outboundReg, conversationPipeline)
+	conversationH := handlers.NewConversationHandler(db, manager, outboundReg, conversationPipeline, llmService)
 	departmentH := handlers.NewDepartmentHandler(db)
 	teamH := handlers.NewTeamHandler(db)
 	queueH := handlers.NewQueueHandler(db)
@@ -955,6 +955,10 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	conversations.Post("/:id/unsnooze", middleware.RequireWorkspacePermission(db, models.PermTicketsSnooze), conversationH.Unsnooze)
 	conversations.Post("/:id/bot/enable", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.EnableBot)
 	conversations.Post("/:id/bot/disable", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.DisableBot)
+	// Agent state per conversation
+	conversations.Get("/:id/agent-state", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.GetAgentState)
+	conversations.Patch("/:id/agent-state", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.SetAgentState)
+	conversations.Post("/:id/agent/suggest", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.SuggestAgentReply)
 
 	// Tags on conversations
 	conversations.Get("/:id/tags", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.ListTags)

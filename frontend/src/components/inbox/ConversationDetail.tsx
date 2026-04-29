@@ -16,6 +16,7 @@ import {
 import { AudioPlayer } from "@/components/inbox/AudioPlayer";
 import { AudioRecorderButton } from "@/components/inbox/AudioRecorderButton";
 import { MediaViewer, type MediaViewerSource } from "@/components/inbox/MediaViewer";
+import { AgentPanel } from "@/components/inbox/AgentPanel";
 import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi, crmContactsApi, linkPreviewApi } from "@/lib/api";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TemplatePicker } from "@/components/inbox/TemplatePicker";
@@ -956,6 +957,18 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
         </div>
 
         <div className="flex-1 overflow-auto p-5 text-xs text-zinc-500">
+          {wsId && conversationId && (
+            <div className="mb-4">
+              <AgentPanel
+                workspaceId={wsId as string}
+                conversationId={conversationId}
+                onSendSuggestion={(text) => {
+                  // Injeta o texto na área de input via evento customizado
+                  window.dispatchEvent(new CustomEvent("uniq:inject-reply", { detail: { text } }));
+                }}
+              />
+            </div>
+          )}
           <div className="mb-2 font-medium uppercase tracking-wide">Detalhes</div>
           <dl className="space-y-1">
             <DRow label="Aberto em" value={conv?.created_at && relativeTime(conv.created_at)} />

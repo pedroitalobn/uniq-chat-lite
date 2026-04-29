@@ -27,6 +27,7 @@ type ConversationHandler struct {
 	manager  *whatsapp.Manager
 	outbound *outbound.Registry
 	pipeline *services.InboundPipeline
+	llm      *services.LLMService
 }
 
 func NewConversationHandler(
@@ -34,8 +35,9 @@ func NewConversationHandler(
 	manager *whatsapp.Manager,
 	outboundReg *outbound.Registry,
 	pipeline *services.InboundPipeline,
+	llm *services.LLMService,
 ) *ConversationHandler {
-	return &ConversationHandler{db: db, manager: manager, outbound: outboundReg, pipeline: pipeline}
+	return &ConversationHandler{db: db, manager: manager, outbound: outboundReg, pipeline: pipeline, llm: llm}
 }
 
 // -- list -------------------------------------------------------------------
@@ -2646,4 +2648,242 @@ func (h *ConversationHandler) resolveConvByIDOrKey(rawID string, ws uuid.UUID, q
 		return nil, err
 	}
 	return &conv, nil
+}
+
+// ── Agent State per Conversation ────────────────────────────────────────────
+
+// GetAgentState GET /v1/conversations/:id/agent-state
+// Retorna o estado operacional do agente para a conversa.
+func (h *ConversationHandler) GetAgentState(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	if err := h.assertAccess(ws, id); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	var state models.ConversationAgentState
+	if err := h.db.Preload("Agent").Where("conversation_id = ?", id).First(&state).Error; err != nil {
+		// Sem state explícito — retorna estado padrão derivado de is_bot_active
+		var conv models.Conversation
+		h.db.Select("id, is_bot_active").Where("id = ?", id).First(&conv)
+		mode := models.AgentModeActive
+		if !conv.IsBotActive {
+			mode = models.AgentModeDisabled
+		}
+		return c.JSON(fiber.Map{
+			"conversation_id": id,
+			"mode":            mode,
+			"agent_id":        nil,
+			"agent":           nil,
+			"last_suggestion": "",
+			"suggestion_at":   nil,
+			"handoff_reason":  "",
+		})
+	}
+	return c.JSON(state)
+}
+
+// SetAgentState PATCH /v1/conversations/:id/agent-state
+// Atualiza o modo e/ou agente da conversa.
+// Body: { mode: "active"|"observing"|"disabled", agent_id?: uuid, handoff_reason?: string }
+func (h *ConversationHandler) SetAgentState(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	if err := h.assertAccess(ws, id); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	var body struct {
+		Mode           string  `json:"mode"`
+		AgentID        *string `json:"agent_id"`
+		HandoffReason  string  `json:"handoff_reason"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	mode := models.AgentMode(body.Mode)
+	if mode != models.AgentModeActive && mode != models.AgentModeObserving && mode != models.AgentModeDisabled {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "mode deve ser active, observing ou disabled"})
+	}
+
+	var agentID *uuid.UUID
+	if body.AgentID != nil && *body.AgentID != "" {
+		parsed, err := uuid.Parse(*body.AgentID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "agent_id inválido"})
+		}
+		agentID = &parsed
+	}
+
+	var state models.ConversationAgentState
+	result := h.db.Where("conversation_id = ?", id).First(&state)
+	if result.Error != nil {
+		// Create
+		state = models.ConversationAgentState{
+			ConversationID: id,
+			Mode:           mode,
+			AgentID:        agentID,
+			HandoffReason:  body.HandoffReason,
+		}
+		h.db.Create(&state)
+	} else {
+		// Update
+		updates := map[string]any{"mode": mode, "handoff_reason": body.HandoffReason}
+		if agentID != nil {
+			updates["agent_id"] = agentID
+		}
+		h.db.Model(&state).Updates(updates)
+	}
+
+	// Sync is_bot_active on conversation for backward compat
+	botActive := mode == models.AgentModeActive || mode == models.AgentModeObserving
+	h.db.Model(&models.Conversation{}).Where("id = ?", id).Update("is_bot_active", botActive)
+
+	// Audit event
+	actor := middleware.GetCurrentUserID(c)
+	h.db.Create(&models.ConversationEvent{
+		ConversationID: id,
+		WorkspaceID:    ws,
+		ActorType:      models.ActorUser,
+		ActorUserID:    &actor,
+		EventType:      models.ConvEventBotHandoff,
+		Payload:        jsonEncode(map[string]any{"mode": mode, "handoff_reason": body.HandoffReason}),
+	})
+
+	h.db.Preload("Agent").Where("conversation_id = ?", id).First(&state)
+	return c.JSON(state)
+}
+
+// SuggestAgentReply POST /v1/conversations/:id/agent/suggest
+// Gera uma sugestão de resposta sem enviar — para uso no modo "observing".
+// Salva a sugestão no ConversationAgentState e retorna o texto.
+func (h *ConversationHandler) SuggestAgentReply(c *fiber.Ctx) error {
+	if h.llm == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "LLM não configurado"})
+	}
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	if err := h.assertAccess(ws, id); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Load conversation + agent
+	var conv models.Conversation
+	if err := h.db.Where("id = ? AND workspace_id = ?", id, ws).First(&conv).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "conversa não encontrada"})
+	}
+
+	// Resolve agent: check override first, then instance
+	var agent models.InstanceAgent
+	var state models.ConversationAgentState
+	hasState := h.db.Preload("Agent").Where("conversation_id = ?", id).First(&state).Error == nil
+
+	if hasState && state.AgentID != nil {
+		if err := h.db.Preload("Integration").Preload("Assets", func(tx *gorm.DB) *gorm.DB {
+			return tx.Where("is_active = ?", true)
+		}).Where("id = ? AND is_active = ?", *state.AgentID, true).First(&agent).Error; err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "agente configurado não encontrado"})
+		}
+	} else {
+		// Fallback: instance agent
+		if err := h.db.Preload("Integration").Preload("Assets", func(tx *gorm.DB) *gorm.DB {
+			return tx.Where("is_active = ?", true)
+		}).Where("instance_id = ? AND is_active = ?", conv.InstanceID, true).First(&agent).Error; err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "nenhum agente ativo nesta instância"})
+		}
+	}
+
+	if agent.Integration == nil {
+		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{"error": "agente sem integração de LLM configurada"})
+	}
+
+	// Load last messages for context
+	var logs []models.MessageLog
+	h.db.Where("conversation_id = ?", id).Order("created_at DESC").Limit(10).Find(&logs)
+
+	var historyLines []string
+	for i := len(logs) - 1; i >= 0; i-- {
+		l := logs[i]
+		content := l.Content
+		var s string
+		if json.Unmarshal([]byte(content), &s) == nil {
+			content = s
+		}
+		content = strings.TrimSpace(content)
+		if content == "" {
+			continue
+		}
+		role := "Cliente"
+		if l.Direction == models.DirectionOut {
+			role = "Agente"
+		}
+		historyLines = append(historyLines, "- "+role+": "+content)
+	}
+
+	contactName := ""
+	if conv.Contact != nil {
+		contactName = conv.Contact.Name
+	}
+
+	systemPrompt := services.BuildAgentSystemPrompt(&agent, agent.Assets)
+	userPrompt := "Contexto da conversa em tempo real.\n" +
+		"Contato: " + contactName + "\n" +
+		"Canal: " + string(conv.ChannelType) + "\n\n"
+	if len(historyLines) > 0 {
+		userPrompt += "Histórico recente:\n" + strings.Join(historyLines, "\n") + "\n\n"
+	}
+	userPrompt += "Gere uma sugestão de resposta para o próximo turno. Seja conciso e natural.\n" +
+		"Responda como o agente configurado, sem mencionar prompts ou estrutura interna."
+
+	integration := agent.Integration
+	if model := strings.TrimSpace(agent.Model); model != "" {
+		integCopy := *integration
+		if b, err := json.Marshal([]string{model}); err == nil {
+			integCopy.Models = string(b)
+		}
+		integration = &integCopy
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+
+	suggestion, err := h.llm.CallChatWithSystem(ctx, integration, systemPrompt, userPrompt, false)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao gerar sugestão: " + err.Error()})
+	}
+	suggestion = strings.TrimSpace(suggestion)
+
+	// Persist suggestion in state
+	now := time.Now()
+	if hasState {
+		h.db.Model(&state).Updates(map[string]any{
+			"last_suggestion": suggestion,
+			"suggestion_at":   now,
+		})
+	} else {
+		state = models.ConversationAgentState{
+			ConversationID:  id,
+			Mode:            models.AgentModeObserving,
+			LastSuggestion:  suggestion,
+			SuggestionAt:    &now,
+		}
+		h.db.Create(&state)
+	}
+
+	return c.JSON(fiber.Map{
+		"suggestion":    suggestion,
+		"suggestion_at": now,
+		"agent_name":    agent.AgentName,
+		"model":         agent.Model,
+	})
 }

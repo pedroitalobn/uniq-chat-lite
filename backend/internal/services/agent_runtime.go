@@ -59,11 +59,7 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		return false
 	}
 
-	// Respect explicit human handoff: if a live Conversation exists for this
-	// (instance, channel_key) with is_bot_active=false, skip the bot entirely.
-	// Also: if the Queue attached to the conversation has its own chatbot,
-	// that agent takes precedence over the instance-level one.
-	agent, found := r.resolveAgent(instUUID, fromJID)
+	agent, agentMode, found := r.resolveAgent(instUUID, fromJID)
 	if !found {
 		return false
 	}
@@ -106,6 +102,17 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		return false
 	}
 
+	// Modo "observing": salva sugestão no estado da conversa, não envia.
+	if agentMode == models.AgentModeObserving {
+		r.saveSuggestion(instUUID, fromJID, messageID, reply)
+		log.Info().
+			Str("instance", instanceID).
+			Str("chat", fromJID).
+			Str("agent", agent.AgentName).
+			Msg("agent-runtime: sugestão salva (modo observing)")
+		return true
+	}
+
 	_ = client.SendTyping(fromJID, true)
 	time.Sleep(900 * time.Millisecond)
 	_, sendErr := client.SendTextMessage(fromJID, reply)
@@ -124,19 +131,62 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 	return true
 }
 
+// saveSuggestion persiste a última sugestão gerada no modo observing.
+func (r *AgentRuntime) saveSuggestion(instanceID uuid.UUID, fromJID, msgID, suggestion string) {
+	var conv models.Conversation
+	if err := r.db.
+		Where("instance_id = ? AND channel_key = ?", instanceID, fromJID).
+		Where("status IN ?", []models.ConversationStatus{
+			models.ConversationStatusOpen,
+			models.ConversationStatusPending,
+			models.ConversationStatusSnoozed,
+		}).
+		Order("updated_at DESC").
+		First(&conv).Error; err != nil {
+		return
+	}
+	now := time.Now()
+	var state models.ConversationAgentState
+	if r.db.Where("conversation_id = ?", conv.ID).First(&state).Error != nil {
+		r.db.Create(&models.ConversationAgentState{
+			ConversationID:  conv.ID,
+			Mode:            models.AgentModeObserving,
+			LastSuggestion:  suggestion,
+			SuggestionAt:    &now,
+			SuggestionMsgID: msgID,
+		})
+	} else {
+		r.db.Model(&state).Updates(map[string]interface{}{
+			"last_suggestion":   suggestion,
+			"suggestion_at":     now,
+			"suggestion_msg_id": msgID,
+		})
+	}
+}
+
 // resolveAgent decides which InstanceAgent answers a given inbound message.
 //
-// Precedence (per user spec):
-//  1. If a live Conversation has is_bot_active=false → no bot at all.
-//  2. If that Conversation belongs to a Queue with EnableChatbot=true and
-//     ChatbotAgentID set → that queue agent wins.
-//  3. Otherwise, fall back to the instance-level InstanceAgent.
+// Precedence:
+//  1. ConversationAgentState.Mode = disabled → no bot.
+//  2. ConversationAgentState.AgentID set → use that specific agent.
+//  3. ConversationAgentState.Mode = active|observing, no AgentID → continue.
+//  4. If no state: Conversation.is_bot_active=false → no bot.
+//  5. Queue-level agent (EnableChatbot + ChatbotAgentID).
+//  6. Instance-level agent fallback.
 //
-// A returned (nil, false) means "do not reply"; (agent, true) means "use this".
-func (r *AgentRuntime) resolveAgent(instanceID uuid.UUID, fromJID string) (*models.InstanceAgent, bool) {
+// Returns (agent, mode, found). mode is AgentModeActive or AgentModeObserving.
+func (r *AgentRuntime) resolveAgent(instanceID uuid.UUID, fromJID string) (*models.InstanceAgent, models.AgentMode, bool) {
+	preloadAgent := func(db *gorm.DB, cond string, args ...interface{}) (*models.InstanceAgent, bool) {
+		var a models.InstanceAgent
+		err := db.Preload("Integration").Preload("Assets", func(tx *gorm.DB) *gorm.DB {
+			return tx.Where("is_active = ?", true).Order("created_at DESC")
+		}).Where(cond, args...).First(&a).Error
+		return &a, err == nil
+	}
+
 	// Load the active conversation for this instance + channel_key.
 	var conv models.Conversation
-	err := r.db.
+	convErr := r.db.
 		Where("instance_id = ? AND channel_key = ?", instanceID, fromJID).
 		Where("status IN ?", []models.ConversationStatus{
 			models.ConversationStatusOpen,
@@ -146,36 +196,57 @@ func (r *AgentRuntime) resolveAgent(instanceID uuid.UUID, fromJID string) (*mode
 		Order("updated_at DESC").
 		First(&conv).Error
 
-	if err == nil && !conv.IsBotActive {
-		// Human handoff explicitly disabled the bot for this conversation.
-		return nil, false
+	// Check per-conversation agent state (highest precedence)
+	if convErr == nil {
+		var state models.ConversationAgentState
+		if stateErr := r.db.Where("conversation_id = ?", conv.ID).First(&state).Error; stateErr == nil {
+			if state.Mode == models.AgentModeDisabled {
+				return nil, models.AgentModeDisabled, false
+			}
+			mode := state.Mode
+			if mode == "" {
+				mode = models.AgentModeActive
+			}
+			// Agent override
+			if state.AgentID != nil {
+				if a, ok := preloadAgent(r.db, "id = ? AND is_active = ?", *state.AgentID, true); ok {
+					return a, mode, true
+				}
+			}
+			// No agent override but mode is set — fall through to queue/instance resolution
+			// but preserve the mode.
+			if a, ok := r.resolveQueueOrInstance(conv, instanceID, preloadAgent); ok {
+				return a, mode, true
+			}
+			return nil, models.AgentModeDisabled, false
+		}
 	}
 
-	// Try queue-level agent first
-	if err == nil && conv.QueueID != nil {
+	// Legacy: check is_bot_active
+	if convErr == nil && !conv.IsBotActive {
+		return nil, models.AgentModeDisabled, false
+	}
+
+	if a, ok := r.resolveQueueOrInstance(conv, instanceID, preloadAgent); ok {
+		return a, models.AgentModeActive, true
+	}
+	return nil, models.AgentModeDisabled, false
+}
+
+func (r *AgentRuntime) resolveQueueOrInstance(conv models.Conversation, instanceID uuid.UUID, load func(*gorm.DB, string, ...interface{}) (*models.InstanceAgent, bool)) (*models.InstanceAgent, bool) {
+	// Queue-level agent
+	if conv.QueueID != nil {
 		var q models.Queue
 		if qErr := r.db.First(&q, "id = ?", *conv.QueueID).Error; qErr == nil {
 			if q.EnableChatbot && q.ChatbotAgentID != nil {
-				var agent models.InstanceAgent
-				qa := r.db.Preload("Integration").Preload("Assets", func(tx *gorm.DB) *gorm.DB {
-					return tx.Where("is_active = ?", true).Order("created_at DESC")
-				}).Where("id = ? AND is_active = ?", *q.ChatbotAgentID, true).First(&agent)
-				if qa.Error == nil {
-					return &agent, true
+				if a, ok := load(r.db, "id = ? AND is_active = ?", *q.ChatbotAgentID, true); ok {
+					return a, true
 				}
 			}
 		}
 	}
-
-	// Fallback: instance-level agent
-	var agent models.InstanceAgent
-	fallback := r.db.Preload("Integration").Preload("Assets", func(tx *gorm.DB) *gorm.DB {
-		return tx.Where("is_active = ?", true).Order("created_at DESC")
-	}).Where("instance_id = ? AND is_active = ?", instanceID, true).First(&agent)
-	if fallback.Error != nil {
-		return nil, false
-	}
-	return &agent, true
+	// Instance-level fallback
+	return load(r.db, "instance_id = ? AND is_active = ?", instanceID, true)
 }
 
 func (r *AgentRuntime) buildUserPrompt(instanceID uuid.UUID, fromJID, fromName, latestMessage, messageType string) string {
