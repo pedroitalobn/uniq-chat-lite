@@ -1,7 +1,6 @@
 package services
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -164,21 +163,21 @@ func (o *ClaudeOAuth) ExchangeCode(ctx context.Context, code, state string) (*Cl
 	// para copy-paste manual. Separamos aqui para não contaminar o token endpoint.
 	rawCode := strings.SplitN(code, "#", 2)[0]
 
-	body := map[string]string{
-		"grant_type":    DefaultClaudeOAuthGrantType,
-		"client_id":     claudeClientID(),
-		"code":          rawCode,
-		"redirect_uri":  p.redirectURI,
-		"code_verifier": p.verifier,
-		"state":         state,
-	}
-	payload, _ := json.Marshal(body)
+	// RFC 6749 §4.1.3: token endpoint exige application/x-www-form-urlencoded.
+	// `state` não faz parte do token request — só vai na autorização e no
+	// lookup interno acima.
+	form := url.Values{}
+	form.Set("grant_type", DefaultClaudeOAuthGrantType)
+	form.Set("client_id", claudeClientID())
+	form.Set("code", rawCode)
+	form.Set("redirect_uri", p.redirectURI)
+	form.Set("code_verifier", p.verifier)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, claudeTokenURL(), bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, claudeTokenURL(), strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, "", err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
 	client := &http.Client{Timeout: 30 * time.Second}
@@ -205,18 +204,16 @@ func (o *ClaudeOAuth) ExchangeCode(ctx context.Context, code, state string) (*Cl
 
 // RefreshAccessToken renova o access token usando o refresh token.
 func (o *ClaudeOAuth) RefreshAccessToken(ctx context.Context, refreshToken string) (*ClaudeOAuthTokenResp, error) {
-	body := map[string]string{
-		"grant_type":    "refresh_token",
-		"client_id":     claudeClientID(),
-		"refresh_token": refreshToken,
-	}
-	payload, _ := json.Marshal(body)
+	form := url.Values{}
+	form.Set("grant_type", "refresh_token")
+	form.Set("client_id", claudeClientID())
+	form.Set("refresh_token", refreshToken)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, claudeTokenURL(), bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, claudeTokenURL(), strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
 	client := &http.Client{Timeout: 30 * time.Second}
