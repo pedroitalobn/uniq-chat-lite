@@ -262,10 +262,10 @@ func (h *MediaHealthHandler) proxyMediaKey(c *fiber.Ctx, key, filename, disposit
 			"error": "falha ao buscar do storage: " + err.Error(),
 		})
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 && resp.StatusCode != 206 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		resp.Body.Close()
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
 			"error":           "storage retornou erro",
 			"upstream_status": resp.StatusCode,
@@ -288,6 +288,8 @@ func (h *MediaHealthHandler) proxyMediaKey(c *fiber.Ctx, key, filename, disposit
 	c.Set("Accept-Ranges", "bytes")
 
 	c.Status(resp.StatusCode)
+	// SendStream hands the reader to fasthttp; closing resp.Body here would
+	// cut the response before Cloudflare/n8n receives the full media body.
 	return c.SendStream(resp.Body)
 }
 
