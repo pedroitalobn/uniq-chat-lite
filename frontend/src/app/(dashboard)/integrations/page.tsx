@@ -54,7 +54,7 @@ const PROVIDERS = [
   { id: "openai", name: "ChatGPT (OpenAI)", description: "gpt-4o, gpt-4o-mini, o1-preview", color: "#10a37f", bg: "rgba(16,163,127,0.08)", border: "rgba(16,163,127,0.2)", models: ["gpt-4o", "gpt-4o-mini", "o1-preview"] },
   { id: "deepseek", name: "DeepSeek", description: "deepseek-chat, deepseek-reasoner", color: "#4f6ef7", bg: "rgba(79,110,247,0.08)", border: "rgba(79,110,247,0.2)", models: ["deepseek-chat", "deepseek-reasoner"] },
   { id: "gemini", name: "Gemini (Google)", description: "gemini-1.5-pro, gemini-1.5-flash, gemini-2.0-flash", color: "#4285f4", bg: "rgba(66,133,244,0.08)", border: "rgba(66,133,244,0.2)", models: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash"] },
-  { id: "openrouter", name: "OpenRouter", description: "API key OR login com conta OpenRouter — 100+ modelos", color: "#7c3aed", bg: "rgba(124,58,237,0.08)", border: "rgba(124,58,237,0.2)", models: ["anthropic/claude-sonnet-4.5", "openai/gpt-5", "google/gemini-2.5-pro"], supportsOAuth: true },
+  { id: "openrouter", name: "OpenRouter", description: "100+ modelos via API key", color: "#7c3aed", bg: "rgba(124,58,237,0.08)", border: "rgba(124,58,237,0.2)", models: ["anthropic/claude-sonnet-4.5", "openai/gpt-5", "google/gemini-2.5-pro"] },
   { id: "qwen", name: "Qwen (Alibaba)", description: "qwen-turbo, qwen-plus, qwen-max", color: "#ff6a00", bg: "rgba(255,106,0,0.08)", border: "rgba(255,106,0,0.2)", models: ["qwen-turbo", "qwen-plus", "qwen-max"] },
   { id: "kimi", name: "Kimi (Moonshot)", description: "moonshot-v1-8k/32k/128k", color: "#1f8ae0", bg: "rgba(31,138,224,0.08)", border: "rgba(31,138,224,0.2)", models: ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"] },
   { id: "mistral", name: "Mistral AI", description: "mistral-large, mistral-small, codestral", color: "#ff7000", bg: "rgba(255,112,0,0.08)", border: "rgba(255,112,0,0.2)", models: ["mistral-large-latest", "mistral-small-latest", "codestral-latest", "mistral-medium-latest"] },
@@ -597,18 +597,8 @@ function ProxiesSection() {
 function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId; onClose: () => void }) {
   const provider = PROVIDERS.find(p => p.id === providerId)!;
   const qc = useQueryClient();
-  // Tipo pode ser estritamente inferido só para providers que o suportam
-  const supportsOAuth = "supportsOAuth" in provider && (provider as { supportsOAuth?: boolean }).supportsOAuth === true;
-  const [authMode, setAuthMode] = useState<"api_key" | "oauth">(supportsOAuth ? "oauth" : "api_key");
   const [form, setForm] = useState<{ name: string; api_key: string; models: string[] }>({ name: provider.name, api_key: "", models: [] });
   const [showKey, setShowKey] = useState(false);
-
-  // OAuth state
-  const [oauthURL, setOauthURL] = useState<string>("");
-  const [oauthState, setOauthState] = useState<string>("");
-  const [oauthCode, setOauthCode] = useState<string>("");
-  const [oauthStarting, setOauthStarting] = useState(false);
-  const [oauthCompleting, setOauthCompleting] = useState(false);
 
   const create = useMutation({
     mutationFn: () => integrationsApi.create({ provider: providerId, name: form.name, api_key: form.api_key, models: form.models.length ? form.models : undefined }),
@@ -616,48 +606,14 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
     onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro"),
   });
 
-  const startOAuth = async () => {
-    setOauthStarting(true);
-    try {
-      let r;
-      if (providerId === "openrouter") {
-        const callbackUrl = `${window.location.origin}/integrations/openrouter/callback`;
-        r = await integrationsApi.startOpenRouterOAuth(callbackUrl);
-      } else {
-        r = await integrationsApi.startClaudeOAuth();
-      }
-      setOauthURL(r.data.auth_url);
-      setOauthState(r.data.state);
-      window.open(r.data.auth_url, "_blank", "noopener,noreferrer");
-    } catch (e: unknown) {
-      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Falha ao iniciar OAuth");
-    } finally {
-      setOauthStarting(false);
-    }
+  const API_KEY_LINKS: Partial<Record<ProviderId, { href: string; label: string }>> = {
+    claude:      { href: "https://console.anthropic.com/settings/keys", label: "console.anthropic.com/settings/keys" },
+    openai:      { href: "https://platform.openai.com/api-keys",        label: "platform.openai.com/api-keys" },
+    openrouter:  { href: "https://openrouter.ai/settings/keys",         label: "openrouter.ai/settings/keys" },
+    deepseek:    { href: "https://platform.deepseek.com/api_keys",      label: "platform.deepseek.com/api_keys" },
+    gemini:      { href: "https://aistudio.google.com/apikey",          label: "aistudio.google.com/apikey" },
   };
-
-  const completeOAuth = async () => {
-    if (!oauthCode.trim() || !oauthState) {
-      toast.error("Cole o código mostrado após autorizar.");
-      return;
-    }
-    setOauthCompleting(true);
-    try {
-      if (providerId === "openrouter") {
-        await integrationsApi.completeOpenRouterOAuth({ code: oauthCode.trim(), state: oauthState, name: form.name });
-        toast.success("OpenRouter conectado via OAuth!");
-      } else {
-        await integrationsApi.completeClaudeOAuth({ code: oauthCode.trim(), state: oauthState, name: form.name });
-        toast.success("Claude.ai conectado via OAuth!");
-      }
-      qc.invalidateQueries({ queryKey: ["integrations"] });
-      onClose();
-    } catch (e: unknown) {
-      toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Falha no OAuth");
-    } finally {
-      setOauthCompleting(false);
-    }
-  };
+  const keyLink = API_KEY_LINKS[providerId];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "var(--surface-overlay)" }}>
@@ -667,149 +623,53 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
           <div><h2 className="font-medium" style={{ color: "var(--text-1)" }}>Conectar {provider.name}</h2><p className="text-xs" style={{ color: "var(--text-3)" }}>{provider.description}</p></div>
         </div>
 
-        {/* Auth mode selector (apenas para providers com supportsOAuth) */}
-        {supportsOAuth && (
-          <div className="flex rounded-xl p-1" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
-            <button
-              type="button"
-              onClick={() => setAuthMode("oauth")}
-              className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors"
-              style={{ background: authMode === "oauth" ? provider.color + "22" : "transparent", color: authMode === "oauth" ? provider.color : "var(--text-3)" }}>
-              🔐 Login com {providerId === "openrouter" ? "OpenRouter" : "Claude.ai"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setAuthMode("api_key")}
-              className="flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors"
-              style={{ background: authMode === "api_key" ? "var(--border-default)" : "transparent", color: authMode === "api_key" ? "var(--text-1)" : "var(--text-3)" }}>
-              🔑 API Key
-            </button>
-          </div>
-        )}
-
         <div>
           <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Nome</label>
           <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="input-field w-full" />
         </div>
 
-        {authMode === "api_key" ? (
-          <>
-            {providerId === "claude" && (
-              <a
-                href="https://console.anthropic.com/settings/keys"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs rounded-xl px-3 py-2.5 w-full"
-                style={{ background: "rgba(212,162,127,0.08)", border: "1px solid rgba(212,162,127,0.2)", color: "#d4a27f" }}>
-                <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
-                Obter API key em console.anthropic.com/settings/keys
-              </a>
-            )}
-            <div>
-              <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>API Key</label>
-              <div className="relative">
-                <input type={showKey ? "text" : "password"} value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })} className="input-field w-full" style={{ paddingRight: "2.5rem" }} placeholder={providerId === "claude" ? "sk-ant-..." : "sk-..."} />
-                <button type="button" onClick={() => setShowKey(!showKey)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-3)" }}>
-                  {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-            {provider.models.length > 0 && (
-              <div className="space-y-2">
-                <label className="text-xs font-medium" style={{ color: "var(--text-2)" }}>Modelos</label>
-                <div className="rounded-xl border p-3 max-h-40 overflow-y-auto" style={{ background: "var(--surface-3)", borderColor: "var(--surface-border)" }}>
-                  {provider.models.map(m => (
-                    <label key={m} className="flex items-center gap-2">
-                      <input type="checkbox" checked={form.models.includes(m)} onChange={e => setForm(f => ({ ...f, models: e.target.checked ? [...f.models, m] : f.models.filter(x => x !== m) }))} className="rounded" />
-                      <span className="text-sm">{m}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="flex gap-2 pt-2">
-              <button onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
-              <button onClick={() => create.mutate()} disabled={create.isPending || !form.api_key} className="btn-primary flex-1">
-                {create.isPending ? "Conectando..." : "Conectar"}
-              </button>
-            </div>
-          </>
-        ) : (
-          // ─── OAuth flow ────────────────────────────────────────────────────
-          <div className="space-y-3">
-            {providerId !== "openrouter" ? (
-              <div className="rounded-xl p-3 text-xs" style={{ background: "rgba(217,119,6,0.06)", border: "1px solid rgba(217,119,6,0.2)" }}>
-                <p className="font-medium mb-2" style={{ color: "var(--text-1)" }}>Como funciona:</p>
-                <ol className="list-decimal list-inside space-y-1" style={{ color: "var(--text-3)" }}>
-                  <li>Clique &quot;Abrir autorização&quot; — claude.ai abre em nova aba.</li>
-                  <li>Autorize o acesso da sua conta Claude.</li>
-                  <li>O browser vai mostrar <strong style={{ color: "var(--text-2)" }}>erro de conexão</strong> — isso é esperado.</li>
-                  <li>Copie a <strong style={{ color: "var(--text-2)" }}>URL completa</strong> da barra de endereços e cole abaixo.</li>
-                </ol>
-              </div>
-            ) : (
-              <div className="rounded-xl p-3 text-xs" style={{ background: "rgba(0,212,106,0.06)", border: "1px solid rgba(0,212,106,0.2)" }}>
-                <p style={{ color: "var(--text-1)" }}><strong>Como funciona:</strong></p>
-                <ol className="list-decimal list-inside space-y-1 mt-2" style={{ color: "var(--text-3)" }}>
-                  <li>Clique &quot;Abrir autorização&quot; — openrouter.ai abre.</li>
-                  <li>Autorize o acesso da sua conta.</li>
-                  <li>Redireciona de volta automaticamente.</li>
-                </ol>
-              </div>
-            )}
+        {keyLink && (
+          <a
+            href={keyLink.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs rounded-xl px-3 py-2.5 w-full"
+            style={{ background: `${provider.color}12`, border: `1px solid ${provider.color}30`, color: provider.color }}>
+            <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+            Obter API key em {keyLink.label}
+          </a>
+        )}
 
-            {!oauthState ? (
-              <button
-                onClick={startOAuth}
-                disabled={oauthStarting}
-                className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2"
-                style={{ background: provider.color, color: "#0d0d0d" }}>
-                {oauthStarting ? "Gerando link..." : `🚀 Abrir autorização ${providerId === "openrouter" ? "OpenRouter" : "Claude.ai"}`}
-              </button>
-            ) : providerId === "openrouter" ? (
-              <div className="rounded-xl p-3 text-xs space-y-2" style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)" }}>
-                <p style={{ color: "var(--text-1)" }}>Aguardando o OpenRouter redirecionar…</p>
-                {oauthURL && (
-                  <p style={{ color: "var(--text-3)" }}>
-                    Não abriu?{" "}
-                    <a href={oauthURL} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: provider.color }}>clique aqui</a>
-                  </p>
-                )}
-                <button onClick={onClose} className="btn-ghost text-xs mt-1">Cancelar</button>
-              </div>
-            ) : (
-              <>
-                {oauthURL && (
-                  <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
-                    Não abriu?{" "}
-                    <a href={oauthURL} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: provider.color }}>clique aqui</a>
-                  </p>
-                )}
-                <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>
-                    URL da barra de endereços (após o erro de conexão)
-                  </label>
-                  <textarea
-                    value={oauthCode}
-                    onChange={e => setOauthCode(e.target.value)}
-                    placeholder="http://localhost/callback?code=...&state=..."
-                    rows={3}
-                    className="input-field w-full font-mono text-xs"
-                  />
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <button onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
-                  <button
-                    onClick={completeOAuth}
-                    disabled={oauthCompleting || !oauthCode.trim()}
-                    className="btn-primary flex-1">
-                    {oauthCompleting ? "Finalizando..." : "Finalizar"}
-                  </button>
-                </div>
-              </>
-            )}
+        <div>
+          <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>API Key</label>
+          <div className="relative">
+            <input type={showKey ? "text" : "password"} value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })} className="input-field w-full" style={{ paddingRight: "2.5rem" }} placeholder="sk-..." />
+            <button type="button" onClick={() => setShowKey(!showKey)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-3)" }}>
+              {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        {provider.models.length > 0 && (
+          <div className="space-y-2">
+            <label className="text-xs font-medium" style={{ color: "var(--text-2)" }}>Modelos</label>
+            <div className="rounded-xl border p-3 max-h-40 overflow-y-auto" style={{ background: "var(--surface-3)", borderColor: "var(--surface-border)" }}>
+              {provider.models.map(m => (
+                <label key={m} className="flex items-center gap-2">
+                  <input type="checkbox" checked={form.models.includes(m)} onChange={e => setForm(f => ({ ...f, models: e.target.checked ? [...f.models, m] : f.models.filter(x => x !== m) }))} className="rounded" />
+                  <span className="text-sm">{m}</span>
+                </label>
+              ))}
+            </div>
           </div>
         )}
+
+        <div className="flex gap-2 pt-2">
+          <button onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
+          <button onClick={() => create.mutate()} disabled={create.isPending || !form.api_key} className="btn-primary flex-1">
+            {create.isPending ? "Conectando..." : "Conectar"}
+          </button>
+        </div>
       </div>
     </div>
   );
