@@ -160,10 +160,14 @@ func (o *ClaudeOAuth) ExchangeCode(ctx context.Context, code, state string) (*Cl
 		return nil, "", fmt.Errorf("autorização expirada, tente de novo")
 	}
 
+	// A página de callback da Anthropic exibe o código no formato "code#state"
+	// para copy-paste manual. Separamos aqui para não contaminar o token endpoint.
+	rawCode := strings.SplitN(code, "#", 2)[0]
+
 	body := map[string]string{
 		"grant_type":    DefaultClaudeOAuthGrantType,
 		"client_id":     claudeClientID(),
-		"code":          code,
+		"code":          rawCode,
 		"redirect_uri":  p.redirectURI,
 		"code_verifier": p.verifier,
 		"state":         state,
