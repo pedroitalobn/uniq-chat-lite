@@ -782,15 +782,7 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
                   <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Código de autorização</label>
                   <textarea
                     value={oauthCode}
-                    onChange={e => {
-                      // A Anthropic exibe "code#state" na página de callback.
-                      // Extraímos só o code; se o state estiver embutido e
-                      // ainda não foi definido, preenchemos automaticamente.
-                      const raw = e.target.value;
-                      const [codePart, statePart] = raw.split("#");
-                      setOauthCode(codePart);
-                      if (statePart && !oauthState) setOauthState(statePart.trim());
-                    }}
+                    onChange={e => setOauthCode(e.target.value)}
                     placeholder="Cole o código mostrado pela página da Anthropic após autorizar..."
                     rows={3}
                     className="input-field w-full font-mono text-xs"
