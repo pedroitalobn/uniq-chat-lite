@@ -299,18 +299,23 @@ export function UniqAIChatPanel({
   if (isEmpty) {
     return (
       <div className="flex flex-col h-full" style={{ background: "var(--surface-2)" }}>
-        <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-4 sm:px-8">
-          <div className="w-full max-w-2xl">
-            <EmptyState onSuggestionClick={handleSuggestionClick} />
-            <div className="mt-2">
-              <MentionPicker
-                value={prompt}
-                onChange={(v) => setPrompt(v)}
-                onSend={handleSend}
-                disabled={isStreaming}
-                isLoading={isStreaming}
-                placeholder="Pergunte ou peça… use /instancia, /grupo, /contato, /tag, /funil ou /jornada."
-              />
+        {/* overflow-y-auto + py em vez de justify-center: garante que em
+            telas baixas (laptop, mobile landscape) o conteúdo role em vez
+            de ser cortado pelo overflow-hidden do wrapper externo. */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8">
+          <div className="min-h-full flex flex-col items-center justify-center py-6 sm:py-10">
+            <div className="w-full max-w-2xl">
+              <EmptyState onSuggestionClick={handleSuggestionClick} />
+              <div className="mt-2">
+                <MentionPicker
+                  value={prompt}
+                  onChange={(v) => setPrompt(v)}
+                  onSend={handleSend}
+                  disabled={isStreaming}
+                  isLoading={isStreaming}
+                  placeholder="Pergunte ou peça… use /instancia, /grupo, /contato, /tag, /funil ou /jornada."
+                />
+              </div>
             </div>
           </div>
         </div>

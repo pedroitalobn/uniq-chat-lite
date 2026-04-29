@@ -94,6 +94,24 @@ export function UniqAIIsland() {
     if (state.mode !== "expanded") return;
   }, [state.mode]);
 
+  // Hooks do branch desktop precisam ser declarados ANTES de qualquer
+  // early return — caso contrário, a contagem de hooks muda entre
+  // renders (ex: navegar de /inbox pra /uniq-ai colapsa o componente
+  // pra `return null` e dispara React error #300/#310).
+  const isExpanded = state.mode === "expanded";
+  const isNotif = state.mode === "notification";
+  const [prompt, setPrompt] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isExpanded) {
+      // Foca o input após a animação de morph terminar.
+      setTimeout(() => inputRef.current?.focus(), 220);
+    } else {
+      setPrompt("");
+    }
+  }, [isExpanded]);
+
   if (shouldHide(pathname, isMobile)) return null;
 
   // Mobile: bubble FAB + bottom-sheet.
@@ -176,20 +194,7 @@ export function UniqAIIsland() {
   // comando — inspirado em https://skiper-ui.com/v1/skiper2 + cult-ui +
   // iOS Live Activities. SEM modal, SEM backdrop. Resultado e
   // notificações realtime aparecem inline na pill.
-  const isExpanded = state.mode === "expanded";
-  const isNotif = state.mode === "notification";
   const islandSpring = { type: "spring" as const, stiffness: 420, damping: 36, mass: 0.7 };
-  const [prompt, setPrompt] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (isExpanded) {
-      // Foca o input após a animação de morph terminar.
-      setTimeout(() => inputRef.current?.focus(), 220);
-    } else {
-      setPrompt("");
-    }
-  }, [isExpanded]);
 
   const submitPrompt = () => {
     if (!prompt.trim()) return;

@@ -175,13 +175,17 @@ export function FlowPreview({ flow, trigger }: { flow?: any; trigger?: string })
 export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: string) => void }) {
   return (
     <motion.div
-      className="h-full flex flex-col items-center justify-center px-4 sm:px-8 py-8 sm:py-12"
+      className="flex flex-col items-center justify-center"
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      {/* Aura animada — orb pulsante simulando IA ativa. */}
-      <div className="relative w-20 h-20 sm:w-24 sm:h-24 mb-5 sm:mb-6 flex items-center justify-center">
+      {/* Aura animada — orb pulsante simulando IA ativa, com ícone vivo. */}
+      <motion.div
+        className="relative w-20 h-20 sm:w-24 sm:h-24 mb-5 sm:mb-6 flex items-center justify-center"
+        animate={{ y: [0, -3, 0] }}
+        transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
+      >
         <motion.div
           className="absolute inset-0 rounded-full"
           style={{
@@ -200,17 +204,75 @@ export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: s
           animate={{ rotate: 360 }}
           transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
         />
-        <div
-          className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center"
+
+        {/* Partículas orbitando — 3 pontos verdes em raios distintos */}
+        {[
+          { size: 4, radius: 38, duration: 6, delay: 0 },
+          { size: 3, radius: 44, duration: 9, delay: -2, reverse: true },
+          { size: 2.5, radius: 34, duration: 7.5, delay: -4 },
+        ].map((p, i) => (
+          <motion.div
+            key={i}
+            className="absolute top-1/2 left-1/2 rounded-full"
+            style={{
+              width: p.size,
+              height: p.size,
+              background: "var(--green)",
+              boxShadow: "0 0 8px rgba(0,212,106,0.8)",
+              marginTop: -p.size / 2,
+              marginLeft: -p.size / 2,
+            }}
+            animate={{
+              x: Array.from({ length: 60 }, (_, k) => Math.cos((k / 60) * Math.PI * 2 * (p.reverse ? -1 : 1)) * p.radius),
+              y: Array.from({ length: 60 }, (_, k) => Math.sin((k / 60) * Math.PI * 2 * (p.reverse ? -1 : 1)) * p.radius),
+              opacity: [0.4, 1, 0.4],
+            }}
+            transition={{
+              x: { duration: p.duration, repeat: Infinity, ease: "linear", delay: p.delay },
+              y: { duration: p.duration, repeat: Infinity, ease: "linear", delay: p.delay },
+              opacity: { duration: p.duration / 2, repeat: Infinity, ease: "easeInOut" },
+            }}
+          />
+        ))}
+
+        <motion.div
+          className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center overflow-hidden"
           style={{
             background: "rgba(0,212,106,0.18)",
             border: "1px solid rgba(0,212,106,0.45)",
             boxShadow: "0 0 20px rgba(0,212,106,0.35)",
           }}
+          animate={{ scale: [1, 1.06, 1] }}
+          transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
         >
-          <SparklesIcon className="w-6 h-6 sm:w-7 sm:h-7" style={{ color: "var(--green)" }} />
-        </div>
-      </div>
+          {/* Shimmer giratório dentro do quadrado — dá sensação de "pensando" */}
+          <motion.div
+            className="absolute inset-0"
+            style={{
+              background:
+                "conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.18) 60deg, transparent 120deg)",
+            }}
+            animate={{ rotate: 360 }}
+            transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+          />
+          <motion.div
+            className="relative"
+            animate={{
+              rotate: [0, -8, 0, 8, 0],
+              scale: [1, 1.1, 1],
+            }}
+            transition={{
+              rotate: { duration: 4, repeat: Infinity, ease: "easeInOut" },
+              scale: { duration: 2.4, repeat: Infinity, ease: "easeInOut" },
+            }}
+          >
+            <SparklesIcon
+              className="w-6 h-6 sm:w-7 sm:h-7 drop-shadow-[0_0_6px_rgba(0,212,106,0.8)]"
+              style={{ color: "var(--green)" }}
+            />
+          </motion.div>
+        </motion.div>
+      </motion.div>
       <h2 className="text-lg sm:text-xl font-medium mb-2 text-center" style={{ color: "var(--text-1)" }}>
         Olá, sou o Uniq AI
       </h2>
