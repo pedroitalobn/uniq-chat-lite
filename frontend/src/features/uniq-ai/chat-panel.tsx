@@ -7,18 +7,20 @@
 //
 // Canvas e Templates SAÍRAM do header — agora vivem em /journeys.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  CheckCircle2, ChevronDown, Loader2, Sparkles, Wand2,
+  CheckCircle2, Loader2, Sparkles, Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { agentsApi, instancesApi, integrationsApi, journeysApi } from "@/lib/api";
+import { agentsApi, instancesApi, journeysApi } from "@/lib/api";
 import { MentionPicker, type Mention, type MentionPickerHandles } from "@/components/MentionPicker";
 import {
   ChatMessage, EmptyState, type Message, ThinkingDots,
 } from "./atoms";
+import { ModelSelector } from "./ModelSelector";
+import { loadModelPref, type ModelPreference } from "./model-preference";
 
 export interface UniqAIChatPanelProps {
   // Mensagens controladas externamente — quem hospeda o painel decide
@@ -44,51 +46,24 @@ export function UniqAIChatPanel({
   onBeforeFirstSend,
 }: UniqAIChatPanelProps) {
   const [prompt, setPrompt] = useState("");
-  const [selectedIntegration, setSelectedIntegration] = useState<string>("");
-  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [modelPref, setModelPref] = useState<ModelPreference | null>(() => loadModelPref());
   const [selectedInstance, setSelectedInstance] = useState<string>("");
-  const [groupedIntegrations, setGroupedIntegrations] = useState<Record<string, any[]>>({});
   const [isCreatingJourney, setIsCreatingJourney] = useState(false);
   const [pendingJourneyPrompt, setPendingJourneyPrompt] = useState<string>("");
   const [pendingJourneyRendered, setPendingJourneyRendered] = useState<string>("");
   const [pendingJourneyMentions, setPendingJourneyMentions] = useState<Mention[]>([]);
   const [, setPendingJourneyData] = useState<any>(null);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [isLoadingIntegrations, setIsLoadingIntegrations] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+
+  const selectedIntegration = modelPref?.integrationId ?? "";
+  const selectedModel = modelPref?.model ?? "";
 
   const { data: instances = [] } = useQuery({
     queryKey: ["instances"],
     queryFn: async () => (await instancesApi.list()).data,
   });
-
-  const loadIntegrations = useCallback(async () => {
-    setIsLoadingIntegrations(true);
-    try {
-      const res = await integrationsApi.list();
-      const llmProviders = ["openai", "claude", "deepseek", "gemini", "openrouter", "kilo", "zai", "kimi", "qwen", "minimax", "manus"];
-      const filtered = (res.data || []).filter((i: any) =>
-        i.is_active && llmProviders.includes(i.provider?.toLowerCase()),
-      );
-      const grouped = filtered.reduce((acc: Record<string, any[]>, curr: any) => {
-        const provider = curr.provider?.toUpperCase() || "OTHER";
-        if (!acc[provider]) acc[provider] = [];
-        acc[provider].push(curr);
-        return acc;
-      }, {});
-      setGroupedIntegrations(grouped);
-      if (filtered.length > 0) {
-        setSelectedIntegration((prev) => prev || filtered[0]?.id || "");
-      }
-    } catch (err) {
-      console.error("Failed to load integrations", err);
-    } finally {
-      setIsLoadingIntegrations(false);
-    }
-  }, []);
-
-  useEffect(() => { loadIntegrations(); }, [loadIntegrations]);
 
   useEffect(() => {
     if (scrollRef.current && messages.length > 0) {
@@ -150,20 +125,6 @@ export function UniqAIChatPanel({
       setIsStreaming(false);
     }
   }, [isStreaming, selectedIntegration, selectedModel, messages.length, onBeforeFirstSend, onMessagesChange]);
-
-  useEffect(() => {
-    if (!selectedIntegration) {
-      setSelectedModel("");
-      return;
-    }
-    const allIntegrations = Object.values(groupedIntegrations).flat();
-    const integration = allIntegrations.find((i: any) => i.id === selectedIntegration);
-    if (integration && Array.isArray(integration?.models) && integration.models.length > 0) {
-      setSelectedModel(integration.models[0]);
-    } else {
-      setSelectedModel("");
-    }
-  }, [selectedIntegration, groupedIntegrations]);
 
   const createJourneyMutation = useMutation({
     mutationFn: async (data: {
@@ -315,6 +276,12 @@ export function UniqAIChatPanel({
                   isLoading={isStreaming}
                   placeholder="Pergunte ou peça… use /instancia, /grupo, /contato, /tag, /funil ou /jornada."
                 />
+                <div className="flex items-center justify-between mt-1.5 px-1">
+                  <ModelSelector value={modelPref} onChange={setModelPref} />
+                  <span className="text-[10px] hidden sm:inline" style={{ color: "var(--text-3)" }}>
+                    Enter para enviar · Shift+Enter nova linha
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -325,77 +292,17 @@ export function UniqAIChatPanel({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header — só selectors essenciais (LLM + instância). Canvas e
-          Templates foram pra /journeys. */}
       {!hideHeader && (
         <div
-          className={`flex items-center justify-between gap-2 flex-shrink-0 border-b ${compact ? "px-3 py-2" : "px-3 sm:px-6 py-3 sm:py-4"}`}
+          className={`flex items-center gap-2 flex-shrink-0 border-b ${compact ? "px-3 py-2" : "px-3 sm:px-6 py-3"}`}
           style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}
         >
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "var(--green)" }}>
-              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-sm sm:text-base font-medium truncate" style={{ color: "var(--text-1)" }}>Uniq AI</h2>
-              <p className="text-[10px] sm:text-xs truncate" style={{ color: "var(--text-3)" }}>Sua plataforma em linguagem natural</p>
-            </div>
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "var(--green)" }}>
+            <Sparkles className="w-3.5 h-3.5 text-white" />
           </div>
-
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
-            {/* Model selector — só desktop */}
-            <div className="hidden lg:flex items-center gap-1">
-              <div className="relative">
-                <select
-                  value={selectedIntegration || ""}
-                  onChange={(e) => setSelectedIntegration(e.target.value)}
-                  className="appearance-none outline-none text-xs font-medium rounded-lg px-3 py-2 pr-8 cursor-pointer min-w-[140px] max-w-[200px]"
-                  style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
-                >
-                  {isLoadingIntegrations ? (
-                    <option value="">Carregando...</option>
-                  ) : Object.keys(groupedIntegrations).length === 0 ? (
-                    <option value="">Nenhum modelo</option>
-                  ) : (
-                    <>
-                      {!selectedIntegration && <option value="">LLM...</option>}
-                      {Object.entries(groupedIntegrations).map(([provider, items]: [string, any]) => (
-                        <optgroup key={provider} label={`── ${provider} ──`}>
-                          {(items as any[]).map((i: any) => (
-                            <option key={i.id} value={i.id}>
-                              {i.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </>
-                  )}
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "var(--text-3)" }} />
-              </div>
-
-              {selectedIntegration && (() => {
-                const allIntegrations = Object.values(groupedIntegrations).flat();
-                const currentIntegration = allIntegrations.find((i: any) => i.id === selectedIntegration);
-                const hasModels = currentIntegration && Array.isArray(currentIntegration?.models) && currentIntegration.models.length > 1;
-                if (!hasModels || !currentIntegration?.models) return null;
-                return (
-                  <div className="relative">
-                    <select
-                      value={selectedModel || ""}
-                      onChange={(e) => setSelectedModel(e.target.value)}
-                      className="appearance-none outline-none text-xs font-medium rounded-lg px-3 py-2 pr-8 cursor-pointer min-w-[120px]"
-                      style={{ background: "var(--green)", color: "#000", border: "none" }}
-                    >
-                      {(currentIntegration.models as string[]).map((m: string) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "#000" }} />
-                  </div>
-                );
-              })()}
-            </div>
+          <span className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Uniq AI</span>
+          <div className="ml-auto">
+            <ModelSelector value={modelPref} onChange={setModelPref} />
           </div>
         </div>
       )}
@@ -472,6 +379,9 @@ export function UniqAIChatPanel({
               ? "Descreva uma automação… use /grupo, /contato, /tag etc."
               : "Pergunte ou peça… use /instancia, /grupo, /contato, /tag, /funil ou /jornada."}
           />
+          <div className="flex items-center justify-between px-3 sm:px-6 pb-2">
+            <ModelSelector value={modelPref} onChange={setModelPref} />
+          </div>
         </div>
       </div>
     </div>

@@ -19,6 +19,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, Loader2, MessageSquare, Sparkles, X } from "lucide-react";
 import { UniqAIChatPanel } from "@/features/uniq-ai/chat-panel";
 import type { Message } from "@/features/uniq-ai/atoms";
+import { loadModelPref } from "@/features/uniq-ai/model-preference";
 import { useUniqAIIsland } from "./island-context";
 import { useConversationWS } from "@/hooks/useConversationWS";
 
@@ -260,13 +261,26 @@ export function UniqAIIsland() {
       {/* Pill colapsada: label clicável */}
       {!isExpanded && !isNotif && (
         <motion.div layout="position" className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-xs font-medium text-white/90 whitespace-nowrap truncate">
-            {state.mode === "executing"
-              ? (state.preview || "Processando…")
-              : state.mode === "result"
-                ? state.result.text.slice(0, 60)
-                : "Pergunte ao Uniq AI"}
-          </span>
+          {state.mode === "executing" || state.mode === "result" ? (
+            <span className="text-xs font-medium text-white/90 whitespace-nowrap truncate">
+              {state.mode === "executing" ? (state.preview || "Processando…") : state.result.text.slice(0, 60)}
+            </span>
+          ) : (
+            <>
+              <span className="text-xs font-medium text-white/90 whitespace-nowrap">Uniq AI</span>
+              {(() => {
+                const pref = loadModelPref();
+                return pref ? (
+                  <span
+                    className="text-[9px] font-medium px-1.5 py-0.5 rounded truncate max-w-[100px]"
+                    style={{ background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.65)" }}
+                  >
+                    {pref.model || pref.integrationName}
+                  </span>
+                ) : null;
+              })()}
+            </>
+          )}
           <span className="text-[10px] text-white/40 font-mono ml-auto hidden sm:inline">⌘K</span>
         </motion.div>
       )}
