@@ -729,20 +729,9 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
             <div className="rounded-xl p-3 text-xs" style={{ background: "rgba(0,212,106,0.06)", border: "1px solid rgba(0,212,106,0.2)" }}>
               <p style={{ color: "var(--text-1)" }}><strong>Como funciona:</strong></p>
               <ol className="list-decimal list-inside space-y-1 mt-2" style={{ color: "var(--text-3)" }}>
-                {providerId === "openrouter" ? (
-                  <>
-                    <li>Clique &quot;Abrir autorização&quot; — uma nova aba com openrouter.ai abre.</li>
-                    <li>Autorize o acesso da sua conta.</li>
-                    <li>O OpenRouter redireciona automaticamente de volta pra esta aplicação — não precisa copiar nada.</li>
-                  </>
-                ) : (
-                  <>
-                    <li>Clique &quot;Abrir autorização&quot; — uma nova aba com claude.ai abre.</li>
-                    <li>Autorize o acesso da sua conta.</li>
-                    <li>Copie o código mostrado ao final da página.</li>
-                    <li>Cole abaixo e clique em &quot;Finalizar&quot;.</li>
-                  </>
-                )}
+                <li>Clique &quot;Abrir autorização&quot; — uma nova aba abre.</li>
+                <li>Autorize o acesso da sua conta.</li>
+                <li>Você é redirecionado de volta automaticamente — não precisa copiar nada.</li>
               </ol>
             </div>
 
@@ -754,10 +743,13 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
                 style={{ background: provider.color, color: "#0d0d0d" }}>
                 {oauthStarting ? "Gerando link..." : `🚀 Abrir autorização ${providerId === "openrouter" ? "OpenRouter" : "Claude.ai"}`}
               </button>
-            ) : providerId === "openrouter" ? (
-              <div className="rounded-xl p-3 text-xs space-y-2" style={{ background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)" }}>
+            ) : (
+              <div className="rounded-xl p-3 text-xs space-y-2" style={{
+                background: providerId === "openrouter" ? "rgba(124,58,237,0.06)" : "rgba(217,119,6,0.06)",
+                border: `1px solid ${providerId === "openrouter" ? "rgba(124,58,237,0.2)" : "rgba(217,119,6,0.2)"}`
+              }}>
                 <p style={{ color: "var(--text-1)" }}>
-                  Aguardando o OpenRouter redirecionar a outra aba de volta para esta aplicação…
+                  Aguardando autorização na outra aba…
                 </p>
                 {oauthURL && (
                   <p style={{ color: "var(--text-3)" }}>
@@ -767,37 +759,8 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
                     </a>
                   </p>
                 )}
+                <button onClick={onClose} className="btn-ghost text-xs mt-1">Cancelar</button>
               </div>
-            ) : (
-              <>
-                {oauthURL && (
-                  <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
-                    Não abriu?{" "}
-                    <a href={oauthURL} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: provider.color }}>
-                      clique aqui
-                    </a>
-                  </p>
-                )}
-                <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Código de autorização</label>
-                  <textarea
-                    value={oauthCode}
-                    onChange={e => setOauthCode(e.target.value)}
-                    placeholder="Cole o código mostrado pela página da Anthropic após autorizar..."
-                    rows={3}
-                    className="input-field w-full font-mono text-xs"
-                  />
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <button onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
-                  <button
-                    onClick={completeOAuth}
-                    disabled={oauthCompleting || !oauthCode.trim()}
-                    className="btn-primary flex-1">
-                    {oauthCompleting ? "Finalizando..." : "Finalizar"}
-                  </button>
-                </div>
-              </>
             )}
           </div>
         )}

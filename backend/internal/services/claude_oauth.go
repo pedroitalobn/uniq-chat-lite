@@ -53,16 +53,23 @@ type ClaudeOAuthTokenResp struct {
 	Account      string `json:"account,omitempty"` // email ou ID, se disponível
 }
 
-// Configurable defaults (Anthropic's public OAuth parameters — equivalent to
-// what Claude Code uses). Podem ser sobrescritos via env para self-hosted.
+// Configurable defaults (Anthropic OAuth 2.0 + PKCE).
 //
-// DefaultClaudeOAuthBeta é o header anthropic-beta obrigatório no token endpoint.
-// Descoberto inspecionando o binário do Claude Code CLI v2.1.123.
+// client_id: URL do client metadata (RFC 7591 dynamic client registration).
+//   Anthropic aceita client_id como URL que aponta para um JSON com grant_types,
+//   redirect_uris etc. Usamos nossa própria metadata URL para registrar nosso
+//   redirect_uri de auto-callback (sem copy-paste).
+//
+// redirect_uri: URL do nosso frontend que recebe o callback automático.
+//   Sobrescrever via env CLAUDE_OAUTH_REDIRECT_URI em dev local.
+//
+// anthropic-beta: oauth-2025-04-20 — obrigatório no token endpoint.
+//   Descoberto inspecionando o binário Claude Code CLI v2.1.123.
 const (
-	DefaultClaudeOAuthClientID  = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+	DefaultClaudeOAuthClientID  = "" // preenchido em runtime via claudeClientID()
 	DefaultClaudeOAuthAuthURL   = "https://claude.ai/oauth/authorize"
 	DefaultClaudeOAuthTokenURL  = "https://console.anthropic.com/v1/oauth/token"
-	DefaultClaudeOAuthRedirect  = "https://console.anthropic.com/oauth/code/callback"
+	DefaultClaudeOAuthRedirect  = "" // preenchido em runtime via claudeRedirectURI()
 	DefaultClaudeOAuthScope     = "org:create_api_key user:profile user:inference"
 	DefaultClaudeOAuthGrantType = "authorization_code"
 	DefaultClaudeOAuthBeta      = "oauth-2025-04-20"
@@ -75,12 +82,24 @@ func NewClaudeOAuth() *ClaudeOAuth {
 	}
 }
 
-// claudeClientID retorna o client_id configurado (env CLAUDE_OAUTH_CLIENT_ID) ou default.
+// ClaudeOAuthClientID é a versão exportada de claudeClientID (usada pelos handlers).
+func ClaudeOAuthClientID() string  { return claudeClientID() }
+func ClaudeOAuthRedirectURI() string { return claudeRedirectURI() }
+
+// claudeClientID retorna o client_id OAuth.
+// Usa a URL da nossa própria metadata (RFC 7591) para que o Anthropic
+// authorization server leia nosso redirect_uri registrado.
+// Override via env CLAUDE_OAUTH_CLIENT_ID.
 func claudeClientID() string {
 	if v := os.Getenv("CLAUDE_OAUTH_CLIENT_ID"); v != "" {
 		return v
 	}
-	return DefaultClaudeOAuthClientID
+	// <appURL>/v1/integrations/claude/client-metadata (endpoint público no backend)
+	appURL := os.Getenv("APP_API_URL")
+	if appURL == "" {
+		appURL = "https://api.uniq.chat"
+	}
+	return appURL + "/v1/integrations/claude/client-metadata"
 }
 
 func claudeAuthURL() string {
@@ -97,11 +116,17 @@ func claudeTokenURL() string {
 	return DefaultClaudeOAuthTokenURL
 }
 
+// claudeRedirectURI retorna o redirect_uri para o callback automático do OAuth.
+// Deve bater com o registrado em client-metadata.
 func claudeRedirectURI() string {
 	if v := os.Getenv("CLAUDE_OAUTH_REDIRECT_URI"); v != "" {
 		return v
 	}
-	return DefaultClaudeOAuthRedirect
+	appURL := os.Getenv("APP_FRONTEND_URL")
+	if appURL == "" {
+		appURL = "https://app.uniq.chat"
+	}
+	return appURL + "/integrations/claude/callback"
 }
 
 // StartAuthorization gera o PKCE challenge, armazena verifier+state em memória

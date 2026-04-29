@@ -38,6 +38,27 @@ func NewIntegrationHandler(db *gorm.DB) *IntegrationHandler {
 	}
 }
 
+// ClaudeOAuthClientMetadata serve o JSON de metadata pública do cliente OAuth.
+// GET /v1/integrations/claude/client-metadata (sem autenticação)
+//
+// Anthropic's authorization server faz GET nesta URL para validar o client_id
+// (que é a própria URL desta rota) e obter os redirect_uris permitidos.
+func (h *IntegrationHandler) ClaudeOAuthClientMetadata(c *fiber.Ctx) error {
+	clientID := services.ClaudeOAuthClientID()
+	redirectURI := services.ClaudeOAuthRedirectURI()
+	c.Set("Content-Type", "application/json")
+	return c.JSON(fiber.Map{
+		"client_id":                  clientID,
+		"client_name":                "Uniq Chat",
+		"client_uri":                 "https://uniq.chat",
+		"redirect_uris":              []string{redirectURI},
+		"grant_types":                []string{"authorization_code", "refresh_token"},
+		"response_types":             []string{"code"},
+		"token_endpoint_auth_method": "none",
+		"scope":                      services.DefaultClaudeOAuthScope,
+	})
+}
+
 // StartClaudeOAuth inicia o fluxo OAuth do Claude.ai
 // POST /integrations/claude/oauth/start
 // Retorna: { auth_url, state, redirect_uri }
@@ -48,11 +69,17 @@ func (h *IntegrationHandler) StartClaudeOAuth(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(fiber.Map{
-		"auth_url":     authURL,
-		"state":        state,
-		"redirect_uri": services.DefaultClaudeOAuthRedirect,
-		"instructions": "Abra a URL no navegador, autorize com sua conta Claude.ai, copie o código mostrado ao final e envie em /integrations/claude/oauth/callback junto com o state.",
+		"auth_url": authURL,
+		"state":    state,
 	})
+}
+
+// CompleteClaudeOAuthAuto é o handler para o auto-callback OAuth sem copy-paste.
+// POST /integrations/claude/oauth/callback-auto
+// Body: { code, state, name? } — chamado pelo frontend depois de ler code+state da URL.
+// Alias de CompleteClaudeOAuth; separated for clarity.
+func (h *IntegrationHandler) CompleteClaudeOAuthAuto(c *fiber.Ctx) error {
+	return h.CompleteClaudeOAuth(c)
 }
 
 // CompleteClaudeOAuth finaliza o fluxo OAuth trocando code por tokens.

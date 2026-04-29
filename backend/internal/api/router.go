@@ -281,6 +281,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	v1Public.Get("/invites/status", inviteH.GetStatus)
 	v1Public.Post("/invites/validate", middleware.RateLimit(10), inviteH.Validate)
 
+	// Claude OAuth client metadata — público (Anthropic faz GET aqui para validar client_id)
+	v1Public.Get("/integrations/claude/client-metadata", integrationH.ClaudeOAuthClientMetadata)
+
 	// Workspace invite preview — público pra decidir se mandamos o
 	// destinatário pra /login ou /register.
 	v1Public.Get("/workspaces/invites/preview/:token", middleware.RateLimit(10), workspaceH.PreviewInvite)
@@ -1119,6 +1122,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Claude OAuth (claude.ai account login — alternativa a API key)
 	integrations.Post("/claude/oauth/start", integrationH.StartClaudeOAuth)
 	integrations.Post("/claude/oauth/callback", integrationH.CompleteClaudeOAuth)
+	integrations.Post("/claude/oauth/callback-auto", integrationH.CompleteClaudeOAuthAuto)
 	// OpenRouter OAuth PKCE — devolve API key persistente vinculada à conta
 	integrations.Post("/openrouter/oauth/start", integrationH.StartOpenRouterOAuth)
 	integrations.Post("/openrouter/oauth/callback", integrationH.CompleteOpenRouterOAuth)
