@@ -74,7 +74,9 @@ func (h *IntegrationHandler) CompleteClaudeOAuth(c *fiber.Ctx) error {
 
 	tok, authUserID, err := h.claudeOAuth.ExchangeCode(ctx, req.Code, req.State)
 	if err != nil {
-		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+		// 422 em vez de 502: o Cloudflare intercepta 5xx de origin e apaga
+		// o body, deixando o usuário sem mensagem de erro. 422 passa direto.
+		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{"error": err.Error()})
 	}
 	if authUserID != user.ID.String() {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "state não pertence ao usuário autenticado"})

@@ -189,6 +189,9 @@ func (o *ClaudeOAuth) ExchangeCode(ctx context.Context, code, state string) (*Cl
 
 	raw, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		// Log completo para debug — o Cloudflare apaga o body no 502 do
+		// handler, então precisamos ver aqui o que a Anthropic devolveu.
+		fmt.Printf("[claude-oauth] token endpoint %d | body: %s\n", resp.StatusCode, string(raw))
 		return nil, "", fmt.Errorf("OAuth token endpoint retornou %d: %s", resp.StatusCode, string(raw))
 	}
 
