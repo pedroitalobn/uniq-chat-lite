@@ -210,8 +210,18 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// frontend quando o resolver server-side não conseguiu embedar a URL
 	// resolvida no payload da mensagem (presign falhou, mídia muito antiga,
 	// etc.). É público pra <audio src>/<img src> não precisar de auth header.
+	//
+	// Aceita key com `/` via wildcard (`*`) — necessário pro layout real do
+	// bucket (`media/<instance_id>/<yyyy>/<mm>/<uuid>.<ext>`). O fallback
+	// `:key` continua funcionando pra keys flat.
 	mediaHandler := func(c *fiber.Ctx) error {
-		key := c.Params("key")
+		key := c.Params("+")
+		if key == "" {
+			key = c.Params("*")
+		}
+		if key == "" {
+			key = c.Params("key")
+		}
 		if key == "" {
 			return c.Status(fiber.StatusBadRequest).SendString("missing key")
 		}
@@ -226,8 +236,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 		}
 		return c.Redirect(signed, fiber.StatusFound)
 	}
-	app.Get("/v1/media/:key", mediaHandler)
-	app.Get("/media/:key", mediaHandler)
+	app.Get("/v1/media/+", mediaHandler)
+	app.Get("/media/+", mediaHandler)
 
 	// Stripe webhook (public — must receive raw body, Stripe signature verified internally)
 	app.Post("/stripe/webhook", stripeH.Webhook)
@@ -1219,6 +1229,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// gerada na hora pra browser baixar com Content-Disposition: attachment)
 	mediaH := handlers.NewMediaHealthHandler()
 	api.Get("/media/download", mediaH.Download)
+	// Stream pro player (inline) — mesma proxy, mas com Content-Disposition:
+	// inline + suporte a Range pra seek em <audio>/<video>.
+	api.Get("/media/stream", mediaH.Stream)
 
 	// Link preview — fetcha OG/Twitter card metadata. Cache 7d.
 	linkPreviewSvc := services.NewLinkPreviewService(db)

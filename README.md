@@ -233,6 +233,49 @@ curl -X DELETE http://localhost:8080/api/instances/<id>/proxy \
   -H "Authorization: Bearer <token>"
 ```
 
+### Media
+
+Mídias (áudio, imagem, vídeo, documento) ficam num bucket S3-compatível
+**privado** (Hetzner / MinIO). A URL pública direta retorna `403`. Use os
+endpoints abaixo pra acessar.
+
+A `key` é o path completo do objeto dentro do bucket, ex.:
+`media/<instance_id>/<yyyy>/<mm>/<uuid>.<ext>`.
+
+```bash
+# 1) Download autenticado (force download — Content-Disposition: attachment)
+#    Stream do bucket pro client via backend (resolve CORS de bucket privado).
+curl "http://localhost:8080/api/media/download?key=media/08a45587-.../404117dd-...ogg" \
+  -H "Authorization: Bearer <token>" \
+  -o audio.ogg
+
+# Filename custom no header de download:
+curl "http://localhost:8080/api/media/download?key=<media_key>&filename=meu-audio.ogg" \
+  -H "Authorization: Bearer <token>" -o meu-audio.ogg
+
+# 2) Stream inline (Content-Disposition: inline + Accept-Ranges)
+#    Use em <audio src> / <video src> via fetch com Authorization header.
+#    Suporta Range requests pra seek em players HTML5.
+curl "http://localhost:8080/api/media/stream?key=<media_key>" \
+  -H "Authorization: Bearer <token>"
+
+# 3) Redirect público pra signed URL (sem auth — TTL 30min)
+#    Bom pra <audio src="..."> / <img src="..."> direto no DOM, sem header.
+#    Aceita key com `/` (wildcard).
+curl -L "http://localhost:8080/v1/media/media/08a45587-.../404117dd-...ogg"
+# → 302 Location: https://<bucket>.fsn1.your-objectstorage.com/...?X-Amz-...
+```
+
+| Endpoint | Auth | Disposition | Uso |
+|---|---|---|---|
+| `GET /api/media/download?key=` | Bearer | attachment | Forçar download |
+| `GET /api/media/stream?key=` | Bearer | inline + Range | Player HTML5 com auth |
+| `GET /v1/media/<key-com-slashes>` | público | redirect 302 | `<audio src>` / `<img src>` |
+| `GET /v1/admin/media/health` | admin | — | Diagnóstico storage |
+
+> **Nota**: o redirect público (`/v1/media/...`) sempre regenera a signed URL
+> com TTL de 30min. Não cacheie a URL final no front — ela expira.
+
 ### Webhooks
 
 ```bash

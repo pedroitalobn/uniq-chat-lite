@@ -102,6 +102,20 @@ func (h *MediaHealthHandler) Check(c *fiber.Ctx) error {
 // Auth: requireAuth (qualquer usuário logado pode baixar — assume que ele
 // já tem permissão pra ver a conversa onde a mídia foi linkada).
 func (h *MediaHealthHandler) Download(c *fiber.Ctx) error {
+	return h.proxyMedia(c, "attachment")
+}
+
+// MediaProxyStream — mesma proxy do Download, mas com
+// Content-Disposition: inline pra o browser tocar/exibir a mídia direto
+// (player de áudio/vídeo, <img>, <embed>) em vez de baixar.
+//
+// GET /v1/media/stream?key=<media_key>&filename=<filename-opcional>
+// Auth: requireAuth.
+func (h *MediaHealthHandler) Stream(c *fiber.Ctx) error {
+	return h.proxyMedia(c, "inline")
+}
+
+func (h *MediaHealthHandler) proxyMedia(c *fiber.Ctx, disposition string) error {
 	if !storage.IsConfigured() {
 		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
 			"error": "storage não configurado",
@@ -115,7 +129,6 @@ func (h *MediaHealthHandler) Download(c *fiber.Ctx) error {
 	}
 	filename := c.Query("filename")
 	if filename == "" {
-		// extrai filename do final do key
 		if idx := strings.LastIndex(key, "/"); idx >= 0 {
 			filename = key[idx+1:]
 		} else {
@@ -126,7 +139,6 @@ func (h *MediaHealthHandler) Download(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	// Gera signed URL curta pra fazer o GET interno
 	signedURL, err := storage.GlobalStorage.PresignURL(ctx, key, 5*time.Minute)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -144,6 +156,10 @@ func (h *MediaHealthHandler) Download(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+	// Range pra suportar seek em <audio>/<video> (HTTP 206)
+	if rng := c.Get("Range"); rng != "" {
+		req.Header.Set("Range", rng)
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
@@ -152,17 +168,16 @@ func (h *MediaHealthHandler) Download(c *fiber.Ctx) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != 200 && resp.StatusCode != 206 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
-			"error":          "storage retornou erro",
+			"error":           "storage retornou erro",
 			"upstream_status": resp.StatusCode,
-			"body_excerpt":   string(body),
+			"body_excerpt":    string(body),
 		})
 	}
 
-	// Headers que forçam download em vez de inline rendering
-	c.Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	c.Set("Content-Disposition", disposition+`; filename="`+filename+`"`)
 	if ct := resp.Header.Get("Content-Type"); ct != "" {
 		c.Set("Content-Type", ct)
 	} else {
@@ -171,7 +186,11 @@ func (h *MediaHealthHandler) Download(c *fiber.Ctx) error {
 	if cl := resp.Header.Get("Content-Length"); cl != "" {
 		c.Set("Content-Length", cl)
 	}
+	if cr := resp.Header.Get("Content-Range"); cr != "" {
+		c.Set("Content-Range", cr)
+	}
+	c.Set("Accept-Ranges", "bytes")
 
-	// Stream pro client (não buffer todo na memória — vídeos grandes)
+	c.Status(resp.StatusCode)
 	return c.SendStream(resp.Body)
 }
