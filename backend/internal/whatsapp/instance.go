@@ -2465,6 +2465,52 @@ func (ic *InstanceClient) dispatchEvent(event string, data interface{}, ctx even
 	}
 }
 
+// addJIDDuality enriquece um payload de webhook com as duas formas de
+// identidade (PN @s.whatsapp.net e LID @lid) a partir de um MessageSource.
+//
+// Why: o WhatsApp/whatsmeow alterna entre PN e LID no campo Sender/Chat
+// dependendo do tipo de chat, privacidade do contato e versão do protocolo.
+// Consumidores do webhook que usam `from`/`chat` como chave de identidade
+// acabam duplicando contatos. Expor `*_pn` e `*_lid` resolvidos elimina
+// a ambiguidade.
+//
+// Comportamento:
+//   - `addressing_mode`: "pn" ou "lid" (qual forma o servidor usou no Sender).
+//   - `from_pn` / `from_lid`: par resolvido do Sender via SenderAlt.
+//   - `chat_pn` / `chat_lid`: par resolvido do Chat (apenas DMs — em grupos
+//     o Chat é sempre @g.us e não tem dualidade).
+func addJIDDuality(data map[string]interface{}, src types.MessageSource) {
+	data["addressing_mode"] = string(src.AddressingMode)
+
+	// Sender: a forma "principal" depende do AddressingMode; a outra está em SenderAlt.
+	if src.AddressingMode == types.AddressingModeLID {
+		data["from_lid"] = src.Sender.String()
+		if !src.SenderAlt.IsEmpty() {
+			data["from_pn"] = src.SenderAlt.String()
+		}
+	} else {
+		data["from_pn"] = src.Sender.String()
+		if !src.SenderAlt.IsEmpty() {
+			data["from_lid"] = src.SenderAlt.String()
+		}
+	}
+
+	// Chat: só em DMs faz sentido ter dualidade (em grupos o Chat é @g.us).
+	if !src.IsGroup && !src.Chat.IsEmpty() {
+		if src.Chat.Server == types.HiddenUserServer { // @lid
+			data["chat_lid"] = src.Chat.String()
+			if !src.RecipientAlt.IsEmpty() {
+				data["chat_pn"] = src.RecipientAlt.String()
+			}
+		} else {
+			data["chat_pn"] = src.Chat.String()
+			if !src.RecipientAlt.IsEmpty() {
+				data["chat_lid"] = src.RecipientAlt.String()
+			}
+		}
+	}
+}
+
 // handleEvent is the main whatsmeow event dispatcher.
 func (ic *InstanceClient) handleEvent(evt interface{}) {
 	switch v := evt.(type) {
@@ -2676,6 +2722,7 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 			"from_me":   isFromMe,
 			"push_name": v.Info.PushName,
 		}
+		addJIDDuality(data, v.Info.MessageSource)
 		if text != "" {
 			data["text"] = text
 		}
@@ -2830,6 +2877,7 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 			"type":      string(v.Type),
 			"timestamp": v.Timestamp,
 		}
+		addJIDDuality(data, v.MessageSource)
 		ic.broadcastWS("message.status", data)
 		ic.dispatchEvent("message.status", data, eventContext{isGroup: v.Chat.Server == "g.us"})
 
@@ -2869,6 +2917,7 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 			"state": string(v.State),
 			"media": string(v.Media),
 		}
+		addJIDDuality(data, v.MessageSource)
 		ic.broadcastWS("chat.presence", data)
 		ic.dispatchEvent("chat.presence", data, eventContext{isGroup: v.Chat.Server == "g.us"})
 
