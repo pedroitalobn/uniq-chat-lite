@@ -50,7 +50,7 @@ const ProviderIcon = ({ id, color }: { id: string; color: string }) => {
 };
 
 const PROVIDERS = [
-  { id: "claude", name: "Claude (Anthropic)", description: "API key OR login com conta claude.ai", color: "#d4a27f", bg: "rgba(212,162,127,0.08)", border: "rgba(212,162,127,0.2)", models: ["claude-sonnet-4-5", "claude-opus-4-5", "claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"], supportsOAuth: true },
+  { id: "claude", name: "Claude (Anthropic)", description: "API key do console.anthropic.com", color: "#d4a27f", bg: "rgba(212,162,127,0.08)", border: "rgba(212,162,127,0.2)", models: ["claude-sonnet-4-5", "claude-opus-4-5", "claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"] },
   { id: "openai", name: "ChatGPT (OpenAI)", description: "gpt-4o, gpt-4o-mini, o1-preview", color: "#10a37f", bg: "rgba(16,163,127,0.08)", border: "rgba(16,163,127,0.2)", models: ["gpt-4o", "gpt-4o-mini", "o1-preview"] },
   { id: "deepseek", name: "DeepSeek", description: "deepseek-chat, deepseek-reasoner", color: "#4f6ef7", bg: "rgba(79,110,247,0.08)", border: "rgba(79,110,247,0.2)", models: ["deepseek-chat", "deepseek-reasoner"] },
   { id: "gemini", name: "Gemini (Google)", description: "gemini-1.5-pro, gemini-1.5-flash, gemini-2.0-flash", color: "#4285f4", bg: "rgba(66,133,244,0.08)", border: "rgba(66,133,244,0.2)", models: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash"] },
@@ -694,10 +694,21 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
 
         {authMode === "api_key" ? (
           <>
+            {providerId === "claude" && (
+              <a
+                href="https://console.anthropic.com/settings/keys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs rounded-xl px-3 py-2.5 w-full"
+                style={{ background: "rgba(212,162,127,0.08)", border: "1px solid rgba(212,162,127,0.2)", color: "#d4a27f" }}>
+                <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+                Obter API key em console.anthropic.com/settings/keys
+              </a>
+            )}
             <div>
               <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>API Key</label>
               <div className="relative">
-                <input type={showKey ? "text" : "password"} value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })} className="input-field w-full" style={{ paddingRight: "2.5rem" }} placeholder="sk-..." />
+                <input type={showKey ? "text" : "password"} value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })} className="input-field w-full" style={{ paddingRight: "2.5rem" }} placeholder={providerId === "claude" ? "sk-ant-..." : "sk-..."} />
                 <button type="button" onClick={() => setShowKey(!showKey)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-3)" }}>
                   {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
