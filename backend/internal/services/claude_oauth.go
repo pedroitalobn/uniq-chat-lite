@@ -110,17 +110,15 @@ func claudeTokenURL() string {
 	return DefaultClaudeOAuthTokenURL
 }
 
-// claudeRedirectURI retorna o redirect_uri para o callback automático do OAuth.
-// Deve bater com o registrado em client-metadata.
+// claudeRedirectURI retorna o redirect_uri registrado para o UUID client_id.
+// O client 9d1c250a... aceita APENAS loopback URIs (per RFC 8252).
+// O browser tentará carregar http://localhost/callback?code=XXX&state=YYY —
+// falha, mas a URL fica na barra de endereços para o usuário copiar.
 func claudeRedirectURI() string {
 	if v := os.Getenv("CLAUDE_OAUTH_REDIRECT_URI"); v != "" {
 		return v
 	}
-	appURL := os.Getenv("APP_FRONTEND_URL")
-	if appURL == "" {
-		appURL = "https://app.uniq.chat"
-	}
-	return appURL + "/integrations/claude/callback"
+	return "http://localhost/callback"
 }
 
 // StartAuthorization gera o PKCE challenge, armazena verifier+state em memória
@@ -181,12 +179,20 @@ func (o *ClaudeOAuth) ExchangeCode(ctx context.Context, code, state string) (*Cl
 		return nil, "", fmt.Errorf("autorização expirada, tente de novo")
 	}
 
-	// A página de callback da Anthropic exibe o código no formato "code#state"
-	// para copy-paste manual. Separamos aqui para não contaminar o token endpoint.
-	// Trim espaços/newlines que o usuário pode arrastar no copy-paste.
-	rawCode := strings.TrimSpace(strings.SplitN(code, "#", 2)[0])
+	// O usuário copia a URL completa da barra de endereços do browser após o redirect
+	// para http://localhost/callback?code=XXX&state=YYY falhar.
+	// Aceita tanto a URL completa quanto só o código.
+	rawCode := strings.TrimSpace(code)
 	rawCode = strings.ReplaceAll(rawCode, "\n", "")
 	rawCode = strings.ReplaceAll(rawCode, "\r", "")
+
+	if strings.HasPrefix(rawCode, "http://localhost") || strings.HasPrefix(rawCode, "http://127.0.0.1") {
+		if u, err := url.Parse(rawCode); err == nil {
+			if c := u.Query().Get("code"); c != "" {
+				rawCode = c
+			}
+		}
+	}
 
 	form := url.Values{}
 	form.Set("grant_type", DefaultClaudeOAuthGrantType)
