@@ -87,19 +87,13 @@ func ClaudeOAuthClientID() string  { return claudeClientID() }
 func ClaudeOAuthRedirectURI() string { return claudeRedirectURI() }
 
 // claudeClientID retorna o client_id OAuth.
-// Usa a URL da nossa própria metadata (RFC 7591) para que o Anthropic
-// authorization server leia nosso redirect_uri registrado.
+// O UUID abaixo é o client_id público do Claude Code (Anthropic).
 // Override via env CLAUDE_OAUTH_CLIENT_ID.
 func claudeClientID() string {
 	if v := os.Getenv("CLAUDE_OAUTH_CLIENT_ID"); v != "" {
 		return v
 	}
-	// <appURL>/v1/integrations/claude/client-metadata (endpoint público no backend)
-	appURL := os.Getenv("APP_API_URL")
-	if appURL == "" {
-		appURL = "https://api.uniq.chat"
-	}
-	return appURL + "/v1/integrations/claude/client-metadata"
+	return "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 }
 
 func claudeAuthURL() string {
@@ -160,7 +154,6 @@ func (o *ClaudeOAuth) StartAuthorization(userID string) (authURL, state string, 
 	o.mu.Unlock()
 
 	params := url.Values{}
-	params.Set("code", "true")
 	params.Set("client_id", claudeClientID())
 	params.Set("response_type", "code")
 	params.Set("redirect_uri", claudeRedirectURI())
