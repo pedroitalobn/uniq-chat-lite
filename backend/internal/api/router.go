@@ -206,6 +206,14 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	app.Get("/v1/asaas/plans", paymentH.ListPlans)
 	app.Get("/v1/payments/plans", paymentH.ListPlans)
 
+	mediaH := handlers.NewMediaHealthHandler()
+
+	// Media proxy routes must be registered before the public wildcard below.
+	// Otherwise /v1/media/download is treated as key="download" and the
+	// query param with the real object key is ignored.
+	app.Get("/v1/media/download", middleware.RequireAuth(db), middleware.RateLimit(1500), mediaH.Download)
+	app.Get("/v1/media/stream", middleware.RequireAuth(db), middleware.RateLimit(1500), mediaH.Stream)
+
 	// Media by key — redireciona pra signed URL (TTL curto). Usado pelo
 	// frontend quando o resolver server-side não conseguiu embedar a URL
 	// resolvida no payload da mensagem (presign falhou, mídia muito antiga,
@@ -251,8 +259,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// ─── Auth routes (public) ─────────────────────────────────────────────────
 	// Rate limits agressivos: contas/login/reset são alvo #1 de bots.
 	// 5/min é o suficiente pra usuário humano e barra ataques de massa.
-	authStrict := middleware.RateLimit(5)   // signup/forgot/reset
-	authLogin := middleware.RateLimit(10)   // login pode legitimamente repetir (typo de senha)
+	authStrict := middleware.RateLimit(5)    // signup/forgot/reset
+	authLogin := middleware.RateLimit(10)    // login pode legitimamente repetir (typo de senha)
 	authValidate := middleware.RateLimit(20) // validate-key/refresh: chamados pela UI
 	auth := app.Group("/auth")
 	auth.Post("/login", authLogin, authH.Login)
@@ -1227,15 +1235,6 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	servers.Put("/:id/proxy", serverH.SetProxy)
 	servers.Delete("/:id/proxy", serverH.DeleteProxy)
 	servers.Post("/:id/proxy/test", serverH.TestProxy)
-
-	// ─── Admin routes ─────────────────────────────────────────────────────────
-	// Media proxy download (qualquer user logado pode usar — signed URL
-	// gerada na hora pra browser baixar com Content-Disposition: attachment)
-	mediaH := handlers.NewMediaHealthHandler()
-	api.Get("/media/download", mediaH.Download)
-	// Stream pro player (inline) — mesma proxy, mas com Content-Disposition:
-	// inline + suporte a Range pra seek em <audio>/<video>.
-	api.Get("/media/stream", mediaH.Stream)
 
 	// Link preview — fetcha OG/Twitter card metadata. Cache 7d.
 	linkPreviewSvc := services.NewLinkPreviewService(db)
