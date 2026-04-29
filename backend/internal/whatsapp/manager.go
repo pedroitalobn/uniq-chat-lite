@@ -691,15 +691,21 @@ func (m *Manager) StartInstanceForPairing(instance *models.Instance) error {
 
 // LoadAll loads and starts all connected instances from the database.
 func (m *Manager) LoadAll() {
-	var instances []models.Instance
+	// Instâncias presas em "connecting" são resíduo de deploys/crashes no meio
+	// do handshake QR. Resetamos para "disconnected" antes de qualquer coisa —
+	// isso evita que o boot re-inicie sessões incompletas ou instâncias que o
+	// usuário desconectou enquanto ainda estava em connecting.
+	if err := m.db.Model(&models.Instance{}).
+		Where("status = ?", models.StatusConnecting).
+		Update("status", models.StatusDisconnected).Error; err != nil {
+		log.Error().Err(err).Msg("failed to reset stale connecting instances")
+	}
 
-	// Carrega connected E connecting. Connecting normalmente é estado
-	// transitório do handshake; quando o backend reinicia no meio dele
-	// (deploy, crash, OOM kill), instances ficam presas com esse status.
-	// Tentamos startar — se a sessão whatsmeow ainda existe no SQLite
-	// store, a instância sobe; se não, o handshake falha e marcamos
-	// como disconnected logo abaixo, igual ao path normal.
-	if err := m.db.Raw("SELECT * FROM instances WHERE status IN ('connected', 'connecting')").Scan(&instances).Error; err != nil {
+	// Carrega apenas instâncias que estavam efetivamente conectadas.
+	// "connecting" foi limpo acima; "disconnected" = usuário desconectou ou
+	// sessão caiu — não deve ser re-iniciada automaticamente sem ação do user.
+	var instances []models.Instance
+	if err := m.db.Find(&instances, "status = ?", models.StatusConnected).Error; err != nil {
 		log.Error().Err(err).Msg("failed to load connected instances")
 		return
 	}
@@ -724,13 +730,15 @@ func (m *Manager) LoadAll() {
 	log.Info().Int("count", len(instances)).Msg("loaded WhatsApp instances")
 }
 
-// startReconnectionChecker periodically checks disconnected instances and tries to reconnect them
+// startReconnectionChecker periodically checks connected instances that lost
+// their manager client (e.g. after a crash/OOM that didn't update the DB)
+// and restarts them. Only runs for status="connected" — disconnected instances
+// (user-initiated or session-cleared) are never touched.
 func (m *Manager) startReconnectionChecker() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		// Check all instances that should be connected
 		var instances []models.Instance
 		m.db.Find(&instances, "status = ?", models.StatusConnected)
 
@@ -739,14 +747,25 @@ func (m *Manager) startReconnectionChecker() {
 			client, exists := m.clients[inst.ID.String()]
 			m.mu.RUnlock()
 
-			log.Debug().Str("instance", inst.ID.String()).Bool("exists_in_manager", exists).Msg("checking auto-reconnect")
+			// Já está rodando e conectado — nada a fazer.
+			if exists && client != nil && client.IsConnected() {
+				continue
+			}
 
-			// If not in clients map or not connected, try to start
-			if !exists || (client != nil && !client.IsConnected()) {
-				log.Info().Str("instance", inst.ID.String()).Msg("attempting auto-reconnect")
-				if err := m.StartInstance(&inst); err != nil {
-					log.Error().Err(err).Str("instance", inst.ID.String()).Msg("auto-reconnect failed")
-				}
+			// Sem sessão whatsmeow no store → usuário desconectou e limpou
+			// a sessão. Não re-iniciamos: atualizamos o status para refletir
+			// a realidade e deixamos o usuário reconectar manualmente.
+			if exists && client != nil && !client.IsLoggedIn() {
+				log.Info().Str("instance", inst.ID.String()).
+					Msg("reconnect checker: sem sessão no store — marcando como disconnected")
+				m.db.Model(&inst).Update("status", models.StatusDisconnected)
+				m.StopInstance(inst.ID.String())
+				continue
+			}
+
+			log.Info().Str("instance", inst.ID.String()).Msg("attempting auto-reconnect")
+			if err := m.StartInstance(&inst); err != nil {
+				log.Error().Err(err).Str("instance", inst.ID.String()).Msg("auto-reconnect failed")
 			}
 		}
 	}
