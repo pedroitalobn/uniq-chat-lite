@@ -210,6 +210,19 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    id: "media",
+    title: "Mídia",
+    icon: Music,
+    description: "Acesso a áudios, imagens, vídeos e documentos do bucket S3-compatível (Hetzner / MinIO — privado em produção). A key é o path completo do objeto no bucket, ex.: media/{instance_id}/{yyyy}/{mm}/{uuid}.{ext}.",
+    endpoints: [
+      { method: "GET", path: "/v1/media/download", description: "Download autenticado (Content-Disposition: attachment). Stream via backend — resolve CORS de bucket privado. Use pra botão 'Baixar' no front.", auth: "bearer", params: { key: "media/<instance_id>/<yyyy>/<mm>/<uuid>.<ext>", filename: "(opcional) nome do arquivo no header" } },
+      { method: "GET", path: "/v1/media/stream", description: "Stream inline com suporte a Range requests (HTTP 206). Use em <audio>/<video> com seek. Header Range é repassado ao bucket; resposta inclui Accept-Ranges: bytes.", auth: "bearer", params: { key: "media/<instance_id>/<yyyy>/<mm>/<uuid>.<ext>", filename: "(opcional)", Range: "(opcional, header) ex: bytes=0-65535" } },
+      { method: "GET", path: "/v1/media/{key}", description: "Redirect 302 público pra signed URL temporária do bucket (TTL 30min). Sem auth header — ideal pra <audio src> / <img src> direto no DOM. Aceita key com slashes (wildcard). ⚠️ Qualquer um com a URL acessa enquanto a signed URL não expirar — não use pra mídia sensível.", auth: "none" },
+      { method: "GET", path: "/v1/admin/media/health", description: "Diagnóstico end-to-end do storage: upload + presign + fetch de arquivo de teste. Reporta cada etapa pra debug (bucket inexistente, credencial errada, endpoint errado, signed URL inválida).", auth: "bearer", response: `{ "configured": true, "upload": { "ok": true, "public_url": "..." }, "presign": { "ok": true, "signed_url": "..." }, "fetch": { "ok": true, "status": 200, "match": true } }` },
+      { method: "POST", path: "/v1/{server}/{instance}/media/upload", description: "Upload de mídia pro bucket. Retorna a key + public_url + signed_url pra usar nos endpoints de envio (image/video/audio/document).", auth: "token", body: { file: "(multipart/form-data)" }, response: `{ "key": "media/.../<uuid>.<ext>", "public_url": "...", "signed_url": "..." }` },
+    ],
+  },
+  {
     id: "otp",
     title: "OTP",
     icon: Lock,
