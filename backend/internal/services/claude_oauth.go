@@ -1,7 +1,6 @@
 package services
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -162,24 +161,39 @@ func (o *ClaudeOAuth) ExchangeCode(ctx context.Context, code, state string) (*Cl
 
 	// A página de callback da Anthropic exibe o código no formato "code#state"
 	// para copy-paste manual. Separamos aqui para não contaminar o token endpoint.
-	rawCode := strings.SplitN(code, "#", 2)[0]
+	// Trim espaços/newlines que o usuário pode arrastar no copy-paste.
+	rawCode := strings.TrimSpace(strings.SplitN(code, "#", 2)[0])
+	rawCode = strings.ReplaceAll(rawCode, "\n", "")
+	rawCode = strings.ReplaceAll(rawCode, "\r", "")
 
-	// O endpoint /v1/oauth/token da Anthropic segue o padrão dos demais
-	// endpoints /v1/ deles: espera JSON, não form-encoded (RFC 6749 padrão).
-	body := map[string]string{
-		"grant_type":    DefaultClaudeOAuthGrantType,
-		"client_id":     claudeClientID(),
-		"code":          rawCode,
-		"redirect_uri":  p.redirectURI,
-		"code_verifier": p.verifier,
-	}
-	payload, _ := json.Marshal(body)
+	form := url.Values{}
+	form.Set("grant_type", DefaultClaudeOAuthGrantType)
+	form.Set("client_id", claudeClientID())
+	form.Set("code", rawCode)
+	form.Set("redirect_uri", p.redirectURI)
+	form.Set("code_verifier", p.verifier)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, claudeTokenURL(), bytes.NewReader(payload))
+	tokenURL := claudeTokenURL()
+	fmt.Printf("[claude-oauth] DEBUG exchange request:\n"+
+		"  url:          %s\n"+
+		"  grant_type:   %s\n"+
+		"  client_id:    %s\n"+
+		"  redirect_uri: %s\n"+
+		"  code (len=%d): %q\n"+
+		"  verifier (len=%d): %s...\n",
+		tokenURL,
+		DefaultClaudeOAuthGrantType,
+		claudeClientID(),
+		p.redirectURI,
+		len(rawCode), rawCode,
+		len(p.verifier), p.verifier[:min(20, len(p.verifier))],
+	)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, "", err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
 	client := &http.Client{Timeout: 30 * time.Second}
@@ -190,10 +204,8 @@ func (o *ClaudeOAuth) ExchangeCode(ctx context.Context, code, state string) (*Cl
 	defer resp.Body.Close()
 
 	raw, _ := io.ReadAll(resp.Body)
+	fmt.Printf("[claude-oauth] token endpoint %d | body: %s\n", resp.StatusCode, string(raw))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		// Log completo para debug — o Cloudflare apaga o body no 502 do
-		// handler, então precisamos ver aqui o que a Anthropic devolveu.
-		fmt.Printf("[claude-oauth] token endpoint %d | body: %s\n", resp.StatusCode, string(raw))
 		return nil, "", fmt.Errorf("OAuth token endpoint retornou %d: %s", resp.StatusCode, string(raw))
 	}
 
