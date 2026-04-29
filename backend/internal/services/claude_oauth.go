@@ -55,13 +55,17 @@ type ClaudeOAuthTokenResp struct {
 
 // Configurable defaults (Anthropic's public OAuth parameters — equivalent to
 // what Claude Code uses). Podem ser sobrescritos via env para self-hosted.
+//
+// DefaultClaudeOAuthBeta é o header anthropic-beta obrigatório no token endpoint.
+// Descoberto inspecionando o binário do Claude Code CLI v2.1.123.
 const (
-	DefaultClaudeOAuthClientID  = "9d1c250a-e61b-44d9-88ed-5944d1962f5e" // Anthropic public OAuth client id
+	DefaultClaudeOAuthClientID  = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 	DefaultClaudeOAuthAuthURL   = "https://claude.ai/oauth/authorize"
 	DefaultClaudeOAuthTokenURL  = "https://console.anthropic.com/v1/oauth/token"
 	DefaultClaudeOAuthRedirect  = "https://console.anthropic.com/oauth/code/callback"
 	DefaultClaudeOAuthScope     = "org:create_api_key user:profile user:inference"
 	DefaultClaudeOAuthGrantType = "authorization_code"
+	DefaultClaudeOAuthBeta      = "oauth-2025-04-20"
 )
 
 // NewClaudeOAuth creates a new OAuth manager.
@@ -195,6 +199,7 @@ func (o *ClaudeOAuth) ExchangeCode(ctx context.Context, code, state string) (*Cl
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("anthropic-beta", DefaultClaudeOAuthBeta)
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
