@@ -10,7 +10,11 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
+	"github.com/uniq-chat/backend/internal/api/middleware"
+	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/storage"
+	"gorm.io/gorm"
 )
 
 // MediaHealthHandler permite ao super-admin diagnosticar a config de
@@ -21,9 +25,11 @@ import (
 //   - credencial errada
 //   - endpoint errado
 //   - signed URL não funcional (CNAME custom não aceito pelo provedor)
-type MediaHealthHandler struct{}
+type MediaHealthHandler struct {
+	db *gorm.DB
+}
 
-func NewMediaHealthHandler() *MediaHealthHandler { return &MediaHealthHandler{} }
+func NewMediaHealthHandler(db *gorm.DB) *MediaHealthHandler { return &MediaHealthHandler{db: db} }
 
 func (h *MediaHealthHandler) Check(c *fiber.Ctx) error {
 	out := fiber.Map{
@@ -71,10 +77,10 @@ func (h *MediaHealthHandler) Check(c *fiber.Ctx) error {
 	body := new(bytes.Buffer)
 	body.ReadFrom(resp.Body)
 	out["fetch_signed"] = fiber.Map{
-		"ok":          resp.StatusCode == 200,
-		"status":      resp.StatusCode,
-		"body_match":  bytes.Equal(body.Bytes(), testData),
-		"body_size":   body.Len(),
+		"ok":           resp.StatusCode == 200,
+		"status":       resp.StatusCode,
+		"body_match":   bytes.Equal(body.Bytes(), testData),
+		"body_size":    body.Len(),
 		"content_type": resp.Header.Get("Content-Type"),
 	}
 
@@ -115,6 +121,79 @@ func (h *MediaHealthHandler) Stream(c *fiber.Ctx) error {
 	return h.proxyMedia(c, "inline")
 }
 
+func (h *MediaHealthHandler) GetFile(c *fiber.Ctx) error {
+	media, err := h.loadMediaFile(c)
+	if err != nil {
+		return err
+	}
+	return c.JSON(mediaFileResponse(media))
+}
+
+func (h *MediaHealthHandler) FindFile(c *fiber.Ctx) error {
+	key := c.Query("key", c.Query("media_key"))
+	if key == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "param ?key=<media_key> é obrigatório"})
+	}
+	var media models.MediaFile
+	if err := h.db.First(&media, "object_key = ?", key).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "mídia não encontrada"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	if !h.canAccessMedia(c, &media) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "sem acesso a esta mídia"})
+	}
+	return c.JSON(mediaFileResponse(&media))
+}
+
+func (h *MediaHealthHandler) DownloadFile(c *fiber.Ctx) error {
+	return h.proxyMediaFile(c, "attachment")
+}
+
+func (h *MediaHealthHandler) StreamFile(c *fiber.Ctx) error {
+	return h.proxyMediaFile(c, "inline")
+}
+
+func (h *MediaHealthHandler) PublicRedirectFile(c *fiber.Ctx) error {
+	return h.publicRedirectFile(c, false)
+}
+
+func (h *MediaHealthHandler) PublicDownloadFile(c *fiber.Ctx) error {
+	return h.publicRedirectFile(c, true)
+}
+
+func (h *MediaHealthHandler) publicRedirectFile(c *fiber.Ctx, download bool) error {
+	media, err := h.loadPublicMediaFile(c)
+	if err != nil {
+		return err
+	}
+	if !storage.IsConfigured() {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error": "storage não configurado",
+		})
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	signedURL, err := storage.GlobalStorage.PresignURL(ctx, media.ObjectKey, 30*time.Minute)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "mídia não encontrada no storage"})
+	}
+	if download {
+		return h.proxyMediaKey(c, media.ObjectKey, c.Query("filename", media.Filename), "attachment")
+	}
+	return c.Redirect(signedURL, fiber.StatusFound)
+}
+
+func (h *MediaHealthHandler) proxyMediaFile(c *fiber.Ctx, disposition string) error {
+	media, err := h.loadMediaFile(c)
+	if err != nil {
+		return err
+	}
+	filename := c.Query("filename", media.Filename)
+	return h.proxyMediaKey(c, media.ObjectKey, filename, disposition)
+}
+
 func (h *MediaHealthHandler) proxyMedia(c *fiber.Ctx, disposition string) error {
 	if !storage.IsConfigured() {
 		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
@@ -123,11 +202,28 @@ func (h *MediaHealthHandler) proxyMedia(c *fiber.Ctx, disposition string) error 
 	}
 	key := c.Query("key")
 	if key == "" {
+		if id := c.Query("id", c.Query("media_id")); id != "" {
+			media, err := h.loadMediaFileByID(c, id)
+			if err != nil {
+				return err
+			}
+			return h.proxyMediaKey(c, media.ObjectKey, c.Query("filename", media.Filename), disposition)
+		}
+	}
+	if key == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "param ?key=<media_key> é obrigatório",
+			"error": "param ?key=<media_key> ou ?id=<media_id> é obrigatório",
 		})
 	}
-	filename := c.Query("filename")
+	return h.proxyMediaKey(c, key, c.Query("filename"), disposition)
+}
+
+func (h *MediaHealthHandler) proxyMediaKey(c *fiber.Ctx, key, filename, disposition string) error {
+	if !storage.IsConfigured() {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error": "storage não configurado",
+		})
+	}
 	if filename == "" {
 		if idx := strings.LastIndex(key, "/"); idx >= 0 {
 			filename = key[idx+1:]
@@ -193,4 +289,96 @@ func (h *MediaHealthHandler) proxyMedia(c *fiber.Ctx, disposition string) error 
 
 	c.Status(resp.StatusCode)
 	return c.SendStream(resp.Body)
+}
+
+func (h *MediaHealthHandler) loadMediaFile(c *fiber.Ctx) (*models.MediaFile, error) {
+	return h.loadMediaFileByID(c, c.Params("id"))
+}
+
+func (h *MediaHealthHandler) loadMediaFileByID(c *fiber.Ctx, rawID string) (*models.MediaFile, error) {
+	if h.db == nil {
+		return nil, c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "database não configurado"})
+	}
+	id, err := uuid.Parse(rawID)
+	if err != nil {
+		return nil, c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "media_id inválido"})
+	}
+	var media models.MediaFile
+	if err := h.db.First(&media, "id = ?", id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "mídia não encontrada"})
+		}
+		return nil, c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	if !h.canAccessMedia(c, &media) {
+		return nil, c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "sem acesso a esta mídia"})
+	}
+	return &media, nil
+}
+
+func (h *MediaHealthHandler) loadPublicMediaFile(c *fiber.Ctx) (*models.MediaFile, error) {
+	if h.db == nil {
+		return nil, c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "database não configurado"})
+	}
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return nil, c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "media_id inválido"})
+	}
+	var media models.MediaFile
+	if err := h.db.First(&media, "id = ?", id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "mídia não encontrada"})
+		}
+		return nil, c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return &media, nil
+}
+
+func (h *MediaHealthHandler) canAccessMedia(c *fiber.Ctx, media *models.MediaFile) bool {
+	user := middleware.GetCurrentUser(c)
+	if user == nil {
+		return false
+	}
+	if user.Role == models.RoleSuperAdmin {
+		return true
+	}
+	if media.UserID != nil && *media.UserID == user.ID {
+		return true
+	}
+	if media.WorkspaceID == nil {
+		return false
+	}
+	var count int64
+	h.db.Model(&models.UserWorkspace{}).
+		Where("user_id = ? AND workspace_id = ?", user.ID, *media.WorkspaceID).
+		Count(&count)
+	return count > 0
+}
+
+func mediaFileResponse(media *models.MediaFile) fiber.Map {
+	out := fiber.Map{
+		"id":           media.ID,
+		"media_id":     media.ID,
+		"object_key":   media.ObjectKey,
+		"media_key":    media.ObjectKey,
+		"media_type":   media.MediaType,
+		"mime_type":    media.MimeType,
+		"filename":     media.Filename,
+		"size_bytes":   media.SizeBytes,
+		"status":       media.Status,
+		"public_url":   "/m/" + media.ID.String(),
+		"download_url": "/v1/media/files/" + media.ID.String() + "/download",
+		"stream_url":   "/v1/media/files/" + media.ID.String() + "/stream",
+		"created_at":   media.CreatedAt,
+	}
+	if media.WorkspaceID != nil {
+		out["workspace_id"] = *media.WorkspaceID
+	}
+	if media.InstanceID != nil {
+		out["instance_id"] = *media.InstanceID
+	}
+	if media.MessageLogID != nil {
+		out["message_log_id"] = *media.MessageLogID
+	}
+	return out
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/queue"
+	"github.com/uniq-chat/backend/internal/storage"
 	"gorm.io/gorm"
 )
 
@@ -220,16 +221,16 @@ func (m *Manager) SaveMessage(instanceID string, toJID string, content string, d
 // novos campos (external_id, reply_to_external_id, ...) sem quebrar
 // signatures existentes.
 type SaveMessageInput struct {
-	InstanceID         string
-	ToJID              string
-	Content            string
-	Direction          models.MessageDirection
-	Type               string
-	PushName           string
-	IsGroup            bool
-	SenderJID          string
-	ExternalMessageID  string // ex.: stanza_id WhatsApp (v.Info.ID)
-	ReplyToExternalID  string // stanza_id da msg citada — resolve pra ReplyToID
+	InstanceID        string
+	ToJID             string
+	Content           string
+	Direction         models.MessageDirection
+	Type              string
+	PushName          string
+	IsGroup           bool
+	SenderJID         string
+	ExternalMessageID string // ex.: stanza_id WhatsApp (v.Info.ID)
+	ReplyToExternalID string // stanza_id da msg citada — resolve pra ReplyToID
 }
 
 // SaveMessageEx é a versão completa do save. Recebe um struct pra evoluir
@@ -392,6 +393,9 @@ func (m *Manager) SaveMessageEx(in SaveMessageInput) error {
 	if err := m.db.Create(&logEntry).Error; err != nil {
 		return err
 	}
+	if updatedContent, ok := m.registerMediaFileForMessage(&logEntry); ok {
+		logEntry.Content = updatedContent
+	}
 
 	// Fire ticketing pipeline (non-blocking).
 	//   - Inbound: cria/abre Conversation pro contato.
@@ -415,6 +419,102 @@ func (m *Manager) SaveMessageEx(in SaveMessageInput) error {
 	}
 
 	return nil
+}
+
+func (m *Manager) registerMediaFileForMessage(msg *models.MessageLog) (string, bool) {
+	if m.db == nil || msg == nil || msg.Content == "" || !strings.HasPrefix(strings.TrimSpace(msg.Content), "{") {
+		return "", false
+	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal([]byte(msg.Content), &payload); err != nil {
+		return "", false
+	}
+	key, _ := payload["media_key"].(string)
+	if key == "" {
+		return "", false
+	}
+	if existingID, _ := payload["media_id"].(string); existingID != "" {
+		return msg.Content, false
+	}
+
+	var media models.MediaFile
+	err := m.db.Where("object_key = ?", key).First(&media).Error
+	if err != nil && err != gorm.ErrRecordNotFound {
+		log.Warn().Err(err).Str("key", key).Msg("media file lookup failed")
+		return "", false
+	}
+	if err == gorm.ErrRecordNotFound {
+		media = models.MediaFile{
+			WorkspaceID:  msg.WorkspaceID,
+			UserID:       msg.UserID,
+			InstanceID:   &msg.InstanceID,
+			MessageLogID: &msg.ID,
+			ObjectKey:    key,
+			MediaType:    msg.Type,
+			MimeType:     stringFromPayload(payload, "mime_type"),
+			Filename:     stringFromPayload(payload, "filename"),
+			PublicURL:    stringFromPayload(payload, "url"),
+			SizeBytes:    int64FromPayload(payload, "size_bytes"),
+		}
+		if storage.GlobalStorage != nil {
+			media.Bucket = storage.GlobalStorage.BucketName()
+			if media.PublicURL == "" {
+				media.PublicURL = storage.GlobalStorage.PublicURL(key)
+			}
+		}
+		if err := m.db.Create(&media).Error; err != nil {
+			log.Warn().Err(err).Str("key", key).Msg("media file create failed")
+			return "", false
+		}
+	} else if media.MessageLogID == nil {
+		updates := map[string]interface{}{"message_log_id": msg.ID}
+		if media.WorkspaceID == nil && msg.WorkspaceID != nil {
+			updates["workspace_id"] = *msg.WorkspaceID
+		}
+		if media.UserID == nil && msg.UserID != nil {
+			updates["user_id"] = *msg.UserID
+		}
+		if media.InstanceID == nil {
+			updates["instance_id"] = msg.InstanceID
+		}
+		m.db.Model(&media).Updates(updates)
+	}
+
+	payload["media_id"] = media.ID.String()
+	payload["public_url"] = "/m/" + media.ID.String()
+	payload["download_url"] = "/v1/media/files/" + media.ID.String() + "/download"
+	payload["stream_url"] = "/v1/media/files/" + media.ID.String() + "/stream"
+	out, err := json.Marshal(payload)
+	if err != nil {
+		return "", false
+	}
+	updated := string(out)
+	if updated != msg.Content {
+		if err := m.db.Model(&models.MessageLog{}).Where("id = ?", msg.ID).Update("content", updated).Error; err != nil {
+			log.Warn().Err(err).Str("message_id", msg.ID.String()).Msg("message media_id update failed")
+			return "", false
+		}
+		return updated, true
+	}
+	return updated, false
+}
+
+func stringFromPayload(payload map[string]interface{}, key string) string {
+	v, _ := payload[key].(string)
+	return v
+}
+
+func int64FromPayload(payload map[string]interface{}, key string) int64 {
+	switch v := payload[key].(type) {
+	case float64:
+		return int64(v)
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	default:
+		return 0
+	}
 }
 
 // UpdateEditedMessage atualiza uma MessageLog existente quando o cliente

@@ -146,6 +146,9 @@ func RequireAuth(db *gorm.DB) fiber.Handler {
 
 		claims, err := ParseAccessToken(tokenStr)
 		if err != nil {
+			if strings.HasPrefix(tokenStr, "sk_") {
+				return tryAPIKeyValue(c, db, tokenStr)
+			}
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "token inválido ou expirado"})
 		}
 
@@ -216,7 +219,10 @@ func tryAPIKey(c *fiber.Ctx, db *gorm.DB) error {
 	if key == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "autenticação necessária"})
 	}
+	return tryAPIKeyValue(c, db, key)
+}
 
+func tryAPIKeyValue(c *fiber.Ctx, db *gorm.DB, key string) error {
 	// Instance tokens (prefixo `it_`) são escopados à rota
 	// /v1/:server_slug/:instance_slug/* (ResolveV1Instance). Rejeitamos
 	// cedo aqui — sem tocar no DB de api_keys — pra deixar explícito que

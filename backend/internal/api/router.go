@@ -206,13 +206,20 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	app.Get("/v1/asaas/plans", paymentH.ListPlans)
 	app.Get("/v1/payments/plans", paymentH.ListPlans)
 
-	mediaH := handlers.NewMediaHealthHandler()
+	mediaH := handlers.NewMediaHealthHandler(db)
 
 	// Media proxy routes must be registered before the public wildcard below.
 	// Otherwise /v1/media/download is treated as key="download" and the
 	// query param with the real object key is ignored.
 	app.Get("/v1/media/download", middleware.RequireAuth(db), middleware.RateLimit(1500), mediaH.Download)
 	app.Get("/v1/media/stream", middleware.RequireAuth(db), middleware.RateLimit(1500), mediaH.Stream)
+	app.Get("/v1/media/files", middleware.RequireAuth(db), middleware.RateLimit(1500), mediaH.FindFile)
+	app.Get("/v1/media/files/:id", middleware.RequireAuth(db), middleware.RateLimit(1500), mediaH.GetFile)
+	app.Get("/v1/media/files/:id/download", middleware.RequireAuth(db), middleware.RateLimit(1500), mediaH.DownloadFile)
+	app.Get("/v1/media/files/:id/stream", middleware.RequireAuth(db), middleware.RateLimit(1500), mediaH.StreamFile)
+	app.Get("/m/:id", middleware.RateLimit(1500), mediaH.PublicRedirectFile)
+	app.Get("/m/:id/stream", middleware.RateLimit(1500), mediaH.PublicRedirectFile)
+	app.Get("/m/:id/download", middleware.RateLimit(1500), mediaH.PublicDownloadFile)
 
 	// Media by key — redireciona pra signed URL (TTL curto). Usado pelo
 	// frontend quando o resolver server-side não conseguiu embedar a URL

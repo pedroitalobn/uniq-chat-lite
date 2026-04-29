@@ -1165,13 +1165,60 @@ func (h *MessageHandler) UploadMedia(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha no upload: " + err.Error()})
 	}
 
+	var userID *uuid.UUID
+	if v, ok := c.Locals("user_id").(uuid.UUID); ok && v != uuid.Nil {
+		userID = &v
+	} else {
+		uid := instance.UserID
+		userID = &uid
+	}
+	media := models.MediaFile{
+		WorkspaceID: instance.WorkspaceID,
+		UserID:      userID,
+		InstanceID:  &instance.ID,
+		ObjectKey:   objectName,
+		Bucket:      storage.GlobalStorage.BucketName(),
+		MediaType:   mediaTypeFromMIME(mime),
+		MimeType:    mime,
+		Filename:    file.Filename,
+		SizeBytes:   file.Size,
+		PublicURL:   url,
+	}
+	if err := h.db.Create(&media).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao registrar mídia: " + err.Error()})
+	}
+
 	return c.JSON(fiber.Map{
-		"url":         url,
-		"object_name": objectName,
-		"mime_type":   mime,
-		"size":        file.Size,
-		"filename":    file.Filename,
+		"id":           media.ID,
+		"media_id":     media.ID,
+		"url":          url,
+		"public_url":   "/m/" + media.ID.String(),
+		"download_url": "/v1/media/files/" + media.ID.String() + "/download",
+		"stream_url":   "/v1/media/files/" + media.ID.String() + "/stream",
+		"media_key":    objectName,
+		"object_name":  objectName,
+		"media_type":   media.MediaType,
+		"mime_type":    mime,
+		"size":         file.Size,
+		"size_bytes":   file.Size,
+		"filename":     file.Filename,
 	})
+}
+
+func mediaTypeFromMIME(mime string) string {
+	base := strings.ToLower(strings.TrimSpace(strings.Split(mime, ";")[0]))
+	switch {
+	case strings.HasPrefix(base, "image/"):
+		return "image"
+	case strings.HasPrefix(base, "audio/"):
+		return "audio"
+	case strings.HasPrefix(base, "video/"):
+		return "video"
+	case base == "application/pdf" || strings.HasPrefix(base, "application/") || strings.HasPrefix(base, "text/"):
+		return "document"
+	default:
+		return "file"
+	}
 }
 
 // RevokeMessage godoc

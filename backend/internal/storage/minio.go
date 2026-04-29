@@ -84,17 +84,17 @@ func MediaObjectName(instanceID, ext string) string {
 // MimeToExt returns a file extension for common MIME types.
 func MimeToExt(mime string) string {
 	m := map[string]string{
-		"image/jpeg":          "jpg",
-		"image/png":           "png",
-		"image/webp":          "webp",
-		"image/gif":           "gif",
-		"audio/ogg":           "ogg",
-		"audio/mpeg":          "mp3",
-		"audio/mp4":           "m4a",
-		"video/mp4":           "mp4",
-		"application/pdf":     "pdf",
-		"application/zip":     "zip",
-		"text/plain":          "txt",
+		"image/jpeg":      "jpg",
+		"image/png":       "png",
+		"image/webp":      "webp",
+		"image/gif":       "gif",
+		"audio/ogg":       "ogg",
+		"audio/mpeg":      "mp3",
+		"audio/mp4":       "m4a",
+		"video/mp4":       "mp4",
+		"application/pdf": "pdf",
+		"application/zip": "zip",
+		"text/plain":      "txt",
 	}
 	// Strip codec suffix: "audio/ogg; codecs=opus" → "audio/ogg"
 	base := strings.Split(mime, ";")[0]
@@ -117,9 +117,12 @@ func MimeToExt(mime string) string {
 // Robusto contra duplicação de bucket: se publicURL já contém o nome do
 // bucket (virtual-hosted style, ex: https://uniq-chat-media.fsn1.your-
 // objectstorage.com), gera URL com bucket UMA vez:
-//   https://uniq-chat-media.fsn1.your-objectstorage.com/{key}
+//
+//	https://uniq-chat-media.fsn1.your-objectstorage.com/{key}
+//
 // Path-style (publicURL = https://fsn1.your-objectstorage.com) inclui:
-//   https://fsn1.your-objectstorage.com/{bucket}/{key}
+//
+//	https://fsn1.your-objectstorage.com/{bucket}/{key}
 func (c *Client) PublicURL(objectName string) string {
 	// Detecta virtual-hosted: bucket no host (depois do //, antes do primeiro /)
 	host := c.publicURL
@@ -152,14 +155,19 @@ func (c *Client) PresignURL(ctx context.Context, objectName string, ttl time.Dur
 	return u.String(), nil
 }
 
+func (c *Client) BucketName() string {
+	return c.bucket
+}
+
 // KeyFromURL extrai o objectName de uma URL gerada por PublicURL().
 // Retorna "" se a URL não pertence ao bucket configurado. Usado pra
 // migrar storage de modo público pra privado: detecta URLs antigas
 // salvas no MessageLog.Content e substitui pelo key extraído.
 //
 // Aceita ambos formatos:
-//   path-style:        https://host/bucket/key
-//   virtual-hosted:    https://bucket.host/key
+//
+//	path-style:        https://host/bucket/key
+//	virtual-hosted:    https://bucket.host/key
 func (c *Client) KeyFromURL(url string) string {
 	// Tenta virtual-hosted primeiro (publicURL já tem bucket no host)
 	prefix := c.publicURL + "/"

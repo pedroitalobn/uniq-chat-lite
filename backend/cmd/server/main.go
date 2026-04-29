@@ -146,6 +146,7 @@ func main() {
 	} else {
 		log.Warn().Msg("MINIO_ENDPOINT not set — media storage disabled")
 	}
+	backfillMediaFiles(db)
 
 	// Start real-time event hub
 	whatsapp.StartHub()
@@ -186,11 +187,11 @@ func main() {
 			hub.Broadcast(&whatsapp.Event{
 				Type: "usage.threshold",
 				Payload: map[string]any{
-					"user_id":  userID.String(),
-					"type":     usageType,
-					"percent":  percent,
-					"current":  current,
-					"limit":    limit,
+					"user_id": userID.String(),
+					"type":    usageType,
+					"percent": percent,
+					"current": current,
+					"limit":   limit,
 				},
 			})
 		}
@@ -265,6 +266,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.Webhook{},
 		&models.GlobalWebhook{},
 		&models.WebhookDelivery{},
+		&models.MediaFile{},
 		&models.MessageLog{},
 		&models.MessageReceipt{},
 		&models.LinkPreview{},
@@ -606,6 +608,92 @@ func backfillDoubleEncodedMediaContent(db *gorm.DB) {
 	if fixed > 0 {
 		log.Info().Int("fixed", fixed).Int("scanned", len(rows)).
 			Msg("backfill content: JSON estruturado desembrulhado (location/contact/poll/etc)")
+	}
+}
+
+func backfillMediaFiles(db *gorm.DB) {
+	var rows []models.MessageLog
+	if err := db.
+		Where("content LIKE ? AND content NOT LIKE ?", "%\"media_key\"%", "%\"media_id\"%").
+		Find(&rows).Error; err != nil {
+		log.Warn().Err(err).Msg("media files backfill query failed")
+		return
+	}
+	fixed := 0
+	for i := range rows {
+		row := &rows[i]
+		var payload map[string]interface{}
+		if err := json.Unmarshal([]byte(row.Content), &payload); err != nil {
+			continue
+		}
+		key, _ := payload["media_key"].(string)
+		if key == "" {
+			continue
+		}
+		var media models.MediaFile
+		err := db.Where("object_key = ?", key).First(&media).Error
+		if err != nil && err != gorm.ErrRecordNotFound {
+			log.Warn().Err(err).Str("key", key).Msg("media files backfill lookup failed")
+			continue
+		}
+		if err == gorm.ErrRecordNotFound {
+			media = models.MediaFile{
+				WorkspaceID:  row.WorkspaceID,
+				UserID:       row.UserID,
+				InstanceID:   &row.InstanceID,
+				MessageLogID: &row.ID,
+				ObjectKey:    key,
+				MediaType:    row.Type,
+				MimeType:     stringPayload(payload, "mime_type"),
+				Filename:     stringPayload(payload, "filename"),
+				PublicURL:    stringPayload(payload, "url"),
+				SizeBytes:    int64Payload(payload, "size_bytes"),
+			}
+			if storage.GlobalStorage != nil {
+				media.Bucket = storage.GlobalStorage.BucketName()
+				if media.PublicURL == "" {
+					media.PublicURL = storage.GlobalStorage.PublicURL(key)
+				}
+			}
+			if err := db.Create(&media).Error; err != nil {
+				log.Warn().Err(err).Str("key", key).Msg("media files backfill create failed")
+				continue
+			}
+		}
+		payload["media_id"] = media.ID.String()
+		payload["public_url"] = "/m/" + media.ID.String()
+		payload["download_url"] = "/v1/media/files/" + media.ID.String() + "/download"
+		payload["stream_url"] = "/v1/media/files/" + media.ID.String() + "/stream"
+		out, err := json.Marshal(payload)
+		if err != nil {
+			continue
+		}
+		if err := db.Model(&models.MessageLog{}).Where("id = ?", row.ID).Update("content", string(out)).Error; err != nil {
+			log.Warn().Err(err).Str("message_id", row.ID.String()).Msg("media files backfill content update failed")
+			continue
+		}
+		fixed++
+	}
+	if len(rows) > 0 {
+		log.Info().Int("fixed", fixed).Int("scanned", len(rows)).Msg("media files backfill done")
+	}
+}
+
+func stringPayload(payload map[string]interface{}, key string) string {
+	v, _ := payload[key].(string)
+	return v
+}
+
+func int64Payload(payload map[string]interface{}, key string) int64 {
+	switch v := payload[key].(type) {
+	case float64:
+		return int64(v)
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	default:
+		return 0
 	}
 }
 
