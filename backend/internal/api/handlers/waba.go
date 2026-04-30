@@ -699,9 +699,13 @@ func (h *WABAHandler) processStatusUpdate(waba *models.WABAInstance, st *Webhook
 	ev.Msg("waba: status update")
 
 	// 1. MessageLog correspondente (outbound salvo com external_message_id = wamid)
+	mlUpdates := map[string]any{"status": msgStatus}
+	if st.Status == "failed" && len(st.Errors) > 0 {
+		mlUpdates["delivery_error"] = metaErrorLabel(st.Errors[0].Code, st.Errors[0].Title)
+	}
 	h.db.Model(&models.MessageLog{}).
 		Where("external_message_id = ?", st.ID).
-		Update("status", msgStatus)
+		Updates(mlUpdates)
 
 	// 2. CampaignRecipient — se essa mensagem foi de uma campanha
 	updates := map[string]any{}
@@ -724,6 +728,29 @@ func (h *WABAHandler) processStatusUpdate(waba *models.WABAInstance, st *Webhook
 			Where("message_id = ?", st.ID).
 			Updates(updates)
 	}
+}
+
+// metaErrorLabel traduz códigos de erro da Meta para mensagens amigáveis em pt-BR.
+func metaErrorLabel(code int, fallback string) string {
+	labels := map[int]string{
+		100:    "App em modo de desenvolvimento — número não está na lista de testes autorizados",
+		130472: "Limite de mensagens de marketing atingido para este número (1/dia)",
+		131026: "Número não tem WhatsApp ou está desativado",
+		131030: "Destinatário não deu opt-in para receber mensagens desta empresa",
+		131031: "Número bloqueou mensagens desta empresa",
+		131042: "Problema de pagamento na conta WhatsApp Business — verifique o faturamento no Meta Business Manager",
+		131047: "Janela de 24h expirada — use um template aprovado para reiniciar a conversa",
+		131051: "Tipo de mensagem não suportado",
+		131052: "Erro ao enviar mídia",
+		131053: "Arquivo de mídia excede o limite de tamanho",
+	}
+	if label, ok := labels[code]; ok {
+		return fmt.Sprintf("[%d] %s", code, label)
+	}
+	if fallback != "" {
+		return fmt.Sprintf("[%d] %s", code, fallback)
+	}
+	return fmt.Sprintf("Erro Meta #%d", code)
 }
 
 func (h *WABAHandler) SendMessage(c *fiber.Ctx) error {

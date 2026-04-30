@@ -112,6 +112,7 @@ interface MessagePayload {
     media_url?: string;
     mime_type?: string;
   };
+  delivery_error?: string;
 }
 
 interface NotePayload {
@@ -1307,6 +1308,7 @@ function MessageBubble({
     // dispensar a borda gradiente externa pra não ficar bubble dentro de bubble.
     const isAudioOnly = m.type === "audio";
     return (
+      <>
       <div className={`group relative flex ${isOut ? "justify-end" : "justify-start"}`}>
         <div
           className="relative max-w-[80%] uniq-slide-up"
@@ -1368,7 +1370,7 @@ function MessageBubble({
             ) : <span />}
             <span className="flex items-center gap-1">
               {relativeTime(m.created_at)}
-              {isOut && <StatusTicks status={m.status} />}
+              {isOut && <StatusTicks status={m.status} deliveryError={m.delivery_error} />}
             </span>
           </div>
 
@@ -1386,10 +1388,19 @@ function MessageBubble({
           <ReactionChips reactions={reactions} isOut={isOut} />
         </div>
       </div>
+      {isOut && m.status === "failed" && m.delivery_error && (
+        <div className="flex justify-end mt-0.5 px-1">
+          <p className="text-[11px] max-w-[80%] text-right" style={{ color: "#f87171" }}>
+            {m.delivery_error}
+          </p>
+        </div>
+      )}
+      </>
     );
   }
 
   return (
+    <>
     <div className={`group relative flex ${isOut ? "justify-end" : "justify-start"}`}>
       <div
         className="relative max-w-[80%] rounded-2xl px-3 py-2 shadow-sm uniq-slide-up"
@@ -1463,7 +1474,7 @@ function MessageBubble({
         >
           {m.is_edited && <span className="italic">editada</span>}
           <span>{relativeTime(m.created_at)}</span>
-          {isOut && <StatusTicks status={m.status} />}
+          {isOut && <StatusTicks status={m.status} deliveryError={m.delivery_error} />}
         </div>
 
         <MessageActionsToolbar
@@ -1480,6 +1491,12 @@ function MessageBubble({
         <ReactionChips reactions={reactions} isOut={isOut} />
       </div>
     </div>
+    {isOut && m.status === "failed" && m.delivery_error && (
+      <div className="flex justify-end mt-0.5 px-1">
+        <p className="text-[11px] max-w-[80%] text-right" style={{ color: "#f87171" }}>{m.delivery_error}</p>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -2697,10 +2714,14 @@ function ErrorLine({ text }: { text: string }) {
   );
 }
 
-function StatusTicks({ status }: { status?: string }) {
+function StatusTicks({ status, deliveryError }: { status?: string; deliveryError?: string }) {
   if (!status) return null;
   if (status === "failed") {
-    return <AlertCircle className="h-3 w-3" style={{ color: "#ef4444" }} />;
+    return (
+      <span title={deliveryError || "Falha na entrega"}>
+        <AlertCircle className="h-3 w-3" style={{ color: "#ef4444" }} />
+      </span>
+    );
   }
   if (status === "read") {
     return <CheckCheck className="h-3 w-3" style={{ color: "#00d46a" }} />;

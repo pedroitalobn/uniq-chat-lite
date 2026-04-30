@@ -55,8 +55,9 @@ type MessageLog struct {
 	// IsEdited — flag pra mostrar selo "editada" na bubble. Atualizado
 	// quando chega events.Message com IsEdit=true matching a MessageLog
 	// existente via reply_to/external_id.
-	IsEdited  bool      `gorm:"default:false" json:"is_edited"`
-	CreatedAt time.Time `json:"created_at"`
+	IsEdited      bool   `gorm:"default:false" json:"is_edited"`
+	DeliveryError string `gorm:"type:text" json:"delivery_error,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
 
 	// ReplyTo é um snapshot in-memory da mensagem citada — preenchido pelo
 	// Timeline handler em batch. Não é persistido. Permite ao frontend
