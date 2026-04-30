@@ -572,6 +572,58 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    id: "waba",
+    title: "WABA (WhatsApp API Oficial)",
+    icon: Send,
+    description: "WhatsApp Cloud API (Meta) — templates HSM, janela de 24h, envio de mensagens ativas. Use X-API-Key: sc_... no header. Os endpoints /v1/instances/{id}/waba/* requerem uma instância com WABA vinculada.",
+    badge: "Meta Cloud API",
+    endpoints: [
+      // Setup
+      { method: "GET",    path: "/v1/instances/{id}/waba", description: "Detalhes da conta WABA vinculada à instância (WABA ID, business name, status)", auth: "bearer", response: `{ "waba_id": "...", "business_name": "Minha Empresa", "phone_number_id": "...", "status": "active" }` },
+      { method: "GET",    path: "/v1/instances/{id}/waba/phone-numbers", description: "Listar números de telefone cadastrados na conta WABA com rating de qualidade e status", auth: "bearer", response: `{ "data": [{ "id": "...", "display_phone_number": "+55 11 99999-9999", "verified_name": "Minha Empresa", "quality_rating": "GREEN", "status": "CONNECTED" }] }` },
+      { method: "POST",   path: "/v1/instances/{id}/waba/subscribe", description: "Assinar webhooks da App Meta na conta WABA (Tech Provider flow — executar após Embedded Signup)", auth: "bearer" },
+      { method: "POST",   path: "/v1/instances/{id}/waba/register", description: "Registrar número de telefone para habilitar envio de mensagens ativas", auth: "bearer", body: { pin: "(opcional) PIN de verificação" } },
+      { method: "DELETE", path: "/v1/instances/{id}/waba", description: "Desvincular conta WABA da instância", auth: "bearer" },
+      // Templates
+      { method: "GET",    path: "/v1/instances/{id}/waba/templates", description: "Listar templates HSM — inclui status (APPROVED, PENDING, REJECTED) e componentes de cada template", auth: "bearer", response: `{ "data": [{ "id": "...", "name": "confirmacao_pedido", "status": "APPROVED", "language": "pt_BR", "components": [{ "type": "BODY", "text": "Olá {{1}}, seu pedido {{2}} foi confirmado." }] }] }` },
+      { method: "POST",   path: "/v1/instances/{id}/waba/templates", description: "Criar novo template e enviá-lo para revisão da Meta. Status inicial: PENDING. Aprovação leva de minutos a horas.", auth: "bearer", body: { name: "confirmacao_pedido", language: "pt_BR", category: "UTILITY", components: [{ type: "BODY", text: "Olá {{1}}, seu pedido {{2}} foi confirmado." }] }, response: `{ "id": "...", "name": "confirmacao_pedido", "status": "PENDING" }` },
+      { method: "POST",   path: "/v1/instances/{id}/waba/templates/{templateId}", description: "Editar template existente (status volta a PENDING após edição — mesmo que fosse APPROVED)", auth: "bearer", body: { components: [{ type: "BODY", text: "Olá {{1}}, confirmamos o pedido {{2}}." }] } },
+      { method: "DELETE", path: "/v1/instances/{id}/waba/templates/{name}", description: "Deletar template pelo nome (remove permanentemente da Meta — não pode ser desfeito)", auth: "bearer" },
+      // Mensagens
+      { method: "POST",   path: "/v1/instances/{id}/waba/messages", description: "Enviar mensagem WABA. Dentro da janela de 24h: qualquer tipo (text/image/audio/document/video). Fora da janela: apenas templates aprovados. Use GET /conversations/{id}/send-constraints para verificar.", auth: "bearer", body: { to: "5511999999999", type: "template", template_name: "confirmacao_pedido", template_language: "pt_BR", components: [{ type: "body", parameters: [{ type: "text", text: "João" }, { type: "text", text: "#12345" }] }] }, response: `{ "id": "uuid", "message_id": "wamid.HBgM...", "status": "sent" }` },
+      // Webhook
+      { method: "GET",    path: "/waba/webhook", description: "Verificação do webhook pela Meta (hub.challenge) — responde automaticamente, não chamar diretamente", auth: "none" },
+      { method: "POST",   path: "/waba/webhook", description: "Recebe eventos WABA da Meta: mensagens inbound, status (sent/delivered/read/failed), erros de entrega. Qualquer falha de entrega gera delivery_error no MessageLog.", auth: "none" },
+      { method: "GET",    path: "/v1/waba/auth-url", description: "Gerar URL para iniciar Embedded Signup Meta (vinculação WABA via OAuth)", auth: "bearer", response: `{ "url": "https://www.facebook.com/dialog/oauth?..." }` },
+      { method: "POST",   path: "/v1/waba/callback", description: "Callback OAuth pós-Embedded Signup: troca code por access_token e vincula a conta WABA à instância", auth: "bearer", body: { code: "...", instance_id: "..." }, response: `{ "waba_id": "...", "phone_number_id": "..." }` },
+      // Janela / constraints
+      { method: "GET",    path: "/v1/conversations/{id}/send-constraints", description: "Verificar janela de 24h WABA antes de enviar. Se window_open=false, é obrigatório usar template. Funciona para todos os tipos de canal.", auth: "bearer", response: `{ "channel": "waba", "window_open": false, "allows_template": true, "allowed_types": ["template"], "max_body_chars": 1024, "last_customer_msg_at": "2026-04-29T10:00:00Z" }` },
+    ],
+  },
+  {
+    id: "instagram",
+    title: "Instagram DMs",
+    icon: Globe,
+    description: "Instagram via conexão não-oficial — envio de DMs, follow/unfollow, upload de stories e posts. A instância deve ter channel=instagram e estar conectada com usuário/senha ou token Meta.",
+    badge: "Instagram (não-oficial)",
+    endpoints: [
+      { method: "POST", path: "/v1/instances/{id}/instagram/login", description: "Conectar conta Instagram com usuário + senha (instagram-cli interno)", auth: "bearer", body: { username: "minha_conta", password: "••••••••" }, response: `{ "message": "login iniciado", "instance_id": "..." }` },
+      { method: "POST", path: "/v1/instances/{id}/instagram/logout", description: "Desconectar conta Instagram", auth: "bearer" },
+      { method: "POST", path: "/v1/instances/{id}/instagram/dm", description: "Enviar DM para um usuário pelo username ou user_id", auth: "bearer", body: { to: "user123", text: "Olá! Como posso ajudar?" }, response: `{ "status": "sent", "message_id": "..." }` },
+      { method: "GET",  path: "/v1/instances/{id}/instagram/dm", description: "Listar DMs recebidas (inbox)", auth: "bearer", response: `{ "dms": [{ "from": "user123", "text": "Olá!", "timestamp": "..." }] }` },
+      { method: "POST", path: "/v1/instances/{id}/instagram/follow", description: "Seguir usuário pelo username", auth: "bearer", body: { username: "user123" } },
+      { method: "POST", path: "/v1/instances/{id}/instagram/unfollow", description: "Deixar de seguir usuário", auth: "bearer", body: { username: "user123" } },
+      { method: "POST", path: "/v1/instances/{id}/instagram/post", description: "Publicar post (foto/vídeo)", auth: "bearer", body: { media_url: "https://...", caption: "Legenda do post" } },
+      { method: "POST", path: "/v1/instances/{id}/instagram/story", description: "Publicar story (imagem ou vídeo)", auth: "bearer", body: { media_url: "https://..." } },
+      { method: "GET",  path: "/v1/instances/{id}/instagram/media", description: "Listar posts/mídias do usuário conectado", auth: "bearer" },
+      { method: "POST", path: "/v1/instances/{id}/instagram/like", description: "Curtir uma mídia pelo media_id", auth: "bearer", body: { media_id: "1234567890" } },
+      { method: "POST", path: "/v1/instances/{id}/instagram/pause", description: "Pausar automação Instagram (para o bot sem desconectar)", auth: "bearer" },
+      { method: "POST", path: "/v1/instances/{id}/instagram/resume", description: "Retomar automação Instagram", auth: "bearer" },
+      { method: "POST", path: "/v1/instances/{id}/instagram/challenge", description: "Responder challenge de verificação de identidade Instagram", auth: "bearer", body: { code: "123456" } },
+      { method: "POST", path: "/v1/instances/{id}/instagram/challenge/resend", description: "Solicitar reenvio do código de challenge", auth: "bearer" },
+    ],
+  },
+  {
     id: "realtime",
     title: "Realtime & Health",
     icon: BarChart2,
