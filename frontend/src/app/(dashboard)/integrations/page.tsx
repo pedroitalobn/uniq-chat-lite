@@ -5,10 +5,11 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plug, Plus, Trash2, RefreshCw, CheckCircle2,
-  Eye, EyeOff, Zap, Globe, Bot, Webhook,
+  Eye, EyeOff, Zap, Globe, Bot, Webhook, Mic,
   Key, FileJson, ExternalLink, Loader2, Link2, Copy, X, ShoppingBag,
 } from "lucide-react";
 import { ShopSection } from "@/components/integrations/ShopSection";
+import { VoicesSection } from "@/components/integrations/VoicesSection";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { integrationsApi, apiKeysApi, proxiesApi, adminApi, instancesApi } from "@/lib/api";
@@ -79,9 +80,9 @@ interface Integration {
   created_at: string;
 }
 
-type Section = "llm" | "agents" | "api" | "webhook" | "mcp" | "shop" | "docs";
+type Section = "llm" | "agents" | "api" | "webhook" | "mcp" | "shop" | "voices" | "docs";
 
-const VALID_SECTIONS: Section[] = ["llm", "agents", "api", "webhook", "mcp", "docs"];
+const VALID_SECTIONS: Section[] = ["llm", "agents", "api", "webhook", "mcp", "voices", "docs"];
 
 export default function IntegrationsPage() {
   const searchParams = useSearchParams();
@@ -112,6 +113,7 @@ export default function IntegrationsPage() {
   const sections = [
     { id: "llm" as const, label: "LLMs", icon: Bot, color: "var(--green)" },
     { id: "agents" as const, label: "Agents", icon: Zap, color: "#8b5cf6" },
+    { id: "voices" as const, label: "Vozes", icon: Mic, color: "#f5a623" },
     { id: "mcp" as const, label: "MCPs", icon: Link2, color: "#f59e0b" },
     { id: "webhook" as const, label: "Webhooks", icon: Webhook, color: "#10b981" },
     { id: "shop" as const, label: "Shop", icon: ShoppingBag, color: "#22c55e" },
@@ -201,6 +203,7 @@ export default function IntegrationsPage() {
             {section === "agents" && <AgentsSection />}
             {section === "mcp" && <MCPSection />}
             {section === "webhook" && <WebhooksPanel />}
+            {section === "voices" && <VoicesSection />}
             {section === "shop" && <ShopSection />}
             {section === "api" && <APIKeysSection />}
             {section === "docs" && <DocsSection />}

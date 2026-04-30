@@ -19,16 +19,18 @@ type AgentRuntime struct {
 	db      *gorm.DB
 	manager *whatsapp.Manager
 	llm     *LLMService
+	tts     *TTSService
 
 	seenMu   sync.Mutex
 	seenMsgs map[string]time.Time
 }
 
-func NewAgentRuntime(db *gorm.DB, manager *whatsapp.Manager, llm *LLMService) *AgentRuntime {
+func NewAgentRuntime(db *gorm.DB, manager *whatsapp.Manager, llm *LLMService, tts *TTSService) *AgentRuntime {
 	return &AgentRuntime{
 		db:       db,
 		manager:  manager,
 		llm:      llm,
+		tts:      tts,
 		seenMsgs: make(map[string]time.Time),
 	}
 }
@@ -115,6 +117,18 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 
 	_ = client.SendTyping(fromJID, true)
 	time.Sleep(900 * time.Millisecond)
+
+	// Tentar responder em áudio se voz estiver configurada
+	if r.tts != nil && r.trySendAudio(ctx, client, agent, fromJID, reply) {
+		_ = client.SendTyping(fromJID, false)
+		log.Info().
+			Str("instance", instanceID).
+			Str("chat", fromJID).
+			Str("agent", agent.AgentName).
+			Msg("agent-runtime: resposta enviada em áudio")
+		return true
+	}
+
 	_, sendErr := client.SendTextMessage(fromJID, reply)
 	_ = client.SendTyping(fromJID, false)
 	if sendErr != nil {
@@ -293,6 +307,85 @@ func (r *AgentRuntime) recentHistory(instanceID uuid.UUID, fromJID string, limit
 		lines = append(lines, fmt.Sprintf("- %s: %s", role, content))
 	}
 	return strings.Join(lines, "\n")
+}
+
+// trySendAudio converts reply text to audio via TTS and sends it as a PTT message.
+// Returns true if audio was sent successfully.
+func (r *AgentRuntime) trySendAudio(ctx context.Context, client interface{ SendAudioMessage(string, []byte, string, bool) (string, error) }, agent *models.InstanceAgent, toJID, text string) bool {
+	cfg, ok := parseAgentVoiceConfig(agent.Voice)
+	if !ok {
+		return false
+	}
+
+	// Resolve the WorkspaceVoice to get provider credentials
+	var voice models.WorkspaceVoice
+	if cfg.WorkspaceVoiceID != "" {
+		voiceID, err := uuid.Parse(cfg.WorkspaceVoiceID)
+		if err != nil {
+			return false
+		}
+		if r.db.Preload("Provider").First(&voice, "id = ?", voiceID).Error != nil {
+			return false
+		}
+	} else {
+		return false
+	}
+
+	if voice.Provider == nil || !voice.Provider.IsActive {
+		return false
+	}
+
+	stability := cfg.Stability
+	if stability == 0 {
+		stability = 0.5
+	}
+	similarity := cfg.Similarity
+	if similarity == 0 {
+		similarity = 0.75
+	}
+	style := cfg.Style
+	speed := cfg.Speed
+	if speed == 0 {
+		speed = 1.0
+	}
+
+	audioData, mime, err := r.tts.Synthesize(ctx, voice.Provider, TTSRequest{
+		Text:       text,
+		VoiceID:    voice.ExternalID,
+		Stability:  stability,
+		Similarity: similarity,
+		Style:      style,
+		Speed:      speed,
+	})
+	if err != nil {
+		log.Warn().Err(err).Str("voice", voice.ExternalID).Msg("agent-runtime: TTS falhou, usando texto")
+		return false
+	}
+
+	_, err = client.SendAudioMessage(toJID, audioData, mime, true)
+	return err == nil
+}
+
+// parseAgentVoiceConfig desserializa o campo Voice do InstanceAgent.
+func parseAgentVoiceConfig(raw string) (*agentVoiceConfig, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || raw == "{}" || raw == "null" {
+		return nil, false
+	}
+	var cfg agentVoiceConfig
+	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+		return nil, false
+	}
+	return &cfg, cfg.AudioEnabled && cfg.WorkspaceVoiceID != ""
+}
+
+type agentVoiceConfig struct {
+	WorkspaceVoiceID string  `json:"workspace_voice_id,omitempty"`
+	AudioEnabled     bool    `json:"audio_enabled"`
+	Stability        float64 `json:"stability"`
+	Similarity       float64 `json:"similarity"`
+	Style            float64 `json:"style"`
+	Speed            float64 `json:"speed"`
 }
 
 func (r *AgentRuntime) seenRecently(instanceID, messageID string) bool {

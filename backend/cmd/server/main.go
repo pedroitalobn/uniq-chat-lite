@@ -165,7 +165,8 @@ func main() {
 	journeyLLM := services.NewLLMService()
 	journeySender := whatsapp.NewManagerSender(manager)
 	journeyExec := services.NewJourneyExecutor(db, journeySender, journeyLLM)
-	agentRuntime := services.NewAgentRuntime(db, manager, journeyLLM)
+	ttsService := services.NewTTSService()
+	agentRuntime := services.NewAgentRuntime(db, manager, journeyLLM, ttsService)
 	manager.SetJourneyExecutor(journeyExec)
 	manager.SetAgentRuntime(agentRuntime)
 
@@ -346,6 +347,9 @@ func autoMigrate(db *gorm.DB) error {
 		&models.Segment{},
 		&models.SegmentMember{},
 		&models.ContactAlias{},
+		// Voice / TTS
+		&models.VoiceProvider{},
+		&models.WorkspaceVoice{},
 		// Módulo Shop (Fase 1)
 		&models.Shop{},
 		&models.Product{},

@@ -1061,6 +1061,18 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	campaigns.Post("/:id/clear-sent", campaignH.ClearSent)
 	campaigns.Get("/:id/messages", campaignH.ListMessageStatus)
 
+	// ─── Voice / TTS ─────────────────────────────────────────────────
+	ttsForVoice := services.NewTTSService()
+	voiceH := handlers.NewVoiceHandler(db, ttsForVoice)
+	voices := api.Group("/voices")
+	voices.Get("/providers", voiceH.ListProviders)
+	voices.Post("/providers", voiceH.CreateProvider)
+	voices.Delete("/providers/:id", voiceH.DeleteProvider)
+	voices.Post("/providers/:id/sync", voiceH.SyncVoices)
+	voices.Get("/", voiceH.ListVoices)
+	voices.Patch("/:id", voiceH.ToggleVoice)
+	voices.Post("/test", voiceH.TestTTS)
+
 	// ─── Shop module (Fase 1) ─────────────────────────────────────────
 	shopH := handlers.NewShopHandler(db)
 	// Catálogo público de providers — antes do gate pra UI poder listar

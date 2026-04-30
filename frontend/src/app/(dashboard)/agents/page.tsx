@@ -7,7 +7,8 @@ import {
   Mic2, Plus, Save, Shield, Sparkles, Trash2, Upload, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { instancesApi, integrationsApi } from "@/lib/api";
+import { instancesApi, integrationsApi, voicesApi } from "@/lib/api";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { cn } from "@/lib/utils";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -38,7 +39,7 @@ type AgentForm = {
   knowledge_base: string;
   faq: Array<{ id: string; question: string; answer: string }>;
   variables: Array<{ id: string; key: string; value: string; description: string }>;
-  voice: { provider?: string; voice?: string; stability: number; similarity: number; style: number; speed: number };
+  voice: { workspace_voice_id?: string; audio_enabled?: boolean; provider?: string; voice?: string; stability: number; similarity: number; style: number; speed: number };
   skills: Array<{ id: string; name: string; type: string; description: string; enabled: boolean }>;
   app_access: Array<{ id: string; name: string; type: string; target: string; description: string; enabled: boolean }>;
   rag_enabled: boolean;
@@ -126,7 +127,7 @@ function emptyForm(): AgentForm {
     integration_id: "", model: "", system_prompt: "", agent_name: "", identity: "",
     objective: "", communication_guidelines: "", service_instructions: "", restrictions: "",
     knowledge_base: "", faq: [], variables: [],
-    voice: { provider: "", voice: "", stability: 0.5, similarity: 0.7, style: 0.5, speed: 1 },
+    voice: { workspace_voice_id: "", audio_enabled: false, provider: "", voice: "", stability: 0.5, similarity: 0.7, style: 0.5, speed: 1 },
     skills: [], app_access: [], rag_enabled: true, is_active: false,
     webhook_url: "", webhook_secret: "", mcp_server_url: "", compiled_prompt: "", assets: [],
   };
@@ -193,6 +194,8 @@ const TABS: Array<{ id: TabId; label: string; icon: React.ElementType; descripti
 
 export default function AgentsPage() {
   const queryClient = useQueryClient();
+  const { currentWorkspace } = useWorkspace();
+  const wsId = currentWorkspace?.id ?? "";
   const [tab, setTab] = useState<TabId>("personality");
   const [selectedInstance, setSelectedInstance] = useState("");
   const [form, setForm] = useState<AgentForm>(emptyForm());
@@ -201,6 +204,11 @@ export default function AgentsPage() {
 
   const instancesQuery = useQuery({ queryKey: ["instances"], queryFn: async () => (await instancesApi.list()).data || [] });
   const integrationsQuery = useQuery({ queryKey: ["integrations"], queryFn: async () => (await integrationsApi.list()).data || [] });
+  const voicesQuery = useQuery({
+    queryKey: ["voices", wsId],
+    queryFn: () => voicesApi.listVoices(wsId).then(r => r.data as Array<{ id: string; name: string; language: string; gender: string; provider?: { provider: string } }>),
+    enabled: !!wsId,
+  });
 
   useEffect(() => {
     if (!selectedInstance && instancesQuery.data?.length) setSelectedInstance(instancesQuery.data[0].id);
@@ -407,11 +415,42 @@ export default function AgentsPage() {
                 </div>
 
                 <div className="rounded-3xl p-5 space-y-4" style={cs()}>
-                  <h2 className="text-lg font-medium flex items-center gap-2" style={{ color: "var(--text-1)" }}>
-                    <Mic2 className="w-4 h-4" style={{ color: "var(--green)" }} /> Voz configurada
-                  </h2>
-                  <input value={form.voice.voice || ""} onChange={(e) => setForm((p) => ({ ...p, voice: { ...p.voice, voice: e.target.value } }))} placeholder="Ex.: marina-br" style={inp()} />
-                  <input value={form.voice.provider || ""} onChange={(e) => setForm((p) => ({ ...p, voice: { ...p.voice, provider: e.target.value } }))} placeholder="Provider de voz (elevenlabs, openai, etc.)" style={inp()} />
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-medium flex items-center gap-2" style={{ color: "var(--text-1)" }}>
+                      <Mic2 className="w-4 h-4" style={{ color: "var(--green)" }} /> Resposta em áudio
+                    </h2>
+                    {/* audio_enabled toggle */}
+                    <button
+                      onClick={() => setForm(p => ({ ...p, voice: { ...p.voice, audio_enabled: !p.voice.audio_enabled } }))}
+                      className="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-xl transition-all"
+                      style={{ background: form.voice.audio_enabled ? "rgba(0,200,100,0.12)" : "var(--surface-3)", color: form.voice.audio_enabled ? "var(--green)" : "var(--text-3)", border: `1px solid ${form.voice.audio_enabled ? "var(--green)" : "var(--surface-border)"}` }}>
+                      {form.voice.audio_enabled ? "Ativado" : "Desativado"}
+                    </button>
+                  </div>
+
+                  {/* Voice picker */}
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-2)" }}>Voz</label>
+                    <select
+                      value={form.voice.workspace_voice_id || ""}
+                      onChange={e => setForm(p => ({ ...p, voice: { ...p.voice, workspace_voice_id: e.target.value } }))}
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
+                      style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: form.voice.workspace_voice_id ? "var(--text-1)" : "var(--text-3)" }}>
+                      <option value="">Selecionar voz...</option>
+                      {(voicesQuery.data ?? []).map(v => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}{v.language ? ` · ${v.language}` : ""}{v.gender ? ` · ${v.gender}` : ""}{v.provider?.provider ? ` (${v.provider.provider})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    {!voicesQuery.data?.length && (
+                      <p className="text-[11px] mt-1.5" style={{ color: "var(--text-3)" }}>
+                        Nenhuma voz disponível. Configure providers em{" "}
+                        <a href="/integrations?tab=voices" className="underline" style={{ color: "var(--green)" }}>Integrações → Vozes</a>.
+                      </p>
+                    )}
+                  </div>
+
                   {(["stability", "similarity", "style", "speed"] as const).map((key) => {
                     const labels: Record<string, string> = { stability: "Estabilidade", similarity: "Similaridade", style: "Sotaque / estilo", speed: "Velocidade" };
                     const [min, max] = key === "speed" ? [0.7, 1.2] : [0, 1];
