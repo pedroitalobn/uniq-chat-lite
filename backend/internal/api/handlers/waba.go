@@ -19,6 +19,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/models"
+	"github.com/uniq-chat/backend/internal/storage"
 	"gorm.io/gorm"
 )
 
@@ -630,19 +631,46 @@ func (h *WABAHandler) processInboundMessage(
 		body = msg.Text.Body
 	}
 
-	// Conteúdo serializado pra ficar compatível com parseMessageContent do front.
+	// Extrai mídia do payload Meta e normaliza para o formato que o front
+	// espera: {url, mime_type, media_key, caption} no top-level do content.
+	// A Meta entrega apenas o media object ID; é preciso chamar a Graph API
+	// para obter a URL e então baixar + guardar no bucket.
+	var mediaObj map[string]interface{}
+	switch msg.Type {
+	case "image":
+		if msg.Image != nil {
+			mediaObj = *msg.Image
+		}
+	case "audio":
+		if msg.Audio != nil {
+			mediaObj = *msg.Audio
+		}
+	case "video":
+		if msg.Video != nil {
+			mediaObj = *msg.Video
+		}
+	case "document":
+		if msg.Document != nil {
+			mediaObj = *msg.Document
+		}
+	case "sticker":
+		if msg.Sticker != nil {
+			mediaObj = *msg.Sticker
+		}
+	}
+
 	contentMap := map[string]any{"text": body, "type": msg.Type}
-	if msg.Image != nil {
-		contentMap["image"] = *msg.Image
-	}
-	if msg.Audio != nil {
-		contentMap["audio"] = *msg.Audio
-	}
-	if msg.Video != nil {
-		contentMap["video"] = *msg.Video
-	}
-	if msg.Document != nil {
-		contentMap["document"] = *msg.Document
+	if mediaObj != nil {
+		// Copia campos conhecidos para o top-level (caption, filename).
+		if cap, ok := mediaObj["caption"].(string); ok && cap != "" {
+			contentMap["caption"] = cap
+		}
+		if fn, ok := mediaObj["filename"].(string); ok && fn != "" {
+			contentMap["filename"] = fn
+		}
+		if mime, ok := mediaObj["mime_type"].(string); ok && mime != "" {
+			contentMap["mime_type"] = mime
+		}
 	}
 	contentJSON, _ := json.Marshal(contentMap)
 
@@ -659,6 +687,15 @@ func (h *WABAHandler) processInboundMessage(
 		ExternalMessageID: msg.ID,
 	}
 	h.db.Create(&ml)
+
+	// Download assíncrono: busca URL do media na Graph API, baixa e guarda
+	// no bucket, depois atualiza MessageLog.Content com url + media_key.
+	if mediaObj != nil {
+		if metaID, ok := mediaObj["id"].(string); ok && metaID != "" {
+			go h.downloadAndStoreWABAMedia(ml.ID, waba, metaID, msg.Type, contentMap)
+		}
+	}
+
 	if h.pipeline != nil {
 		go func(m models.MessageLog) {
 			if err := h.pipeline.ProcessSavedInbound(context.Background(), &m); err != nil {
@@ -666,6 +703,92 @@ func (h *WABAHandler) processInboundMessage(
 			}
 		}(ml)
 	}
+}
+
+// downloadAndStoreWABAMedia resolve o media object ID da Meta para uma URL
+// real, baixa o arquivo e guarda no bucket. Atualiza MessageLog.Content com
+// url e media_key para que o front consiga exibir/reproduzir a mídia.
+func (h *WABAHandler) downloadAndStoreWABAMedia(
+	mlID uuid.UUID,
+	waba *models.WABAInstance,
+	metaMediaID, msgType string,
+	existingContent map[string]any,
+) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// 1. Resolve media object → URL de download
+	graphURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s", metaMediaID)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, graphURL, nil)
+	req.Header.Set("Authorization", "Bearer "+waba.AccessToken)
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Warn().Err(err).Str("media_id", metaMediaID).Msg("waba media: falha ao resolver media object")
+		return
+	}
+	defer resp.Body.Close()
+	var mediaInfo struct {
+		URL      string `json:"url"`
+		MimeType string `json:"mime_type"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&mediaInfo); err != nil || mediaInfo.URL == "" {
+		log.Warn().Str("media_id", metaMediaID).Msg("waba media: resposta sem url")
+		return
+	}
+
+	// 2. Baixa o arquivo
+	dlReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, mediaInfo.URL, nil)
+	dlReq.Header.Set("Authorization", "Bearer "+waba.AccessToken)
+	dlResp, err := client.Do(dlReq)
+	if err != nil {
+		log.Warn().Err(err).Str("media_id", metaMediaID).Msg("waba media: falha ao baixar arquivo")
+		return
+	}
+	defer dlResp.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(dlResp.Body, 50*1024*1024)) // max 50MB
+	if err != nil {
+		log.Warn().Err(err).Str("media_id", metaMediaID).Msg("waba media: falha ao ler body")
+		return
+	}
+
+	// 3. Determina mime e extensão
+	mime := mediaInfo.MimeType
+	if mime == "" {
+		mime = dlResp.Header.Get("Content-Type")
+	}
+	if m, ok := existingContent["mime_type"].(string); ok && m != "" {
+		mime = m
+	}
+	ext := storage.MimeToExt(mime)
+
+	// 4. Faz upload pro bucket
+	if storage.GlobalStorage == nil {
+		log.Warn().Msg("waba media: storage não configurado — pulando upload")
+		return
+	}
+	objectKey := storage.MediaObjectName(waba.InstanceID.String(), ext)
+	publicURL, err := storage.GlobalStorage.UploadBytes(ctx, objectKey, data, mime)
+	if err != nil {
+		log.Warn().Err(err).Str("media_id", metaMediaID).Msg("waba media: falha no upload ao bucket")
+		return
+	}
+
+	// 5. Atualiza MessageLog.Content com url e media_key
+	updContent := make(map[string]any)
+	for k, v := range existingContent {
+		updContent[k] = v
+	}
+	updContent["url"] = publicURL
+	updContent["media_key"] = objectKey
+	updContent["mime_type"] = mime
+	updJSON, _ := json.Marshal(updContent)
+	h.db.Model(&models.MessageLog{}).Where("id = ?", mlID).Update("content", string(updJSON))
+	log.Info().
+		Str("media_id", metaMediaID).
+		Str("object_key", objectKey).
+		Str("msg_type", msgType).
+		Msg("waba media: baixado e guardado no bucket")
 }
 
 // processStatusUpdate aplica o status novo do Meta:
