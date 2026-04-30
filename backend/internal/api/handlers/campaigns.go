@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,15 +22,24 @@ import (
 	"gorm.io/gorm"
 )
 
+type campaignPipelineIface interface {
+	ProcessSavedOutbound(ctx context.Context, ml *models.MessageLog) error
+}
+
 type CampaignHandler struct {
-	db      *gorm.DB
-	manager *whatsapp.Manager
+	db       *gorm.DB
+	manager  *whatsapp.Manager
+	pipeline campaignPipelineIface
 }
 
 func NewCampaignHandler(db *gorm.DB, manager *whatsapp.Manager) *CampaignHandler {
 	h := &CampaignHandler{db: db, manager: manager}
 	go h.schedulerLoop()
 	return h
+}
+
+func (h *CampaignHandler) SetInboundPipeline(p campaignPipelineIface) {
+	h.pipeline = p
 }
 
 // ── Scheduler ──────────────────────────────────────────────────────────────────
@@ -996,6 +1006,28 @@ func (h *CampaignHandler) processCampaignWABA(c models.Campaign, today string) {
 			"message_id":     messageID,
 		})
 		h.db.Model(&c).Update("sent_count", gorm.Expr("sent_count + 1"))
+
+		// Create/link conversation in inbox so agents see the campaign outbound
+		if h.pipeline != nil && c.InstanceID != uuid.Nil {
+			ml := models.MessageLog{
+				ID:                uuid.New(),
+				InstanceID:        c.InstanceID,
+				Direction:         models.DirectionOut,
+				Type:              "template",
+				ToJID:             r.Phone,
+				Content:           string(body),
+				Status:            models.MessageStatusSent,
+				ExternalMessageID: messageID,
+			}
+			if c.WorkspaceID != nil {
+				ml.WorkspaceID = c.WorkspaceID
+			}
+			go func(m models.MessageLog) {
+				if err := h.pipeline.ProcessSavedOutbound(context.Background(), &m); err != nil {
+					log.Warn().Err(err).Str("phone", m.ToJID).Msg("campaign WABA: pipeline failed")
+				}
+			}(ml)
+		}
 
 		// Spread between sends
 		time.Sleep(delay)

@@ -75,6 +75,10 @@ type Conversation struct {
 
 	IsBotActive bool `gorm:"default:false" json:"is_bot_active"`
 	IsArchived  bool `gorm:"default:false;index" json:"is_archived"`
+
+	// WABA 24h window keeper — envia mensagem automática antes da janela fechar
+	WindowKeeperEnabled bool   `gorm:"default:false" json:"window_keeper_enabled"`
+	WindowKeeperMessage string `gorm:"type:text" json:"window_keeper_message,omitempty"`
 	// IsPinned: aparece no topo da lista. IsMuted: suprime notificações
 	// no frontend (não bloqueia entrada — só reduz ruído pro agente).
 	IsPinned bool `gorm:"default:false;index" json:"is_pinned"`

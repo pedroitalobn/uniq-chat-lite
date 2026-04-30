@@ -1824,6 +1824,15 @@ export interface ProxyConfig {
 
 // ─── Voices / TTS ────────────────────────────────────────────────────────────
 
+// ─── Window Keeper ───────────────────────────────────────────────────────────
+
+export const windowKeeperApi = {
+  set: (workspaceId: string, conversationId: string, enabled: boolean, message?: string) =>
+    api.patch(`/v1/conversations/${conversationId}/window-keeper`,
+      { enabled, message },
+      { headers: wsHeaders(workspaceId) }),
+};
+
 export const voicesApi = {
   listProviders: (workspaceId: string) =>
     api.get("/v1/voices/providers", { headers: wsHeaders(workspaceId) }),

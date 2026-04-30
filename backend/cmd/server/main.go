@@ -179,6 +179,10 @@ func main() {
 	inboundPipeline.SetTriggerService(triggerSvc)
 	manager.SetInboundProcessor(inboundPipeline)
 
+	// WABA window keeper — envia mensagem automática antes da janela de 24h fechar
+	windowKeeper := services.NewWindowKeeperService(db, inboundPipeline)
+	go windowKeeper.Start(context.Background())
+
 	// Sprint billing — usage counters + thresholds. Notifier dispara
 	// webhook usage.threshold + WS pra UI mostrar banner.
 	usageSvc := services.NewUsageService(db)

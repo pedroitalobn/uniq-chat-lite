@@ -195,6 +195,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 
 	// WABA
 	wabaH := handlers.NewWABAHandler(db)
+	wabaH.SetInboundPipeline(conversationPipeline)
+	campaignH.SetInboundPipeline(conversationPipeline)
 
 	// Plans (public — used by pricing/register page)
 	app.Get("/stripe/plans", paymentH.ListPlans)
@@ -959,6 +961,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	conversations.Get("/:id/agent-state", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.GetAgentState)
 	conversations.Patch("/:id/agent-state", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.SetAgentState)
 	conversations.Post("/:id/agent/suggest", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.SuggestAgentReply)
+	// WABA window keeper — toggle automático para manter janela de 24h aberta
+	conversations.Patch("/:id/window-keeper", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.SetWindowKeeper)
 
 	// Tags on conversations
 	conversations.Get("/:id/tags", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.ListTags)

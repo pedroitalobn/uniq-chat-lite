@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -22,11 +23,21 @@ import (
 )
 
 type WABAHandler struct {
-	db *gorm.DB
+	db       *gorm.DB
+	pipeline inboundPipelineIface
+}
+
+type inboundPipelineIface interface {
+	ProcessSavedInbound(ctx context.Context, ml *models.MessageLog) error
+	ProcessSavedOutbound(ctx context.Context, ml *models.MessageLog) error
 }
 
 func NewWABAHandler(db *gorm.DB) *WABAHandler {
 	return &WABAHandler{db: db}
+}
+
+func (h *WABAHandler) SetInboundPipeline(p inboundPipelineIface) {
+	h.pipeline = p
 }
 
 type WABACreateRequest struct {
@@ -635,18 +646,26 @@ func (h *WABAHandler) processInboundMessage(
 	}
 	contentJSON, _ := json.Marshal(contentMap)
 
-	messageLog := models.MessageLog{
-		ID:          uuid.New(),
-		InstanceID:  waba.InstanceID,
-		Direction:   models.DirectionIn,
-		Type:        msg.Type,
-		ToJID:       msg.From,
-		ContactName: contactName,
-		Content:     string(contentJSON),
-		Status:      models.MessageStatusDelivered,
+	ml := models.MessageLog{
+		ID:                uuid.New(),
+		InstanceID:        waba.InstanceID,
+		Direction:         models.DirectionIn,
+		Type:              msg.Type,
+		ToJID:             msg.From,
+		SenderJID:         msg.From,
+		ContactName:       contactName,
+		Content:           string(contentJSON),
+		Status:            models.MessageStatusDelivered,
 		ExternalMessageID: msg.ID,
 	}
-	h.db.Create(&messageLog)
+	h.db.Create(&ml)
+	if h.pipeline != nil {
+		go func(m models.MessageLog) {
+			if err := h.pipeline.ProcessSavedInbound(context.Background(), &m); err != nil {
+				log.Warn().Err(err).Str("msg_id", m.ID.String()).Msg("waba inbound: pipeline failed")
+			}
+		}(ml)
+	}
 }
 
 // processStatusUpdate aplica o status novo do Meta:
@@ -780,24 +799,50 @@ func (h *WABAHandler) SendMessage(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Meta API error: " + string(body)})
 	}
 
-	var metaResp map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&metaResp)
-
-	msgID := uuid.New()
-	messageLog := models.MessageLog{
-		ID:         msgID,
-		InstanceID: waba.InstanceID,
-		Direction:  models.DirectionOut,
-		Type:       req.Type,
-		ToJID:      req.To,
-		Content:    req.Body,
-		Status:     models.MessageStatusSent,
+	var metaResp struct {
+		Messages []struct {
+			ID string `json:"id"`
+		} `json:"messages"`
 	}
-	h.db.Create(&messageLog)
+	json.NewDecoder(resp.Body).Decode(&metaResp)
+	wamid := ""
+	if len(metaResp.Messages) > 0 {
+		wamid = metaResp.Messages[0].ID
+	}
+
+	// Serialize body para content do MessageLog
+	var contentStr string
+	if req.Template != nil {
+		b, _ := json.Marshal(req.Template)
+		contentStr = string(b)
+	} else if req.Body != "" {
+		b, _ := json.Marshal(req.Body)
+		contentStr = string(b)
+	}
+
+	ml := models.MessageLog{
+		ID:                uuid.New(),
+		InstanceID:        waba.InstanceID,
+		Direction:         models.DirectionOut,
+		Type:              req.Type,
+		ToJID:             req.To,
+		Content:           contentStr,
+		Status:            models.MessageStatusSent,
+		ExternalMessageID: wamid,
+	}
+	h.db.Create(&ml)
+
+	if h.pipeline != nil {
+		go func(m models.MessageLog) {
+			if err := h.pipeline.ProcessSavedOutbound(context.Background(), &m); err != nil {
+				log.Warn().Err(err).Str("to", m.ToJID).Msg("waba sendmessage: pipeline failed")
+			}
+		}(ml)
+	}
 
 	return c.JSON(fiber.Map{
-		"id":         msgID.String(),
-		"message_id": metaResp["message_id"],
+		"id":         ml.ID.String(),
+		"message_id": wamid,
 		"status":     "sent",
 	})
 }

@@ -2887,3 +2887,35 @@ func (h *ConversationHandler) SuggestAgentReply(c *fiber.Ctx) error {
 		"model":         agent.Model,
 	})
 }
+
+// SetWindowKeeper PATCH /v1/conversations/:id/window-keeper
+// Body: { enabled: bool, message?: string }
+// Ativa/desativa o envio automático de mensagem para manter a janela WABA de 24h aberta.
+func (h *ConversationHandler) SetWindowKeeper(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var body struct {
+		Enabled bool   `json:"enabled"`
+		Message string `json:"message"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	updates := map[string]any{
+		"window_keeper_enabled": body.Enabled,
+	}
+	if body.Message != "" {
+		updates["window_keeper_message"] = body.Message
+	}
+
+	if err := h.db.Model(&models.Conversation{}).
+		Where("id = ? AND workspace_id = ?", id, ws).
+		Updates(updates).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"ok": true, "enabled": body.Enabled})
+}
