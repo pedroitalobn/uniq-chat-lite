@@ -1631,7 +1631,26 @@ func (h *ConversationHandler) Transfer(c *fiber.Ctx) error {
 	} else {
 		// Fallback: trata o param como channel_key (JID/lid). Pega a conversa
 		// mais recente nesse canal dentro do workspace.
-		if err := h.db.Where("workspace_id = ? AND channel_key = ?", ws, rawID).
+		//
+		// LID → PN: quando o caller passa um @lid (ex: "268255570710700@lid"),
+		// as conversas são armazenadas com o phone JID (@s.whatsapp.net) porque
+		// o whatsmeow resolve LIDs antes de persistir. Tentamos resolver via
+		// qualquer instância conectada do workspace antes de fazer o lookup.
+		lookupKey := rawID
+		if strings.HasSuffix(rawID, "@lid") && h.manager != nil {
+			var instances []models.Instance
+			h.db.Where("workspace_id = ? AND status = ?", ws, models.StatusConnected).Find(&instances)
+			for _, inst := range instances {
+				if client := h.manager.GetInstance(inst.ID.String()); client != nil {
+					if resolved := client.ResolvePNForLID(rawID); strings.HasSuffix(resolved, "@s.whatsapp.net") {
+						lookupKey = resolved
+						break
+					}
+				}
+			}
+		}
+
+		if err := h.db.Where("workspace_id = ? AND channel_key = ?", ws, lookupKey).
 			Order("updated_at DESC").
 			First(&conv).Error; err != nil {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
