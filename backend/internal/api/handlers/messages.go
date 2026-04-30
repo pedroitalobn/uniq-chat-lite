@@ -1379,13 +1379,14 @@ func (h *MessageHandler) GetMessage(c *fiber.Ctx) error {
 	}
 	// Fallback 2: meta_media_id — campo top-level (mensagens pós-fix).
 	if err := q.Where("content::jsonb->>'meta_media_id' = ?", msgID).First(&ml).Error; err == nil {
+		ensureWABAMediaDownloaded(h.db, &ml)
 		return c.JSON(decorateMessage(&ml))
 	}
 	// Fallback 3: media object ID aninhado no content legado —
 	// formato antigo: {"image":{"id":"AC75DB..."}} antes do campo meta_media_id.
-	// Busca por LIKE como último recurso (sem index, mas só para IDs de 32+ chars).
 	if len(msgID) >= 16 {
 		if err := q.Where("content LIKE ?", "%"+msgID+"%").First(&ml).Error; err == nil {
+			ensureWABAMediaDownloaded(h.db, &ml)
 			return c.JSON(decorateMessage(&ml))
 		}
 	}
@@ -1436,6 +1437,125 @@ func decorateMessage(ml *models.MessageLog) fiber.Map {
 		}
 	}
 	return out
+}
+
+// ensureWABAMediaDownloaded verifica se a mensagem é WABA com mídia mas sem
+// url/media_key no content. Se for, resolve e baixa da Meta de forma síncrona
+// (timeout 15s) e atualiza o MessageLog antes de retornar — assim a primeira
+// consulta por media_id já devolve o conteúdo com URL usável.
+func ensureWABAMediaDownloaded(db *gorm.DB, ml *models.MessageLog) {
+	if ml == nil || ml.Content == "" {
+		return
+	}
+	// Só atua em mensagens inbound WABA (instância do tipo waba).
+	var inst models.Instance
+	if err := db.Select("channel").First(&inst, "id = ?", ml.InstanceID).Error; err != nil {
+		return
+	}
+	if inst.Channel != models.ChannelWABA {
+		return
+	}
+
+	var parsed map[string]interface{}
+	if err := json.Unmarshal([]byte(ml.Content), &parsed); err != nil {
+		return
+	}
+	// Já tem URL — nada a fazer.
+	if u, _ := parsed["url"].(string); u != "" {
+		return
+	}
+
+	// Extrai o meta_media_id: novo formato (top-level) ou legado (nested).
+	metaID, _ := parsed["meta_media_id"].(string)
+	if metaID == "" {
+		for _, mediaType := range []string{"image", "audio", "video", "document", "sticker"} {
+			if nested, ok := parsed[mediaType].(map[string]interface{}); ok {
+				if id, _ := nested["id"].(string); id != "" {
+					metaID = id
+					// Migra mime_type e caption para top-level enquanto estamos aqui.
+					if m, _ := nested["mime_type"].(string); m != "" {
+						parsed["mime_type"] = m
+					}
+					if cap, _ := nested["caption"].(string); cap != "" {
+						parsed["caption"] = cap
+					}
+					parsed["meta_media_id"] = metaID
+					break
+				}
+			}
+		}
+	}
+	if metaID == "" {
+		return
+	}
+
+	// Busca as credenciais WABA da instância.
+	var waba models.WABAInstance
+	if err := db.Select("access_token, instance_id").Where("instance_id = ?", ml.InstanceID).First(&waba).Error; err != nil {
+		return
+	}
+	if waba.AccessToken == "" {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	// 1. Resolve meta_media_id → URL de download.
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet,
+		fmt.Sprintf("https://graph.facebook.com/v18.0/%s", metaID), nil)
+	req.Header.Set("Authorization", "Bearer "+waba.AccessToken)
+	resp, err := mediaHTTPClient.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	var info struct {
+		URL      string `json:"url"`
+		MimeType string `json:"mime_type"`
+	}
+	if json.NewDecoder(resp.Body).Decode(&info) != nil || info.URL == "" {
+		return
+	}
+
+	// 2. Baixa o arquivo.
+	dlReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, info.URL, nil)
+	dlReq.Header.Set("Authorization", "Bearer "+waba.AccessToken)
+	dlResp, err := mediaHTTPClient.Do(dlReq)
+	if err != nil {
+		return
+	}
+	defer dlResp.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(dlResp.Body, 50*1024*1024))
+	if err != nil || len(data) == 0 {
+		return
+	}
+
+	// 3. Determina mime e faz upload.
+	mime, _ := parsed["mime_type"].(string)
+	if mime == "" {
+		mime = info.MimeType
+	}
+	if mime == "" {
+		mime = dlResp.Header.Get("Content-Type")
+	}
+	if storage.GlobalStorage == nil {
+		return
+	}
+	objectKey := storage.MediaObjectName(ml.InstanceID.String(), storage.MimeToExt(mime))
+	publicURL, err := storage.GlobalStorage.UploadBytes(ctx, objectKey, data, mime)
+	if err != nil {
+		return
+	}
+
+	// 4. Atualiza content e MessageLog.
+	parsed["url"] = publicURL
+	parsed["media_key"] = objectKey
+	parsed["mime_type"] = mime
+	parsed["meta_media_id"] = metaID
+	updJSON, _ := json.Marshal(parsed)
+	db.Model(&models.MessageLog{}).Where("id = ?", ml.ID).Update("content", string(updJSON))
+	ml.Content = string(updJSON)
 }
 
 // GetChats godoc
