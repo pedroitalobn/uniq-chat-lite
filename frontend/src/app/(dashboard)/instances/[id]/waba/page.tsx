@@ -1177,15 +1177,26 @@ function TestSendSection({ instanceId, templates = [] }: {
       });
     },
     onSuccess: (r: any) => {
-      const msgId = r.data?.messages?.[0]?.id || r.data?.id || "";
-      setSentId(msgId);
-      toast.success("Mensagem enviada — confira o WhatsApp do destinatário");
+      const d = r.data ?? {};
+      setSentId(d.message_id || d.id || "");
+      if (d.status === "failed") {
+        toast.error(d.error || "Falha na entrega", { duration: 10000 });
+      } else {
+        toast.success("Mensagem enviada para a Meta — aguarde confirmação de entrega no WhatsApp do destinatário");
+      }
     },
     onError: (e: any) => {
-      const raw = e?.response?.data?.error || "";
-      // Detecta erros comuns da Cloud API e dá instrução clara
+      const raw: string = e?.response?.data?.error || "";
+      // Erros de entrega retornados após poll (422)
+      if (e?.response?.status === 422) {
+        toast.error(raw || "Falha na entrega — verifique a conta no Meta Business Manager", { duration: 10000 });
+        return;
+      }
+      // Erros sincrônicos da Cloud API
       if (raw.includes("133010") || raw.includes("Account not registered")) {
         toast.error("Número não registrado. Use o card '2. Register phone' acima com seu PIN 2FA antes de enviar.", { duration: 8000 });
+      } else if (raw.includes("131042") || raw.includes("eligibility payment")) {
+        toast.error("Problema de pagamento na conta WhatsApp Business. Verifique o faturamento no Meta Business Manager.", { duration: 10000 });
       } else if (raw.includes("131056") || raw.includes("Pair not allowed")) {
         toast.error("Destinatário não está na lista de testes da Meta. Adicione em Meta Business → WhatsApp → API Setup → 'To'.", { duration: 8000 });
       } else if (raw.includes("131058") || raw.includes("Hello World templates can only")) {
@@ -1202,7 +1213,7 @@ function TestSendSection({ instanceId, templates = [] }: {
       } else if (raw.includes("131051")) {
         toast.error("Tipo de mensagem não suportado.", { duration: 6000 });
       } else {
-        toast.error(raw || "Falha ao enviar");
+        toast.error(raw || "Falha ao enviar", { duration: 8000 });
       }
     },
   });

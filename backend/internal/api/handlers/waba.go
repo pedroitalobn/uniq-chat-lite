@@ -886,6 +886,36 @@ func (h *WABAHandler) SendMessage(c *fiber.Ctx) error {
 		}(ml)
 	}
 
+	// Polling curto: alguns erros Meta (pagamento, elegibilidade) chegam via
+	// webhook em 1-3s. Esperamos até 2,5s antes de responder ao caller pra
+	// poder retornar o erro real em vez de "sent".
+	if wamid != "" {
+		deadline := time.Now().Add(2500 * time.Millisecond)
+		for time.Now().Before(deadline) {
+			time.Sleep(300 * time.Millisecond)
+			var check models.MessageLog
+			if err := h.db.Select("status, delivery_error").
+				Where("id = ?", ml.ID).First(&check).Error; err != nil {
+				break
+			}
+			if check.Status == models.MessageStatusFailed {
+				errMsg := check.DeliveryError
+				if errMsg == "" {
+					errMsg = "Falha na entrega — verifique o status da conta no Meta Business Manager"
+				}
+				return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
+					"error":      errMsg,
+					"message_id": wamid,
+					"status":     "failed",
+				})
+			}
+			// Já confirmado entregue/lido — sai cedo do poll
+			if check.Status == models.MessageStatusDelivered || check.Status == models.MessageStatusRead {
+				break
+			}
+		}
+	}
+
 	return c.JSON(fiber.Map{
 		"id":         ml.ID.String(),
 		"message_id": wamid,
