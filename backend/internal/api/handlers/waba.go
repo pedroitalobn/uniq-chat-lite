@@ -671,6 +671,11 @@ func (h *WABAHandler) processInboundMessage(
 		if mime, ok := mediaObj["mime_type"].(string); ok && mime != "" {
 			contentMap["mime_type"] = mime
 		}
+		// Guarda o media object ID da Meta como campo pesquisável — permite
+		// que o endpoint GET /messages/:id encontre a mensagem por esse ID.
+		if mid, ok := mediaObj["id"].(string); ok && mid != "" {
+			contentMap["meta_media_id"] = mid
+		}
 	}
 	contentJSON, _ := json.Marshal(contentMap)
 
@@ -774,7 +779,7 @@ func (h *WABAHandler) downloadAndStoreWABAMedia(
 		return
 	}
 
-	// 5. Atualiza MessageLog.Content com url e media_key
+	// 5. Atualiza MessageLog.Content com url e media_key (preserva meta_media_id)
 	updContent := make(map[string]any)
 	for k, v := range existingContent {
 		updContent[k] = v
@@ -782,6 +787,7 @@ func (h *WABAHandler) downloadAndStoreWABAMedia(
 	updContent["url"] = publicURL
 	updContent["media_key"] = objectKey
 	updContent["mime_type"] = mime
+	updContent["meta_media_id"] = metaMediaID
 	updJSON, _ := json.Marshal(updContent)
 	h.db.Model(&models.MessageLog{}).Where("id = ?", mlID).Update("content", string(updJSON))
 	log.Info().

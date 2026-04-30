@@ -1373,15 +1373,21 @@ func (h *MessageHandler) GetMessage(c *fiber.Ctx) error {
 			return c.JSON(decorateMessage(&ml))
 		}
 	}
-	// Fallback: external_message_id (stanza id WhatsApp).
-	if err := q.Where("external_message_id = ?", msgID).First(&ml).Error; err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error":   "mensagem não encontrada",
-			"hint":    "msgID pode ser o UUID interno OU o external_message_id (stanza WhatsApp)",
-			"queried": msgID,
-		})
+	// Fallback 1: external_message_id (wamid / stanza id WhatsApp).
+	if err := q.Where("external_message_id = ?", msgID).First(&ml).Error; err == nil {
+		return c.JSON(decorateMessage(&ml))
 	}
-	return c.JSON(decorateMessage(&ml))
+	// Fallback 2: meta_media_id — WABA media object ID (campo no content JSON).
+	// Necessário porque n8n/webhooks frequentemente recebem o media object ID
+	// (messages[0].image.id) em vez do wamid (messages[0].id).
+	if err := q.Where("content::jsonb->>'meta_media_id' = ?", msgID).First(&ml).Error; err == nil {
+		return c.JSON(decorateMessage(&ml))
+	}
+	return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+		"error":   "mensagem não encontrada",
+		"hint":    "msgID aceito: UUID interno, wamid (external_message_id) ou meta_media_id (media object ID da Meta)",
+		"queried": msgID,
+	})
 }
 
 // decorateMessage enriquece o MessageLog antes de devolver: parseia
