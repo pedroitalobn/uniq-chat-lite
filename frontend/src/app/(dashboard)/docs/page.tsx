@@ -29,7 +29,7 @@ function isRootLevelPath(path: string) {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Endpoint {
-  method: "GET" | "POST" | "PUT" | "DELETE";
+  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   path: string;
   summary: string;
   body?: Record<string, { type: string; required?: boolean; description?: string; example?: string }>;
@@ -48,6 +48,7 @@ const METHOD_STYLE: Record<string, { bg: string; color: string }> = {
   GET:    { bg: "rgba(96,165,250,0.08)",   color: "#60a5fa" },
   POST:   { bg: "rgba(0,212,106,0.08)",    color: "#00d46a" },
   PUT:    { bg: "rgba(251,191,36,0.08)",   color: "#fbbf24" },
+  PATCH:  { bg: "rgba(251,146,60,0.08)",   color: "#fb923c" },
   DELETE: { bg: "rgba(239,68,68,0.08)",    color: "#f87171" },
 };
 
@@ -762,6 +763,165 @@ const SECTIONS: Section[] = [
         body: { snapshot_id: { type: "string", required: true, description: "ID do snapshot", example: "uuid" } } },
     ],
   },
+
+  // ── Conversas / Inbox Universal ────────────────────────────────────────────
+  {
+    id: "conversations",
+    label: "Conversas (Inbox)",
+    icon: <MessageSquare className="w-3.5 h-3.5" />,
+    endpoints: [
+      { method: "GET",  path: "/conversations",                              summary: "Listar conversas (todos os canais)",
+        response: `{ "conversations": [...], "total": 42, "unread": 5 }` },
+      { method: "GET",  path: "/conversations/count",                        summary: "Contagem de conversas por status" },
+      { method: "GET",  path: "/conversations/inbox-stats",                  summary: "Estatísticas do inbox" },
+      { method: "GET",  path: "/conversations/messages/search",              summary: "Buscar mensagens no inbox",
+        response: `{ "results": [{ "id": "uuid", "conversation_id": "uuid", "content": {...}, "snippet": "..." }] }` },
+      { method: "GET",  path: "/conversations/{id}",                         summary: "Buscar conversa",      pathParams: ["id"],
+        response: `{ "id": "uuid", "channel": "waba", "contact": {...}, "status": "open", "last_customer_msg_at": "2026-04-30T..." }` },
+      { method: "GET",  path: "/conversations/{id}/timeline",                summary: "Timeline da conversa (mensagens + eventos)", pathParams: ["id"] },
+      { method: "GET",  path: "/conversations/{id}/send-constraints",        summary: "Restrições de envio (janela 24h, tipos permitidos)", pathParams: ["id"],
+        response: `{ "channel": "waba", "window_open": false, "allows_template": true, "allowed_types": ["template"], "max_body_chars": 1024 }` },
+      { method: "POST", path: "/conversations/{id}/messages",                summary: "Enviar mensagem pela conversa (detecta canal automaticamente)", pathParams: ["id"],
+        body: {
+          type:        { type: "string",  required: true,  description: "text | image | audio | document | template", example: "text" },
+          content:     { type: "string",  required: false, description: "Texto da mensagem", example: "Olá! Como posso ajudar?" },
+          url:         { type: "string",  required: false, description: "URL da mídia (para tipos de mídia)" },
+          template_id: { type: "string",  required: false, description: "ID do template WABA (quando type=template)" },
+          variables:   { type: "object",  required: false, description: "Variáveis do template", example: '{"1":"João","2":"Pedido #123"}' },
+        },
+        response: `{ "id": "uuid", "status": "sent", "channel": "waba" }` },
+      { method: "DELETE",path: "/conversations/{id}/messages/{msgId}",       summary: "Revogar mensagem",     pathParams: ["id","msgId"] },
+      { method: "PATCH", path: "/conversations/{id}/messages/{msgId}/content",summary: "Editar mensagem",     pathParams: ["id","msgId"],
+        body: { content: { type: "string", required: true, description: "Novo texto" } } },
+      { method: "POST", path: "/conversations/{id}/messages/{msgId}/react",  summary: "Reagir a mensagem",   pathParams: ["id","msgId"],
+        body: { emoji: { type: "string", required: true, description: "Emoji", example: "👍" } } },
+      { method: "POST", path: "/conversations/{id}/messages/{msgId}/forward",summary: "Encaminhar mensagem para outra conversa / canal", pathParams: ["id","msgId"],
+        body: {
+          target_conversation_id: { type: "string", required: true, description: "ID da conversa destino" },
+          comment:                { type: "string", required: false, description: "Comentário opcional" },
+        } },
+      { method: "POST", path: "/conversations/{id}/transfer",                summary: "Transferir conversa (entre instâncias, filas ou agentes)", pathParams: ["id"],
+        body: {
+          instance_id:  { type: "string", required: false, description: "UUID da instância destino (cross-instance, ex: whatsmeow→WABA)" },
+          queue_id:     { type: "string", required: false, description: "ID da fila destino" },
+          department_id:{ type: "string", required: false, description: "ID do departamento destino" },
+          user_id:      { type: "string", required: false, description: "ID do agente destino" },
+          note:         { type: "string", required: false, description: "Nota de transferência" },
+        },
+        response: `{ "message": "transferred", "conversation_id": "uuid", "new_instance": "alto-monte-waba" }` },
+      { method: "POST", path: "/conversations/{id}/assign",                  summary: "Atribuir a agente",    pathParams: ["id"],
+        body: { user_id: { type: "string", required: true, description: "ID do agente" } } },
+      { method: "POST", path: "/conversations/{id}/unassign",                summary: "Desatribuir",          pathParams: ["id"] },
+      { method: "POST", path: "/conversations/{id}/resolve",                 summary: "Resolver conversa",    pathParams: ["id"] },
+      { method: "POST", path: "/conversations/{id}/close",                   summary: "Fechar conversa",      pathParams: ["id"] },
+      { method: "POST", path: "/conversations/{id}/reopen",                  summary: "Reabrir conversa",     pathParams: ["id"] },
+      { method: "POST", path: "/conversations/{id}/snooze",                  summary: "Adiar conversa",       pathParams: ["id"],
+        body: { until: { type: "string", required: true, description: "ISO 8601 data/hora de retorno", example: "2026-05-01T09:00:00Z" } } },
+      { method: "POST", path: "/conversations/{id}/read",                    summary: "Marcar como lida",     pathParams: ["id"] },
+      { method: "POST", path: "/conversations/bulk",                         summary: "Ações em massa (assign/resolve/close/transfer)",
+        body: {
+          ids:    { type: "string[]", required: true,  description: "IDs das conversas", example: '["uuid1","uuid2"]' },
+          action: { type: "string",   required: true,  description: "assign | resolve | close | reopen | transfer | snooze", example: "resolve" },
+        } },
+      { method: "GET",  path: "/conversations/{id}/notes",                   summary: "Listar notas internas", pathParams: ["id"] },
+      { method: "POST", path: "/conversations/{id}/notes",                   summary: "Adicionar nota interna", pathParams: ["id"],
+        body: { content: { type: "string", required: true, description: "Conteúdo da nota", example: "Cliente ligou às 14h pedindo desconto." } } },
+      { method: "POST", path: "/conversations/{id}/csat",                    summary: "Enviar pesquisa CSAT",  pathParams: ["id"] },
+    ],
+  },
+];
+
+// ─── WABA Sections ────────────────────────────────────────────────────────────
+const WABA_SECTIONS: Section[] = [
+  {
+    id: "waba-setup",
+    label: "Setup WABA",
+    icon: <Settings className="w-3.5 h-3.5" />,
+    endpoints: [
+      { method: "GET",    path: "/instances/{id}/waba",                summary: "Detalhes da conta WABA vinculada",  pathParams: ["id"] },
+      { method: "GET",    path: "/instances/{id}/waba/phone-numbers",  summary: "Listar números de telefone WABA",   pathParams: ["id"],
+        response: `{ "data": [{ "id": "...", "display_phone_number": "+55 11 99999-9999", "verified_name": "Minha Empresa", "quality_rating": "GREEN", "status": "CONNECTED" }] }` },
+      { method: "POST",   path: "/instances/{id}/waba/subscribe",      summary: "Assinar webhooks (Tech Provider flow)", pathParams: ["id"] },
+      { method: "POST",   path: "/instances/{id}/waba/register",       summary: "Registrar número (habilitar envio)", pathParams: ["id"],
+        body: { pin: { type: "string", required: false, description: "PIN de verificação (se configurado)", example: "123456" } } },
+      { method: "DELETE", path: "/instances/{id}/waba",                summary: "Desvincular conta WABA",            pathParams: ["id"] },
+    ],
+  },
+  {
+    id: "waba-templates",
+    label: "Templates HSM",
+    icon: <BookOpen className="w-3.5 h-3.5" />,
+    endpoints: [
+      { method: "GET",    path: "/instances/{id}/waba/templates",                   summary: "Listar templates aprovados/pendentes", pathParams: ["id"],
+        response: `{ "data": [{ "id": "uuid", "name": "boas_vindas", "status": "APPROVED", "language": "pt_BR", "components": [...] }] }` },
+      { method: "POST",   path: "/instances/{id}/waba/templates",                   summary: "Criar novo template (envia para revisão Meta)", pathParams: ["id"],
+        body: {
+          name:       { type: "string",   required: true,  description: "Nome do template (snake_case, sem espaços)", example: "confirmacao_pedido" },
+          language:   { type: "string",   required: true,  description: "Código de idioma",   example: "pt_BR" },
+          category:   { type: "string",   required: true,  description: "MARKETING | UTILITY | AUTHENTICATION", example: "UTILITY" },
+          components: { type: "object[]", required: true,  description: "Array de componentes (HEADER, BODY, FOOTER, BUTTONS)", example: '[{"type":"BODY","text":"Olá {{1}}, seu pedido {{2}} foi confirmado."}]' },
+        },
+        response: `{ "id": "template_uuid", "name": "confirmacao_pedido", "status": "PENDING" }` },
+      { method: "POST",   path: "/instances/{id}/waba/templates/{templateId}",      summary: "Editar template (status volta a PENDING)", pathParams: ["id","templateId"],
+        body: {
+          components: { type: "object[]", required: true, description: "Novos componentes do template" },
+        } },
+      { method: "DELETE", path: "/instances/{id}/waba/templates/{name}",            summary: "Deletar template", pathParams: ["id","name"] },
+    ],
+  },
+  {
+    id: "waba-messages",
+    label: "Mensagens WABA",
+    icon: <MessageSquare className="w-3.5 h-3.5" />,
+    endpoints: [
+      { method: "POST",   path: "/instances/{id}/waba/messages",   summary: "Enviar mensagem WABA (template fora da janela 24h / texto dentro da janela)", pathParams: ["id"],
+        body: {
+          to:           { type: "string",  required: true,  description: "Número E.164 do destinatário", example: "5511999999999" },
+          type:         { type: "string",  required: true,  description: "text | template | image | document | audio | video", example: "template" },
+          text:         { type: "string",  required: false, description: "Texto livre (apenas dentro da janela de 24h)", example: "Olá! Como posso ajudar?" },
+          template_name:{ type: "string",  required: false, description: "Nome do template aprovado (quando type=template)", example: "confirmacao_pedido" },
+          template_language:{ type: "string", required: false, description: "Código de idioma do template", example: "pt_BR" },
+          components:   { type: "object[]",required: false, description: "Componentes do template com variáveis preenchidas", example: '[{"type":"body","parameters":[{"type":"text","text":"João"},{"type":"text","text":"#12345"}]}]' },
+          url:          { type: "string",  required: false, description: "URL da mídia (quando type=image/document/audio/video)" },
+          caption:      { type: "string",  required: false, description: "Legenda da mídia" },
+          filename:     { type: "string",  required: false, description: "Nome do arquivo (para documentos)" },
+        },
+        response: `{ "id": "uuid", "message_id": "wamid.HBgM...", "status": "sent" }` },
+    ],
+  },
+  {
+    id: "waba-inbox",
+    label: "Conversas WABA",
+    icon: <UploadCloud className="w-3.5 h-3.5" />,
+    endpoints: [
+      { method: "GET",  path: "/conversations",                         summary: "Listar conversas WABA (filtrar por instância via ?instance_id=)", response: `{ "conversations": [...] }` },
+      { method: "GET",  path: "/conversations/{id}/send-constraints",   summary: "Verificar janela de 24h e tipos permitidos", pathParams: ["id"],
+        response: `{ "channel": "waba", "window_open": false, "allows_template": true, "allowed_types": ["template"], "max_body_chars": 1024 }` },
+      { method: "POST", path: "/conversations/{id}/messages",           summary: "Enviar via inbox (detecta canal WABA automaticamente, exige template se janela fechada)", pathParams: ["id"],
+        body: {
+          type:        { type: "string",  required: true,  description: "text | template", example: "template" },
+          template_id: { type: "string",  required: false, description: "ID do template WABA aprovado" },
+          variables:   { type: "object",  required: false, description: "Variáveis {{1}}, {{2}}...", example: '{"1":"João","2":"Pedido #123"}' },
+        } },
+      { method: "POST", path: "/conversations/{id}/transfer",           summary: "Transferir lead WABA para outra instância (ex: whatsmeow→WABA para janela ativa)", pathParams: ["id"],
+        body: {
+          instance_id: { type: "string", required: false, description: "UUID da instância destino" },
+          queue_id:    { type: "string", required: false, description: "ID da fila destino" },
+          note:        { type: "string", required: false, description: "Nota de transferência" },
+        } },
+    ],
+  },
+  {
+    id: "waba-webhook",
+    label: "Webhook WABA",
+    icon: <Webhook className="w-3.5 h-3.5" />,
+    endpoints: [
+      { method: "GET",  path: "/waba/webhook",  summary: "Verificação do webhook pela Meta (hub.challenge — não chamar diretamente)" },
+      { method: "POST", path: "/waba/webhook",  summary: "Webhook de eventos WABA (Meta entrega aqui: mensagens, status, erros de entrega)" },
+      { method: "GET",  path: "/waba/auth-url", summary: "Gerar URL de Embedded Signup Meta (iniciar vinculação WABA)" },
+      { method: "POST", path: "/waba/callback", summary: "Callback OAuth pós-Embedded Signup (código trocado por token)" },
+    ],
+  },
 ];
 
 // ─── Webhook Events Reference ─────────────────────────────────────────────────
@@ -925,6 +1085,7 @@ function EndpointRow({ endpoint, apiKey, instanceId }: {
     endpoint.path.startsWith("/instances/{id}/pairing-code") ||
     endpoint.path.startsWith("/instances/{id}/status") ||
     endpoint.path.startsWith("/instances/{id}/profile");
+  const isWABARoute = endpoint.path.startsWith("/instances/{id}/waba");
 
   const curlExample = () => {
     let path = endpoint.path;
@@ -933,6 +1094,9 @@ function EndpointRow({ endpoint, apiKey, instanceId }: {
       path = path.replace("/instances/{id}", "/v1/{server-slug}/{instance-slug}");
       authHeader = "Authorization: Bearer it_...";
       endpoint.pathParams?.forEach((p) => { if (p !== "id") path = path.replace(`:${p}`, `{${p}}`); });
+    } else if (isWABARoute) {
+      path = path.replace("{id}", "{instance_uuid}");
+      endpoint.pathParams?.forEach((p) => { if (p !== "id") path = path.replace(`{${p}}`, `{${p}}`); });
     } else {
       endpoint.pathParams?.forEach((p) => { path = path.replace(`:${p}`, p === "id" ? "{instance_id}" : `{${p}}`); });
     }
@@ -1042,16 +1206,17 @@ const INSTAGRAM_SECTIONS: Section[] = [
   },
 ];
 
-type ChannelTab = "whatsapp" | "instagram";
+type ChannelTab = "business" | "waba" | "instagram";
 
-const CHANNEL_TABS: { id: ChannelTab; label: string; color: string }[] = [
-  { id: "whatsapp",  label: "WhatsApp",  color: "#25d366" },
-  { id: "instagram", label: "Instagram", color: "#e1306c" },
+const CHANNEL_TABS: { id: ChannelTab; label: string; color: string; description: string }[] = [
+  { id: "business",  label: "Business API",  color: "#25d366", description: "WhatsApp via whatsmeow (QR/pairing)" },
+  { id: "waba",      label: "WABA",          color: "#0088ff", description: "WhatsApp API Oficial (Meta Cloud)" },
+  { id: "instagram", label: "Instagram",     color: "#e1306c", description: "Instagram DMs (não-oficial)" },
 ];
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function DocsPage() {
-  const [channelTab, setChannelTab] = useState<ChannelTab>("whatsapp");
+  const [channelTab, setChannelTab] = useState<ChannelTab>("business");
   const [activeSection, setActiveSection] = useState("instances");
   const [selectedKey, setSelectedKey] = useState("");
   const [selectedInstance, setSelectedInstance] = useState("");
@@ -1061,9 +1226,9 @@ export default function DocsPage() {
     queryFn: () => instancesApi.list().then((r) => r.data),
   });
 
-  const activeSections = channelTab === "instagram" ? INSTAGRAM_SECTIONS : SECTIONS;
+  const activeSections = channelTab === "instagram" ? INSTAGRAM_SECTIONS : channelTab === "waba" ? WABA_SECTIONS : SECTIONS;
   const section = activeSections.find((s) => s.id === activeSection);
-  const totalEndpoints = [...SECTIONS, ...INSTAGRAM_SECTIONS].reduce((acc, s) => acc + s.endpoints.length, 0);
+  const totalEndpoints = [...SECTIONS, ...WABA_SECTIONS, ...INSTAGRAM_SECTIONS].reduce((acc, s) => acc + s.endpoints.length, 0);
 
   return (
     <div className="space-y-6">
@@ -1106,70 +1271,109 @@ export default function DocsPage() {
 
       {/* URL structure + Auth info */}
       <div className="space-y-3 animate-fade-in-up">
-        <div className="rounded-2xl p-4 space-y-3"
-          style={{ background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.14)" }}>
-          <p className="text-xs font-medium" style={{ color: "#a78bfa" }}>Estrutura da URL — API Pública v1</p>
-          <div className="rounded-xl px-3 py-2.5" style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}>
-            <code className="text-xs font-mono" style={{ color: "hsl(240 15% 75%)" }}>
-              <span style={{ color: "hsl(240 8% 46%)" }}>{API_ROOT}</span>
-              <span style={{ color: "#a78bfa" }}>/v1/</span>
-              <span style={{ color: "#fbbf24" }}>{"{server-slug}"}</span>
-              <span style={{ color: "#a78bfa" }}>/</span>
-              <span style={{ color: "#00d46a" }}>{"{instance-slug}"}</span>
-              <span style={{ color: "hsl(240 8% 55%)" }}>/messages/text</span>
-            </code>
+        {channelTab === "waba" ? (
+          <div className="rounded-2xl p-4 space-y-3"
+            style={{ background: "rgba(0,136,255,0.04)", border: "1px solid rgba(0,136,255,0.18)" }}>
+            <p className="text-xs font-medium" style={{ color: "#60a5fa" }}>Estrutura da URL — WABA (Meta Cloud API)</p>
+            <div className="space-y-2">
+              <div className="rounded-xl px-3 py-2.5" style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}>
+                <code className="text-xs font-mono" style={{ color: "hsl(240 15% 75%)" }}>
+                  <span style={{ color: "hsl(240 8% 46%)" }}>{API_ROOT}</span>
+                  <span style={{ color: "#60a5fa" }}>/v1/instances/</span>
+                  <span style={{ color: "#fbbf24" }}>{"{instance_uuid}"}</span>
+                  <span style={{ color: "#60a5fa" }}>/waba/</span>
+                  <span style={{ color: "hsl(240 8% 55%)" }}>messages</span>
+                </code>
+              </div>
+              <div className="rounded-xl px-3 py-2.5" style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}>
+                <code className="text-xs font-mono" style={{ color: "hsl(240 15% 75%)" }}>
+                  <span style={{ color: "hsl(240 8% 46%)" }}>Auth: </span>
+                  <span style={{ color: "#60a5fa" }}>X-API-Key: sc_...</span>
+                </code>
+              </div>
+            </div>
+            <p className="text-[11px]" style={{ color: "hsl(240 8% 44%)" }}>
+              WABA usa a <strong style={{ color: "hsl(240 15% 70%)" }}>Meta Cloud API</strong>. A janela de 24h determina se você pode enviar texto livre ou apenas templates aprovados.
+              Use <code className="font-mono text-[10px]">GET /conversations/{"{id}"}/send-constraints</code> para verificar o estado antes de enviar.
+            </p>
           </div>
-          <p className="text-[11px]" style={{ color: "hsl(240 8% 44%)" }}>
-            Cada instância tem um <strong style={{ color: "hsl(240 15% 70%)" }}>slug único</strong> dentro do seu server (derivado do nome) e um <strong style={{ color: "hsl(240 15% 70%)" }}>token</strong> exclusivo para autenticação. Encontre esses valores na página de gerenciamento da instância.
-          </p>
-        </div>
+        ) : (
+          <div className="rounded-2xl p-4 space-y-3"
+            style={{ background: "rgba(167,139,250,0.04)", border: "1px solid rgba(167,139,250,0.14)" }}>
+            <p className="text-xs font-medium" style={{ color: "#a78bfa" }}>Estrutura da URL — API Pública v1</p>
+            <div className="rounded-xl px-3 py-2.5" style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}>
+              <code className="text-xs font-mono" style={{ color: "hsl(240 15% 75%)" }}>
+                <span style={{ color: "hsl(240 8% 46%)" }}>{API_ROOT}</span>
+                <span style={{ color: "#a78bfa" }}>/v1/</span>
+                <span style={{ color: "#fbbf24" }}>{"{server-slug}"}</span>
+                <span style={{ color: "#a78bfa" }}>/</span>
+                <span style={{ color: "#00d46a" }}>{"{instance-slug}"}</span>
+                <span style={{ color: "hsl(240 8% 55%)" }}>/messages/text</span>
+              </code>
+            </div>
+            <p className="text-[11px]" style={{ color: "hsl(240 8% 44%)" }}>
+              Cada instância tem um <strong style={{ color: "hsl(240 15% 70%)" }}>slug único</strong> dentro do seu server e um <strong style={{ color: "hsl(240 15% 70%)" }}>token</strong> exclusivo para autenticação. Encontre esses valores na página de gerenciamento da instância.
+            </p>
+          </div>
+        )}
         <div className="rounded-2xl p-4 space-y-2"
           style={{ background: "rgba(96,165,250,0.04)", border: "1px solid rgba(96,165,250,0.12)" }}>
           <p className="text-xs font-medium" style={{ color: "#60a5fa" }}>Autenticação</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
             <div className="rounded-lg px-3 py-2" style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}>
-              <span style={{ color: "hsl(240 8% 46%)" }}>v1 (por instância): </span>
+              <p className="text-[10px] mb-1" style={{ color: "hsl(240 8% 46%)" }}>Business API (v1/:slug/:inst)</p>
               <span style={{ color: "#60a5fa" }}>Authorization: Bearer it_...</span>
             </div>
             <div className="rounded-lg px-3 py-2" style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}>
-              <span style={{ color: "hsl(240 8% 46%)" }}>Dashboard API: </span>
+              <p className="text-[10px] mb-1" style={{ color: "hsl(240 8% 46%)" }}>WABA + Dashboard API</p>
               <span style={{ color: "#60a5fa" }}>X-API-Key: sc_...</span>
+            </div>
+            <div className="rounded-lg px-3 py-2" style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}>
+              <p className="text-[10px] mb-1" style={{ color: "hsl(240 8% 46%)" }}>Inbox / Conversas</p>
+              <span style={{ color: "#60a5fa" }}>X-Workspace-ID: uuid</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Channel Tab Switcher */}
-      <div className="flex gap-1.5 animate-fade-in-up">
-        {CHANNEL_TABS.map((tab) => (
-          <button key={tab.id} onClick={() => { setChannelTab(tab.id); setActiveSection(tab.id === "instagram" ? "ig-instances" : "instances"); }}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all"
-            style={channelTab === tab.id
-              ? { background: `${tab.color}18`, color: tab.color, border: `1px solid ${tab.color}40` }
-              : { background: "transparent", color: "hsl(240 8% 46%)", border: "1px solid hsl(240 12% 13%)" }}>
-            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: channelTab === tab.id ? tab.color : "hsl(240 8% 30%)" }} />
-            {tab.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap gap-1.5 animate-fade-in-up">
+        {CHANNEL_TABS.map((tab) => {
+          const defaultSection = tab.id === "instagram" ? "ig-instances" : tab.id === "waba" ? "waba-setup" : "instances";
+          return (
+            <button key={tab.id} onClick={() => { setChannelTab(tab.id); setActiveSection(defaultSection); }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all"
+              style={channelTab === tab.id
+                ? { background: `${tab.color}18`, color: tab.color, border: `1px solid ${tab.color}40` }
+                : { background: "transparent", color: "hsl(240 8% 46%)", border: "1px solid hsl(240 12% 13%)" }}
+              title={tab.description}>
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: channelTab === tab.id ? tab.color : "hsl(240 8% 30%)" }} />
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-[180px_1fr] gap-5">
         {/* Sidebar */}
         <div className="space-y-0.5">
-          {activeSections.map((s) => (
-            <button key={s.id} onClick={() => setActiveSection(s.id)}
-              className={cn("w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all",
-                activeSection === s.id ? "text-white" : "text-slate-500 hover:text-slate-300")}
-              style={activeSection === s.id ? { background: "var(--surface-2)", boxShadow: "inset 1px 0 0 0 var(--green)" } : undefined}
-            >
-              <span style={activeSection === s.id ? { color: "var(--green)" } : { color: "hsl(240 8% 40%)" }}>{s.icon}</span>
-              {s.label}
-              <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-lg"
-                style={{ background: "var(--surface-2)", color: "hsl(240 8% 38%)" }}>
-                {s.endpoints.length}
-              </span>
-            </button>
-          ))}
+          {activeSections.map((s) => {
+            const tabColor = CHANNEL_TABS.find(t => t.id === channelTab)?.color || "var(--green)";
+            return (
+              <button key={s.id} onClick={() => setActiveSection(s.id)}
+                className={cn("w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all",
+                  activeSection === s.id ? "text-white" : "text-slate-500 hover:text-slate-300")}
+                style={activeSection === s.id ? { background: "var(--surface-2)", boxShadow: `inset 1px 0 0 0 ${tabColor}` } : undefined}
+              >
+                <span style={activeSection === s.id ? { color: tabColor } : { color: "hsl(240 8% 40%)" }}>{s.icon}</span>
+                {s.label}
+                <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-lg"
+                  style={{ background: "var(--surface-2)", color: "hsl(240 8% 38%)" }}>
+                  {s.endpoints.length}
+                </span>
+              </button>
+            );
+          })}
 
           <div className="pt-4">
             <p className="text-[10px] font-medium uppercase tracking-widest px-3 mb-2" style={{ color: "hsl(240 8% 36%)" }}>Referência</p>
