@@ -653,6 +653,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	instanceWaba.Get("/phone-numbers", wabaH.ListPhoneNumbers)
 	instanceWaba.Get("/templates", wabaH.ListTemplates)
 	instanceWaba.Post("/templates", wabaH.CreateTemplate)
+	instanceWaba.Post("/templates/:templateId", wabaH.EditTemplate)
 	instanceWaba.Delete("/templates/:name", wabaH.DeleteTemplate)
 	instanceWaba.Post("/messages", wabaH.SendMessage)
 	// Tech Provider flow — chamados após Embedded Signup pra ativar

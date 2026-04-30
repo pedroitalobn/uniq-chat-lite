@@ -760,6 +760,8 @@ export const wabaApi = {
     category: "MARKETING" | "UTILITY" | "AUTHENTICATION";
     components: any[];
   }) => api.post(`/v1/instances/${instanceId}/waba/templates`, data),
+  editTemplate: (instanceId: string, templateId: string, data: { components: any[]; category?: string }) =>
+    api.post(`/v1/instances/${instanceId}/waba/templates/${templateId}`, data),
   deleteTemplate: (instanceId: string, name: string) =>
     api.delete(`/v1/instances/${instanceId}/waba/templates/${name}`),
   register: (instanceId: string, pin: string) =>

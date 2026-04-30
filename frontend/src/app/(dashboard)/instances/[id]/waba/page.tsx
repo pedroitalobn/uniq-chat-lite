@@ -33,12 +33,21 @@ interface WABAData {
   code_verification: string;
 }
 
+interface TemplateComponent {
+  type: string;        // HEADER | BODY | FOOTER | BUTTONS
+  format?: string;     // TEXT | IMAGE | VIDEO | DOCUMENT (for HEADER)
+  text?: string;
+  buttons?: Array<{ type: string; text: string; url?: string; phone_number?: string }>;
+  example?: Record<string, unknown>;
+}
+
 interface Template {
+  id?: string;         // Meta template ID (needed for edit)
   name: string;
   language: string;
   status: string;
   category: string;
-  components: any[];
+  components: TemplateComponent[];
 }
 
 export default function WABAManagePage({ params }: { params: Promise<{ id: string }> }) {
@@ -288,21 +297,207 @@ function StatusCard({ icon: Icon, label, value, color, mono }: {
   );
 }
 
-function TemplatesSection({ instanceId, templates, qc }: {
-  instanceId: string;
-  templates: Template[];
-  qc: ReturnType<typeof useQueryClient>;
-}) {
-  const [creating, setCreating] = useState(false);
+function TemplateCard({ t, instanceId, qc }: { t: Template; instanceId: string; qc: ReturnType<typeof useQueryClient> }) {
+  const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+
+  const body = t.components.find((c) => c.type === "BODY" || c.type === "body");
+  const header = t.components.find((c) => c.type === "HEADER" || c.type === "header");
+  const footer = t.components.find((c) => c.type === "FOOTER" || c.type === "footer");
+  const buttonsComp = t.components.find((c) => c.type === "BUTTONS" || c.type === "buttons");
+  const bodyText = body?.text || "";
+  const preview = bodyText.length > 90 ? bodyText.slice(0, 90) + "…" : bodyText;
 
   const deleteMut = useMutation({
-    mutationFn: (name: string) => wabaApi.deleteTemplate(instanceId, name),
+    mutationFn: () => wabaApi.deleteTemplate(instanceId, t.name),
     onSuccess: () => {
       toast.success("Template removido");
       qc.invalidateQueries({ queryKey: ["waba-templates", instanceId] });
     },
     onError: (e: any) => toast.error(e?.response?.data?.error || "Falha ao remover"),
   });
+
+  return (
+    <>
+      <div className="px-4 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <button className="min-w-0 text-left flex-1" onClick={() => setExpanded((v) => !v)}>
+            <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{t.name}</p>
+            <p className="text-[11px] mb-1" style={{ color: "var(--text-3)" }}>
+              {t.language} · {t.category} ·{" "}
+              <span style={{ color: t.status === "APPROVED" ? "var(--green)" : "#fbbf24" }}>
+                {t.status}
+              </span>
+            </p>
+            {!expanded && bodyText && (
+              <p className="text-xs" style={{ color: "var(--text-2)" }}>{preview}</p>
+            )}
+          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {t.id && (
+              <button onClick={() => setEditing(true)}
+                className="p-1.5 rounded-md hover:opacity-80" style={{ color: "var(--text-3)" }}
+                title="Editar template">
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button onClick={() => { if (confirm(`Remover template ${t.name}?`)) deleteMut.mutate(); }}
+              className="p-1.5 rounded-md hover:opacity-80" style={{ color: "#f87171" }}>
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {expanded && (
+          <div className="mt-3 rounded-xl overflow-hidden"
+            style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>
+            {header?.text && (
+              <div className="px-3 py-2 border-b" style={{ borderColor: "var(--surface-border)" }}>
+                <p className="text-[10px] uppercase tracking-wider font-medium mb-0.5" style={{ color: "var(--text-3)" }}>Header</p>
+                <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>{header.text}</p>
+              </div>
+            )}
+            {header?.format && header.format !== "TEXT" && !header.text && (
+              <div className="px-3 py-2 border-b" style={{ borderColor: "var(--surface-border)" }}>
+                <p className="text-[10px] uppercase tracking-wider font-medium mb-0.5" style={{ color: "var(--text-3)" }}>Header</p>
+                <p className="text-xs" style={{ color: "var(--text-3)" }}>[{header.format}]</p>
+              </div>
+            )}
+            {bodyText && (
+              <div className="px-3 py-2">
+                <p className="text-[10px] uppercase tracking-wider font-medium mb-0.5" style={{ color: "var(--text-3)" }}>Body</p>
+                <p className="text-sm whitespace-pre-wrap" style={{ color: "var(--text-1)" }}>{bodyText}</p>
+              </div>
+            )}
+            {footer?.text && (
+              <div className="px-3 py-2 border-t" style={{ borderColor: "var(--surface-border)" }}>
+                <p className="text-[10px] uppercase tracking-wider font-medium mb-0.5" style={{ color: "var(--text-3)" }}>Footer</p>
+                <p className="text-xs" style={{ color: "var(--text-3)" }}>{footer.text}</p>
+              </div>
+            )}
+            {buttonsComp?.buttons && buttonsComp.buttons.length > 0 && (
+              <div className="px-3 py-2 border-t flex flex-wrap gap-1.5" style={{ borderColor: "var(--surface-border)" }}>
+                {buttonsComp.buttons.map((b, i) => (
+                  <span key={i} className="text-[11px] px-2 py-0.5 rounded-full border"
+                    style={{ borderColor: "var(--surface-border)", color: "var(--text-2)" }}>
+                    {b.text}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      {editing && t.id && (
+        <EditTemplateModal
+          instanceId={instanceId}
+          template={t}
+          onClose={() => setEditing(false)}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ["waba-templates", instanceId] });
+            setEditing(false);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function EditTemplateModal({ instanceId, template, onClose, onSaved }: {
+  instanceId: string;
+  template: Template;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const bodyComp = template.components.find((c) => c.type === "BODY" || c.type === "body");
+  const footerComp = template.components.find((c) => c.type === "FOOTER" || c.type === "footer");
+  const buttonsComp = template.components.find((c) => c.type === "BUTTONS" || c.type === "buttons");
+
+  const [bodyText, setBodyText] = useState(bodyComp?.text || "");
+  const [footerText, setFooterText] = useState(footerComp?.text || "");
+
+  const editMut = useMutation({
+    mutationFn: () => {
+      const components: Record<string, unknown>[] = [];
+      const headerComp = template.components.find((c) => c.type === "HEADER" || c.type === "header");
+      if (headerComp) components.push({ ...headerComp });
+      components.push({ type: "BODY", text: bodyText });
+      if (footerText.trim()) components.push({ type: "FOOTER", text: footerText.trim() });
+      if (buttonsComp) components.push({ ...buttonsComp });
+      return wabaApi.editTemplate(instanceId, template.id!, { components });
+    },
+    onSuccess: () => {
+      toast.success("Template atualizado — voltará para PENDING enquanto a Meta revisa");
+      onSaved();
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Falha ao editar template"),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
+      <div className="rounded-2xl w-full max-w-lg flex flex-col"
+        style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)", maxHeight: "90vh" }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b shrink-0"
+          style={{ borderColor: "var(--surface-border)" }}>
+          <div>
+            <h3 className="text-base font-medium" style={{ color: "var(--text-1)" }}>Editar template</h3>
+            <p className="text-[11px] mt-0.5" style={{ color: "#fbbf24" }}>
+              ⚠ Templates APPROVED voltarão para PENDING após edição
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-md p-1" style={{ color: "var(--text-3)" }}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="space-y-4 px-5 py-4 overflow-y-auto">
+          <div>
+            <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-2)" }}>Body</label>
+            <textarea
+              rows={6}
+              value={bodyText}
+              onChange={(e) => setBodyText(e.target.value)}
+              className="input-field w-full resize-none font-mono text-sm"
+              placeholder="Texto do body. Use {{1}}, {{2}} para variáveis."
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-2)" }}>Footer (opcional)</label>
+            <input
+              value={footerText}
+              onChange={(e) => setFooterText(e.target.value)}
+              className="input-field w-full"
+              placeholder="Texto do rodapé"
+            />
+          </div>
+          <p className="text-[11px] rounded-lg px-3 py-2" style={{ background: "var(--surface-2)", color: "var(--text-3)" }}>
+            Header e botões são preservados. Apenas body e footer podem ser editados aqui.
+          </p>
+        </div>
+        <div className="flex justify-end gap-2 px-5 py-4 border-t shrink-0" style={{ borderColor: "var(--surface-border)" }}>
+          <button type="button" onClick={onClose}
+            className="text-sm px-4 py-2 rounded-lg" style={{ color: "var(--text-2)" }}>
+            Cancelar
+          </button>
+          <button
+            onClick={() => editMut.mutate()}
+            disabled={editMut.isPending || !bodyText.trim()}
+            className="text-sm font-medium px-4 py-2 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50"
+            style={{ background: "var(--green)", color: "var(--green-fg)" }}>
+            {editMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+            Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TemplatesSection({ instanceId, templates, qc }: {
+  instanceId: string;
+  templates: Template[];
+  qc: ReturnType<typeof useQueryClient>;
+}) {
+  const [creating, setCreating] = useState(false);
 
   return (
     <div className="rounded-2xl"
@@ -332,21 +527,7 @@ function TemplatesSection({ instanceId, templates, qc }: {
       ) : (
         <div className="divide-y" style={{ borderColor: "var(--surface-border)" }}>
           {templates.map((t) => (
-            <div key={`${t.name}-${t.language}`} className="px-4 py-3 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{t.name}</p>
-                <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
-                  {t.language} · {t.category} ·{" "}
-                  <span style={{ color: t.status === "APPROVED" ? "var(--green)" : "#fbbf24" }}>
-                    {t.status}
-                  </span>
-                </p>
-              </div>
-              <button onClick={() => { if (confirm(`Remover template ${t.name}?`)) deleteMut.mutate(t.name); }}
-                className="p-1.5 rounded-md" style={{ color: "#f87171" }}>
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <TemplateCard key={`${t.name}-${t.language}`} t={t} instanceId={instanceId} qc={qc} />
           ))}
         </div>
       )}

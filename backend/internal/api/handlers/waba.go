@@ -687,6 +687,17 @@ func (h *WABAHandler) processStatusUpdate(waba *models.WABAInstance, st *Webhook
 		return
 	}
 
+	ev := log.Debug().Str("wamid", st.ID).Str("status", st.Status).Str("recipient", st.RecipientID)
+	if st.Status == "failed" && len(st.Errors) > 0 {
+		ev = log.Warn().
+			Str("wamid", st.ID).
+			Str("recipient", st.RecipientID).
+			Int("error_code", st.Errors[0].Code).
+			Str("error_title", st.Errors[0].Title).
+			Str("error_message", st.Errors[0].Message)
+	}
+	ev.Msg("waba: status update")
+
 	// 1. MessageLog correspondente (outbound salvo com external_message_id = wamid)
 	h.db.Model(&models.MessageLog{}).
 		Where("external_message_id = ?", st.ID).
@@ -696,7 +707,7 @@ func (h *WABAHandler) processStatusUpdate(waba *models.WABAInstance, st *Webhook
 	updates := map[string]any{}
 	switch st.Status {
 	case "delivered":
-		updates["status"] = models.RecipientStatusSent // já estava sent; mantém pra não regredir
+		updates["status"] = models.RecipientStatusSent
 		now := time.Now()
 		updates["delivered_at"] = &now
 	case "read":
@@ -778,6 +789,13 @@ func (h *WABAHandler) SendMessage(c *fiber.Ctx) error {
 
 	jsonData, _ := json.Marshal(messageData)
 
+	log.Info().
+		Str("to", req.To).
+		Str("type", req.Type).
+		Str("phone_number_id", waba.PhoneNumberID).
+		RawJSON("payload", jsonData).
+		Msg("waba: sending message to Meta")
+
 	graphURL := fmt.Sprintf(
 		"https://graph.facebook.com/v18.0/%s/messages",
 		waba.PhoneNumberID,
@@ -796,6 +814,7 @@ func (h *WABAHandler) SendMessage(c *fiber.Ctx) error {
 
 	if resp.StatusCode >= 400 {
 		body, _ := io.ReadAll(resp.Body)
+		log.Error().Str("to", req.To).Str("meta_response", string(body)).Msg("waba: Meta rejected message")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Meta API error: " + string(body)})
 	}
 
@@ -1052,6 +1071,53 @@ func (h *WABAHandler) DeleteTemplate(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
-func init() {
-	// Note: Cannot access config.AppConfig here as it's not initialized yet
+// ─── Edit template ─────────────────────────────────────────────────────
+// POST /v1/instances/:id/waba/templates/:templateId
+// Atualiza os components de um template existente.
+// Templates APPROVED voltam para PENDING (re-revisão pela Meta).
+// Apenas components (body text e botões) podem ser alterados — name e
+// language são imutáveis após aprovação.
+func (h *WABAHandler) EditTemplate(c *fiber.Ctx) error {
+	instanceID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	templateID := c.Params("templateId")
+	if templateID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "templateId obrigatório"})
+	}
+	var req struct {
+		Category   string `json:"category,omitempty"`
+		Components []any  `json:"components"`
+	}
+	if err := c.BodyParser(&req); err != nil || len(req.Components) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "components obrigatório"})
+	}
+
+	var waba models.WABAInstance
+	if err := h.db.Where("instance_id = ?", instanceID).First(&waba).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "WABA não encontrado"})
+	}
+
+	payload := map[string]any{"components": req.Components}
+	if req.Category != "" {
+		payload["category"] = req.Category
+	}
+	jsonBody, _ := json.Marshal(payload)
+	url := fmt.Sprintf("https://graph.facebook.com/v18.0/%s", templateID)
+	httpReq, _ := http.NewRequest("POST", url, strings.NewReader(string(jsonBody)))
+	httpReq.Header.Set("Authorization", "Bearer "+waba.AccessToken)
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(httpReq)
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return c.Status(resp.StatusCode).JSON(fiber.Map{"error": "Meta: " + string(respBody), "raw": string(respBody)})
+	}
+	var out map[string]any
+	_ = json.Unmarshal(respBody, &out)
+	return c.JSON(out)
 }
