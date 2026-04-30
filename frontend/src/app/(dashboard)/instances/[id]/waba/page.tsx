@@ -922,6 +922,33 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
   );
 }
 
+function extractTemplateVars(tpl: Template | undefined): string[] {
+  if (!tpl?.components) return [];
+  const rx = /\{\{\s*(\d+)\s*\}\}/g;
+  const set = new Set<string>();
+  for (const comp of tpl.components) {
+    if (!comp.text) continue;
+    let m;
+    while ((m = rx.exec(comp.text)) !== null) set.add(m[1]);
+  }
+  return Array.from(set).sort((a, b) => Number(a) - Number(b));
+}
+
+function buildTemplateComponents(tpl: Template | undefined, vars: Record<string, string>): Array<Record<string, unknown>> {
+  if (!tpl?.components) return [];
+  const out: Array<Record<string, unknown>> = [];
+  for (const comp of tpl.components) {
+    if (!comp.text) continue;
+    const compVars = (comp.text.match(/\{\{\s*(\d+)\s*\}\}/g) ?? []).map((m) => m.replace(/[{}\s]/g, ""));
+    if (compVars.length === 0) continue;
+    out.push({
+      type: comp.type.toLowerCase(),
+      parameters: compVars.map((k) => ({ type: "text", text: vars[k] ?? "" })),
+    });
+  }
+  return out;
+}
+
 function TestSendSection({ instanceId, templates = [] }: {
   instanceId: string;
   wabaStatus?: string;
@@ -936,24 +963,38 @@ function TestSendSection({ instanceId, templates = [] }: {
   const [templateKey, setTemplateKey] = useState<string>(
     approved[0] ? `${approved[0].name}|${approved[0].language}` : "",
   );
+  const [templateVars, setTemplateVars] = useState<Record<string, string>>({});
   const [templateName, templateLang] = templateKey.split("|");
 
+  const selectedTpl = approved.find((t) => t.name === templateName && t.language === templateLang);
+  const tplVarKeys = extractTemplateVars(selectedTpl);
+
+  // Reset variables when template changes
+  const handleTemplateChange = (key: string) => {
+    setTemplateKey(key);
+    setTemplateVars({});
+  };
+
+  const canSend = mode === "text"
+    ? !!to && !!text
+    : !!to && !!templateName && !!templateLang && tplVarKeys.every((k) => (templateVars[k] ?? "").trim().length > 0);
+
   const send = useMutation({
-    mutationFn: () =>
-      mode === "text"
-        ? wabaApi.sendMessage(instanceId, {
-            to,
-            type: "text",
-            text: { body: text },
-          })
-        : wabaApi.sendMessage(instanceId, {
-            to,
-            type: "template",
-            template: {
-              name: templateName,
-              language: { code: templateLang },
-            },
-          }),
+    mutationFn: () => {
+      if (mode === "text") {
+        return wabaApi.sendMessage(instanceId, { to, type: "text", text: { body: text } });
+      }
+      const components = buildTemplateComponents(selectedTpl, templateVars);
+      return wabaApi.sendMessage(instanceId, {
+        to,
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: templateLang },
+          ...(components.length > 0 ? { components } : {}),
+        },
+      });
+    },
     onSuccess: (r: any) => {
       const msgId = r.data?.messages?.[0]?.id || r.data?.id || "";
       setSentId(msgId);
@@ -1025,7 +1066,7 @@ function TestSendSection({ instanceId, templates = [] }: {
         ) : (
           <select
             value={templateKey}
-            onChange={(e) => setTemplateKey(e.target.value)}
+            onChange={(e) => handleTemplateChange(e.target.value)}
             className="input-field sm:col-span-2"
           >
             <option value="">— Selecione um template —</option>
@@ -1037,6 +1078,24 @@ function TestSendSection({ instanceId, templates = [] }: {
           </select>
         )}
       </div>
+      {/* Variable inputs for templates with {{N}} params */}
+      {mode === "template" && tplVarKeys.length > 0 && (
+        <div className="mt-2 grid sm:grid-cols-2 gap-2">
+          {tplVarKeys.map((k) => (
+            <div key={k}>
+              <label className="block text-[10px] mb-1" style={{ color: "var(--text-3)" }}>
+                {`{{${k}}}`}
+              </label>
+              <input
+                value={templateVars[k] ?? ""}
+                onChange={(e) => setTemplateVars((prev) => ({ ...prev, [k]: e.target.value }))}
+                placeholder={`Valor para {{${k}}}`}
+                className="input-field w-full"
+              />
+            </div>
+          ))}
+        </div>
+      )}
       {mode === "template" && approved.length > 0 && (
         <p className="text-[11px] mt-1" style={{ color: "var(--text-3)" }}>
           Apenas templates com status <span style={{ color: "var(--green)" }}>APPROVED</span> aparecem.
@@ -1045,7 +1104,7 @@ function TestSendSection({ instanceId, templates = [] }: {
       )}
       <button
         onClick={() => send.mutate()}
-        disabled={!to || (mode === "text" && !text) || (mode === "template" && (!templateName || !templateLang)) || send.isPending}
+        disabled={!canSend || send.isPending}
         className="mt-3 text-xs font-medium px-3 py-2 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50"
         style={{ background: "var(--green)", color: "var(--green-fg)" }}>
         {send.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
