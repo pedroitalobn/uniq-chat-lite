@@ -645,6 +645,34 @@ const METHOD_COLORS: Record<string, { bg: string; text: string }> = {
   DELETE: { bg: "rgba(239,68,68,0.12)",  text: "#ef4444" },
 };
 
+// ─── Tab definitions ─────────────────────────────────────────────────────────
+type TabId = "account" | "business" | "waba" | "ig-profile" | "ig-api";
+
+const TABS: { id: TabId; label: string; color: string; description: string; comingSoon?: boolean }[] = [
+  { id: "account",    label: "Uniq Account",      color: "#00d46a", description: "Auth, workspaces, CRM, campanhas, billing e AI — comum a toda a plataforma" },
+  { id: "business",   label: "Business API",       color: "#25d366", description: "WhatsApp via whatsmeow (QR/pairing) — mensagens, grupos, OTP, inbox" },
+  { id: "waba",       label: "WABA",               color: "#3b82f6", description: "WhatsApp Cloud API oficial (Meta) — templates HSM, janela 24h" },
+  { id: "ig-profile", label: "Instagram Profile",  color: "#e1306c", description: "Instagram não-oficial — DMs, follow, stories, automação" },
+  { id: "ig-api",     label: "Instagram API",      color: "#cc2366", description: "API oficial Meta (Messaging Graph API) — em breve", comingSoon: true },
+];
+
+const SECTION_TABS: Record<string, TabId> = {
+  // Uniq Account
+  auth: "account", apikeys: "account", "instances-mgmt": "account",
+  webhooks: "account", media: "account", crm: "account",
+  campaigns: "account", integrations: "account", "ai-chat": "account",
+  agent: "account", invites: "account", payments: "account",
+  realtime: "account", queues: "account", workspaces: "account",
+  servers: "account", proxies: "account", conversations: "account",
+  // Business API
+  messages: "business", instance: "business", groups: "business",
+  otp: "business", inbox: "business",
+  // WABA
+  waba: "waba",
+  // Instagram Profile
+  instagram: "ig-profile",
+};
+
 const AUTH_LABELS: Record<string, { label: string; color: string; header: string }> = {
   // "Token" = instance token OU global API key (sk_*) — ambos vão no mesmo
   // header `apikey:`. NÃO confundir com JWT — ver seção "Autenticação".
@@ -792,18 +820,21 @@ function EndpointCard({
 }
 
 export default function ApiDocsPage() {
+  const [activeTab, setActiveTab] = useState<TabId>("business");
   const [activeSection, setActiveSection] = useState("messages");
   const [activeAnchor, setActiveAnchor] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  // Quais seções vêm expandidas no menu — só a ativa por padrão.
-  // Set vazio significa "expande só a active". User pode clicar no
-  // chevron pra expandir outras sem trocar de seção.
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set([activeSection]));
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(["messages"]));
+
+  const tabSections = useMemo(
+    () => SECTIONS.filter(s => SECTION_TABS[s.id] === activeTab),
+    [activeTab]
+  );
 
   const totalEndpoints = SECTIONS.reduce((sum, s) => sum + s.endpoints.length, 0);
-  const activeS = SECTIONS.find(s => s.id === activeSection)!;
+  const activeS = tabSections.find(s => s.id === activeSection) ?? tabSections[0];
+  const activeTabDef = TABS.find(t => t.id === activeTab)!;
 
-  // Filtrar endpoints pela busca (search é case-insensitive em path + description).
   const searchLower = search.trim().toLowerCase();
   const matchesSearch = (ep: Endpoint) =>
     !searchLower ||
@@ -811,24 +842,29 @@ export default function ApiDocsPage() {
     ep.description.toLowerCase().includes(searchLower) ||
     ep.method.toLowerCase().includes(searchLower);
 
-  // Quando busca está ativa, expandir todas as seções com matches.
   const sectionMatches = useMemo(() => {
-    return SECTIONS.map(s => ({
+    return tabSections.map(s => ({
       ...s,
       filteredEndpoints: s.endpoints.filter(matchesSearch),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchLower]);
+  }, [searchLower, tabSections]);
 
   useEffect(() => {
     if (searchLower) {
-      // Auto-expande seções com match enquanto o user digita.
       setOpenSections(new Set(sectionMatches.filter(s => s.filteredEndpoints.length > 0).map(s => s.id)));
     } else {
-      // Sem busca, mantém só a ativa expandida.
       setOpenSections(new Set([activeSection]));
     }
   }, [searchLower, activeSection, sectionMatches]);
+
+  const switchTab = (tabId: TabId) => {
+    setActiveTab(tabId);
+    const first = SECTIONS.find(s => SECTION_TABS[s.id] === tabId);
+    if (first) { setActiveSection(first.id); setOpenSections(new Set([first.id])); }
+    setActiveAnchor(null);
+    setSearch("");
+  };
 
   const toggleSection = (id: string) => {
     setOpenSections(prev => {
@@ -838,8 +874,6 @@ export default function ApiDocsPage() {
     });
   };
 
-  // Click num endpoint da sidebar: troca seção + abre o card + scroll.
-  // activeAnchor controla qual card está expandido (accordion: só 1 aberto).
   const goToEndpoint = (sectionId: string, anchor: string) => {
     setActiveSection(sectionId);
     setActiveAnchor(anchor);
@@ -849,7 +883,6 @@ export default function ApiDocsPage() {
     }, 50);
   };
 
-  // Toggle a partir do header do card: se já é o ativo, fecha; senão abre.
   const toggleCard = (anchor: string) => {
     setActiveAnchor(prev => (prev === anchor ? null : anchor));
   };
@@ -858,7 +891,7 @@ export default function ApiDocsPage() {
     <div className="min-h-screen" style={{ background: "hsl(240 8% 6%)", color: "hsl(240 8% 85%)" }}>
       {/* Header */}
       <header className="border-b sticky top-0 z-10" style={{ background: "hsl(240 8% 6%)", borderColor: "hsl(240 8% 14%)" }}>
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Logo />
             <div className="w-px h-5" style={{ background: "hsl(240 8% 20%)" }} />
@@ -866,281 +899,268 @@ export default function ApiDocsPage() {
               <BookOpen className="w-4 h-4" style={{ color: "hsl(240 8% 50%)" }} />
               <span className="text-sm font-medium" style={{ color: "hsl(240 8% 70%)" }}>API Reference</span>
             </div>
-            <span className="text-xs px-2 py-0.5 rounded" style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.2)" }}>
-              v1
-            </span>
+            <span className="text-xs px-2 py-0.5 rounded" style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.2)" }}>v1</span>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs hidden sm:block" style={{ color: "hsl(240 8% 40%)" }}>
-              {totalEndpoints} endpoints
-            </span>
-            <a
-              href="/login"
-              className="text-xs px-4 py-2 rounded-lg font-medium transition-opacity hover:opacity-80"
-              style={{ background: "rgba(0,212,106,0.15)", border: "1px solid rgba(0,212,106,0.3)", color: "#00d46a" }}
-            >
+            <span className="text-xs hidden sm:block" style={{ color: "hsl(240 8% 40%)" }}>{totalEndpoints} endpoints</span>
+            <a href="/login" className="text-xs px-4 py-2 rounded-lg font-medium transition-opacity hover:opacity-80"
+              style={{ background: "rgba(0,212,106,0.15)", border: "1px solid rgba(0,212,106,0.3)", color: "#00d46a" }}>
               Acessar plataforma →
             </a>
           </div>
         </div>
+
+        {/* ── Tab Pills ──────────────────────────────────────────────────────── */}
+        <div className="max-w-7xl mx-auto px-6 pb-2.5 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+          {TABS.map(tab => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => !tab.comingSoon && switchTab(tab.id)}
+                title={tab.description}
+                disabled={tab.comingSoon}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0"
+                style={isActive
+                  ? { background: `${tab.color}22`, color: tab.color, border: `1px solid ${tab.color}55` }
+                  : { background: "transparent", color: tab.comingSoon ? "hsl(240 8% 28%)" : "hsl(240 8% 52%)", border: "1px solid hsl(240 8% 17%)", cursor: tab.comingSoon ? "default" : "pointer" }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full shrink-0"
+                  style={{ background: isActive ? tab.color : "hsl(240 8% 28%)" }} />
+                {tab.label}
+                {tab.comingSoon && (
+                  <span className="text-[9px] px-1 rounded-sm ml-0.5" style={{ background: "hsl(240 8% 16%)", color: "hsl(240 8% 38%)" }}>
+                    em breve
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          <div className="flex-1" />
+          <span className="text-[11px] shrink-0" style={{ color: "hsl(240 8% 35%)" }}>
+            {tabSections.reduce((n, s) => n + s.endpoints.length, 0)} endpoints nesta aba
+          </span>
+        </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10 flex flex-col lg:flex-row gap-4 sm:gap-8">
-        {/* Mobile: section selector dropdown + search */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col lg:flex-row gap-4 sm:gap-8">
+        {/* Mobile controls */}
         <div className="lg:hidden space-y-2">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "hsl(240 8% 40%)" }} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar endpoint..."
-              className="w-full text-sm rounded-lg pl-9 pr-3 py-2 outline-none"
-              style={{ background: "hsl(240 8% 10%)", border: "1px solid hsl(240 8% 16%)", color: "hsl(240 8% 85%)" }}
-            />
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar endpoint..." className="w-full text-sm rounded-lg pl-9 pr-3 py-2 outline-none"
+              style={{ background: "hsl(240 8% 10%)", border: "1px solid hsl(240 8% 16%)", color: "hsl(240 8% 85%)" }} />
           </div>
-          <select
-            value={activeSection}
-            onChange={(e) => { setActiveSection(e.target.value); setActiveAnchor(null); }}
+          <select value={activeSection} onChange={e => { setActiveSection(e.target.value); setActiveAnchor(null); }}
             className="w-full text-sm rounded-lg px-3 py-2 outline-none"
-            style={{ background: "hsl(240 8% 10%)", border: "1px solid hsl(240 8% 16%)", color: "hsl(240 8% 85%)" }}
-          >
-            {SECTIONS.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.title} ({s.endpoints.length})
-              </option>
-            ))}
+            style={{ background: "hsl(240 8% 10%)", border: "1px solid hsl(240 8% 16%)", color: "hsl(240 8% 85%)" }}>
+            {tabSections.map(s => <option key={s.id} value={s.id}>{s.title} ({s.endpoints.length})</option>)}
           </select>
         </div>
 
-        {/* Sidebar — Mintlify-style: 2 níveis (seção → endpoints), busca global */}
-        <aside className="w-72 shrink-0 hidden lg:block">
-          <div className="sticky top-24 space-y-3">
-            {/* Search */}
+        {/* Sidebar */}
+        <aside className="w-64 shrink-0 hidden lg:block">
+          <div className="sticky top-[6.5rem] space-y-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "hsl(240 8% 40%)" }} />
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Buscar endpoint..."
-                className="w-full text-sm rounded-lg pl-9 pr-9 py-2 outline-none"
-                style={{ background: "hsl(240 8% 10%)", border: "1px solid hsl(240 8% 16%)", color: "hsl(240 8% 85%)" }}
-              />
+              <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Buscar endpoint..." className="w-full text-sm rounded-lg pl-9 pr-9 py-2 outline-none"
+                style={{ background: "hsl(240 8% 10%)", border: "1px solid hsl(240 8% 16%)", color: "hsl(240 8% 85%)" }} />
               {search && (
-                <button
-                  onClick={() => setSearch("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-white/10"
-                  aria-label="Limpar busca"
-                >
+                <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-white/10">
                   <X className="w-3.5 h-3.5" style={{ color: "hsl(240 8% 50%)" }} />
                 </button>
               )}
             </div>
 
-            <p className="text-xs font-medium uppercase px-3" style={{ color: "hsl(240 8% 35%)" }}>
-              Recursos
+            <p className="text-[10px] font-semibold uppercase tracking-wider px-1" style={{ color: activeTabDef.color }}>
+              {activeTabDef.label}
               {searchLower && (
                 <span className="ml-2 normal-case font-normal" style={{ color: "hsl(240 8% 50%)" }}>
-                  · {sectionMatches.reduce((n, s) => n + s.filteredEndpoints.length, 0)} matches
+                  · {sectionMatches.reduce((n, s) => n + s.filteredEndpoints.length, 0)} resultados
                 </span>
               )}
             </p>
 
-            <div className="space-y-0.5 max-h-[calc(100vh-12rem)] overflow-y-auto pr-1 -mr-1">
-              {sectionMatches.map((s) => {
-                const Icon = s.icon;
-                const isActive = activeSection === s.id;
-                const isOpen = openSections.has(s.id);
-                const endpoints = searchLower ? s.filteredEndpoints : s.endpoints;
-                if (searchLower && endpoints.length === 0) return null;
+            {activeTabDef.comingSoon ? (
+              <div className="px-2 py-10 text-center space-y-2">
+                <p className="text-sm" style={{ color: "hsl(240 8% 40%)" }}>Em breve</p>
+                <p className="text-xs" style={{ color: "hsl(240 8% 30%)" }}>{activeTabDef.description}</p>
+              </div>
+            ) : (
+              <div className="space-y-0.5 max-h-[calc(100vh-16rem)] overflow-y-auto pr-1">
+                {sectionMatches.map(s => {
+                  const Icon = s.icon;
+                  const isActive = activeSection === s.id;
+                  const isOpen = openSections.has(s.id);
+                  const endpoints = searchLower ? s.filteredEndpoints : s.endpoints;
+                  if (searchLower && endpoints.length === 0) return null;
 
-                return (
-                  <div key={s.id}>
-                    {/* Section header */}
-                    <button
-                      onClick={() => {
-                        setActiveSection(s.id);
-                        toggleSection(s.id);
-                        setActiveAnchor(null);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors"
-                      style={{
-                        background: isActive && !activeAnchor ? "rgba(0,212,106,0.1)" : "transparent",
-                        color: isActive ? "#00d46a" : "hsl(240 8% 70%)",
-                        border: isActive && !activeAnchor ? "1px solid rgba(0,212,106,0.2)" : "1px solid transparent",
-                      }}
-                    >
-                      <Icon className="w-4 h-4 shrink-0" />
-                      <span className="flex-1 font-medium">{s.title}</span>
-                      <span className="text-[10px] tabular-nums shrink-0" style={{ color: "hsl(240 8% 40%)" }}>
-                        {endpoints.length}
-                      </span>
-                      {isOpen ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
-                    </button>
+                  return (
+                    <div key={s.id}>
+                      <button
+                        onClick={() => { setActiveSection(s.id); toggleSection(s.id); setActiveAnchor(null); }}
+                        className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-left transition-colors"
+                        style={{
+                          background: isActive && !activeAnchor ? `${activeTabDef.color}18` : "transparent",
+                          color: isActive ? activeTabDef.color : "hsl(240 8% 68%)",
+                          border: isActive && !activeAnchor ? `1px solid ${activeTabDef.color}35` : "1px solid transparent",
+                        }}
+                      >
+                        <Icon className="w-4 h-4 shrink-0" />
+                        <span className="flex-1 font-medium text-[13px]">{s.title}</span>
+                        <span className="text-[10px] tabular-nums" style={{ color: "hsl(240 8% 38%)" }}>{endpoints.length}</span>
+                        {isOpen ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
+                      </button>
 
-                    {/* Endpoints list — só renderiza se a seção tá aberta */}
-                    {isOpen && (
-                      <div className="ml-2 pl-3 mt-0.5 space-y-0.5" style={{ borderLeft: "1px solid hsl(240 8% 14%)" }}>
-                        {endpoints.map((ep) => {
-                          const anchor = endpointSlug(ep);
-                          const isEpActive = isActive && activeAnchor === anchor;
-                          const mc = METHOD_COLORS[ep.method];
-                          return (
-                            <button
-                              key={anchor}
-                              onClick={() => goToEndpoint(s.id, anchor)}
-                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-left transition-colors group"
-                              style={{
-                                background: isEpActive ? "rgba(0,212,106,0.08)" : "transparent",
-                                color: isEpActive ? "#00d46a" : "hsl(240 8% 60%)",
-                              }}
-                            >
-                              <span
-                                className="text-[9px] font-semibold uppercase shrink-0 w-9 text-center px-1 py-0.5 rounded"
-                                style={{ background: mc.bg, color: mc.text }}
-                              >
-                                {ep.method === "DELETE" ? "DEL" : ep.method}
-                              </span>
-                              <span className="flex-1 truncate font-mono" style={{ fontSize: "11px" }}>
-                                {/* Mostra última parte significativa do path */}
-                                {ep.path.split("/").filter(p => p && !p.startsWith("{")).slice(-2).join("/")}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {searchLower && sectionMatches.every(s => s.filteredEndpoints.length === 0) && (
-                <p className="text-xs px-3 py-4 italic" style={{ color: "hsl(240 8% 45%)" }}>
-                  Nenhum endpoint encontrado para &quot;{search}&quot;
-                </p>
-              )}
-            </div>
+                      {isOpen && (
+                        <div className="ml-3 pl-3 mt-0.5 space-y-0.5" style={{ borderLeft: "1px solid hsl(240 8% 13%)" }}>
+                          {endpoints.map(ep => {
+                            const anchor = endpointSlug(ep);
+                            const isEpActive = isActive && activeAnchor === anchor;
+                            const mc = METHOD_COLORS[ep.method];
+                            return (
+                              <button key={anchor} onClick={() => goToEndpoint(s.id, anchor)}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-left transition-colors"
+                                style={{ background: isEpActive ? `${activeTabDef.color}12` : "transparent", color: isEpActive ? activeTabDef.color : "hsl(240 8% 58%)" }}>
+                                <span className="text-[9px] font-bold uppercase shrink-0 w-8 text-center px-0.5 py-0.5 rounded" style={{ background: mc.bg, color: mc.text }}>
+                                  {ep.method === "DELETE" ? "DEL" : ep.method}
+                                </span>
+                                <span className="flex-1 truncate font-mono" style={{ fontSize: "11px" }}>
+                                  {ep.path.split("/").filter(p => p && !p.startsWith("{")).slice(-2).join("/")}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {searchLower && sectionMatches.every(s => s.filteredEndpoints.length === 0) && (
+                  <p className="text-xs px-2 py-6 italic text-center" style={{ color: "hsl(240 8% 40%)" }}>
+                    Sem resultados para &quot;{search}&quot;
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </aside>
 
         {/* Content */}
         <main className="flex-1 min-w-0">
-          {/* Section header */}
-          <div className="flex items-start gap-4 mb-6">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}>
-              <activeS.icon className="w-6 h-6" style={{ color: "#00d46a" }} />
+          {activeTabDef.comingSoon ? (
+            <div className="flex flex-col items-center justify-center py-28 text-center space-y-4">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: `${activeTabDef.color}14`, border: `1px solid ${activeTabDef.color}30` }}>
+                <Globe className="w-8 h-8" style={{ color: activeTabDef.color }} />
+              </div>
+              <h2 className="text-xl font-semibold" style={{ color: "hsl(240 8% 85%)" }}>{activeTabDef.label}</h2>
+              <p className="text-sm max-w-sm" style={{ color: "hsl(240 8% 50%)" }}>{activeTabDef.description}</p>
+              <span className="text-xs px-3 py-1.5 rounded-full" style={{ background: "hsl(240 8% 14%)", color: "hsl(240 8% 45%)" }}>Em breve</span>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-semibold" style={{ color: "hsl(240 8% 90%)" }}>{activeS.title}</h1>
-                {activeS.badge && (
-                  <span className="text-xs px-2 py-0.5 rounded" style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.2)" }}>
-                    {activeS.badge}
-                  </span>
+          ) : activeS ? (
+            <>
+              {/* Section header */}
+              <div className="flex items-start gap-4 mb-6">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${activeTabDef.color}14`, border: `1px solid ${activeTabDef.color}30` }}>
+                  <activeS.icon className="w-5 h-5" style={{ color: activeTabDef.color }} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-xl font-semibold" style={{ color: "hsl(240 8% 90%)" }}>{activeS.title}</h1>
+                    {activeS.badge && (
+                      <span className="text-xs px-2 py-0.5 rounded" style={{ background: `${activeTabDef.color}14`, color: activeTabDef.color, border: `1px solid ${activeTabDef.color}30` }}>
+                        {activeS.badge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm mt-0.5" style={{ color: "hsl(240 8% 50%)" }}>{activeS.description}</p>
+                </div>
+              </div>
+
+              {/* Base URL bar */}
+              <div className="flex flex-wrap items-center gap-4 mb-6 px-4 py-3 rounded-xl" style={{ background: "hsl(240 8% 10%)", border: "1px solid hsl(240 8% 16%)" }}>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium uppercase" style={{ color: "hsl(240 8% 40%)" }}>Base URL</span>
+                  <code className="text-sm font-mono" style={{ color: "#93c5fd" }}>{BASE}</code>
+                  <CopyButton text={BASE} />
+                </div>
+                {activeS.badge === "V1 API" && (
+                  <>
+                    <span style={{ color: "hsl(240 8% 25%)" }}>|</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium uppercase" style={{ color: "hsl(240 8% 40%)" }}>V1 Base</span>
+                      <code className="text-sm font-mono" style={{ color: "#f9a8d4" }}>{V1_BASE}</code>
+                      <CopyButton text={V1_BASE} />
+                    </div>
+                  </>
                 )}
               </div>
-              <p className="text-sm mt-0.5" style={{ color: "hsl(240 8% 50%)" }}>{activeS.description}</p>
-            </div>
-          </div>
 
-          {/* Base URL */}
-          <div className="flex flex-wrap items-center gap-4 mb-6 px-4 py-3 rounded-xl" style={{ background: "hsl(240 8% 10%)", border: "1px solid hsl(240 8% 16%)" }}>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium uppercase" style={{ color: "hsl(240 8% 40%)" }}>Base URL</span>
-              <code className="text-sm font-mono" style={{ color: "#93c5fd" }}>{BASE}</code>
-              <CopyButton text={BASE} />
-            </div>
-            {activeS.badge === "V1 API" && (
-              <>
-                <span style={{ color: "hsl(240 8% 25%)" }}>|</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium uppercase" style={{ color: "hsl(240 8% 40%)" }}>V1 Base</span>
-                  <code className="text-sm font-mono" style={{ color: "#f9a8d4" }}>{V1_BASE}</code>
-                  <CopyButton text={V1_BASE} />
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Endpoints — accordion (só 1 aberto por vez, controlado pelo activeAnchor) */}
-          <div className="space-y-2">
-            {activeS.endpoints.map((ep, i) => {
-              const anchor = endpointSlug(ep);
-              return (
-                <EndpointCard
-                  key={`${anchor}-${i}`}
-                  ep={ep}
-                  anchor={anchor}
-                  open={activeAnchor === anchor}
-                  onToggle={toggleCard}
-                />
-              );
-            })}
-          </div>
-
-          {/* Auth legend — explicação detalhada */}
-          <div className="mt-8 p-5 rounded-xl space-y-4" style={{ background: "hsl(240 8% 10%)", border: "1px solid hsl(240 8% 16%)" }}>
-            <p className="text-xs font-medium uppercase" style={{ color: "hsl(240 8% 40%)" }}>Como autenticar</p>
-
-            {/* Instance Token */}
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(234,179,8,0.12)", color: "#eab308" }}>Instance Token</span>
-                <span className="text-xs font-medium" style={{ color: "hsl(240 8% 80%)" }}>endpoints de mensagem / instância</span>
+              {/* Endpoints accordion */}
+              <div className="space-y-2">
+                {activeS.endpoints.map((ep, i) => {
+                  const anchor = endpointSlug(ep);
+                  return (
+                    <EndpointCard key={`${anchor}-${i}`} ep={ep} anchor={anchor} open={activeAnchor === anchor} onToggle={toggleCard} />
+                  );
+                })}
               </div>
-              <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 60%)" }}>
-                Token único por instância. <strong>Não expira</strong> (só sai quando a instância é deletada ou o token regenerado). Pegue em <code className="text-[11px] px-1 py-0.5 rounded" style={{ background: "hsl(240 8% 14%)", color: "#93c5fd" }}>app.uniq.chat → Instâncias → [sua instância] → Token</code>.
-              </p>
-              <pre className="text-[11px] font-mono p-2 rounded mt-1 overflow-x-auto" style={{ background: "hsl(240 8% 6%)", color: "hsl(240 8% 75%)" }}>
-{`# Header canônico (recomendado)
+
+              {/* Auth legend */}
+              <div className="mt-8 p-5 rounded-xl space-y-4" style={{ background: "hsl(240 8% 10%)", border: "1px solid hsl(240 8% 16%)" }}>
+                <p className="text-xs font-medium uppercase" style={{ color: "hsl(240 8% 40%)" }}>Como autenticar</p>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(234,179,8,0.12)", color: "#eab308" }}>Instance Token</span>
+                    <span className="text-xs font-medium" style={{ color: "hsl(240 8% 80%)" }}>endpoints de mensagem / instância</span>
+                  </div>
+                  <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 60%)" }}>
+                    Token único por instância. <strong>Não expira</strong>. Pegue em <code className="text-[11px] px-1 py-0.5 rounded" style={{ background: "hsl(240 8% 14%)", color: "#93c5fd" }}>app.uniq.chat → Instâncias → [sua instância] → Token</code>.
+                  </p>
+                  <pre className="text-[11px] font-mono p-2 rounded mt-1 overflow-x-auto" style={{ background: "hsl(240 8% 6%)", color: "hsl(240 8% 75%)" }}>
+{`# Header canônico
 apikey: inst_abc123xyz...
 
-# Aliases aceitos (legacy):
+# Aliases aceitos
 X-Instance-Token: inst_abc123xyz...
 Authorization: Bearer inst_abc123xyz...`}
-              </pre>
-              <p className="text-[11px]" style={{ color: "hsl(240 8% 45%)" }}>
-                Apesar do header se chamar <code>apikey</code>, o valor é o <strong>instance token</strong>, não a JWT da sessão.
-              </p>
-            </div>
-
-            {/* Global API Key */}
-            <div className="space-y-1.5 pt-3" style={{ borderTop: "1px solid hsl(240 8% 16%)" }}>
-              <div className="flex items-center gap-2">
-                <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(234,179,8,0.12)", color: "#eab308" }}>Global API Key</span>
-                <span className="text-xs font-medium" style={{ color: "hsl(240 8% 80%)" }}>n8n / SDK gerenciando várias instâncias</span>
-              </div>
-              <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 60%)" }}>
-                Chave começando com <code>sk_</code> que abre TODAS as instâncias do dono. Útil quando 1 integração orquestra múltiplas conexões. Crie em <code className="text-[11px] px-1 py-0.5 rounded" style={{ background: "hsl(240 8% 14%)", color: "#93c5fd" }}>app.uniq.chat → API Keys</code>. Vai no mesmo header <code>apikey:</code>. Não expira.
-              </p>
-            </div>
-
-            {/* JWT Bearer */}
-            <div className="space-y-1.5 pt-3" style={{ borderTop: "1px solid hsl(240 8% 16%)" }}>
-              <div className="flex items-center gap-2">
-                <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(59,130,246,0.12)", color: "#3b82f6" }}>JWT (humano)</span>
-                <span className="text-xs font-medium" style={{ color: "hsl(240 8% 80%)" }}>UI / fluxo logado</span>
-              </div>
-              <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 60%)" }}>
-                Token de sessão obtido em <code>POST /auth/login</code>. <strong>Expira em 24h</strong>; renove com <code>/auth/refresh</code>. Usado pelos endpoints de CRM, workspace, dashboard — onde o request precisa identificar o usuário humano que clicou.
-              </p>
-              <pre className="text-[11px] font-mono p-2 rounded mt-1 overflow-x-auto" style={{ background: "hsl(240 8% 6%)", color: "hsl(240 8% 75%)" }}>
+                  </pre>
+                </div>
+                <div className="space-y-1.5 pt-3" style={{ borderTop: "1px solid hsl(240 8% 16%)" }}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(234,179,8,0.12)", color: "#eab308" }}>Global API Key</span>
+                    <span className="text-xs font-medium" style={{ color: "hsl(240 8% 80%)" }}>n8n / SDK — várias instâncias</span>
+                  </div>
+                  <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 60%)" }}>
+                    Chave <code>sc_*</code> que acessa todas as instâncias do dono. Crie em <code className="text-[11px] px-1 py-0.5 rounded" style={{ background: "hsl(240 8% 14%)", color: "#93c5fd" }}>app.uniq.chat → API Keys</code>. Mesmo header <code>apikey:</code>. Não expira.
+                  </p>
+                </div>
+                <div className="space-y-1.5 pt-3" style={{ borderTop: "1px solid hsl(240 8% 16%)" }}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-2 py-0.5 rounded font-medium" style={{ background: "rgba(59,130,246,0.12)", color: "#3b82f6" }}>JWT (humano)</span>
+                    <span className="text-xs font-medium" style={{ color: "hsl(240 8% 80%)" }}>UI / fluxo logado</span>
+                  </div>
+                  <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 60%)" }}>
+                    Token de sessão do <code>POST /auth/login</code>. <strong>Expira em 24h</strong>; renove com <code>/auth/refresh</code>. Necessário para CRM, workspace, billing.
+                  </p>
+                  <pre className="text-[11px] font-mono p-2 rounded mt-1 overflow-x-auto" style={{ background: "hsl(240 8% 6%)", color: "hsl(240 8% 75%)" }}>
 {`Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`}
-              </pre>
-            </div>
-
-            {/* Quando usar qual */}
-            <div className="pt-3" style={{ borderTop: "1px solid hsl(240 8% 16%)" }}>
-              <p className="text-xs font-medium mb-2" style={{ color: "hsl(240 8% 70%)" }}>Qual usar?</p>
-              <ul className="text-xs space-y-1" style={{ color: "hsl(240 8% 60%)" }}>
-                <li>• <strong>Vou enviar mensagens via webhook/n8n/cron?</strong> → Instance Token (ou Global Key se gerencia várias)</li>
-                <li>• <strong>Estou construindo uma UI que o usuário loga?</strong> → JWT</li>
-                <li>• <strong>Endpoint da doc tem badge amarelo &quot;Instance Token&quot;?</strong> → use o token da instância</li>
-                <li>• <strong>Endpoint da doc tem badge azul &quot;JWT&quot;?</strong> → use o JWT do login</li>
-              </ul>
-            </div>
-          </div>
+                  </pre>
+                </div>
+                <div className="pt-3" style={{ borderTop: "1px solid hsl(240 8% 16%)" }}>
+                  <p className="text-xs font-medium mb-2" style={{ color: "hsl(240 8% 70%)" }}>Qual usar?</p>
+                  <ul className="text-xs space-y-1" style={{ color: "hsl(240 8% 60%)" }}>
+                    <li>• <strong>Enviar mensagens via n8n/cron/webhook?</strong> → Instance Token (ou Global Key)</li>
+                    <li>• <strong>UI com login de usuário?</strong> → JWT</li>
+                    <li>• <strong>Badge amarelo no endpoint?</strong> → Instance Token</li>
+                    <li>• <strong>Badge azul no endpoint?</strong> → JWT</li>
+                  </ul>
+                </div>
+              </div>
+            </>
+          ) : null}
         </main>
       </div>
     </div>
