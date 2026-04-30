@@ -417,7 +417,47 @@ func (h *InstanceHandler) Delete(c *fiber.Ctx) error {
 	// plain DELETE fails with FK violations in Postgres once any child
 	// row exists (messages, webhooks, campaigns, etc.).
 	instanceID := instance.ID
+
+	// Clean conversation children before deleting conversations themselves.
+	convSubquery := "SELECT id FROM conversations WHERE instance_id = ?"
+	for _, t := range []string{"conversation_events", "conversation_assignments", "conversation_notes", "conversation_agent_states"} {
+		if err := h.db.Exec("DELETE FROM "+t+" WHERE conversation_id IN ("+convSubquery+")", instanceID).Error; err != nil {
+			log.Warn().Err(err).Str("table", t).Str("instance", instanceID.String()).
+				Msg("failed to cleanup conversation child rows during instance delete (continuing)")
+		}
+	}
+	// conversation_participants has a composite PK, same pattern.
+	if err := h.db.Exec("DELETE FROM conversation_participants WHERE conversation_id IN ("+convSubquery+")", instanceID).Error; err != nil {
+		log.Warn().Err(err).Str("table", "conversation_participants").Str("instance", instanceID.String()).
+			Msg("failed to cleanup conversation_participants during instance delete (continuing)")
+	}
+
+	// Clean contact_group_memberships before contact_groups.
+	if err := h.db.Exec(`
+		DELETE FROM contact_group_memberships
+		WHERE contact_group_id IN (SELECT id FROM contact_groups WHERE instance_id = ?)
+	`, instanceID).Error; err != nil {
+		log.Warn().Err(err).Str("table", "contact_group_memberships").Str("instance", instanceID.String()).
+			Msg("failed to cleanup contact_group_memberships during instance delete (continuing)")
+	}
+
+	// Clean agent_assets before instance_agents.
+	if err := h.db.Exec(`
+		DELETE FROM agent_assets
+		WHERE instance_agent_id IN (
+			SELECT id FROM instance_agents WHERE instance_id = ?
+		)
+	`, instanceID).Error; err != nil {
+		log.Warn().Err(err).Str("table", "agent_assets").Str("instance", instanceID.String()).
+			Msg("failed to cleanup instance child rows")
+	}
+
 	childTables := []string{
+		"conversations",
+		"contact_groups",
+		"warmup_sessions",
+		"queue_channels",
+		"journey_executions",
 		"message_logs",
 		"webhooks",
 		"campaigns",
@@ -428,21 +468,14 @@ func (h *InstanceHandler) Delete(c *fiber.Ctx) error {
 		"waba_instances",
 		"proxy_pool_assignments",
 	}
-	if err := h.db.Exec(`
-		DELETE FROM agent_assets
-		WHERE instance_agent_id IN (
-			SELECT id FROM instance_agents WHERE instance_id = ?
-		)
-	`, instanceID).Error; err != nil {
-		log.Warn().Err(err).Str("table", "agent_assets").Str("instance", instanceID.String()).
-			Msg("failed to cleanup instance child rows")
-	}
 	for _, t := range childTables {
 		if err := h.db.Exec("DELETE FROM "+t+" WHERE instance_id = ?", instanceID).Error; err != nil {
 			log.Warn().Err(err).Str("table", t).Str("instance", instanceID.String()).
 				Msg("failed to clean child rows during instance delete (continuing)")
 		}
 	}
+	// media_files.instance_id is nullable — detach rather than delete.
+	_ = h.db.Exec("UPDATE media_files SET instance_id = NULL WHERE instance_id = ?", instanceID).Error
 	// contacts.instance_id is nullable — detach rather than delete so
 	// CRM history is preserved.
 	_ = h.db.Exec("UPDATE contacts SET instance_id = NULL WHERE instance_id = ?", instanceID).Error
@@ -839,7 +872,16 @@ func (h *InstanceHandler) InstagramLogin(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "username e password são obrigatórios"})
 	}
 
-	resp, err := h.instagram.Login(c.Context(), instance.ID.String(), req.Username, req.Password)
+	// Resolve proxy from the instance's server, if any.
+	proxyURL := ""
+	if instance.Server != nil && instance.Server.ProxyID != nil {
+		var proxy models.Proxy
+		if h.db.First(&proxy, "id = ?", *instance.Server.ProxyID).Error == nil && proxy.IsActive {
+			proxyURL = fmt.Sprintf("%s://%s:%s@%s:%d", proxy.ProxyType, proxy.Username, proxy.Password, proxy.Host, proxy.Port)
+		}
+	}
+
+	resp, err := h.instagram.Login(c.Context(), instance.ID.String(), req.Username, req.Password, proxyURL)
 	if err != nil {
 		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
 	}

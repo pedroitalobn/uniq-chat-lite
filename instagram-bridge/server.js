@@ -17,6 +17,20 @@ function sessionFile(instanceId) {
   return path.join(sessionsDir, `${instanceId}.json`);
 }
 
+function metaFile(instanceId) {
+  return path.join(sessionsDir, `${instanceId}.meta.json`);
+}
+
+function loadMeta(instanceId) {
+  const file = metaFile(instanceId);
+  if (!fs.existsSync(file)) return {};
+  try { return JSON.parse(fs.readFileSync(file, "utf-8")); } catch { return {}; }
+}
+
+function saveMeta(instanceId, data) {
+  fs.writeFileSync(metaFile(instanceId), JSON.stringify(data));
+}
+
 function ok(data) {
   return { success: true, data };
 }
@@ -35,6 +49,12 @@ async function buildClient(instanceId, username) {
     await ig.state.deserialize(state);
   }
 
+  // Apply proxy stored in meta (set during login from the server's proxy config)
+  const meta = loadMeta(instanceId);
+  if (meta.proxy) {
+    ig.state.proxyUrl = meta.proxy;
+  }
+
   return ig;
 }
 
@@ -50,13 +70,18 @@ app.get("/health", (_req, res) => {
 
 app.post("/instagram/login", async (req, res) => {
   try {
-    const { instance_id: instanceId, username, password } = req.body || {};
+    const { instance_id: instanceId, username, password, proxy } = req.body || {};
     if (!instanceId || !username || !password) {
       return fail(res, 400, "instance_id, username e password são obrigatórios");
     }
 
+    // Persist proxy config before building client so it's applied immediately
+    if (proxy) {
+      saveMeta(instanceId, { proxy });
+    }
+
     const ig = await buildClient(instanceId, username);
-    
+
     try {
       await ig.account.login(username, password);
     } catch (loginErr) {
@@ -179,6 +204,9 @@ app.post("/instagram/logout", async (req, res) => {
 
   const file = sessionFile(instanceId);
   if (fs.existsSync(file)) fs.unlinkSync(file);
+
+  const mf = metaFile(instanceId);
+  if (fs.existsSync(mf)) fs.unlinkSync(mf);
 
   return res.json(ok({ status: "disconnected" }));
 });

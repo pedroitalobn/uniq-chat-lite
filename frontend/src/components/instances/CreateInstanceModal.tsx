@@ -153,6 +153,10 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
       toast.error("Username e password são obrigatórios para este canal");
       return;
     }
+    if (selectedChannel === "instagram" && !serverId) {
+      toast.error("Selecione um server para a instância Instagram (necessário para proxy)");
+      return;
+    }
 
     setCreating(true);
     try {
@@ -457,14 +461,14 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
               </>
             )}
 
-            {/* Server — não aplicável para WABA (Cloud API da Meta) nem social */}
-            {!isSocial && !isWABA && (
+            {/* Server — não aplicável para WABA (Cloud API da Meta) nem TikTok */}
+            {selectedChannel !== "tiktok" && !isWABA && (
               <div>
                 <label className="text-xs font-medium flex items-center gap-1.5 mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
-                  <Server className="w-3 h-3" /> Server (opcional)
+                  <Server className="w-3 h-3" /> Server {isSocial ? <span className="text-red-400">*</span> : "(opcional)"}
                 </label>
                 <select value={serverId} onChange={(e) => setServerId(e.target.value)} className="input-field w-full">
-                  <option value="">— sem server —</option>
+                  <option value="">{isSocial ? "— selecione um server —" : "— sem server —"}</option>
                   {servers.map((s) => (
                     <option key={s.id} value={s.id}>{s.name} ({s.slug})</option>
                   ))}
@@ -504,7 +508,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
               {!challenge && (
                 <button
                   type="submit"
-                  disabled={!name.trim() || creating || (isSocial && (!igUsername.trim() || !igPassword.trim()))}
+                  disabled={!name.trim() || creating || (isSocial && (!igUsername.trim() || !igPassword.trim())) || (selectedChannel === "instagram" && !serverId)}
                   className="btn-primary flex-1 py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   style={{ background: ch.color, color: ch.id === "whatsapp" ? "#03170a" : "white" }}
                 >

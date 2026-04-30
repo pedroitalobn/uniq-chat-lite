@@ -154,7 +154,7 @@ func (s *InstagramService) doRequest(ctx context.Context, method, path string, p
 	return nil
 }
 
-func (s *InstagramService) Login(ctx context.Context, instanceID, username, password string) (*LoginResponse, error) {
+func (s *InstagramService) Login(ctx context.Context, instanceID, username, password, proxyURL string) (*LoginResponse, error) {
 	session := &InstagramSession{
 		InstanceID: instanceID,
 		Username:   username,
@@ -162,13 +162,18 @@ func (s *InstagramService) Login(ctx context.Context, instanceID, username, pass
 		DeviceID:   generateDeviceID(username),
 	}
 
-	var loginResp LoginResponse
-	err := s.doRequest(ctx, http.MethodPost, "/instagram/login", map[string]interface{}{
+	payload := map[string]interface{}{
 		"instance_id": instanceID,
 		"username":    username,
 		"password":    password,
 		"device":      session.DeviceID,
-	}, &loginResp)
+	}
+	if proxyURL != "" {
+		payload["proxy"] = proxyURL
+	}
+
+	var loginResp LoginResponse
+	err := s.doRequest(ctx, http.MethodPost, "/instagram/login", payload, &loginResp)
 	if err != nil {
 		return nil, err
 	}
