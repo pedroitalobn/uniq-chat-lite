@@ -1377,11 +1377,17 @@ func (h *MessageHandler) GetMessage(c *fiber.Ctx) error {
 	if err := q.Where("external_message_id = ?", msgID).First(&ml).Error; err == nil {
 		return c.JSON(decorateMessage(&ml))
 	}
-	// Fallback 2: meta_media_id — WABA media object ID (campo no content JSON).
-	// Necessário porque n8n/webhooks frequentemente recebem o media object ID
-	// (messages[0].image.id) em vez do wamid (messages[0].id).
+	// Fallback 2: meta_media_id — campo top-level (mensagens pós-fix).
 	if err := q.Where("content::jsonb->>'meta_media_id' = ?", msgID).First(&ml).Error; err == nil {
 		return c.JSON(decorateMessage(&ml))
+	}
+	// Fallback 3: media object ID aninhado no content legado —
+	// formato antigo: {"image":{"id":"AC75DB..."}} antes do campo meta_media_id.
+	// Busca por LIKE como último recurso (sem index, mas só para IDs de 32+ chars).
+	if len(msgID) >= 16 {
+		if err := q.Where("content LIKE ?", "%"+msgID+"%").First(&ml).Error; err == nil {
+			return c.JSON(decorateMessage(&ml))
+		}
 	}
 	return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 		"error":   "mensagem não encontrada",
