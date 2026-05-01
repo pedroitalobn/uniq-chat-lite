@@ -840,7 +840,11 @@ func (m *Manager) startReconnectionChecker() {
 
 	for range ticker.C {
 		var instances []models.Instance
-		m.db.Find(&instances, "status = ?", models.StatusConnected)
+		// Apenas canais gerenciados pelo whatsmeow (WhatsApp não-oficial).
+		// Instagram, TikTok e WABA têm seu próprio ciclo de vida e não
+		// possuem client em m.clients — incluí-los causaria reconnect loops.
+		m.db.Find(&instances, "status = ? AND channel IN ?", models.StatusConnected,
+			[]string{"whatsapp", "whatsapp_business"})
 
 		for _, inst := range instances {
 			m.mu.RLock()
