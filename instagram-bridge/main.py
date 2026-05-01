@@ -114,9 +114,9 @@ def map_error(err: Exception) -> tuple[int, str]:
     if ("invalid" in ml and "code" in ml) or "wrong code" in ml:
         return 422, "Código de verificação inválido. Verifique e tente novamente."
     if "eof" in ml or "eof when reading" in ml or "connection reset" in ml or "remotedisconnected" in ml:
-        return 422, "Instagram fechou a conexão inesperadamente. Isso ocorre quando o IP de origem não é residencial — configure um proxy residencial no servidor desta instância."
-    if "proxy" in ml or "proxyerror" in ml or "tunnel" in ml:
-        return 503, "Falha na conexão com o proxy. Verifique as configurações do servidor."
+        return 422, f"Instagram encerrou a conexão inesperadamente ({msg}). Possíveis causas: IP bloqueado pelo Instagram, proxy com credenciais inválidas ou proxy sem suporte a HTTPS — verifique o proxy do servidor."
+    if "proxy" in ml or "proxyerror" in ml or "tunnel" in ml or "407" in ml:
+        return 503, f"Falha na conexão com o proxy ({msg}). Verifique usuário/senha e se o proxy suporta HTTPS."
     if "timeout" in ml or "timed out" in ml or "read timeout" in ml:
         return 503, "Timeout ao conectar com o Instagram. Verifique a conexão do servidor/proxy."
     if "ssl" in ml or "certificate" in ml:
@@ -320,7 +320,7 @@ def instagram_login(req: LoginReq):
 
     except Exception as err:
         status, msg = map_error(err)
-        logger.error(f"Instagram login error [{req.username}]: {err}")
+        logger.error(f"Instagram login error [{req.username}] proxy={req.proxy!r}: {type(err).__name__}: {err}")
         return fail(status, msg)
 
 
