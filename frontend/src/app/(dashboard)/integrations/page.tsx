@@ -80,9 +80,9 @@ interface Integration {
   created_at: string;
 }
 
-type Section = "llm" | "agents" | "api" | "webhook" | "mcp" | "shop" | "voices" | "docs";
+type Section = "llm" | "agents" | "api" | "webhook" | "mcp" | "shop" | "voices" | "proxies" | "docs";
 
-const VALID_SECTIONS: Section[] = ["llm", "agents", "api", "webhook", "mcp", "voices", "docs"];
+const VALID_SECTIONS: Section[] = ["llm", "agents", "api", "webhook", "mcp", "voices", "proxies", "docs"];
 
 export default function IntegrationsPage() {
   const searchParams = useSearchParams();
@@ -114,6 +114,7 @@ export default function IntegrationsPage() {
     { id: "llm" as const, label: "LLMs", icon: Bot, color: "var(--green)" },
     { id: "agents" as const, label: "Agents", icon: Zap, color: "#8b5cf6" },
     { id: "voices" as const, label: "Vozes", icon: Mic, color: "#f5a623" },
+    { id: "proxies" as const, label: "Proxies", icon: Globe, color: "#60a5fa" },
     { id: "mcp" as const, label: "MCPs", icon: Link2, color: "#f59e0b" },
     { id: "webhook" as const, label: "Webhooks", icon: Webhook, color: "#10b981" },
     { id: "shop" as const, label: "Shop", icon: ShoppingBag, color: "#22c55e" },
@@ -201,6 +202,7 @@ export default function IntegrationsPage() {
           <div className="flex-1 min-w-0 w-full">
             {section === "llm" && <LLMSection onConnect={setConnecting} />}
             {section === "agents" && <AgentsSection />}
+            {section === "proxies" && <ProxiesSection />}
             {section === "mcp" && <MCPSection />}
             {section === "webhook" && <WebhooksPanel />}
             {section === "voices" && <VoicesSection />}
