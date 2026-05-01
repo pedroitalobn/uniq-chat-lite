@@ -39,6 +39,44 @@ function fail(res, status, error) {
   return res.status(status).json({ success: false, error });
 }
 
+function mapIgError(err) {
+  const raw = String(err?.message || err || "");
+
+  if (/incorrect.*password|password.*incorrect|wrong password/i.test(raw))
+    return "Senha incorreta. Verifique e tente novamente.";
+  if (/username.*doesn.*belong|no account found|user.*not found/i.test(raw))
+    return "Usuário não encontrado no Instagram.";
+  if (/account.*disabled|account.*suspended|account.*banned/i.test(raw))
+    return "Conta desativada ou banida pelo Instagram.";
+  if (/wait a few minutes|too many requests|rate.?limit|try again later/i.test(raw))
+    return "Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.";
+  if (/unusual.*login|suspicious|unusual.*attempt/i.test(raw))
+    return "Login bloqueado por atividade suspeita. Acesse o app do Instagram e aprove o login.";
+  if (/two.?factor|2fa|two.?step/i.test(raw))
+    return "Autenticação de dois fatores ativada. Use o código do app autenticador.";
+  if (/checkpoint|challenge/i.test(raw))
+    return "Instagram exigiu verificação de segurança. Verifique seu e-mail ou celular.";
+  if (/feedback_required/i.test(raw))
+    return "Instagram bloqueou esta ação temporariamente. Tente novamente mais tarde ou use um proxy.";
+  if (/consent_required/i.test(raw))
+    return "Instagram requer aceite de novos termos. Acesse o app e aceite os termos de uso.";
+  if (/Please wait/i.test(raw))
+    return "Instagram pediu para aguardar. Tente novamente em alguns minutos.";
+  if (/invalid.*code|code.*invalid|wrong.*code/i.test(raw))
+    return "Código de verificação inválido. Verifique e tente novamente.";
+  if (/code.*expired|expired.*code/i.test(raw))
+    return "Código de verificação expirado. Solicite um novo código.";
+  if (/proxy|ECONNREFUSED|ETIMEDOUT|ENOTFOUND/i.test(raw))
+    return "Falha na conexão com o proxy. Verifique as configurações do servidor.";
+
+  // Extract the human-readable part after the HTTP status line if present
+  // e.g. "POST /api/v1/... - 400 Bad Request; The password you entered..."
+  const afterSemicolon = raw.match(/;\s*(.+)$/);
+  if (afterSemicolon) return afterSemicolon[1].trim();
+
+  return raw || "Erro desconhecido ao conectar com o Instagram.";
+}
+
 async function buildClient(instanceId, username) {
   const ig = new IgApiClient();
   ig.state.generateDevice(username);
@@ -131,7 +169,7 @@ app.post("/instagram/login", async (req, res) => {
 
       throw loginErr;
     }
-    
+
     await persistState(ig, instanceId);
 
     const me = await ig.account.currentUser();
@@ -142,7 +180,7 @@ app.post("/instagram/login", async (req, res) => {
       status: "connected",
     }));
   } catch (err) {
-    return fail(res, 502, err?.message || "login failed");
+    return fail(res, 502, mapIgError(err));
   }
 });
 
@@ -170,7 +208,7 @@ app.post("/instagram/challenge", async (req, res) => {
       status: "connected",
     }));
   } catch (err) {
-    return fail(res, 502, err?.message || "challenge verification failed");
+    return fail(res, 502, mapIgError(err));
   }
 });
 
@@ -190,7 +228,7 @@ app.post("/instagram/challenge/resend", async (req, res) => {
 
     return res.json(ok({ message: "código reenviado" }));
   } catch (err) {
-    return fail(res, 502, err?.message || "resend failed");
+    return fail(res, 502, mapIgError(err));
   }
 });
 
