@@ -155,13 +155,13 @@ func (s *TicketingScheduler) runSLABreachDetection(ctx context.Context) {
 	s.db.WithContext(ctx).Raw(`
 		SELECT c.id::text AS id, c.workspace_id::text AS workspace_id,
 		       'first_response' AS sla_type,
-		       (c.created_at + make_interval(mins => q.first_response_sla_minutes)) AS due_at
+		       (c.created_at + (q.first_response_sla_minutes * interval '1 minute')) AS due_at
 		FROM conversations c
 		JOIN queues q ON q.id = c.queue_id
 		WHERE c.status IN ('open','pending')
 		  AND q.first_response_sla_minutes > 0
 		  AND c.first_response_at IS NULL
-		  AND (c.created_at + make_interval(mins => q.first_response_sla_minutes)) <= ?
+		  AND (c.created_at + (q.first_response_sla_minutes * interval '1 minute')) <= ?
 		  AND NOT EXISTS (
 		    SELECT 1 FROM conversation_events e
 		    WHERE e.conversation_id = c.id
@@ -171,12 +171,12 @@ func (s *TicketingScheduler) runSLABreachDetection(ctx context.Context) {
 		UNION ALL
 		SELECT c.id::text AS id, c.workspace_id::text AS workspace_id,
 		       'resolution' AS sla_type,
-		       (c.created_at + make_interval(mins => q.resolution_sla_minutes)) AS due_at
+		       (c.created_at + (q.resolution_sla_minutes * interval '1 minute')) AS due_at
 		FROM conversations c
 		JOIN queues q ON q.id = c.queue_id
 		WHERE c.status IN ('open','pending')
 		  AND q.resolution_sla_minutes > 0
-		  AND (c.created_at + make_interval(mins => q.resolution_sla_minutes)) <= ?
+		  AND (c.created_at + (q.resolution_sla_minutes * interval '1 minute')) <= ?
 		  AND NOT EXISTS (
 		    SELECT 1 FROM conversation_events e
 		    WHERE e.conversation_id = c.id
@@ -273,7 +273,7 @@ func (s *TicketingScheduler) runAutoCloseResolved(ctx context.Context) {
 		WHERE c.status = ?
 		  AND c.resolved_at IS NOT NULL
 		  AND COALESCE(q.auto_close_after_hours, 0) > 0
-		  AND c.resolved_at + make_interval(hours => q.auto_close_after_hours) <= ?
+		  AND c.resolved_at + (q.auto_close_after_hours * interval '1 hour') <= ?
 		LIMIT 500
 	`, models.ConversationStatusResolved, now).Scan(&rows)
 	if len(rows) == 0 {

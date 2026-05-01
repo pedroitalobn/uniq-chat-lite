@@ -18,7 +18,7 @@ import (
 type MessageReceipt struct {
 	ID            uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
 	MessageLogID  uuid.UUID `gorm:"type:uuid;not null;index:idx_msg_receipt_msg" json:"message_log_id"`
-	ParticipantJID string   `gorm:"type:varchar(120);not null;index:idx_msg_receipt_msg,priority:2" json:"participant_jid"`
+	ParticipantJID string   `gorm:"column:participant_j_id;type:varchar(120);not null;index:idx_msg_receipt_msg,priority:2" json:"participant_jid"`
 	Type          string    `gorm:"type:varchar(20);not null" json:"type"`
 	Timestamp     time.Time `json:"timestamp"`
 	CreatedAt     time.Time `json:"created_at"`

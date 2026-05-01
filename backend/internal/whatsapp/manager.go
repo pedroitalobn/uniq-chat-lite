@@ -627,7 +627,7 @@ func (m *Manager) ApplyReceipt(instanceID string, externalIDs []string, receiptT
 			// Idempotente — se já existe receipt do mesmo tipo do mesmo participante, skipa
 			var count int64
 			m.db.Model(&models.MessageReceipt{}).
-				Where("message_log_id = ? AND participant_jid = ? AND type = ?", msg.ID, participantJID, receiptKind).
+				Where("message_log_id = ? AND participant_j_id = ? AND type = ?", msg.ID, participantJID, receiptKind).
 				Count(&count)
 			if count == 0 {
 				_ = m.db.Create(&r).Error
