@@ -8,7 +8,6 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, GitMerge, AlertCircle, Users, Phone, Mail } from "lucide-react";
 import { toast } from "sonner";
-import { CRMTabs } from "@/components/crm/CRMTabs";
 import { contactsMergeApi } from "@/lib/api";
 
 interface DupGroup {

@@ -14,7 +14,6 @@ import { KanbanBoard, type KanbanStage, type KanbanStageStats } from "@/componen
 import type { DealCardData } from "@/components/crm/DealCard";
 import { formatCurrency, uniq, statusColor, statusLabel, relativeTime } from "@/components/crm/tokens";
 import { NewDealDialog } from "@/components/crm/NewDealDialog";
-import { CRMTabs } from "@/components/crm/CRMTabs";
 
 interface Funnel {
   id: string;
@@ -184,13 +183,6 @@ export default function DealsPage() {
   return (
     <div className="flex h-full flex-col uniq-page">
       <header className="border-b px-4 sm:px-6 py-3 sm:py-4 space-y-3" style={{ borderColor: uniq.borderSoft }}>
-        {/* Title row + tabs inline */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: uniq.textPrimary }}>
-            Deals
-          </h1>
-
-        </div>
         <div className="flex flex-wrap items-center gap-3">
           <FunnelSelector
             funnels={funnelsQ.data ?? []}

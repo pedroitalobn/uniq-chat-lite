@@ -22,7 +22,6 @@ import { showConfirm } from "@/lib/confirm";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useIsMobile } from "@/hooks/useMediaQuery";
-import { CRMTabs } from "@/components/crm/CRMTabs";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1410,7 +1409,7 @@ export default function CRMPage() {
       {/* Header — em mobile vira coluna; secondary actions colapsam num kebab */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
         <div className="min-w-0">
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight truncate" style={{ color: "hsl(240 15% 93%)" }}>CRM</h1>
+          <h2 className="text-sm font-medium" style={{ color: "hsl(240 8% 55%)" }}>Contatos</h2>
           <p className="text-xs sm:text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
             {contacts.length} contato{contacts.length !== 1 ? "s" : ""}
             {activeFilterCount > 0 && (

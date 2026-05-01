@@ -9,7 +9,6 @@ import { companiesApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { formatCurrency, uniq, cardStyle } from "@/components/crm/tokens";
-import { CRMTabs } from "@/components/crm/CRMTabs";
 
 interface Company {
   id: string;
@@ -60,9 +59,9 @@ export default function CompaniesPage() {
       <header className="flex flex-wrap items-center justify-between gap-3 border-b px-4 sm:px-6 py-3 sm:py-4" style={{ borderColor: uniq.borderSoft }}>
         <div className="flex items-center gap-4 flex-wrap">
           <div>
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: uniq.textStrong }}>
+            <h2 className="text-sm font-medium" style={{ color: "hsl(240 8% 55%)" }}>
               Empresas
-            </h1>
+            </h2>
             <p className="text-xs" style={{ color: uniq.textFaint }}>
               {listQ.data?.total ?? 0} empresas cadastradas
             </p>

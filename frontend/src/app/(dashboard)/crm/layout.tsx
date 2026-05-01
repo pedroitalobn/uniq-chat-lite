@@ -1,28 +1,45 @@
 "use client";
 
-import { CRMTabs } from "@/components/crm/CRMTabs";
+import { usePathname } from "next/navigation";
+import { CRMNav } from "@/components/crm/CRMNav";
 
-// Shared layout for /crm/* — renderiza CRMTabs UMA VEZ no topo, alinhada
-// à esquerda. Antes cada página renderizava o componente em posições
-// diferentes (ora à direita do título, ora dentro de um header de filtros)
-// — UX ficou inconsistente.
-// pt-10 sm:pt-12 dá folga vertical pra Dynamic Island fixa no topo
-// não sobrepor o título/pílulas.
+const PAGE_NAMES: Array<{ match: (p: string) => boolean; label: string }> = [
+  { match: (p) => p === "/crm" || p.startsWith("/crm/deals"),      label: "Deals" },
+  { match: (p) => p.startsWith("/crm/contacts"),                    label: "Contatos" },
+  { match: (p) => p.startsWith("/crm/companies"),                   label: "Empresas" },
+  { match: (p) => p.startsWith("/crm/segments"),                    label: "Segmentos" },
+  { match: (p) => p.startsWith("/crm/import"),                      label: "Importar" },
+  { match: (p) => p.startsWith("/crm/duplicates"),                  label: "Duplicatas" },
+];
+
 export default function CRMLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const pageLabel = PAGE_NAMES.find((n) => n.match(pathname))?.label ?? "";
+
   return (
     <div className="flex h-full flex-col pt-10 sm:pt-12">
-      <div className="mb-3">
-        <h1 className="text-xl font-medium" style={{ color: "var(--text-1)" }}>
+      {/* Header — CRM em destaque, subpágina como label menor */}
+      <div className="mb-5 flex items-baseline gap-3">
+        <h1 className="text-2xl font-bold tracking-tight" style={{ color: "hsl(240 15% 95%)" }}>
           CRM
         </h1>
-        <p className="text-xs" style={{ color: "var(--text-3)" }}>
-          Gerencie deals, contatos e empresas em um só lugar
-        </p>
+        {pageLabel && (
+          <>
+            <span style={{ color: "hsl(240 8% 30%)" }}>/</span>
+            <span className="text-sm font-medium" style={{ color: "hsl(240 8% 55%)" }}>
+              {pageLabel}
+            </span>
+          </>
+        )}
       </div>
-      <div className="mb-4 sm:mb-5">
-        <CRMTabs />
+
+      {/* Body — submenu vertical à esquerda + conteúdo à direita */}
+      <div className="flex flex-1 min-h-0 gap-0">
+        <CRMNav />
+        <div className="flex-1 min-w-0 pl-6 overflow-hidden">
+          {children}
+        </div>
       </div>
-      <div className="flex-1 min-h-0">{children}</div>
     </div>
   );
 }

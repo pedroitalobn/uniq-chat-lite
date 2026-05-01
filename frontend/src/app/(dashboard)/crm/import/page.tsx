@@ -7,7 +7,6 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Upload, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Briefcase, Contact as ContactIcon } from "lucide-react";
 import { toast } from "sonner";
-import { CRMTabs } from "@/components/crm/CRMTabs";
 import { crmImportApi } from "@/lib/api";
 
 type Stat = { created: number; updated: number; skipped: number; errors?: string[] };

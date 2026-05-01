@@ -12,7 +12,6 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Filter as FilterIcon, Save, Search, Layers, ChevronRight, Loader2, Users } from "lucide-react";
 import { toast } from "sonner";
-import { CRMTabs } from "@/components/crm/CRMTabs";
 import { segmentsApi } from "@/lib/api";
 
 type Op = "and" | "or";
