@@ -241,7 +241,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
         onClick={handleClose}
       />
       <div
-        className="relative w-full max-w-md rounded-2xl shadow-2xl animate-fade-in-up overflow-hidden"
+        className="relative w-full max-w-md rounded-2xl shadow-2xl animate-fade-in-up overflow-y-auto max-h-[90vh]"
         style={{
           background: "hsl(240 18% 6%)",
           border: "1px solid hsl(240 12% 14%)",
