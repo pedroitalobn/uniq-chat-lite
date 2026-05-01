@@ -628,25 +628,41 @@ const SECTIONS: Section[] = [
   },
   {
     id: "instagram",
-    title: "Instagram DMs",
+    title: "Instagram",
     icon: Globe,
-    description: "Instagram via conexão não-oficial — envio de DMs, follow/unfollow, upload de stories e posts. A instância deve ter channel=instagram e estar conectada com usuário/senha ou token Meta.",
-    badge: "Instagram (não-oficial)",
+    description: "Instagram via instagrapi — DMs, perfil, follow/unfollow, posts, stories, likes, comentários, busca e hashtags. Instância deve ter channel=instagram e estar conectada via login.",
+    badge: "instagrapi",
     endpoints: [
-      { method: "POST", path: "/v1/instances/{id}/instagram/login", description: "Conectar conta Instagram com usuário + senha (instagram-cli interno)", auth: "bearer", body: { username: "minha_conta", password: "••••••••" }, response: `{ "message": "login iniciado", "instance_id": "..." }` },
-      { method: "POST", path: "/v1/instances/{id}/instagram/logout", description: "Desconectar conta Instagram", auth: "bearer" },
-      { method: "POST", path: "/v1/instances/{id}/instagram/dm", description: "Enviar DM para um usuário pelo username ou user_id", auth: "bearer", body: { to: "user123", text: "Olá! Como posso ajudar?" }, response: `{ "status": "sent", "message_id": "..." }` },
-      { method: "GET",  path: "/v1/instances/{id}/instagram/dm", description: "Listar DMs recebidas (inbox)", auth: "bearer", response: `{ "dms": [{ "from": "user123", "text": "Olá!", "timestamp": "..." }] }` },
-      { method: "POST", path: "/v1/instances/{id}/instagram/follow", description: "Seguir usuário pelo username", auth: "bearer", body: { username: "user123" } },
-      { method: "POST", path: "/v1/instances/{id}/instagram/unfollow", description: "Deixar de seguir usuário", auth: "bearer", body: { username: "user123" } },
-      { method: "POST", path: "/v1/instances/{id}/instagram/post", description: "Publicar post (foto/vídeo)", auth: "bearer", body: { media_url: "https://...", caption: "Legenda do post" } },
-      { method: "POST", path: "/v1/instances/{id}/instagram/story", description: "Publicar story (imagem ou vídeo)", auth: "bearer", body: { media_url: "https://..." } },
-      { method: "GET",  path: "/v1/instances/{id}/instagram/media", description: "Listar posts/mídias do usuário conectado", auth: "bearer" },
-      { method: "POST", path: "/v1/instances/{id}/instagram/like", description: "Curtir uma mídia pelo media_id", auth: "bearer", body: { media_id: "1234567890" } },
-      { method: "POST", path: "/v1/instances/{id}/instagram/pause", description: "Pausar automação Instagram (para o bot sem desconectar)", auth: "bearer" },
-      { method: "POST", path: "/v1/instances/{id}/instagram/resume", description: "Retomar automação Instagram", auth: "bearer" },
-      { method: "POST", path: "/v1/instances/{id}/instagram/challenge", description: "Responder challenge de verificação de identidade Instagram", auth: "bearer", body: { code: "123456" } },
-      { method: "POST", path: "/v1/instances/{id}/instagram/challenge/resend", description: "Solicitar reenvio do código de challenge", auth: "bearer" },
+      // ── Sessão ──────────────────────────────────────────────────────────────
+      { method: "POST", path: "/v1/instances/{id}/instagram/login", description: "Conectar conta Instagram com usuário + senha. Retorna status=ok, challenge (se 2FA/email) ou two_factor.", auth: "bearer", body: { username: "minha_conta", password: "senha123" }, response: `{ "status": "ok", "username": "minha_conta", "pk": "4456188..." }` },
+      { method: "POST", path: "/v1/instances/{id}/instagram/logout", description: "Desconectar conta Instagram e apagar sessão local.", auth: "bearer" },
+      { method: "POST", path: "/v1/instances/{id}/instagram/challenge", description: "Responder challenge de verificação de identidade (código SMS/email recebido).", auth: "bearer", body: { code: "123456" } },
+      { method: "POST", path: "/v1/instances/{id}/instagram/challenge/resend", description: "Solicitar reenvio do código de challenge.", auth: "bearer" },
+      { method: "POST", path: "/v1/instances/{id}/instagram/pause", description: "Pausar automação Instagram (bot para sem desconectar a conta).", auth: "bearer" },
+      { method: "POST", path: "/v1/instances/{id}/instagram/resume", description: "Retomar automação Instagram após pausa.", auth: "bearer" },
+      // ── Perfil ──────────────────────────────────────────────────────────────
+      { method: "GET",  path: "/v1/instances/{id}/instagram/profile", description: "Buscar perfil completo de qualquer usuário pelo username — pk, bio, seguidores, seguindo, nº de posts, url externa.", auth: "bearer", params: { username: "farm.round" }, response: `{ "pk": "44561886643", "username": "farm.round", "full_name": "Farm", "biography": "...", "follower_count": 12000, "following_count": 500, "media_count": 320, "is_private": false, "is_verified": true, "profile_pic_url": "https://..." }` },
+      // ── DMs ─────────────────────────────────────────────────────────────────
+      { method: "POST", path: "/v1/instances/{id}/instagram/dm", description: "Enviar DM para um usuário pelo username. Cria thread nova ou reutiliza existente.", auth: "bearer", body: { recipient: "user123", message: "Olá! Como posso ajudar?" }, response: `{ "thread_id": "340282366841710...", "status": "sent" }` },
+      { method: "GET",  path: "/v1/instances/{id}/instagram/dm", description: "Listar threads de DM da inbox (últimas 20). Inclui usuários, mensagens e unread_count.", auth: "bearer", response: `{ "threads": [{ "thread_id": "...", "users": [{ "pk": "...", "username": "..." }], "messages": [...], "unread_count": 2 }] }` },
+      { method: "POST", path: "/v1/instances/{id}/instagram/dm/reply", description: "Responder em uma thread existente pelo thread_id.", auth: "bearer", body: { thread_id: "340282366841710...", text: "Claro, pode falar!" }, response: `{ "status": "sent", "thread_id": "..." }` },
+      { method: "GET",  path: "/v1/instances/{id}/instagram/dm/thread", description: "Buscar mensagens de uma thread específica (últimas 50).", auth: "bearer", params: { thread_id: "340282366841710..." }, response: `{ "thread_id": "...", "messages": [{ "item_id": "...", "user_id": "...", "text": "...", "timestamp": "2026-04-30T02:30:00Z", "item_type": "text" }] }` },
+      // ── Follow / Unfollow ───────────────────────────────────────────────────
+      { method: "POST", path: "/v1/instances/{id}/instagram/follow", description: "Seguir usuário pelo username.", auth: "bearer", body: { target: "user123" }, response: `{ "status": "ok", "target": "user123" }` },
+      { method: "POST", path: "/v1/instances/{id}/instagram/unfollow", description: "Deixar de seguir usuário.", auth: "bearer", body: { target: "user123" }, response: `{ "status": "ok", "target": "user123" }` },
+      // ── Mídia (posts) ───────────────────────────────────────────────────────
+      { method: "POST", path: "/v1/instances/{id}/instagram/post", description: "Publicar post no feed — foto ou vídeo. Passe image_url OU video_url.", auth: "bearer", body: { image_url: "https://exemplo.com/foto.jpg", caption: "Legenda do post #hashtag" }, response: `{ "media_id": "3380...", "media_pk": "3380...", "code": "ABC123", "url": "https://instagram.com/p/ABC123", "status": "posted" }` },
+      { method: "POST", path: "/v1/instances/{id}/instagram/story", description: "Publicar story — foto ou vídeo. Passe image_url OU video_url.", auth: "bearer", body: { image_url: "https://exemplo.com/story.jpg", caption: "" }, response: `{ "media_id": "3380...", "status": "story_posted" }` },
+      { method: "GET",  path: "/v1/instances/{id}/instagram/media", description: "Listar posts do próprio perfil conectado (ou de outro usuário via ?target=username).", auth: "bearer", params: { amount: "12" }, response: `{ "medias": [{ "pk": "...", "code": "ABC", "media_type": 1, "thumbnail_url": "...", "like_count": 42, "comment_count": 5, "caption": "...", "taken_at": "2026-04-29T..." }] }` },
+      // ── Like / Unlike ───────────────────────────────────────────────────────
+      { method: "POST", path: "/v1/instances/{id}/instagram/like", description: "Curtir mídia pelo media_id (pk numérico do post).", auth: "bearer", body: { media_id: "3380945671234567890" }, response: `{ "status": "ok" }` },
+      { method: "POST", path: "/v1/instances/{id}/instagram/unlike", description: "Descurtir mídia.", auth: "bearer", body: { media_id: "3380945671234567890" }, response: `{ "status": "ok" }` },
+      // ── Comentários ─────────────────────────────────────────────────────────
+      { method: "POST", path: "/v1/instances/{id}/instagram/comment", description: "Comentar em uma mídia.", auth: "bearer", body: { media_id: "3380945671234567890", text: "Que incrível! 🔥" }, response: `{ "comment_id": "17858...", "text": "Que incrível! 🔥", "status": "ok" }` },
+      { method: "GET",  path: "/v1/instances/{id}/instagram/comments", description: "Listar comentários de uma mídia.", auth: "bearer", params: { media_id: "3380945671234567890", amount: "20" }, response: `{ "comments": [{ "pk": "...", "user": { "pk": "...", "username": "..." }, "text": "...", "created_at": "...", "like_count": 3 }] }` },
+      // ── Busca ────────────────────────────────────────────────────────────────
+      { method: "GET",  path: "/v1/instances/{id}/instagram/search/users", description: "Buscar usuários por nome ou username. Retorna até 20 resultados.", auth: "bearer", params: { query: "farm" }, response: `{ "users": [{ "pk": "...", "username": "farm.round", "full_name": "Farm", "profile_pic_url": "...", "is_private": false, "is_verified": true }] }` },
+      { method: "GET",  path: "/v1/instances/{id}/instagram/hashtag", description: "Explorar posts de uma hashtag. tab: top (padrão) | recent.", auth: "bearer", params: { hashtag: "moda", tab: "top", amount: "9" }, response: `{ "hashtag": "moda", "medias": [{ "pk": "...", "code": "...", "media_type": 1, "thumbnail_url": "...", "like_count": 1200, "caption": "..." }] }` },
     ],
   },
   {
