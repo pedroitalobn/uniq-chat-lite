@@ -48,8 +48,8 @@ export default function WorkspacePage() {
   });
 
   const cardStyle = {
-    background: "hsl(240 18% 6%)",
-    border: "1px solid hsl(240 12% 13%)",
+    background: "var(--surface-1)",
+    border: "1px solid var(--surface-border)",
   };
 
   return (
@@ -57,10 +57,10 @@ export default function WorkspacePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
+          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "var(--text-1)" }}>
             Workspaces
           </h1>
-          <p className="text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
+          <p className="text-sm mt-1" style={{ color: "var(--text-3)" }}>
             Gerencie seus workspaces e times.
           </p>
         </div>
@@ -83,7 +83,7 @@ export default function WorkspacePage() {
             >
               <Building2 className="w-3.5 h-3.5" style={{ color: "#a78bfa" }} />
             </div>
-            <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>Criar novo workspace</h2>
+            <h2 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Criar novo workspace</h2>
           </div>
 
           <div className="flex gap-3">
@@ -118,8 +118,8 @@ export default function WorkspacePage() {
 
       {/* Workspaces list */}
       <div className="rounded-2xl overflow-hidden animate-fade-in-up" style={cardStyle}>
-        <div className="px-5 py-4" style={{ borderBottom: "1px solid hsl(240 12% 11%)" }}>
-          <h2 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--surface-3)" }}>
+          <h2 className="text-xs font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
             {workspaces.length} workspace{workspaces.length !== 1 ? "s" : ""}
           </h2>
         </div>
@@ -149,10 +149,10 @@ export default function WorkspacePage() {
               className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-3"
               style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}
             >
-              <Building2 className="w-5 h-5" style={{ color: "hsl(240 8% 28%)" }} />
+              <Building2 className="w-5 h-5" style={{ color: "var(--text-4)" }} />
             </div>
-            <p className="text-sm" style={{ color: "hsl(240 8% 42%)" }}>Nenhum workspace criado</p>
-            <p className="text-xs mt-1" style={{ color: "hsl(240 8% 32%)" }}>
+            <p className="text-sm" style={{ color: "var(--text-3)" }}>Nenhum workspace criado</p>
+            <p className="text-xs mt-1" style={{ color: "var(--text-4)" }}>
               Clique em "Novo Workspace" para começar
             </p>
           </div>
@@ -190,16 +190,16 @@ export default function WorkspacePage() {
                   </div>
                   <div className="flex items-center gap-3 mt-1">
                     {ws.role && (
-                      <span className="text-xs" style={{ color: "hsl(240 8% 38%)" }}>
+                      <span className="text-xs" style={{ color: "var(--text-4)" }}>
                         {ws.role.name}
                       </span>
                     )}
-                    <span className="text-xs" style={{ color: "hsl(240 8% 28%" }}>
+                    <span className="text-xs" style={{ color: "var(--text-4)" }}>
                       Criado {new Date(ws.created_at).toLocaleDateString("pt-BR")}
                     </span>
                   </div>
                 </div>
-                <ChevronRight className="w-5 h-5 flex-shrink-0" style={{ color: "hsl(240 8% 28%)" }} />
+                <ChevronRight className="w-5 h-5 flex-shrink-0" style={{ color: "var(--text-4)" }} />
               </div>
             ))}
           </div>
@@ -214,20 +214,20 @@ export default function WorkspacePage() {
         <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 85%)" }}>
           O que é um Workspace?
         </h3>
-        <p className="text-sm" style={{ color: "hsl(240 8% 50%)" }}>
-          Workspaces permitem organizar seus projetos e times. Cada workspace tem suas próprias instâncias, 
+        <p className="text-sm" style={{ color: "var(--text-3)" }}>
+          Workspaces permitem organizar seus projetos e times. Cada workspace tem suas próprias instâncias,
           contatos e configurações. Você pode convidar membros e definir permissões personalizadas para cada time.
         </p>
         <div className="flex items-center gap-4 pt-2">
-          <div className="flex items-center gap-2 text-xs" style={{ color: "hsl(240 8% 42%)" }}>
+          <div className="flex items-center gap-2 text-xs" style={{ color: "var(--text-3)" }}>
             <Building2 className="w-4 h-4" />
             <span>Múltiplos projetos</span>
           </div>
-          <div className="flex items-center gap-2 text-xs" style={{ color: "hsl(240 8% 42%)" }}>
+          <div className="flex items-center gap-2 text-xs" style={{ color: "var(--text-3)" }}>
             <Users className="w-4 h-4" />
             <span>Times colaborativos</span>
           </div>
-          <div className="flex items-center gap-2 text-xs" style={{ color: "hsl(240 8% 42%)" }}>
+          <div className="flex items-center gap-2 text-xs" style={{ color: "var(--text-3)" }}>
             <Crown className="w-4 h-4" />
             <span>Permissões customizadas</span>
           </div>

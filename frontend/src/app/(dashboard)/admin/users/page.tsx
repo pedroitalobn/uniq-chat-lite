@@ -62,18 +62,18 @@ function CreateUserModal({ plans, onClose, onCreated }: {
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-md rounded-2xl p-6 animate-fade-in-up"
-        style={{ background: "hsl(240 18% 6%)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 32px 80px rgba(0,0,0,0.6)" }}>
+        style={{ background: "var(--surface-1)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 32px 80px rgba(0,0,0,0.6)" }}>
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center"
               style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)" }}>
               <Plus className="w-4 h-4" style={{ color: "var(--green)" }} />
             </div>
-            <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>Novo usuário</h2>
+            <h2 className="text-base font-medium" style={{ color: "var(--text-1)" }}>Novo usuário</h2>
           </div>
-          <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }}
+          <button onClick={onClose} style={{ color: "var(--text-4)" }}
             onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
-            onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}>
+            onMouseLeave={e => (e.currentTarget.style.color = "var(--text-4)")}>
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -98,7 +98,7 @@ function CreateUserModal({ plans, onClose, onCreated }: {
                 type={showPass ? "text" : "password"} placeholder="Mínimo 8 caracteres"
                 className="input-field w-full pr-10" />
               <button type="button" onClick={() => setShowPass(!showPass)}
-                className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "hsl(240 8% 38%)" }}>
+                className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-4)" }}>
                 {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
@@ -154,15 +154,15 @@ function ResetPasswordModal({ user, onClose }: { user: User; onClose: () => void
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl p-6 animate-fade-in-up"
-        style={{ background: "hsl(240 18% 6%)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 24px 64px rgba(0,0,0,0.5)" }}>
+        style={{ background: "var(--surface-1)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 24px 64px rgba(0,0,0,0.5)" }}>
         <div className="flex items-center gap-3 mb-5">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center"
             style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.18)" }}>
             <Lock className="w-4 h-4" style={{ color: "#fbbf24" }} />
           </div>
           <div>
-            <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>Redefinir senha</h2>
-            <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>{user.email}</p>
+            <h2 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Redefinir senha</h2>
+            <p className="text-xs" style={{ color: "var(--text-3)" }}>{user.email}</p>
           </div>
         </div>
         <form onSubmit={submit} className="space-y-4">
@@ -171,7 +171,7 @@ function ResetPasswordModal({ user, onClose }: { user: User; onClose: () => void
               type={show ? "text" : "password"} placeholder="Nova senha (mín. 8 chars)"
               className="input-field w-full pr-10" autoFocus />
             <button type="button" onClick={() => setShow(!show)}
-              className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "hsl(240 8% 38%)" }}>
+              className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-4)" }}>
               {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
@@ -210,15 +210,15 @@ function BlockModal({ user, onClose, onConfirm }: {
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl p-6 animate-fade-in-up"
-        style={{ background: "hsl(240 18% 6%)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 24px 64px rgba(0,0,0,0.5)" }}>
+        style={{ background: "var(--surface-1)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 24px 64px rgba(0,0,0,0.5)" }}>
         <div className="flex items-center gap-3 mb-5">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center"
             style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)" }}>
             <Ban className="w-4 h-4 text-red-400" />
           </div>
           <div>
-            <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>Bloquear usuário</h2>
-            <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>{user.email}</p>
+            <h2 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Bloquear usuário</h2>
+            <p className="text-xs" style={{ color: "var(--text-3)" }}>{user.email}</p>
           </div>
         </div>
 
@@ -285,10 +285,10 @@ function LabelInput({ label, value, onChange, placeholder, type = "text" }: {
 }
 
 function planBadge(plan?: Plan) {
-  if (!plan) return { bg: "var(--surface-2)", color: "hsl(240 8% 46%)" };
+  if (!plan) return { bg: "var(--surface-2)", color: "var(--text-3)" };
   if (plan.name === "Enterprise") return { bg: "rgba(167,139,250,0.08)", color: "#a78bfa" };
   if (plan.name === "Pro") return { bg: "rgba(96,165,250,0.08)", color: "#60a5fa" };
-  return { bg: "var(--surface-2)", color: "hsl(240 8% 46%)" };
+  return { bg: "var(--surface-2)", color: "var(--text-3)" };
 }
 
 // ─── Invite System Toggle ─────────────────────────────────────────────────────
@@ -329,17 +329,17 @@ function InviteSystemToggle() {
 
   return (
     <div className="flex items-center justify-between px-5 py-4 rounded-2xl"
-      style={{ background: "hsl(240 18% 6%)", border: `1px solid ${enabled ? "rgba(0,212,106,0.3)" : "hsl(240 12% 13%)"}` }}>
+      style={{ background: "var(--surface-1)", border: `1px solid ${enabled ? "rgba(0,212,106,0.3)" : "var(--surface-border)"}` }}>
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center"
           style={{ background: enabled ? "rgba(0,212,106,0.1)" : "var(--surface-3)" }}>
-          <Ticket className="w-5 h-5" style={{ color: enabled ? "var(--green)" : "hsl(240 8% 40%)" }} />
+          <Ticket className="w-5 h-5" style={{ color: enabled ? "var(--green)" : "var(--text-4)" }} />
         </div>
         <div>
-          <p className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+          <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
             Sistema de Convites
           </p>
-          <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 46%)" }}>
+          <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
             {enabled
               ? "Cadastro apenas via código de convite"
               : "Cadastro liberado para todos"}
@@ -454,8 +454,8 @@ export default function AdminUsersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Customers</h1>
-          <p className="text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "var(--text-1)" }}>Customers</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--text-3)" }}>
             {users.length} usuário{users.length !== 1 ? "s" : ""} cadastrado{users.length !== 1 ? "s" : ""}
           </p>
         </div>
@@ -480,7 +480,7 @@ export default function AdminUsersPage() {
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "hsl(240 8% 36%)" }} />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-4)" }} />
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Buscar por nome ou email..."
           className="input-field w-full pl-9" />
@@ -491,9 +491,9 @@ export default function AdminUsersPage() {
 
       {/* Table */}
       <div className="rounded-2xl overflow-hidden animate-fade-in-up"
-        style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+        style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>
         <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-4 px-5 py-3 text-[10px] font-medium uppercase tracking-widest"
-          style={{ color: "hsl(240 8% 36%)", borderBottom: "1px solid hsl(240 12% 10%)" }}>
+          style={{ color: "var(--text-4)", borderBottom: "1px solid var(--surface-3)" }}>
           <span>Customer</span>
           <span className="text-center">Plano</span>
           <span className="text-center">Status</span>
@@ -510,9 +510,9 @@ export default function AdminUsersPage() {
           <div className="p-12 text-center">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-3"
               style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
-              <Users className="w-5 h-5" style={{ color: "hsl(240 8% 28%)" }} />
+              <Users className="w-5 h-5" style={{ color: "var(--text-4)" }} />
             </div>
-            <p className="text-sm" style={{ color: "hsl(240 8% 42%)" }}>
+            <p className="text-sm" style={{ color: "var(--text-3)" }}>
               {search ? "Nenhum usuário encontrado" : "Nenhum usuário cadastrado"}
             </p>
           </div>
@@ -541,7 +541,7 @@ export default function AdminUsersPage() {
                         } : { background: "var(--surface-2)", borderColor: "var(--border-default)" }}>
                         {user.role === "super_admin"
                           ? <Shield className="w-3.5 h-3.5" style={{ color: "#fbbf24" }} />
-                          : <UserIcon className="w-3.5 h-3.5" style={{ color: "hsl(240 8% 42%)" }} />}
+                          : <UserIcon className="w-3.5 h-3.5" style={{ color: "var(--text-3)" }} />}
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 80%)" }}>
@@ -561,7 +561,7 @@ export default function AdminUsersPage() {
                             </button>
                           )}
                         </p>
-                        <p className="text-xs mt-0.5 truncate" style={{ color: "hsl(240 8% 40%)" }}>
+                        <p className="text-xs mt-0.5 truncate" style={{ color: "var(--text-4)" }}>
                           {user.email}
                           {user.blocked_until && new Date(user.blocked_until) > new Date() && (
                             <span className="ml-2 text-amber-500/70">
@@ -594,14 +594,14 @@ export default function AdminUsersPage() {
                       <span className="text-xs font-medium px-2.5 py-1 rounded-lg"
                         style={user.role === "super_admin"
                           ? { background: "rgba(251,191,36,0.08)", color: "#fbbf24" }
-                          : { background: "var(--surface-2)", color: "hsl(240 8% 50%)" }}>
+                          : { background: "var(--surface-2)", color: "var(--text-3)" }}>
                         {user.role}
                       </span>
                     </div>
 
                     {/* Last Login */}
                     <div className="text-center">
-                      <span className="text-xs" style={{ color: "hsl(240 8% 50%)" }}>
+                      <span className="text-xs" style={{ color: "var(--text-3)" }}>
                         {user.last_login_at 
                           ? (() => {
                               const date = new Date(user.last_login_at);
@@ -621,9 +621,9 @@ export default function AdminUsersPage() {
                     {/* Expand indicator */}
                     <div className="flex items-center justify-end">
                       {isPending
-                        ? <Loader2 className="w-4 h-4 animate-spin" style={{ color: "hsl(240 8% 40%)" }} />
+                        ? <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--text-4)" }} />
                         : <ChevronDown className={cn("w-4 h-4 transition-transform", isExpanded && "rotate-180")}
-                            style={{ color: "hsl(240 8% 32%)" }} />
+                            style={{ color: "var(--text-4)" }} />
                       }
                     </div>
                   </div>
