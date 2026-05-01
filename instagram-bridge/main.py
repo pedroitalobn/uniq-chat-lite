@@ -12,7 +12,7 @@ from instagrapi.exceptions import (
     PleaseWaitFewMinutes, UserNotFound, LoginRequired,
     ClientLoginRequired, MediaNotFound, ReloginAttemptExceeded,
     SelectContactPointRecoveryForm, RecaptchaChallengeForm,
-    TwoFactorRequired,
+    TwoFactorRequired, UnknownError,
 )
 
 app = FastAPI(title="Instagram Bridge", version="2.0.0")
@@ -105,6 +105,9 @@ def map_error(err: Exception) -> tuple[int, str]:
         return 422, "Mídia não encontrada."
     if isinstance(err, ReloginAttemptExceeded):
         return 422, "Limite de tentativas de login excedido. Tente novamente em alguns minutos."
+    if isinstance(err, UnknownError):
+        # UnknownError carrega mensagens legíveis do Instagram (conta não encontrada, etc.)
+        return 422, str(err)
     msg = str(err)
     ml = msg.lower()
     if "disabled" in ml or "banned" in ml or "suspended" in ml:
