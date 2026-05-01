@@ -91,6 +91,9 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
 
   const isSocial = selectedChannel === "instagram" || selectedChannel === "tiktok";
   const isWABA = selectedChannel === "waba";
+  // Canais baseados em API oficial da Meta não precisam de server/proxy.
+  // Todos os outros canais (WhatsApp não-oficial, Instagram, TikTok, etc.) precisam.
+  const requiresServer = !isWABA && selectedChannel !== "instagram_api";
 
   const { data: session } = useSession();
   const isSuperAdmin = session?.user?.role === "super_admin";
@@ -153,8 +156,8 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
       toast.error("Username e password são obrigatórios para este canal");
       return;
     }
-    if (selectedChannel === "instagram" && !serverId) {
-      toast.error("Selecione um server para a instância Instagram (necessário para proxy)");
+    if (requiresServer && !serverId) {
+      toast.error("Selecione um server para esta instância (necessário para aplicar o proxy)");
       return;
     }
 
@@ -465,23 +468,23 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
               </>
             )}
 
-            {/* Server — não aplicável para WABA (Cloud API da Meta) nem TikTok */}
-            {selectedChannel !== "tiktok" && !isWABA && (
+            {/* Server — obrigatório para todos exceto WABA/instagram_api (APIs oficiais Meta) */}
+            {requiresServer && (
               <div>
                 <label className="text-xs font-medium flex items-center gap-1.5 mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
-                  <Server className="w-3 h-3" /> Server {isSocial ? <span className="text-red-400">*</span> : "(opcional)"}
+                  <Server className="w-3 h-3" /> Server <span className="text-red-400">*</span>
                 </label>
-                {servers.length === 0 && isSocial ? (
+                {servers.length === 0 ? (
                   <div className="rounded-xl p-3 text-xs" style={{ background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)", color: "hsl(240 8% 60%)" }}>
                     Nenhum server disponível neste workspace.{" "}
                     <a href="/servers" target="_blank" rel="noopener" className="underline" style={{ color: "#f87171" }}>
                       Crie um server
                     </a>{" "}
-                    antes de criar uma instância Instagram — o server define o proxy utilizado.
+                    com proxy configurado antes de criar esta instância.
                   </div>
                 ) : (
                   <select value={serverId} onChange={(e) => setServerId(e.target.value)} className="input-field w-full">
-                    <option value="">{isSocial ? "— selecione um server —" : "— sem server —"}</option>
+                    <option value="">— selecione um server —</option>
                     {servers.map((s) => (
                       <option key={s.id} value={s.id}>{s.name} ({s.slug})</option>
                     ))}
@@ -522,7 +525,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
               {!challenge && (
                 <button
                   type="submit"
-                  disabled={!name.trim() || creating || (isSocial && (!igUsername.trim() || !igPassword.trim())) || (selectedChannel === "instagram" && !serverId)}
+                  disabled={!name.trim() || creating || (isSocial && (!igUsername.trim() || !igPassword.trim())) || (requiresServer && !serverId)}
                   className="btn-primary flex-1 py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   style={{ background: ch.color, color: ch.id === "whatsapp" ? "#03170a" : "white" }}
                 >

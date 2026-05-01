@@ -30,7 +30,7 @@ func OwnsInstance(db *gorm.DB) fiber.Handler {
 		}
 
 		var instance models.Instance
-		if err := db.Preload("Server").First(&instance, "id = ?", instanceID).Error; err != nil {
+		if err := db.Preload("Server").Preload("Server.Proxy").First(&instance, "id = ?", instanceID).Error; err != nil {
 			// Distingue "não existe" de outros erros pra ajudar a debugar
 			// quando o usuário vê a instância na lista mas o GET 404a.
 			if err == gorm.ErrRecordNotFound {

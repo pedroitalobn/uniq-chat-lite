@@ -876,19 +876,29 @@ func (h *InstanceHandler) InstagramLogin(c *fiber.Ctx) error {
 	// Resolve proxy from the instance's server using the shared resolver so that
 	// UseEnv proxies (BrightData env vars) and encrypted passwords are handled correctly.
 	proxyURL := ""
-	if instance.Server != nil && instance.Server.ProxyID != nil {
+	if instance.Server == nil {
+		log.Warn().Str("instance", instance.ID.String()).Msg("instagram login: instância sem servidor — sem proxy")
+	} else if instance.Server.ProxyID == nil {
+		log.Warn().Str("instance", instance.ID.String()).
+			Str("server", instance.Server.ID.String()).
+			Msg("instagram login: servidor sem proxy configurado — login direto pode ser bloqueado pelo Instagram")
+	} else {
 		var proxy models.Proxy
-		if h.db.First(&proxy, "id = ?", *instance.Server.ProxyID).Error == nil && proxy.IsActive {
-			if cfg, _, ok := whatsapp.BuildProxyConfigExported(&proxy); ok {
-				proxyURL = whatsapp.FormatProxyURL(cfg, false)
-				log.Debug().Str("instance", instance.ID.String()).
-					Str("proxy", whatsapp.FormatProxyURL(cfg, true)).
-					Msg("instagram login: proxy resolved")
-			}
+		if err := h.db.First(&proxy, "id = ?", *instance.Server.ProxyID).Error; err != nil {
+			log.Error().Err(err).Str("proxy_id", instance.Server.ProxyID.String()).Msg("instagram login: falha ao carregar proxy")
+		} else if !proxy.IsActive {
+			log.Warn().Str("proxy_id", proxy.ID.String()).Msg("instagram login: proxy inativo — login sem proxy")
+		} else if cfg, _, ok := whatsapp.BuildProxyConfigExported(&proxy); ok {
+			proxyURL = whatsapp.FormatProxyURL(cfg, false)
+			log.Info().Str("instance", instance.ID.String()).
+				Str("proxy", whatsapp.FormatProxyURL(cfg, true)).
+				Msg("instagram login: proxy aplicado")
+		} else {
+			log.Error().Str("proxy_id", proxy.ID.String()).Msg("instagram login: falha ao construir URL do proxy")
 		}
 	}
 	if proxyURL == "" {
-		log.Debug().Str("instance", instance.ID.String()).Msg("instagram login: no proxy")
+		log.Warn().Str("instance", instance.ID.String()).Msg("instagram login: sem proxy — Instagram pode bloquear login de IP de datacenter")
 	}
 
 	resp, err := h.instagram.Login(c.Context(), instance.ID.String(), req.Username, req.Password, proxyURL)
