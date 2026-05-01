@@ -371,11 +371,17 @@ const PROXY_PROVIDERS = [
   { id: "manual", name: "Proxy Personalizado", description: "Conectar com URL ou credenciais", color: "#64748b" },
 ];
 
+type PlatformProxy = { id: string; name: string; country: string; provider: string };
+
 function ProxiesSection() {
   const queryClient = useQueryClient();
   const { data: proxies = [], isLoading } = useQuery<Proxy[]>({
     queryKey: ["my-proxies"],
     queryFn: () => proxiesApi.listMine().then(r => r.data),
+  });
+  const { data: platformProxies = [], isLoading: loadingPlatform } = useQuery<PlatformProxy[]>({
+    queryKey: ["platform-proxies"],
+    queryFn: () => proxiesApi.listPlatform().then(r => r.data),
   });
   const del = useMutation({
     mutationFn: (id: string) => proxiesApi.remove(id),
@@ -450,68 +456,119 @@ function ProxiesSection() {
   const COUNTRY_FLAGS: Record<string, string> = { br: "🇧🇷", us: "🇺🇸", gb: "🇬🇧", ar: "🇦🇷" };
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border p-4" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(96,165,250,0.1)" }}>
-            <Globe className="w-5 h-5" style={{ color: "#60a5fa" }} />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Proxies customizados</p>
-            <p className="text-xs" style={{ color: "var(--text-3)" }}>
-              Criados aqui e selecionáveis na tela de cada server. Todas as instâncias do server herdam o proxy.
-            </p>
-          </div>
+    <div className="space-y-6">
+
+      {/* ── Proxies Uniq ── */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>Proxies Uniq</h3>
+          <span className="text-xs px-1.5 py-0.5 rounded-full font-medium" style={{ background: "rgba(0,212,106,0.1)", color: "var(--green)" }}>ativos</span>
+        </div>
+        <div className="rounded-2xl border p-4" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
+          <p className="text-xs mb-3" style={{ color: "var(--text-3)" }}>
+            Proxies residenciais gerenciados pela Uniq. Disponíveis automaticamente em todos os servers.
+          </p>
+          {loadingPlatform ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: "var(--text-3)" }} />
+              <span className="text-xs" style={{ color: "var(--text-3)" }}>Carregando…</span>
+            </div>
+          ) : platformProxies.length === 0 ? (
+            <p className="text-xs" style={{ color: "var(--text-3)" }}>Nenhum proxy da plataforma ativo no momento.</p>
+          ) : (
+            <div className="space-y-2">
+              {platformProxies.map(p => (
+                <div key={p.id} className="flex items-center gap-3 py-2 px-3 rounded-xl" style={{ background: "var(--surface-1)" }}>
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "var(--green)" }} />
+                  <span className="text-sm font-medium flex-1" style={{ color: "var(--text-1)" }}>{p.name}</span>
+                  {p.country && (
+                    <span className="text-xs" style={{ color: "var(--text-3)" }}>
+                      {COUNTRY_FLAGS[p.country.toLowerCase()] || "🌍"} {p.country.toUpperCase()}
+                    </span>
+                  )}
+                  {p.provider && p.provider !== "manual" && (
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--surface-2)", color: "var(--text-3)" }}>
+                      {p.provider}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      <button
-        onClick={() => { setShowModal(true); setTestResult(null); }}
-        className="w-full rounded-2xl border-2 border-dashed p-4 flex items-center justify-center gap-2 transition-all hover:bg-white/5"
-        style={{ borderColor: "var(--surface-border)", color: "var(--text-2)" }}
-      >
-        <Plus className="w-5 h-5" />
-        <span className="text-sm font-medium">Adicionar proxy</span>
-      </button>
-
-      {isLoading ? (
-        <div className="flex items-center gap-2 p-4">
-          <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--text-3)" }} />
-          <span className="text-xs" style={{ color: "var(--text-3)" }}>Carregando…</span>
-        </div>
-      ) : proxies.length > 0 ? (
-        <div className="space-y-2">
-          <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>Meus proxies</h3>
-          {proxies.map(p => (
-            <div key={p.id} className="rounded-xl border p-3 flex items-center gap-3" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(96,165,250,0.1)" }}>
-                <Globe className="w-4 h-4" style={{ color: "#60a5fa" }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{p.name}</p>
-                <p className="text-xs truncate" style={{ color: "var(--text-3)" }}>
-                  {p.host}:{p.port}{p.proxy_type && ` · ${p.proxy_type.toUpperCase()}`}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {p.country && (
-                  <span className="text-xs px-2 py-1 rounded-full" style={{ background: "var(--surface-2)", color: "var(--text-2)" }}>
-                    {COUNTRY_FLAGS[p.country.toLowerCase()] || "🌍"} {p.country.toUpperCase()}
-                  </span>
-                )}
-                <button onClick={() => test.mutate(p.id)}
-                  disabled={test.isPending}
-                  className="text-xs px-2 py-1 rounded-lg" style={{ background: "rgba(96,165,250,0.1)", color: "#60a5fa" }}>
-                  {test.isPending ? "…" : "Testar"}
-                </button>
-                <button onClick={() => del.mutate(p.id)} className="p-1.5 rounded-lg hover:bg-red-500/10" style={{ color: "var(--text-3)" }}>
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
+      {/* ── Proxies do usuário ── */}
+      <div className="space-y-3">
+        <div className="rounded-2xl border p-4" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(96,165,250,0.1)" }}>
+              <Globe className="w-5 h-5" style={{ color: "#60a5fa" }} />
             </div>
-          ))}
+            <div className="flex-1">
+              <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Proxies customizados</p>
+              <p className="text-xs" style={{ color: "var(--text-3)" }}>
+                Criados aqui e selecionáveis na tela de cada server. Todas as instâncias do server herdam o proxy.
+              </p>
+            </div>
+          </div>
         </div>
-      ) : null}
+
+        <button
+          onClick={() => { setShowModal(true); setTestResult(null); }}
+          className="w-full rounded-2xl border-2 border-dashed p-4 flex items-center justify-center gap-2 transition-all hover:bg-white/5"
+          style={{ borderColor: "var(--surface-border)", color: "var(--text-2)" }}
+        >
+          <Plus className="w-5 h-5" />
+          <span className="text-sm font-medium">Adicionar proxy</span>
+        </button>
+
+        {isLoading ? (
+          <div className="flex items-center gap-2 p-4">
+            <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--text-3)" }} />
+            <span className="text-xs" style={{ color: "var(--text-3)" }}>Carregando…</span>
+          </div>
+        ) : proxies.length > 0 ? (
+          <div className="space-y-2">
+            <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>Meus proxies</h3>
+            {proxies.map(p => (
+              <div key={p.id} className="rounded-xl border p-3 flex items-center gap-3" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
+                <div className="relative w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(96,165,250,0.1)" }}>
+                  <Globe className="w-4 h-4" style={{ color: "#60a5fa" }} />
+                  <span
+                    className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
+                    style={{
+                      background: (p as Proxy & { is_active?: boolean }).is_active !== false ? "var(--green)" : "#ef4444",
+                      borderColor: "var(--surface-2)",
+                    }}
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{p.name}</p>
+                  <p className="text-xs truncate" style={{ color: "var(--text-3)" }}>
+                    {p.host}:{p.port}{p.proxy_type && ` · ${p.proxy_type.toUpperCase()}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {p.country && (
+                    <span className="text-xs px-2 py-1 rounded-full" style={{ background: "var(--surface-2)", color: "var(--text-2)" }}>
+                      {COUNTRY_FLAGS[p.country.toLowerCase()] || "🌍"} {p.country.toUpperCase()}
+                    </span>
+                  )}
+                  <button onClick={() => test.mutate(p.id)}
+                    disabled={test.isPending}
+                    className="text-xs px-2 py-1 rounded-lg" style={{ background: "rgba(96,165,250,0.1)", color: "#60a5fa" }}>
+                    {test.isPending ? "…" : "Testar"}
+                  </button>
+                  <button onClick={() => del.mutate(p.id)} className="p-1.5 rounded-lg hover:bg-red-500/10" style={{ color: "var(--text-3)" }}>
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "var(--surface-overlay)" }}>

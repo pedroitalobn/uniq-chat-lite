@@ -248,6 +248,7 @@ export const channelsApi = {
 export const proxiesApi = {
   listAvailable: () => api.get("/v1/proxies"),
   listMine: () => api.get("/v1/proxies/mine"),
+  listPlatform: () => api.get("/v1/proxies/platform"),
   create: (data: {
     name: string;
     country?: string;

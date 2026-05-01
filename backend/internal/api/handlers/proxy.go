@@ -37,6 +37,28 @@ func (h *ProxyHandler) ListAvailable(c *fiber.Ctx) error {
 	return c.JSON(summarizeProxies(proxies))
 }
 
+// ListPlatform retorna os proxies da plataforma (is_platform=true) ativos,
+// expondo apenas name, country, provider e is_active — sem credenciais.
+// Acessível por qualquer usuário autenticado.
+func (h *ProxyHandler) ListPlatform(c *fiber.Ctx) error {
+	var proxies []models.Proxy
+	if err := h.db.Where("is_platform = ? AND is_active = ?", true, true).
+		Order("name ASC").
+		Find(&proxies).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao listar proxies da plataforma"})
+	}
+	out := make([]fiber.Map, len(proxies))
+	for i, p := range proxies {
+		out[i] = fiber.Map{
+			"id":       p.ID,
+			"name":     p.Name,
+			"country":  p.Country,
+			"provider": p.Provider,
+		}
+	}
+	return c.JSON(out)
+}
+
 func (h *ProxyHandler) ListMine(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 	var proxies []models.Proxy

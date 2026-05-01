@@ -240,6 +240,13 @@ def instagram_login(req: LoginReq):
     if meta.get("proxy"):
         cl.set_proxy(meta["proxy"])
 
+    # Override the default stdin-blocking challenge handler so that when
+    # instagrapi internally calls challenge_resolve(), it raises ChallengeRequired
+    # instead of blocking on input() — which would EOF in a container.
+    def _raise_challenge(username: str, choice) -> str:
+        raise ChallengeRequired()
+    cl.challenge_code_handler = _raise_challenge
+
     try:
         cl.login(req.username, req.password)
         save_session(cl, req.instance_id)

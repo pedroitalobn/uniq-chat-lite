@@ -1245,6 +1245,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Plataforma (is_platform=true, admin-managed) + custom do usuário.
 	proxies := api.Group("/proxies")
 	proxies.Get("/", proxyH.ListAvailable)          // platform + próprios, pra usar no server
+	proxies.Get("/platform", proxyH.ListPlatform)   // proxies Uniq ativos (só name/country/provider)
 	proxies.Get("/mine", proxyH.ListMine)           // só os próprios (integrations)
 	proxies.Post("/", proxyH.Create)                // criar custom (plano pago)
 	proxies.Put("/:id", proxyH.Update)              // editar próprio
