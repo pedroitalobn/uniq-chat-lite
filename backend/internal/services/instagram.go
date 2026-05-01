@@ -37,13 +37,17 @@ type InstagramSession struct {
 }
 
 type InstagramUser struct {
-	PK         int64  `json:"pk"`
-	Username   string `json:"username"`
-	FullName   string `json:"full_name"`
-	ProfilePic string `json:"profile_pic_url"`
-	IsPrivate  bool   `json:"is_private"`
-	Followers  int    `json:"follower_count"`
-	Following  int    `json:"following_count"`
+	PK          string `json:"pk"`
+	Username    string `json:"username"`
+	FullName    string `json:"full_name"`
+	Biography   string `json:"biography"`
+	ProfilePic  string `json:"profile_pic_url"`
+	IsPrivate   bool   `json:"is_private"`
+	IsVerified  bool   `json:"is_verified"`
+	Followers   int    `json:"follower_count"`
+	Following   int    `json:"following_count"`
+	MediaCount  int    `json:"media_count"`
+	ExternalURL string `json:"external_url"`
 }
 
 type InboxResponse struct {
@@ -51,23 +55,23 @@ type InboxResponse struct {
 }
 
 type Thread struct {
-	ThreadID int64                    `json:"thread_id"`
-	Messages []ThreadMessage          `json:"messages"`
-	Users    map[string]InstagramUser `json:"users"`
+	ThreadID    string          `json:"thread_id"`
+	Messages    []ThreadMessage `json:"messages"`
+	Users       []InstagramUser `json:"users"`
+	UnreadCount int             `json:"unread_count"`
 }
 
 type ThreadMessage struct {
-	MessageID int64  `json:"message_id"`
-	UserID    int64  `json:"user_id"`
+	ItemID    string `json:"item_id"`
+	UserID    string `json:"user_id"`
 	Text      string `json:"text"`
-	Timestamp int64  `json:"timestamp"`
+	Timestamp string `json:"timestamp"`
 	ItemType  string `json:"item_type"`
 }
 
 type SendDMResponse struct {
-	MessageID int64  `json:"message_id"`
-	ThreadID  int64  `json:"thread_id"`
-	Status    string `json:"status"`
+	ThreadID string `json:"thread_id"`
+	Status   string `json:"status"`
 }
 
 type LoginResponse struct {

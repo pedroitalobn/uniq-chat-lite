@@ -359,8 +359,8 @@ func (r *Registry) sendInstagram(ctx context.Context, inst *models.Instance, msg
 		return nil, err
 	}
 	ext := ""
-	if resp != nil && resp.MessageID != 0 {
-		ext = fmt.Sprintf("%d", resp.MessageID)
+	if resp != nil && resp.ThreadID != "" {
+		ext = resp.ThreadID
 	}
 	return &SendResult{ExternalID: ext, Status: models.MessageStatusSent}, nil
 }
