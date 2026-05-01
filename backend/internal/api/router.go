@@ -633,6 +633,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	instance.Get("/instagram/comments", instanceH.InstagramGetComments)
 	instance.Get("/instagram/search/users", instanceH.InstagramSearchUsers)
 	instance.Get("/instagram/hashtag", instanceH.InstagramHashtag)
+	instance.Get("/instagram/profile", instanceH.InstagramGetProfile)
 	instance.Post("/instagram/challenge", instanceH.InstagramChallenge)
 	instance.Post("/instagram/challenge/resend", instanceH.InstagramChallengeResend)
 	instance.Get("/profile", instanceH.Profile)

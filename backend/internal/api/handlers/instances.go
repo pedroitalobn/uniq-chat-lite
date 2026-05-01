@@ -1362,6 +1362,22 @@ func (h *InstanceHandler) InstagramHashtag(c *fiber.Ctx) error {
 	return c.JSON(resp)
 }
 
+func (h *InstanceHandler) InstagramGetProfile(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	username := c.Query("username")
+	if username == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "username é obrigatório"})
+	}
+	resp, err := h.instagram.GetProfile(c.Context(), instance.ID.String(), username)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(resp)
+}
+
 func generateDeviceID(username string) string {
 	return fmt.Sprintf("android-%s", uuid.New().String()[:8])
 }

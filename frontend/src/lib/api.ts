@@ -315,20 +315,42 @@ export const instancesApi = {
   instagramSendDM: (id: string, data: { recipient: string; message: string }) =>
     api.post(`/v1/instances/${id}/instagram/dm`, data),
   instagramGetInbox: (id: string) => api.get(`/v1/instances/${id}/instagram/dm`),
-  instagramFollow: (id: string, target: string) =>
-    api.post(`/v1/instances/${id}/instagram/follow`, { target }),
-  instagramUnfollow: (id: string, target: string) =>
-    api.post(`/v1/instances/${id}/instagram/unfollow`, { target }),
+  instagramFollow: (id: string, data: { target: string }) =>
+    api.post(`/v1/instances/${id}/instagram/follow`, data),
+  instagramUnfollow: (id: string, data: { target: string }) =>
+    api.post(`/v1/instances/${id}/instagram/unfollow`, data),
   instagramPause: (id: string) => api.post(`/v1/instances/${id}/instagram/pause`),
   instagramResume: (id: string) => api.post(`/v1/instances/${id}/instagram/resume`),
+  instagramPost: (id: string, data: { image_url?: string; video_url?: string; caption?: string }) =>
+    api.post(`/v1/instances/${id}/instagram/post`, data),
   instagramPublishPost: (id: string, data: { image_url?: string; video_url?: string; caption?: string }) =>
     api.post(`/v1/instances/${id}/instagram/post`, data),
+  instagramStory: (id: string, data: { image_url?: string; video_url?: string; caption?: string }) =>
+    api.post(`/v1/instances/${id}/instagram/story`, data),
   instagramUploadStory: (id: string, data: { image_url?: string; video_url?: string; caption?: string }) =>
     api.post(`/v1/instances/${id}/instagram/story`, data),
   instagramGetUserMedia: (id: string, username: string) =>
     api.get(`/v1/instances/${id}/instagram/media`, { params: { username } }),
+  instagramLike: (id: string, data: { media_id: string }) =>
+    api.post(`/v1/instances/${id}/instagram/like`, data),
   instagramLikeMedia: (id: string, mediaId: string) =>
     api.post(`/v1/instances/${id}/instagram/like`, { media_id: mediaId }),
+  instagramUnlike: (id: string, data: { media_id: string }) =>
+    api.post(`/v1/instances/${id}/instagram/unlike`, data),
+  instagramComment: (id: string, data: { media_id: string; text: string }) =>
+    api.post(`/v1/instances/${id}/instagram/comment`, data),
+  instagramGetComments: (id: string, mediaId: string) =>
+    api.get(`/v1/instances/${id}/instagram/comments`, { params: { media_id: mediaId } }),
+  instagramDMReply: (id: string, data: { thread_id: string; text: string }) =>
+    api.post(`/v1/instances/${id}/instagram/dm/reply`, data),
+  instagramGetThread: (id: string, threadId: string) =>
+    api.get(`/v1/instances/${id}/instagram/dm/thread`, { params: { thread_id: threadId } }),
+  instagramSearchUsers: (id: string, query: string) =>
+    api.get(`/v1/instances/${id}/instagram/search/users`, { params: { query } }),
+  instagramHashtag: (id: string, hashtag: string) =>
+    api.get(`/v1/instances/${id}/instagram/hashtag`, { params: { hashtag } }),
+  instagramProfile: (id: string, username: string) =>
+    api.get(`/v1/instances/${id}/instagram/profile`, { params: { username } }),
   instagramChallenge: (id: string, data: { api_path: string; code: string; method?: string }) =>
     api.post(`/v1/instances/${id}/instagram/challenge`, data),
   instagramChallengeResend: (id: string, data: { api_path: string; method?: string }) =>

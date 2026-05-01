@@ -12,6 +12,8 @@ import {
   Video, MapPin, User, Smile, BarChart2, Sticker, MessageSquareText,
   MousePointerClick, ShieldAlert, Camera, Users, Phone, RotateCcw, Download,
   Eye, EyeOff, Lock, LogIn, List, LayoutGrid, Banknote, Upload, Paperclip,
+  Heart, UserPlus, UserMinus, MessageCircle, Search, Hash, BookImage,
+  Film, ThumbsUp, ThumbsDown, AtSign,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -633,6 +635,157 @@ function LogsTab({ instanceId }: { instanceId: string }) {
             </div>
           </div>
         ))
+      )}
+    </div>
+  );
+}
+
+// ─── Instagram Quick Actions ──────────────────────────────────────────────────
+function InstagramQuickActions({ instanceId, cardStyle }: { instanceId: string; cardStyle: React.CSSProperties }) {
+  const [action, setAction] = useState<string>("dm");
+  const [target, setTarget] = useState("");
+  const [text, setText] = useState("");
+  const [mediaUrl, setMediaUrl] = useState("");
+  const [mediaId, setMediaId] = useState("");
+  const [threadId, setThreadId] = useState("");
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  const ACTIONS = [
+    { id: "dm",       label: "DM",          icon: <MessageCircle className="w-3.5 h-3.5" />,  desc: "Enviar mensagem direta" },
+    { id: "follow",   label: "Seguir",       icon: <UserPlus className="w-3.5 h-3.5" />,       desc: "Seguir usuário" },
+    { id: "unfollow", label: "Deixar",       icon: <UserMinus className="w-3.5 h-3.5" />,      desc: "Deixar de seguir" },
+    { id: "like",     label: "Curtir",       icon: <Heart className="w-3.5 h-3.5" />,          desc: "Curtir publicação" },
+    { id: "unlike",   label: "Descurtir",    icon: <ThumbsDown className="w-3.5 h-3.5" />,     desc: "Descurtir publicação" },
+    { id: "comment",  label: "Comentar",     icon: <MessageSquareText className="w-3.5 h-3.5" />, desc: "Comentar em publicação" },
+    { id: "comments", label: "Ver comentários", icon: <List className="w-3.5 h-3.5" />,        desc: "Listar comentários" },
+    { id: "post",     label: "Publicar",     icon: <BookImage className="w-3.5 h-3.5" />,      desc: "Publicar foto/vídeo" },
+    { id: "story",    label: "Story",        icon: <Film className="w-3.5 h-3.5" />,           desc: "Publicar story" },
+    { id: "search",   label: "Buscar user",  icon: <Search className="w-3.5 h-3.5" />,         desc: "Buscar usuários" },
+    { id: "hashtag",  label: "Hashtag",      icon: <Hash className="w-3.5 h-3.5" />,           desc: "Ver posts de hashtag" },
+    { id: "profile",  label: "Perfil",       icon: <AtSign className="w-3.5 h-3.5" />,         desc: "Ver perfil de usuário" },
+    { id: "reply_dm", label: "Responder DM", icon: <Send className="w-3.5 h-3.5" />,           desc: "Responder thread de DM" },
+  ];
+
+  const run = async () => {
+    setRunning(true);
+    setResult(null);
+    try {
+      let res: unknown;
+      switch (action) {
+        case "dm":       res = await instancesApi.instagramSendDM(instanceId, { recipient: target, message: text }); break;
+        case "follow":   res = await instancesApi.instagramFollow(instanceId, { target }); break;
+        case "unfollow": res = await instancesApi.instagramUnfollow(instanceId, { target }); break;
+        case "like":     res = await instancesApi.instagramLike(instanceId, { media_id: mediaId }); break;
+        case "unlike":   res = await instancesApi.instagramUnlike(instanceId, { media_id: mediaId }); break;
+        case "comment":  res = await instancesApi.instagramComment(instanceId, { media_id: mediaId, text }); break;
+        case "comments": res = await instancesApi.instagramGetComments(instanceId, mediaId); break;
+        case "post":     res = await instancesApi.instagramPost(instanceId, { image_url: mediaUrl, caption: text }); break;
+        case "story":    res = await instancesApi.instagramStory(instanceId, { image_url: mediaUrl }); break;
+        case "search":   res = await instancesApi.instagramSearchUsers(instanceId, target); break;
+        case "hashtag":  res = await instancesApi.instagramHashtag(instanceId, target); break;
+        case "profile":  res = await instancesApi.instagramProfile(instanceId, target); break;
+        case "reply_dm": res = await instancesApi.instagramDMReply(instanceId, { thread_id: threadId, text }); break;
+      }
+      setResult(JSON.stringify((res as { data: unknown })?.data ?? res, null, 2));
+      toast.success("Ação executada");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao executar ação";
+      toast.error(msg);
+      setResult(null);
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const cur = ACTIONS.find(a => a.id === action)!;
+  const needsTarget = ["dm","follow","unfollow","search","hashtag","profile"].includes(action);
+  const needsText   = ["dm","comment","post","story","reply_dm"].includes(action);
+  const needsMediaId = ["like","unlike","comment","comments"].includes(action);
+  const needsMediaUrl = ["post","story"].includes(action);
+  const needsThread  = action === "reply_dm";
+
+  return (
+    <div className="rounded-2xl p-5 space-y-4" style={cardStyle}>
+      <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
+        Ações rápidas
+      </h3>
+
+      {/* Action selector */}
+      <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-7">
+        {ACTIONS.map(a => (
+          <button
+            key={a.id}
+            onClick={() => { setAction(a.id); setResult(null); }}
+            title={a.desc}
+            className="flex flex-col items-center gap-1 py-2 px-1 rounded-xl text-xs font-medium transition-all"
+            style={{
+              background: action === a.id ? "rgba(225,48,108,0.12)" : "var(--surface-2)",
+              color: action === a.id ? "#e1306c" : "var(--text-3)",
+              border: action === a.id ? "1px solid rgba(225,48,108,0.3)" : "1px solid transparent",
+            }}
+          >
+            {a.icon}
+            <span className="leading-tight text-center" style={{ fontSize: "10px" }}>{a.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <p className="text-xs" style={{ color: "hsl(240 8% 42%)" }}>{cur.desc}</p>
+
+      {/* Fields */}
+      {needsTarget && (
+        <div>
+          <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 42%)" }}>
+            {action === "search" || action === "hashtag" ? "Termo de busca" : "Username (@)"}
+          </label>
+          <input value={target} onChange={e => setTarget(e.target.value)}
+            className="input-field w-full" placeholder={action === "hashtag" ? "moda" : "monali.pizza"} />
+        </div>
+      )}
+      {needsThread && (
+        <div>
+          <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 42%)" }}>Thread ID</label>
+          <input value={threadId} onChange={e => setThreadId(e.target.value)} className="input-field w-full" placeholder="340282..." />
+        </div>
+      )}
+      {needsMediaId && (
+        <div>
+          <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 42%)" }}>Media ID</label>
+          <input value={mediaId} onChange={e => setMediaId(e.target.value)} className="input-field w-full" placeholder="3123456789_123456" />
+        </div>
+      )}
+      {needsMediaUrl && (
+        <div>
+          <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 42%)" }}>URL da mídia</label>
+          <input value={mediaUrl} onChange={e => setMediaUrl(e.target.value)} className="input-field w-full" placeholder="https://..." />
+        </div>
+      )}
+      {needsText && (
+        <div>
+          <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 42%)" }}>
+            {action === "post" || action === "story" ? "Legenda (opcional)" : "Mensagem"}
+          </label>
+          <textarea value={text} onChange={e => setText(e.target.value)}
+            rows={3} className="input-field w-full resize-none"
+            placeholder={action === "dm" ? "Olá! 👋" : action === "comment" ? "Que incrível! 🔥" : ""} />
+        </div>
+      )}
+
+      <button
+        onClick={run}
+        disabled={running}
+        className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-40"
+        style={{ background: "#e1306c", color: "white" }}
+      >
+        {running ? <Loader2 className="w-4 h-4 animate-spin" /> : cur.icon}
+        {running ? "Executando..." : cur.label}
+      </button>
+
+      {result && (
+        <div className="rounded-xl p-3 overflow-auto max-h-48" style={{ background: "var(--surface-1)" }}>
+          <pre className="text-xs" style={{ color: "var(--text-2)" }}>{result}</pre>
+        </div>
       )}
     </div>
   );
@@ -1440,8 +1593,11 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
         </div>
       </div>
 
-      {/* Quick send */}
-      {instance.status === "connected" && (
+      {/* Quick send / Quick actions */}
+      {instance.status === "connected" && isInstagram && (
+        <InstagramQuickActions instanceId={instanceId} cardStyle={cardStyle} />
+      )}
+      {instance.status === "connected" && !isInstagram && (
         <div className="rounded-2xl p-5 space-y-4" style={cardStyle}>
           <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
             Envio rápido
@@ -2537,14 +2693,14 @@ function ActionsTab({ instance }: { instance: Instance }) {
     try {
       if (action === "follow") {
         if (channel === "instagram") {
-          await instancesApi.instagramFollow(instance.id, target.trim());
+          await instancesApi.instagramFollow(instance.id, { target: target.trim() });
         } else {
           await tiktokApi.follow(instance.id, target.trim());
         }
         toast.success(`Seguiu @${target.trim()} com sucesso!`);
       } else {
         if (channel === "instagram") {
-          await instancesApi.instagramUnfollow(instance.id, target.trim());
+          await instancesApi.instagramUnfollow(instance.id, { target: target.trim() });
         } else {
           await tiktokApi.unfollow(instance.id, target.trim());
         }
