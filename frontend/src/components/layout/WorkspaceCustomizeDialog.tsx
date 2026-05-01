@@ -73,14 +73,47 @@ export function WorkspaceCustomizeDialog({
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center sm:p-4">
-      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="absolute inset-0"
+        style={{
+          background: "rgba(0,0,0,0.70)",
+          backdropFilter: "blur(8px) saturate(150%)",
+          WebkitBackdropFilter: "blur(8px) saturate(150%)",
+        }}
+        onClick={onClose}
+      />
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 32 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden"
-        style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}
+        exit={{ opacity: 0, scale: 0.96, y: 16 }}
+        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl overflow-hidden"
+        style={{
+          background: "linear-gradient(160deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 50%, rgba(0,0,0,0.10) 100%)",
+          backdropFilter: "blur(32px) saturate(200%) brightness(1.1)",
+          WebkitBackdropFilter: "blur(32px) saturate(200%) brightness(1.1)",
+          border: "1px solid rgba(255,255,255,0.15)",
+          boxShadow: "0 40px 80px rgba(0,0,0,0.70), 0 16px 32px rgba(0,0,0,0.50), 0 4px 8px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.20)",
+        }}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--surface-border)" }}>
+        {/* Top light line */}
+        <div style={{
+          position: "absolute", top: 0, left: "20%", right: "20%", height: "1px",
+          background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.30), transparent)",
+          pointerEvents: "none",
+        }} />
+        {/* Ambient orb */}
+        <div style={{
+          position: "absolute", top: "-50px", right: "-50px",
+          width: "180px", height: "180px", borderRadius: "50%",
+          background: `radial-gradient(circle, ${color}26 0%, transparent 70%)`,
+          filter: "blur(35px)", pointerEvents: "none",
+        }} />
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}22`, border: `1px solid ${color}44` }}>
               <PreviewIcon className="w-5 h-5" style={{ color }} />
@@ -183,7 +216,7 @@ export function WorkspaceCustomizeDialog({
           )}
         </div>
 
-        <div className="px-5 py-4 border-t flex gap-2 justify-end" style={{ borderColor: "var(--surface-border)" }}>
+        <div className="px-5 py-4 border-t flex gap-2 justify-end" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-lg text-sm font-medium"

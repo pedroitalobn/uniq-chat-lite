@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { authApi, instancesApi } from "@/lib/api";
 import { UsageBanner } from "@/components/billing/UsageBanner";
+import { motion, AnimatePresence } from "framer-motion";
 
 export function LayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -133,7 +134,18 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-hidden flex flex-col">
         <UsageBanner />
         <div className="flex-1 px-4 sm:px-6 py-6 lg:py-8 pt-16 lg:pt-8 pb-14 md:pb-8 overflow-y-auto">
-          {children}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 6, scale: 0.998 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.998 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              style={{ height: "100%" }}
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
     );
@@ -147,7 +159,18 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
         <UsageBanner />
         <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pt-16 lg:pt-8 pb-14 md:pb-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
-            {children}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={pathname}
+                initial={{ opacity: 0, y: 6, scale: 0.998 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.998 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                style={{ height: "100%" }}
+              >
+                {children}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
       </main>
@@ -161,7 +184,18 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
     <main className="flex-1 overflow-hidden flex flex-col">
       <UsageBanner />
       <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pt-16 lg:pt-8 pb-14 md:pb-8 overflow-y-auto">
-        {children}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={pathname}
+            initial={{ opacity: 0, y: 6, scale: 0.998 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.998 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            style={{ height: "100%" }}
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </main>
   );

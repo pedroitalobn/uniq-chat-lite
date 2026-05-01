@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import {
   Bot, Building2, Calendar, ChevronDown, ChevronLeft, ChevronRight, Contact,
   CreditCard, Globe, Hash, HelpCircle, Home,
@@ -171,12 +172,26 @@ export function Sidebar() {
 
   const sidebarContent = (
     <aside
-      className={cn("relative flex flex-col h-full border-r shrink-0 overflow-hidden",
+      className={cn("relative flex flex-col h-full shrink-0 overflow-hidden",
         "transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
         collapsed ? "w-14" : "w-56"
       )}
-      style={{ background: "var(--sidebar-bg)", borderColor: "var(--sidebar-border)" }}
+      style={{
+        background: "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)",
+        backdropFilter: "blur(24px) saturate(180%)",
+        WebkitBackdropFilter: "blur(24px) saturate(180%)",
+        borderRight: "1px solid rgba(255,255,255,0.08)",
+        boxShadow: "4px 0 24px rgba(0,0,0,0.30), inset -1px 0 0 rgba(255,255,255,0.05)",
+      }}
     >
+      {/* Linha difusa no topo — luz ambiente */}
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: "1px",
+        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
+        pointerEvents: "none",
+        zIndex: 1,
+      }} />
+
       {/* Ambient glow — radial verde no topo, pulsa suave */}
       <div
         className="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 w-40 h-40 rounded-full uniq-glow-pulse"
@@ -185,7 +200,7 @@ export function Sidebar() {
 
       {/* Logo + collapse toggle */}
       <div className="relative flex items-center justify-between px-3 h-14 flex-shrink-0"
-        style={{ borderBottom: "1px solid var(--sidebar-border)" }}>
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
         {!collapsed && <Logo height={36} />}
         <button
           onClick={() => setCollapsed((c) => !c)}
@@ -216,7 +231,8 @@ export function Sidebar() {
               style={{
                 background: `linear-gradient(135deg, ${wsColor}30, ${wsColor}12)`,
                 border: `1px solid ${wsColor}30`,
-                boxShadow: `0 0 10px ${wsColor}18`,
+                boxShadow: `0 0 20px rgba(0,212,106,0.15), 0 0 0 1px rgba(255,255,255,0.12)`,
+                transition: "box-shadow 0.3s ease",
               }}
             >
               <WsIcon className="w-3.5 h-3.5" style={{ color: wsColor }} />
@@ -245,11 +261,12 @@ export function Sidebar() {
           </div>
           <button
             onClick={() => router.push("/workspace")}
-            className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-all duration-150"
+            className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-medium"
             style={{
               background: "rgba(124,58,237,0.07)",
               border: "1px solid rgba(124,58,237,0.12)",
               color: "#a78bfa",
+              transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
             }}
             onMouseEnter={e => { e.currentTarget.style.background = "rgba(124,58,237,0.12)"; }}
             onMouseLeave={e => { e.currentTarget.style.background = "rgba(124,58,237,0.07)"; }}
@@ -266,8 +283,13 @@ export function Sidebar() {
           <button
             onClick={() => window.dispatchEvent(new CustomEvent("uniq:cmd-k"))}
             title="Buscar (⌘K)"
-            className="w-full flex items-center justify-center p-2 rounded-lg transition-all duration-150"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-3)" }}
+            className="w-full flex items-center justify-center p-2 rounded-lg"
+            style={{
+              background: "var(--surface-2)",
+              border: "1px solid var(--surface-border)",
+              color: "var(--text-3)",
+              transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+            }}
             onMouseEnter={e => { e.currentTarget.style.color = "var(--text-1)"; }}
             onMouseLeave={e => { e.currentTarget.style.color = "var(--text-3)"; }}
           >
@@ -276,8 +298,13 @@ export function Sidebar() {
         ) : (
           <button
             onClick={() => window.dispatchEvent(new CustomEvent("uniq:cmd-k"))}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-all duration-150 text-xs"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-3)" }}
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs"
+            style={{
+              background: "var(--surface-2)",
+              border: "1px solid var(--surface-border)",
+              color: "var(--text-3)",
+              transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+            }}
             onMouseEnter={e => { e.currentTarget.style.color = "var(--text-2)"; }}
             onMouseLeave={e => { e.currentTarget.style.color = "var(--text-3)"; }}
           >
@@ -295,65 +322,91 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className={cn("flex-1 py-2 space-y-px overflow-y-auto", collapsed ? "px-1.5" : "px-2")}>
-        {visibleNavItems.map((item) => {
+        {visibleNavItems.map((item, index) => {
           const active = item.exact
             ? pathname === item.href
             : pathname === item.href || pathname.startsWith(item.href + "/");
           const isInbox = item.href === "/inbox";
           return (
-            <Link
+            <motion.div
               key={item.href}
-              href={item.href}
-              onClick={closeMobile}
-              title={collapsed ? item.label : undefined}
-              className={cn(
-                "group relative flex items-center rounded-xl text-sm font-medium",
-                "transition-all duration-150 ease-out",
-                collapsed ? "justify-center px-2 py-2.5" : "gap-2.5 px-2.5 py-2"
-              )}
-              style={active
-                ? {
-                    background: "linear-gradient(90deg, rgba(0,212,106,0.12) 0%, rgba(0,212,106,0.04) 100%)",
-                    color: "var(--text-1)",
-                    boxShadow: "inset 2px 0 0 var(--green), inset 0 0 0 1px rgba(0,212,106,0.12)",
-                  }
-                : { color: "var(--text-3)" }
-              }
-              onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
-              onMouseLeave={e => { if (!active) e.currentTarget.style.background = ""; }}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.04, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             >
-              {/* Icon container */}
-              <span
-                className="relative flex items-center justify-center w-5 h-5 flex-shrink-0 rounded-md transition-all duration-150"
+              <Link
+                href={item.href}
+                onClick={closeMobile}
+                title={collapsed ? item.label : undefined}
+                className={cn(
+                  "group relative flex items-center rounded-xl text-sm font-medium",
+                  collapsed ? "justify-center px-2 py-2.5" : "gap-2.5 px-2.5 py-2"
+                )}
                 style={active
-                  ? { background: "rgba(0,212,106,0.14)", color: "var(--green)" }
-                  : { color: "inherit" }
+                  ? {
+                      background: "linear-gradient(90deg, rgba(0,212,106,0.15) 0%, rgba(0,212,106,0.05) 100%)",
+                      color: "var(--text-1)",
+                      boxShadow: "inset 2px 0 0 var(--green), 0 0 20px rgba(0,212,106,0.08)",
+                      backdropFilter: "blur(8px)",
+                      transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                    }
+                  : {
+                      color: "var(--text-3)",
+                      transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+                    }
                 }
+                onMouseEnter={e => {
+                  if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+                }}
+                onMouseLeave={e => {
+                  if (!active) e.currentTarget.style.background = "transparent";
+                }}
               >
-                <item.icon className="w-3.5 h-3.5" />
-                {collapsed && isInbox && unreadCount > 0 && (
+                {/* Icon container */}
+                <span
+                  className="relative flex items-center justify-center w-5 h-5 flex-shrink-0 rounded-md"
+                  style={active
+                    ? {
+                        background: "linear-gradient(135deg, rgba(0,212,106,0.25), rgba(0,212,106,0.10))",
+                        backdropFilter: "blur(8px)",
+                        border: "1px solid rgba(0,212,106,0.30)",
+                        boxShadow: "0 0 12px rgba(0,212,106,0.20)",
+                        color: "var(--green)",
+                        transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                      }
+                    : {
+                        background: "rgba(255,255,255,0.06)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        color: "inherit",
+                        transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                      }
+                  }
+                >
+                  <item.icon className="w-3.5 h-3.5" />
+                  {collapsed && isInbox && unreadCount > 0 && (
+                    <span
+                      className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full"
+                      style={{ background: "var(--green)", boxShadow: "0 0 5px var(--green)" }}
+                    />
+                  )}
+                </span>
+                {!collapsed && <span className="truncate">{item.label}</span>}
+                {!collapsed && isInbox && unreadCount > 0 && (
                   <span
-                    className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full"
+                    className="ml-auto flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex-shrink-0"
+                    style={{ background: "var(--green)", color: "#000", boxShadow: "0 0 6px rgba(0,212,106,0.4)" }}
+                  >
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+                {!collapsed && active && unreadCount === 0 && (
+                  <span
+                    className="ml-auto w-1 h-1 rounded-full flex-shrink-0"
                     style={{ background: "var(--green)", boxShadow: "0 0 5px var(--green)" }}
                   />
                 )}
-              </span>
-              {!collapsed && <span className="truncate">{item.label}</span>}
-              {!collapsed && isInbox && unreadCount > 0 && (
-                <span
-                  className="ml-auto flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex-shrink-0"
-                  style={{ background: "var(--green)", color: "#000", boxShadow: "0 0 6px rgba(0,212,106,0.4)" }}
-                >
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              )}
-              {!collapsed && active && unreadCount === 0 && (
-                <span
-                  className="ml-auto w-1 h-1 rounded-full flex-shrink-0"
-                  style={{ background: "var(--green)", boxShadow: "0 0 5px var(--green)" }}
-                />
-              )}
-            </Link>
+              </Link>
+            </motion.div>
           );
         })}
 
@@ -368,37 +421,66 @@ export function Sidebar() {
                 </p>
               )}
             </div>
-            {adminItems.map((item) => {
+            {adminItems.map((item, index) => {
               const active = pathname.startsWith(item.href);
               return (
-                <Link
+                <motion.div
                   key={item.href}
-                  href={item.href}
-                  onClick={closeMobile}
-                  className={cn(
-                    "group relative flex items-center rounded-xl text-sm font-medium",
-                    "transition-all duration-150 ease-out",
-                    collapsed ? "justify-center px-2 py-2" : "gap-2.5 px-2.5 py-2"
-                  )}
-                  style={active
-                    ? {
-                        background: "linear-gradient(90deg, rgba(0,212,106,0.12) 0%, rgba(0,212,106,0.04) 100%)",
-                        color: "var(--text-1)",
-                        boxShadow: "inset 2px 0 0 var(--green), inset 0 0 0 1px rgba(0,212,106,0.12)",
-                      }
-                    : { color: "var(--text-3)" }
-                  }
-                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
-                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = ""; }}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: (visibleNavItems.length + index) * 0.04, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                 >
-                  <span
-                    className="flex items-center justify-center w-5 h-5 flex-shrink-0 rounded-md transition-all duration-150"
-                    style={active ? { background: "rgba(0,212,106,0.14)", color: "var(--green)" } : { color: "inherit" }}
+                  <Link
+                    href={item.href}
+                    onClick={closeMobile}
+                    className={cn(
+                      "group relative flex items-center rounded-xl text-sm font-medium",
+                      collapsed ? "justify-center px-2 py-2" : "gap-2.5 px-2.5 py-2"
+                    )}
+                    style={active
+                      ? {
+                          background: "linear-gradient(90deg, rgba(0,212,106,0.15) 0%, rgba(0,212,106,0.05) 100%)",
+                          color: "var(--text-1)",
+                          boxShadow: "inset 2px 0 0 var(--green), 0 0 20px rgba(0,212,106,0.08)",
+                          backdropFilter: "blur(8px)",
+                          transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                        }
+                      : {
+                          color: "var(--text-3)",
+                          transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+                        }
+                    }
+                    onMouseEnter={e => {
+                      if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+                    }}
+                    onMouseLeave={e => {
+                      if (!active) e.currentTarget.style.background = "transparent";
+                    }}
                   >
-                    <item.icon className="w-3.5 h-3.5" />
-                  </span>
-                  {!collapsed && <span>{item.label}</span>}
-                </Link>
+                    <span
+                      className="flex items-center justify-center w-5 h-5 flex-shrink-0 rounded-md"
+                      style={active
+                        ? {
+                            background: "linear-gradient(135deg, rgba(0,212,106,0.25), rgba(0,212,106,0.10))",
+                            backdropFilter: "blur(8px)",
+                            border: "1px solid rgba(0,212,106,0.30)",
+                            boxShadow: "0 0 12px rgba(0,212,106,0.20)",
+                            color: "var(--green)",
+                            transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                          }
+                        : {
+                            background: "rgba(255,255,255,0.06)",
+                            border: "1px solid rgba(255,255,255,0.08)",
+                            color: "inherit",
+                            transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                          }
+                      }
+                    >
+                      <item.icon className="w-3.5 h-3.5" />
+                    </span>
+                    {!collapsed && <span>{item.label}</span>}
+                  </Link>
+                </motion.div>
               );
             })}
           </div>
@@ -411,15 +493,21 @@ export function Sidebar() {
           <Link
             href="/settings?section=billing"
             onClick={closeMobile}
-            className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-xs font-semibold transition-all duration-150"
+            className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-xs font-semibold"
             style={{
-              background: "linear-gradient(135deg, rgba(0,212,106,0.12), rgba(0,212,106,0.06))",
-              border: "1px solid rgba(0,212,106,0.18)",
+              background: "linear-gradient(135deg, rgba(0,212,106,0.18) 0%, rgba(0,212,106,0.06) 100%)",
+              backdropFilter: "blur(12px)",
+              border: "1px solid rgba(0,212,106,0.28)",
               color: "var(--green)",
-              boxShadow: "0 0 12px rgba(0,212,106,0.08)",
+              boxShadow: "0 4px 16px rgba(0,212,106,0.15), inset 0 1px 0 rgba(255,255,255,0.10)",
+              transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
             }}
-            onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 0 20px rgba(0,212,106,0.15)"; }}
-            onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 0 12px rgba(0,212,106,0.08)"; }}
+            onMouseEnter={e => {
+              e.currentTarget.style.boxShadow = "0 4px 24px rgba(0,212,106,0.25), inset 0 1px 0 rgba(255,255,255,0.15)";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,212,106,0.15), inset 0 1px 0 rgba(255,255,255,0.10)";
+            }}
           >
             <Zap className="w-3 h-3" />
             Fazer upgrade
@@ -434,10 +522,13 @@ export function Sidebar() {
       >
         <div
           className={cn(
-            "flex items-center rounded-xl transition-all duration-150 cursor-default mb-1",
+            "flex items-center rounded-xl cursor-default mb-1",
             collapsed ? "justify-center px-2 py-2.5" : "gap-2.5 px-2.5 py-2"
           )}
-          style={{ background: "rgba(255,255,255,0.03)" }}
+          style={{
+            background: "rgba(255,255,255,0.03)",
+            transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+          }}
         >
           {/* Avatar com gradiente único por usuário */}
           <div
@@ -469,11 +560,14 @@ export function Sidebar() {
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
           className={cn(
-            "flex items-center rounded-xl text-xs transition-all duration-150 w-full",
+            "flex items-center rounded-xl text-xs w-full",
             "hover:text-red-400 hover:bg-red-500/[0.07]",
             collapsed ? "justify-center px-2 py-2" : "gap-2.5 px-2.5 py-2"
           )}
-          style={{ color: "var(--text-4)" }}
+          style={{
+            color: "var(--text-4)",
+            transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+          }}
           title={collapsed ? t("nav_logout") : undefined}
         >
           <LogOut className="w-3.5 h-3.5 flex-shrink-0" />

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 import {
   LayoutDashboard, Headset, Contact, Megaphone, MoreHorizontal,
   Wand2, Bot, Smartphone, Plug, Settings, X,
@@ -46,48 +47,93 @@ export function BottomNav() {
         className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center"
         style={{
           height: "56px",
-          background: "var(--surface-1)",
-          borderTop: "1px solid var(--surface-border)",
+          background: "rgba(10,10,20,0.75)",
+          backdropFilter: "blur(24px) saturate(180%)",
+          WebkitBackdropFilter: "blur(24px) saturate(180%)",
+          borderTop: "1px solid rgba(255,255,255,0.10)",
+          boxShadow: "0 -8px 32px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.08)",
         }}
       >
-        {PRIMARY.map((item) => {
+        {PRIMARY.map((item, index) => {
           const active = isActive(item.href);
           return (
-            <Link
+            <motion.div
               key={item.href}
-              href={item.href}
-              className="flex-1 flex flex-col items-center justify-center gap-0.5 h-full transition-all duration-150"
+              className="flex-1 flex items-center justify-center h-full"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             >
-              <span
-                className="flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl transition-all duration-150"
-                style={{
-                  background: active ? "var(--green-dim)" : "transparent",
-                  color: active ? "var(--green)" : "var(--text-3)",
-                }}
+              <Link
+                href={item.href}
+                className="flex flex-col items-center justify-center gap-0.5 h-full w-full"
+                style={{ transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)" }}
               >
-                <item.icon className="w-5 h-5" />
-                <span className="text-[10px] font-medium leading-none">{item.label}</span>
-              </span>
-            </Link>
+                <span
+                  className="flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl"
+                  style={active
+                    ? {
+                        background: "rgba(0,212,106,0.12)",
+                        backdropFilter: "blur(8px)",
+                        border: "1px solid rgba(0,212,106,0.25)",
+                        borderRadius: "12px",
+                        boxShadow: "0 0 16px rgba(0,212,106,0.15)",
+                        color: "var(--green)",
+                        transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                      }
+                    : {
+                        background: "transparent",
+                        border: "1px solid transparent",
+                        color: "var(--text-3)",
+                        transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                      }
+                  }
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span className="text-[10px] font-medium leading-none">{item.label}</span>
+                </span>
+              </Link>
+            </motion.div>
           );
         })}
 
         {/* More button */}
-        <button
-          onClick={() => setSheetOpen(true)}
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 h-full transition-all duration-150"
+        <motion.div
+          className="flex-1 flex items-center justify-center h-full"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: PRIMARY.length * 0.05, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         >
-          <span
-            className="flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl transition-all duration-150"
-            style={{
-              background: isMoreActive ? "var(--green-dim)" : "transparent",
-              color: isMoreActive ? "var(--green)" : "var(--text-3)",
-            }}
+          <button
+            onClick={() => setSheetOpen(true)}
+            className="flex flex-col items-center justify-center gap-0.5 h-full w-full"
+            style={{ transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)" }}
           >
-            <MoreHorizontal className="w-5 h-5" />
-            <span className="text-[10px] font-medium leading-none">Mais</span>
-          </span>
-        </button>
+            <span
+              className="flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl"
+              style={isMoreActive
+                ? {
+                    background: "rgba(0,212,106,0.12)",
+                    backdropFilter: "blur(8px)",
+                    border: "1px solid rgba(0,212,106,0.25)",
+                    borderRadius: "12px",
+                    boxShadow: "0 0 16px rgba(0,212,106,0.15)",
+                    color: "var(--green)",
+                    transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                  }
+                : {
+                    background: "transparent",
+                    border: "1px solid transparent",
+                    color: "var(--text-3)",
+                    transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                  }
+              }
+            >
+              <MoreHorizontal className="w-5 h-5" />
+              <span className="text-[10px] font-medium leading-none">Mais</span>
+            </span>
+          </button>
+        </motion.div>
       </nav>
 
       {/* Sheet backdrop */}
@@ -105,39 +151,63 @@ export function BottomNav() {
           sheetOpen ? "translate-y-0" : "translate-y-full"
         )}
         style={{
-          background: "var(--surface-2)",
-          borderTop: "1px solid var(--surface-border)",
+          background: "rgba(10,10,20,0.85)",
+          backdropFilter: "blur(24px) saturate(180%)",
+          WebkitBackdropFilter: "blur(24px) saturate(180%)",
+          borderTop: "1px solid rgba(255,255,255,0.10)",
+          boxShadow: "0 -8px 32px rgba(0,0,0,0.50), inset 0 1px 0 rgba(255,255,255,0.08)",
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
         }}
       >
         <div className="flex items-center justify-between px-4 py-3"
-          style={{ borderBottom: "1px solid var(--surface-border)" }}>
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
           <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Mais opções</p>
           <button
             onClick={() => setSheetOpen(false)}
             className="p-1 rounded-lg"
-            style={{ color: "var(--text-3)" }}
+            style={{
+              color: "var(--text-3)",
+              transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+            }}
           >
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="grid grid-cols-4 gap-2 p-4">
-          {MORE.map((item) => {
+          {MORE.map((item, index) => {
             const active = isActive(item.href);
             return (
-              <Link
+              <motion.div
                 key={item.href}
-                href={item.href}
-                onClick={() => setSheetOpen(false)}
-                className="flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all duration-150"
-                style={{
-                  background: active ? "var(--green-dim)" : "var(--surface-3)",
-                  color: active ? "var(--green)" : "var(--text-2)",
-                }}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.04, duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
               >
-                <item.icon className="w-5 h-5" />
-                <span className="text-[10px] font-medium text-center leading-tight">{item.label}</span>
-              </Link>
+                <Link
+                  href={item.href}
+                  onClick={() => setSheetOpen(false)}
+                  className="flex flex-col items-center gap-1.5 p-3 rounded-xl"
+                  style={active
+                    ? {
+                        background: "rgba(0,212,106,0.12)",
+                        backdropFilter: "blur(8px)",
+                        border: "1px solid rgba(0,212,106,0.25)",
+                        boxShadow: "0 0 16px rgba(0,212,106,0.15)",
+                        color: "var(--green)",
+                        transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                      }
+                    : {
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.06)",
+                        color: "var(--text-2)",
+                        transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                      }
+                  }
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span className="text-[10px] font-medium text-center leading-tight">{item.label}</span>
+                </Link>
+              </motion.div>
             );
           })}
         </div>

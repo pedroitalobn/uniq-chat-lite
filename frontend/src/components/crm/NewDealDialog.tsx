@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { X } from "lucide-react";
 import { crmApi, companiesApi, dealsApi } from "@/lib/api";
@@ -89,15 +90,46 @@ export function NewDealDialog({
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 backdrop-blur-sm"
-        style={{ background: uniq.backdrop }}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="absolute inset-0"
+        style={{
+          background: "rgba(0,0,0,0.70)",
+          backdropFilter: "blur(8px) saturate(150%)",
+          WebkitBackdropFilter: "blur(8px) saturate(150%)",
+        }}
         onClick={onClose}
       />
-      <div
-        className="relative w-full max-w-xl rounded-2xl p-6 shadow-xl"
-        style={{ background: uniq.bg, border: `1px solid ${uniq.border}` }}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: -16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: -8 }}
+        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        className="relative w-full max-w-xl rounded-2xl p-6 overflow-hidden"
+        style={{
+          background: "linear-gradient(160deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 50%, rgba(0,0,0,0.10) 100%)",
+          backdropFilter: "blur(32px) saturate(200%) brightness(1.1)",
+          WebkitBackdropFilter: "blur(32px) saturate(200%) brightness(1.1)",
+          border: "1px solid rgba(255,255,255,0.15)",
+          boxShadow: "0 40px 80px rgba(0,0,0,0.70), 0 16px 32px rgba(0,0,0,0.50), 0 4px 8px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.20)",
+        }}
       >
+        {/* Top light line */}
+        <div style={{
+          position: "absolute", top: 0, left: "20%", right: "20%", height: "1px",
+          background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.30), transparent)",
+          pointerEvents: "none",
+        }} />
+        {/* Ambient orb */}
+        <div style={{
+          position: "absolute", top: "-60px", right: "-60px",
+          width: "200px", height: "200px", borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(0,212,106,0.15) 0%, transparent 70%)",
+          filter: "blur(40px)", pointerEvents: "none",
+        }} />
         <div className="mb-4 flex items-start justify-between">
           <div>
             <h2 className="text-base font-medium" style={{ color: uniq.textStrong }}>
@@ -267,7 +299,7 @@ export function NewDealDialog({
             {create.isPending ? "Criando…" : "Criar deal"}
           </button>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

@@ -137,9 +137,44 @@ function StatCard({
 
   const inner = (
     <div
-      className="rounded-2xl p-4 sm:p-5 transition-all hover:scale-[1.01] animate-fade-in-up h-full relative overflow-hidden"
-      style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}
+      className="p-4 sm:p-5 animate-fade-in-up h-full"
+      style={{
+        background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+        backdropFilter: "blur(20px) saturate(180%)",
+        WebkitBackdropFilter: "blur(20px) saturate(180%)",
+        border: "1px solid rgba(255,255,255,0.10)",
+        borderRadius: "20px",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.30), 0 2px 6px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.10)",
+        transition: "all 0.35s cubic-bezier(0.16,1,0.3,1)",
+        position: "relative",
+        overflow: "hidden"
+      }}
+      onMouseEnter={e => {
+        const el = e.currentTarget as HTMLElement;
+        el.style.transform = "translateY(-3px) scale(1.003)";
+        el.style.boxShadow = "0 16px 40px rgba(0,0,0,0.40), 0 4px 12px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.14), 0 0 0 1px rgba(0,212,106,0.10)";
+      }}
+      onMouseLeave={e => {
+        const el = e.currentTarget as HTMLElement;
+        el.style.transform = "";
+        el.style.boxShadow = "0 8px 24px rgba(0,0,0,0.30), 0 2px 6px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.10)";
+      }}
     >
+      {/* Linha de luz no topo */}
+      <div style={{
+        position: "absolute", top: 0, left: "15%", right: "15%", height: "1px",
+        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.20), transparent)",
+        pointerEvents: "none"
+      }} />
+      {/* Ambient orb */}
+      <div style={{
+        position: "absolute", top: "-30px", right: "-30px",
+        width: "100px", height: "100px",
+        borderRadius: "50%",
+        background: `radial-gradient(circle, ${s.icon}1f 0%, transparent 70%)`,
+        filter: "blur(20px)",
+        pointerEvents: "none"
+      }} />
       <div
         className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 sm:mb-4"
         style={{ background: s.bg, border: `1px solid ${s.border}` }}
@@ -330,7 +365,26 @@ export default function DashboardPage() {
   const [tab, setTab] = useState<Tab>("geral");
 
   return (
-    <div className="space-y-5 sm:space-y-7">
+    <div className="space-y-5 sm:space-y-7" style={{ position: "relative", zIndex: 1 }}>
+      {/* Atmospheric orbs */}
+      <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
+        <div style={{
+          position: "absolute", top: "10%", left: "15%",
+          width: "400px", height: "400px",
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(0,212,106,0.06) 0%, transparent 70%)",
+          filter: "blur(60px)",
+          animation: "liquid-glow 6s ease-in-out infinite"
+        }} />
+        <div style={{
+          position: "absolute", bottom: "20%", right: "10%",
+          width: "300px", height: "300px",
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(59,130,246,0.05) 0%, transparent 70%)",
+          filter: "blur(60px)",
+          animation: "liquid-glow 8s ease-in-out infinite 2s"
+        }} />
+      </div>
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -346,8 +400,15 @@ export default function DashboardPage() {
       </div>
 
       {/* Pills de tabs — mesmo padrão dos outros menus pill (CRMTabs, etc) */}
-      <div className="flex items-center gap-0.5 rounded-2xl p-1 self-start overflow-x-auto"
-        style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+      <div className="flex items-center gap-0.5 self-start overflow-x-auto"
+        style={{
+          background: "rgba(255,255,255,0.04)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: "16px",
+          padding: "4px"
+        }}>
         <DashTab id="geral"     label="Geral"      icon={LayoutDashboard} tab={tab} setTab={setTab} />
         <DashTab id="campaigns" label="Campanhas"  icon={Megaphone}        tab={tab} setTab={setTab} />
         <DashTab id="inbox"     label="Inbox / SLA" icon={InboxIcon}       tab={tab} setTab={setTab} />
@@ -616,10 +677,18 @@ function DashTab({ id, label, icon: Icon, tab, setTab }: {
   return (
     <button
       onClick={() => setTab(id)}
-      className="flex items-center gap-2 rounded-xl px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium transition-all duration-150 whitespace-nowrap"
+      className="flex items-center gap-2 px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap"
       style={active
-        ? { background: "rgba(0,212,106,0.12)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.25)" }
-        : { background: "transparent", color: "hsl(240 8% 55%)", border: "1px solid transparent" }}
+        ? {
+            background: "linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04))",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: "12px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.10)",
+            color: "#00d46a"
+          }
+        : { background: "transparent", color: "hsl(240 8% 55%)", border: "1px solid transparent", borderRadius: "12px" }}
     >
       <Icon className="w-3.5 h-3.5" />
       <span className="hidden xs:inline sm:inline">{label}</span>

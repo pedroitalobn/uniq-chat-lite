@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Headset, Contact, Megaphone, Bot, Wand2, Smartphone, Plug, Settings,
   LayoutDashboard, Sparkles, Search, X,
@@ -108,139 +109,251 @@ export function CommandPalette() {
     setActiveIndex(0);
   }, [query]);
 
-  if (!open) return null;
-
   let globalIndex = -1;
 
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-start justify-center pt-[15vh]"
-      style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)" }}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) closePalette();
-      }}
-    >
-      <div
-        className="w-full max-w-xl mx-4 rounded-2xl overflow-hidden flex flex-col"
-        style={{
-          background: "var(--surface-2)",
-          border: "1px solid var(--surface-border)",
-          boxShadow: "0 25px 50px rgba(0,0,0,0.6)",
-          maxHeight: "60vh",
-        }}
-      >
-        {/* Search input */}
-        <div
-          className="flex items-center gap-3 px-4 py-3"
-          style={{ borderBottom: "1px solid var(--surface-border)" }}
-        >
-          <Search className="w-4 h-4 flex-shrink-0" style={{ color: "var(--text-3)" }} />
-          <input
-            autoFocus
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar páginas e ações..."
-            className="flex-1 bg-transparent outline-none text-sm"
-            style={{ color: "var(--text-1)" }}
-          />
-          {query && (
-            <button onClick={() => setQuery("")} style={{ color: "var(--text-4)" }}>
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-          <kbd
-            className="text-[10px] px-1.5 py-0.5 rounded"
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            key="cmd-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onMouseDown={closePalette}
             style={{
-              background: "var(--surface-3)",
-              border: "1px solid var(--surface-border)",
-              color: "var(--text-4)",
+              position: "fixed",
+              inset: 0,
+              zIndex: 9998,
+              background: "rgba(0,0,0,0.70)",
+              backdropFilter: "blur(8px) saturate(150%)",
+              WebkitBackdropFilter: "blur(8px) saturate(150%)",
+            }}
+          />
+
+          {/* Modal */}
+          <motion.div
+            key="cmd-modal"
+            initial={{ opacity: 0, scale: 0.95, y: -20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: -10 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            style={{
+              position: "fixed",
+              top: "20%",
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: "min(600px, 90vw)",
+              zIndex: 9999,
+              background: "linear-gradient(160deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 50%, rgba(0,0,0,0.10) 100%)",
+              backdropFilter: "blur(32px) saturate(200%) brightness(1.1)",
+              WebkitBackdropFilter: "blur(32px) saturate(200%) brightness(1.1)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              borderRadius: "24px",
+              boxShadow: "0 40px 80px rgba(0,0,0,0.70), 0 16px 32px rgba(0,0,0,0.50), 0 4px 8px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.20)",
+              overflow: "hidden",
+              maxHeight: "60vh",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
-            ESC
-          </kbd>
-        </div>
+            {/* Top light line */}
+            <div style={{
+              position: "absolute",
+              top: 0,
+              left: "20%",
+              right: "20%",
+              height: "1px",
+              background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.30), transparent)",
+              pointerEvents: "none",
+            }} />
 
-        {/* Results */}
-        <div className="overflow-y-auto py-2">
-          {filtered.length === 0 && (
-            <p className="text-center text-sm py-8" style={{ color: "var(--text-4)" }}>
-              Nenhum resultado encontrado
-            </p>
-          )}
-          {sections.map((section) => {
-            const sectionItems = filtered.filter((i) => i.section === section);
-            return (
-              <div key={section}>
+            {/* Ambient orb */}
+            <div style={{
+              position: "absolute",
+              top: "-60px",
+              right: "-60px",
+              width: "200px",
+              height: "200px",
+              borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(0,212,106,0.15) 0%, transparent 70%)",
+              filter: "blur(40px)",
+              pointerEvents: "none",
+            }} />
+
+            {/* Search input */}
+            <div style={{ position: "relative", flexShrink: 0 }}>
+              <Search
+                className="w-4 h-4"
+                style={{
+                  position: "absolute",
+                  left: "20px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "var(--text-3)",
+                  pointerEvents: "none",
+                }}
+              />
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar páginas e ações..."
+                style={{
+                  background: "rgba(255,255,255,0.06)",
+                  backdropFilter: "blur(8px)",
+                  border: "none",
+                  borderBottom: "1px solid rgba(255,255,255,0.10)",
+                  color: "var(--text-1)",
+                  fontSize: "16px",
+                  padding: "18px 20px 18px 52px",
+                  width: "100%",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery("")}
+                  style={{
+                    position: "absolute",
+                    right: "16px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "var(--text-4)",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: "4px",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Results */}
+            <div style={{ overflowY: "auto", padding: "8px 0", flex: 1 }}>
+              {filtered.length === 0 && (
                 <p
-                  className="text-[10px] font-semibold uppercase tracking-widest px-4 py-1.5"
+                  className="text-center text-sm py-8"
                   style={{ color: "var(--text-4)" }}
                 >
-                  {section}
+                  Nenhum resultado encontrado
                 </p>
-                {sectionItems.map((item) => {
-                  globalIndex++;
-                  const idx = globalIndex;
-                  const isActive = activeIndex === idx;
-                  return (
-                    <button
-                      key={item.id}
-                      onMouseEnter={() => setActiveIndex(idx)}
-                      onClick={() => navigate(item)}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all duration-100"
+              )}
+              {sections.map((section) => {
+                const sectionItems = filtered.filter((i) => i.section === section);
+                return (
+                  <div key={section}>
+                    <p
+                      className="text-[10px] font-semibold uppercase tracking-widest"
                       style={{
-                        background: isActive ? "var(--surface-3)" : "transparent",
-                        borderLeft: isActive ? "2px solid var(--green)" : "2px solid transparent",
-                        color: isActive ? "var(--text-1)" : "var(--text-2)",
+                        color: "var(--text-4)",
+                        padding: "6px 16px",
+                        opacity: 0.6,
                       }}
                     >
-                      <span
-                        className="flex items-center justify-center w-7 h-7 rounded-lg flex-shrink-0"
-                        style={{
-                          background: isActive ? "rgba(0,212,106,0.12)" : "var(--surface-3)",
-                          color: isActive ? "var(--green)" : "var(--text-3)",
-                        }}
-                      >
-                        <item.icon className="w-3.5 h-3.5" />
-                      </span>
-                      <span className="flex-1 text-sm font-medium">{item.label}</span>
-                      {item.shortcut && (
-                        <span className="flex items-center gap-1">
-                          {item.shortcut.split(" ").map((k, i) => (
-                            <kbd
-                              key={i}
-                              className="text-[10px] px-1.5 py-0.5 rounded"
-                              style={{
-                                background: "var(--surface-3)",
-                                border: "1px solid var(--surface-border)",
-                                color: "var(--text-4)",
-                              }}
-                            >
-                              {k}
-                            </kbd>
-                          ))}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
+                      {section}
+                    </p>
+                    {sectionItems.map((item) => {
+                      globalIndex++;
+                      const idx = globalIndex;
+                      const isActive = activeIndex === idx;
+                      return (
+                        <button
+                          key={item.id}
+                          onMouseEnter={() => setActiveIndex(idx)}
+                          onClick={() => navigate(item)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                            padding: "10px 16px",
+                            borderRadius: "12px",
+                            cursor: "pointer",
+                            transition: "all 0.15s cubic-bezier(0.16,1,0.3,1)",
+                            margin: "2px 8px",
+                            width: "calc(100% - 16px)",
+                            textAlign: "left",
+                            border: "none",
+                            background: isActive ? "rgba(255,255,255,0.08)" : "transparent",
+                            backdropFilter: isActive ? "blur(4px)" : undefined,
+                            borderLeft: isActive ? "2px solid var(--green)" : "2px solid transparent",
+                            boxShadow: isActive ? "inset 0 0 20px rgba(0,212,106,0.05)" : "none",
+                            color: isActive ? "var(--text-1)" : "var(--text-2)",
+                            boxSizing: "border-box",
+                          }}
+                        >
+                          <span
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: "28px",
+                              height: "28px",
+                              borderRadius: "8px",
+                              flexShrink: 0,
+                              background: isActive ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.06)",
+                              color: isActive ? "var(--green)" : "var(--text-3)",
+                              transition: "all 0.15s cubic-bezier(0.16,1,0.3,1)",
+                            }}
+                          >
+                            <item.icon style={{ width: "14px", height: "14px" }} />
+                          </span>
+                          <span style={{ flex: 1, fontSize: "14px", fontWeight: 500 }}>{item.label}</span>
+                          {item.shortcut && (
+                            <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                              {item.shortcut.split(" ").map((k, i) => (
+                                <kbd
+                                  key={i}
+                                  style={{
+                                    fontSize: "10px",
+                                    padding: "2px 6px",
+                                    borderRadius: "4px",
+                                    background: "rgba(255,255,255,0.06)",
+                                    border: "1px solid rgba(255,255,255,0.10)",
+                                    color: "var(--text-4)",
+                                    fontFamily: "monospace",
+                                  }}
+                                >
+                                  {k}
+                                </kbd>
+                              ))}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
 
-        {/* Footer */}
-        <div
-          className="flex items-center gap-3 px-4 py-2 text-[10px]"
-          style={{
-            borderTop: "1px solid var(--surface-border)",
-            color: "var(--text-4)",
-          }}
-        >
-          <span><kbd className="font-mono">↑↓</kbd> navegar</span>
-          <span><kbd className="font-mono">↵</kbd> selecionar</span>
-          <span><kbd className="font-mono">ESC</kbd> fechar</span>
-        </div>
-      </div>
-    </div>
+            {/* Footer */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                padding: "8px 16px",
+                fontSize: "10px",
+                borderTop: "1px solid rgba(255,255,255,0.08)",
+                color: "var(--text-4)",
+                flexShrink: 0,
+              }}
+            >
+              <span><kbd style={{ fontFamily: "monospace" }}>↑↓</kbd> navegar</span>
+              <span><kbd style={{ fontFamily: "monospace" }}>↵</kbd> selecionar</span>
+              <span><kbd style={{ fontFamily: "monospace" }}>ESC</kbd> fechar</span>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   );
 }
