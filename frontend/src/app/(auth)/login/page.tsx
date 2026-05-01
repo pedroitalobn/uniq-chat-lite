@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import {
@@ -68,15 +68,6 @@ const LOGIN_TR = {
     err_pass_match: "Las contraseñas no coinciden",
   },
 } as const;
-
-// Map country code → language
-function countryToLang(country: string): Lang {
-  const pt = ["BR", "PT", "AO", "MZ", "CV", "GW", "ST", "TL"];
-  const es = ["MX", "AR", "CO", "CL", "PE", "VE", "EC", "BO", "PY", "UY", "CR", "PA", "GT", "HN", "SV", "NI", "DO", "CU", "PR", "ES", "GQ"];
-  if (pt.includes(country)) return "pt";
-  if (es.includes(country)) return "es";
-  return "en";
-}
 
 // ─── OAuth Button ─────────────────────────────────────────────────────────────
 function OAuthButton({
@@ -349,15 +340,17 @@ function LoginForm({ onSuccess, tr }: { onSuccess: () => void; tr: (typeof LOGIN
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function LoginPage() {
-  const [lang, setLang] = useState<Lang>("pt");
+  // Idioma detectado pelo middleware via CF-IPCountry (cookie sc-lang).
+  // Fallback: Accept-Language do browser, depois "pt".
+  const [lang, setLang] = useState<Lang>(() => {
+    if (typeof document === "undefined") return "pt";
+    const cookie = document.cookie
+      .split("; ")
+      .find((r) => r.startsWith("sc-lang="))
+      ?.split("=")[1] as Lang | undefined;
+    return (cookie && cookie in LOGIN_TR) ? cookie : "pt";
+  });
   const tr = LOGIN_TR[lang];
-
-  useEffect(() => {
-    fetch("https://freeipapi.com/api/json", { signal: AbortSignal.timeout(3000) })
-      .then(r => r.json())
-      .then(d => { if (d?.countryCode) setLang(countryToLang(d.countryCode)); })
-      .catch(() => {/* keep default pt */});
-  }, []);
 
   const onSuccess = () => {
     // Respeita ?callbackUrl= (usado pelo fluxo de convite, por exemplo

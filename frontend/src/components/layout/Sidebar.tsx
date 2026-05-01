@@ -118,7 +118,7 @@ export function Sidebar() {
   const navItems: NavItem[] = [
     { href: "/uniq-ai",      label: "Uniq AI",             icon: Sparkles,        exact: false, show: canSeeUniqAi },
     { href: "/dashboard",    label: t("nav_dashboard"),    icon: LayoutDashboard, exact: true,  show: canSeeDashboard },
-    { href: "/inbox",        label: "Inbox",               icon: Headset,         exact: false, show: canSeeInbox },
+    { href: "/inbox",        label: t("nav_inbox"),        icon: Headset,         exact: false, show: canSeeInbox },
     { href: "/crm",          label: t("nav_crm"),          icon: Contact,         exact: false, show: canSeeCRM },
     { href: "/campaigns",    label: t("nav_campaigns"),    icon: Megaphone,       exact: false, show: canSeeCampaigns },
     { href: "/journeys",     label: "Jornadas",            icon: Wand2,           exact: false, show: canSeeJourneys },
@@ -127,7 +127,7 @@ export function Sidebar() {
     { href: "/shops",        label: "Shops",               icon: ShoppingBag,     exact: false, show: true },
     { href: "/instances",    label: t("nav_instances"),    icon: Smartphone,      exact: false, show: canSeeInstances },
     { href: "/integrations", label: t("nav_integrations"), icon: Plug,            exact: false, show: canSeeIntegrations },
-    { href: "/settings",     label: "Conta",               icon: Settings,        exact: false, show: true },
+    { href: "/settings",     label: t("nav_settings"),     icon: Settings,        exact: false, show: true },
   ];
   const visibleNavItems = navItems.filter((n) => n.show);
 

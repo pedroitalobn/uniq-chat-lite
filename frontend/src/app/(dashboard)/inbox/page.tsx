@@ -11,6 +11,7 @@ import {
   Layers, Smartphone, Radio, RefreshCw, Check, BarChart3,
   MoreVertical, Users, Building2, Zap, Bell, X,
 } from "lucide-react";
+import { usePreferences } from "@/lib/preferences";
 import {
   conversationsApi, queuesApi, workspacesApi, channelsApi, instancesApi,
 } from "@/lib/api";
@@ -56,17 +57,21 @@ interface InboxStats {
   mine_open: number;
 }
 
-const TABS: { id: StatusTab; label: string }[] = [
-  { id: "all", label: "Todos" },
-  { id: "open", label: "Abertos" },
-  { id: "pending", label: "Pendentes" },
-  { id: "unassigned", label: "Sem atribuição" },
-  { id: "snoozed", label: "Soneca" },
-  { id: "resolved", label: "Resolvidos" },
-  { id: "closed", label: "Encerrados" },
-];
+function getTabs(t: (k: string) => string): { id: StatusTab; label: string }[] {
+  return [
+    { id: "all",        label: t("inbox_all") },
+    { id: "open",       label: t("inbox_open") },
+    { id: "pending",    label: t("inbox_pending") },
+    { id: "unassigned", label: t("inbox_unassigned") },
+    { id: "snoozed",    label: t("inbox_snoozed") },
+    { id: "resolved",   label: t("inbox_resolved") },
+    { id: "closed",     label: t("inbox_closed") },
+  ];
+}
 
 export default function InboxPage() {
+  const { t } = usePreferences();
+  const TABS = getTabs(t);
   const { currentWorkspace } = useWorkspace();
   const { hasPerm, isLoading: permsLoading, isOwner } = useWorkspacePermissions();
   const { data: session } = useSession();
@@ -365,32 +370,32 @@ export default function InboxPage() {
     (statsQ.data.conversations === 0 || statsQ.data.pending_backfill >= 100);
 
   const agentLabel = (() => {
-    if (agentScope === "me") return "Meus atendimentos";
-    if (agentScope === "all") return "Todos os agentes";
+    if (agentScope === "me") return t("inbox_my");
+    if (agentScope === "all") return t("inbox_all_agents");
     const m = membersQ.data?.find((x) => x.user_id === agentScope);
     return m?.user?.name || m?.user?.email || "Agente";
   })();
 
   const queueLabel =
-    queueScope === "all" ? "Todas as filas"
+    queueScope === "all" ? t("inbox_all_queues")
     : queueScope === "none" ? "Sem fila"
     : queuesQ.data?.items.find((q) => q.id === queueScope)?.name ?? "Fila";
 
   const availableChannels = (channelsQ.data ?? []).filter((c) => c.available);
   const channelLabel =
-    channelFilter.length === 0 ? "Todos os canais"
+    channelFilter.length === 0 ? t("inbox_all_channels")
     : channelFilter.length === 1
       ? availableChannels.find((c) => c.id === channelFilter[0])?.label ?? channelFilter[0]
       : `${channelFilter.length} canais`;
 
   const connectedInstances = instancesQ.data ?? [];
   const instanceLabel =
-    instanceFilter.length === 0 ? "Todas as instâncias"
+    instanceFilter.length === 0 ? t("inbox_all_instances")
     : instanceFilter.length === 1
       ? connectedInstances.find((i) => i.id === instanceFilter[0])?.name ?? "Instância"
       : `${instanceFilter.length} instâncias`;
 
-  const statusLabel = TABS.find((t) => t.id === statusTab)?.label ?? "Atendimentos";
+  const statusLabel = TABS.find((tb) => tb.id === statusTab)?.label ?? t("inbox_attendances");
 
   return (
     <div className="flex h-full flex-col uniq-page rounded-xl overflow-hidden">
@@ -401,11 +406,11 @@ export default function InboxPage() {
         <div className="flex flex-wrap items-center gap-3">
           <div>
             <h1 className="text-xl font-medium" style={{ color: "hsl(240 15% 93%)" }}>
-              Inbox
+              {t("inbox_title")}
             </h1>
             <p className="text-xs" style={{ color: "hsl(240 8% 48%)" }}>
               {viewMode === "reports"
-                ? "Relatórios e métricas do atendimento"
+                ? t("inbox_reports")
                 : `${agentLabel} · ${channelLabel} · ${instanceLabel} · ${queueLabel}`}
             </p>
           </div>
@@ -445,7 +450,7 @@ export default function InboxPage() {
                   color: "#00d46a",
                 }}
               >
-                <Bell className="h-3 w-3" /> Ativar notificações
+                <Bell className="h-3 w-3" /> {t("inbox_enable_notif")}
               </button>
             )}
             {/* Agent */}
@@ -471,7 +476,7 @@ export default function InboxPage() {
                 }))}
                 selected={channelFilter}
                 onChange={setChannelFilter}
-                emptyMsg="Nenhum canal disponível"
+                emptyMsg={t("common_no_results")}
               />
             </div>
 
@@ -488,7 +493,7 @@ export default function InboxPage() {
                 }))}
                 selected={instanceFilter}
                 onChange={setInstanceFilter}
-                emptyMsg="Nenhuma instância conectada"
+                emptyMsg={t("common_no_results")}
               />
             </div>
 
@@ -497,7 +502,7 @@ export default function InboxPage() {
               icon={<Layers className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />}
               label={queueLabel}
               items={[
-                { id: "all", label: "Todas as filas" },
+                { id: "all", label: t("inbox_all_queues") },
                 { id: "none", label: "Sem fila" },
                 ...(queuesQ.data?.items.map((q) => ({ id: q.id, label: q.name })) ?? []),
               ]}
@@ -509,7 +514,7 @@ export default function InboxPage() {
                   className="block border-t px-3 py-2 text-xs"
                   style={{ color: "hsl(240 8% 52%)", borderColor: "hsl(240 12% 16%)" }}
                 >
-                  Gerenciar filas →
+                  {t("inbox_manage_queues")}
                 </Link>
               }
             />
@@ -724,6 +729,7 @@ function AgentDropdown({
   members: WorkspaceMember[];
   currentLabel: string;
 }) {
+  const { t } = usePreferences();
   const [open, setOpen] = useState(false);
   return (
     <Dropdown
@@ -751,14 +757,14 @@ function AgentDropdown({
         active={agentScope === "me"}
         onClick={() => { setAgentScope("me"); setOpen(false); }}
       >
-        Meus atendimentos
+        {t("inbox_my")}
       </DropdownItem>
       {canViewAll && (
         <DropdownItem
           active={agentScope === "all"}
           onClick={() => { setAgentScope("all"); setOpen(false); }}
         >
-          Todos os agentes
+          {t("inbox_all_agents")}
         </DropdownItem>
       )}
       {canViewAll && members.length > 0 && (

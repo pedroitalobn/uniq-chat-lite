@@ -21,11 +21,13 @@ interface Preferences {
 
 const TR = {
   pt: {
+    // Nav
     nav_dashboard: "Dashboard", nav_servers: "Servers", nav_instances: "Instâncias",
     nav_crm: "CRM", nav_campaigns: "Campanhas", nav_api_keys: "API Keys",
-    nav_integrations: "Integrações",
+    nav_integrations: "Integrações", nav_inbox: "Inbox",
     nav_api_docs: "API Docs", nav_settings: "Conta", nav_logout: "Sair da conta",
     nav_admin: "Admin", nav_users: "Usuários", nav_plans: "Planos",
+    // Settings
     settings_title: "Configurações", settings_desc: "Gerencie seu perfil e segurança da conta",
     settings_profile: "Perfil", settings_profile_desc: "Atualize seu nome e username",
     settings_security: "Segurança", settings_security_desc: "Altere sua senha de acesso",
@@ -34,18 +36,49 @@ const TR = {
     settings_language: "Idioma", settings_theme: "Tema",
     settings_theme_dark: "Escuro", settings_theme_light: "Claro", settings_theme_system: "Sistema",
     settings_timezone: "Fuso horário", settings_save: "Salvar preferências", settings_saved: "Preferências salvas!",
-    instances_title: "Instâncias", instances_new: "Nova Instância",
-    campaigns_new: "Nova Campanha",
-    crm_new_contact: "Novo Contato",
-    servers_new: "Novo Server",
     timezone_label: "Fuso horário ativo",
+    // Instances
+    instances_title: "Instâncias", instances_new: "Nova Instância",
+    instance_connected: "Conectado", instance_disconnected: "Desconectado", instance_connecting: "Conectando",
+    instance_scan_qr: "Escanear QR Code", instance_reconnect: "Reconectar", instance_delete: "Excluir",
+    // Inbox
+    inbox_title: "Inbox", inbox_all: "Todos", inbox_open: "Abertos", inbox_pending: "Pendentes",
+    inbox_unassigned: "Sem atribuição", inbox_snoozed: "Soneca", inbox_resolved: "Resolvidos",
+    inbox_closed: "Encerrados", inbox_attendances: "Atendimentos",
+    inbox_my: "Meus atendimentos", inbox_all_agents: "Todos os agentes",
+    inbox_all_channels: "Todos os canais", inbox_all_instances: "Todas as instâncias",
+    inbox_all_queues: "Todas as filas", inbox_search: "Buscar…",
+    inbox_select: "Selecione um atendimento", inbox_empty: "Nenhum atendimento neste filtro.",
+    inbox_refresh: "Atualizar", inbox_enable_notif: "Ativar notificações",
+    inbox_manage_queues: "Gerenciar filas →", inbox_reports: "Relatórios e métricas do atendimento",
+    // CRM
+    crm_new_contact: "Novo Contato", crm_new_deal: "Novo Deal", crm_new_company: "Nova Empresa",
+    crm_contacts: "Contatos", crm_deals: "Deals", crm_companies: "Empresas",
+    crm_segments: "Segmentos", crm_import: "Importar", crm_duplicates: "Duplicatas",
+    crm_search: "Buscar…", crm_empty_contacts: "Ainda sem contatos cadastrados.",
+    crm_empty_deals: "Nenhum deal neste funil.", crm_empty_companies: "Ainda sem empresas cadastradas.",
+    // Campaigns
+    campaigns_new: "Nova Campanha", campaigns_title: "Campanhas",
+    // Servers
+    servers_new: "Novo Server", servers_title: "Servers",
+    // Common
+    common_save: "Salvar", common_cancel: "Cancelar", common_delete: "Excluir",
+    common_edit: "Editar", common_create: "Criar", common_loading: "Carregando…",
+    common_error: "Ocorreu um erro", common_success: "Sucesso", common_confirm: "Confirmar",
+    common_search: "Buscar", common_filter: "Filtrar", common_clear: "Limpar",
+    common_back: "Voltar", common_next: "Próximo", common_close: "Fechar",
+    common_name: "Nome", common_email: "E-mail", common_phone: "Telefone",
+    common_status: "Status", common_created_at: "Criado em", common_updated_at: "Atualizado em",
+    common_no_results: "Nenhum resultado encontrado.", common_try_again: "Tentar novamente",
   },
   en: {
+    // Nav
     nav_dashboard: "Dashboard", nav_servers: "Servers", nav_instances: "Instances",
     nav_crm: "CRM", nav_campaigns: "Campaigns", nav_api_keys: "API Keys",
-    nav_integrations: "Integrations",
+    nav_integrations: "Integrations", nav_inbox: "Inbox",
     nav_api_docs: "API Docs", nav_settings: "Account", nav_logout: "Sign out",
     nav_admin: "Admin", nav_users: "Users", nav_plans: "Plans",
+    // Settings
     settings_title: "Settings", settings_desc: "Manage your profile and account security",
     settings_profile: "Profile", settings_profile_desc: "Update your name and username",
     settings_security: "Security", settings_security_desc: "Change your access password",
@@ -54,18 +87,49 @@ const TR = {
     settings_language: "Language", settings_theme: "Theme",
     settings_theme_dark: "Dark", settings_theme_light: "Light", settings_theme_system: "System",
     settings_timezone: "Timezone", settings_save: "Save preferences", settings_saved: "Preferences saved!",
-    instances_title: "Instances", instances_new: "New Instance",
-    campaigns_new: "New Campaign",
-    crm_new_contact: "New Contact",
-    servers_new: "New Server",
     timezone_label: "Active timezone",
+    // Instances
+    instances_title: "Instances", instances_new: "New Instance",
+    instance_connected: "Connected", instance_disconnected: "Disconnected", instance_connecting: "Connecting",
+    instance_scan_qr: "Scan QR Code", instance_reconnect: "Reconnect", instance_delete: "Delete",
+    // Inbox
+    inbox_title: "Inbox", inbox_all: "All", inbox_open: "Open", inbox_pending: "Pending",
+    inbox_unassigned: "Unassigned", inbox_snoozed: "Snoozed", inbox_resolved: "Resolved",
+    inbox_closed: "Closed", inbox_attendances: "Conversations",
+    inbox_my: "My conversations", inbox_all_agents: "All agents",
+    inbox_all_channels: "All channels", inbox_all_instances: "All instances",
+    inbox_all_queues: "All queues", inbox_search: "Search…",
+    inbox_select: "Select a conversation", inbox_empty: "No conversations match this filter.",
+    inbox_refresh: "Refresh", inbox_enable_notif: "Enable notifications",
+    inbox_manage_queues: "Manage queues →", inbox_reports: "Reports and attendance metrics",
+    // CRM
+    crm_new_contact: "New Contact", crm_new_deal: "New Deal", crm_new_company: "New Company",
+    crm_contacts: "Contacts", crm_deals: "Deals", crm_companies: "Companies",
+    crm_segments: "Segments", crm_import: "Import", crm_duplicates: "Duplicates",
+    crm_search: "Search…", crm_empty_contacts: "No contacts yet.",
+    crm_empty_deals: "No deals in this funnel.", crm_empty_companies: "No companies yet.",
+    // Campaigns
+    campaigns_new: "New Campaign", campaigns_title: "Campaigns",
+    // Servers
+    servers_new: "New Server", servers_title: "Servers",
+    // Common
+    common_save: "Save", common_cancel: "Cancel", common_delete: "Delete",
+    common_edit: "Edit", common_create: "Create", common_loading: "Loading…",
+    common_error: "An error occurred", common_success: "Success", common_confirm: "Confirm",
+    common_search: "Search", common_filter: "Filter", common_clear: "Clear",
+    common_back: "Back", common_next: "Next", common_close: "Close",
+    common_name: "Name", common_email: "Email", common_phone: "Phone",
+    common_status: "Status", common_created_at: "Created at", common_updated_at: "Updated at",
+    common_no_results: "No results found.", common_try_again: "Try again",
   },
   es: {
+    // Nav
     nav_dashboard: "Panel", nav_servers: "Servidores", nav_instances: "Instancias",
     nav_crm: "CRM", nav_campaigns: "Campañas", nav_api_keys: "Claves API",
-    nav_integrations: "Integraciones",
+    nav_integrations: "Integraciones", nav_inbox: "Bandeja",
     nav_api_docs: "Docs API", nav_settings: "Cuenta", nav_logout: "Cerrar sesión",
     nav_admin: "Admin", nav_users: "Usuarios", nav_plans: "Planes",
+    // Settings
     settings_title: "Configuración", settings_desc: "Gestiona tu perfil y seguridad",
     settings_profile: "Perfil", settings_profile_desc: "Actualiza tu nombre y usuario",
     settings_security: "Seguridad", settings_security_desc: "Cambia tu contraseña",
@@ -74,11 +138,40 @@ const TR = {
     settings_language: "Idioma", settings_theme: "Tema",
     settings_theme_dark: "Oscuro", settings_theme_light: "Claro", settings_theme_system: "Sistema",
     settings_timezone: "Zona horaria", settings_save: "Guardar preferencias", settings_saved: "¡Preferencias guardadas!",
-    instances_title: "Instancias", instances_new: "Nueva Instancia",
-    campaigns_new: "Nueva Campaña",
-    crm_new_contact: "Nuevo Contacto",
-    servers_new: "Nuevo Servidor",
     timezone_label: "Zona horaria activa",
+    // Instances
+    instances_title: "Instancias", instances_new: "Nueva Instancia",
+    instance_connected: "Conectado", instance_disconnected: "Desconectado", instance_connecting: "Conectando",
+    instance_scan_qr: "Escanear código QR", instance_reconnect: "Reconectar", instance_delete: "Eliminar",
+    // Inbox
+    inbox_title: "Bandeja", inbox_all: "Todos", inbox_open: "Abiertos", inbox_pending: "Pendientes",
+    inbox_unassigned: "Sin asignar", inbox_snoozed: "Pospuestos", inbox_resolved: "Resueltos",
+    inbox_closed: "Cerrados", inbox_attendances: "Atenciones",
+    inbox_my: "Mis atenciones", inbox_all_agents: "Todos los agentes",
+    inbox_all_channels: "Todos los canales", inbox_all_instances: "Todas las instancias",
+    inbox_all_queues: "Todas las colas", inbox_search: "Buscar…",
+    inbox_select: "Selecciona una conversación", inbox_empty: "Ninguna atención en este filtro.",
+    inbox_refresh: "Actualizar", inbox_enable_notif: "Activar notificaciones",
+    inbox_manage_queues: "Gestionar colas →", inbox_reports: "Informes y métricas de atención",
+    // CRM
+    crm_new_contact: "Nuevo Contacto", crm_new_deal: "Nuevo Deal", crm_new_company: "Nueva Empresa",
+    crm_contacts: "Contactos", crm_deals: "Deals", crm_companies: "Empresas",
+    crm_segments: "Segmentos", crm_import: "Importar", crm_duplicates: "Duplicados",
+    crm_search: "Buscar…", crm_empty_contacts: "Aún sin contactos registrados.",
+    crm_empty_deals: "Ningún deal en este embudo.", crm_empty_companies: "Aún sin empresas registradas.",
+    // Campaigns
+    campaigns_new: "Nueva Campaña", campaigns_title: "Campañas",
+    // Servers
+    servers_new: "Nuevo Servidor", servers_title: "Servidores",
+    // Common
+    common_save: "Guardar", common_cancel: "Cancelar", common_delete: "Eliminar",
+    common_edit: "Editar", common_create: "Crear", common_loading: "Cargando…",
+    common_error: "Ocurrió un error", common_success: "Éxito", common_confirm: "Confirmar",
+    common_search: "Buscar", common_filter: "Filtrar", common_clear: "Limpiar",
+    common_back: "Volver", common_next: "Siguiente", common_close: "Cerrar",
+    common_name: "Nombre", common_email: "Correo", common_phone: "Teléfono",
+    common_status: "Estado", common_created_at: "Creado el", common_updated_at: "Actualizado el",
+    common_no_results: "No se encontraron resultados.", common_try_again: "Intentar de nuevo",
   },
 } as const;
 
@@ -105,7 +198,13 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const lang = (localStorage.getItem("sc-lang") as Language) || "pt";
+    // Lê cookie sc-lang (setado pelo middleware via CF-IPCountry) como fonte
+    // primária; cai para localStorage para retrocompatibilidade.
+    const cookieLang = document.cookie
+      .split("; ")
+      .find((r) => r.startsWith("sc-lang="))
+      ?.split("=")[1] as Language | undefined;
+    const lang = cookieLang || (localStorage.getItem("sc-lang") as Language) || "pt";
     const th = (localStorage.getItem("sc-theme") as ThemeMode) || "dark";
     const tz = localStorage.getItem("sc-tz") || Intl.DateTimeFormat().resolvedOptions().timeZone;
     setLangState(lang);
@@ -134,7 +233,12 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     }
   }, [theme, mounted]);
 
-  const setLanguage = (l: Language) => { setLangState(l); localStorage.setItem("sc-lang", l); };
+  const setLanguage = (l: Language) => {
+    setLangState(l);
+    localStorage.setItem("sc-lang", l);
+    // Grava no cookie também para que o middleware não sobrescreva na próxima request.
+    document.cookie = `sc-lang=${l};path=/;max-age=${60 * 60 * 24 * 365};samesite=lax`;
+  };
   const setTheme = (t: ThemeMode) => { setThemeState(t); localStorage.setItem("sc-theme", t); };
   const setTimezone = (tz: string) => { setTzState(tz); localStorage.setItem("sc-tz", tz); };
   const t = (k: TKey): string => TR[language]?.[k] ?? TR["pt"][k] ?? k;
