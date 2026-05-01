@@ -98,15 +98,46 @@ export interface ServerStats {
 export interface Plan {
   id: string;
   name: string;
+  slug: string;
   price: number;
   max_instances: number;
   max_messages_per_day: number;
   max_users: number;
   max_workspaces: number;
-  features: string; // JSON-encoded string from API
+  max_agents: number;
+  max_journeys: number;
+  max_campaigns: number;
+  max_triggers: number;
+  max_webhooks: number;
+  max_contacts: number;
+  max_deals: number;
+  max_shops: number;
+  max_products: number;
+  max_shop_integrations: number;
+  max_instances_per_proxy: number;
+  max_proxy_pool: number;
+  allow_ai: boolean;
+  allow_journeys: boolean;
+  allow_crm: boolean;
+  allow_inbox: boolean;
+  allow_campaigns: boolean;
+  allow_triggers: boolean;
+  allow_warmup: boolean;
+  allow_newsletters: boolean;
+  allow_communities: boolean;
+  allow_instagram: boolean;
+  allow_tiktok: boolean;
+  allow_api_access: boolean;
+  allow_global_webhook: boolean;
+  allow_shop: boolean;
   allow_proxy: boolean;
+  allow_proxy_residencial: boolean;
   is_active: boolean;
   stripe_price_id?: string;
+  asaas_product_id?: string;
+  features: string; // JSON-encoded string from API
+  created_at: string;
+  updated_at: string;
 }
 
 export type ChannelType = "whatsapp" | "instagram" | "instagram_api" | "facebook" | "telegram" | "linkedin" | "tiktok" | "kwai" | "waba";
