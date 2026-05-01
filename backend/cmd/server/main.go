@@ -49,6 +49,9 @@ func main() {
 	// (Postgres only — SQLite dev mode skips them).
 	applyTicketingIndexes(db)
 
+	// Ensure all extended plan columns exist (idempotent, Postgres-only).
+	applyPlansMigration(db)
+
 	// Seed default plans
 	seedPlans(db)
 
@@ -531,6 +534,55 @@ func applyTicketingIndexes(db *gorm.DB) {
 		}
 	}
 	log.Info().Msg("ticketing indexes applied")
+}
+
+// applyPlansMigration garante que as colunas estendidas da tabela plans existam.
+// Idempotente — usa IF NOT EXISTS em cada ALTER TABLE.
+func applyPlansMigration(db *gorm.DB) {
+	if db.Dialector.Name() != "postgres" {
+		return
+	}
+	stmts := []string{
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS slug VARCHAR(60) DEFAULT ''`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_users INTEGER NOT NULL DEFAULT 1`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_workspaces INTEGER NOT NULL DEFAULT 1`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_agents INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_journeys INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_campaigns INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_triggers INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_webhooks INTEGER NOT NULL DEFAULT 5`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_contacts INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_deals INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_shops INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_products INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_shop_integrations INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_instances_per_proxy INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_proxy_pool INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_ai BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_journeys BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_crm BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_inbox BOOLEAN NOT NULL DEFAULT true`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_campaigns BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_triggers BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_warmup BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_newsletters BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_communities BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_instagram BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_tiktok BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_api_access BOOLEAN NOT NULL DEFAULT true`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_global_webhook BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_shop BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_proxy_residencial BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS stripe_price_id VARCHAR(255)`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS asaas_product_id VARCHAR(255)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_plans_slug ON plans(slug) WHERE slug != ''`,
+	}
+	for _, s := range stmts {
+		if err := db.Exec(s).Error; err != nil {
+			log.Warn().Err(err).Str("stmt", s[:40]).Msg("plans migration: failed (non-fatal)")
+		}
+	}
+	log.Info().Msg("plans extended columns applied")
 }
 
 // backfillAdminRolePermissions picks up any permission keys added after a
