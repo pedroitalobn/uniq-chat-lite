@@ -70,6 +70,15 @@ export function Sidebar() {
   const planName = (session?.user?.plan as { name?: string } | undefined)?.name ?? session?.user?.role;
   const initials = session?.user?.name?.[0]?.toUpperCase() || "U";
 
+  // Gradiente dinâmico de avatar baseado no nome — cada usuário tem sua cor
+  const avatarGradient = (() => {
+    const name = session?.user?.name || "U";
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    const hue = ((hash % 360) + 360) % 360;
+    return `linear-gradient(135deg, hsl(${hue} 65% 55%), hsl(${(hue + 50) % 360} 75% 40%))`;
+  })();
+
   // Itens ficam todos listados com a regra `show` — `true` = sempre visível;
   // função = visível quando a condição bate. Dono do workspace e super-admin
   // bypassam qualquer regra (via hasPerm retornando true no isOwner).
@@ -142,21 +151,30 @@ export function Sidebar() {
   const closeMobile = () => setMobileOpen(false);
 
   const sidebarContent = (
-    <aside className={cn("flex flex-col h-full border-r shrink-0 transition-[width] duration-200",
-      collapsed ? "w-14" : "w-56")}
-      style={{ background: "var(--sidebar-bg)", borderColor: "var(--sidebar-border)" }}>
+    <aside
+      className={cn("relative flex flex-col h-full border-r shrink-0 overflow-hidden",
+        "transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        collapsed ? "w-14" : "w-56"
+      )}
+      style={{ background: "var(--sidebar-bg)", borderColor: "var(--sidebar-border)" }}
+    >
+      {/* Ambient glow — radial verde no topo, pulsa suave */}
+      <div
+        className="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 w-40 h-40 rounded-full uniq-glow-pulse"
+        style={{ background: "radial-gradient(circle, rgba(0,212,106,0.07) 0%, transparent 70%)" }}
+      />
 
-      {/* Logo + toggle */}
-      <div className="flex items-center justify-between px-3 h-14 border-b"
-        style={{ borderColor: "var(--sidebar-border)" }}>
-        {!collapsed && <Logo height={38} />}
+      {/* Logo + collapse toggle */}
+      <div className="relative flex items-center justify-between px-3 h-14 flex-shrink-0"
+        style={{ borderBottom: "1px solid var(--sidebar-border)" }}>
+        {!collapsed && <Logo height={36} />}
         <button
           onClick={() => setCollapsed((c) => !c)}
-          className="hidden lg:flex p-1.5 rounded-lg transition-colors hover:bg-white/5"
-          style={{ color: "var(--text-3)", marginLeft: collapsed ? "auto" : 0, marginRight: collapsed ? "auto" : 0 }}
+          className="hidden lg:flex p-1.5 rounded-lg transition-all duration-150 hover:bg-white/[0.06]"
+          style={{ color: "var(--text-4)", marginLeft: collapsed ? "auto" : 0, marginRight: collapsed ? "auto" : 0 }}
           title={collapsed ? "Expandir menu" : "Recolher menu"}
         >
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
         </button>
         <button
           onClick={closeMobile}
@@ -167,80 +185,106 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Workspace info — escondido em modo colapsado pra economizar espaço */}
+      {/* Workspace — compacto, sem borda pesada */}
       {!collapsed && (
-      <div className="px-3 py-3 border-b" style={{ borderColor: "var(--sidebar-border)" }}>
-        <div className="flex items-center gap-2 mb-2">
-          <button
-            onClick={() => currentWorkspace && setCustomizeOpen(true)}
-            disabled={!currentWorkspace}
-            title={currentWorkspace?.is_owner ? "Personalizar workspace" : "Detalhes"}
-            className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform hover:scale-105"
-            style={{ background: `${wsColor}26`, border: `1px solid ${wsColor}44` }}
-          >
-            <WsIcon className="w-4 h-4" style={{ color: wsColor }} />
-          </button>
-          <div className="flex-1 min-w-0">
-            {workspaces.length > 1 ? (
-              <WorkspaceDropdown
-                workspaces={workspaces}
-                currentId={currentWorkspace?.id || ""}
-                onSelect={(ws) => {
-                  const full = workspaces.find((w) => w.id === ws.id);
-                  if (full) setCurrentWorkspace(full);
-                }}
-              />
-            ) : (
-              <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>
-                {currentWorkspace?.name || "Selecione workspace"}
+        <div className="px-3 pt-3 pb-2 flex-shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+          <div className="flex items-center gap-2.5 mb-2">
+            <button
+              onClick={() => currentWorkspace && setCustomizeOpen(true)}
+              disabled={!currentWorkspace}
+              title={currentWorkspace?.is_owner ? "Personalizar workspace" : "Detalhes"}
+              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-all hover:scale-105 hover:brightness-110"
+              style={{
+                background: `linear-gradient(135deg, ${wsColor}30, ${wsColor}12)`,
+                border: `1px solid ${wsColor}30`,
+                boxShadow: `0 0 10px ${wsColor}18`,
+              }}
+            >
+              <WsIcon className="w-3.5 h-3.5" style={{ color: wsColor }} />
+            </button>
+            <div className="flex-1 min-w-0">
+              {workspaces.length > 1 ? (
+                <WorkspaceDropdown
+                  workspaces={workspaces}
+                  currentId={currentWorkspace?.id || ""}
+                  onSelect={(ws) => {
+                    const full = workspaces.find((w) => w.id === ws.id);
+                    if (full) setCurrentWorkspace(full);
+                  }}
+                />
+              ) : (
+                <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>
+                  {currentWorkspace?.name || "Selecione workspace"}
+                </p>
+              )}
+              <p className="text-[9px] mt-0.5 font-medium" style={{
+                color: currentWorkspace?.is_owner ? "#fbbf24" : "var(--text-4)"
+              }}>
+                {currentWorkspace?.is_owner ? "Proprietário" : currentWorkspace ? "Membro" : ""}
               </p>
-            )}
-            {currentWorkspace?.is_owner ? (
-              <p className="text-[10px]" style={{ color: "#fbbf24" }}>Proprietário</p>
-            ) : currentWorkspace ? (
-              <p className="text-[10px]" style={{ color: "hsl(240 8% 45%)" }}>Membro</p>
-            ) : null}
+            </div>
           </div>
+          <button
+            onClick={() => router.push("/workspace")}
+            className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-all duration-150"
+            style={{
+              background: "rgba(124,58,237,0.07)",
+              border: "1px solid rgba(124,58,237,0.12)",
+              color: "#a78bfa",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(124,58,237,0.12)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(124,58,237,0.07)"; }}
+          >
+            <Settings className="w-3 h-3" />
+            Gerenciar workspaces
+          </button>
         </div>
-        <button
-          onClick={() => {
-            router.push("/workspace");
-          }}
-          className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-medium transition-all"
-          style={{ background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.15)", color: "#a78bfa" }}
-        >
-          <Settings className="w-3 h-3" />
-          Gerenciar workspaces
-        </button>
-      </div>
       )}
 
       {/* Nav */}
-      <nav className={cn("flex-1 py-3 space-y-0.5 overflow-y-auto", collapsed ? "px-1.5" : "px-2.5")}>
+      <nav className={cn("flex-1 py-2 space-y-px overflow-y-auto", collapsed ? "px-1.5" : "px-2")}>
         {visibleNavItems.map((item) => {
           const active = item.exact
             ? pathname === item.href
             : pathname === item.href || pathname.startsWith(item.href + "/");
           return (
-            <Link key={item.href} href={item.href} onClick={closeMobile}
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={closeMobile}
               title={collapsed ? item.label : undefined}
               className={cn(
-                "group relative flex items-center rounded-xl text-sm font-medium transition-all duration-150",
-                collapsed ? "justify-center px-2 py-2" : "gap-2.5 px-3 py-2",
-                active ? "text-white" : "hover:opacity-80"
+                "group relative flex items-center rounded-xl text-sm font-medium",
+                "transition-all duration-150 ease-out",
+                collapsed ? "justify-center px-2 py-2.5" : "gap-2.5 px-2.5 py-2"
               )}
               style={active
-                ? { background: "var(--surface-2)", color: "var(--text-1)",
-                    boxShadow: "inset 1px 0 0 0 var(--green), inset 0 0 0 1px var(--border-default)" }
+                ? {
+                    background: "linear-gradient(90deg, rgba(0,212,106,0.12) 0%, rgba(0,212,106,0.04) 100%)",
+                    color: "var(--text-1)",
+                    boxShadow: "inset 2px 0 0 var(--green), inset 0 0 0 1px rgba(0,212,106,0.12)",
+                  }
                 : { color: "var(--text-3)" }
               }
+              onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+              onMouseLeave={e => { if (!active) e.currentTarget.style.background = ""; }}
             >
-              <item.icon className="w-4 h-4 flex-shrink-0 transition-colors"
-                style={active ? { color: "var(--green)" } : undefined} />
-              {!collapsed && <span>{item.label}</span>}
+              {/* Icon container */}
+              <span
+                className="flex items-center justify-center w-5 h-5 flex-shrink-0 rounded-md transition-all duration-150"
+                style={active
+                  ? { background: "rgba(0,212,106,0.14)", color: "var(--green)" }
+                  : { color: "inherit" }
+                }
+              >
+                <item.icon className="w-3.5 h-3.5" />
+              </span>
+              {!collapsed && <span className="truncate">{item.label}</span>}
               {!collapsed && active && (
-                <span className="ml-auto w-1.5 h-1.5 rounded-full"
-                  style={{ background: "var(--green)", boxShadow: "0 0 6px var(--green)" }} />
+                <span
+                  className="ml-auto w-1 h-1 rounded-full flex-shrink-0"
+                  style={{ background: "var(--green)", boxShadow: "0 0 5px var(--green)" }}
+                />
               )}
             </Link>
           );
@@ -248,27 +292,45 @@ export function Sidebar() {
 
         {/* Admin */}
         {isAdmin && (
-          <div className="pt-4">
-            <div className="flex items-center gap-1.5 px-3 mb-1.5">
-              <Shield className="w-3 h-3 text-amber-500/60" />
-              <p className="text-[10px] font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
-                {t("nav_admin")}
-              </p>
+          <div className="pt-3">
+            <div className="flex items-center gap-1.5 px-2.5 mb-1">
+              <Shield className="w-2.5 h-2.5" style={{ color: "rgba(245,158,11,0.5)" }} />
+              {!collapsed && (
+                <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-4)" }}>
+                  {t("nav_admin")}
+                </p>
+              )}
             </div>
             {adminItems.map((item) => {
               const active = pathname.startsWith(item.href);
               return (
-                <Link key={item.href} href={item.href} onClick={closeMobile}
-                  className="group relative flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150"
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={closeMobile}
+                  className={cn(
+                    "group relative flex items-center rounded-xl text-sm font-medium",
+                    "transition-all duration-150 ease-out",
+                    collapsed ? "justify-center px-2 py-2" : "gap-2.5 px-2.5 py-2"
+                  )}
                   style={active
-                    ? { background: "var(--surface-2)", color: "var(--text-1)",
-                        boxShadow: "inset 1px 0 0 0 var(--green), inset 0 0 0 1px var(--border-default)" }
+                    ? {
+                        background: "linear-gradient(90deg, rgba(0,212,106,0.12) 0%, rgba(0,212,106,0.04) 100%)",
+                        color: "var(--text-1)",
+                        boxShadow: "inset 2px 0 0 var(--green), inset 0 0 0 1px rgba(0,212,106,0.12)",
+                      }
                     : { color: "var(--text-3)" }
                   }
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = ""; }}
                 >
-                  <item.icon className="w-4 h-4 flex-shrink-0"
-                    style={active ? { color: "var(--green)" } : undefined} />
-                  <span>{item.label}</span>
+                  <span
+                    className="flex items-center justify-center w-5 h-5 flex-shrink-0 rounded-md transition-all duration-150"
+                    style={active ? { background: "rgba(0,212,106,0.14)", color: "var(--green)" } : { color: "inherit" }}
+                  >
+                    <item.icon className="w-3.5 h-3.5" />
+                  </span>
+                  {!collapsed && <span>{item.label}</span>}
                 </Link>
               );
             })}
@@ -276,74 +338,79 @@ export function Sidebar() {
         )}
       </nav>
 
-      {/* Upgrade prompt for free plan — só pro dono do workspace */}
-      {canSeeBilling && planName?.toLowerCase() === "free" && (
-        <div className="px-2.5 pb-2 space-y-2">
-          <div className="rounded-xl p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 38%)" }}>Mensagens hoje</span>
-              <span className="text-[10px] font-mono" style={{ color: "hsl(240 8% 50%)" }}>—/100</span>
-            </div>
-            <div className="h-1 rounded-full overflow-hidden" style={{ background: "var(--surface-2)" }}>
-              <div className="h-full rounded-full transition-all" style={{ width: "0%", background: "var(--green)" }} />
-            </div>
-          </div>
-          <Link href="/settings?section=billing" onClick={closeMobile}
-            className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-xs font-medium transition-all"
-            style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.2)", color: "var(--green)" }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.14)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(0,212,106,0.08)"; }}>
+      {/* Upgrade prompt — só pro dono, plano free */}
+      {!collapsed && canSeeBilling && planName?.toLowerCase() === "free" && (
+        <div className="px-2 pb-2">
+          <Link
+            href="/settings?section=billing"
+            onClick={closeMobile}
+            className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-xs font-semibold transition-all duration-150"
+            style={{
+              background: "linear-gradient(135deg, rgba(0,212,106,0.12), rgba(0,212,106,0.06))",
+              border: "1px solid rgba(0,212,106,0.18)",
+              color: "var(--green)",
+              boxShadow: "0 0 12px rgba(0,212,106,0.08)",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 0 20px rgba(0,212,106,0.15)"; }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 0 12px rgba(0,212,106,0.08)"; }}
+          >
             <Zap className="w-3 h-3" />
             Fazer upgrade
           </Link>
         </div>
       )}
-      {canSeeBilling && planName?.toLowerCase() !== "free" && !isAdmin && (
-        <div className="px-2.5 pb-2">
-          <Link href="/settings" onClick={closeMobile}
-            className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-xs font-medium transition-all"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 46%)" }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-2)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "var(--surface-2)"; }}>
-            <CreditCard className="w-3 h-3" />
-            Gerenciar plano
-          </Link>
-        </div>
-      )}
 
       {/* User section */}
-      <div className="p-2.5 border-t" style={{ borderColor: "var(--sidebar-border)" }}>
-        <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl mb-0.5"
-          style={{ background: "rgba(128,128,128,0.06)" }}>
-          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0"
+      <div
+        className="flex-shrink-0 p-2"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}
+      >
+        <div
+          className={cn(
+            "flex items-center rounded-xl transition-all duration-150 cursor-default mb-1",
+            collapsed ? "justify-center px-2 py-2.5" : "gap-2.5 px-2.5 py-2"
+          )}
+          style={{ background: "rgba(255,255,255,0.03)" }}
+        >
+          {/* Avatar com gradiente único por usuário */}
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold flex-shrink-0"
             style={{
-              background: "linear-gradient(135deg, rgba(0,212,106,0.2), rgba(0,212,106,0.05))",
-              boxShadow: "inset 0 0 0 1px rgba(0,212,106,0.2)",
-              color: "var(--green)",
-            }}>
+              background: avatarGradient,
+              color: "#fff",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+            }}
+          >
             {initials}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium truncate leading-tight" style={{ color: "var(--text-1)" }}>
-              {session?.user?.name || "Usuário"}
-              {session?.user?.is_beta && (
-                <span className="ml-2 inline-flex items-center px-1 py-0.5 rounded text-[9px] font-semibold bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                  BETA
-                </span>
-              )}
-            </p>
-            <p className="text-[10px] truncate capitalize leading-tight mt-0.5" style={{ color: "var(--text-3)" }}>
-              {planName}
-            </p>
-          </div>
+          {!collapsed && (
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium truncate leading-tight" style={{ color: "var(--text-1)" }}>
+                {session?.user?.name || "Usuário"}
+                {session?.user?.is_beta && (
+                  <span className="ml-1.5 inline-flex items-center px-1 py-0.5 rounded text-[9px] font-semibold bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                    BETA
+                  </span>
+                )}
+              </p>
+              <p className="text-[10px] truncate capitalize leading-tight mt-0.5" style={{ color: "var(--text-4)" }}>
+                {planName}
+              </p>
+            </div>
+          )}
         </div>
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs hover:text-red-400 hover:bg-red-500/[0.08] transition-all w-full"
-          style={{ color: "var(--text-3)" }}
+          className={cn(
+            "flex items-center rounded-xl text-xs transition-all duration-150 w-full",
+            "hover:text-red-400 hover:bg-red-500/[0.07]",
+            collapsed ? "justify-center px-2 py-2" : "gap-2.5 px-2.5 py-2"
+          )}
+          style={{ color: "var(--text-4)" }}
+          title={collapsed ? t("nav_logout") : undefined}
         >
-          <LogOut className="w-3.5 h-3.5" />
-          {t("nav_logout")}
+          <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
+          {!collapsed && t("nav_logout")}
         </button>
       </div>
     </aside>

@@ -402,12 +402,27 @@
     background: var(--hero-gradient);
   }
 
+  /* ── Glass / frost surface ─────────────────────────────────────────── */
+  .glass {
+    background: rgba(255,255,255,0.03);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .light .glass {
+    background: rgba(255,255,255,0.72);
+    border-color: rgba(14,15,12,0.08);
+  }
+
   /* Glow effects */
   .glow-green {
     box-shadow: 0 0 30px var(--green-soft), 0 0 60px var(--green-dim);
   }
   .glow-green-sm {
-    box-shadow: 0 0 12px var(--green-soft);
+    box-shadow: 0 0 10px rgba(0,212,106,0.2), 0 0 20px rgba(0,212,106,0.08);
+  }
+  .glow-green-xs {
+    box-shadow: 0 0 6px rgba(0,212,106,0.35);
   }
 
   /* Gradient top border trick */
@@ -567,6 +582,21 @@
   0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
   30%           { opacity: 1;   transform: translateY(-2px); }
 }
+@keyframes uniq-glow-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
+@keyframes uniq-border-shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes uniq-float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-4px); }
+}
+.uniq-glow-pulse { animation: uniq-glow-pulse 2.4s ease-in-out infinite; }
+.uniq-float      { animation: uniq-float      3s   ease-in-out infinite; }
 
 .uniq-fade-in    { animation: uniq-fade-in    180ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .uniq-scale-in   { animation: uniq-scale-in   220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
@@ -619,10 +649,20 @@ a:active:not([aria-disabled="true"]),
 *::-webkit-scrollbar-thumb:hover {
   background: var(--border-strong);
 }
+/* ─── Scrollbar — ultra-thin, modern ──────────────────────────────── */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--border-default) transparent;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
 }
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+.light ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.10); }
+.light ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.20); }
 
 /* ─── Selects nativos com tema Uniq ────────────────────────────────
    <select> usa dropdown nativo do OS por padrão (branco em Chrome/macOS,
