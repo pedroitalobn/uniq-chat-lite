@@ -88,6 +88,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
   const [challengeCode, setChallengeCode] = useState("");
   const [pendingInstagramInstanceId, setPendingInstagramInstanceId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [loggingIn, setLoggingIn] = useState(false);
 
   const isSocial = selectedChannel === "instagram" || selectedChannel === "tiktok";
   const isWABA = selectedChannel === "waba";
@@ -184,10 +185,12 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
           throw new Error("falha ao criar instância Instagram");
         }
 
+        setLoggingIn(true);
         const loginResp = await instancesApi.instagramLogin(createdId, {
           username: igUsername.trim().toLowerCase(),
           password: igPassword,
         });
+        setLoggingIn(false);
 
         const loginData = loginResp?.data as { status?: string; api_path?: string; challenge_type?: string; options?: string[] };
         if (loginData?.status === "challenge_required") {
@@ -217,6 +220,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
       toast.error(msg);
     } finally {
       setCreating(false);
+      setLoggingIn(false);
     }
   };
 
@@ -239,6 +243,52 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
   if (!open) return null;
 
   const ch = availableChannels.find((c) => c.id === selectedChannel);
+
+  if (loggingIn) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "hsl(240 18% 4% / 0.95)", backdropFilter: "blur(12px)" }}>
+        <div className="flex flex-col items-center gap-6">
+          {/* Aura animada */}
+          <div className="relative flex items-center justify-center">
+            <div className="absolute w-32 h-32 rounded-full animate-ping" style={{ background: "radial-gradient(circle, rgba(225,48,108,0.3) 0%, transparent 70%)", animationDuration: "1.5s" }} />
+            <div className="absolute w-24 h-24 rounded-full animate-ping" style={{ background: "radial-gradient(circle, rgba(225,48,108,0.2) 0%, transparent 70%)", animationDuration: "1.5s", animationDelay: "0.3s" }} />
+            <div className="absolute w-20 h-20 rounded-full" style={{ background: "radial-gradient(circle, rgba(225,48,108,0.15) 0%, transparent 70%)", animation: "pulse 2s ease-in-out infinite" }} />
+            <div
+              className="relative w-16 h-16 rounded-2xl flex items-center justify-center shadow-2xl"
+              style={{ background: "linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045)", boxShadow: "0 0 40px rgba(225,48,108,0.5)" }}
+            >
+              {CHANNEL_ICONS.instagram}
+            </div>
+          </div>
+
+          <div className="text-center space-y-1">
+            <p className="text-base font-semibold" style={{ color: "var(--text-1)" }}>Conectando ao Instagram</p>
+            <p className="text-sm" style={{ color: "var(--text-3)" }}>Autenticando <span className="font-medium" style={{ color: "#e1306c" }}>@{igUsername}</span>…</p>
+            <p className="text-xs" style={{ color: "var(--text-3)" }}>Isso pode levar até 30 segundos</p>
+          </div>
+
+          {/* Barra de progresso indeterminada */}
+          <div className="w-48 h-0.5 rounded-full overflow-hidden" style={{ background: "var(--surface-2)" }}>
+            <div
+              className="h-full rounded-full"
+              style={{
+                background: "linear-gradient(90deg, #833ab4, #fd1d1d, #fcb045)",
+                animation: "slide-indeterminate 1.8s ease-in-out infinite",
+                width: "40%",
+              }}
+            />
+          </div>
+        </div>
+
+        <style>{`
+          @keyframes slide-indeterminate {
+            0% { transform: translateX(-250%); }
+            100% { transform: translateX(500%); }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

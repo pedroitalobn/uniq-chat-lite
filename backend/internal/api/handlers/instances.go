@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -901,17 +902,26 @@ func (h *InstanceHandler) InstagramLogin(c *fiber.Ctx) error {
 		log.Warn().Str("instance", instance.ID.String()).Msg("instagram login: sem proxy — Instagram pode bloquear login de IP de datacenter")
 	}
 
-	resp, err := h.instagram.Login(c.Context(), instance.ID.String(), req.Username, req.Password, proxyURL)
+	// Use a detached context so that if the HTTP client disconnects (browser
+	// navigates away) we don't cancel the bridge call mid-login. Instagram
+	// sessions take 20-30s; a cancelled context would delete the instance
+	// even though the bridge already authenticated successfully.
+	loginCtx, loginCancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer loginCancel()
+
+	resp, err := h.instagram.Login(loginCtx, instance.ID.String(), req.Username, req.Password, proxyURL)
 	if err != nil {
-		// Clean up the orphaned instance so the user can retry from scratch
-		h.db.Delete(instance)
 		var bridgeErr *services.BridgeError
 		if errors.As(err, &bridgeErr) {
-			// Business error from Instagram (wrong password, banned, etc.) → 422
+			// Explicit business error from Instagram (wrong password, banned, etc.)
+			// → safe to delete the instance, login definitively failed
+			h.db.Delete(instance)
 			return c.Status(422).JSON(fiber.Map{"error": err.Error()})
 		}
-		// Bridge unreachable → 502
-		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+		// Connectivity/timeout error: bridge may have succeeded but we lost the
+		// response. Don't delete the instance — user can retry.
+		log.Error().Err(err).Str("instance", instance.ID.String()).Msg("instagram login: bridge error sem BridgeError — instância mantida para retry")
+		return c.Status(502).JSON(fiber.Map{"error": "Falha de comunicação com o serviço Instagram. Tente novamente em alguns segundos."})
 	}
 
 	if resp.Status == "challenge_required" {
