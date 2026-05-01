@@ -45,6 +45,21 @@ services:
   # endpoint Hetzner. Pra reativar local: descomentar serviço, voltar
   # depends_on do backend e setar MINIO_ENDPOINT=uniqchat-minio:9000.
 
+  # ── Instagram Bridge ───────────────────────────────────────────────────────
+  instagram-bridge:
+    build:
+      context: ./instagram-bridge
+      dockerfile: Dockerfile
+    container_name: uniqchat-instagram-bridge
+    restart: unless-stopped
+    environment:
+      INSTAGRAM_BRIDGE_PORT: 8091
+      INSTAGRAM_BRIDGE_SESSIONS_DIR: /app/sessions
+    volumes:
+      - instagram_sessions:/app/sessions
+    networks:
+      - dokploy-network
+
   # ── Backend ────────────────────────────────────────────────────────────────
   backend:
     build:
@@ -57,6 +72,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      instagram-bridge:
+        condition: service_started
     environment:
       PORT: 8080
       # Usa container_name como hostname — DNS do dokploy-network resolve por nome do container
@@ -88,6 +105,7 @@ services:
       SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL}
       SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD}
       SUPER_ADMIN_NAME: ${SUPER_ADMIN_NAME:-Admin}
+      INSTAGRAM_BASE_URL: http://uniqchat-instagram-bridge:8091
       # ── Meta WhatsApp Cloud API (WABA Tech Provider) ────────────────────
       META_APP_ID: ${META_APP_ID}
       META_APP_SECRET: ${META_APP_SECRET}
@@ -129,6 +147,7 @@ volumes:
   postgres_data:
   rabbitmq_data:
   sessions_data:
+  instagram_sessions:
   # minio_data removido junto com o serviço local. Se reativar, voltar aqui.
 
 # dokploy-network é a rede externa gerenciada pelo Dokploy/Traefik.

@@ -872,13 +872,22 @@ func (h *InstanceHandler) InstagramLogin(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "username e password são obrigatórios"})
 	}
 
-	// Resolve proxy from the instance's server, if any.
+	// Resolve proxy from the instance's server using the shared resolver so that
+	// UseEnv proxies (BrightData env vars) and encrypted passwords are handled correctly.
 	proxyURL := ""
 	if instance.Server != nil && instance.Server.ProxyID != nil {
 		var proxy models.Proxy
 		if h.db.First(&proxy, "id = ?", *instance.Server.ProxyID).Error == nil && proxy.IsActive {
-			proxyURL = fmt.Sprintf("%s://%s:%s@%s:%d", proxy.ProxyType, proxy.Username, proxy.Password, proxy.Host, proxy.Port)
+			if cfg, _, ok := whatsapp.BuildProxyConfigExported(&proxy); ok {
+				proxyURL = whatsapp.FormatProxyURL(cfg, false)
+				log.Debug().Str("instance", instance.ID.String()).
+					Str("proxy", whatsapp.FormatProxyURL(cfg, true)).
+					Msg("instagram login: proxy resolved")
+			}
 		}
+	}
+	if proxyURL == "" {
+		log.Debug().Str("instance", instance.ID.String()).Msg("instagram login: no proxy")
 	}
 
 	resp, err := h.instagram.Login(c.Context(), instance.ID.String(), req.Username, req.Password, proxyURL)
