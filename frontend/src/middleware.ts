@@ -20,8 +20,12 @@ export function middleware(req: NextRequest) {
   const existing = req.cookies.get(COOKIE)?.value;
   if (existing && SUPPORTED.includes(existing)) return res;
 
+  // Override de teste: ?_country=US  (remover em produção ou restringir por env)
+  const testCountry = req.nextUrl.searchParams.get("_country")?.toUpperCase();
+
   // 1. Cloudflare CF-IPCountry (sem custo, sem rate-limit, sem terceiro)
   const cfCountry =
+    testCountry ||
     req.headers.get("cf-ipcountry") ||
     req.headers.get("CF-IPCountry");
 
