@@ -95,7 +95,7 @@ type bridgeResponse struct {
 func NewInstagramService(db *gorm.DB) *InstagramService {
 	baseURL := config.AppConfig.InstagramBaseURL
 	if baseURL == "" {
-		baseURL = "http://localhost:8091"
+		baseURL = "http://uniqchat-instagram-bridge:8091"
 	}
 	log.Info().Str("instagram_bridge_url", baseURL).Msg("initializing Instagram service")
 	return &InstagramService{
