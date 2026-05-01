@@ -580,19 +580,6 @@ func (s *InstagramService) GetHashtag(ctx context.Context, instanceID, hashtag, 
 	return &resp, err
 }
 
-func (s *InstagramService) GetProfile(ctx context.Context, instanceID, username string) (interface{}, error) {
-	session := s.getSession(instanceID)
-	if session == nil || !session.LoggedIn {
-		return nil, fmt.Errorf("not logged in")
-	}
-	q := url.Values{}
-	q.Set("instance_id", instanceID)
-	q.Set("username", username)
-	var resp interface{}
-	err := s.doRequest(ctx, http.MethodGet, "/instagram/profile?"+q.Encode(), nil, &resp)
-	return resp, err
-}
-
 func generateDeviceID(username string) string {
 	return fmt.Sprintf("android-%s", uuid.New().String()[:8])
 }
