@@ -743,7 +743,7 @@ func (h *ConversationHandler) SendConstraints(c *fiber.Ctx) error {
 		out.SupportsReaction = false
 		out.SupportsEdit = false
 		out.SupportsRevoke = false
-		out.AllowedTypes = []string{"text", "image", "video"}
+		out.AllowedTypes = []string{"text", "image", "video", "audio"}
 		out.MaxBodyChars = 1000
 	case models.ChannelTikTok:
 		out.SupportsReply = true

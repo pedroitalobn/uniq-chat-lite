@@ -174,6 +174,14 @@ class DMReplyReq(BaseModel):
     thread_id: str
     text: str
 
+class DMMediaReq(BaseModel):
+    instance_id: str
+    username: str
+    recipient: str          # username do destinatário
+    media_url: str          # URL pública da mídia (MinIO signed URL)
+    caption: Optional[str] = ""
+    thread_id: Optional[str] = None  # se já temos o thread, usa thread_ids em vez de user_ids
+
 class FollowReq(BaseModel):
     instance_id: str
     username: str
@@ -419,12 +427,18 @@ def instagram_dm_reply(req: DMReplyReq):
 
 
 @app.get("/instagram/dm/read")
-def instagram_dm_inbox(instance_id: str, username: str):
+def instagram_dm_inbox(instance_id: str, username: str, folder: int = 0):
+    """
+    folder=0 → Primary (inbox padrão)
+    folder=1 → General (mensagens pendentes de não-seguidores)
+    folder=2 → Requests (pedidos de mensagem)
+    """
     cl = build_client(instance_id)
     try:
-        raw = cl.direct_threads(amount=20)
+        raw = cl.direct_threads(amount=20, selected_filter="", folder=folder)
         threads = [{
             "thread_id": str(t.id),
+            "folder": folder,
             "users": [{"pk": str(u.pk), "username": u.username, "full_name": u.full_name} for u in t.users],
             "messages": [{
                 "item_id": str(m.id),
@@ -432,11 +446,12 @@ def instagram_dm_inbox(instance_id: str, username: str):
                 "text": m.text or "",
                 "timestamp": m.timestamp.isoformat() if m.timestamp else "",
                 "item_type": m.item_type,
+                "media_url": str(getattr(m, "media", None) and getattr(m.media, "thumbnail_url", "") or ""),
             } for m in (t.messages or [])[:10]],
             "unread_count": t.read_state or 0,
         } for t in raw]
         save_session(cl, instance_id)
-        return ok({"threads": threads})
+        return ok({"threads": threads, "folder": folder})
     except Exception as err:
         status, msg = map_error(err)
         return fail(status, msg)
@@ -459,6 +474,71 @@ def instagram_dm_thread(instance_id: str, thread_id: str):
     except Exception as err:
         status, msg = map_error(err)
         return fail(status, msg)
+
+
+# ── DM Media ──────────────────────────────────────────────────────────────────
+
+def _resolve_target(cl, req: DMMediaReq) -> dict:
+    """Retorna {'user_ids': [uid]} ou {'thread_ids': [tid]} dependendo do que temos."""
+    if req.thread_id:
+        return {"thread_ids": [int(req.thread_id)]}
+    uid = cl.user_id_from_username(req.recipient)
+    return {"user_ids": [uid]}
+
+@app.post("/instagram/dm/send-photo")
+def instagram_dm_send_photo(req: DMMediaReq):
+    cl = build_client(req.instance_id)
+    tmp = None
+    try:
+        target = _resolve_target(cl, req)
+        tmp = download_tmp(req.media_url, ".jpg")
+        thread = cl.direct_send_photo(tmp, **target)
+        save_session(cl, req.instance_id)
+        return ok({"thread_id": str(thread.id), "status": "sent"})
+    except Exception as err:
+        status, msg = map_error(err)
+        return fail(status, msg)
+    finally:
+        if tmp and tmp.exists():
+            tmp.unlink()
+
+
+@app.post("/instagram/dm/send-video")
+def instagram_dm_send_video(req: DMMediaReq):
+    cl = build_client(req.instance_id)
+    tmp = None
+    try:
+        target = _resolve_target(cl, req)
+        tmp = download_tmp(req.media_url, ".mp4")
+        thread = cl.direct_send_video(tmp, **target)
+        save_session(cl, req.instance_id)
+        return ok({"thread_id": str(thread.id), "status": "sent"})
+    except Exception as err:
+        status, msg = map_error(err)
+        return fail(status, msg)
+    finally:
+        if tmp and tmp.exists():
+            tmp.unlink()
+
+
+@app.post("/instagram/dm/send-voice")
+def instagram_dm_send_voice(req: DMMediaReq):
+    """Envia áudio como voice note (aparece como mensagem de voz no app)."""
+    cl = build_client(req.instance_id)
+    tmp = None
+    try:
+        target = _resolve_target(cl, req)
+        # instagrapi aceita mp4/m4a/webm; converte internamente via ffmpeg se instalado
+        tmp = download_tmp(req.media_url, ".m4a")
+        thread = cl.direct_send_voice(tmp, **target)
+        save_session(cl, req.instance_id)
+        return ok({"thread_id": str(thread.id), "status": "sent"})
+    except Exception as err:
+        status, msg = map_error(err)
+        return fail(status, msg)
+    finally:
+        if tmp and tmp.exists():
+            tmp.unlink()
 
 
 # ── Profile ───────────────────────────────────────────────────────────────────

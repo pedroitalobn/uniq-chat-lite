@@ -352,9 +352,25 @@ func (r *Registry) sendInstagram(ctx context.Context, inst *models.Instance, msg
 	if r.igSvc == nil {
 		return nil, errors.New("instagram service unavailable")
 	}
-	// Use the private-API path by default; graph_api accounts are handled by
-	// the same SendDM which branches internally.
-	resp, err := r.igSvc.SendDM(ctx, inst.ID.String(), msg.To, msg.Body)
+
+	var resp *services.SendDMResponse
+	var err error
+
+	switch msg.Type {
+	case "image", "video", "audio":
+		if msg.MediaURL == "" {
+			return nil, fmt.Errorf("instagram %s requer media_url", msg.Type)
+		}
+		resp, err = r.igSvc.SendDMMedia(ctx, inst.ID.String(), msg.To, msg.Type, msg.MediaURL)
+	default:
+		// text e qualquer tipo não reconhecido → texto
+		body := msg.Body
+		if body == "" && msg.Caption != "" {
+			body = msg.Caption
+		}
+		resp, err = r.igSvc.SendDM(ctx, inst.ID.String(), msg.To, body)
+	}
+
 	if err != nil {
 		return nil, err
 	}

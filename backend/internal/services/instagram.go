@@ -56,6 +56,7 @@ type InboxResponse struct {
 
 type Thread struct {
 	ThreadID    string          `json:"thread_id"`
+	Folder      int             `json:"folder"` // 0=Primary, 1=General, 2=Requests
 	Messages    []ThreadMessage `json:"messages"`
 	Users       []InstagramUser `json:"users"`
 	UnreadCount int             `json:"unread_count"`
@@ -234,7 +235,47 @@ func (s *InstagramService) SendDM(ctx context.Context, instanceID, recipient, me
 	return &dmResp, nil
 }
 
+// SendDMMedia envia foto, vídeo ou áudio como DM do Instagram.
+// mediaType: "image" | "video" | "audio"
+func (s *InstagramService) SendDMMedia(ctx context.Context, instanceID, recipient, mediaType, mediaURL string) (*SendDMResponse, error) {
+	session := s.getSession(instanceID)
+	if session == nil || !session.LoggedIn {
+		return nil, fmt.Errorf("not logged in")
+	}
+
+	var endpoint string
+	switch mediaType {
+	case "image":
+		endpoint = "/instagram/dm/send-photo"
+	case "video":
+		endpoint = "/instagram/dm/send-video"
+	case "audio":
+		endpoint = "/instagram/dm/send-voice"
+	default:
+		return nil, fmt.Errorf("unsupported media type for instagram dm: %s", mediaType)
+	}
+
+	var dmResp SendDMResponse
+	err := s.doRequest(ctx, http.MethodPost, endpoint, map[string]interface{}{
+		"instance_id": instanceID,
+		"username":    session.Username,
+		"recipient":   recipient,
+		"media_url":   mediaURL,
+	}, &dmResp)
+	if err != nil {
+		return nil, err
+	}
+	return &dmResp, nil
+}
+
+// GetInbox retorna as threads da pasta Primary (folder=0).
 func (s *InstagramService) GetInbox(ctx context.Context, instanceID string) (*InboxResponse, error) {
+	return s.GetInboxFolder(ctx, instanceID, 0)
+}
+
+// GetInboxFolder retorna threads de uma pasta específica do Instagram DM.
+// folder: 0=Primary, 1=General, 2=Requests
+func (s *InstagramService) GetInboxFolder(ctx context.Context, instanceID string, folder int) (*InboxResponse, error) {
 	session := s.getSession(instanceID)
 	if session == nil || !session.LoggedIn {
 		return nil, fmt.Errorf("not logged in")
@@ -244,6 +285,7 @@ func (s *InstagramService) GetInbox(ctx context.Context, instanceID string) (*In
 	q := url.Values{}
 	q.Set("instance_id", instanceID)
 	q.Set("username", session.Username)
+	q.Set("folder", fmt.Sprintf("%d", folder))
 	err := s.doRequest(ctx, http.MethodGet, "/instagram/dm/read?"+q.Encode(), nil, &inbox)
 	if err != nil {
 		return nil, err

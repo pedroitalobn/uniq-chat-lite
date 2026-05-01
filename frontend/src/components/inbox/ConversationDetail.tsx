@@ -35,6 +35,7 @@ interface Conversation {
   contact_id?: string | null;
   channel_type: string;
   channel_key: string;
+  thread_key?: string | null;
   status: string;
   priority: string;
   subject?: string;
@@ -54,6 +55,18 @@ interface Conversation {
   created_at: string;
   window_keeper_enabled?: boolean;
   window_keeper_message?: string;
+}
+
+// Label da pasta do Instagram (Primary / General / Requests) a partir do thread_key.
+function igFolderLabel(threadKey?: string | null): { label: string; color: string } | null {
+  if (!threadKey?.startsWith("ig:")) return null;
+  const folder = threadKey.split(":")[1];
+  switch (folder) {
+    case "primary":  return { label: "Primary",  color: "#e1306c" };
+    case "general":  return { label: "General",  color: "#f59e0b" };
+    case "requests": return { label: "Requests", color: "#8b5cf6" };
+    default:         return null;
+  }
 }
 
 // Cor + label por canal — visual hint pra que o atendente saiba de onde
@@ -720,6 +733,23 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               >
                 {channelChipStyle(conv?.channel_type).label}
               </span>
+              {/* Pasta do Instagram (Primary / General / Requests) */}
+              {conv?.channel_type === "instagram" && igFolderLabel(conv?.thread_key) && (() => {
+                const f = igFolderLabel(conv?.thread_key)!;
+                return (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium"
+                    style={{
+                      background: `${f.color}14`,
+                      color: f.color,
+                      border: `1px solid ${f.color}33`,
+                    }}
+                    title={`Pasta do Instagram: ${f.label}`}
+                  >
+                    {f.label}
+                  </span>
+                );
+              })()}
               {/* Chip da instância — ajuda quando "todas as instâncias" */}
               {conv?.instance?.name && (
                 <span
@@ -734,7 +764,11 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                   {conv.instance.name}
                 </span>
               )}
-              <span className="truncate" title={conv?.channel_key}>{conv?.channel_key}</span>
+              <span className="truncate" title={conv?.channel_key}>
+                {conv?.channel_type === "instagram" && conv?.channel_key
+                  ? `@${conv.channel_key}`
+                  : conv?.channel_key}
+              </span>
               <span style={{ color: "hsl(240 8% 35%)" }}>·</span>
               {conv?.assigned_user?.name ? (
                 <span>responsável {conv.assigned_user.name}</span>

@@ -198,6 +198,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	wabaH.SetInboundPipeline(conversationPipeline)
 	campaignH.SetInboundPipeline(conversationPipeline)
 
+	// Instagram inbound poller — faz polling de DMs a cada 30s e injeta
+	// mensagens novas no pipeline (instagrapi não tem webhooks nativos).
+	igPoller := services.NewInstagramPoller(db, igSvc, conversationPipeline)
+	igPoller.Start()
+
 	// Plans (public — used by pricing/register page)
 	app.Get("/stripe/plans", paymentH.ListPlans)
 	app.Get("/asaas/plans", paymentH.ListPlans)
