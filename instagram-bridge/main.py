@@ -106,14 +106,21 @@ def map_error(err: Exception) -> tuple[int, str]:
     if isinstance(err, ReloginAttemptExceeded):
         return 422, "Limite de tentativas de login excedido. Tente novamente em alguns minutos."
     msg = str(err)
-    if "disabled" in msg.lower() or "banned" in msg.lower():
+    ml = msg.lower()
+    if "disabled" in ml or "banned" in ml or "suspended" in ml:
         return 422, "Conta desativada ou banida pelo Instagram."
-    if "consent_required" in msg.lower():
+    if "consent_required" in ml:
         return 422, "Instagram requer aceite de novos termos. Acesse o app e aceite os termos."
-    if "invalid" in msg.lower() and "code" in msg.lower():
+    if ("invalid" in ml and "code" in ml) or "wrong code" in ml:
         return 422, "Código de verificação inválido. Verifique e tente novamente."
-    if "proxy" in msg.lower() or "connection" in msg.lower() or "timeout" in msg.lower():
+    if "eof" in ml or "eof when reading" in ml or "connection reset" in ml or "remotedisconnected" in ml:
+        return 422, "Instagram fechou a conexão inesperadamente. Isso ocorre quando o IP de origem não é residencial — configure um proxy residencial no servidor desta instância."
+    if "proxy" in ml or "proxyerror" in ml or "tunnel" in ml:
         return 503, "Falha na conexão com o proxy. Verifique as configurações do servidor."
+    if "timeout" in ml or "timed out" in ml or "read timeout" in ml:
+        return 503, "Timeout ao conectar com o Instagram. Verifique a conexão do servidor/proxy."
+    if "ssl" in ml or "certificate" in ml:
+        return 503, "Erro SSL ao conectar com o Instagram. Verifique as configurações do proxy."
     return 502, msg or "Erro desconhecido ao conectar com o Instagram."
 
 
