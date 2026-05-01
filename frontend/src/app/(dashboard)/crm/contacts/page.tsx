@@ -1597,26 +1597,48 @@ export default function CRMPage() {
       {isLoading ? (
         <div className="space-y-2">{[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}</div>
       ) : contacts.length === 0 ? (
-        <div className="rounded-2xl p-14 text-center animate-fade-in-up"
-          style={{ background: "hsl(240 18% 6%)", border: "1px dashed hsl(240 12% 16%)" }}>
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
-            <User className="w-6 h-6" style={{ color: "hsl(240 8% 35%)" }} />
+        (activeFilterCount > 0 || search || activeTagFilter) ? (
+          <div className="rounded-2xl p-14 text-center animate-fade-in-up"
+            style={{ background: "hsl(240 18% 6%)", border: "1px dashed hsl(240 12% 16%)" }}>
+            <Search className="w-10 h-10 mx-auto mb-3 opacity-30" style={{ color: "var(--text-3)" }} />
+            <p className="font-medium text-sm" style={{ color: "hsl(240 8% 70%)" }}>Nenhum contato encontrado</p>
+            <p className="text-sm mt-1.5" style={{ color: "hsl(240 8% 42%)" }}>Tente ajustar os filtros</p>
           </div>
-          <p className="font-medium text-sm" style={{ color: "hsl(240 8% 70%)" }}>Nenhum contato encontrado</p>
-          <p className="text-sm mt-1.5 mb-6" style={{ color: "hsl(240 8% 42%)" }}>
-            {activeFilterCount > 0 || search || activeTagFilter
-              ? "Tente ajustar os filtros"
-              : "Crie seus primeiros contatos para gerenciar o CRM"}
-          </p>
-          {!activeFilterCount && !search && !activeTagFilter && (
-            <button onClick={() => setCreateOpen(true)}
-              className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl transition-all active:scale-[0.97]"
-              style={{ background: "var(--green)", color: "#03170a" }}>
-              <Plus className="w-4 h-4" /> Criar primeiro contato
-            </button>
-          )}
-        </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20 px-4 text-center animate-fade-in-up">
+            {/* SVG: duas figuras humanas com ícone + */}
+            <div className="mb-6 opacity-60">
+              <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+                {/* Pessoa 1 — esquerda */}
+                <circle cx="38" cy="38" r="12" stroke="var(--text-3)" strokeWidth="2" fill="none" />
+                <path d="M18 78 C18 62 58 62 58 78" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" fill="none" />
+                {/* Pessoa 2 — direita, levemente sobreposta */}
+                <circle cx="66" cy="38" r="12" stroke="var(--text-3)" strokeWidth="2" fill="none" />
+                <path d="M46 78 C46 62 86 62 86 78" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" fill="none" />
+                {/* Ícone + verde — canto superior direito */}
+                <circle cx="94" cy="26" r="14" fill="none" stroke="var(--green)" strokeWidth="2" />
+                <line x1="94" y1="20" x2="94" y2="32" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" />
+                <line x1="88" y1="26" x2="100" y2="26" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" />
+              </svg>
+            </div>
+            <h3 className="text-base font-semibold mb-2" style={{ color: "var(--text-1)" }}>
+              Nenhum contato ainda
+            </h3>
+            <p className="text-sm mb-6 max-w-xs" style={{ color: "var(--text-3)" }}>
+              Importe contatos ou adicione manualmente para começar seu CRM
+            </p>
+            <Link
+              href="/crm/import"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+              style={{ background: "var(--green-dim)", color: "var(--green)", border: "1px solid var(--green-border)" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,212,106,0.18)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "var(--green-dim)"; }}
+            >
+              <Plus className="w-4 h-4" />
+              Importar contatos
+            </Link>
+          </div>
+        )
       ) : viewMode === "list" ? (
         <div className="rounded-2xl overflow-hidden" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
           {contacts.map((contact, i) => (

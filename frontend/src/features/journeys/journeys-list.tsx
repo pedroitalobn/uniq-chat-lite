@@ -387,29 +387,54 @@ export function JourneysList() {
             ))}
           </div>
         ) : journeys.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-            <Wand2 className="w-12 h-12 mb-3 opacity-40" style={{ color: "var(--text-3)" }} />
-            <p className="text-sm font-medium" style={{ color: "var(--text-2)" }}>Nenhuma jornada ainda</p>
-            <p className="text-xs mt-1 mb-4 max-w-sm" style={{ color: "var(--text-3)" }}>
-              Descreva em linguagem natural pelo Uniq AI, comece de um template, ou monte direto no canvas.
-            </p>
-            <div className="flex items-center gap-2 flex-wrap justify-center">
-              <button
-                onClick={async () => {
-                  try {
-                    const res = await journeysApi.createBlank();
-                    const id = res.data?.id;
-                    if (id) window.location.href = `/journeys/${id}`;
-                  } catch (e: any) {
-                    toast.error(e?.response?.data?.error || "Falha ao criar jornada");
-                  }
-                }}
-                className="inline-flex items-center gap-1.5 text-xs font-medium rounded-lg px-3 py-2"
-                style={{ background: "var(--green)", color: "white" }}
-              >
-                <Plus className="w-3.5 h-3.5" /> Canvas em branco
-              </button>
+          <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+            {/* SVG: flowchart — 3 nós conectados por linhas */}
+            <div className="mb-6 opacity-60">
+              <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+                {/* Linha esquerda → centro */}
+                <line x1="28" y1="60" x2="50" y2="60" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" />
+                {/* Linha centro → direita */}
+                <line x1="70" y1="60" x2="92" y2="60" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" />
+                {/* Seta da linha direita */}
+                <polyline points="88,56 92,60 88,64" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                {/* Nó esquerdo */}
+                <circle cx="18" cy="60" r="10" stroke="var(--text-3)" strokeWidth="2" fill="none" />
+                <circle cx="18" cy="60" r="4" fill="var(--text-3)" />
+                {/* Nó central — destaque verde */}
+                <circle cx="60" cy="60" r="12" stroke="var(--green)" strokeWidth="2" fill="none" />
+                <circle cx="60" cy="60" r="5" fill="var(--green)" opacity="0.7" />
+                {/* Nó direito */}
+                <circle cx="102" cy="60" r="10" stroke="var(--text-3)" strokeWidth="2" fill="none" />
+                <circle cx="102" cy="60" r="4" fill="var(--text-3)" />
+                {/* Ramal para baixo do nó central */}
+                <line x1="60" y1="72" x2="60" y2="88" stroke="var(--text-3)" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round" />
+                <circle cx="60" cy="96" r="6" stroke="var(--text-3)" strokeWidth="1.5" fill="none" />
+              </svg>
             </div>
+            <h3 className="text-base font-semibold mb-2" style={{ color: "var(--text-1)" }}>
+              Nenhuma jornada criada
+            </h3>
+            <p className="text-sm mb-6 max-w-xs" style={{ color: "var(--text-3)" }}>
+              Crie fluxos automatizados para engajar seus contatos
+            </p>
+            <button
+              onClick={async () => {
+                try {
+                  const res = await journeysApi.createBlank();
+                  const id = res.data?.id;
+                  if (id) window.location.href = `/journeys/${id}`;
+                } catch (e: any) {
+                  toast.error(e?.response?.data?.error || "Falha ao criar jornada");
+                }
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+              style={{ background: "var(--green-dim)", color: "var(--green)", border: "1px solid var(--green-border)" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,212,106,0.18)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "var(--green-dim)"; }}
+            >
+              <Plus className="w-4 h-4" />
+              Criar jornada
+            </button>
           </div>
         ) : filteredJourneys.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-center px-4">

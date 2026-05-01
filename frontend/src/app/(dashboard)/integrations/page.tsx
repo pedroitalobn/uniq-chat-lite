@@ -224,6 +224,24 @@ function LLMSection({ onConnect }: { onConnect: (p: ProviderId) => void }) {
   const integrations = data ?? [];
   const connectedProviders = new Set(integrations.map((i) => i.provider));
 
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="animate-pulse flex flex-col items-start gap-2 rounded-2xl p-4"
+            style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>
+            <div className="w-10 h-10 rounded-xl" style={{ background: "var(--surface-2)" }} />
+            <div className="space-y-2 w-full">
+              <div className="h-3 rounded-full w-3/4" style={{ background: "var(--surface-2)" }} />
+              <div className="h-2 rounded-full w-full" style={{ background: "var(--surface-3)" }} />
+            </div>
+            <div className="h-2 rounded-full w-16 mt-1" style={{ background: "var(--surface-3)" }} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">

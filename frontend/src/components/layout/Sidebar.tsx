@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Bot, Building2, Calendar, ChevronDown, ChevronLeft, ChevronRight, Contact,
   CreditCard, Globe, Hash, HelpCircle, Home,
@@ -19,6 +20,7 @@ import { Logo } from "@/components/Logo";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { WorkspaceCustomizeDialog, resolveWorkspaceIcon } from "@/components/layout/WorkspaceCustomizeDialog";
+import { conversationsApi } from "@/lib/api";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -59,6 +61,23 @@ export function Sidebar() {
     return () => mq.removeEventListener("change", update);
   }, [collapsed]);
   const { currentWorkspace, setCurrentWorkspace, workspaces } = useWorkspace();
+
+  const { data: unreadData } = useQuery({
+    queryKey: ["inbox-unread-count", currentWorkspace?.id],
+    queryFn: async () => {
+      if (!currentWorkspace?.id) return { total: 0 };
+      try {
+        const res = await conversationsApi.list(currentWorkspace.id, { status: "open", limit: 1 });
+        return res.data as { total?: number; items?: unknown[] };
+      } catch {
+        return { total: 0 };
+      }
+    },
+    enabled: !!currentWorkspace?.id,
+    refetchInterval: 30000,
+  });
+  const unreadCount = (unreadData?.total ?? 0) as number;
+
   // Cor + ícone do workspace atual (com fallbacks). Defaults:
   // roxo (#7c3aed) e Building2 — aplicados quando o user ainda
   // não personalizou. Mudanças locais via dialog dão feedback
@@ -241,12 +260,46 @@ export function Sidebar() {
         </div>
       )}
 
+      {/* Search / Command Palette trigger */}
+      <div className={cn("flex-shrink-0", collapsed ? "px-1.5 py-2" : "px-2 py-2")}>
+        {collapsed ? (
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent("uniq:cmd-k"))}
+            title="Buscar (⌘K)"
+            className="w-full flex items-center justify-center p-2 rounded-lg transition-all duration-150"
+            style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-3)" }}
+            onMouseEnter={e => { e.currentTarget.style.color = "var(--text-1)"; }}
+            onMouseLeave={e => { e.currentTarget.style.color = "var(--text-3)"; }}
+          >
+            <Search className="w-3.5 h-3.5" />
+          </button>
+        ) : (
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent("uniq:cmd-k"))}
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-all duration-150 text-xs"
+            style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-3)" }}
+            onMouseEnter={e => { e.currentTarget.style.color = "var(--text-2)"; }}
+            onMouseLeave={e => { e.currentTarget.style.color = "var(--text-3)"; }}
+          >
+            <Search className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="flex-1 text-left">Buscar...</span>
+            <kbd
+              className="text-[10px] px-1 py-0.5 rounded flex-shrink-0"
+              style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-4)" }}
+            >
+              ⌘K
+            </kbd>
+          </button>
+        )}
+      </div>
+
       {/* Nav */}
       <nav className={cn("flex-1 py-2 space-y-px overflow-y-auto", collapsed ? "px-1.5" : "px-2")}>
         {visibleNavItems.map((item) => {
           const active = item.exact
             ? pathname === item.href
             : pathname === item.href || pathname.startsWith(item.href + "/");
+          const isInbox = item.href === "/inbox";
           return (
             <Link
               key={item.href}
@@ -271,16 +324,30 @@ export function Sidebar() {
             >
               {/* Icon container */}
               <span
-                className="flex items-center justify-center w-5 h-5 flex-shrink-0 rounded-md transition-all duration-150"
+                className="relative flex items-center justify-center w-5 h-5 flex-shrink-0 rounded-md transition-all duration-150"
                 style={active
                   ? { background: "rgba(0,212,106,0.14)", color: "var(--green)" }
                   : { color: "inherit" }
                 }
               >
                 <item.icon className="w-3.5 h-3.5" />
+                {collapsed && isInbox && unreadCount > 0 && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full"
+                    style={{ background: "var(--green)", boxShadow: "0 0 5px var(--green)" }}
+                  />
+                )}
               </span>
               {!collapsed && <span className="truncate">{item.label}</span>}
-              {!collapsed && active && (
+              {!collapsed && isInbox && unreadCount > 0 && (
+                <span
+                  className="ml-auto flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex-shrink-0"
+                  style={{ background: "var(--green)", color: "#000", boxShadow: "0 0 6px rgba(0,212,106,0.4)" }}
+                >
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+              {!collapsed && active && unreadCount === 0 && (
                 <span
                   className="ml-auto w-1 h-1 rounded-full flex-shrink-0"
                   style={{ background: "var(--green)", boxShadow: "0 0 5px var(--green)" }}

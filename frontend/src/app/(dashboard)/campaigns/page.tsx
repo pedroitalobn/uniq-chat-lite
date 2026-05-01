@@ -1070,20 +1070,37 @@ export default function CampaignsPage() {
           {[1, 2, 3].map((i) => <div key={i} className="skeleton h-52 rounded-2xl" />)}
         </div>
       ) : campaigns.length === 0 ? (
-        <div className="rounded-2xl p-14 text-center animate-fade-in-up"
-          style={{ background: "hsl(240 18% 6%)", border: "1px dashed hsl(240 12% 16%)" }}>
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
-            <Megaphone className="w-6 h-6" style={{ color: "hsl(240 8% 35%)" }} />
+        <div className="flex flex-col items-center justify-center py-20 px-4 text-center animate-fade-in-up">
+          {/* SVG: megafone com ondas de sinal */}
+          <div className="mb-6 opacity-60">
+            <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+              {/* Corpo do megafone */}
+              <path d="M24 48 L24 72 L40 72 L68 86 L68 34 L40 48 Z" stroke="var(--text-3)" strokeWidth="2.5" strokeLinejoin="round" fill="none" />
+              {/* Cabo / boca */}
+              <rect x="16" y="50" width="8" height="20" rx="3" stroke="var(--text-3)" strokeWidth="2" fill="none" />
+              {/* Ondas de sinal */}
+              <path d="M76 50 Q84 60 76 70" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" fill="none" opacity="0.9" />
+              <path d="M84 44 Q96 60 84 76" stroke="var(--green)" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.6" />
+              <path d="M92 38 Q108 60 92 82" stroke="var(--text-3)" strokeWidth="1.5" strokeLinecap="round" fill="none" opacity="0.4" />
+              {/* Ponto focal do megafone */}
+              <circle cx="46" cy="60" r="3" fill="var(--green)" opacity="0.6" />
+            </svg>
           </div>
-          <p className="font-medium text-sm" style={{ color: "hsl(240 8% 70%)" }}>Nenhuma campanha ainda</p>
-          <p className="text-sm mt-1.5 mb-6" style={{ color: "hsl(240 8% 42%)" }}>
-            Envie mensagens em massa para contatos ou grupos com agendamento inteligente
+          <h3 className="text-base font-semibold mb-2" style={{ color: "var(--text-1)" }}>
+            Nenhuma campanha criada
+          </h3>
+          <p className="text-sm mb-6 max-w-xs" style={{ color: "var(--text-3)" }}>
+            Dispare mensagens em massa para sua base de contatos
           </p>
-          <button onClick={() => setCreateOpen(true)}
-            className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl transition-all active:scale-[0.97]"
-            style={{ background: "var(--green)", color: "#03170a" }}>
-            <Plus className="w-4 h-4" /> Criar primeira campanha
+          <button
+            onClick={() => setCreateOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all active:scale-[0.97]"
+            style={{ background: "var(--green-dim)", color: "var(--green)", border: "1px solid var(--green-border)" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,212,106,0.18)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "var(--green-dim)"; }}
+          >
+            <Plus className="w-4 h-4" />
+            Nova campanha
           </button>
         </div>
       ) : (

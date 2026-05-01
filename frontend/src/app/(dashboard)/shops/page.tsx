@@ -82,19 +82,40 @@ export default function ShopsPage() {
           <Loader2 className="w-5 h-5 animate-spin mx-auto" />
         </div>
       ) : shops.length === 0 ? (
-        <div
-          className="rounded-2xl border border-dashed py-12 flex flex-col items-center gap-3"
-          style={{ borderColor: "var(--surface-border)" }}
-        >
-          <Store className="w-10 h-10 opacity-40" style={{ color: "var(--text-3)" }} />
-          <p className="text-sm" style={{ color: "var(--text-2)" }}>
-            Nenhuma shop criada ainda
+        <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+          {/* SVG: sacola de compras geométrica */}
+          <div className="mb-6 opacity-60">
+            <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+              {/* Corpo da sacola */}
+              <rect x="22" y="44" width="76" height="58" rx="8" stroke="var(--text-3)" strokeWidth="2.5" fill="none" />
+              {/* Alças */}
+              <path d="M44 44 C44 30 76 30 76 44" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+              {/* Detalhe central — ícone de loja */}
+              <line x1="38" y1="68" x2="82" y2="68" stroke="var(--text-3)" strokeWidth="1.5" strokeDasharray="4 3" />
+              {/* Etiqueta de preço */}
+              <rect x="50" y="76" width="20" height="14" rx="3" stroke="var(--green)" strokeWidth="1.5" fill="none" opacity="0.8" />
+              <line x1="60" y1="74" x2="60" y2="76" stroke="var(--green)" strokeWidth="1.5" />
+              {/* Estrelinhas decorativas */}
+              <circle cx="35" cy="56" r="2" fill="var(--text-3)" opacity="0.5" />
+              <circle cx="85" cy="56" r="2" fill="var(--text-3)" opacity="0.5" />
+            </svg>
+          </div>
+          <h3 className="text-base font-semibold mb-2" style={{ color: "var(--text-1)" }}>
+            Nenhuma loja criada
+          </h3>
+          <p className="text-sm mb-6 max-w-xs" style={{ color: "var(--text-3)" }}>
+            Crie uma loja para vender produtos pelo WhatsApp
           </p>
-          <p className="text-xs max-w-md text-center" style={{ color: "var(--text-3)" }}>
-            Crie a primeira pra começar a vender pelo WhatsApp. Você pode subir produtos manualmente
-            (consultorias, infoprodutos, serviços) ou conectar e-commerces como Shopify, VTEX,
-            Mercado Livre, Magalu e Amazon.
-          </p>
+          <button
+            onClick={() => setCreating(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+            style={{ background: "var(--green-dim)", color: "var(--green)", border: "1px solid var(--green-border)" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,212,106,0.18)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "var(--green-dim)"; }}
+          >
+            <Plus className="w-4 h-4" />
+            Criar loja
+          </button>
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 gap-3">

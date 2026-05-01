@@ -788,7 +788,38 @@ export default function ServersPage() {
       {/* Grid */}
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1,2,3].map(i => <div key={i} className="skeleton h-44 rounded-2xl" />)}
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="animate-pulse rounded-2xl p-5 flex flex-col gap-4"
+              style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>
+              {/* Header */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: "var(--surface-2)" }} />
+                  <div className="space-y-2">
+                    <div className="h-3 rounded-full w-28" style={{ background: "var(--surface-2)" }} />
+                    <div className="h-2 rounded-full w-20" style={{ background: "var(--surface-3)" }} />
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <div className="w-6 h-6 rounded-lg" style={{ background: "var(--surface-2)" }} />
+                  <div className="w-6 h-6 rounded-lg" style={{ background: "var(--surface-2)" }} />
+                </div>
+              </div>
+              {/* Slug row */}
+              <div className="h-8 rounded-xl" style={{ background: "var(--surface-2)" }} />
+              {/* Status badges */}
+              <div className="flex gap-2">
+                <div className="h-6 rounded-lg w-12" style={{ background: "var(--surface-2)" }} />
+                <div className="h-6 rounded-lg w-12" style={{ background: "var(--surface-2)" }} />
+                <div className="h-6 rounded-lg w-20" style={{ background: "var(--surface-2)" }} />
+              </div>
+              {/* Footer */}
+              <div className="flex items-center justify-between">
+                <div className="h-2 rounded-full w-24" style={{ background: "var(--surface-3)" }} />
+                <div className="h-2 rounded-full w-20" style={{ background: "var(--surface-3)" }} />
+              </div>
+            </div>
+          ))}
         </div>
       ) : servers.length === 0 ? (
         <div className="rounded-2xl p-16 text-center animate-fade-in-up"

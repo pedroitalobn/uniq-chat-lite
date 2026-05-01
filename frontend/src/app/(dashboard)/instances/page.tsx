@@ -516,8 +516,32 @@ function InstancesContent() {
       {/* Grid */}
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="skeleton h-44 rounded-2xl" />
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="animate-pulse rounded-2xl p-5 flex flex-col gap-4"
+              style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>
+              {/* Header */}
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex-shrink-0" style={{ background: "var(--surface-2)" }} />
+                  <div className="space-y-2">
+                    <div className="h-3 rounded-full w-28" style={{ background: "var(--surface-2)" }} />
+                    <div className="h-2 rounded-full w-20" style={{ background: "var(--surface-3)" }} />
+                    <div className="h-2 rounded-full w-32" style={{ background: "var(--surface-3)" }} />
+                  </div>
+                </div>
+                <div className="w-2.5 h-2.5 rounded-full mt-1" style={{ background: "var(--surface-3)" }} />
+              </div>
+              {/* Badges */}
+              <div className="flex gap-1.5">
+                <div className="h-5 rounded-full w-24" style={{ background: "var(--surface-2)" }} />
+                <div className="h-5 rounded-full w-20" style={{ background: "var(--surface-2)" }} />
+              </div>
+              {/* Actions */}
+              <div className="flex gap-2 mt-auto pt-1">
+                <div className="flex-1 h-8 rounded-xl" style={{ background: "var(--surface-2)" }} />
+                <div className="w-8 h-8 rounded-xl" style={{ background: "var(--surface-2)" }} />
+              </div>
+            </div>
           ))}
         </div>
       ) : filtered.length === 0 ? (

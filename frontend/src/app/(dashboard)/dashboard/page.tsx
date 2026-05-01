@@ -5,7 +5,7 @@
 // Cada visão consome endpoints já existentes; a rota /reports antiga
 // é mantida via tab Inbox/SLA (deeplink ?tab=inbox).
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   adminApi, agentsApi, campaignsApi, companiesApi, crmApi, dealsApi,
@@ -38,8 +38,88 @@ const statStyles = {
 };
 type StatColor = keyof typeof statStyles;
 
+// ─── AnimatedNumber ───────────────────────────────────────────────────────────
+function AnimatedNumber({ value }: { value: number }) {
+  const [display, setDisplay] = useState(0);
+  const rafRef = useRef<number | null>(null);
+  const startRef = useRef<number | null>(null);
+  const duration = 600;
+
+  useEffect(() => {
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    startRef.current = null;
+
+    const animate = (timestamp: number) => {
+      if (startRef.current === null) startRef.current = timestamp;
+      const elapsed = timestamp - startRef.current;
+      const progress = Math.min(elapsed / duration, 1);
+      // easeOutExpo
+      const eased = 1 - Math.pow(1 - progress, 4);
+      setDisplay(Math.round(eased * value));
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    rafRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [value]);
+
+  return <>{display > 1000 ? display.toLocaleString("pt-BR") : display}</>;
+}
+
+// ─── Sparkline ────────────────────────────────────────────────────────────────
+const SPARKLINE_PLACEHOLDER = [65, 72, 68, 80, 75, 88, 92];
+
+function Sparkline({ data = SPARKLINE_PLACEHOLDER, positive = true }: { data?: number[]; positive?: boolean }) {
+  const w = 80;
+  const h = 32;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const stepX = w / (data.length - 1);
+  const points = data
+    .map((v, i) => `${i * stepX},${h - ((v - min) / range) * (h - 4) - 2}`)
+    .join(" ");
+  const color = positive ? "var(--green)" : "#ef4444";
+  return (
+    <svg
+      width={w}
+      height={h}
+      style={{ opacity: 0.5, display: "block" }}
+      aria-hidden="true"
+    >
+      <polyline
+        points={points}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+// ─── StatCard skeleton ────────────────────────────────────────────────────────
+function StatCardSkeleton() {
+  return (
+    <div
+      className="rounded-2xl p-4 sm:p-5 animate-pulse h-full"
+      style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
+    >
+      <div className="w-9 h-9 rounded-xl mb-3 sm:mb-4" style={{ background: "var(--surface-3)" }} />
+      <div className="h-7 w-16 rounded-lg mb-2" style={{ background: "var(--surface-3)" }} />
+      <div className="h-3 w-24 rounded-md" style={{ background: "var(--surface-3)" }} />
+    </div>
+  );
+}
+
+// ─── StatCard ─────────────────────────────────────────────────────────────────
 function StatCard({
-  href, label, value, icon: Icon, sub, color = "green",
+  href, label, value, icon: Icon, sub, color = "green", isLoading = false, sparkline,
 }: {
   href?: string;
   label: string;
@@ -47,19 +127,56 @@ function StatCard({
   icon: React.ElementType;
   sub?: string;
   color?: StatColor;
+  isLoading?: boolean;
+  sparkline?: number[];
 }) {
+  if (isLoading) return <StatCardSkeleton />;
+
   const s = statStyles[color];
+  const numValue = typeof value === "number" ? value : undefined;
+
   const inner = (
-    <div className="rounded-2xl p-4 sm:p-5 transition-all hover:scale-[1.01] animate-fade-in-up h-full" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-      <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 sm:mb-4" style={{ background: s.bg, border: `1px solid ${s.border}` }}>
+    <div
+      className="rounded-2xl p-4 sm:p-5 transition-all hover:scale-[1.01] animate-fade-in-up h-full relative overflow-hidden"
+      style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}
+    >
+      <div
+        className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 sm:mb-4"
+        style={{ background: s.bg, border: `1px solid ${s.border}` }}
+      >
         <Icon className="w-4 h-4" style={{ color: s.icon }} />
       </div>
-      <p className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>{value}</p>
+      <p className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
+        {numValue !== undefined ? <AnimatedNumber value={numValue} /> : value}
+      </p>
       <p className="text-xs sm:text-sm mt-1" style={{ color: "hsl(240 8% 52%)" }}>{label}</p>
       {sub && <p className="text-[10px] sm:text-xs mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>{sub}</p>}
+      {/* Sparkline — bottom-right */}
+      <div style={{ position: "absolute", bottom: 12, right: 12 }}>
+        <Sparkline data={sparkline} positive={color !== "red"} />
+      </div>
     </div>
   );
   return href ? <Link href={href} className="block h-full">{inner}</Link> : inner;
+}
+
+// ─── LiveIndicator ────────────────────────────────────────────────────────────
+function LiveIndicator() {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: "var(--green)" }}>
+      <span
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: "var(--green)",
+          display: "inline-block",
+          animation: "live-dot-pulse 2s infinite",
+        }}
+      />
+      Ao vivo
+    </span>
+  );
 }
 
 function ShortcutCard({ href, icon: Icon, label, description, color }: {
@@ -109,11 +226,13 @@ export default function DashboardPage() {
     queryKey: ["admin-stats"],
     queryFn: () => adminApi.getStats().then((r) => r.data),
     enabled: isAdmin,
+    refetchInterval: 30_000,
   });
 
   const instancesQ = useQuery<Instance[]>({
     queryKey: ["instances", wsId],
     queryFn: () => instancesApi.list(undefined, wsId).then((r) => r.data),
+    refetchInterval: 30_000,
   });
   const instances = instancesQ.data ?? [];
   const connected = instances.filter((i) => i.status === "connected").length;
@@ -121,6 +240,7 @@ export default function DashboardPage() {
   const journeysQ = useQuery({
     queryKey: ["journeys"],
     queryFn: () => journeysApi.list(wsId).then((r) => r.data as any[]),
+    refetchInterval: 30_000,
   });
   const journeys = journeysQ.data ?? [];
   const activeJourneys = journeys.filter((j) => j.status === "active").length;
@@ -128,7 +248,7 @@ export default function DashboardPage() {
   const journeyStatsQ = useQuery({
     queryKey: ["agent-stats"],
     queryFn: () => agentsApi.stats(wsId).then((r) => r.data),
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
   });
 
   // Helper: vários endpoints do backend retornam shapes diferentes
@@ -152,6 +272,7 @@ export default function DashboardPage() {
     queryKey: ["campaigns", wsId],
     queryFn: () => campaignsApi.list(wsId).then((r) => r.data),
     enabled: !!wsId,
+    refetchInterval: 30_000,
   });
   const campaigns = asArray<any>(campaignsQ.data);
   const activeCampaigns = campaigns.filter((c: any) => ["running", "active", "scheduled"].includes(c.status)).length;
@@ -160,6 +281,7 @@ export default function DashboardPage() {
     queryKey: ["deals-dashboard", wsId],
     queryFn: () => dealsApi.list(wsId as string).then((r) => r.data),
     enabled: !!wsId,
+    refetchInterval: 30_000,
   });
   const deals = asArray<any>(dealsQ.data);
   const openDeals = deals.filter((d: any) => d.status === "open").length;
@@ -172,6 +294,7 @@ export default function DashboardPage() {
     queryKey: ["contacts-count", wsId],
     queryFn: () => crmApi.listContacts({ workspace_id: wsId, limit: 1 }).then((r) => r.data),
     enabled: !!wsId,
+    refetchInterval: 30_000,
   });
   const contactsTotal = asTotal(contactsQ.data);
 
@@ -179,8 +302,18 @@ export default function DashboardPage() {
     queryKey: ["companies-count", wsId],
     queryFn: () => companiesApi.list(wsId as string, { limit: 1 }).then((r) => r.data),
     enabled: !!wsId,
+    refetchInterval: 30_000,
   });
   const companiesTotal = asTotal(companiesQ.data);
+
+  // Loading state: true enquanto qualquer query principal ainda carrega pela primeira vez
+  const isLoadingStats =
+    instancesQ.isLoading ||
+    journeysQ.isLoading ||
+    campaignsQ.isLoading ||
+    dealsQ.isLoading ||
+    contactsQ.isLoading ||
+    companiesQ.isLoading;
 
   // Top 5 deals abertos
   const topOpenDeals = deals
@@ -199,12 +332,17 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5 sm:space-y-7">
       {/* Header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-medium tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Dashboard</h1>
-        <p className="text-xs sm:text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
-          Bem-vindo{currentWorkspace ? ` ao workspace ${currentWorkspace.name}` : ""},{" "}
-          <span style={{ color: "hsl(240 8% 70%)" }}>{session?.user?.name}</span>
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-medium tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Dashboard</h1>
+          <p className="text-xs sm:text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
+            Bem-vindo{currentWorkspace ? ` ao workspace ${currentWorkspace.name}` : ""},{" "}
+            <span style={{ color: "hsl(240 8% 70%)" }}>{session?.user?.name}</span>
+          </p>
+        </div>
+        <div className="mt-1">
+          <LiveIndicator />
+        </div>
       </div>
 
       {/* Pills de tabs — mesmo padrão dos outros menus pill (CRMTabs, etc) */}
@@ -232,6 +370,7 @@ export default function DashboardPage() {
           icon={Smartphone}
           sub={connected > 0 ? `${connected} conectada${connected !== 1 ? "s" : ""}` : undefined}
           color="green"
+          isLoading={isLoadingStats}
         />
         <StatCard
           href="/journeys"
@@ -240,6 +379,7 @@ export default function DashboardPage() {
           icon={Wand2}
           sub={activeJourneys > 0 ? `${activeJourneys} ativa${activeJourneys !== 1 ? "s" : ""}` : undefined}
           color="violet"
+          isLoading={isLoadingStats}
         />
         <StatCard
           href="/campaigns"
@@ -248,6 +388,7 @@ export default function DashboardPage() {
           icon={Megaphone}
           sub={activeCampaigns > 0 ? `${activeCampaigns} em andamento` : undefined}
           color="amber"
+          isLoading={isLoadingStats}
         />
         <StatCard
           href="/crm/deals"
@@ -256,6 +397,7 @@ export default function DashboardPage() {
           icon={TrendingUp}
           sub={dealsValue ? `R$ ${dealsValue.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}` : undefined}
           color="blue"
+          isLoading={isLoadingStats}
         />
         <StatCard
           href="/crm/contacts"
@@ -263,6 +405,7 @@ export default function DashboardPage() {
           value={contactsTotal}
           icon={ContactIcon}
           color="pink"
+          isLoading={isLoadingStats}
         />
         <StatCard
           href="/crm/companies"
@@ -270,6 +413,7 @@ export default function DashboardPage() {
           value={companiesTotal}
           icon={Building2}
           color="violet"
+          isLoading={isLoadingStats}
         />
       </div>
 
@@ -501,6 +645,7 @@ function CampaignsView({ wsId }: { wsId?: string }) {
     queryKey: ["dash-campaigns", wsId],
     queryFn: () => campaignsApi.list(wsId).then((r) => r.data),
     enabled: !!wsId,
+    refetchInterval: 30_000,
   });
   const list: any[] = Array.isArray(q.data) ? q.data : (q.data as any)?.data || [];
   const totals = useMemo(() => {
@@ -533,6 +678,7 @@ function InboxStatsView({ wsId }: { wsId?: string }) {
     queryKey: ["dash-conv-count", wsId],
     queryFn: () => conversationsApi.count(wsId as string).then(r => r.data as Record<string, number>),
     enabled: !!wsId,
+    refetchInterval: 30_000,
   });
   const c = counts.data ?? {};
   return (
@@ -556,6 +702,7 @@ function ShopStatsView({ wsId }: { wsId?: string }) {
     queryKey: ["dash-shops", wsId],
     queryFn: () => api.get("/v1/shops", { headers }).then(r => r.data),
     enabled: !!wsId,
+    refetchInterval: 30_000,
   });
   const shops: any[] = (shopsQ.data as any)?.data ?? [];
   const productsQ = useQuery({
@@ -571,6 +718,7 @@ function ShopStatsView({ wsId }: { wsId?: string }) {
       return total;
     },
     enabled: shops.length > 0,
+    refetchInterval: 30_000,
   });
   return (
     <div className="space-y-4">
@@ -592,7 +740,7 @@ function AgentsStatsView() {
   const q = useQuery({
     queryKey: ["dash-agent-stats", wsId],
     queryFn: () => agentsApi.stats(wsId).then(r => r.data),
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
   });
   const s: any = q.data || {};
   return (

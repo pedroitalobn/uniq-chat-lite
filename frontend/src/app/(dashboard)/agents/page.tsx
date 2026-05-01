@@ -351,8 +351,57 @@ export default function AgentsPage() {
         </div>
       </div>
 
+      {/* Empty state — no instances */}
+      {!instancesQuery.isLoading && instancesQuery.data?.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+          {/* SVG: robô/bot com círculos e linhas de conexão */}
+          <div className="mb-6 opacity-60">
+            <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+              {/* Cabeça do robô */}
+              <rect x="36" y="22" width="48" height="38" rx="8" stroke="var(--text-3)" strokeWidth="2.5" fill="none" />
+              {/* Antena */}
+              <line x1="60" y1="22" x2="60" y2="12" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="60" cy="10" r="3" fill="var(--green)" />
+              {/* Olhos */}
+              <circle cx="50" cy="38" r="5" stroke="var(--green)" strokeWidth="2" fill="none" />
+              <circle cx="70" cy="38" r="5" stroke="var(--green)" strokeWidth="2" fill="none" />
+              <circle cx="50" cy="38" r="2" fill="var(--green)" opacity="0.7" />
+              <circle cx="70" cy="38" r="2" fill="var(--green)" opacity="0.7" />
+              {/* Corpo */}
+              <rect x="42" y="64" width="36" height="26" rx="6" stroke="var(--text-3)" strokeWidth="2" fill="none" />
+              {/* Pescoço */}
+              <line x1="60" y1="60" x2="60" y2="64" stroke="var(--text-3)" strokeWidth="3" strokeLinecap="round" />
+              {/* Braços */}
+              <line x1="42" y1="74" x2="28" y2="80" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" />
+              <line x1="78" y1="74" x2="92" y2="80" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" />
+              {/* Nós de conexão nas pontas dos braços */}
+              <circle cx="26" cy="81" r="4" stroke="var(--text-3)" strokeWidth="1.5" fill="none" />
+              <circle cx="94" cy="81" r="4" stroke="var(--text-3)" strokeWidth="1.5" fill="none" />
+              {/* Botão no corpo */}
+              <circle cx="60" cy="77" r="3" fill="var(--text-3)" opacity="0.4" />
+            </svg>
+          </div>
+          <h3 className="text-base font-semibold mb-2" style={{ color: "var(--text-1)" }}>
+            Nenhum agente criado
+          </h3>
+          <p className="text-sm mb-6 max-w-xs" style={{ color: "var(--text-3)" }}>
+            Crie um agente de IA para automatizar atendimentos no WhatsApp
+          </p>
+          <a
+            href="/instances"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+            style={{ background: "var(--green-dim)", color: "var(--green)", border: "1px solid var(--green-border)" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,212,106,0.18)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "var(--green-dim)"; }}
+          >
+            <Plus className="w-4 h-4" />
+            Criar primeira instância
+          </a>
+        </div>
+      )}
+
       {/* Layout */}
-      <div className="grid grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)] gap-5">
+      <div className="grid grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)] gap-5" style={{ display: (!instancesQuery.isLoading && instancesQuery.data?.length === 0) ? "none" : undefined }}>
         {/* Sidebar */}
         <aside className="space-y-4">
           {/* Instance selector */}

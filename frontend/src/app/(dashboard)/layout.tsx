@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { BottomNav } from "@/components/layout/BottomNav";
+import { CommandPalette } from "@/components/ui/CommandPalette";
 import { LayoutClient } from "./LayoutClient";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { WorkspacePermissionsProvider } from "@/contexts/WorkspacePermissionsContext";
@@ -26,6 +28,8 @@ export default async function DashboardLayout({
               <LayoutClient>{children}</LayoutClient>
             </div>
             <UniqAIIsland />
+            <BottomNav />
+            <CommandPalette />
           </UniqAIIslandProvider>
         </PresenceProvider>
       </WorkspacePermissionsProvider>
