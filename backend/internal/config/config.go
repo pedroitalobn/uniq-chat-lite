@@ -129,7 +129,7 @@ func Load() *Config {
 
 		// Bridges — social channel automation
 		TaktikBaseURL:    getEnv("TAKTIK_BASE_URL", "http://localhost:8090"),
-		InstagramBaseURL: getEnv("INSTAGRAM_BRIDGE_URL", "http://localhost:8091"),
+		InstagramBaseURL: getEnv("INSTAGRAM_BASE_URL", getEnv("INSTAGRAM_BRIDGE_URL", "http://uniqchat-instagram-bridge:8091")),
 
 		// Meta — WhatsApp Business API (WABA)
 		MetaAppID:              getEnv("META_APP_ID", ""),
