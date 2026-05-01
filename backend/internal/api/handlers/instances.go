@@ -1197,6 +1197,18 @@ func (h *InstanceHandler) InstagramChallenge(c *fiber.Ctx) error {
 		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
 	}
 
+	// Persist the authenticated session so the instance stays connected after
+	// frontend refresh and backend restarts. Challenge verification completes
+	// the login flow, but InstagramLogin only saves to DB on direct success —
+	// the challenge path was missing this step.
+	if session := h.instagram.GetSession(instance.ID.String()); session != nil && session.Username != "" {
+		h.db.Model(instance).Updates(map[string]interface{}{
+			"instagram_username":  session.Username,
+			"status":              models.StatusConnected,
+			"instagram_device_id": generateDeviceID(session.Username),
+		})
+	}
+
 	return c.JSON(resp)
 }
 
