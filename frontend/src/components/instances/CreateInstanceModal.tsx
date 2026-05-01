@@ -204,9 +204,13 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
       onCreated();
       onClose();
     } catch (err: unknown) {
+      type AxiosErr = { response?: { data?: { error?: string } }; code?: string; message?: string };
+      const e = err as AxiosErr;
       const msg =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
-        "Erro ao criar instância";
+        e?.response?.data?.error ||
+        (e?.code === "ERR_NETWORK" || e?.code === "ERR_FAILED"
+          ? "Falha na conexão com o servidor. Verifique o servidor/proxy da instância."
+          : e?.message || "Erro ao criar instância");
       toast.error(msg);
     } finally {
       setCreating(false);

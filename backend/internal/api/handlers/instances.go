@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -892,6 +893,14 @@ func (h *InstanceHandler) InstagramLogin(c *fiber.Ctx) error {
 
 	resp, err := h.instagram.Login(c.Context(), instance.ID.String(), req.Username, req.Password, proxyURL)
 	if err != nil {
+		// Clean up the orphaned instance so the user can retry from scratch
+		h.db.Delete(instance)
+		var bridgeErr *services.BridgeError
+		if errors.As(err, &bridgeErr) {
+			// Business error from Instagram (wrong password, banned, etc.) → 422
+			return c.Status(422).JSON(fiber.Map{"error": err.Error()})
+		}
+		// Bridge unreachable → 502
 		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
 	}
 

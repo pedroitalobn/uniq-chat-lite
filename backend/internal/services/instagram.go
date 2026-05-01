@@ -92,6 +92,12 @@ type bridgeResponse struct {
 	Error   string          `json:"error"`
 }
 
+// BridgeError wraps errors returned by the Instagram bridge (business errors from Instagram,
+// e.g. wrong password). Distinct from connectivity errors so callers can return 422 vs 502.
+type BridgeError struct{ Message string }
+
+func (e *BridgeError) Error() string { return e.Message }
+
 func NewInstagramService(db *gorm.DB) *InstagramService {
 	baseURL := config.AppConfig.InstagramBaseURL
 	if baseURL == "" {
@@ -144,7 +150,7 @@ func (s *InstagramService) doRequest(ctx context.Context, method, path string, p
 			bridge.Error = "bridge request failed"
 		}
 		log.Warn().Str("error", bridge.Error).Str("url", url).Msg("instagram bridge error")
-		return fmt.Errorf("%s", bridge.Error)
+		return &BridgeError{Message: bridge.Error}
 	}
 	if out != nil && len(bridge.Data) > 0 {
 		if err := json.Unmarshal(bridge.Data, out); err != nil {
