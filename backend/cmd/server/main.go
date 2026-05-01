@@ -227,6 +227,11 @@ func main() {
 	ticketingScheduler := services.NewTicketingScheduler(db, services.NewDispatchService(db))
 	ticketingScheduler.Start()
 
+	// Proxy health monitor: testa proxies da plataforma a cada 5min e reinicia
+	// instâncias afetadas automaticamente quando um proxy se recupera.
+	proxyMonitor := services.NewProxyMonitor(db, manager)
+	proxyMonitor.Start()
+
 	// Scheduled recovery snapshots (check every hour)
 	recoveryH := handlers.NewRecoveryHandler(db, manager)
 	go func() {

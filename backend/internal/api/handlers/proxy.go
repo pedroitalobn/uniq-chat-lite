@@ -401,7 +401,9 @@ func checkProxyPlanAccess(c *fiber.Ctx) error {
 }
 
 // restartServersUsingProxy reinicia as instâncias dos servers que usam um
-// proxy específico, pra aplicar mudanças de credenciais.
+// proxy específico, pra aplicar mudanças de credenciais ou recuperar de falha.
+// Reinicia tanto instâncias rodando quanto as marcadas como disconnected,
+// garantindo recuperação quando o proxy volta após uma queda.
 func restartServersUsingProxy(db *gorm.DB, manager *whatsapp.Manager, proxyID uuid.UUID) {
 	if manager == nil {
 		return
@@ -411,17 +413,20 @@ func restartServersUsingProxy(db *gorm.DB, manager *whatsapp.Manager, proxyID uu
 	if len(serverIDs) == 0 {
 		return
 	}
+	// Inclui instâncias disconnected: quando o proxy cai, as instâncias perdem
+	// a conexão e saem do estado "running". Sem isso, o restart nunca acontece.
 	var instances []models.Instance
-	if err := db.Where("server_id IN ?", serverIDs).Find(&instances).Error; err != nil {
+	if err := db.Where("server_id IN ? AND status IN ?", serverIDs,
+		[]string{"connected", "disconnected"},
+	).Find(&instances).Error; err != nil {
 		return
 	}
 	for i := range instances {
 		inst := &instances[i]
-		if !manager.IsRunning(inst.ID.String()) {
-			continue
-		}
 		if err := manager.RestartWithProxy(inst); err != nil {
-			log.Warn().Err(err).Str("instance", inst.ID.String()).Msg("failed to restart instance on proxy update")
+			log.Warn().Err(err).Str("instance", inst.ID.String()).Msg("proxy recovery: falha ao reiniciar instância")
+		} else {
+			log.Info().Str("instance", inst.ID.String()).Str("proxy", proxyID.String()).Msg("proxy recovery: instância reiniciada")
 		}
 	}
 }

@@ -72,7 +72,7 @@ type SendDMResponse struct {
 
 type LoginResponse struct {
 	Username             string   `json:"username"`
-	PK                   int64    `json:"pk"`
+	PK                   string   `json:"pk"`
 	ProfilePic           string   `json:"profile_pic_url"`
 	Session              []byte   `json:"session"`
 	Status               string   `json:"status"`
