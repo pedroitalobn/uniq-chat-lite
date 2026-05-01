@@ -1,9 +1,9 @@
-FROM node:20-alpine
+FROM python:3.11-slim
 WORKDIR /app
-COPY package.json ./
-RUN npm install --omit=dev
-COPY server.js ./
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+COPY main.py ./
 RUN mkdir -p sessions
-ENV NODE_ENV=production
+ENV PYTHONUNBUFFERED=1
 EXPOSE 8091
-CMD ["node", "server.js"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8091"]

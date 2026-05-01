@@ -431,13 +431,153 @@ func (s *InstagramService) ChallengeResend(ctx context.Context, instanceID, apiP
 }
 
 type PublishResponse struct {
-	MediaID int64  `json:"media_id"`
-	Status  string `json:"status"`
-	URL     string `json:"url,omitempty"`
+	MediaID  string `json:"media_id"`
+	MediaPK  string `json:"media_pk"`
+	Code     string `json:"code"`
+	Status   string `json:"status"`
+	URL      string `json:"url,omitempty"`
 }
 
 type UserMediaResponse struct {
+	Medias []MediaItem `json:"medias"`
+}
+
+type MediaItem struct {
+	PK           string `json:"pk"`
+	ID           string `json:"id"`
+	Code         string `json:"code"`
+	MediaType    int    `json:"media_type"`
+	ThumbnailURL string `json:"thumbnail_url"`
+	LikeCount    int    `json:"like_count"`
+	CommentCount int    `json:"comment_count"`
+	Caption      string `json:"caption"`
+	TakenAt      string `json:"taken_at"`
+}
+
+type CommentResponse struct {
+	CommentID string `json:"comment_id"`
+	Text      string `json:"text"`
+	Status    string `json:"status"`
+}
+
+type CommentsResponse struct {
+	Comments []CommentItem `json:"comments"`
+}
+
+type CommentItem struct {
+	PK        string          `json:"pk"`
+	User      InstagramUser   `json:"user"`
+	Text      string          `json:"text"`
+	CreatedAt string          `json:"created_at"`
+	LikeCount int             `json:"like_count"`
+}
+
+type SearchUsersResponse struct {
 	Users []InstagramUser `json:"users"`
+}
+
+type HashtagResponse struct {
+	Hashtag string      `json:"hashtag"`
+	Medias  []MediaItem `json:"medias"`
+}
+
+type ThreadResponse struct {
+	ThreadID string          `json:"thread_id"`
+	Messages []ThreadMessage `json:"messages"`
+}
+
+func (s *InstagramService) Unlike(ctx context.Context, instanceID, mediaID string) error {
+	session := s.getSession(instanceID)
+	if session == nil || !session.LoggedIn {
+		return fmt.Errorf("not logged in")
+	}
+	return s.doRequest(ctx, http.MethodPost, "/instagram/unlike", map[string]interface{}{
+		"instance_id": instanceID,
+		"username":    session.Username,
+		"media_id":    mediaID,
+	}, nil)
+}
+
+func (s *InstagramService) Comment(ctx context.Context, instanceID, mediaID, text string) (*CommentResponse, error) {
+	session := s.getSession(instanceID)
+	if session == nil || !session.LoggedIn {
+		return nil, fmt.Errorf("not logged in")
+	}
+	var resp CommentResponse
+	err := s.doRequest(ctx, http.MethodPost, "/instagram/comment", map[string]interface{}{
+		"instance_id": instanceID,
+		"username":    session.Username,
+		"media_id":    mediaID,
+		"text":        text,
+	}, &resp)
+	return &resp, err
+}
+
+func (s *InstagramService) GetComments(ctx context.Context, instanceID, mediaID string, amount int) (*CommentsResponse, error) {
+	session := s.getSession(instanceID)
+	if session == nil || !session.LoggedIn {
+		return nil, fmt.Errorf("not logged in")
+	}
+	q := url.Values{}
+	q.Set("instance_id", instanceID)
+	q.Set("media_id", mediaID)
+	q.Set("amount", fmt.Sprintf("%d", amount))
+	var resp CommentsResponse
+	err := s.doRequest(ctx, http.MethodGet, "/instagram/comments?"+q.Encode(), nil, &resp)
+	return &resp, err
+}
+
+func (s *InstagramService) ReplyDM(ctx context.Context, instanceID, threadID, text string) error {
+	session := s.getSession(instanceID)
+	if session == nil || !session.LoggedIn {
+		return fmt.Errorf("not logged in")
+	}
+	return s.doRequest(ctx, http.MethodPost, "/instagram/dm/reply", map[string]interface{}{
+		"instance_id": instanceID,
+		"thread_id":   threadID,
+		"text":        text,
+	}, nil)
+}
+
+func (s *InstagramService) GetThread(ctx context.Context, instanceID, threadID string) (*ThreadResponse, error) {
+	session := s.getSession(instanceID)
+	if session == nil || !session.LoggedIn {
+		return nil, fmt.Errorf("not logged in")
+	}
+	q := url.Values{}
+	q.Set("instance_id", instanceID)
+	q.Set("thread_id", threadID)
+	var resp ThreadResponse
+	err := s.doRequest(ctx, http.MethodGet, "/instagram/dm/thread?"+q.Encode(), nil, &resp)
+	return &resp, err
+}
+
+func (s *InstagramService) SearchUsers(ctx context.Context, instanceID, query string) (*SearchUsersResponse, error) {
+	session := s.getSession(instanceID)
+	if session == nil || !session.LoggedIn {
+		return nil, fmt.Errorf("not logged in")
+	}
+	q := url.Values{}
+	q.Set("instance_id", instanceID)
+	q.Set("query", query)
+	var resp SearchUsersResponse
+	err := s.doRequest(ctx, http.MethodGet, "/instagram/search/users?"+q.Encode(), nil, &resp)
+	return &resp, err
+}
+
+func (s *InstagramService) GetHashtag(ctx context.Context, instanceID, hashtag, tab string, amount int) (*HashtagResponse, error) {
+	session := s.getSession(instanceID)
+	if session == nil || !session.LoggedIn {
+		return nil, fmt.Errorf("not logged in")
+	}
+	q := url.Values{}
+	q.Set("instance_id", instanceID)
+	q.Set("hashtag", hashtag)
+	q.Set("tab", tab)
+	q.Set("amount", fmt.Sprintf("%d", amount))
+	var resp HashtagResponse
+	err := s.doRequest(ctx, http.MethodGet, "/instagram/hashtag?"+q.Encode(), nil, &resp)
+	return &resp, err
 }
 
 func generateDeviceID(username string) string {

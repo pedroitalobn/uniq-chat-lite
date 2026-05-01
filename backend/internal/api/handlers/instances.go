@@ -1206,6 +1206,142 @@ func (h *InstanceHandler) InstagramChallengeResend(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "código reenviado"})
 }
 
+// InstagramUnlike POST /instances/:id/instagram/unlike
+func (h *InstanceHandler) InstagramUnlike(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	var req struct {
+		MediaID string `json:"media_id"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.MediaID == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "media_id é obrigatório"})
+	}
+	if err := h.instagram.Unlike(c.Context(), instance.ID.String(), req.MediaID); err != nil {
+		var bridgeErr *services.BridgeError
+		if errors.As(err, &bridgeErr) {
+			return c.Status(422).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "ok"})
+}
+
+// InstagramComment POST /instances/:id/instagram/comment
+func (h *InstanceHandler) InstagramComment(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	var req struct {
+		MediaID string `json:"media_id"`
+		Text    string `json:"text"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.MediaID == "" || req.Text == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "media_id e text são obrigatórios"})
+	}
+	resp, err := h.instagram.Comment(c.Context(), instance.ID.String(), req.MediaID, req.Text)
+	if err != nil {
+		var bridgeErr *services.BridgeError
+		if errors.As(err, &bridgeErr) {
+			return c.Status(422).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(resp)
+}
+
+// InstagramGetComments GET /instances/:id/instagram/comments
+func (h *InstanceHandler) InstagramGetComments(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	mediaID := c.Query("media_id")
+	if mediaID == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "media_id é obrigatório"})
+	}
+	amount := c.QueryInt("amount", 20)
+	resp, err := h.instagram.GetComments(c.Context(), instance.ID.String(), mediaID, amount)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(resp)
+}
+
+// InstagramDMReply POST /instances/:id/instagram/dm/reply
+func (h *InstanceHandler) InstagramDMReply(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	var req struct {
+		ThreadID string `json:"thread_id"`
+		Text     string `json:"text"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.ThreadID == "" || req.Text == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "thread_id e text são obrigatórios"})
+	}
+	if err := h.instagram.ReplyDM(c.Context(), instance.ID.String(), req.ThreadID, req.Text); err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "sent"})
+}
+
+// InstagramGetThread GET /instances/:id/instagram/dm/thread
+func (h *InstanceHandler) InstagramGetThread(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	threadID := c.Query("thread_id")
+	if threadID == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "thread_id é obrigatório"})
+	}
+	resp, err := h.instagram.GetThread(c.Context(), instance.ID.String(), threadID)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(resp)
+}
+
+// InstagramSearchUsers GET /instances/:id/instagram/search/users
+func (h *InstanceHandler) InstagramSearchUsers(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	query := c.Query("q")
+	if query == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "q é obrigatório"})
+	}
+	resp, err := h.instagram.SearchUsers(c.Context(), instance.ID.String(), query)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(resp)
+}
+
+// InstagramHashtag GET /instances/:id/instagram/hashtag
+func (h *InstanceHandler) InstagramHashtag(c *fiber.Ctx) error {
+	instance := middleware.GetCurrentInstance(c)
+	if instance == nil {
+		return c.Status(404).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	hashtag := c.Query("hashtag")
+	if hashtag == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "hashtag é obrigatório"})
+	}
+	tab := c.Query("tab", "top")
+	amount := c.QueryInt("amount", 9)
+	resp, err := h.instagram.GetHashtag(c.Context(), instance.ID.String(), hashtag, tab, amount)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(resp)
+}
+
 func generateDeviceID(username string) string {
 	return fmt.Sprintf("android-%s", uuid.New().String()[:8])
 }
