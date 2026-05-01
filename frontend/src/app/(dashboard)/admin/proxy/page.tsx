@@ -189,7 +189,7 @@ function ProxyModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div className="relative w-full max-w-lg rounded-2xl p-6 space-y-4 animate-fade-in-up"
         style={{ background: "hsl(240 18% 6.5%)", border: "1px solid hsl(240 12% 13%)" }}>
@@ -306,7 +306,7 @@ function SetDefaultModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl p-6 space-y-4 animate-fade-in-up"
         style={{ background: "hsl(240 18% 6.5%)", border: "1px solid hsl(240 12% 13%)" }}>
@@ -356,7 +356,7 @@ function DeleteModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl p-6 space-y-4 animate-fade-in-up"
         style={{ background: "hsl(240 18% 6.5%)", border: "1px solid hsl(240 12% 13%)" }}>

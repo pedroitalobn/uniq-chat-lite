@@ -246,7 +246,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
 
   if (loggingIn) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "hsl(240 18% 4% / 0.95)", backdropFilter: "blur(12px)" }}>
+      <div className="fixed inset-0 z-[110] flex items-center justify-center" style={{ background: "hsl(240 18% 4% / 0.95)", backdropFilter: "blur(12px)" }}>
         <div className="flex flex-col items-center gap-6">
           {/* Aura animada */}
           <div className="relative flex items-center justify-center">
@@ -291,7 +291,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div
         className="absolute inset-0 backdrop-blur-sm"
         style={{ background: "var(--surface-overlay)" }}

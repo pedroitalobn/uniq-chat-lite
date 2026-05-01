@@ -434,7 +434,7 @@ function EditTemplateModal({ instanceId, template, onClose, onSaved }: {
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
       <div className="rounded-2xl w-full max-w-lg flex flex-col"
         style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)", maxHeight: "90vh" }}>
         <div className="flex items-center justify-between px-5 py-4 border-b shrink-0"
@@ -801,7 +801,7 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
       <div className="rounded-2xl w-full max-w-2xl flex flex-col"
         style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)", maxHeight: "92vh" }}>
         <div className="flex items-center justify-between px-5 py-4 border-b shrink-0"

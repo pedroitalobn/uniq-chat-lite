@@ -159,7 +159,7 @@ function TopicEditor({ topic, onClose, onSaved }: {
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
       <div className="rounded-2xl w-full max-w-md p-5"
         style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>
         <div className="flex items-center justify-between mb-4">

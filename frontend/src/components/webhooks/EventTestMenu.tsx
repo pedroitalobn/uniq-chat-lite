@@ -217,7 +217,7 @@ function PayloadPreviewDialog({ eventId, onClose }: { eventId: string; onClose: 
   }, [eventId]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "var(--surface-overlay)" }} onClick={onClose}>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ background: "var(--surface-overlay)" }} onClick={onClose}>
       <div
         className="w-full max-w-xl rounded-2xl flex flex-col max-h-[85vh]"
         style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}

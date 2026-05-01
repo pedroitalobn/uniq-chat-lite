@@ -23,12 +23,19 @@ type InstanceHandler struct {
 	db        *gorm.DB
 	manager   *whatsapp.Manager
 	instagram *services.InstagramService
+	igPoller  *services.InstagramPoller
 }
 
 func NewInstanceHandler(db *gorm.DB, manager *whatsapp.Manager) *InstanceHandler {
 	h := &InstanceHandler{db: db, manager: manager}
 	h.instagram = services.NewInstagramService(db)
 	return h
+}
+
+// SetInstagramPoller wires the poller so the handler can trigger immediate
+// polls after a successful Instagram login (avoids 30s wait for first messages).
+func (h *InstanceHandler) SetInstagramPoller(p *services.InstagramPoller) {
+	h.igPoller = p
 }
 
 // resolveLiveStatus unifica a regra de "qual é o status real" da instância
@@ -607,10 +614,13 @@ func (h *InstanceHandler) Status(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
 	}
 
-	// Mesma regra de resolução que List/Get — mantém a UI consistente
-	// entre o card da lista e a tela do manager.
 	status := string(h.resolveLiveStatus(instance))
+	// "running" só faz sentido para WhatsApp (whatsmeow manager). Para outros
+	// canais, usa o status como proxy: connected = running.
 	running := h.manager.IsRunning(instance.ID.String())
+	if instance.Channel != models.ChannelWhatsApp && instance.Channel != "" {
+		running = status == string(models.StatusConnected)
+	}
 
 	return c.JSON(fiber.Map{
 		"id":           instance.ID,
@@ -630,32 +640,43 @@ func (h *InstanceHandler) Profile(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
 	}
 
-	client := h.manager.GetInstance(instance.ID.String())
-	phoneNumber := instance.PhoneNumber
-	profilePicURL := ""
-
-	if client != nil && client.IsConnected() {
-		if pn := client.GetPhoneNumber(); pn != "" {
-			phoneNumber = pn
-			// Persist phone number if changed
-			if pn != instance.PhoneNumber {
-				h.db.Model(instance).Update("phone_number", pn)
-			}
-		}
-		profilePicURL = client.GetProfilePicture()
-	}
-
 	// Count distinct conversations from message_logs
 	var convCount int64
 	h.db.Raw(`SELECT COUNT(DISTINCT to_jid) FROM message_logs WHERE instance_id = ? AND to_jid != ''`, instance.ID).Scan(&convCount)
 
-	return c.JSON(fiber.Map{
-		"phone_number":    phoneNumber,
-		"profile_pic_url": profilePicURL,
-		"conversations":   convCount,
-		"status":          instance.Status,
-		"connected_at":    instance.ConnectedAt,
-	})
+	base := fiber.Map{
+		"conversations": convCount,
+		"status":        instance.Status,
+		"connected_at":  instance.ConnectedAt,
+		"channel":       instance.Channel,
+	}
+
+	switch instance.Channel {
+	case models.ChannelInstagram:
+		// Profile pic is not stored in DB; skip live fetch to avoid session dependency.
+		// The frontend can display the avatar from the last known inbox thread data.
+		base["identifier"] = instance.InstagramUsername
+		base["profile_pic_url"] = ""
+
+	default: // WhatsApp and any future channel with phone_number
+		client := h.manager.GetInstance(instance.ID.String())
+		phoneNumber := instance.PhoneNumber
+		profilePicURL := ""
+
+		if client != nil && client.IsConnected() {
+			if pn := client.GetPhoneNumber(); pn != "" {
+				phoneNumber = pn
+				if pn != instance.PhoneNumber {
+					h.db.Model(instance).Update("phone_number", pn)
+				}
+			}
+			profilePicURL = client.GetProfilePicture()
+		}
+		base["phone_number"] = phoneNumber
+		base["profile_pic_url"] = profilePicURL
+	}
+
+	return c.JSON(base)
 }
 
 // ContactInfo godoc
@@ -913,14 +934,13 @@ func (h *InstanceHandler) InstagramLogin(c *fiber.Ctx) error {
 	if err != nil {
 		var bridgeErr *services.BridgeError
 		if errors.As(err, &bridgeErr) {
-			// Explicit business error from Instagram (wrong password, banned, etc.)
-			// → safe to delete the instance, login definitively failed
-			h.db.Delete(instance)
+			// Business error (wrong password, banned, etc.) — keep the instance so
+			// the user can fix their credentials and try again without losing setup.
+			log.Warn().Err(err).Str("instance", instance.ID.String()).Msg("instagram login: falha de autenticação")
 			return c.Status(422).JSON(fiber.Map{"error": err.Error()})
 		}
-		// Connectivity/timeout error: bridge may have succeeded but we lost the
-		// response. Don't delete the instance — user can retry.
-		log.Error().Err(err).Str("instance", instance.ID.String()).Msg("instagram login: bridge error sem BridgeError — instância mantida para retry")
+		// Connectivity/timeout error: bridge may have succeeded but we lost the response.
+		log.Error().Err(err).Str("instance", instance.ID.String()).Msg("instagram login: erro de comunicação com bridge")
 		return c.Status(502).JSON(fiber.Map{"error": "Falha de comunicação com o serviço Instagram. Tente novamente em alguns segundos."})
 	}
 
@@ -943,6 +963,11 @@ func (h *InstanceHandler) InstagramLogin(c *fiber.Ctx) error {
 		"status":              models.StatusConnected,
 		"instagram_device_id": generateDeviceID(req.Username),
 	})
+
+	// Dispara poll imediato para carregar DMs existentes sem esperar o tick de 30s.
+	if h.igPoller != nil {
+		h.igPoller.PollNow(instance.ID.String())
+	}
 
 	return c.JSON(fiber.Map{
 		"username": resp.Username,
@@ -1188,25 +1213,35 @@ func (h *InstanceHandler) InstagramChallenge(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "body inválido"})
 	}
 
-	if req.APIPath == "" || req.Code == "" {
-		return c.Status(400).JSON(fiber.Map{"error": "api_path e code são obrigatórios"})
+	if req.Code == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "code é obrigatório"})
 	}
 
 	resp, err := h.instagram.ChallengeVerify(c.Context(), instance.ID.String(), req.APIPath, req.Code, req.Method)
 	if err != nil {
+		var bridgeErr *services.BridgeError
+		if errors.As(err, &bridgeErr) {
+			return c.Status(422).JSON(fiber.Map{"error": err.Error()})
+		}
 		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// Persist the authenticated session so the instance stays connected after
-	// frontend refresh and backend restarts. Challenge verification completes
-	// the login flow, but InstagramLogin only saves to DB on direct success —
-	// the challenge path was missing this step.
-	if session := h.instagram.GetSession(instance.ID.String()); session != nil && session.Username != "" {
+	// Extract username from bridge response to persist session in DB.
+	// This works regardless of whether the Go in-memory session is present,
+	// so the instance stays connected even after a backend restart mid-challenge.
+	username := instance.InstagramUsername
+	if u, ok := resp["username"].(string); ok && u != "" {
+		username = u
+	}
+	if username != "" {
 		h.db.Model(instance).Updates(map[string]interface{}{
-			"instagram_username":  session.Username,
+			"instagram_username":  username,
 			"status":              models.StatusConnected,
-			"instagram_device_id": generateDeviceID(session.Username),
+			"instagram_device_id": generateDeviceID(username),
 		})
+		if h.igPoller != nil {
+			h.igPoller.PollNow(instance.ID.String())
+		}
 	}
 
 	return c.JSON(resp)

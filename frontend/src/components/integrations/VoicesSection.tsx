@@ -296,7 +296,7 @@ function AddProviderModal({ onClose, workspaceId }: { onClose: () => void; works
   const keyLink = API_KEY_LINKS[provider];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.6)" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="w-full max-w-md rounded-2xl p-6 space-y-5"

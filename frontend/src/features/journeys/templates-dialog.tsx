@@ -37,7 +37,7 @@ export function TemplatesDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }} onClick={onClose} />
       <div className="relative w-full max-w-2xl rounded-2xl p-5 sm:p-6 shadow-2xl max-h-[85vh] overflow-hidden flex flex-col"
         style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>

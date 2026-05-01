@@ -3,7 +3,9 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -48,6 +50,23 @@ func (p *InstagramPoller) Start() {
 	log.Info().Dur("interval", p.interval).Msg("instagram poller: started")
 }
 
+// PollNow dispara um poll imediato para uma instância específica (ex: após login).
+func (p *InstagramPoller) PollNow(instanceID string) {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+
+		var inst models.Instance
+		if err := p.db.WithContext(ctx).
+			Where("id = ? AND channel = ? AND status = ?", instanceID, models.ChannelInstagram, models.StatusConnected).
+			First(&inst).Error; err != nil {
+			return
+		}
+		log.Debug().Str("instance", instanceID).Msg("instagram poller: poll imediato pós-login")
+		p.pollInstance(ctx, &inst)
+	}()
+}
+
 func (p *InstagramPoller) Stop() {
 	close(p.stop)
 }
@@ -88,12 +107,28 @@ func (p *InstagramPoller) poll() {
 }
 
 func (p *InstagramPoller) pollInstance(ctx context.Context, inst *models.Instance) {
-	// Pastas a monitorar: Primary (0), General (1), Requests (2).
 	for _, folder := range []int{0, 1, 2} {
 		inbox, err := p.igSvc.GetInboxFolder(ctx, inst.ID.String(), folder)
 		if err != nil {
-			// Não loga erro como warn em "not logged in" — é esperado pra instâncias
-			// sem sessão ativa; só loga debug.
+			var bridgeErr *BridgeError
+			if errors.As(err, &bridgeErr) {
+				msg := strings.ToLower(bridgeErr.Message)
+				// Bridge diz que a sessão expirou → instância não está realmente
+				// conectada. Marca como disconnected para o usuário reconectar.
+				if strings.Contains(msg, "sessão expirada") ||
+					strings.Contains(msg, "login") ||
+					strings.Contains(msg, "not logged in") {
+					log.Warn().
+						Str("instance", inst.ID.String()).
+						Str("error", bridgeErr.Message).
+						Msg("instagram poller: sessão inválida — marcando instância como desconectada")
+					p.db.Model(inst).Updates(map[string]interface{}{
+						"status":             models.StatusDisconnected,
+						"instagram_username": "",
+					})
+					return // Não tenta as outras pastas
+				}
+			}
 			log.Debug().Err(err).
 				Str("instance", inst.ID.String()).
 				Int("folder", folder).

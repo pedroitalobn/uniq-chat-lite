@@ -202,6 +202,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// mensagens novas no pipeline (instagrapi não tem webhooks nativos).
 	igPoller := services.NewInstagramPoller(db, igSvc, conversationPipeline)
 	igPoller.Start()
+	instanceH.SetInstagramPoller(igPoller)
 
 	// Plans (public — used by pricing/register page)
 	app.Get("/stripe/plans", paymentH.ListPlans)

@@ -415,7 +415,7 @@ function ProductFormModal({ shopId, shop, headers, existing, onClose, onSaved }:
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
       <div className="w-full max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto"
         style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>
         <div className="flex items-center justify-between p-4 border-b sticky top-0" style={{ borderColor: "var(--surface-border)", background: "var(--surface-1)" }}>

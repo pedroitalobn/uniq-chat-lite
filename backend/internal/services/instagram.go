@@ -192,13 +192,19 @@ func (s *InstagramService) Login(ctx context.Context, instanceID, username, pass
 		loginResp.Status = "connected"
 	}
 
-	session.LoggedIn = true
-	session.SessionData = loginResp.Session
-	s.mu.Lock()
-	s.sessions[instanceID] = session
-	s.mu.Unlock()
+	// Only mark session as logged in when the bridge confirms a real connection.
+	// Challenge responses mean the session isn't established yet.
+	if loginResp.Status == "connected" {
+		session.LoggedIn = true
+		session.SessionData = loginResp.Session
+		s.mu.Lock()
+		s.sessions[instanceID] = session
+		s.mu.Unlock()
+		log.Info().Str("username", username).Str("instance", instanceID).Msg("instagram logged in")
+	} else {
+		log.Info().Str("username", username).Str("instance", instanceID).Str("status", loginResp.Status).Msg("instagram login: challenge required")
+	}
 
-	log.Info().Str("username", username).Str("instance", instanceID).Msg("instagram logged in")
 	return &loginResp, nil
 }
 
@@ -446,15 +452,9 @@ func (s *InstagramService) LikeMedia(ctx context.Context, instanceID, mediaID st
 }
 
 func (s *InstagramService) ChallengeVerify(ctx context.Context, instanceID, apiPath, code, method string) (map[string]interface{}, error) {
-	session := s.getSession(instanceID)
-	if session == nil {
-		return nil, fmt.Errorf("not logged in")
-	}
-
 	var resp map[string]interface{}
 	err := s.doRequest(ctx, http.MethodPost, "/instagram/challenge", map[string]interface{}{
 		"instance_id": instanceID,
-		"username":    session.Username,
 		"api_path":    apiPath,
 		"code":        code,
 		"method":      method,
@@ -463,14 +463,8 @@ func (s *InstagramService) ChallengeVerify(ctx context.Context, instanceID, apiP
 }
 
 func (s *InstagramService) ChallengeResend(ctx context.Context, instanceID, apiPath, method string) error {
-	session := s.getSession(instanceID)
-	if session == nil {
-		return fmt.Errorf("not logged in")
-	}
-
 	return s.doRequest(ctx, http.MethodPost, "/instagram/challenge/resend", map[string]interface{}{
 		"instance_id": instanceID,
-		"username":    session.Username,
 		"api_path":    apiPath,
 		"method":      method,
 	}, nil)

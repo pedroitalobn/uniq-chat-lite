@@ -302,7 +302,7 @@ function QueueDrawer({
   const [tab, setTab] = useState<"settings" | "members" | "channels">("settings");
 
   return (
-    <div className="fixed inset-0 z-50 flex">
+    <div className="fixed inset-0 z-[110] flex">
       <div className="flex-1 bg-black/40" onClick={onClose} />
       <div className="flex w-full max-w-xl flex-col bg-white shadow-xl dark:bg-zinc-950">
         <header className="flex items-center justify-between border-b border-zinc-200 p-4 dark:border-zinc-800">

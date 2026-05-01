@@ -149,14 +149,14 @@ class LoginReq(BaseModel):
 
 class ChallengeReq(BaseModel):
     instance_id: str
-    username: str
+    username: Optional[str] = None
     api_path: str
     code: str
     method: Optional[str] = None
 
 class ChallengeResendReq(BaseModel):
     instance_id: str
-    username: str
+    username: Optional[str] = None
     api_path: str
     method: Optional[str] = None
 
@@ -229,23 +229,30 @@ def instagram_login(req: LoginReq):
         meta["proxy"] = req.proxy
         save_meta(req.instance_id, meta)
 
-    # Try existing session first (avoids unnecessary login requests to Instagram)
+    # Try existing session only when the saved username matches the requested one.
+    # Never skip credential validation when a different user is logging in, and
+    # never accept a stale session as proof that the supplied password is correct.
     settings = load_session(req.instance_id)
     if settings:
-        try:
-            cl = build_client(req.instance_id)
-            me = cl.user_info(cl.user_id)
-            return ok({
-                "username": me.username,
-                "pk": str(me.pk),
-                "profile_pic_url": str(me.profile_pic_url) if me.profile_pic_url else "",
-                "full_name": me.full_name,
-                "status": "connected",
-            })
-        except Exception:
-            pass
+        saved_username = settings.get("authorization_data", {}).get("ds_user_id", "") or \
+                         settings.get("username", "")
+        # Also accept match by checking the session's logged-in user after restore.
+        if saved_username.lower() == req.username.lower() or not saved_username:
+            try:
+                cl = build_client(req.instance_id)
+                me = cl.user_info(cl.user_id)
+                if me.username.lower() == req.username.lower():
+                    return ok({
+                        "username": me.username,
+                        "pk": str(me.pk),
+                        "profile_pic_url": str(me.profile_pic_url) if me.profile_pic_url else "",
+                        "full_name": me.full_name,
+                        "status": "connected",
+                    })
+            except Exception:
+                pass
 
-    # Fresh login
+    # Fresh login — always performed when credentials don't match the saved session
     cl = Client()
     meta = load_meta(req.instance_id)
     if meta.get("proxy"):
@@ -328,6 +335,13 @@ def instagram_login(req: LoginReq):
         })
 
     except TwoFactorRequired:
+        two_factor_info = cl.last_json.get("two_factor_info", {})
+        identifier = two_factor_info.get("two_factor_identifier", "")
+        meta = load_meta(req.instance_id)
+        meta["two_factor_identifier"] = identifier
+        meta["two_factor_username"] = req.username
+        meta["two_factor_password"] = req.password
+        save_meta(req.instance_id, meta)
         return ok({
             "status": "challenge_required",
             "challenge_type": "2fa",
@@ -348,6 +362,31 @@ def instagram_login(req: LoginReq):
 def instagram_challenge(req: ChallengeReq):
     cl = build_client(req.instance_id)
     meta = load_meta(req.instance_id)
+
+    # 2FA flow: use two_factor_identifier saved during login
+    two_factor_id = meta.get("two_factor_identifier", "")
+    if two_factor_id:
+        try:
+            username = meta.get("two_factor_username", "")
+            password = meta.get("two_factor_password", "")
+            cl.login(username, password, verification_code=req.code, two_factor_identifier=two_factor_id)
+            save_session(cl, req.instance_id)
+            me = cl.user_info(cl.user_id)
+            meta.pop("two_factor_identifier", None)
+            meta.pop("two_factor_username", None)
+            meta.pop("two_factor_password", None)
+            save_meta(req.instance_id, meta)
+            return ok({
+                "username": me.username,
+                "pk": str(me.pk),
+                "profile_pic_url": str(me.profile_pic_url) if me.profile_pic_url else "",
+                "status": "connected",
+            })
+        except Exception as err:
+            status, msg = map_error(err)
+            return fail(status, msg)
+
+    # Regular challenge (email/phone code)
     api_path = req.api_path or meta.get("challenge_api_path", "")
     if not api_path:
         return fail(400, "challenge expirado, faça login novamente")

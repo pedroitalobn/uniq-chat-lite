@@ -141,7 +141,7 @@ export default function SuppressionsPage({ params }: { params: Promise<{ workspa
       )}
 
       {creating && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
           <div className="rounded-2xl w-full max-w-md p-5"
             style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>
             <h3 className="text-sm font-medium mb-4" style={{ color: "var(--text-1)" }}>Adicionar bloqueio</h3>

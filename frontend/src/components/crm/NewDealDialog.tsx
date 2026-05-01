@@ -88,7 +88,7 @@ export function NewDealDialog({
   const sortedStages = useMemo(() => [...stages].sort((a, b) => a.order - b.order), [stages]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div
         className="absolute inset-0 backdrop-blur-sm"
         style={{ background: uniq.backdrop }}

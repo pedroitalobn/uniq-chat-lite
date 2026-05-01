@@ -571,7 +571,7 @@ function ProxiesSection() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "var(--surface-overlay)" }}>
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ background: "var(--surface-overlay)" }}>
           <div className="w-full max-w-md rounded-2xl border p-5 space-y-4" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
             <div className="flex items-center justify-between">
               <h2 className="font-medium" style={{ color: "var(--text-1)" }}>Novo proxy</h2>
@@ -678,7 +678,7 @@ function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId;
   const keyLink = API_KEY_LINKS[providerId];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "var(--surface-overlay)" }}>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ background: "var(--surface-overlay)" }}>
       <div className="w-full max-w-md rounded-2xl border p-6 space-y-4" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: provider.bg, border: `1px solid ${provider.border}` }}><ProviderIcon id={provider.id} color={provider.color} /></div>

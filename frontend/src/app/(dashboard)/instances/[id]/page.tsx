@@ -935,6 +935,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
       } else {
         toast.success("Conectado ao Instagram!");
         queryClient.invalidateQueries({ queryKey: ["instance", instanceId] });
+        queryClient.invalidateQueries({ queryKey: ["instances"] });
         setShowIgLogin(false);
         setIgUsername("");
         setIgPassword("");
@@ -975,6 +976,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
     onSuccess: () => {
       toast.success("Verificado com sucesso!");
       queryClient.invalidateQueries({ queryKey: ["instance", instanceId] });
+      queryClient.invalidateQueries({ queryKey: ["instances"] });
       setShowIgLogin(false);
       setIgChallenge(null);
       setIgChallengeCode("");
@@ -1287,7 +1289,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
             <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>{instance.name}</h3>
             <p className="text-xs font-mono mt-0.5" style={{ color: "hsl(240 8% 52%)" }}>
               {isWhatsApp ? (profile?.phone_number || instance.phone_number || "Sem número") :
-               isInstagram ? `@${instance.name}` :
+               isInstagram ? `@${profile?.identifier || instance.instagram_username || instance.name}` :
                `@${instance.name}`}
             </p>
             {profile?.conversations !== undefined && isWhatsApp && (
@@ -1872,7 +1874,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
       )}
 
       {showIgLogin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={() => setShowIgLogin(false)} />
           <div className="relative w-full max-w-sm rounded-2xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto"
             style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
@@ -1956,6 +1958,8 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                     <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "rgba(225,48,108,0.15)" }}>
                       {igChallenge.external_verification ? (
                         <ShieldAlert className="w-4 h-4" style={{ color: "#e1306c" }} />
+                      ) : igChallenge.challenge_type === "2fa" ? (
+                        <Lock className="w-4 h-4" style={{ color: "#e1306c" }} />
                       ) : igChallenge.challenge_type === "email" ? (
                         <svg className="w-4 h-4" style={{ color: "#e1306c" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -1968,11 +1972,13 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium mb-0.5" style={{ color: "#e1306c" }}>
-                        {igChallenge.external_verification ? "Verificação externa necessária" : "Código de verificação necessário"}
+                        {igChallenge.external_verification ? "Verificação externa necessária" : igChallenge.challenge_type === "2fa" ? "Autenticação de dois fatores" : "Código de verificação necessário"}
                       </p>
                       <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 62%)" }}>
                         {igChallenge.external_verification
                           ? "O Instagram exige que você verifique sua identidade diretamente no app ou site do Instagram."
+                          : igChallenge.challenge_type === "2fa"
+                          ? "Digite o código de 6 dígitos do seu app autenticador (Google Authenticator, Authy, etc.)."
                           : igChallenge.challenge_type === "email"
                           ? `Enviamos um código de 6 dígitos para o email ${igChallenge.email_mask || "cadastrado"}.`
                           : igChallenge.challenge_type === "phone" || igChallenge.challenge_type === "sms"

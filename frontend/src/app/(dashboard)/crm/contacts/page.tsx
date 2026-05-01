@@ -191,7 +191,7 @@ function ContactModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div
         className="relative w-full max-w-lg rounded-2xl shadow-2xl animate-fade-in-up flex flex-col"
@@ -360,7 +360,7 @@ function TagManager({ onClose, workspaceId }: { onClose: () => void; workspaceId
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-fade-in-up"
         style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
@@ -443,7 +443,7 @@ function FunnelManager({ onClose, workspaceId }: { onClose: () => void; workspac
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div
         className="relative w-full max-w-2xl rounded-2xl shadow-2xl animate-fade-in-up overflow-hidden flex flex-col"
@@ -1064,7 +1064,7 @@ function JourneyManager({ onClose }: { onClose: () => void }) {
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-md rounded-2xl p-6 shadow-2xl animate-fade-in-up"
         style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
@@ -1175,7 +1175,7 @@ function FilterPanel({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-end p-4">
+    <div className="fixed inset-0 z-[110] flex items-start justify-end p-4">
       <div className="absolute inset-0" onClick={onClose} />
       <div
         className="relative w-72 rounded-2xl p-5 shadow-2xl animate-fade-in-up mt-16"

@@ -142,7 +142,7 @@ function EditJourneyModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+    <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center sm:p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "rgba(0,0,0,0.7)" }} onClick={onClose} />
       <motion.div
         className="relative w-full sm:max-w-2xl sm:max-h-[80vh] max-h-[92vh] rounded-t-2xl sm:rounded-2xl flex flex-col shadow-2xl"
@@ -542,7 +542,7 @@ export function JourneysList() {
 
       {/* Delete confirm */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div
             className="absolute inset-0 backdrop-blur-sm"
             style={{ background: "rgba(0,0,0,0.7)" }}

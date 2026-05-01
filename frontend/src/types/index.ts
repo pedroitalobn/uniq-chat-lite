@@ -215,11 +215,13 @@ export interface Webhook {
 }
 
 export interface InstanceProfile {
-  phone_number: string;
+  phone_number?: string;
+  identifier?: string; // channel-agnostic: username for Instagram, etc.
   profile_pic_url: string;
   conversations: number;
   status: string;
   connected_at?: string;
+  channel?: string;
 }
 
 export interface InstanceContactLookup {

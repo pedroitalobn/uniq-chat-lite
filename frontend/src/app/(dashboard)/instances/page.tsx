@@ -35,7 +35,7 @@ const STATUS_MAP: Record<string, { label: string; cls: string; dotColor: string 
   banned:       { label: "Banido",       cls: "status-banned",       dotColor: "#ef4444" },
 };
 
-interface InstanceProfile { profile_pic_url?: string; conversations?: number; phone_number?: string }
+interface InstanceProfile { profile_pic_url?: string; conversations?: number; phone_number?: string; identifier?: string; channel?: string }
 
 function InstanceCard({
   instance, onQR, onDeleted, index, serverName,
@@ -138,9 +138,9 @@ function InstanceCard({
               <h3 className="font-semibold text-base leading-tight" style={{ color: "hsl(240 15% 95%)" }}>
                 {instance.name}
               </h3>
-              {profile?.phone_number && profile.phone_number !== instance.name && (
+              {(profile?.phone_number || profile?.identifier) && (
                 <p className="text-xs mt-0.5 font-medium" style={{ color: "var(--green)" }}>
-                  {profile.phone_number}
+                  {profile.identifier ? `@${profile.identifier}` : profile.phone_number}
                 </p>
               )}
               {/* Instance ID - destacado */}
