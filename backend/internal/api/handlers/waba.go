@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
@@ -891,15 +892,22 @@ func (h *WABAHandler) SendMessage(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		To       string                 `json:"to"`
-		Type     string                 `json:"type"`
-		Body     string                 `json:"body,omitempty"`     // legacy flat
-		Text     map[string]interface{} `json:"text,omitempty"`     // {body: "..."}
-		Template map[string]interface{} `json:"template,omitempty"` // {name, language, components}
-		Image    map[string]interface{} `json:"image,omitempty"`
-		Document map[string]interface{} `json:"document,omitempty"`
-		Audio    map[string]interface{} `json:"audio,omitempty"`
-		Video    map[string]interface{} `json:"video,omitempty"`
+		To          string                 `json:"to"`
+		Type        string                 `json:"type"`
+		Body        string                 `json:"body,omitempty"`        // legacy flat
+		Text        map[string]interface{} `json:"text,omitempty"`        // {body, preview_url}
+		Template    map[string]interface{} `json:"template,omitempty"`    // {name, language, components}
+		Image       map[string]interface{} `json:"image,omitempty"`       // {id|link, caption}
+		Document    map[string]interface{} `json:"document,omitempty"`    // {id|link, caption, filename}
+		Audio       map[string]interface{} `json:"audio,omitempty"`       // {id|link}
+		Video       map[string]interface{} `json:"video,omitempty"`       // {id|link, caption}
+		Sticker     map[string]interface{} `json:"sticker,omitempty"`     // {id|link}
+		Location    map[string]interface{} `json:"location,omitempty"`    // {latitude, longitude, name, address}
+		Contacts    []interface{}          `json:"contacts,omitempty"`    // array of contact objects
+		Reaction    map[string]interface{} `json:"reaction,omitempty"`    // {message_id, emoji}
+		Interactive map[string]interface{} `json:"interactive,omitempty"` // {type, body, action, header, footer}
+		Order       map[string]interface{} `json:"order,omitempty"`       // order details
+		ReplyTo     string                 `json:"reply_to,omitempty"`    // message_id to reply
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request"})
@@ -917,6 +925,10 @@ func (h *WABAHandler) SendMessage(c *fiber.Ctx) error {
 		"messaging_product": "whatsapp",
 		"to":                req.To,
 		"type":              req.Type,
+	}
+
+	if req.ReplyTo != "" {
+		messageData["context"] = map[string]string{"message_id": req.ReplyTo}
 	}
 
 	switch req.Type {
@@ -941,6 +953,30 @@ func (h *WABAHandler) SendMessage(c *fiber.Ctx) error {
 		messageData["audio"] = req.Audio
 	case "video":
 		messageData["video"] = req.Video
+	case "sticker":
+		messageData["sticker"] = req.Sticker
+	case "location":
+		if req.Location == nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "location object is required"})
+		}
+		messageData["location"] = req.Location
+	case "contacts":
+		if len(req.Contacts) == 0 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "contacts array is required"})
+		}
+		messageData["contacts"] = req.Contacts
+	case "reaction":
+		if req.Reaction == nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "reaction object is required"})
+		}
+		messageData["reaction"] = req.Reaction
+	case "interactive":
+		if req.Interactive == nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "interactive object is required"})
+		}
+		messageData["interactive"] = req.Interactive
+	case "order":
+		messageData["order"] = req.Order
 	}
 
 	jsonData, _ := json.Marshal(messageData)
@@ -1221,9 +1257,9 @@ func (h *WABAHandler) CreateTemplate(c *fiber.Ctx) error {
 	if resp.StatusCode >= 400 {
 		return c.Status(resp.StatusCode).JSON(fiber.Map{"error": "Meta: " + string(respBody), "raw": string(respBody)})
 	}
-	var out map[string]any
-	_ = json.Unmarshal(respBody, &out)
-	return c.JSON(out)
+	var outCT map[string]any
+	_ = json.Unmarshal(respBody, &outCT)
+	return c.JSON(outCT)
 }
 
 // ─── Delete template ───────────────────────────────────────────────────
@@ -1303,7 +1339,306 @@ func (h *WABAHandler) EditTemplate(c *fiber.Ctx) error {
 	if resp.StatusCode >= 400 {
 		return c.Status(resp.StatusCode).JSON(fiber.Map{"error": "Meta: " + string(respBody), "raw": string(respBody)})
 	}
+	var outET map[string]any
+	_ = json.Unmarshal(respBody, &outET)
+	return c.JSON(outET)
+}
+
+// ─── Business Profile ──────────────────────────────────────────────────────
+// GET /v1/instances/:id/waba/business-profile
+func (h *WABAHandler) GetBusinessProfile(c *fiber.Ctx) error {
+	waba, err := h.loadWABA(c)
+	if err != nil {
+		return err
+	}
+	fields := "about,address,description,email,profile_picture_url,websites,vertical"
+	metaURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/whatsapp_business_profile?fields=%s", waba.PhoneNumberID, fields)
+	return h.metaGET(c, waba.AccessToken, metaURL)
+}
+
+// PATCH /v1/instances/:id/waba/business-profile
+func (h *WABAHandler) UpdateBusinessProfile(c *fiber.Ctx) error {
+	waba, err := h.loadWABA(c)
+	if err != nil {
+		return err
+	}
+	var body map[string]any
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "body inválido"})
+	}
+	body["messaging_product"] = "whatsapp"
+	metaURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/whatsapp_business_profile", waba.PhoneNumberID)
+	return h.metaPOST(c, waba.AccessToken, metaURL, body)
+}
+
+// ─── WABA Media ────────────────────────────────────────────────────────────
+// POST /v1/instances/:id/waba/media  (multipart/form-data: file)
+func (h *WABAHandler) UploadMedia(c *fiber.Ctx) error {
+	waba, err := h.loadWABA(c)
+	if err != nil {
+		return err
+	}
+	fileHeader, ferr := c.FormFile("file")
+	if ferr != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "file obrigatório"})
+	}
+	f, ferr := fileHeader.Open()
+	if ferr != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "não foi possível abrir o arquivo"})
+	}
+	defer f.Close()
+
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	mw.WriteField("messaging_product", "whatsapp")
+	mw.WriteField("type", fileHeader.Header.Get("Content-Type"))
+	fw, _ := mw.CreateFormFile("file", fileHeader.Filename)
+	io.Copy(fw, f)
+	mw.Close()
+
+	metaURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/media", waba.PhoneNumberID)
+	req, _ := http.NewRequest("POST", metaURL, &buf)
+	req.Header.Set("Authorization", "Bearer "+waba.AccessToken)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	resp, rerr := (&http.Client{Timeout: 60 * time.Second}).Do(req)
+	if rerr != nil {
+		return c.Status(502).JSON(fiber.Map{"error": rerr.Error()})
+	}
+	defer resp.Body.Close()
+	rb, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return c.Status(resp.StatusCode).JSON(fiber.Map{"error": "Meta: " + string(rb)})
+	}
 	var out map[string]any
-	_ = json.Unmarshal(respBody, &out)
+	json.Unmarshal(rb, &out)
+	return c.JSON(out)
+}
+
+// GET /v1/instances/:id/waba/media/:mediaId
+func (h *WABAHandler) GetMedia(c *fiber.Ctx) error {
+	waba, err := h.loadWABA(c)
+	if err != nil {
+		return err
+	}
+	metaURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s", c.Params("mediaId"))
+	return h.metaGET(c, waba.AccessToken, metaURL)
+}
+
+// DELETE /v1/instances/:id/waba/media/:mediaId
+func (h *WABAHandler) DeleteMedia(c *fiber.Ctx) error {
+	waba, err := h.loadWABA(c)
+	if err != nil {
+		return err
+	}
+	metaURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s", c.Params("mediaId"))
+	req, _ := http.NewRequest("DELETE", metaURL, nil)
+	req.Header.Set("Authorization", "Bearer "+waba.AccessToken)
+	resp, rerr := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	if rerr != nil {
+		return c.Status(502).JSON(fiber.Map{"error": rerr.Error()})
+	}
+	defer resp.Body.Close()
+	rb, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return c.Status(resp.StatusCode).JSON(fiber.Map{"error": "Meta: " + string(rb)})
+	}
+	return c.JSON(fiber.Map{"success": true})
+}
+
+// ─── Mark Message as Read ─────────────────────────────────────────────────
+// POST /v1/instances/:id/waba/messages/:messageId/read
+func (h *WABAHandler) MarkAsRead(c *fiber.Ctx) error {
+	waba, err := h.loadWABA(c)
+	if err != nil {
+		return err
+	}
+	metaURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/messages", waba.PhoneNumberID)
+	return h.metaPOST(c, waba.AccessToken, metaURL, map[string]any{
+		"messaging_product": "whatsapp",
+		"status":            "read",
+		"message_id":        c.Params("messageId"),
+	})
+}
+
+// ─── Phone Number verification ────────────────────────────────────────────
+// POST /v1/instances/:id/waba/phone-numbers/:phoneId/request-code
+func (h *WABAHandler) RequestVerificationCode(c *fiber.Ctx) error {
+	waba, err := h.loadWABA(c)
+	if err != nil {
+		return err
+	}
+	var body struct {
+		CodeMethod string `json:"code_method"` // SMS | VOICE
+		Language   string `json:"language"`
+	}
+	c.BodyParser(&body)
+	if body.CodeMethod == "" {
+		body.CodeMethod = "SMS"
+	}
+	if body.Language == "" {
+		body.Language = "pt_BR"
+	}
+	metaURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/request_code", c.Params("phoneId"))
+	return h.metaPOST(c, waba.AccessToken, metaURL, map[string]any{
+		"code_method": body.CodeMethod,
+		"language":    body.Language,
+	})
+}
+
+// POST /v1/instances/:id/waba/phone-numbers/:phoneId/verify-code
+func (h *WABAHandler) VerifyCode(c *fiber.Ctx) error {
+	waba, err := h.loadWABA(c)
+	if err != nil {
+		return err
+	}
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := c.BodyParser(&body); err != nil || body.Code == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "code obrigatório"})
+	}
+	metaURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/verify_code", c.Params("phoneId"))
+	return h.metaPOST(c, waba.AccessToken, metaURL, map[string]any{"code": body.Code})
+}
+
+// ─── Analytics ────────────────────────────────────────────────────────────
+// GET /v1/instances/:id/waba/analytics?start=YYYY-MM-DD&end=YYYY-MM-DD&granularity=DAY
+func (h *WABAHandler) GetAnalytics(c *fiber.Ctx) error {
+	waba, err := h.loadWABA(c)
+	if err != nil {
+		return err
+	}
+	start := c.Query("start")
+	end := c.Query("end")
+	granularity := c.Query("granularity", "DAY")
+	if start == "" || end == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "start e end obrigatórios (YYYY-MM-DD)"})
+	}
+	metaURL := fmt.Sprintf(
+		"https://graph.facebook.com/v18.0/%s?fields=conversation_analytics.with_start(%s).with_end(%s).with_granularity(%s){cost_model,data_points,phone_numbers}&access_token=%s",
+		waba.WABABusinessID, start, end, granularity, waba.AccessToken,
+	)
+	return h.metaGET(c, waba.AccessToken, metaURL)
+}
+
+// ─── QR Codes ─────────────────────────────────────────────────────────────
+// GET /v1/instances/:id/waba/qr-codes
+func (h *WABAHandler) ListQRCodes(c *fiber.Ctx) error {
+	waba, err := h.loadWABA(c)
+	if err != nil {
+		return err
+	}
+	metaURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/message_qrdls", waba.PhoneNumberID)
+	return h.metaGET(c, waba.AccessToken, metaURL)
+}
+
+// POST /v1/instances/:id/waba/qr-codes
+func (h *WABAHandler) CreateQRCode(c *fiber.Ctx) error {
+	waba, err := h.loadWABA(c)
+	if err != nil {
+		return err
+	}
+	var body struct {
+		PrefilledMessage string `json:"prefilled_message"`
+		GenerateQRImage  string `json:"generate_qr_image"` // PNG | SVG
+	}
+	if err := c.BodyParser(&body); err != nil || body.PrefilledMessage == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "prefilled_message obrigatório"})
+	}
+	if body.GenerateQRImage == "" {
+		body.GenerateQRImage = "PNG"
+	}
+	metaURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/message_qrdls", waba.PhoneNumberID)
+	return h.metaPOST(c, waba.AccessToken, metaURL, map[string]any{
+		"prefilled_message": body.PrefilledMessage,
+		"generate_qr_image": body.GenerateQRImage,
+	})
+}
+
+// GET /v1/instances/:id/waba/qr-codes/:qrId
+func (h *WABAHandler) GetQRCode(c *fiber.Ctx) error {
+	waba, err := h.loadWABA(c)
+	if err != nil {
+		return err
+	}
+	metaURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/message_qrdls/%s", waba.PhoneNumberID, c.Params("qrId"))
+	return h.metaGET(c, waba.AccessToken, metaURL)
+}
+
+// DELETE /v1/instances/:id/waba/qr-codes/:qrId
+func (h *WABAHandler) DeleteQRCode(c *fiber.Ctx) error {
+	waba, err := h.loadWABA(c)
+	if err != nil {
+		return err
+	}
+	metaURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/message_qrdls?code=%s", waba.PhoneNumberID, c.Params("qrId"))
+	req, _ := http.NewRequest("DELETE", metaURL, nil)
+	req.Header.Set("Authorization", "Bearer "+waba.AccessToken)
+	resp, rerr := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	if rerr != nil {
+		return c.Status(502).JSON(fiber.Map{"error": rerr.Error()})
+	}
+	defer resp.Body.Close()
+	rb, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return c.Status(resp.StatusCode).JSON(fiber.Map{"error": "Meta: " + string(rb)})
+	}
+	return c.JSON(fiber.Map{"success": true})
+}
+
+// GET /v1/instances/:id/waba/templates/:templateId
+func (h *WABAHandler) GetTemplate(c *fiber.Ctx) error {
+	waba, err := h.loadWABA(c)
+	if err != nil {
+		return err
+	}
+	metaURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s", c.Params("templateId"))
+	return h.metaGET(c, waba.AccessToken, metaURL)
+}
+
+// ─── helpers ──────────────────────────────────────────────────────────────
+
+func (h *WABAHandler) loadWABA(c *fiber.Ctx) (*models.WABAInstance, error) {
+	var waba models.WABAInstance
+	if err := h.db.Where("instance_id = ?", c.Params("id")).First(&waba).Error; err != nil {
+		c.Status(404).JSON(fiber.Map{"error": "WABA não encontrado"})
+		return nil, err
+	}
+	return &waba, nil
+}
+
+func (h *WABAHandler) metaGET(c *fiber.Ctx, token, url string) error {
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+	defer resp.Body.Close()
+	rb, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return c.Status(resp.StatusCode).JSON(fiber.Map{"error": "Meta: " + string(rb)})
+	}
+	var out map[string]any
+	json.Unmarshal(rb, &out)
+	return c.JSON(out)
+}
+
+func (h *WABAHandler) metaPOST(c *fiber.Ctx, token, url string, payload map[string]any) error {
+	jsonBody, _ := json.Marshal(payload)
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
+	}
+	defer resp.Body.Close()
+	rb, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		return c.Status(resp.StatusCode).JSON(fiber.Map{"error": "Meta: " + string(rb)})
+	}
+	var out map[string]any
+	json.Unmarshal(rb, &out)
 	return c.JSON(out)
 }

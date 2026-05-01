@@ -661,9 +661,28 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	instanceWaba.Get("/phone-numbers", wabaH.ListPhoneNumbers)
 	instanceWaba.Get("/templates", wabaH.ListTemplates)
 	instanceWaba.Post("/templates", wabaH.CreateTemplate)
+	instanceWaba.Get("/templates/:templateId", wabaH.GetTemplate)
 	instanceWaba.Post("/templates/:templateId", wabaH.EditTemplate)
 	instanceWaba.Delete("/templates/:name", wabaH.DeleteTemplate)
 	instanceWaba.Post("/messages", wabaH.SendMessage)
+	instanceWaba.Post("/messages/:messageId/read", wabaH.MarkAsRead)
+	// Business Profile
+	instanceWaba.Get("/business-profile", wabaH.GetBusinessProfile)
+	instanceWaba.Patch("/business-profile", wabaH.UpdateBusinessProfile)
+	// Media (CDN Meta)
+	instanceWaba.Post("/media", wabaH.UploadMedia)
+	instanceWaba.Get("/media/:mediaId", wabaH.GetMedia)
+	instanceWaba.Delete("/media/:mediaId", wabaH.DeleteMedia)
+	// Phone number verification
+	instanceWaba.Post("/phone-numbers/:phoneId/request-code", wabaH.RequestVerificationCode)
+	instanceWaba.Post("/phone-numbers/:phoneId/verify-code", wabaH.VerifyCode)
+	// Analytics
+	instanceWaba.Get("/analytics", wabaH.GetAnalytics)
+	// QR Codes
+	instanceWaba.Get("/qr-codes", wabaH.ListQRCodes)
+	instanceWaba.Post("/qr-codes", wabaH.CreateQRCode)
+	instanceWaba.Get("/qr-codes/:qrId", wabaH.GetQRCode)
+	instanceWaba.Delete("/qr-codes/:qrId", wabaH.DeleteQRCode)
 	// Tech Provider flow — chamados após Embedded Signup pra ativar
 	// recebimento de mensagens (subscribe) e envio (register).
 	instanceWaba.Post("/subscribe", wabaH.SubscribeApp)
