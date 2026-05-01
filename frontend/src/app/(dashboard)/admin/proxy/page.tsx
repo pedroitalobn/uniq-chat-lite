@@ -1,12 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api";
-import { Activity, Globe, Loader2, Save, Server, Shield, Users, X, Edit2, Trash2, Star, Check, TestTube2 } from "lucide-react";
+import { Activity, Globe, Loader2, Save, Server, Shield, Users, X, Edit2, Trash2, Star, Check, TestTube2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
+type ProxyTestStatus = {
+  status: "idle" | "testing" | "ok" | "fail";
+  latency_ms?: number;
+  external_ip?: string;
+  error?: string;
+};
 
 type ProxyConfig = {
   id: string;
@@ -403,6 +410,36 @@ export default function AdminProxyPage() {
     queryFn: () => adminApi.getProxyConfig().then((r) => r.data as any),
   });
 
+  // Per-proxy test status map: id → ProxyTestStatus
+  const [proxyStatuses, setProxyStatuses] = useState<Record<string, ProxyTestStatus>>({});
+
+  const testProxy = useCallback(async (id: string) => {
+    setProxyStatuses(prev => ({ ...prev, [id]: { status: "testing" } }));
+    try {
+      const res = await adminApi.testGlobalProxy(id).then(r => r.data as {
+        success: boolean; external_ip?: string; latency_ms?: number; error?: string;
+      });
+      setProxyStatuses(prev => ({
+        ...prev,
+        [id]: res.success
+          ? { status: "ok", latency_ms: res.latency_ms, external_ip: res.external_ip }
+          : { status: "fail", error: res.error },
+      }));
+    } catch {
+      setProxyStatuses(prev => ({ ...prev, [id]: { status: "fail", error: "Sem resposta" } }));
+    }
+  }, []);
+
+  const testAllProxies = useCallback((list: ProxyConfig[]) => {
+    list.forEach(p => testProxy(p.id));
+  }, [testProxy]);
+
+  // Auto-test all proxies when the list loads or changes
+  useEffect(() => {
+    if (configs.length > 0) testAllProxies(configs);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [configs.length]);
+
   const { data: stats } = useQuery<ProxyStats>({
     queryKey: ["admin-proxy-stats"],
     queryFn: () => adminApi.getProxyStats().then((r) => r.data as any),
@@ -526,20 +563,50 @@ export default function AdminProxyPage() {
           <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 92%)" }}>
             Proxies Configurados
           </h2>
-          <span className="text-xs px-2 py-1 rounded-lg" style={{ background: "hsl(240 12% 15%)", color: "hsl(240 8% 60%)" }}>
-            {configs.length} proxy{configs.length !== 1 ? "s" : ""}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs px-2 py-1 rounded-lg" style={{ background: "hsl(240 12% 15%)", color: "hsl(240 8% 60%)" }}>
+              {configs.length} proxy{configs.length !== 1 ? "s" : ""}
+            </span>
+            {configs.length > 0 && (
+              <button
+                onClick={() => testAllProxies(configs)}
+                disabled={Object.values(proxyStatuses).some(s => s.status === "testing")}
+                className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg hover:bg-white/5 transition-colors disabled:opacity-50"
+                style={{ color: "hsl(240 8% 60%)", border: "1px solid hsl(240 12% 15%)" }}
+              >
+                <RefreshCw className="w-3 h-3" />
+                Testar todos
+              </button>
+            )}
+          </div>
         </div>
         <div className="space-y-2">
           {configs.map((proxy) => {
             const country = getCountryInfo(proxy.country || "br");
+            const ts = proxyStatuses[proxy.id] ?? { status: "idle" };
             return (
               <div key={proxy.id} className="rounded-xl p-4 flex items-center justify-between"
                 style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center"
-                    style={{ background: proxy.enabled ? "rgba(0,212,106,0.1)" : "var(--surface-2)" }}>
-                    <Globe className="w-5 h-5" style={{ color: proxy.enabled ? "var(--green)" : "hsl(240 8% 40%)" }} />
+                  {/* Status indicator dot */}
+                  <div className="relative flex-shrink-0">
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center"
+                      style={{ background: proxy.enabled ? "rgba(0,212,106,0.1)" : "var(--surface-2)" }}>
+                      <Globe className="w-5 h-5" style={{ color: proxy.enabled ? "var(--green)" : "hsl(240 8% 40%)" }} />
+                    </div>
+                    {/* Live status dot */}
+                    <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 flex items-center justify-center"
+                      style={{
+                        borderColor: "hsl(240 18% 6%)",
+                        background: ts.status === "testing" ? "#facc15"
+                          : ts.status === "ok" ? "#22c55e"
+                          : ts.status === "fail" ? "#ef4444"
+                          : "hsl(240 8% 35%)",
+                      }}>
+                      {ts.status === "testing" && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-ping" />
+                      )}
+                    </span>
                   </div>
                   <div>
                     <p className="text-sm font-medium" style={{ color: "hsl(240 15% 90%)" }}>
@@ -555,10 +622,26 @@ export default function AdminProxyPage() {
                     </p>
                     <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>
                       {proxy.host}:{proxy.port} • {proxy.provider} • {proxy.proxy_type}
+                      {ts.status === "ok" && ts.latency_ms !== undefined && (
+                        <span style={{ color: "#22c55e" }}> • {ts.latency_ms}ms · {ts.external_ip}</span>
+                      )}
+                      {ts.status === "fail" && (
+                        <span style={{ color: "#ef4444" }}> • {ts.error || "Offline"}</span>
+                      )}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
+                  {/* Re-test button */}
+                  <button
+                    onClick={() => testProxy(proxy.id)}
+                    disabled={ts.status === "testing"}
+                    className="p-2 rounded-lg hover:bg-white/5 disabled:opacity-50"
+                    title="Testar conectividade"
+                  >
+                    <RefreshCw className={cn("w-4 h-4", ts.status === "testing" && "animate-spin")}
+                      style={{ color: ts.status === "ok" ? "#22c55e" : ts.status === "fail" ? "#ef4444" : "hsl(240 8% 46%)" }} />
+                  </button>
                   {!proxy.is_default && (
                     <button
                       onClick={() => setDefaultModal({ open: true, proxy })}

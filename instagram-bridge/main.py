@@ -229,30 +229,10 @@ def instagram_login(req: LoginReq):
         meta["proxy"] = req.proxy
         save_meta(req.instance_id, meta)
 
-    # Try existing session only when the saved username matches the requested one.
-    # Never skip credential validation when a different user is logging in, and
-    # never accept a stale session as proof that the supplied password is correct.
-    settings = load_session(req.instance_id)
-    if settings:
-        saved_username = settings.get("authorization_data", {}).get("ds_user_id", "") or \
-                         settings.get("username", "")
-        # Also accept match by checking the session's logged-in user after restore.
-        if saved_username.lower() == req.username.lower() or not saved_username:
-            try:
-                cl = build_client(req.instance_id)
-                me = cl.user_info(cl.user_id)
-                if me.username.lower() == req.username.lower():
-                    return ok({
-                        "username": me.username,
-                        "pk": str(me.pk),
-                        "profile_pic_url": str(me.profile_pic_url) if me.profile_pic_url else "",
-                        "full_name": me.full_name,
-                        "status": "connected",
-                    })
-            except Exception:
-                pass
-
-    # Fresh login — always performed when credentials don't match the saved session
+    # Always do a fresh login when explicit credentials are provided.
+    # Session reuse cannot validate a password — if there's a cached session,
+    # any password would appear to work. Callers that want to restore a session
+    # without credentials should use a separate reconnect endpoint.
     cl = Client()
     meta = load_meta(req.instance_id)
     if meta.get("proxy"):
