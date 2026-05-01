@@ -54,6 +54,18 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        source: "/api-docs",
+        headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive, nosnippet, noimageindex" },
+        ],
+      },
+      {
+        source: "/api-docs/:path*",
+        headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive, nosnippet, noimageindex" },
+        ],
+      },
     ];
   },
 };
