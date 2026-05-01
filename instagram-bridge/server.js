@@ -94,7 +94,7 @@ app.post("/instagram/login", async (req, res) => {
         let challengeOptions = [];
 
         try {
-          const challengeData = await ig.challenge.selectVerifyMethod(challenge.api_path, true);
+          const challengeData = await ig.challenge.selectVerifyMethod(challenge.api_path, false);
           if (challengeData?.choice) {
             challengeType = challengeData.choice === 1 ? "email" : "phone";
           }
@@ -149,18 +149,17 @@ app.post("/instagram/login", async (req, res) => {
 // Instagram challenge verification endpoint
 app.post("/instagram/challenge", async (req, res) => {
   try {
-    const { instance_id: instanceId, username, api_path, code, method } = req.body || {};
+    const { instance_id: instanceId, username, api_path, code } = req.body || {};
     if (!instanceId || !username || !api_path || !code) {
       return fail(res, 400, "instance_id, username, api_path e code são obrigatórios");
     }
 
-    const ig = await loadClient(instanceId, username);
-    if (!ig) {
-      return fail(res, 400, "sessão não encontrada, faça login novamente");
-    }
+    const ig = await buildClient(instanceId, username);
 
-    // Submit the code
-    await ig.challenge.sendVerifyCode(api_path, code);
+    // Restore checkpoint so sendVerifyCode knows which api_path to POST to
+    ig.state.checkpoint = { api_path };
+
+    await ig.challenge.sendVerifyCode(code);
     await persistState(ig, instanceId);
 
     const me = await ig.account.currentUser();
@@ -178,18 +177,15 @@ app.post("/instagram/challenge", async (req, res) => {
 // Resend challenge code
 app.post("/instagram/challenge/resend", async (req, res) => {
   try {
-    const { instance_id: instanceId, username, api_path, method } = req.body || {};
+    const { instance_id: instanceId, username, api_path } = req.body || {};
     if (!instanceId || !username || !api_path) {
       return fail(res, 400, "instance_id, username e api_path são obrigatórios");
     }
 
-    const ig = await loadClient(instanceId, username);
-    if (!ig) {
-      return fail(res, 400, "sessão não encontrada");
-    }
+    const ig = await buildClient(instanceId, username);
 
-    // Resend code to email/phone
-    await ig.challenge.sendVerifyCode(api_path, null);
+    // replay_challenge=1 triggers Instagram to resend the code
+    await ig.challenge.selectVerifyMethod(api_path, true);
     await persistState(ig, instanceId);
 
     return res.json(ok({ message: "código reenviado" }));
