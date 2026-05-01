@@ -33,3 +33,5 @@ frontend/tsconfig.tsbuildinfo
 *.log
 npm-debug.log*
 .claude/
+instagram-bridge/node_modules/
+instagram-bridge/package-lock.json
