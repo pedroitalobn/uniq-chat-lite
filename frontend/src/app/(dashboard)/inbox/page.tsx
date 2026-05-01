@@ -390,8 +390,10 @@ export default function InboxPage() {
       ? connectedInstances.find((i) => i.id === instanceFilter[0])?.name ?? "Instância"
       : `${instanceFilter.length} instâncias`;
 
+  const statusLabel = TABS.find((t) => t.id === statusTab)?.label ?? "Atendimentos";
+
   return (
-    <div className="flex h-full flex-col uniq-page">
+    <div className="flex h-full flex-col uniq-page rounded-xl overflow-hidden">
       <header
         className="border-b px-4 sm:px-6 py-3 sm:py-4"
         style={{ borderColor: "hsl(240 12% 16%)" }}
@@ -512,6 +514,23 @@ export default function InboxPage() {
               }
             />
 
+            {/* Atendimentos — status filter dropdown */}
+            <SingleSelectDropdown
+              icon={<MessageSquare className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />}
+              label={statusLabel}
+              items={TABS.map((t) => ({
+                id: t.id,
+                label: t.label,
+                hint: t.id === "unassigned" && countsQ.data?.unassigned_open
+                  ? `${countsQ.data.unassigned_open}`
+                  : t.id === "open" && agentScope === "me" && countsQ.data?.mine_open
+                  ? `${countsQ.data.mine_open}`
+                  : undefined,
+              }))}
+              selected={statusTab}
+              onChange={(id) => setStatusTab(id as StatusTab)}
+            />
+
             {/* Clear filters — só aparece quando há ao menos um ativo. Útil
                 pra desfazer rápido toda a combinação (canal + instância + fila). */}
             {(channelFilter.length > 0 || instanceFilter.length > 0 || queueScope !== "all") && (
@@ -553,6 +572,27 @@ export default function InboxPage() {
               />
             </div>
 
+            {showBackfillPill && statsQ.data && (
+              <button
+                onClick={() => backfill.mutate()}
+                disabled={backfill.isPending}
+                className="relative flex h-7 w-7 items-center justify-center rounded-full disabled:opacity-50"
+                style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.25)" }}
+                title={`Sincronizar histórico · ${statsQ.data.pending_backfill} mensagens antigas pendentes`}
+                aria-label="Sincronizar histórico"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${backfill.isPending ? "animate-spin" : ""}`} />
+                {statsQ.data.pending_backfill > 0 && (
+                  <span
+                    className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-1 rounded-full text-[9px] font-semibold flex items-center justify-center"
+                    style={{ background: "#00d46a", color: "#03170a" }}
+                  >
+                    {statsQ.data.pending_backfill > 99 ? "99+" : statsQ.data.pending_backfill}
+                  </span>
+                )}
+              </button>
+            )}
+
             <InboxMenu viewMode={viewMode} setViewMode={setViewMode} />
           </div>
           )}
@@ -562,53 +602,6 @@ export default function InboxPage() {
             </div>
           )}
         </div>
-
-        {/* Status tabs — só quando visualizando conversas */}
-        {viewMode === "conversations" && (
-        <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setStatusTab(t.id)}
-              className="rounded-full px-3 py-1 text-xs transition-colors"
-              style={{
-                background: statusTab === t.id ? "rgba(0,212,106,0.1)" : "transparent",
-                color: statusTab === t.id ? "#00d46a" : "hsl(240 8% 52%)",
-                border: `1px solid ${statusTab === t.id ? "rgba(0,212,106,0.25)" : "transparent"}`,
-              }}
-            >
-              {t.label}
-              {t.id === "unassigned" && countsQ.data?.unassigned_open ? (
-                <span className="ml-1 opacity-70">· {countsQ.data.unassigned_open}</span>
-              ) : null}
-              {t.id === "open" && agentScope === "me" && countsQ.data?.mine_open ? (
-                <span className="ml-1 opacity-70">· {countsQ.data.mine_open}</span>
-              ) : null}
-            </button>
-          ))}
-
-          {showBackfillPill && statsQ.data && (
-            <button
-              onClick={() => backfill.mutate()}
-              disabled={backfill.isPending}
-              className="ml-auto relative flex h-7 w-7 items-center justify-center rounded-full disabled:opacity-50"
-              style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.25)" }}
-              title={`Sincronizar histórico · ${statsQ.data.pending_backfill} mensagens antigas pendentes`}
-              aria-label="Sincronizar histórico"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${backfill.isPending ? "animate-spin" : ""}`} />
-              {statsQ.data.pending_backfill > 0 && (
-                <span
-                  className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-1 rounded-full text-[9px] font-semibold flex items-center justify-center"
-                  style={{ background: "#00d46a", color: "#03170a" }}
-                >
-                  {statsQ.data.pending_backfill > 99 ? "99+" : statsQ.data.pending_backfill}
-                </span>
-              )}
-            </button>
-          )}
-        </div>
-        )}
       </header>
 
       {viewMode === "reports" ? (
