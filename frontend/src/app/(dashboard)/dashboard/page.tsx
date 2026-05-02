@@ -39,23 +39,30 @@ const statStyles = {
 type StatColor = keyof typeof statStyles;
 
 // ─── AnimatedNumber ───────────────────────────────────────────────────────────
-function AnimatedNumber({ value }: { value: number }) {
+function AnimatedNumber({ value, onUpdate }: { value: number; onUpdate?: () => void }) {
   const [display, setDisplay] = useState(0);
   const rafRef = useRef<number | null>(null);
   const startRef = useRef<number | null>(null);
+  const prevValue = useRef(0);
   const duration = 600;
 
   useEffect(() => {
+    // Dispara pulse quando valor muda (exceto na montagem inicial)
+    if (prevValue.current !== 0 && prevValue.current !== value) {
+      onUpdate?.();
+    }
+    prevValue.current = value;
+
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     startRef.current = null;
+    const from = display;
 
     const animate = (timestamp: number) => {
       if (startRef.current === null) startRef.current = timestamp;
       const elapsed = timestamp - startRef.current;
       const progress = Math.min(elapsed / duration, 1);
-      // easeOutExpo
       const eased = 1 - Math.pow(1 - progress, 4);
-      setDisplay(Math.round(eased * value));
+      setDisplay(Math.round(from + (value - from) * eased));
       if (progress < 1) {
         rafRef.current = requestAnimationFrame(animate);
       }
@@ -65,6 +72,7 @@ function AnimatedNumber({ value }: { value: number }) {
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   return <>{display > 1000 ? display.toLocaleString("pt-BR") : display}</>;
@@ -134,6 +142,8 @@ function StatCard({
 
   const s = statStyles[color];
   const numValue = typeof value === "number" ? value : undefined;
+  const [pulse, setPulse] = useState(false);
+  const triggerPulse = () => { setPulse(true); setTimeout(() => setPulse(false), 700); };
 
   const inner = (
     <div
@@ -175,6 +185,15 @@ function StatCard({
         filter: "blur(20px)",
         pointerEvents: "none"
       }} />
+      {/* Pulse flash ao atualizar dados ao vivo */}
+      {pulse && (
+        <div style={{
+          position: "absolute", inset: 0, borderRadius: "20px",
+          background: `radial-gradient(circle at 30% 40%, ${s.icon}22 0%, transparent 60%)`,
+          animation: "pulse-flash 0.7s ease-out forwards",
+          pointerEvents: "none",
+        }} />
+      )}
       <div
         className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 sm:mb-4"
         style={{ background: s.bg, border: `1px solid ${s.border}` }}
@@ -182,7 +201,7 @@ function StatCard({
         <Icon className="w-4 h-4" style={{ color: s.icon }} />
       </div>
       <p className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
-        {numValue !== undefined ? <AnimatedNumber value={numValue} /> : value}
+        {numValue !== undefined ? <AnimatedNumber value={numValue} onUpdate={triggerPulse} /> : value}
       </p>
       <p className="text-xs sm:text-sm mt-1" style={{ color: "hsl(240 8% 52%)" }}>{label}</p>
       {sub && <p className="text-[10px] sm:text-xs mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>{sub}</p>}

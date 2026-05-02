@@ -4,7 +4,7 @@
 // Antes viviam dentro de app/(dashboard)/agents/page.tsx — extraídos pra que o
 // chat possa rodar em telas distintas (home full-screen, ilha rodapé, etc).
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRight, Bot, Check, CheckCircle2, Clock, Copy, Loader2, MessageSquare, Send, Server,
@@ -28,6 +28,54 @@ export const WELCOME_SUGGESTIONS = [
   { icon: SparklesIcon, label: "Explorar recursos", description: "Descubra o que posso fazer" },
   { icon: Server, label: "Ver instâncias", description: "Suas instâncias disponíveis" },
 ];
+
+// Caracteres usados na fase de scramble — alfanuméricos + símbolos tech
+const SCRAMBLE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%!<>[]{}|";
+
+// ScrambleText — fase 1: burst de chars aleatórios (~350ms, monospace verde)
+// depois entrega pro TypewriterText. Dá sensação de "AI decodificando dados".
+export function ScrambleText({ text }: { text: string }) {
+  const [phase, setPhase] = useState<"scramble" | "typewriter">("scramble");
+  const [scrambled, setScrambled] = useState("");
+  const frameRef = useRef<NodeJS.Timeout | null>(null);
+
+  const tick = useCallback(() => {
+    const len = Math.min(32, text.length);
+    setScrambled(
+      Array.from({ length: len }, () =>
+        SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)]
+      ).join("")
+    );
+  }, [text]);
+
+  useEffect(() => {
+    setPhase("scramble");
+    tick();
+    frameRef.current = setInterval(tick, 35);
+    const done = setTimeout(() => {
+      if (frameRef.current) clearInterval(frameRef.current);
+      setPhase("typewriter");
+    }, 340);
+    return () => {
+      if (frameRef.current) clearInterval(frameRef.current);
+      clearTimeout(done);
+    };
+  }, [text, tick]);
+
+  if (phase === "scramble") {
+    return (
+      <span
+        className="font-mono text-sm"
+        style={{ color: "var(--green)", opacity: 0.75, letterSpacing: "0.04em" }}
+      >
+        {scrambled}
+        <span className="inline-block w-[2px] h-[1em] ml-[2px] align-middle animate-pulse"
+          style={{ background: "var(--green)", borderRadius: 1 }} />
+      </span>
+    );
+  }
+  return <TypewriterText text={text} />;
+}
 
 export function TypewriterText({ text }: { text: string }) {
   const [displayed, setDisplayed] = useState(0);
@@ -455,7 +503,7 @@ export function ChatMessage({ message, isNew = false }: { message: Message; isNe
           {isUser ? (
             <RichMentionText className="block" text={message.content} />
           ) : (
-            isNew ? <TypewriterText text={message.content} /> : (
+            isNew ? <ScrambleText text={message.content} /> : (
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{

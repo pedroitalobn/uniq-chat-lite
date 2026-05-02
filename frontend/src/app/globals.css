@@ -207,12 +207,11 @@
     letter-spacing: -0.011em;
   }
 
-  /* Hierarquia de pesos por nível semântico */
-  /* Inter Tight — pesos leves por padrão; design pede menos peso visual */
-  h1 { font-weight: 600; letter-spacing: -0.02em; }
-  h2 { font-weight: 500; letter-spacing: -0.015em; }
-  h3 { font-weight: 500; letter-spacing: -0.01em; }
-  h4, h5, h6 { font-weight: 500; }
+  /* Tipografia assertiva — bold como padrão pra transmitir confiança */
+  h1 { font-weight: 700; letter-spacing: -0.03em; }
+  h2 { font-weight: 650; letter-spacing: -0.025em; }
+  h3 { font-weight: 600; letter-spacing: -0.018em; }
+  h4, h5, h6 { font-weight: 600; letter-spacing: -0.01em; }
 
   .tabular-nums, kbd, code, time {
     font-variant-numeric: tabular-nums lining-nums;
@@ -1023,6 +1022,12 @@ html { scroll-behavior: smooth; }
 }
 
 /* ── Text Shimmer (para headings especiais) ───────────────── */
+@keyframes pulse-flash {
+  0%   { opacity: 0; transform: scale(0.95); }
+  20%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.02); }
+}
+
 @keyframes text-shimmer {
   0%   { background-position: -200% center; }
   100% { background-position: 200% center; }
