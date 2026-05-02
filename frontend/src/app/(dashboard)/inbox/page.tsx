@@ -59,8 +59,8 @@ interface InboxStats {
 
 function getTabs(t: (k: string) => string): { id: StatusTab; label: string }[] {
   return [
-    { id: "all",        label: t("inbox_all") },
     { id: "open",       label: t("inbox_open") },
+    { id: "all",        label: t("inbox_all") },
     { id: "pending",    label: t("inbox_pending") },
     { id: "unassigned", label: t("inbox_unassigned") },
     { id: "snoozed",    label: t("inbox_snoozed") },
@@ -135,7 +135,7 @@ export default function InboxPage() {
     window.addEventListener("mouseup", onUp);
   };
 
-  const [agentScope, setAgentScope] = useState<string>("me"); // "me" | "<uuid>" | "all"
+  const [agentScope, setAgentScope] = useState<string>("all"); // "me" | "<uuid>" | "all"
   const [queueScope, setQueueScope] = useState<string>("all"); // "all" | "none" | uuid
   const [channelFilter, setChannelFilter] = useState<string[]>([]); // multi-select
   const [instanceFilter, setInstanceFilter] = useState<string[]>([]); // multi-select
