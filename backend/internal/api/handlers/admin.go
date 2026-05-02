@@ -464,11 +464,7 @@ func (h *AdminHandler) DeleteUser(c *fiber.Ctx) error {
 			if err := cascadeDeleteByFK(tx, "workspaces", "id", ownerWsIDs, cleaned); err != nil {
 				return err
 			}
-			quotedWs := make([]string, len(ownerWsIDs))
-			for i, id := range ownerWsIDs {
-				quotedWs[i] = "'" + strings.ReplaceAll(id, "'", "") + "'"
-			}
-			res := tx.Exec(`DELETE FROM workspaces WHERE id::text IN (` + strings.Join(quotedWs, ",") + `)`)
+			res := tx.Exec(`DELETE FROM workspaces WHERE id::text IN (` + buildIDList(ownerWsIDs) + `)`)
 			if res.Error != nil {
 				return res.Error
 			}
@@ -503,19 +499,24 @@ func (h *AdminHandler) DeleteUser(c *fiber.Ctx) error {
 	})
 }
 
-// cascadeDeleteByFK descobre todas as tabelas com FK pra (parentTable.parentCol)
-// e roda DELETE WHERE <fkCol> IN (<ids>) em cada uma. Acumula counts no map.
-//
-// Funciona em Postgres; usa pg_catalog pra ler as constraints.
+// cascadeDeleteByFK deleta recursivamente todos os dependentes de (parentTable.parentCol)
+// antes de retornar — permitindo que o caller delete o próprio parent sem violar FKs.
+// Usa recursão em profundidade: para cada filho, coleta os IDs afetados e desce na
+// hierarquia antes de executar o DELETE nessa tabela.
 func cascadeDeleteByFK(tx *gorm.DB, parentTable, parentCol string, ids []string, counts map[string]int64) error {
-	if len(ids) == 0 {
+	return cascadeDeleteRecursive(tx, parentTable, parentCol, ids, counts, map[string]bool{}, 0)
+}
+
+func cascadeDeleteRecursive(tx *gorm.DB, parentTable, parentCol string, ids []string, counts map[string]int64, visited map[string]bool, depth int) error {
+	if len(ids) == 0 || depth > 15 {
 		return nil
 	}
-	type fk struct {
+
+	type fkRef struct {
 		Table  string
 		Column string
 	}
-	var fks []fk
+	var fks []fkRef
 	q := `
 		SELECT
 			cl.relname  AS table,
@@ -532,68 +533,47 @@ func cascadeDeleteByFK(tx *gorm.DB, parentTable, parentCol string, ids []string,
 	if err := tx.Raw(q, parentTable, parentCol).Scan(&fks).Error; err != nil {
 		return err
 	}
-	// Retry-with-progress: ordem arbitrária do pg_catalog não respeita
-	// cadeias (ex: user_workspaces refs roles refs workspaces). Em vez de
-	// topo-sort, fazemos múltiplas passadas com SAVEPOINT — cada DELETE
-	// que falha por FK volta nessa fila pra próxima rodada. Para quando
-	// uma passada inteira sem nenhum DELETE bem-sucedido.
-	pending := make([]fk, 0, len(fks))
+
+	idList := buildIDList(ids)
+
 	for _, f := range fks {
 		if f.Table == parentTable {
 			continue
 		}
-		pending = append(pending, f)
-	}
-	// Monta a lista de UUIDs como literal Postgres: ('uuid1','uuid2',...)
-	// Evita problemas de type-mismatch entre []string e uuid[] com pgx.
-	quotedIDs := make([]string, len(ids))
-	for i, id := range ids {
-		quotedIDs[i] = "'" + strings.ReplaceAll(id, "'", "") + "'"
-	}
-	idList := strings.Join(quotedIDs, ",")
+		visitKey := f.Table + "." + f.Column + "<-" + parentTable + "." + parentCol
+		if visited[visitKey] {
+			continue
+		}
+		visited[visitKey] = true
 
-	for pass := 0; pass < 8 && len(pending) > 0; pass++ {
-		next := pending[:0]
-		progress := false
-		for _, f := range pending {
-			// Casta a coluna pra text pra compatibilidade com uuid e varchar.
-			stmt := fmt.Sprintf(`DELETE FROM "%s" WHERE "%s"::text IN (%s)`, f.Table, f.Column, idList)
-			sp := "sp_" + f.Table + "_" + f.Column
-			if err := tx.Exec("SAVEPOINT " + sp).Error; err != nil {
+		// Coleta PKs dos filhos para recursar nos netos.
+		var childPKs []string
+		pkQ := fmt.Sprintf(`SELECT id::text FROM "%s" WHERE "%s"::text IN (%s)`, f.Table, f.Column, idList)
+		_ = tx.Raw(pkQ).Scan(&childPKs) // ignora tabelas sem coluna "id" (join tables)
+
+		if len(childPKs) > 0 {
+			if err := cascadeDeleteRecursive(tx, f.Table, "id", childPKs, counts, visited, depth+1); err != nil {
 				return err
 			}
-			res := tx.Exec(stmt)
-			if res.Error != nil {
-				_ = tx.Exec("ROLLBACK TO SAVEPOINT " + sp).Error
-				next = append(next, f)
-				continue
-			}
-			_ = tx.Exec("RELEASE SAVEPOINT " + sp).Error
-			counts[f.Table] += res.RowsAffected
-			progress = true
 		}
-		pending = next
-		if !progress {
-			break
+
+		stmt := fmt.Sprintf(`DELETE FROM "%s" WHERE "%s"::text IN (%s)`, f.Table, f.Column, idList)
+		res := tx.Exec(stmt)
+		if res.Error != nil {
+			return fmt.Errorf("delete %s.%s: %w", f.Table, f.Column, res.Error)
 		}
-	}
-	if len(pending) > 0 {
-		tables := make([]string, 0, len(pending))
-		for _, f := range pending {
-			tables = append(tables, f.Table+"."+f.Column)
-		}
-		return errPendingFK(tables)
+		counts[f.Table] += res.RowsAffected
 	}
 	return nil
 }
 
-type pendingFKError []string
-
-func (p pendingFKError) Error() string {
-	return "FKs não resolvidos após retries: " + strings.Join(p, ", ")
+func buildIDList(ids []string) string {
+	quoted := make([]string, len(ids))
+	for i, id := range ids {
+		quoted[i] = "'" + strings.ReplaceAll(id, "'", "") + "'"
+	}
+	return strings.Join(quoted, ",")
 }
-
-func errPendingFK(tables []string) error { return pendingFKError(tables) }
 
 // --- Plans ---
 
