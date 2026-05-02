@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Bot, Brain, CheckCircle2, ChevronDown, ChevronRight, Globe, Link2,
-  Mic2, Pause, Play, Plus, RefreshCw, Save, Shield, Sparkles, Trash2, Upload,
-  Volume2, Zap,
+  ArrowLeft, Bot, Brain, CheckCircle2, ChevronDown, ChevronRight, Globe, Link2,
+  Mic2, Pause, Play, Plus, RefreshCw, Save, Settings2, Shield, Sparkles, Trash2,
+  Upload, Volume2, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { instancesApi, integrationsApi, voicesApi } from "@/lib/api";
@@ -229,6 +229,7 @@ export default function AgentsPage() {
   const queryClient = useQueryClient();
   const { currentWorkspace } = useWorkspace();
   const wsId = currentWorkspace?.id ?? "";
+  const [view, setView] = useState<"list" | "editor">("list");
   const [tab, setTab] = useState<TabId>("personality");
   const [selectedInstance, setSelectedInstance] = useState("");
   const [form, setForm] = useState<AgentForm>(emptyForm());
@@ -255,6 +256,15 @@ export default function AgentsPage() {
     queryKey: ["instance-agent", selectedInstance],
     queryFn: async () => (await integrationsApi.getAgent(selectedInstance)).data,
     enabled: !!selectedInstance,
+  });
+
+  // Batch-fetch para list view — mesmo queryKey do editor, sem double-fetch
+  const agentQueries = useQueries({
+    queries: (instancesQuery.data ?? []).map((inst: any) => ({
+      queryKey: ["instance-agent", inst.id],
+      queryFn: async () => (await integrationsApi.getAgent(inst.id)).data,
+      enabled: !!inst.id && view === "list",
+    })),
   });
 
   useEffect(() => {
@@ -357,88 +367,66 @@ export default function AgentsPage() {
       {/* Header */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
+          {view === "editor" && (
+            <button
+              onClick={() => setView("list")}
+              className="inline-flex items-center gap-1.5 text-xs mb-2 px-2 py-1 rounded-lg transition-all"
+              style={{ color: "var(--text-3)", background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+              <ArrowLeft className="w-3 h-3" /> Agentes
+            </button>
+          )}
           <h1 className="text-xl sm:text-2xl font-medium flex items-center gap-2 sm:gap-3" style={{ color: "var(--text-1)" }}>
             <Bot className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: "var(--green)" }} />
-            Agentes
+            {view === "editor" && selectedInstance
+              ? (instancesQuery.data?.find((i: any) => i.id === selectedInstance)?.name ?? "Agente")
+              : "Agentes"}
           </h1>
           <p className="text-xs sm:text-sm mt-1" style={{ color: "var(--text-3)" }}>
-            Personalidade, voz, 30+ skills e integrações — configure em 5 min, ative por instância.
+            {view === "list"
+              ? "Selecione uma instância para configurar ou ativar um agente de IA."
+              : "Personalidade, voz, 30+ skills e integrações — configure em 5 min, ative por instância."}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Status badges */}
-          <div className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl" style={glassPillStyle}>
-            <span className={`w-1.5 h-1.5 rounded-full ${form.is_active ? "bg-green-500" : "bg-zinc-500"}`} />
-            <span style={{ color: "var(--text-2)" }}>{form.is_active ? "Ativo" : "Inativo"}</span>
-          </div>
-          {totalActiveSkills > 0 && (
-            <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl" style={{ ...glassPillStyle, border: "1px solid rgba(139,92,246,0.20)", color: "#a78bfa" }}>
-              <Sparkles className="w-3 h-3" />
-              {totalActiveSkills} skill{totalActiveSkills !== 1 ? "s" : ""} ativa{totalActiveSkills !== 1 ? "s" : ""}
+        {view === "editor" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl" style={glassPillStyle}>
+              <span className={`w-1.5 h-1.5 rounded-full ${form.is_active ? "bg-green-500" : "bg-zinc-500"}`} />
+              <span style={{ color: "var(--text-2)" }}>{form.is_active ? "Ativo" : "Inativo"}</span>
             </div>
-          )}
-          <button
-            onClick={() => saveMutation.mutate()}
-            disabled={!selectedInstance || saveMutation.isPending}
-            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all"
-            style={{ ...glassBtnStyle, color: "var(--green)", opacity: saveMutation.isPending ? 0.7 : 1, borderRadius: "12px" }}>
-            <Save className="w-4 h-4" />
-            {saveMutation.isPending ? "Salvando..." : "Salvar agente"}
-          </button>
-        </div>
+            {totalActiveSkills > 0 && (
+              <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl" style={{ ...glassPillStyle, border: "1px solid rgba(139,92,246,0.20)", color: "#a78bfa" }}>
+                <Sparkles className="w-3 h-3" />
+                {totalActiveSkills} skill{totalActiveSkills !== 1 ? "s" : ""} ativa{totalActiveSkills !== 1 ? "s" : ""}
+              </div>
+            )}
+            <button
+              onClick={() => saveMutation.mutate()}
+              disabled={!selectedInstance || saveMutation.isPending}
+              className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all"
+              style={{ ...glassBtnStyle, color: "var(--green)", opacity: saveMutation.isPending ? 0.7 : 1, borderRadius: "12px" }}>
+              <Save className="w-4 h-4" />
+              {saveMutation.isPending ? "Salvando..." : "Salvar agente"}
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Empty state — no instances */}
-      {!instancesQuery.isLoading && instancesQuery.data?.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
-          {/* SVG: robô/bot com círculos e linhas de conexão */}
-          <div className="mb-6 opacity-60">
-            <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
-              {/* Cabeça do robô */}
-              <rect x="36" y="22" width="48" height="38" rx="8" stroke="var(--text-3)" strokeWidth="2.5" fill="none" />
-              {/* Antena */}
-              <line x1="60" y1="22" x2="60" y2="12" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" />
-              <circle cx="60" cy="10" r="3" fill="var(--green)" />
-              {/* Olhos */}
-              <circle cx="50" cy="38" r="5" stroke="var(--green)" strokeWidth="2" fill="none" />
-              <circle cx="70" cy="38" r="5" stroke="var(--green)" strokeWidth="2" fill="none" />
-              <circle cx="50" cy="38" r="2" fill="var(--green)" opacity="0.7" />
-              <circle cx="70" cy="38" r="2" fill="var(--green)" opacity="0.7" />
-              {/* Corpo */}
-              <rect x="42" y="64" width="36" height="26" rx="6" stroke="var(--text-3)" strokeWidth="2" fill="none" />
-              {/* Pescoço */}
-              <line x1="60" y1="60" x2="60" y2="64" stroke="var(--text-3)" strokeWidth="3" strokeLinecap="round" />
-              {/* Braços */}
-              <line x1="42" y1="74" x2="28" y2="80" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" />
-              <line x1="78" y1="74" x2="92" y2="80" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" />
-              {/* Nós de conexão nas pontas dos braços */}
-              <circle cx="26" cy="81" r="4" stroke="var(--text-3)" strokeWidth="1.5" fill="none" />
-              <circle cx="94" cy="81" r="4" stroke="var(--text-3)" strokeWidth="1.5" fill="none" />
-              {/* Botão no corpo */}
-              <circle cx="60" cy="77" r="3" fill="var(--text-3)" opacity="0.4" />
-            </svg>
-          </div>
-          <h3 className="text-base font-semibold mb-2" style={{ color: "var(--text-1)" }}>
-            Nenhum agente criado
-          </h3>
-          <p className="text-sm mb-6 max-w-xs" style={{ color: "var(--text-3)" }}>
-            Crie um agente de IA para automatizar atendimentos no WhatsApp
-          </p>
-          <a
-            href="/instances"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
-            style={{ background: "var(--green-dim)", color: "var(--green)", border: "1px solid var(--green-border)" }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(0,212,106,0.18)"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "var(--green-dim)"; }}
-          >
-            <Plus className="w-4 h-4" />
-            Criar primeira instância
-          </a>
-        </div>
+      {/* ── List view ── */}
+      {view === "list" && (
+        <AgentListView
+          instances={instancesQuery.data ?? []}
+          agentQueries={agentQueries}
+          isLoading={instancesQuery.isLoading}
+          onEdit={(instanceId) => {
+            setSelectedInstance(instanceId);
+            setView("editor");
+          }}
+        />
       )}
 
-      {/* Layout */}
-      <div className="grid grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)] gap-5" style={{ display: (!instancesQuery.isLoading && instancesQuery.data?.length === 0) ? "none" : undefined }}>
+      {/* ── Editor view ── */}
+      {view === "editor" && (
+      <div className="grid grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)] gap-5">
         {/* Sidebar */}
         <aside className="space-y-4">
           {/* Instance selector */}
@@ -755,6 +743,151 @@ export default function AgentsPage() {
         </section>
         </AnimatedTabContent>
       </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Agent List View ─────────────────────────────────────────────────────────
+
+const CHANNEL_COLOR: Record<string, string> = {
+  whatsapp: "#25d366", waba: "#25d366", instagram: "#e1306c",
+  instagram_api: "#e1306c", telegram: "#229ed9", facebook: "#1877f2",
+  linkedin: "#0a66c2", tiktok: "#010101",
+};
+
+const STATUS_COLOR: Record<string, string> = {
+  connected: "#22c55e", disconnected: "#71717a", connecting: "#f59e0b", banned: "#ef4444",
+};
+
+function AgentListView({
+  instances, agentQueries, isLoading, onEdit,
+}: {
+  instances: any[];
+  agentQueries: Array<{ data: any; isLoading: boolean }>;
+  isLoading: boolean;
+  onEdit: (instanceId: string) => void;
+}) {
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="rounded-3xl p-5 animate-pulse" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", height: 160 }} />
+        ))}
+      </div>
+    );
+  }
+
+  if (!instances.length) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+        <div className="mb-6 opacity-60">
+          <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+            <rect x="36" y="22" width="48" height="38" rx="8" stroke="var(--text-3)" strokeWidth="2.5" fill="none" />
+            <line x1="60" y1="22" x2="60" y2="12" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" />
+            <circle cx="60" cy="10" r="3" fill="var(--green)" />
+            <circle cx="50" cy="38" r="5" stroke="var(--green)" strokeWidth="2" fill="none" />
+            <circle cx="70" cy="38" r="5" stroke="var(--green)" strokeWidth="2" fill="none" />
+            <circle cx="50" cy="38" r="2" fill="var(--green)" opacity="0.7" />
+            <circle cx="70" cy="38" r="2" fill="var(--green)" opacity="0.7" />
+            <rect x="42" y="64" width="36" height="26" rx="6" stroke="var(--text-3)" strokeWidth="2" fill="none" />
+            <line x1="60" y1="60" x2="60" y2="64" stroke="var(--text-3)" strokeWidth="3" strokeLinecap="round" />
+            <line x1="42" y1="74" x2="28" y2="80" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" />
+            <line x1="78" y1="74" x2="92" y2="80" stroke="var(--text-3)" strokeWidth="2" strokeLinecap="round" />
+            <circle cx="26" cy="81" r="4" stroke="var(--text-3)" strokeWidth="1.5" fill="none" />
+            <circle cx="94" cy="81" r="4" stroke="var(--text-3)" strokeWidth="1.5" fill="none" />
+            <circle cx="60" cy="77" r="3" fill="var(--text-3)" opacity="0.4" />
+          </svg>
+        </div>
+        <h3 className="text-base font-semibold mb-2" style={{ color: "var(--text-1)" }}>Nenhuma instância encontrada</h3>
+        <p className="text-sm mb-6 max-w-xs" style={{ color: "var(--text-3)" }}>Crie uma instância para começar a configurar agentes de IA.</p>
+        <a href="/instances" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
+          style={{ background: "var(--green-dim)", color: "var(--green)", border: "1px solid var(--green-border)" }}>
+          <Plus className="w-4 h-4" /> Criar primeira instância
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {instances.map((inst: any, idx: number) => {
+        const agentData = agentQueries[idx]?.data;
+        const agentLoading = agentQueries[idx]?.isLoading;
+        const configured = !!agentData?.agent_name;
+        const isActive = !!agentData?.is_active;
+        const channelColor = CHANNEL_COLOR[inst.channel] || "#a78bfa";
+        const statusColor = STATUS_COLOR[inst.status] || "#71717a";
+        const totalSkills = (() => {
+          try { return agentData?.skills ? JSON.parse(agentData.skills).filter((s: any) => s.enabled).length : 0; }
+          catch { return 0; }
+        })();
+
+        return (
+          <div
+            key={inst.id}
+            className="rounded-3xl p-5 flex flex-col gap-4 transition-all"
+            style={{
+              ...glassCardStyle,
+              border: `1px solid ${configured ? (isActive ? "rgba(0,212,106,0.20)" : "rgba(255,255,255,0.10)") : "rgba(255,255,255,0.07)"}`,
+            }}>
+            {/* Instance info */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full capitalize"
+                    style={{ background: `${channelColor}18`, color: channelColor }}>
+                    {inst.channel?.replace("_", " ")}
+                  </span>
+                  <span className="flex items-center gap-1 text-xs" style={{ color: statusColor }}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor }} />
+                    {inst.status}
+                  </span>
+                </div>
+                <p className="font-semibold truncate" style={{ color: "var(--text-1)" }}>{inst.name}</p>
+              </div>
+              {configured && (
+                <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${isActive ? "text-green-400" : ""}`}
+                  style={{ background: isActive ? "rgba(0,212,106,0.12)" : "var(--surface-3)", color: isActive ? "var(--green)" : "var(--text-3)", border: `1px solid ${isActive ? "rgba(0,212,106,0.25)" : "var(--surface-border)"}` }}>
+                  {isActive ? "Ativo" : "Inativo"}
+                </span>
+              )}
+            </div>
+
+            {/* Agent summary */}
+            <div className="flex-1 min-h-0">
+              {agentLoading ? (
+                <div className="h-4 rounded animate-pulse" style={{ background: "var(--surface-3)", width: "60%" }} />
+              ) : configured ? (
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium" style={{ color: "var(--text-2)" }}>{agentData.agent_name}</p>
+                  {totalSkills > 0 && (
+                    <p className="text-xs" style={{ color: "#a78bfa" }}>{totalSkills} skill{totalSkills !== 1 ? "s" : ""} ativa{totalSkills !== 1 ? "s" : ""}</p>
+                  )}
+                  {agentData.integration_id && (
+                    <p className="text-xs" style={{ color: "var(--text-3)" }}>LLM configurada</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm" style={{ color: "var(--text-3)" }}>Sem agente configurado</p>
+              )}
+            </div>
+
+            {/* CTA */}
+            <button
+              onClick={() => onEdit(inst.id)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-sm font-medium transition-all"
+              style={{
+                background: configured ? "rgba(0,212,106,0.10)" : "var(--surface-3)",
+                color: configured ? "var(--green)" : "var(--text-2)",
+                border: `1px solid ${configured ? "rgba(0,212,106,0.20)" : "var(--surface-border)"}`,
+              }}>
+              <Settings2 className="w-4 h-4" />
+              {configured ? "Editar agente" : "Configurar agente"}
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }
