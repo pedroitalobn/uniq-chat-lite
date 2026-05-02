@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSPropert
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bot, Brain, CheckCircle2, ChevronDown, ChevronRight, Globe, Link2,
-  Mic2, Plus, Save, Shield, Sparkles, Trash2, Upload, Zap,
+  Mic2, Pause, Play, Plus, RefreshCw, Save, Shield, Sparkles, Trash2, Upload,
+  Volume2, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { instancesApi, integrationsApi, voicesApi } from "@/lib/api";
@@ -14,7 +15,7 @@ import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type TabId = "personality" | "knowledge" | "skills" | "access";
+type TabId = "personality" | "knowledge" | "skills" | "access" | "voice_studio";
 
 type AgentAsset = {
   id: string;
@@ -215,10 +216,11 @@ function inp(multiline = false): CSSProperties {
 }
 
 const TABS: Array<{ id: TabId; label: string; icon: React.ElementType; description: string }> = [
-  { id: "personality", label: "Personality", icon: Bot, description: "Identidade, voz e atendimento" },
-  { id: "knowledge",   label: "Knowledge",   icon: Brain, description: "Base, FAQ e documentos" },
-  { id: "skills",      label: "Skills",      icon: Sparkles, description: "30+ capacidades prontas" },
-  { id: "access",      label: "Access",      icon: Globe, description: "LLM, MCP, apps e integrações" },
+  { id: "personality",   label: "Personality",   icon: Bot,     description: "Identidade, voz e atendimento" },
+  { id: "knowledge",     label: "Knowledge",     icon: Brain,   description: "Base, FAQ e documentos" },
+  { id: "skills",        label: "Skills",        icon: Sparkles, description: "30+ capacidades prontas" },
+  { id: "access",        label: "Access",        icon: Globe,   description: "LLM, MCP, apps e integrações" },
+  { id: "voice_studio",  label: "Voice Studio",  icon: Volume2, description: "Vozes, clones e providers" },
 ];
 
 // ─── Page ────────────────────────────────────────────────────────────────────
@@ -233,7 +235,11 @@ export default function AgentsPage() {
   const knowledgeUploadRef = useRef<HTMLInputElement | null>(null);
   const skillUploadRef = useRef<HTMLInputElement | null>(null);
 
-  const instancesQuery = useQuery({ queryKey: ["instances"], queryFn: async () => (await instancesApi.list()).data || [] });
+  const instancesQuery = useQuery({
+    queryKey: ["instances", wsId],
+    queryFn: async () => (await instancesApi.list(undefined, wsId)).data || [],
+    enabled: !!wsId,
+  });
   const integrationsQuery = useQuery({ queryKey: ["integrations"], queryFn: async () => (await integrationsApi.list()).data || [] });
   const voicesQuery = useQuery({
     queryKey: ["voices", wsId],
@@ -658,6 +664,9 @@ export default function AgentsPage() {
           {/* ── Skills tab ── */}
           {tab === "skills" && <SkillsTab form={form} setForm={setForm} activeSkillNames={activeSkillNames} toggleSkill={toggleSkill} skillUploadRef={skillUploadRef} onUpload={onUpload} assetsByCategory={assetsByCategory} deleteAssetMutation={deleteAssetMutation} renderListEditor={renderListEditor} />}
 
+          {/* ── Voice Studio tab ── */}
+          {tab === "voice_studio" && <VoiceStudioTab wsId={wsId} selectedVoiceId={form.voice.workspace_voice_id} onSelect={(id) => setForm(p => ({ ...p, voice: { ...p.voice, workspace_voice_id: id } }))} />}
+
           {/* ── Access tab ── */}
           {tab === "access" && (
             <>
@@ -747,6 +756,248 @@ export default function AgentsPage() {
         </AnimatedTabContent>
       </div>
     </div>
+  );
+}
+
+// ─── Voice Studio Tab ────────────────────────────────────────────────────────
+
+type VoiceEntry = {
+  id: string;
+  name: string;
+  language?: string;
+  gender?: string;
+  is_active: boolean;
+  provider?: { id: string; provider: string; name: string };
+};
+
+type ProviderEntry = { id: string; provider: string; name: string; is_active: boolean };
+
+function VoiceStudioTab({ wsId, selectedVoiceId, onSelect }: {
+  wsId: string;
+  selectedVoiceId?: string;
+  onSelect: (id: string) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [filterProvider, setFilterProvider] = useState("");
+  const [testText, setTestText] = useState("Olá! Eu sou o seu agente de atendimento.");
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const providersQuery = useQuery({
+    queryKey: ["voice-providers", wsId],
+    queryFn: () => voicesApi.listProviders(wsId).then(r => (r.data as ProviderEntry[]) || []),
+    enabled: !!wsId,
+  });
+
+  const voicesQuery = useQuery({
+    queryKey: ["voices", wsId, filterProvider],
+    queryFn: () => voicesApi.listVoices(wsId, filterProvider ? { provider_id: filterProvider } : undefined).then(r => (r.data as VoiceEntry[]) || []),
+    enabled: !!wsId,
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: (providerId: string) => voicesApi.syncVoices(wsId, providerId),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["voices", wsId] }); toast.success("Vozes sincronizadas."); },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Falha ao sincronizar."),
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, active }: { id: string; active: boolean }) => voicesApi.toggleVoice(wsId, id, active),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["voices", wsId] }),
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Erro ao alterar voz."),
+  });
+
+  const testMutation = useMutation({
+    mutationFn: (voiceId: string) => voicesApi.testTTS(wsId, voiceId, testText),
+    onSuccess: (res, voiceId) => {
+      const blob = new Blob([res.data as ArrayBuffer], { type: "audio/mpeg" });
+      const url = URL.createObjectURL(blob);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        URL.revokeObjectURL(audioRef.current.src);
+      }
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      setPlayingId(voiceId);
+      audio.play();
+      audio.onended = () => setPlayingId(null);
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Falha ao gerar áudio."),
+  });
+
+  const PROVIDER_LABELS: Record<string, string> = {
+    elevenlabs: "ElevenLabs", openai_tts: "OpenAI TTS", qwen_tts: "Qwen TTS",
+  };
+
+  const PROVIDER_COLORS: Record<string, string> = {
+    elevenlabs: "#f59e0b", openai_tts: "#10b981", qwen_tts: "#6366f1",
+  };
+
+  return (
+    <>
+      {/* Providers */}
+      <div className="rounded-3xl p-5 space-y-4" style={glassCardStyle}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-medium flex items-center gap-2" style={{ color: "var(--text-1)" }}>
+              <Volume2 className="w-4 h-4" style={{ color: "var(--green)" }} /> Providers de voz
+            </h2>
+            <p className="text-sm" style={{ color: "var(--text-3)" }}>Configure suas chaves de API para habilitar síntese de voz.</p>
+          </div>
+          <a
+            href="/integrations?tab=voices"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+            style={{ background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.18)", color: "var(--green)" }}>
+            <Plus className="w-4 h-4" /> Adicionar provider
+          </a>
+        </div>
+
+        {providersQuery.isLoading && (
+          <p className="text-sm" style={{ color: "var(--text-3)" }}>Carregando providers...</p>
+        )}
+
+        {!providersQuery.isLoading && !providersQuery.data?.length && (
+          <div className="rounded-2xl p-4 text-sm" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+            <p style={{ color: "var(--text-3)" }}>Nenhum provider configurado. Vá em{" "}
+              <a href="/integrations?tab=voices" className="underline" style={{ color: "var(--green)" }}>Integrações → Vozes</a> para adicionar ElevenLabs, OpenAI TTS ou Qwen TTS.
+            </p>
+          </div>
+        )}
+
+        {providersQuery.data && providersQuery.data.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {providersQuery.data.map((prov) => {
+              const color = PROVIDER_COLORS[prov.provider] || "#a78bfa";
+              const label = PROVIDER_LABELS[prov.provider] || prov.provider;
+              return (
+                <div key={prov.id} className="rounded-2xl p-4 flex items-center justify-between gap-3" style={{ background: "var(--surface-3)", border: `1px solid ${color}25` }}>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: `${color}18`, color }}>{label}</span>
+                      <span className={`w-1.5 h-1.5 rounded-full ${prov.is_active ? "bg-green-500" : "bg-zinc-500"}`} />
+                    </div>
+                    <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{prov.name}</p>
+                  </div>
+                  <button
+                    onClick={() => syncMutation.mutate(prov.id)}
+                    disabled={syncMutation.isPending}
+                    title="Sincronizar vozes"
+                    className="p-2 rounded-xl transition-all"
+                    style={{ background: `${color}12`, color, border: `1px solid ${color}25` }}>
+                    <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? "animate-spin" : ""}`} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Voice browser */}
+      <div className="rounded-3xl p-5 space-y-4" style={glassCardStyle}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>Biblioteca de vozes</h2>
+            <p className="text-sm" style={{ color: "var(--text-3)" }}>{voicesQuery.data?.length ?? 0} voz(es) disponível(is)</p>
+          </div>
+          <select
+            value={filterProvider}
+            onChange={e => setFilterProvider(e.target.value)}
+            className="rounded-xl px-3 py-2 text-sm w-full sm:w-52"
+            style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}>
+            <option value="">Todos os providers</option>
+            {providersQuery.data?.map(p => (
+              <option key={p.id} value={p.id}>{PROVIDER_LABELS[p.provider] || p.provider} — {p.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Test text input */}
+        <div className="flex gap-2">
+          <input
+            value={testText}
+            onChange={e => setTestText(e.target.value)}
+            placeholder="Texto para testar a voz..."
+            className="flex-1 rounded-xl px-3 py-2.5 text-sm"
+            style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+          />
+        </div>
+
+        {voicesQuery.isLoading && <p className="text-sm" style={{ color: "var(--text-3)" }}>Carregando vozes...</p>}
+
+        {!voicesQuery.isLoading && !voicesQuery.data?.length && (
+          <div className="rounded-2xl p-4 text-sm" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+            <p style={{ color: "var(--text-3)" }}>Nenhuma voz encontrada. Adicione um provider e clique em sincronizar.</p>
+          </div>
+        )}
+
+        {voicesQuery.data && voicesQuery.data.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {voicesQuery.data.map((voice) => {
+              const isSelected = selectedVoiceId === voice.id;
+              const isPlaying = playingId === voice.id;
+              const provColor = PROVIDER_COLORS[voice.provider?.provider || ""] || "#a78bfa";
+              return (
+                <div
+                  key={voice.id}
+                  className="rounded-2xl p-4 flex flex-col gap-3 transition-all"
+                  style={{
+                    background: isSelected ? "rgba(0,212,106,0.07)" : "var(--surface-3)",
+                    border: `1px solid ${isSelected ? "rgba(0,212,106,0.30)" : "var(--surface-border)"}`,
+                    outline: isSelected ? "1px solid rgba(0,212,106,0.20)" : "none",
+                  }}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold truncate" style={{ color: isSelected ? "var(--green)" : "var(--text-1)" }}>{voice.name}</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {voice.provider?.provider && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ background: `${provColor}18`, color: provColor }}>
+                            {PROVIDER_LABELS[voice.provider.provider] || voice.provider.provider}
+                          </span>
+                        )}
+                        {voice.language && <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "var(--surface-2)", color: "var(--text-3)" }}>{voice.language}</span>}
+                        {voice.gender && <span className="text-[10px] px-1.5 py-0.5 rounded-full capitalize" style={{ background: "var(--surface-2)", color: "var(--text-3)" }}>{voice.gender}</span>}
+                      </div>
+                    </div>
+                    {/* Active toggle */}
+                    <button
+                      onClick={() => toggleMutation.mutate({ id: voice.id, active: !voice.is_active })}
+                      className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all"
+                      style={{ background: voice.is_active ? "rgba(0,212,106,0.12)" : "var(--surface-2)", border: `1px solid ${voice.is_active ? "rgba(0,212,106,0.25)" : "var(--surface-border)"}` }}
+                      title={voice.is_active ? "Desativar" : "Ativar"}>
+                      <span className={`w-2 h-2 rounded-full ${voice.is_active ? "bg-green-500" : "bg-zinc-500"}`} />
+                    </button>
+                  </div>
+
+                  <div className="flex gap-2">
+                    {/* Preview */}
+                    <button
+                      onClick={() => {
+                        if (isPlaying) { audioRef.current?.pause(); setPlayingId(null); }
+                        else testMutation.mutate(voice.id);
+                      }}
+                      disabled={testMutation.isPending && !isPlaying}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all"
+                      style={{ background: "rgba(99,102,241,0.12)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.20)" }}>
+                      {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                      {isPlaying ? "Pausar" : "Preview"}
+                    </button>
+                    {/* Select */}
+                    <button
+                      onClick={() => onSelect(isSelected ? "" : voice.id)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all"
+                      style={{ background: isSelected ? "rgba(0,212,106,0.14)" : "var(--surface-2)", color: isSelected ? "var(--green)" : "var(--text-2)", border: `1px solid ${isSelected ? "rgba(0,212,106,0.25)" : "var(--surface-border)"}` }}>
+                      {isSelected ? <CheckCircle2 className="w-3.5 h-3.5" /> : null}
+                      {isSelected ? "Selecionada" : "Usar"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
