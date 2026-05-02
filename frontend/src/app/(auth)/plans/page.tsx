@@ -123,7 +123,7 @@ function PlanCard({ plan, onSelect, loading, disabled }: {
   return (
     <div
       className={cn(
-        "relative flex flex-col rounded-2xl p-5 sm:p-6 transition-all duration-200 h-full",
+        "relative flex flex-col rounded-2xl p-3.5 sm:p-5 transition-all duration-200 h-full",
         disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
         isPopular ? "ring-2" : !disabled ? "hover:ring-1" : ""
       )}
@@ -144,40 +144,40 @@ function PlanCard({ plan, onSelect, loading, disabled }: {
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-2.5 mb-4">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+      <div className="flex items-center gap-2 mb-3 sm:mb-4">
+        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center flex-shrink-0"
           style={{ background: `${meta.color}18`, color: meta.color }}>
           {meta.icon}
         </div>
-        <div>
-          <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>{plan.name}</h3>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: "hsl(240 15% 92%)" }}>{plan.name}</h3>
           {description && (
-            <p className="text-[11px] mt-0.5 leading-snug" style={{ color: "hsl(240 8% 46%)" }}>{description}</p>
+            <p className="text-[10px] sm:text-[11px] mt-0.5 leading-snug line-clamp-2" style={{ color: "hsl(240 8% 46%)" }}>{description}</p>
           )}
         </div>
       </div>
 
       {/* Price */}
-      <div className="mb-5">
+      <div className="mb-3 sm:mb-5">
         {isFree ? (
-          <div className="flex items-baseline gap-1">
-            <span className="text-3xl font-extrabold" style={{ color: "hsl(240 15% 92%)" }}>Grátis</span>
-            <span className="text-sm" style={{ color: "hsl(240 8% 42%)" }}>para sempre</span>
+          <div className="flex items-baseline gap-1 flex-wrap">
+            <span className="text-2xl sm:text-3xl font-extrabold" style={{ color: "hsl(240 15% 92%)" }}>Grátis</span>
+            <span className="text-[10px] sm:text-sm" style={{ color: "hsl(240 8% 42%)" }}>para sempre</span>
           </div>
         ) : (
-          <div className="flex items-baseline gap-1">
-            <span className="text-xs font-medium" style={{ color: "hsl(240 8% 46%)" }}>R$</span>
-            <span className="text-3xl font-extrabold" style={{ color: "hsl(240 15% 92%)" }}>{plan.price}</span>
-            <span className="text-sm" style={{ color: "hsl(240 8% 42%)" }}>/mês</span>
+          <div className="flex items-baseline gap-0.5 sm:gap-1 flex-wrap">
+            <span className="text-[10px] sm:text-xs font-medium" style={{ color: "hsl(240 8% 46%)" }}>R$</span>
+            <span className="text-2xl sm:text-3xl font-extrabold" style={{ color: "hsl(240 15% 92%)" }}>{plan.price}</span>
+            <span className="text-[10px] sm:text-sm" style={{ color: "hsl(240 8% 42%)" }}>/mês</span>
           </div>
         )}
       </div>
 
       {/* Features */}
-      <ul className="space-y-1.5 flex-1 mb-5">
+      <ul className="space-y-1 sm:space-y-1.5 flex-1 mb-3 sm:mb-5">
         {highlights.slice(0, 8).map((item) => (
-          <li key={item} className="flex items-center gap-2 text-[11px] truncate" style={{ color: "hsl(240 8% 65%)" }}>
-            <Check className="w-3 h-3 flex-shrink-0" style={{ color: meta.color }} />
+          <li key={item} className="flex items-center gap-1.5 text-[10px] sm:text-[11px] truncate" style={{ color: "hsl(240 8% 65%)" }}>
+            <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-shrink-0" style={{ color: meta.color }} />
             <span className="truncate">{item}</span>
           </li>
         ))}
@@ -186,17 +186,18 @@ function PlanCard({ plan, onSelect, loading, disabled }: {
       {/* CTA */}
       <button
         disabled={loading || disabled}
-        className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] disabled:opacity-60"
+        className="w-full py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-150 active:scale-[0.98] disabled:opacity-60"
         style={isPopular
           ? { background: meta.color, color: "#03170a" }
           : { background: `${meta.color}14`, color: meta.color, border: `1px solid ${meta.color}30` }}
       >
         {loading ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
+          <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
         ) : (
           <>
-            <span>{isFree ? "Começar grátis" : `Assinar por R$${plan.price}/mês`}</span>
-            <ArrowRight className="w-4 h-4" />
+            <span className="hidden sm:inline">{isFree ? "Começar grátis" : `Assinar por R$${plan.price}/mês`}</span>
+            <span className="sm:hidden">{isFree ? "Grátis" : "Assinar"}</span>
+            <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </>
         )}
       </button>
@@ -261,7 +262,7 @@ function PlansContent() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-start p-6 pt-12"
+    <div className="min-h-screen flex flex-col items-center justify-start p-4 sm:p-6 pt-10 sm:pt-12"
       style={{ background: "hsl(240 20% 4%)" }}>
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px]"
@@ -270,7 +271,7 @@ function PlansContent() {
           style={{ background: "radial-gradient(ellipse at bottom right, rgba(167,139,250,0.04) 0%, transparent 60%)" }} />
       </div>
 
-      <div className="w-full max-w-4xl relative">
+      <div className="w-full max-w-[1160px] relative">
         <button onClick={() => router.push("/login")}
           className="flex items-center gap-1.5 text-xs mb-8 transition-colors"
           style={{ color: "hsl(240 8% 42%)" }}
@@ -343,9 +344,9 @@ function PlansContent() {
             <Loader2 className="w-6 h-6 animate-spin" style={{ color: "hsl(240 8% 40%)" }} />
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10 pb-6 pt-2 w-full max-w-6xl mx-auto items-stretch">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-10 pb-6 pt-2 items-stretch">
             {plans.map((plan) => (
-              <div key={plan.id} className="w-full h-full">
+              <div key={plan.id} className="w-full h-full min-w-0">
                 <PlanCard plan={plan} onSelect={handleSelect} loading={selecting === plan.id} disabled={!canSelect} />
               </div>
             ))}

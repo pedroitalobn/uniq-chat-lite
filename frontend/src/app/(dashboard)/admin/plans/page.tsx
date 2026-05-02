@@ -343,7 +343,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
     { id: "limits", label: "Limites" },
     { id: "features", label: "Recursos" },
     { id: "gateway", label: "Cobranças" },
-    { id: "visuals", label: "Aparência" },
+    { id: "visuals", label: "Destaque (/plans)" },
   ] as const;
 
   return (
@@ -569,8 +569,24 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
             )}
 
             {activeTab === "visuals" && (
-              <div className="animate-fade-in-up">
+              <div className="space-y-5 animate-fade-in-up">
+                {/* Live preview */}
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider font-medium mb-2" style={{ color: "hsl(240 8% 46%)" }}>
+                    Preview ao vivo · como aparece em /plans
+                  </p>
+                  <PlanCardPreview
+                    name={form.name}
+                    price={form.price}
+                    description={form.description}
+                    highlights={form.highlights}
+                  />
+                </div>
+                <div className="border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }} />
                 <HighlightsEditor highlights={form.highlights} onChange={(h) => setForm({ ...form, highlights: h })} />
+                <p className="text-[10px]" style={{ color: "hsl(240 8% 36%)" }}>
+                  Esses textos substituem os itens gerados automaticamente. Deixe vazio para usar os valores calculados pelos limites do plano.
+                </p>
               </div>
             )}
 
@@ -815,6 +831,82 @@ export default function AdminPlansPage() {
   );
 }
 
+
+// ─── Plan card preview (mirrors /plans PlanCard visually) ─────────────────────
+const PREVIEW_META: Record<string, { color: string }> = {
+  Free:     { color: "#60a5fa" },
+  Starter:  { color: "#fb923c" },
+  Pro:      { color: "#00d46a" },
+  Business: { color: "#a78bfa" },
+  Lifetime: { color: "#fbbf24" },
+  _default: { color: "#c084fc" },
+};
+
+function PlanCardPreview({ name, price, description, highlights }: {
+  name: string; price: number; description: string; highlights: string[];
+}) {
+  const meta = PREVIEW_META[name] ?? PREVIEW_META["_default"];
+  const isFree = price === 0;
+
+  return (
+    <div style={{
+      background: "hsl(240 18% 6%)",
+      border: `1px solid ${meta.color}33`,
+      borderRadius: 16,
+      padding: "14px 16px",
+      position: "relative",
+      overflow: "hidden",
+      maxWidth: 220,
+    }}>
+      {/* Ambient */}
+      <div style={{ position: "absolute", top: -20, right: -20, width: 80, height: 80, borderRadius: "50%", background: `radial-gradient(circle, ${meta.color}18 0%, transparent 70%)`, pointerEvents: "none" }} />
+
+      {/* Icon + name */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <div style={{ width: 30, height: 30, borderRadius: 10, background: `${meta.color}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <span style={{ fontSize: 13, color: meta.color }}>★</span>
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "hsl(240 15% 92%)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name || "Plano"}</div>
+          {description && <div style={{ fontSize: 9, color: "hsl(240 8% 46%)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{description}</div>}
+        </div>
+      </div>
+
+      {/* Price */}
+      <div style={{ marginBottom: 10 }}>
+        {isFree ? (
+          <span style={{ fontSize: 18, fontWeight: 800, color: "hsl(240 15% 92%)" }}>Grátis</span>
+        ) : (
+          <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
+            <span style={{ fontSize: 10, color: "hsl(240 8% 46%)" }}>R$</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: "hsl(240 15% 92%)" }}>{price}</span>
+            <span style={{ fontSize: 10, color: "hsl(240 8% 42%)" }}>/mês</span>
+          </div>
+        )}
+      </div>
+
+      {/* Highlights */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 10 }}>
+        {(highlights.length > 0 ? highlights : ["(usando valores dos limites)"]).slice(0, 6).map((item, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 9.5, color: "hsl(240 8% 65%)" }}>
+            <span style={{ width: 10, height: 10, color: meta.color, flexShrink: 0 }}>✓</span>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item}</span>
+          </div>
+        ))}
+        {highlights.length === 0 && (
+          <div style={{ fontSize: 9, color: "hsl(240 8% 35%)", fontStyle: "italic" }}>
+            Adicione highlights abaixo para personalizar
+          </div>
+        )}
+      </div>
+
+      {/* CTA */}
+      <div style={{ padding: "7px 0", borderRadius: 10, textAlign: "center", fontSize: 10, fontWeight: 600, background: `${meta.color}18`, color: meta.color, border: `1px solid ${meta.color}30` }}>
+        {isFree ? "Começar grátis →" : `Assinar por R$${price}/mês →`}
+      </div>
+    </div>
+  );
+}
 
 function NumField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
