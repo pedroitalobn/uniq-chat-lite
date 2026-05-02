@@ -42,6 +42,13 @@ export interface UniqAIChatPanelProps {
   onBeforeFirstSend?: () => void;
 }
 
+const STREAMING_PHASES = [
+  "Analisando seu pedido...",
+  "Consultando instâncias...",
+  "Verificando jornadas...",
+  "Formulando resposta...",
+];
+
 export function UniqAIChatPanel({
   messages,
   onMessagesChange,
@@ -50,6 +57,7 @@ export function UniqAIChatPanel({
   onBeforeFirstSend,
   pageContext,
 }: UniqAIChatPanelProps) {
+
   const [prompt, setPrompt] = useState("");
   const [modelPref, setModelPref] = useState<ModelPreference | null>(() => loadModelPref());
   const [selectedInstance, setSelectedInstance] = useState<string>("");
@@ -59,6 +67,7 @@ export function UniqAIChatPanel({
   const [pendingJourneyMentions, setPendingJourneyMentions] = useState<Mention[]>([]);
   const [, setPendingJourneyData] = useState<any>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingPhaseIdx, setStreamingPhaseIdx] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
@@ -75,6 +84,18 @@ export function UniqAIChatPanel({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Avança a fase de streaming a cada 2.5s enquanto isStreaming é true.
+  useEffect(() => {
+    if (!isStreaming) {
+      setStreamingPhaseIdx(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setStreamingPhaseIdx((prev) => (prev + 1) % STREAMING_PHASES.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [isStreaming]);
 
   const sendMessage = useCallback(async (
     messageText: string,
@@ -127,11 +148,28 @@ export function UniqAIChatPanel({
         content,
       }]);
     } catch (error: any) {
-      toast.error(error.response?.data?.error || error.message || "Erro ao enviar mensagem");
+      const rawMsg: string = error.response?.data?.error || error.message || "Erro desconhecido";
+      toast.error(rawMsg);
+
+      // Tenta inferir causa do erro pra mensagem de diagnóstico.
+      let reason = "Erro interno no servidor.";
+      const lower = rawMsg.toLowerCase();
+      if (lower.includes("rate limit") || lower.includes("too many")) {
+        reason = "Limite de requisições atingido (rate limit).";
+      } else if (lower.includes("timeout") || lower.includes("timed out")) {
+        reason = "A requisição demorou demais e expirou (timeout).";
+      } else if (lower.includes("unauthorized") || lower.includes("401")) {
+        reason = "Credenciais inválidas ou sessão expirada.";
+      } else if (lower.includes("instance") || lower.includes("instância")) {
+        reason = "Problema na instância conectada.";
+      } else if (lower.includes("network") || lower.includes("fetch")) {
+        reason = "Falha de conexão com o servidor.";
+      }
+
       onMessagesChange((prev) => [...prev, {
         id: assistantMessageId,
         role: "assistant",
-        content: "Desculpe, ocorreu um erro ao processar sua mensagem.",
+        content: `❌ **Não consegui processar seu pedido**\n\n**O que aconteceu:** ${rawMsg}\n\n**Por que:** ${reason}\n\n**O que fazer:**\n- Tente reformular o pedido\n- Verifique se suas instâncias estão conectadas\n- Tente novamente em alguns segundos`,
       }]);
     } finally {
       setIsStreaming(false);
@@ -346,12 +384,12 @@ export function UniqAIChatPanel({
           </AnimatePresence>
         </div>
 
-        {/* Loading overlay */}
+        {/* Loading overlay — exibe a fase de streaming descritiva atual. */}
         {isStreaming && (
           <div className="px-4 sm:px-6 py-2 border-t flex-shrink-0" style={{ background: "rgba(0,212,106,0.05)", borderColor: "var(--surface-border)" }}>
             <div className="flex items-center gap-2 text-xs" style={{ color: "var(--green)" }}>
               <Loader2 className="w-3 h-3 animate-spin" />
-              <span>Processando resposta...</span>
+              <span>{STREAMING_PHASES[streamingPhaseIdx]}</span>
             </div>
           </div>
         )}

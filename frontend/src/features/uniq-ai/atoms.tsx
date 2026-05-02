@@ -7,8 +7,8 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  ArrowRight, Bot, Check, Clock, Copy, Loader2, MessageSquare, Send, Server,
-  Sparkles as SparklesIcon, Tag, User, Wand2, Zap,
+  ArrowRight, Bot, Check, CheckCircle2, Clock, Copy, Loader2, MessageSquare, Send, Server,
+  Sparkles as SparklesIcon, Tag, User, Wand2, XCircle, Zap,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -86,6 +86,118 @@ export function ThinkingDots() {
           animate={{ y: [0, -5, 0], opacity: [0.4, 1, 0.4] }}
           transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.18, ease: "easeInOut" }}
         />
+      ))}
+    </div>
+  );
+}
+
+// ToolCallBubble — aparece inline no chat quando o AI chama um sistema externo.
+export function ToolCallBubble({
+  system,
+  status,
+}: {
+  system: string;
+  status: "calling" | "done" | "error";
+}) {
+  return (
+    <div
+      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
+      style={{
+        background: status === "error" ? "rgba(239,68,68,0.08)" : "rgba(59,130,246,0.08)",
+        border: `1px solid ${status === "error" ? "rgba(239,68,68,0.25)" : "rgba(59,130,246,0.25)"}`,
+        color: status === "error" ? "#f87171" : "#60a5fa",
+      }}
+    >
+      {status === "calling" && (
+        <motion.span
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+          className="flex items-center"
+        >
+          <Zap className="w-3 h-3" />
+        </motion.span>
+      )}
+      {status === "done" && <CheckCircle2 className="w-3 h-3" style={{ color: "#4ade80" }} />}
+      {status === "error" && <XCircle className="w-3 h-3" />}
+      <span>{system}</span>
+      <span className="opacity-60">
+        {status === "calling" ? "chamando..." : status === "done" ? "concluído" : "erro"}
+      </span>
+    </div>
+  );
+}
+
+// inferConfidence — analisa o conteúdo da resposta do AI e retorna nível de confiança.
+export function inferConfidence(content: string): "high" | "medium" | "low" {
+  const lower = content.toLowerCase();
+  const lowSignals = ["não sei", "talvez", "posso estar errado", "provavelmente", "não tenho certeza", "pode ser que"];
+  if (lowSignals.some((s) => lower.includes(s))) return "low";
+  const highSignals = ["vou", "crie", "configurei", "criei", "ativei", "configurei", "executei"];
+  if (content.length > 200 && highSignals.some((s) => lower.includes(s))) return "high";
+  return "medium";
+}
+
+// ConfidenceBadge — badge discreto abaixo de respostas do AI.
+export function ConfidenceBadge({ level }: { level: "high" | "medium" | "low" }) {
+  const config = {
+    high: { label: "Alta confiança", color: "#4ade80", dot: "bg-green-400" },
+    medium: { label: "Confiança média", color: "#facc15", dot: "bg-yellow-400" },
+    low: { label: "Baixa confiança", color: "#f87171", dot: "bg-red-400" },
+  }[level];
+
+  return (
+    <div className="flex items-center gap-1.5 mt-2 select-none">
+      <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", config.dot)} />
+      <span className="text-[10px] font-medium" style={{ color: config.color, opacity: 0.75 }}>
+        {config.label}
+      </span>
+    </div>
+  );
+}
+
+// ActionPlanPreview — lista vertical de steps de um plano de ação com ícones.
+export function ActionPlanPreview({
+  steps,
+}: {
+  steps: { id: string; label: string; type: string }[];
+}) {
+  const getIcon = (type: string) => {
+    if (type === "trigger") return <Zap className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />;
+    if (type === "message") return <Send className="w-3.5 h-3.5" style={{ color: "#60a5fa" }} />;
+    if (type === "wait") return <Clock className="w-3.5 h-3.5" style={{ color: "#facc15" }} />;
+    if (type === "tag") return <Tag className="w-3.5 h-3.5" style={{ color: "#c084fc" }} />;
+    return <Bot className="w-3.5 h-3.5" style={{ color: "var(--text-3)" }} />;
+  };
+
+  return (
+    <div
+      className="rounded-xl p-3 my-2 border-l-2 space-y-2"
+      style={{
+        background: "rgba(0,212,106,0.04)",
+        border: "1px solid rgba(0,212,106,0.15)",
+        borderLeftColor: "var(--green)",
+        borderLeftWidth: "2px",
+      }}
+    >
+      <p className="text-[10px] uppercase font-semibold tracking-wide mb-2" style={{ color: "var(--text-3)" }}>
+        Plano de ação
+      </p>
+      {steps.map((step, i) => (
+        <div key={step.id} className="flex items-center gap-2.5">
+          <div
+            className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}
+          >
+            {getIcon(step.type)}
+          </div>
+          <span className="text-xs" style={{ color: "var(--text-2)" }}>{step.label}</span>
+          <span
+            className="ml-auto text-[10px] px-1.5 py-0.5 rounded"
+            style={{ background: "var(--surface-3)", color: "var(--text-3)" }}
+          >
+            #{i + 1}
+          </span>
+        </div>
       ))}
     </div>
   );
@@ -384,6 +496,10 @@ export function ChatMessage({ message, isNew = false }: { message: Message; isNe
             )
           )}
         </div>
+        {/* ConfidenceBadge — exibido apenas em mensagens do assistant com conteúdo. */}
+        {!isUser && message.content && (
+          <ConfidenceBadge level={inferConfidence(message.content)} />
+        )}
       </div>
 
       {!isUser && message.content && (

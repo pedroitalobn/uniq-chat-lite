@@ -7,8 +7,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ChevronLeft, ChevronRight, MessageSquare, MoreHorizontal,
-  Pencil, Plus, Sparkles, Trash2,
+  Activity, ChevronLeft, ChevronRight, MessageSquare,
+  Pencil, Plus, Sparkles, Trash2, Zap,
 } from "lucide-react";
 import { UniqAIChatPanel } from "@/features/uniq-ai/chat-panel";
 import type { Message } from "@/features/uniq-ai/atoms";
@@ -25,6 +25,123 @@ function formatRelative(ts: number): string {
   if (diff < day) return `${Math.floor(diff / hr)}h atrás`;
   if (diff < 7 * day) return `${Math.floor(diff / day)}d atrás`;
   return new Date(ts).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
+
+// AgentEvent — evento derivado de uma mensagem do AI para o feed de atividade.
+type AgentEvent = {
+  id: string;
+  type: "journey_created" | "instance_queried" | "campaign_event" | "contact_event" | "message_sent" | "error";
+  label: string;
+  time: Date;
+  status: "success" | "running" | "error";
+};
+
+// Deriva eventos de agente a partir das mensagens da conversa ativa.
+function deriveAgentEvents(messages: Message[]): AgentEvent[] {
+  const events: AgentEvent[] = [];
+  for (const msg of messages) {
+    if (msg.role !== "assistant") continue;
+    const lower = msg.content.toLowerCase();
+    const time = msg.createdAt ?? new Date();
+    if (lower.includes("jornada") && (lower.includes("criada") || lower.includes("criado") || lower.includes("criada com sucesso"))) {
+      events.push({ id: `${msg.id}-journey`, type: "journey_created", label: "Jornada criada", time, status: "success" });
+    }
+    if (lower.includes("instância") || lower.includes("instancia")) {
+      events.push({ id: `${msg.id}-instance`, type: "instance_queried", label: "Instância consultada", time, status: "success" });
+    }
+    if (lower.includes("campanha")) {
+      events.push({ id: `${msg.id}-campaign`, type: "campaign_event", label: "Evento de campanha", time, status: "success" });
+    }
+    if (lower.includes("contato")) {
+      events.push({ id: `${msg.id}-contact`, type: "contact_event", label: "Contato acessado", time, status: "success" });
+    }
+    if (lower.includes("❌") || lower.includes("não consegui")) {
+      events.push({ id: `${msg.id}-error`, type: "error", label: "Erro na execução", time, status: "error" });
+    }
+  }
+  return events;
+}
+
+const EVENT_DOT: Record<AgentEvent["status"], string> = {
+  success: "#4ade80",
+  running: "#facc15",
+  error: "#f87171",
+};
+
+const EVENT_ICON: Record<AgentEvent["type"], React.ReactNode> = {
+  journey_created: <Sparkles className="w-3 h-3" style={{ color: "#4ade80" }} />,
+  instance_queried: <Zap className="w-3 h-3" style={{ color: "#60a5fa" }} />,
+  campaign_event: <Activity className="w-3 h-3" style={{ color: "#c084fc" }} />,
+  contact_event: <MessageSquare className="w-3 h-3" style={{ color: "#facc15" }} />,
+  message_sent: <MessageSquare className="w-3 h-3" style={{ color: "#4ade80" }} />,
+  error: <span className="text-[10px]">❌</span>,
+};
+
+function AgentActivityFeed({ events }: { events: AgentEvent[] }) {
+  return (
+    <aside
+      className="hidden lg:flex flex-col h-full border-l overflow-hidden w-[280px] flex-shrink-0"
+      style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center gap-2 px-4 py-3 border-b flex-shrink-0"
+        style={{ borderColor: "var(--surface-border)" }}
+      >
+        <Activity className="w-4 h-4 flex-shrink-0" style={{ color: "var(--green)" }} />
+        <span className="text-xs font-medium" style={{ color: "var(--text-1)" }}>Atividade do Agente</span>
+      </div>
+
+      {/* Feed */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3">
+        {events.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
+            <Activity className="w-6 h-6 opacity-20" style={{ color: "var(--text-3)" }} />
+            <p className="text-xs" style={{ color: "var(--text-3)" }}>Nenhuma ação ainda</p>
+          </div>
+        ) : (
+          <div className="relative">
+            {/* Linha vertical da timeline */}
+            <div
+              className="absolute left-[7px] top-2 bottom-2 w-[1px]"
+              style={{ background: "var(--surface-border)" }}
+            />
+            <div className="space-y-3">
+              {events.map((event) => (
+                <motion.div
+                  key={event.id}
+                  className="flex gap-3 items-start pl-1"
+                  initial={{ opacity: 0, x: 8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {/* Dot */}
+                  <div
+                    className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 z-10"
+                    style={{
+                      background: "var(--surface-2)",
+                      border: `2px solid ${EVENT_DOT[event.status]}`,
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {EVENT_ICON[event.type]}
+                      <span className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>
+                        {event.label}
+                      </span>
+                    </div>
+                    <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>
+                      {formatRelative(event.time.getTime())}
+                    </p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </aside>
+  );
 }
 
 export default function UniqAIPage() {
@@ -76,6 +193,12 @@ export default function UniqAIPage() {
   const sortedConvs = useMemo(
     () => [...conversations].sort((a, b) => b.updatedAt - a.updatedAt),
     [conversations],
+  );
+
+  // Eventos de atividade derivados das mensagens da conversa ativa.
+  const agentEvents = useMemo(
+    () => deriveAgentEvents(activeConversation?.messages ?? []),
+    [activeConversation?.messages],
   );
 
   const startNew = useCallback(() => {
@@ -358,6 +481,9 @@ export default function UniqAIPage() {
             />
           )}
         </div>
+
+        {/* Activity feed — desktop only (lg+), 280px de largura fixa. */}
+        <AgentActivityFeed events={agentEvents} />
       </div>
     </div>
   );
