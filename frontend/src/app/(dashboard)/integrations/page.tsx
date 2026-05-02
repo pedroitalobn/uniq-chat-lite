@@ -81,9 +81,13 @@ interface Integration {
   created_at: string;
 }
 
-type Section = "llm" | "agents" | "api" | "webhook" | "mcp" | "shop" | "voices" | "proxies" | "docs";
+type Section = "llm" | "agents" | "api" | "webhook" | "mcp" | "shop" | "voices" | "proxies" | "docs" | "marketing";
 
-const VALID_SECTIONS: Section[] = ["llm", "agents", "api", "webhook", "mcp", "voices", "proxies", "docs"];
+const VALID_SECTIONS: Section[] = ["llm", "agents", "api", "webhook", "mcp", "voices", "proxies", "docs", "marketing"];
+
+// Providers que vão no modal unificado (só precisam de API key)
+const STANDARD_PROVIDERS = PROVIDERS.filter(p => p.id !== "openrouter");
+// OpenRouter fica como card especial (OAuth único)
 
 export default function IntegrationsPage() {
   const searchParams = useSearchParams();
@@ -92,7 +96,6 @@ export default function IntegrationsPage() {
   const [section, setSection] = useState<Section>(
     VALID_SECTIONS.includes(initialTab) ? initialTab : "llm"
   );
-  const [connecting, setConnecting] = useState<ProviderId | null>(null);
 
   // Reage a mudanças de ?tab=... (navegação via URL externa / back)
   useEffect(() => {
@@ -114,6 +117,7 @@ export default function IntegrationsPage() {
   const sections = [
     { id: "llm" as const, label: "LLMs", icon: Bot, color: "var(--green)" },
     { id: "agents" as const, label: "Agents", icon: Zap, color: "#8b5cf6" },
+    { id: "marketing" as const, label: "Marketing", icon: Sparkles, color: "#f43f5e" },
     { id: "voices" as const, label: "Vozes", icon: Mic, color: "#f5a623" },
     { id: "proxies" as const, label: "Proxies", icon: Globe, color: "#60a5fa" },
     { id: "mcp" as const, label: "MCPs", icon: Link2, color: "#f59e0b" },
@@ -215,8 +219,9 @@ export default function IntegrationsPage() {
           {/* Content */}
           <div className="flex-1 min-w-0 w-full">
             <AnimatedTabContent tabKey={section}>
-              {section === "llm" && <LLMSection onConnect={setConnecting} />}
+              {section === "llm" && <LLMSection />}
               {section === "agents" && <AgentsSection />}
+              {section === "marketing" && <MarketingSection />}
               {section === "proxies" && <ProxiesSection />}
               {section === "mcp" && <MCPSection />}
               {section === "webhook" && <WebhooksPanel />}
@@ -229,7 +234,6 @@ export default function IntegrationsPage() {
         </div>
       </div>
 
-      {connecting && <ConnectModal provider={connecting} onClose={() => setConnecting(null)} />}
     </div>
   );
 }
@@ -286,57 +290,107 @@ function UniqAICard() {
 }
 
 // ─── LLM Section ─────────────────────────────────────────────────────────────
-function LLMSection({ onConnect }: { onConnect: (p: ProviderId) => void }) {
+function LLMSection() {
   const { data, isLoading } = useQuery<Integration[]>({ queryKey: ["integrations"], queryFn: () => integrationsApi.list().then(r => r.data) });
   const integrations = data ?? [];
-  const connectedProviders = new Set(integrations.map((i) => i.provider));
+  const qc = useQueryClient();
+  const [showAddModal, setShowAddModal] = useState(false);
+  const openrouterConnected = integrations.some(i => i.provider === "openrouter");
+
+  const startOR = useMutation({
+    mutationFn: () => integrationsApi.startOpenRouterOAuth(window.location.href),
+    onSuccess: (res: any) => { if (res.data?.url) window.location.href = res.data.url; },
+    onError: () => toast.error("Falha ao iniciar OAuth do OpenRouter"),
+  });
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="animate-pulse flex flex-col items-start gap-2 rounded-2xl p-4"
-            style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>
-            <div className="w-10 h-10 rounded-xl" style={{ background: "var(--surface-2)" }} />
-            <div className="space-y-2 w-full">
-              <div className="h-3 rounded-full w-3/4" style={{ background: "var(--surface-2)" }} />
-              <div className="h-2 rounded-full w-full" style={{ background: "var(--surface-3)" }} />
-            </div>
-            <div className="h-2 rounded-full w-16 mt-1" style={{ background: "var(--surface-3)" }} />
-          </div>
+      <div className="space-y-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="animate-pulse h-16 rounded-2xl" style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }} />
         ))}
       </div>
     );
   }
 
+  const orProvider = PROVIDERS.find(p => p.id === "openrouter")!;
+
   return (
-    <div>
+    <div className="space-y-6">
       <UniqAICard />
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {PROVIDERS.map((p) => (
-          <button key={p.id} onClick={() => onConnect(p.id)} className="relative flex flex-col items-start gap-2 rounded-2xl p-4 text-left transition-all hover:scale-[1.01]"
-            style={{
-              background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
-              backdropFilter: "blur(20px) saturate(180%)",
-              WebkitBackdropFilter: "blur(20px) saturate(180%)",
-              border: connectedProviders.has(p.id) ? `1px solid ${p.color}50` : "1px solid rgba(255,255,255,0.10)",
-              borderRadius: "16px",
-              boxShadow: "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)",
-              transition: "all 0.35s cubic-bezier(0.16,1,0.3,1)",
-            }}>
-            {connectedProviders.has(p.id) && <span className="absolute top-3 right-3 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold" style={{ background: "rgba(0,212,106,0.15)", backdropFilter: "blur(8px)", border: "1px solid rgba(0,212,106,0.25)", color: "#4ade80" }}><CheckCircle2 className="w-2.5 h-2.5" /> conectado</span>}
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${p.color}18` }}><ProviderIcon id={p.id} color={p.color} /></div>
-            <div><p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{p.name}</p><p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>{p.description}</p></div>
-            <div className="flex items-center gap-1 text-xs font-medium mt-1" style={{ color: p.color }}><Plus className="w-3 h-3" /> {connectedProviders.has(p.id) ? "Adicionar" : "Conectar"}</div>
-          </button>
-        ))}
-      </div>
-      {integrations.length > 0 && (
-        <div className="mt-6 space-y-2">
-          <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>Integrações conectadas</h3>
-          {integrations.map(i => <IntegrationCard key={i.id} integration={i} />)}
+
+      {/* Conectores especiais */}
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-widest mb-2.5" style={{ color: "var(--text-3)" }}>Conectores únicos</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* OpenRouter */}
+          <div className="rounded-2xl p-4 flex items-center gap-3"
+            style={{ background: `${orProvider.color}08`, border: `1px solid ${orProvider.color}25`, borderRadius: 16 }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${orProvider.color}18` }}>
+              <ProviderIcon id="openrouter" color={orProvider.color} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>OpenRouter</p>
+                {openrouterConnected && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
+              </div>
+              <p className="text-xs" style={{ color: "var(--text-3)" }}>100+ modelos via OAuth</p>
+            </div>
+            <button onClick={() => startOR.mutate()} disabled={startOR.isPending}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium"
+              style={{ background: `${orProvider.color}15`, border: `1px solid ${orProvider.color}35`, color: orProvider.color }}>
+              {startOR.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+              {openrouterConnected ? "Reconectar" : "Conectar"}
+            </button>
+          </div>
+
+          {/* HuggingFace — em breve */}
+          <div className="rounded-2xl p-4 flex items-center gap-3 opacity-60"
+            style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", borderRadius: 16 }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(255,160,0,0.12)" }}>
+              <svg viewBox="0 0 24 24" className="w-5 h-5"><circle cx="12" cy="12" r="9" stroke="#ffa000" strokeWidth="1.5" fill="none"/><path d="M8 14c0-2 1.5-4 4-4s4 2 4 4" stroke="#ffa000" strokeWidth="1.6" strokeLinecap="round" fill="none"/><circle cx="9" cy="10" r="1" fill="#ffa000"/><circle cx="15" cy="10" r="1" fill="#ffa000"/></svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>HuggingFace</p>
+                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,160,0,0.12)", color: "#ffa000", border: "1px solid rgba(255,160,0,0.25)" }}>Em breve</span>
+              </div>
+              <p className="text-xs" style={{ color: "var(--text-3)" }}>Modelos open source via Inference API</p>
+            </div>
+          </div>
         </div>
-      )}
+      </div>
+
+      {/* Standard LLMs */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-3)" }}>Modelos de IA</p>
+          <button onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium"
+            style={{ background: "rgba(0,212,106,0.10)", border: "1px solid rgba(0,212,106,0.20)", color: "var(--green)" }}>
+            <Plus className="w-3.5 h-3.5" /> Adicionar LLM
+          </button>
+        </div>
+
+        {integrations.length === 0 ? (
+          <div className="rounded-2xl p-10 text-center" style={{ background: "var(--surface-2)", border: "1px dashed rgba(255,255,255,0.08)" }}>
+            <Bot className="w-8 h-8 mx-auto mb-3 opacity-25" style={{ color: "var(--text-3)" }} />
+            <p className="text-sm font-medium mb-1" style={{ color: "var(--text-2)" }}>Nenhum LLM configurado</p>
+            <p className="text-xs mb-4" style={{ color: "var(--text-3)" }}>Conecte Claude, GPT-4o, Gemini e outros para usar nos agentes de IA.</p>
+            <button onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium"
+              style={{ background: "rgba(0,212,106,0.10)", border: "1px solid rgba(0,212,106,0.20)", color: "var(--green)" }}>
+              <Plus className="w-4 h-4" /> Adicionar primeiro LLM
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {integrations.map(i => <IntegrationCard key={i.id} integration={i} />)}
+          </div>
+        )}
+      </div>
+
+      {showAddModal && <UnifiedLLMModal onClose={() => setShowAddModal(false)} />}
     </div>
   );
 }
@@ -763,82 +817,152 @@ function ProxiesSection() {
   );
 }
 
-// ─── Connect Modal (LLM) ───────────────────────────────────────────────────
-function ConnectModal({ provider: providerId, onClose }: { provider: ProviderId; onClose: () => void }) {
-  const provider = PROVIDERS.find(p => p.id === providerId)!;
+// ─── Unified LLM Modal ──────────────────────────────────────────────────────
+const API_KEY_LINKS: Partial<Record<string, { href: string; label: string }>> = {
+  claude:     { href: "https://console.anthropic.com/settings/keys",  label: "console.anthropic.com" },
+  openai:     { href: "https://platform.openai.com/api-keys",         label: "platform.openai.com" },
+  openrouter: { href: "https://openrouter.ai/settings/keys",          label: "openrouter.ai" },
+  deepseek:   { href: "https://platform.deepseek.com/api_keys",       label: "platform.deepseek.com" },
+  gemini:     { href: "https://aistudio.google.com/apikey",           label: "aistudio.google.com" },
+  mistral:    { href: "https://console.mistral.ai/api-keys",          label: "console.mistral.ai" },
+  qwen:       { href: "https://dashscope.aliyuncs.com",               label: "dashscope.aliyuncs.com" },
+  kimi:       { href: "https://platform.moonshot.cn/console/api-keys", label: "platform.moonshot.cn" },
+  zai:        { href: "https://open.bigmodel.cn/usercenter/apikeys",  label: "open.bigmodel.cn" },
+};
+
+function UnifiedLLMModal({ onClose }: { onClose: () => void }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = STANDARD_PROVIDERS.find(p => p.id === selectedId);
   const qc = useQueryClient();
-  const [form, setForm] = useState<{ name: string; api_key: string; models: string[] }>({ name: provider.name, api_key: "", models: [] });
+  const [form, setForm] = useState({ name: "", api_key: "", base_url: "", models: [] as string[] });
   const [showKey, setShowKey] = useState(false);
 
-  const create = useMutation({
-    mutationFn: () => integrationsApi.create({ provider: providerId, name: form.name, api_key: form.api_key, models: form.models.length ? form.models : undefined }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["integrations"] }); toast.success("Conectado!"); onClose(); },
-    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro"),
-  });
+  useEffect(() => {
+    if (selected) setForm(f => ({ ...f, name: selected.name, api_key: "", models: [] }));
+  }, [selected?.id]);
 
-  const API_KEY_LINKS: Partial<Record<ProviderId, { href: string; label: string }>> = {
-    claude:      { href: "https://console.anthropic.com/settings/keys", label: "console.anthropic.com/settings/keys" },
-    openai:      { href: "https://platform.openai.com/api-keys",        label: "platform.openai.com/api-keys" },
-    openrouter:  { href: "https://openrouter.ai/settings/keys",         label: "openrouter.ai/settings/keys" },
-    deepseek:    { href: "https://platform.deepseek.com/api_keys",      label: "platform.deepseek.com/api_keys" },
-    gemini:      { href: "https://aistudio.google.com/apikey",          label: "aistudio.google.com/apikey" },
-  };
-  const keyLink = API_KEY_LINKS[providerId];
+  const create = useMutation({
+    mutationFn: () => integrationsApi.create({
+      provider: selectedId!,
+      name: form.name,
+      api_key: form.api_key,
+      base_url: (selected as any)?.hasBaseURL && form.base_url ? form.base_url : undefined,
+      models: form.models.length ? form.models : undefined,
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["integrations"] }); toast.success("Integração adicionada!"); onClose(); },
+    onError: (e: unknown) => toast.error((e as any)?.response?.data?.error || "Erro ao conectar"),
+  });
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ background: "var(--surface-overlay)" }}>
-      <div className="w-full max-w-md rounded-2xl border p-6 space-y-4" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: provider.bg, border: `1px solid ${provider.border}` }}><ProviderIcon id={provider.id} color={provider.color} /></div>
-          <div><h2 className="font-medium" style={{ color: "var(--text-1)" }}>Conectar {provider.name}</h2><p className="text-xs" style={{ color: "var(--text-3)" }}>{provider.description}</p></div>
-        </div>
-
-        <div>
-          <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Nome</label>
-          <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="input-field w-full" />
-        </div>
-
-        {keyLink && (
-          <a
-            href={keyLink.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs rounded-xl px-3 py-2.5 w-full"
-            style={{ background: `${provider.color}12`, border: `1px solid ${provider.color}30`, color: provider.color }}>
-            <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
-            Obter API key em {keyLink.label}
-          </a>
-        )}
-
-        <div>
-          <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>API Key</label>
-          <div className="relative">
-            <input type={showKey ? "text" : "password"} value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })} className="input-field w-full" style={{ paddingRight: "2.5rem" }} placeholder="sk-..." />
-            <button type="button" onClick={() => setShowKey(!showKey)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-3)" }}>
-              {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
+      <div className="w-full max-w-2xl rounded-2xl border flex flex-col max-h-[90vh]"
+        style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b" style={{ borderColor: "var(--surface-border)" }}>
+          <div className="flex items-center gap-2">
+            {selectedId && (
+              <button onClick={() => setSelectedId(null)} className="p-1.5 rounded-lg hover:bg-white/5">
+                <svg viewBox="0 0 20 20" className="w-4 h-4 fill-current" style={{ color: "var(--text-3)" }}><path d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"/></svg>
+              </button>
+            )}
+            <h2 className="font-medium" style={{ color: "var(--text-1)" }}>
+              {selected ? `Conectar ${selected.name}` : "Adicionar integração de IA"}
+            </h2>
           </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5"><X className="w-4 h-4" style={{ color: "var(--text-3)" }} /></button>
         </div>
 
-        {provider.models.length > 0 && (
-          <div className="space-y-2">
-            <label className="text-xs font-medium" style={{ color: "var(--text-2)" }}>Modelos</label>
-            <div className="rounded-xl border p-3 max-h-40 overflow-y-auto" style={{ background: "var(--surface-3)", borderColor: "var(--surface-border)" }}>
-              {provider.models.map(m => (
-                <label key={m} className="flex items-center gap-2">
-                  <input type="checkbox" checked={form.models.includes(m)} onChange={e => setForm(f => ({ ...f, models: e.target.checked ? [...f.models, m] : f.models.filter(x => x !== m) }))} className="rounded" />
-                  <span className="text-sm">{m}</span>
-                </label>
-              ))}
+        <div className="overflow-y-auto p-6">
+          {/* Step 1: provider picker */}
+          {!selected && (
+            <div className="space-y-3">
+              <p className="text-sm" style={{ color: "var(--text-3)" }}>Selecione o provedor — basta a API key para conectar.</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {STANDARD_PROVIDERS.map(p => (
+                  <button key={p.id} onClick={() => setSelectedId(p.id)}
+                    className="flex flex-col items-start gap-2.5 rounded-2xl p-4 text-left transition-all hover:scale-[1.01] active:scale-[0.99]"
+                    style={{ background: `${p.color}08`, border: `1px solid ${p.color}25` }}>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${p.color}18` }}>
+                      <ProviderIcon id={p.id} color={p.color} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold leading-tight" style={{ color: "var(--text-1)" }}>{p.name}</p>
+                      <p className="text-[11px] mt-1 line-clamp-2 leading-relaxed" style={{ color: "var(--text-3)" }}>
+                        {(p as any).hasBaseURL ? "Webhook / automação" : p.models.slice(0, 2).join(", ")}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="flex gap-2 pt-2">
-          <button onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
-          <button onClick={() => create.mutate()} disabled={create.isPending || !form.api_key} className="btn-primary flex-1">
-            {create.isPending ? "Conectando..." : "Conectar"}
-          </button>
+          {/* Step 2: form */}
+          {selected && (
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Nome da integração</label>
+                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="input-field w-full" placeholder={selected.name} />
+              </div>
+
+              {API_KEY_LINKS[selected.id] && (
+                <a href={API_KEY_LINKS[selected.id]!.href} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs rounded-xl px-3 py-2.5 w-full"
+                  style={{ background: `${selected.color}10`, border: `1px solid ${selected.color}28`, color: selected.color }}>
+                  <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+                  Obter API key em {API_KEY_LINKS[selected.id]!.label}
+                </a>
+              )}
+
+              <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>API Key</label>
+                <div className="relative">
+                  <input type={showKey ? "text" : "password"} value={form.api_key}
+                    onChange={e => setForm(f => ({ ...f, api_key: e.target.value }))}
+                    className="input-field w-full" style={{ paddingRight: "2.5rem" }}
+                    placeholder={(selected as any).hasBaseURL ? "Token de autenticação (opcional)" : "sk-..."} />
+                  <button type="button" onClick={() => setShowKey(!showKey)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-3)" }}>
+                    {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {(selected as any).hasBaseURL && (
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Base URL</label>
+                  <input value={form.base_url} onChange={e => setForm(f => ({ ...f, base_url: e.target.value }))}
+                    className="input-field w-full" placeholder="https://..." />
+                </div>
+              )}
+
+              {selected.models.length > 0 && (
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Modelos disponíveis</label>
+                  <div className="rounded-xl border p-3 grid grid-cols-1 sm:grid-cols-2 gap-1" style={{ background: "var(--surface-3)", borderColor: "var(--surface-border)" }}>
+                    {selected.models.map(m => (
+                      <label key={m} className="flex items-center gap-2 py-1 cursor-pointer">
+                        <input type="checkbox" checked={form.models.includes(m)}
+                          onChange={e => setForm(f => ({ ...f, models: e.target.checked ? [...f.models, m] : f.models.filter(x => x !== m) }))} />
+                        <span className="text-xs font-mono" style={{ color: "var(--text-2)" }}>{m}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-[11px] mt-1" style={{ color: "var(--text-3)" }}>
+                    Deixe em branco para habilitar todos os modelos.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
+                <button onClick={() => create.mutate()}
+                  disabled={create.isPending || (!form.api_key && !(selected as any).hasBaseURL)}
+                  className="btn-primary flex-1">
+                  {create.isPending ? "Conectando..." : "Conectar"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1025,6 +1149,77 @@ function MCPSection() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Marketing Section ────────────────────────────────────────────────────────
+const MARKETING_INTEGRATIONS = [
+  { id: "google_calendar", name: "Google Agenda", description: "Agende e consulte eventos diretamente nas conversas dos agentes", icon: "📅", color: "#4285f4" },
+  { id: "gmail", name: "Gmail", description: "Leia, envie e automatize e-mails integrados ao fluxo de atendimento", icon: "✉️", color: "#ea4335" },
+  { id: "n8n", name: "n8n", description: "Workflows visuais de automação e integração entre plataformas", icon: "⚡", color: "#ea5e0e" },
+  { id: "microsoft365", name: "Microsoft 365", description: "Outlook, Teams, OneDrive e calendário integrados ao workspace", icon: "🪟", color: "#0078d4" },
+  { id: "google_drive", name: "Google Drive", description: "Acesse, compartilhe e indexe documentos nas conversas", icon: "💾", color: "#34a853" },
+  { id: "pipedrive", name: "Pipedrive", description: "Gerencie pipeline de vendas e atualize negócios automaticamente", icon: "🔧", color: "#28a745" },
+  { id: "hubspot", name: "HubSpot", description: "CRM, automação de marketing e suporte em uma plataforma", icon: "🧲", color: "#ff7a59" },
+  { id: "rd_station", name: "RD Station", description: "CRM e automação de marketing da plataforma mais popular do Brasil", icon: "📊", color: "#00c2a2" },
+  { id: "attio", name: "Attio", description: "CRM moderno orientado a dados — sincronize contatos e negócios", icon: "✦", color: "#7c3aed" },
+  { id: "activecampaign", name: "ActiveCampaign", description: "Automação de e-mail marketing e CRM com segmentação avançada", icon: "⚙️", color: "#356ae6" },
+  { id: "zoho", name: "Zoho CRM", description: "Suite completa de negócios com CRM, vendas e suporte integrados", icon: "🏢", color: "#e42527" },
+  { id: "intercom", name: "Intercom", description: "Plataforma de atendimento ao cliente com chat, e-mail e bots", icon: "💬", color: "#1f5199" },
+  { id: "chatwoot", name: "Chatwoot", description: "Plataforma open source de suporte com multi-canal unificado", icon: "🗨️", color: "#1f93ff" },
+  { id: "typebot", name: "Typebot", description: "Construtor de chatbots e formulários conversacionais", icon: "🤖", color: "#6d28d9" },
+];
+
+function MarketingSection() {
+  return (
+    <div className="space-y-6">
+      <div className="relative rounded-2xl p-5 overflow-hidden"
+        style={{ background: "linear-gradient(135deg, rgba(244,63,94,0.10) 0%, rgba(244,63,94,0.03) 100%)", border: "1px solid rgba(244,63,94,0.20)" }}>
+        <div className="absolute inset-0 pointer-events-none"
+          style={{ background: "radial-gradient(ellipse at top left, rgba(244,63,94,0.08) 0%, transparent 70%)" }} />
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(244,63,94,0.15)" }}>
+            <Sparkles className="w-5 h-5" style={{ color: "#f43f5e" }} />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>Integrações de Marketing</h2>
+            <p className="text-xs" style={{ color: "var(--text-3)" }}>CRMs, automação e ferramentas de crescimento — em breve na plataforma</p>
+          </div>
+        </div>
+        <p className="text-sm" style={{ color: "var(--text-2)" }}>
+          Conecte suas ferramentas de marketing e vendas para automatizar fluxos, sincronizar contatos e potencializar o crescimento direto das conversas.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {MARKETING_INTEGRATIONS.map(tool => (
+          <div key={tool.id}
+            className="relative rounded-2xl p-4 flex flex-col gap-3"
+            style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", opacity: 0.72 }}>
+            <span className="absolute top-3 right-3 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full"
+              style={{ background: "rgba(255,255,255,0.07)", color: "var(--text-3)", border: "1px solid rgba(255,255,255,0.10)" }}>
+              Em breve
+            </span>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                style={{ background: `${tool.color}12`, border: `1px solid ${tool.color}20` }}>
+                {tool.icon}
+              </div>
+              <p className="text-sm font-semibold pr-14" style={{ color: "var(--text-1)" }}>{tool.name}</p>
+            </div>
+            <p className="text-xs leading-relaxed" style={{ color: "var(--text-3)" }}>{tool.description}</p>
+            <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: `${tool.color}90` }}>
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: tool.color, opacity: 0.5 }} />
+              Aguardando integração
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <p className="text-xs text-center" style={{ color: "var(--text-3)" }}>
+        Tem interesse em alguma integração? Fale com o suporte — priorizamos com base na demanda da comunidade.
+      </p>
     </div>
   );
 }
