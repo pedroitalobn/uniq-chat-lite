@@ -21,12 +21,16 @@ import {
 } from "./atoms";
 import { ModelSelector } from "./ModelSelector";
 import { loadModelPref, type ModelPreference } from "./model-preference";
+import type { IslandPageContext } from "@/components/uniq-ai/island-context";
 
 export interface UniqAIChatPanelProps {
   // Mensagens controladas externamente — quem hospeda o painel decide
   // como persistir (localStorage multi-conversa, Redis, etc).
   messages: Message[];
   onMessagesChange: (next: Message[] | ((prev: Message[]) => Message[])) => void;
+  // Contexto da página atual — injetado como prefixo no prompt pra que
+  // o AI saiba o que o usuário está vendo sem precisar perguntar.
+  pageContext?: IslandPageContext | null;
   // `compact` reduz paddings/headers para uso em ilha/modal.
   compact?: boolean;
   // Esconde o header de chat (Uniq AI + selectores). Útil quando a página
@@ -44,6 +48,7 @@ export function UniqAIChatPanel({
   compact = false,
   hideHeader = false,
   onBeforeFirstSend,
+  pageContext,
 }: UniqAIChatPanelProps) {
   const [prompt, setPrompt] = useState("");
   const [modelPref, setModelPref] = useState<ModelPreference | null>(() => loadModelPref());
@@ -91,8 +96,15 @@ export function UniqAIChatPanel({
     setIsStreaming(true);
 
     try {
+      // Prefixa o message com contexto da página pra que o AI saiba onde
+      // o usuário está sem precisar perguntar (ex: "estou no CRM com 42 contatos").
+      const contextPrefix = pageContext
+        ? `[Contexto atual: ${pageContext.scope}${pageContext.label ? ` — ${pageContext.label}` : ""}${pageContext.meta ? ` | ${JSON.stringify(pageContext.meta)}` : ""}]\n\n`
+        : "";
+      const enrichedMessage = contextPrefix + messageText;
+
       const res = await agentsApi.chat(
-        messageText,
+        enrichedMessage,
         selectedIntegration || undefined,
         selectedModel || undefined,
         {

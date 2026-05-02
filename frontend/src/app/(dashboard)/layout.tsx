@@ -9,6 +9,7 @@ import { WorkspacePermissionsProvider } from "@/contexts/WorkspacePermissionsCon
 import { PresenceProvider } from "@/contexts/PresenceProvider";
 import { UniqAIIslandProvider } from "@/components/uniq-ai/island-context";
 import { UniqAIIsland } from "@/components/uniq-ai/dynamic-island";
+import { AmbientAIPanel } from "@/components/uniq-ai/ambient-panel";
 
 export default async function DashboardLayout({
   children,
@@ -28,6 +29,7 @@ export default async function DashboardLayout({
               <LayoutClient>{children}</LayoutClient>
             </div>
             <UniqAIIsland />
+            <AmbientAIPanel />
             <BottomNav />
             <CommandPalette />
           </UniqAIIslandProvider>

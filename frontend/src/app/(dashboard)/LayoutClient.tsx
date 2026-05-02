@@ -6,6 +6,30 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { authApi, instancesApi } from "@/lib/api";
 import { UsageBanner } from "@/components/billing/UsageBanner";
 import { motion, AnimatePresence } from "framer-motion";
+import { useUniqAIPageContext, type IslandPageContext } from "@/components/uniq-ai/island-context";
+
+// Detecta o escopo da página atual a partir do pathname — registra
+// automaticamente no contexto do Uniq AI sem precisar tocar cada página.
+function inferPageContext(pathname: string): IslandPageContext {
+  if (pathname.startsWith("/inbox")) {
+    const isConvo = /^\/inbox\/[^/]+$/.test(pathname);
+    return { scope: "inbox", label: isConvo ? "Conversa" : "Inbox" };
+  }
+  if (pathname.startsWith("/crm")) return { scope: "crm", label: "CRM" };
+  if (pathname.startsWith("/campaigns")) return { scope: "campaigns", label: "Campanhas" };
+  if (pathname.startsWith("/journeys")) return { scope: "journeys", label: "Jornadas" };
+  if (pathname.startsWith("/agents")) return { scope: "agents", label: "Agentes" };
+  if (pathname.startsWith("/instances")) return { scope: "instances", label: "Instâncias" };
+  if (pathname === "/dashboard") return { scope: "home", label: "Dashboard" };
+  return { scope: "other", label: "Plataforma" };
+}
+
+// Componente interno — pode usar hooks depois do LayoutClient declarar os seus.
+function PageContextRegistrar({ pathname }: { pathname: string }) {
+  const ctx = inferPageContext(pathname);
+  useUniqAIPageContext(ctx);
+  return null;
+}
 
 export function LayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -132,6 +156,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
   if (isFullWidth) {
     return (
       <main className="flex-1 overflow-hidden flex flex-col">
+        <PageContextRegistrar pathname={pathname || ""} />
         <UsageBanner />
         <div className="flex-1 px-4 sm:px-6 py-6 lg:py-8 pt-16 lg:pt-8 pb-14 md:pb-8 overflow-y-auto">
           <AnimatePresence mode="wait">
@@ -156,6 +181,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
   if (isBoxed) {
     return (
       <main className="flex-1 overflow-hidden flex flex-col">
+        <PageContextRegistrar pathname={pathname || ""} />
         <UsageBanner />
         <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pt-16 lg:pt-8 pb-14 md:pb-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
@@ -182,6 +208,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
   // confortável usa max-w no próprio componente (ex: settings forms).
   return (
     <main className="flex-1 overflow-hidden flex flex-col">
+      <PageContextRegistrar pathname={pathname || ""} />
       <UsageBanner />
       <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pt-16 lg:pt-8 pb-14 md:pb-8 overflow-y-auto">
         <AnimatePresence mode="wait">

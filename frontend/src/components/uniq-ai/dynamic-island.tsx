@@ -205,9 +205,11 @@ export function UniqAIIsland() {
 
   // Blueprint por estado — padrão cult-ui. Cada estado tem width/height
   // explícitos; framer-motion `animate` interpola simétrico do centro.
+  // No modo `expanded`, a pill fica compacta (o side panel AmbientAIPanel é
+  // que abre do lado direito — pill apenas sinaliza que o AI está ativo).
   const blueprint = {
     idle:         { width: 220, height: 36 },
-    expanded:     { width: 560, height: 48 },
+    expanded:     { width: 260, height: 36 },
     notification: { width: 520, height: 48 },
     executing:    { width: 280, height: 36 },
     result:       { width: 320, height: 36 },
@@ -216,26 +218,27 @@ export function UniqAIIsland() {
 
   return (
     <motion.div
-      onClick={isExpanded || isNotif ? undefined : open}
-      role={isExpanded || isNotif ? undefined : "button"}
-      aria-label={isExpanded || isNotif ? undefined : "Abrir Uniq AI"}
+      onClick={isNotif ? undefined : (isExpanded ? close : open)}
+      role="button"
+      aria-label={isExpanded ? "Fechar Uniq AI" : "Abrir Uniq AI"}
       animate={{ width: target.width, height: target.height }}
       transition={islandSpring}
-      className={`fixed top-3 z-[90] overflow-hidden rounded-full flex items-center gap-2 px-3 ${
-        isExpanded || isNotif ? "cursor-default" : "cursor-pointer"
-      }`}
+      className="fixed top-3 z-[90] overflow-hidden rounded-full flex items-center gap-2 px-3 cursor-pointer"
       style={{
-        // Centro fixo: top-3 + left calculado via CSS var (sidebar offset).
-        // animate={{ width, height }} interpola SIMÉTRICO via spring.
-        // transform: translateX(-50%) mantém pivot no centro.
-        // maxWidth garante que mobile não estoura viewport.
         left: "calc(50% + var(--sidebar-w-offset, 0px))",
         transform: "translateX(-50%)",
         maxWidth: "calc(100vw - 2rem)",
-        background: "rgba(10, 12, 14, 0.94)",
+        background: isExpanded
+          ? "rgba(0,212,106,0.12)"
+          : "rgba(10, 12, 14, 0.94)",
         backdropFilter: "blur(12px)",
-        border: "1px solid var(--border-default)",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 1px var(--border-default)",
+        border: isExpanded
+          ? "1px solid rgba(0,212,106,0.35)"
+          : "1px solid var(--border-default)",
+        boxShadow: isExpanded
+          ? "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,212,106,0.2), inset 0 1px 0 rgba(255,255,255,0.06)"
+          : "0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 1px var(--border-default)",
+        transition: "background 0.2s, border-color 0.2s, box-shadow 0.2s",
       }}
     >
       {/* Avatar — sempre presente (compacto na pill, idem no expandido) */}
@@ -326,43 +329,26 @@ export function UniqAIIsland() {
         </motion.div>
       )}
 
-      {/* Pill expandida: input inline + send + close. SEM modal, SEM backdrop. */}
+      {/* Pill expanded: indicador compacto "ativo" — o painel lateral cuida do chat */}
       {isExpanded && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.18, delay: 0.08 }}
+          transition={{ duration: 0.15 }}
           className="flex items-center gap-2 flex-1 min-w-0"
         >
-          <input
-            ref={inputRef}
-            type="text"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submitPrompt();
-              if (e.key === "Escape") close();
-            }}
-            placeholder="Pergunte, crie jornada, agende disparo…"
-            className="flex-1 min-w-0 bg-transparent text-sm text-white placeholder:text-white/40 outline-none"
-          />
-          <button
-            onClick={submitPrompt}
-            disabled={!prompt.trim()}
-            className="w-7 h-7 rounded-full flex items-center justify-center disabled:opacity-30 transition-opacity"
-            style={{ background: "var(--green)" }}
-            aria-label="Enviar"
+          <span className="text-xs font-medium whitespace-nowrap" style={{ color: "var(--green)" }}>
+            Uniq AI
+          </span>
+          <motion.span
+            className="text-[10px] whitespace-nowrap"
+            style={{ color: "rgba(255,255,255,0.45)" }}
+            animate={{ opacity: [0.45, 0.85, 0.45] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
           >
-            <Sparkles className="w-3.5 h-3.5 text-white" />
-          </button>
-          <button
-            onClick={close}
-            className="w-6 h-6 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors"
-            style={{ color: "rgba(255,255,255,0.5)" }}
-            aria-label="Fechar"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
+            ativo
+          </motion.span>
+          <span className="text-[10px] text-white/30 font-mono ml-auto">Esc</span>
         </motion.div>
       )}
     </motion.div>
