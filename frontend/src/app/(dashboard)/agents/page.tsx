@@ -167,11 +167,41 @@ function mapAgent(data: any): AgentForm {
   };
 }
 
+const glassCardStyle: CSSProperties = {
+  background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+  backdropFilter: "blur(20px) saturate(180%)",
+  WebkitBackdropFilter: "blur(20px) saturate(180%)",
+  border: "1px solid rgba(255,255,255,0.10)",
+  borderRadius: "20px",
+  boxShadow: "0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.10)",
+  transition: "all 0.35s cubic-bezier(0.16,1,0.3,1)",
+};
+
+const glassPillStyle: CSSProperties = {
+  background: "rgba(255,255,255,0.06)",
+  backdropFilter: "blur(8px)",
+  WebkitBackdropFilter: "blur(8px)",
+  border: "1px solid rgba(255,255,255,0.10)",
+  borderRadius: "10px",
+};
+
+const glassBtnStyle: CSSProperties = {
+  background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
+  backdropFilter: "blur(12px)",
+  WebkitBackdropFilter: "blur(12px)",
+  border: "1px solid rgba(0,212,106,0.30)",
+  boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)",
+};
+
 function cs(emphasis = false): CSSProperties {
-  return {
-    background: emphasis ? "linear-gradient(180deg, rgba(0,212,106,0.08), var(--border-subtle))" : "var(--surface-2)",
-    border: `1px solid ${emphasis ? "rgba(0,212,106,0.18)" : "var(--surface-border)"}`,
-  };
+  if (emphasis) {
+    return {
+      ...glassCardStyle,
+      background: "linear-gradient(135deg, rgba(0,212,106,0.08) 0%, rgba(255,255,255,0.02) 100%)",
+      border: "1px solid rgba(0,212,106,0.18)",
+    };
+  }
+  return { ...glassCardStyle };
 }
 
 function inp(multiline = false): CSSProperties {
@@ -330,12 +360,12 @@ export default function AgentsPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* Status badges */}
-          <div className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl" style={cs()}>
+          <div className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl" style={glassPillStyle}>
             <span className={`w-1.5 h-1.5 rounded-full ${form.is_active ? "bg-green-500" : "bg-zinc-500"}`} />
             <span style={{ color: "var(--text-2)" }}>{form.is_active ? "Ativo" : "Inativo"}</span>
           </div>
           {totalActiveSkills > 0 && (
-            <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl" style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.2)", color: "#a78bfa" }}>
+            <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl" style={{ ...glassPillStyle, border: "1px solid rgba(139,92,246,0.20)", color: "#a78bfa" }}>
               <Sparkles className="w-3 h-3" />
               {totalActiveSkills} skill{totalActiveSkills !== 1 ? "s" : ""} ativa{totalActiveSkills !== 1 ? "s" : ""}
             </div>
@@ -343,8 +373,8 @@ export default function AgentsPage() {
           <button
             onClick={() => saveMutation.mutate()}
             disabled={!selectedInstance || saveMutation.isPending}
-            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium"
-            style={{ background: "var(--green)", color: "#06210f", opacity: saveMutation.isPending ? 0.7 : 1 }}>
+            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all"
+            style={{ ...glassBtnStyle, color: "var(--green)", opacity: saveMutation.isPending ? 0.7 : 1, borderRadius: "12px" }}>
             <Save className="w-4 h-4" />
             {saveMutation.isPending ? "Salvando..." : "Salvar agente"}
           </button>
@@ -436,7 +466,7 @@ export default function AgentsPage() {
               return (
                 <button key={item.id} onClick={() => setTab(item.id)}
                   className="w-full flex items-center gap-3 px-4 py-4 text-left"
-                  style={{ borderBottom: index < TABS.length - 1 ? "1px solid var(--surface-border)" : undefined, background: active ? "rgba(0,212,106,0.08)" : "transparent" }}>
+                  style={{ borderBottom: index < TABS.length - 1 ? "1px solid rgba(255,255,255,0.06)" : undefined, background: active ? "rgba(0,212,106,0.08)" : "transparent" }}>
                   <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: active ? "rgba(0,212,106,0.14)" : "var(--surface-3)" }}>
                     <Icon className="w-4 h-4" style={{ color: active ? "var(--green)" : "var(--text-3)" }} />
                   </div>
@@ -738,7 +768,9 @@ function SkillsTab({
   return (
     <>
       {/* Catalog header */}
-      <div className="rounded-3xl p-5" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+      <div className="rounded-3xl p-5 relative overflow-hidden" style={glassCardStyle}>
+        <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+          style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)" }} />
         <div className="flex items-center justify-between gap-3 mb-1">
           <div>
             <h2 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>Catálogo de skills</h2>
@@ -763,11 +795,13 @@ function SkillsTab({
           const isExpanded = expandedCat === cat.id;
           const activeInCat = cat.skills.filter((s) => activeSkillNames.has(s.name)).length;
           return (
-            <div key={cat.id} className="rounded-3xl overflow-hidden" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+            <div key={cat.id} className="rounded-3xl overflow-hidden relative" style={glassCardStyle}>
+              <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+                style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.10), transparent)" }} />
               <button
                 onClick={() => setExpandedCat(isExpanded ? null : cat.id)}
-                className="w-full flex items-center gap-3 px-5 py-4 text-left"
-                style={{ borderBottom: isExpanded ? "1px solid var(--surface-border)" : undefined }}>
+                className="w-full flex items-center gap-3 px-5 py-4 text-left transition-all"
+                style={{ borderBottom: isExpanded ? "1px solid rgba(255,255,255,0.06)" : undefined }}>
                 <span className="text-xl">{cat.icon}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>{cat.label}</p>
@@ -819,7 +853,9 @@ function SkillsTab({
       </div>
 
       {/* Custom skills */}
-      <div className="rounded-3xl p-5" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+      <div className="rounded-3xl p-5 relative overflow-hidden" style={glassCardStyle}>
+        <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+          style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)" }} />
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <h2 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>Skills customizadas</h2>

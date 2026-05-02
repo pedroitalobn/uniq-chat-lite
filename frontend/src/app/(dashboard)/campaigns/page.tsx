@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { campaignsApi, instancesApi, groupsApi, wabaApi } from "@/lib/api";
 import { Campaign, Instance } from "@/types";
@@ -882,6 +882,34 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
 
 // ─── Campaign Card ─────────────────────────────────────────────────────────────
 
+// ─── Glass style constants ─────────────────────────────────────────────────────
+
+const glassCard: React.CSSProperties = {
+  background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+  backdropFilter: "blur(20px) saturate(180%)",
+  WebkitBackdropFilter: "blur(20px) saturate(180%)",
+  border: "1px solid rgba(255,255,255,0.10)",
+  borderRadius: "20px",
+  boxShadow: "0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.10)",
+  transition: "all 0.35s cubic-bezier(0.16,1,0.3,1)",
+};
+
+const glassPill: React.CSSProperties = {
+  background: "rgba(255,255,255,0.06)",
+  backdropFilter: "blur(8px)",
+  WebkitBackdropFilter: "blur(8px)",
+  border: "1px solid rgba(255,255,255,0.10)",
+  borderRadius: "10px",
+};
+
+const glassBtn: React.CSSProperties = {
+  background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
+  backdropFilter: "blur(12px)",
+  WebkitBackdropFilter: "blur(12px)",
+  border: "1px solid rgba(0,212,106,0.30)",
+  boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)",
+};
+
 function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: () => void }) {
   const s = STATUS_MAP[campaign.status] ?? STATUS_MAP.draft;
   const StatusIcon = s.icon;
@@ -908,9 +936,23 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
   const msgIconMap: Record<string, React.ElementType> = { text: FileText, image: Image, audio: Mic, document: File };
   const MsgIcon = msgIconMap[campaign.message_type] ?? FileText;
 
+  const [hovered, setHovered] = React.useState(false);
+
   return (
-    <div className="rounded-2xl overflow-hidden transition-all duration-200"
-      style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+    <div className="rounded-2xl overflow-hidden relative"
+      style={{
+        ...glassCard,
+        ...(hovered ? {
+          transform: "translateY(-2px)",
+          boxShadow: "0 12px 32px rgba(0,0,0,0.40), 0 0 0 1px rgba(0,212,106,0.08), inset 0 1px 0 rgba(255,255,255,0.12)",
+        } : {}),
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* Light line top */}
+      <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+        style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)" }} />
       <div className="p-5">
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
@@ -928,8 +970,8 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
               </span>
             </div>
           </div>
-          <span className="ml-3 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium flex-shrink-0"
-            style={{ background: s.bg, color: s.color }}>
+          <span className="ml-3 inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium flex-shrink-0"
+            style={{ ...glassPill, color: s.color, border: `1px solid ${s.color}30` }}>
             <StatusIcon className={cn("w-3 h-3", campaign.status === "running" && "animate-spin")} />
             {s.label}
           </span>
@@ -973,7 +1015,7 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
             </span>
             <span>{campaign.sent_count} ok · {campaign.failed_count} falhos</span>
           </div>
-          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "hsl(240 12% 12%)" }}>
+          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
             <div className="h-full rounded-full transition-all duration-500"
               style={{ width: `${progress}%`, background: campaign.failed_count > 0 ? "#f59e0b" : "var(--green)" }} />
           </div>
@@ -1051,14 +1093,9 @@ export default function CampaignsPage() {
             style={{ background: "rgba(96,165,250,0.08)", color: "#60a5fa", border: "1px solid rgba(96,165,250,0.15)" }}>
             🕐 {timezone}
           </span>
-          <button onClick={() => setCreateOpen(true)} 
+          <button onClick={() => setCreateOpen(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
-            style={{ 
-              background: "rgba(0, 212, 106, 0.12)", 
-              border: "1px solid rgba(0, 212, 106, 0.3)", 
-              color: "var(--green)", 
-              backdropFilter: "blur(8px)" 
-            }}>
+            style={{ ...glassBtn, color: "var(--green)", borderRadius: "12px" }}>
             <Plus className="w-4 h-4" /> <span className="hidden sm:inline">{t("campaigns_new")}</span>
             <span className="sm:hidden">Nova</span>
           </button>

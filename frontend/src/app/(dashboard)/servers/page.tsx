@@ -591,10 +591,31 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
   const totalCount = stats?.total_instances || instances.length;
 
   return (
-    <div className="rounded-2xl p-5 flex flex-col gap-4 transition-all group"
-      style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}
-      onMouseEnter={e => ((e.currentTarget as HTMLElement).style.borderColor = "hsl(240 12% 18%)")}
-      onMouseLeave={e => ((e.currentTarget as HTMLElement).style.borderColor = "hsl(240 12% 13%)")}>
+    <div
+      className="rounded-2xl p-5 flex flex-col gap-4 group relative"
+      style={{
+        background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+        backdropFilter: "blur(20px) saturate(180%)",
+        WebkitBackdropFilter: "blur(20px) saturate(180%)",
+        border: "1px solid rgba(255,255,255,0.10)",
+        borderRadius: "20px",
+        boxShadow: "0 4px 16px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.08)",
+        transition: "all 0.35s cubic-bezier(0.16,1,0.3,1)",
+      }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.12)";
+        (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.16)";
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.08)";
+        (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.10)";
+      }}
+    >
+      <div style={{
+        position: "absolute", top: 0, left: "15%", right: "15%", height: "1px",
+        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
+        pointerEvents: "none",
+      }} />
 
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
@@ -654,11 +675,30 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
 
       {/* Status badges */}
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs" style={{ background: "hsl(240 12% 8%)" }}>
+        <div
+          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs"
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid rgba(255,255,255,0.09)",
+            borderRadius: "10px",
+            transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+          }}
+        >
           <Smartphone className="w-3 h-3" style={{ color: "hsl(240 8% 46%)" }} />
           <span style={{ color: "hsl(240 8% 65%)" }}>{totalCount}</span>
         </div>
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs" style={{ background: "hsl(240 12% 8%)" }}>
+        <div
+          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs"
+          style={{
+            background: connectedCount > 0 ? "rgba(0,212,106,0.08)" : "rgba(255,255,255,0.06)",
+            backdropFilter: "blur(8px)",
+            border: connectedCount > 0 ? "1px solid rgba(0,212,106,0.20)" : "1px solid rgba(255,255,255,0.09)",
+            borderRadius: "10px",
+            boxShadow: connectedCount > 0 ? "0 0 8px rgba(0,212,106,0.15)" : "none",
+            transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+          }}
+        >
           {connectedCount > 0 ? (
             <><Wifi className="w-3 h-3" style={{ color: "var(--green)" }} /><span style={{ color: "var(--green)" }}>{connectedCount}</span></>
           ) : (
@@ -670,8 +710,12 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
             className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs"
             title={`Proxy ativo: ${server.proxy.name}${server.proxy.is_platform ? " (plataforma)" : " (custom)"}`}
             style={{
-              background: server.proxy.is_active ? "rgba(0,212,106,0.1)" : "rgba(167,139,250,0.08)",
-              border: `1px solid ${server.proxy.is_active ? "rgba(0,212,106,0.25)" : "rgba(167,139,250,0.25)"}`,
+              background: server.proxy.is_active ? "rgba(0,212,106,0.08)" : "rgba(167,139,250,0.08)",
+              backdropFilter: "blur(8px)",
+              border: `1px solid ${server.proxy.is_active ? "rgba(0,212,106,0.22)" : "rgba(167,139,250,0.22)"}`,
+              borderRadius: "10px",
+              boxShadow: server.proxy.is_active ? "0 0 8px rgba(0,212,106,0.12)" : "none",
+              transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
             }}
           >
             <Shield className="w-3 h-3" style={{ color: server.proxy.is_active ? "var(--green)" : "#a78bfa" }} />
@@ -687,7 +731,13 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
         {server.proxy_id && !server.proxy && (
           <div
             className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs"
-            style={{ background: "rgba(167,139,250,0.08)" }}
+            style={{
+              background: "rgba(167,139,250,0.08)",
+              backdropFilter: "blur(8px)",
+              border: "1px solid rgba(167,139,250,0.22)",
+              borderRadius: "10px",
+              transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+            }}
           >
             <Shield className="w-3 h-3" style={{ color: "#a78bfa" }} />
             <span style={{ color: "#a78bfa" }}>Proxy</span>
@@ -762,22 +812,36 @@ export default function ServersPage() {
             Workspaces para organizar instâncias por empresa ou projeto
           </p>
         </div>
-        <button onClick={() => setShowCreate(true)} 
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
-          style={{ 
-            background: "rgba(0, 212, 106, 0.12)", 
-            border: "1px solid rgba(0, 212, 106, 0.3)", 
-            color: "var(--green)", 
-            backdropFilter: "blur(8px)" 
-          }}>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
+          style={{
+            background: "linear-gradient(135deg, rgba(0,212,106,0.15) 0%, rgba(0,212,106,0.06) 100%)",
+            backdropFilter: "blur(12px) saturate(180%)",
+            WebkitBackdropFilter: "blur(12px) saturate(180%)",
+            border: "1px solid rgba(0,212,106,0.25)",
+            color: "var(--green)",
+            transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(0,212,106,0.25) 0%, rgba(0,212,106,0.12) 100%)"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(0,212,106,0.15) 0%, rgba(0,212,106,0.06) 100%)"; }}
+        >
           <Plus className="w-4 h-4" />
           Novo server
         </button>
       </div>
 
       {/* Info box */}
-      <div className="rounded-2xl p-4"
-        style={{ background: "rgba(96,165,250,0.04)", border: "1px solid rgba(96,165,250,0.12)" }}>
+      <div
+        className="rounded-2xl p-4 relative"
+        style={{
+          background: "linear-gradient(135deg, rgba(96,165,250,0.07) 0%, rgba(96,165,250,0.02) 100%)",
+          backdropFilter: "blur(12px) saturate(180%)",
+          WebkitBackdropFilter: "blur(12px) saturate(180%)",
+          border: "1px solid rgba(96,165,250,0.14)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
+        }}
+      >
         <p className="text-xs font-medium mb-1" style={{ color: "#60a5fa" }}>Como funcionam os Servers</p>
         <p className="text-xs" style={{ color: "hsl(240 8% 50%)" }}>
           Cada server tem um slug único que funciona como subdomínio. Agrupe instâncias WhatsApp por empresa, cliente ou projeto —

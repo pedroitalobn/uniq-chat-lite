@@ -43,7 +43,14 @@ function SectionWrap({ title, description, children }: {
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl p-6" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+    <div className="rounded-2xl p-6" style={{
+      background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+      backdropFilter: "blur(20px) saturate(180%)",
+      WebkitBackdropFilter: "blur(20px) saturate(180%)",
+      border: "1px solid rgba(255,255,255,0.08)",
+      borderRadius: "20px",
+      boxShadow: "0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.10)",
+    }}>
       {children}
     </div>
   );
@@ -176,7 +183,7 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
           </div>
 
           {currentPlan && (
-            <div className="flex items-center gap-6 mt-5 pt-5" style={{ borderTop: "1px solid var(--surface-border)" }}>
+            <div className="flex items-center gap-6 mt-5 pt-5" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
               {[
                 { label: "Instâncias", value: currentPlan.max_instances === -1 ? "∞" : currentPlan.max_instances },
                 { label: "Msgs/dia", value: currentPlan.max_messages_per_day === -1 ? "∞" : currentPlan.max_messages_per_day.toLocaleString("pt-BR") },
@@ -207,10 +214,12 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
                 const isCurrent = plan.name.toLowerCase() === currentPlanName.toLowerCase();
                 return (
                   <div key={plan.id}
-                    className="rounded-xl p-3.5 flex items-center justify-between transition-all"
+                    className="rounded-xl p-3.5 flex items-center justify-between"
                     style={{
-                      background: isCurrent ? "rgba(0,212,106,0.05)" : "var(--surface-3)",
-                      border: isCurrent ? "1px solid rgba(0,212,106,0.2)" : "1px solid var(--surface-border)",
+                      background: isCurrent ? "rgba(0,212,106,0.07)" : "rgba(255,255,255,0.03)",
+                      border: isCurrent ? "1px solid rgba(0,212,106,0.20)" : "1px solid rgba(255,255,255,0.07)",
+                      backdropFilter: "blur(8px)",
+                      transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                     }}>
                     <div>
                       <p className="text-sm font-medium flex items-center gap-2" style={{ color: isCurrent ? "var(--green)" : "var(--text-1)" }}>
@@ -227,10 +236,23 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
                       <button
                         onClick={() => checkoutMutation.mutate(plan.id)}
                         disabled={checkoutMutation.isPending}
-                        className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl transition-all disabled:opacity-40"
-                        style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)", color: "var(--green)" }}
-                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(0,212,106,0.18)"; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = "rgba(0,212,106,0.1)"; }}
+                        className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl disabled:opacity-40"
+                        style={{
+                          background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
+                          backdropFilter: "blur(12px)",
+                          border: "1px solid rgba(0,212,106,0.30)",
+                          boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)",
+                          color: "var(--green)",
+                          transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.transform = "translateY(-1px)";
+                          e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,212,106,0.28), inset 0 1px 0 rgba(255,255,255,0.16)";
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.transform = "translateY(0)";
+                          e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)";
+                        }}
                       >
                         {checkoutMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowRight className="w-3 h-3" />}
                         Selecionar
@@ -296,7 +318,7 @@ function ProfileSection({ session, update, t }: {
             </div>
           </div>
 
-          <div className="space-y-4" style={{ borderTop: "1px solid var(--surface-border)", paddingTop: "20px" }}>
+          <div className="space-y-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "20px" }}>
             <Field label="Nome completo">
               <input type="text" value={name} onChange={(e) => setName(e.target.value)}
                 className="input-field w-full" placeholder="Seu nome" />
@@ -373,10 +395,25 @@ function SecuritySection() {
           <div className="flex justify-end pt-1">
             <button type="submit"
               disabled={mutation.isPending || !currentPw || !newPw || newPw !== confirmPw}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.2)", color: "#60a5fa" }}
-              onMouseEnter={e => { if (!mutation.isPending) e.currentTarget.style.background = "rgba(96,165,250,0.16)"; }}
-              onMouseLeave={e => (e.currentTarget.style.background = "rgba(96,165,250,0.1)")}>
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                background: "linear-gradient(135deg, rgba(96,165,250,0.15), rgba(96,165,250,0.06))",
+                backdropFilter: "blur(12px)",
+                border: "1px solid rgba(96,165,250,0.25)",
+                boxShadow: "0 4px 16px rgba(96,165,250,0.12), inset 0 1px 0 rgba(255,255,255,0.10)",
+                color: "#60a5fa",
+                transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+              }}
+              onMouseEnter={e => {
+                if (!mutation.isPending) {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = "0 8px 24px rgba(96,165,250,0.22), inset 0 1px 0 rgba(255,255,255,0.14)";
+                }
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 16px rgba(96,165,250,0.12), inset 0 1px 0 rgba(255,255,255,0.10)";
+              }}>
               {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
               Alterar senha
             </button>
@@ -646,7 +683,7 @@ function AccountSection({ session }: { session: ReturnType<typeof useSession>["d
   return (
     <SectionWrap title="Conta" description="Informações da sua conta.">
       <Card>
-        <div className="divide-y" style={{ borderColor: "var(--surface-border)" }}>
+        <div className="divide-y" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
           {rows.map(({ label, value }) => (
             <div key={label} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
               <span className="text-xs" style={{ color: "var(--text-3)" }}>{label}</span>
@@ -734,8 +771,23 @@ function InviteSection() {
             </p>
           </div>
           <button onClick={generate} disabled={generating}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
-            style={{ background: "var(--green)", color: "#03170a" }}>
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50"
+            style={{
+              background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
+              backdropFilter: "blur(12px)",
+              border: "1px solid rgba(0,212,106,0.30)",
+              boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)",
+              color: "var(--green)",
+              transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.transform = "translateY(-1px)";
+              e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,212,106,0.28), inset 0 1px 0 rgba(255,255,255,0.16)";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)";
+            }}>
             {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ticket className="w-4 h-4" />}
             Gerar código
           </button>
@@ -754,7 +806,12 @@ function InviteSection() {
           <div className="space-y-2">
             {codes.map((c) => (
               <div key={c.id} className="flex items-center justify-between p-3 rounded-xl"
-                style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+                style={{
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.07)",
+                  backdropFilter: "blur(8px)",
+                  transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                }}>
                 <div className="flex items-center gap-3 min-w-0">
                   <code className="text-sm font-mono font-semibold shrink-0" style={{ color: "var(--green)" }}>{c.code}</code>
                   {c.used_by ? (
@@ -805,13 +862,24 @@ export default function SettingsPage() {
       <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start">
         {/* ── Submenu sidebar - hidden on mobile, tabs visible on mobile ── */}
         {/* Mobile tabs */}
-        <div className="sm:hidden flex gap-1 p-1 rounded-xl w-full" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+        <div className="sm:hidden flex gap-1 p-1 rounded-xl w-full" style={{
+          background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+          backdropFilter: "blur(16px) saturate(180%)",
+          WebkitBackdropFilter: "blur(16px) saturate(180%)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.20)",
+        }}>
           {SECTIONS.map((section) => {
             const Icon = section.icon;
             const isActive = active === section.id;
             return (
-              <button key={section.id} onClick={() => setActive(section.id)} className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs font-medium transition-all"
-                style={{ background: isActive ? "rgba(0,212,106,0.15)" : "transparent", color: isActive ? "var(--green)" : "var(--text-3)" }}>
+              <button key={section.id} onClick={() => setActive(section.id)}
+                className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs font-medium"
+                style={{
+                  background: isActive ? "rgba(0,212,106,0.15)" : "transparent",
+                  color: isActive ? "var(--green)" : "var(--text-3)",
+                  transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                }}>
                 <Icon className="w-3.5 h-3.5" />
                 <span className="truncate">{section.label.split(" ")[0]}</span>
               </button>
@@ -821,7 +889,13 @@ export default function SettingsPage() {
 
         {/* Desktop sidebar */}
         <aside className="hidden sm:flex w-44 lg:w-52 flex-shrink-0 sticky top-0">
-          <nav className="rounded-2xl overflow-hidden w-full" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+          <nav className="rounded-2xl overflow-hidden w-full" style={{
+            background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+            backdropFilter: "blur(16px) saturate(180%)",
+            WebkitBackdropFilter: "blur(16px) saturate(180%)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.10)",
+          }}>
             {SECTIONS.map((section, i) => {
               const Icon = section.icon;
               const isActive = active === section.id;
@@ -830,14 +904,15 @@ export default function SettingsPage() {
                   key={section.id}
                   onClick={() => setActive(section.id)}
                   className={cn(
-                    "w-full flex items-center gap-3 px-3 lg:px-4 py-3 lg:py-3.5 text-left transition-all duration-150 relative",
+                    "w-full flex items-center gap-3 px-3 lg:px-4 py-3 lg:py-3.5 text-left relative",
                     i < SECTIONS.length - 1 ? "border-b" : ""
                   )}
                   style={{
-                    borderColor: "var(--surface-border)",
-                    background: isActive ? "var(--green-dim)" : "transparent",
+                    borderColor: "rgba(255,255,255,0.06)",
+                    background: isActive ? "rgba(0,212,106,0.10)" : "transparent",
+                    transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                   }}
-                  onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--surface-3)"; }}
+                  onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
                   onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
                 >
                   {/* Active indicator */}

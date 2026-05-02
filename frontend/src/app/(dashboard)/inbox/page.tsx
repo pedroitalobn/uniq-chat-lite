@@ -401,7 +401,12 @@ export default function InboxPage() {
     <div className="flex h-full flex-col uniq-page rounded-xl overflow-hidden">
       <header
         className="border-b px-4 sm:px-6 py-3 sm:py-4"
-        style={{ borderColor: "hsl(240 12% 16%)" }}
+        style={{
+          borderColor: "rgba(255,255,255,0.06)",
+          background: "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)",
+          backdropFilter: "blur(16px) saturate(180%)",
+          WebkitBackdropFilter: "blur(16px) saturate(180%)",
+        }}
       >
         <div className="flex flex-wrap items-center gap-3">
           <div>
@@ -429,11 +434,13 @@ export default function InboxPage() {
               }}
               title="Atualizar"
               aria-label="Atualizar lista"
-              className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
+              className="flex h-7 w-7 items-center justify-center rounded-md"
               style={{
-                background: "var(--surface-2)",
-                border: "1px solid hsl(240 12% 16%)",
+                background: "rgba(255,255,255,0.06)",
+                backdropFilter: "blur(8px)",
+                border: "1px solid rgba(255,255,255,0.10)",
                 color: "hsl(240 8% 65%)",
+                transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
               }}
             >
               <RefreshCw className="h-3 w-3" />
@@ -445,9 +452,12 @@ export default function InboxPage() {
                 title="Ativar notificações desktop e som de mensagens"
                 className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium"
                 style={{
-                  background: "rgba(0,212,106,0.08)",
+                  background: "rgba(0,212,106,0.12)",
+                  backdropFilter: "blur(8px)",
                   border: "1px solid rgba(0,212,106,0.25)",
+                  boxShadow: "0 0 12px rgba(0,212,106,0.10)",
                   color: "#00d46a",
+                  transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                 }}
               >
                 <Bell className="h-3 w-3" /> {t("inbox_enable_notif")}
@@ -545,11 +555,13 @@ export default function InboxPage() {
                   setInstanceFilter([]);
                   setQueueScope("all");
                 }}
-                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors"
+                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium"
                 style={{
-                  background: "rgba(248,113,113,0.08)",
-                  border: "1px solid rgba(248,113,113,0.2)",
+                  background: "rgba(248,113,113,0.10)",
+                  backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(248,113,113,0.22)",
                   color: "#f87171",
+                  transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                 }}
                 title="Remover todos os filtros"
               >
@@ -570,9 +582,11 @@ export default function InboxPage() {
                 placeholder="Buscar…"
                 className="w-44 rounded-lg py-1.5 pl-8 pr-3 text-xs outline-none"
                 style={{
-                  background: "var(--surface-2)",
-                  border: "1px solid hsl(240 12% 16%)",
+                  background: "rgba(255,255,255,0.05)",
+                  backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(255,255,255,0.10)",
                   color: "hsl(240 15% 90%)",
+                  transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                 }}
               />
             </div>
@@ -622,6 +636,7 @@ export default function InboxPage() {
             width: isMobile ? "100%" : listWidth,
             display: isMobile && selectedId ? "none" : "flex",
             background: "hsl(240 18% 5%)",
+            borderRight: isMobile ? "none" : "1px solid rgba(255,255,255,0.06)",
           }}
         >
           <div className="flex-1 overflow-y-auto uniq-no-bounce">
@@ -741,11 +756,15 @@ function AgentDropdown({
           disabled={!canViewAll}
           className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
           style={{
-            background: "var(--surface-2)",
-            border: "1px solid var(--border-default)",
+            background: "rgba(255,255,255,0.06)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid rgba(255,255,255,0.10)",
             color: "hsl(240 15% 90%)",
             opacity: canViewAll ? 1 : 0.6,
+            transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
           }}
+          onMouseEnter={e => { if (canViewAll) { e.currentTarget.style.background = "rgba(255,255,255,0.10)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; } }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.10)"; }}
         >
           <UserIcon className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />
           {currentLabel}
@@ -815,10 +834,14 @@ function SingleSelectDropdown({
           onClick={() => setOpen((o) => !o)}
           className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
           style={{
-            background: "var(--surface-2)",
-            border: "1px solid var(--border-default)",
+            background: "rgba(255,255,255,0.06)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid rgba(255,255,255,0.10)",
             color: "hsl(240 15% 90%)",
+            transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
           }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.10)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.10)"; }}
         >
           {icon}
           {label}
@@ -868,9 +891,22 @@ function MultiSelectDropdown({
           onClick={() => setOpen((o) => !o)}
           className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
           style={{
-            background: selected.length > 0 ? "rgba(0,212,106,0.05)" : "var(--surface-2)",
-            border: `1px solid ${selected.length > 0 ? "rgba(0,212,106,0.2)" : "var(--border-default)"}`,
-            color: "hsl(240 15% 90%)",
+            background: selected.length > 0 ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.06)",
+            backdropFilter: "blur(8px)",
+            border: `1px solid ${selected.length > 0 ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.10)"}`,
+            boxShadow: selected.length > 0 ? "0 0 12px rgba(0,212,106,0.10)" : "none",
+            color: selected.length > 0 ? "#00d46a" : "hsl(240 15% 90%)",
+            transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+          }}
+          onMouseEnter={e => {
+            const active = selected.length > 0;
+            e.currentTarget.style.background = active ? "rgba(0,212,106,0.18)" : "rgba(255,255,255,0.10)";
+            e.currentTarget.style.borderColor = active ? "rgba(0,212,106,0.35)" : "rgba(255,255,255,0.15)";
+          }}
+          onMouseLeave={e => {
+            const active = selected.length > 0;
+            e.currentTarget.style.background = active ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.06)";
+            e.currentTarget.style.borderColor = active ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.10)";
           }}
         >
           {icon}
@@ -947,8 +983,11 @@ function Dropdown({
           <div
             className="absolute right-0 top-full z-40 mt-1 w-64 overflow-auto rounded-lg shadow-xl"
             style={{
-              background: "hsl(240 18% 6%)",
-              border: "1px solid hsl(240 12% 14%)",
+              background: "linear-gradient(135deg, rgba(18,18,30,0.95) 0%, rgba(10,10,20,0.98) 100%)",
+              backdropFilter: "blur(20px) saturate(180%)",
+              WebkitBackdropFilter: "blur(20px) saturate(180%)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              boxShadow: "0 16px 40px rgba(0,0,0,0.50), inset 0 1px 0 rgba(255,255,255,0.07)",
               maxHeight: "60vh",
             }}
           >
@@ -970,10 +1009,11 @@ function DropdownItem({
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-white/5"
+      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-white/5"
       style={{
         color: active ? "#00d46a" : "hsl(240 15% 90%)",
-        background: active ? "rgba(0,212,106,0.04)" : "transparent",
+        background: active ? "rgba(0,212,106,0.08)" : "transparent",
+        transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
       }}
     >
       {children}
@@ -1226,11 +1266,13 @@ function InboxMenu({
       trigger={
         <button
           onClick={() => setOpen((o) => !o)}
-          className="flex items-center justify-center rounded-lg p-1.5 transition-colors"
+          className="flex items-center justify-center rounded-lg p-1.5"
           style={{
-            background: open ? "rgba(0,212,106,0.08)" : "var(--surface-2)",
-            border: "1px solid hsl(240 12% 16%)",
+            background: open ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.06)",
+            backdropFilter: "blur(8px)",
+            border: open ? "1px solid rgba(0,212,106,0.25)" : "1px solid rgba(255,255,255,0.10)",
             color: open ? "#00d46a" : "hsl(240 8% 60%)",
+            transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
           }}
           title="Mais opções do inbox"
           aria-label="Menu do inbox"

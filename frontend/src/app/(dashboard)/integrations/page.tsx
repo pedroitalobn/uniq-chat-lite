@@ -125,10 +125,18 @@ export default function IntegrationsPage() {
   return (
     <div className="min-h-screen p-6 lg:p-8" style={{ background: "var(--bg)" }}>
       <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
+        <div className="mb-6 relative">
+          {/* Section header glass line */}
+          <div className="absolute -bottom-3 left-0 right-0 h-px pointer-events-none"
+            style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)" }} />
           <div className="flex items-center gap-2.5 mb-1">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: "var(--green-soft)", border: "1px solid var(--green-border)" }}>
+              style={{
+                background: "linear-gradient(135deg, rgba(0,212,106,0.15), rgba(0,212,106,0.05))",
+                backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
+                border: "1px solid rgba(0,212,106,0.25)",
+              }}>
               <Plug className="w-4 h-4" style={{ color: "var(--green)" }} />
             </div>
             <h1 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>Integrações</h1>
@@ -158,8 +166,13 @@ export default function IntegrationsPage() {
 
           {/* Desktop sidebar */}
           <aside className="hidden sm:flex w-44 lg:w-52 flex-shrink-0 sticky top-4">
-            <nav className="rounded-2xl overflow-hidden w-full"
-              style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+            <nav className="rounded-2xl overflow-hidden w-full" style={{
+              background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+              backdropFilter: "blur(20px) saturate(180%)",
+              WebkitBackdropFilter: "blur(20px) saturate(180%)",
+              border: "1px solid rgba(255,255,255,0.10)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.10)",
+            }}>
               {sections.map((s, i) => {
                 const Icon = s.icon;
                 const isActive = section === s.id;
@@ -172,8 +185,8 @@ export default function IntegrationsPage() {
                       i < sections.length - 1 ? "border-b" : ""
                     )}
                     style={{
-                      borderColor: "var(--surface-border)",
-                      background: isActive ? "var(--green-dim)" : "transparent",
+                      borderColor: "rgba(255,255,255,0.06)",
+                      background: isActive ? "rgba(0,212,106,0.10)" : "transparent",
                     }}
                     onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--surface-3)"; }}
                     onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
@@ -246,9 +259,17 @@ function LLMSection({ onConnect }: { onConnect: (p: ProviderId) => void }) {
     <div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {PROVIDERS.map((p) => (
-          <button key={p.id} onClick={() => onConnect(p.id)} className="relative flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition-all hover:scale-[1.01]"
-            style={{ background: p.bg, borderColor: connectedProviders.has(p.id) ? p.color : p.border }}>
-            {connectedProviders.has(p.id) && <span className="absolute top-3 right-3 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-green-500/20 text-green-400"><CheckCircle2 className="w-2.5 h-2.5" /> conectado</span>}
+          <button key={p.id} onClick={() => onConnect(p.id)} className="relative flex flex-col items-start gap-2 rounded-2xl p-4 text-left transition-all hover:scale-[1.01]"
+            style={{
+              background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+              backdropFilter: "blur(20px) saturate(180%)",
+              WebkitBackdropFilter: "blur(20px) saturate(180%)",
+              border: connectedProviders.has(p.id) ? `1px solid ${p.color}50` : "1px solid rgba(255,255,255,0.10)",
+              borderRadius: "16px",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)",
+              transition: "all 0.35s cubic-bezier(0.16,1,0.3,1)",
+            }}>
+            {connectedProviders.has(p.id) && <span className="absolute top-3 right-3 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold" style={{ background: "rgba(0,212,106,0.15)", backdropFilter: "blur(8px)", border: "1px solid rgba(0,212,106,0.25)", color: "#4ade80" }}><CheckCircle2 className="w-2.5 h-2.5" /> conectado</span>}
             <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${p.color}18` }}><ProviderIcon id={p.id} color={p.color} /></div>
             <div><p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{p.name}</p><p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>{p.description}</p></div>
             <div className="flex items-center gap-1 text-xs font-medium mt-1" style={{ color: p.color }}><Plus className="w-3 h-3" /> {connectedProviders.has(p.id) ? "Adicionar" : "Conectar"}</div>
@@ -272,14 +293,28 @@ function IntegrationCard({ integration }: { integration: Integration }) {
   const test = useMutation({ mutationFn: () => integrationsApi.test(integration.id), onSuccess: () => { qc.invalidateQueries({ queryKey: ["integrations"] }); toast.success("Conexão OK!"); }, onError: () => toast.error("Falha") });
   const color = provider?.color ?? "#64748b";
   return (
-    <div className="rounded-2xl border p-4 flex items-center gap-4" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
+    <div className="rounded-2xl p-4 flex items-center gap-4" style={{
+      background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+      backdropFilter: "blur(16px) saturate(160%)",
+      WebkitBackdropFilter: "blur(16px) saturate(160%)",
+      border: "1px solid rgba(255,255,255,0.09)",
+      borderRadius: "16px",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.08)",
+    }}>
       <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${color}18`, border: `1px solid ${color}30` }}><Plug className="w-5 h-5" style={{ color }} /></div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2"><p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{integration.name}</p>
           {integration.test_status === "ok" && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}</div>
         <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>{provider?.name} · {integration.models?.length || 0} modelo(s)</p>
       </div>
-      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${integration.is_active ? "text-green-400 bg-green-500/10" : "text-gray-400 bg-gray-500/10"}`}>{integration.is_active ? "Ativo" : "Inativo"}</span>
+      <span className="px-2 py-0.5 text-[10px] font-medium" style={{
+        background: integration.is_active ? "rgba(0,212,106,0.12)" : "rgba(100,116,139,0.12)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+        border: integration.is_active ? "1px solid rgba(0,212,106,0.25)" : "1px solid rgba(100,116,139,0.20)",
+        borderRadius: "10px",
+        color: integration.is_active ? "#4ade80" : "#94a3b8",
+      }}>{integration.is_active ? "Ativo" : "Inativo"}</span>
       <div className="flex gap-1.5"><button onClick={() => test.mutate()} className="p-2 rounded-xl hover:bg-neutral-500/10"><RefreshCw className={`w-4 h-4 ${test.isPending ? "animate-spin" : ""}`} style={{ color: "var(--text-3)" }} /></button><button onClick={() => del.mutate()} className="p-2 rounded-xl hover:bg-red-500/10"><Trash2 className="w-4 h-4" style={{ color: "var(--text-3)" }} /></button></div>
     </div>
   );

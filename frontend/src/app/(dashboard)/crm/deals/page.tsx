@@ -171,8 +171,14 @@ export default function DealsPage() {
         </p>
         <Link
           href="/crm/contacts"
-          className="mt-2 rounded-lg px-3 py-1.5 text-xs font-medium"
-          style={{ background: uniq.green, color: "#03170a" }}
+          className="mt-2 rounded-lg px-3 py-1.5 text-xs font-medium inline-flex items-center"
+          style={{
+            background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
+            backdropFilter: "blur(12px)",
+            border: "1px solid rgba(0,212,106,0.30)",
+            boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)",
+            color: "#00d46a",
+          }}
         >
           Ir para Contatos e criar funil →
         </Link>
@@ -182,7 +188,12 @@ export default function DealsPage() {
 
   return (
     <div className="flex h-full flex-col uniq-page">
-      <header className="border-b px-4 sm:px-6 py-3 sm:py-4 space-y-3" style={{ borderColor: uniq.borderSoft }}>
+      <header className="border-b px-4 sm:px-6 py-3 sm:py-4 space-y-3" style={{
+        borderColor: "rgba(255,255,255,0.06)",
+        background: "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)",
+        backdropFilter: "blur(16px) saturate(180%)",
+        WebkitBackdropFilter: "blur(16px) saturate(180%)",
+      }}>
         <div className="flex flex-wrap items-center gap-3">
           <FunnelSelector
             funnels={funnelsQ.data ?? []}
@@ -190,12 +201,20 @@ export default function DealsPage() {
             onChange={setFunnelId}
           />
 
-          <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ background: "var(--surface-2)", border: `1px solid ${uniq.borderFaint}` }}>
+          <div className="flex items-center gap-1 rounded-lg p-0.5" style={{
+            background: "rgba(255,255,255,0.05)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid rgba(255,255,255,0.09)",
+          }}>
             <ViewToggle active={viewMode === "kanban"} onClick={() => setViewMode("kanban")} label="Kanban" icon={<LayoutGrid className="h-3.5 w-3.5" />} />
             <ViewToggle active={viewMode === "list"} onClick={() => setViewMode("list")} label="Lista" icon={<List className="h-3.5 w-3.5" />} />
           </div>
 
-          <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ background: "var(--surface-2)", border: `1px solid ${uniq.borderFaint}` }}>
+          <div className="flex items-center gap-1 rounded-lg p-0.5" style={{
+            background: "rgba(255,255,255,0.05)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid rgba(255,255,255,0.09)",
+          }}>
             <ViewToggle active={ownerFilter === "all"} onClick={() => setOwnerFilter("all")} label="Todos" />
             <ViewToggle active={ownerFilter === "me"} onClick={() => setOwnerFilter("me")} label="Meus" />
           </div>
@@ -208,9 +227,11 @@ export default function DealsPage() {
               placeholder="Buscar deal…"
               className="w-52 rounded-lg py-1.5 pl-8 pr-3 text-xs outline-none"
               style={{
-                background: "var(--surface-2)",
-                border: `1px solid ${uniq.borderSoft}`,
+                background: "rgba(255,255,255,0.05)",
+                backdropFilter: "blur(8px)",
+                border: "1px solid rgba(255,255,255,0.10)",
                 color: uniq.textPrimary,
+                transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
               }}
             />
           </div>
@@ -219,8 +240,23 @@ export default function DealsPage() {
             {canCreate && (
               <button
                 onClick={() => setNewOpen(true)}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90"
-                style={{ background: uniq.green, color: "#03170a" }}
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
+                style={{
+                  background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
+                  backdropFilter: "blur(12px)",
+                  border: "1px solid rgba(0,212,106,0.30)",
+                  boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)",
+                  color: "#00d46a",
+                  transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,212,106,0.28), inset 0 1px 0 rgba(255,255,255,0.16)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)";
+                }}
               >
                 <Plus className="h-3.5 w-3.5" />
                 Novo deal
@@ -230,7 +266,7 @@ export default function DealsPage() {
         </div>
 
         {/* Summary strip */}
-        <div className="mt-3 flex flex-wrap items-center gap-4 text-xs" style={{ color: uniq.textDim }}>
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs" style={{ color: uniq.textDim }}>
           <Metric
             label="Em aberto"
             value={String(summaryQ.data?.total_open ?? 0)}
@@ -248,7 +284,12 @@ export default function DealsPage() {
             accent={uniq.statusLost}
           />
           {activeFunnel?.probability_on && (
-            <span className="flex items-center gap-1" style={{ color: uniq.textFaint }}>
+            <span className="flex items-center gap-1 rounded-lg px-3 py-1.5" style={{
+              background: "rgba(255,255,255,0.04)",
+              backdropFilter: "blur(8px)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              color: uniq.textFaint,
+            }}>
               <TrendingUp className="h-3 w-3" /> Probabilidade ativada
             </span>
           )}
@@ -309,10 +350,13 @@ function ViewToggle({ active, onClick, label, icon }: {
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
+      className="flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium"
       style={{
-        background: active ? "rgba(0,212,106,0.08)" : "transparent",
+        background: active ? "rgba(0,212,106,0.12)" : "transparent",
+        border: active ? "1px solid rgba(0,212,106,0.20)" : "1px solid transparent",
+        boxShadow: active ? "0 0 10px rgba(0,212,106,0.10)" : "none",
         color: active ? uniq.green : uniq.textDim,
+        transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
       }}
     >
       {icon}
@@ -323,10 +367,16 @@ function ViewToggle({ active, onClick, label, icon }: {
 
 function Metric({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent: string }) {
   return (
-    <div className="flex items-baseline gap-1.5">
+    <div className="flex items-center gap-2 rounded-lg px-3 py-1.5" style={{
+      background: `${accent}0f`,
+      backdropFilter: "blur(8px)",
+      border: `1px solid ${accent}22`,
+      boxShadow: `0 2px 8px ${accent}10`,
+      transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+    }}>
       <span
-        className="h-2 w-2 self-center rounded-full"
-        style={{ background: accent }}
+        className="h-2 w-2 flex-shrink-0 rounded-full"
+        style={{ background: accent, boxShadow: `0 0 6px ${accent}80` }}
       />
       <span style={{ color: uniq.textFaint }}>{label}</span>
       <span className="font-medium" style={{ color: uniq.textPrimary }}>{value}</span>
@@ -348,10 +398,15 @@ function FunnelSelector({ funnels, activeId, onChange }: {
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium"
         style={{
-          background: "var(--surface-2)",
-          border: `1px solid ${uniq.borderFaint}`,
+          background: "rgba(255,255,255,0.07)",
+          backdropFilter: "blur(8px)",
+          border: "1px solid rgba(255,255,255,0.12)",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.08)",
           color: uniq.textStrong,
+          transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
         }}
+        onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.11)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)"; }}
+        onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
       >
         {active?.name ?? "Selecionar funil"}
         <ChevronDown className="h-3 w-3" style={{ color: uniq.textFaint }} />
@@ -362,8 +417,11 @@ function FunnelSelector({ funnels, activeId, onChange }: {
           <div
             className="absolute left-0 top-full z-40 mt-1 min-w-64 overflow-auto rounded-lg shadow-xl"
             style={{
-              background: uniq.bg,
-              border: `1px solid ${uniq.border}`,
+              background: "linear-gradient(135deg, rgba(18,18,30,0.95) 0%, rgba(10,10,20,0.98) 100%)",
+              backdropFilter: "blur(20px) saturate(180%)",
+              WebkitBackdropFilter: "blur(20px) saturate(180%)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              boxShadow: "0 16px 40px rgba(0,0,0,0.50), inset 0 1px 0 rgba(255,255,255,0.07)",
               maxHeight: "60vh",
             }}
           >
@@ -371,10 +429,11 @@ function FunnelSelector({ funnels, activeId, onChange }: {
               <button
                 key={f.id}
                 onClick={() => { onChange(f.id); setOpen(false); }}
-                className="flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-white/5"
+                className="flex w-full items-center justify-between px-3 py-2 text-left text-xs hover:bg-white/5"
                 style={{
                   color: f.id === activeId ? uniq.green : uniq.textPrimary,
-                  background: f.id === activeId ? "rgba(0,212,106,0.04)" : "transparent",
+                  background: f.id === activeId ? "rgba(0,212,106,0.08)" : "transparent",
+                  transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
                 }}
               >
                 <span>{f.name}</span>
@@ -413,7 +472,7 @@ function DealsList({ deals, stages, currency, isLoading }: {
     <div className="overflow-auto p-3">
       <table className="w-full text-sm" style={{ color: uniq.textPrimary }}>
         <thead>
-          <tr className="text-left text-xs" style={{ color: uniq.textFaint }}>
+          <tr className="text-left text-xs" style={{ color: uniq.textFaint, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
             <Th>Título</Th>
             <Th>Contato</Th>
             <Th>Estágio</Th>
@@ -427,8 +486,8 @@ function DealsList({ deals, stages, currency, isLoading }: {
           {deals.map((d) => (
             <tr
               key={d.id}
-              className="border-t transition-colors hover:bg-white/5"
-              style={{ borderColor: uniq.borderFaint }}
+              className="hover:bg-white/5"
+              style={{ borderTop: "1px solid rgba(255,255,255,0.05)", transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)" }}
             >
               <Td>
                 <Link href={`/crm/deals/${d.id}`} className="font-medium hover:underline">

@@ -315,7 +315,15 @@ export function JourneysList() {
   return (
     <div className="flex flex-col h-full">
       {/* Stats + filter bar */}
-      <div className="flex flex-col gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b flex-shrink-0" style={{ borderColor: "var(--surface-border)", background: "var(--surface-2)" }}>
+      <div
+        className="flex flex-col gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b flex-shrink-0"
+        style={{
+          borderColor: "rgba(255,255,255,0.07)",
+          background: "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)",
+          backdropFilter: "blur(20px) saturate(180%)",
+          WebkitBackdropFilter: "blur(20px) saturate(180%)",
+        }}
+      >
         <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
           <div className="flex items-center gap-2">
             <Wand2 className="w-4 h-4" style={{ color: "#8b5cf6" }} />
@@ -446,7 +454,26 @@ export function JourneysList() {
           </div>
         ) : (
           filteredJourneys.map((j: any) => (
-            <div key={j.id} className="rounded-xl overflow-hidden" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+            <div
+              key={j.id}
+              className="rounded-xl overflow-hidden relative"
+              style={{
+                background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+                backdropFilter: "blur(20px) saturate(180%)",
+                WebkitBackdropFilter: "blur(20px) saturate(180%)",
+                border: "1px solid rgba(255,255,255,0.10)",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)",
+                transition: "all 0.35s cubic-bezier(0.16,1,0.3,1)",
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.12)";
+                (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.15)";
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)";
+                (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.10)";
+              }}
+            >
               <div
                 className="p-3 sm:p-4 flex items-center justify-between cursor-pointer hover:bg-[var(--surface-2)] transition-colors gap-2"
                 onClick={() => setExpanded((p) => ({ ...p, [j.id]: !p[j.id] }))}
@@ -464,7 +491,18 @@ export function JourneysList() {
                       }}
                     />
                     {j.instance_name && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-2)] hidden sm:inline" style={{ color: "var(--text-3)" }}>
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded hidden sm:inline"
+                        style={{
+                          background: "rgba(255,255,255,0.06)",
+                          backdropFilter: "blur(8px)",
+                          WebkitBackdropFilter: "blur(8px)",
+                          border: "1px solid rgba(255,255,255,0.10)",
+                          borderRadius: "10px",
+                          color: "var(--text-3)",
+                          transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+                        }}
+                      >
                         {j.instance_name}
                       </span>
                     )}
@@ -509,7 +547,13 @@ export function JourneysList() {
               </div>
 
               {expanded[j.id] && (
-                <div className="p-3 sm:p-4 border-t" style={{ borderColor: "var(--surface-border)", background: "var(--surface-2)" }}>
+                <div
+                  className="p-3 sm:p-4 border-t"
+                  style={{
+                    borderColor: "rgba(255,255,255,0.07)",
+                    background: "rgba(255,255,255,0.03)",
+                  }}
+                >
                   <FlowPreview flow={j.flow} trigger={j.trigger_filter} />
 
                   <div className="flex flex-col sm:flex-row gap-3 mt-3">

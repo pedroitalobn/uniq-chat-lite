@@ -360,11 +360,19 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
       />
       
       {/* Slide-over Drawer */}
-      <div className="fixed top-0 right-0 bottom-0 z-[101] w-full max-w-md h-screen shadow-2xl flex flex-col animate-drawer-in"
-        style={{ background: "hsl(240 12% 8%)", borderLeft: "1px solid hsl(240 12% 15%)" }}>
+      <div
+        className="fixed top-0 right-0 bottom-0 z-[101] w-full max-w-md h-screen shadow-2xl flex flex-col animate-drawer-in"
+        style={{
+          background: "linear-gradient(180deg, rgba(20,20,35,0.96) 0%, rgba(10,10,20,0.98) 100%)",
+          backdropFilter: "blur(24px) saturate(180%)",
+          WebkitBackdropFilter: "blur(24px) saturate(180%)",
+          borderLeft: "1px solid rgba(255,255,255,0.10)",
+          boxShadow: "-8px 0 32px rgba(0,0,0,0.50)",
+        }}
+      >
           
           {/* Header */}
-          <div className="flex items-center justify-between p-5 border-b flex-shrink-0" style={{ borderColor: "hsl(240 12% 15%)" }}>
+          <div className="flex items-center justify-between p-5 border-b flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.09)" }}>
             <div>
               <h2 className="text-lg font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
                 {isEditing ? "Editar Plano" : "Novo Plano"}
@@ -377,15 +385,22 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
           </div>
 
           {/* Tab Navigation */}
-          <div className="flex px-2 pt-2 border-b overflow-x-auto flex-shrink-0 custom-scrollbar" style={{ borderColor: "hsl(240 12% 12%)" }}>
+          <div
+            className="flex px-2 pt-2 border-b overflow-x-auto flex-shrink-0 custom-scrollbar"
+            style={{ borderColor: "rgba(255,255,255,0.07)" }}
+          >
             {TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className="px-4 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors"
+                className="px-4 py-2.5 text-xs font-medium whitespace-nowrap border-b-2"
                 style={{
                   color: activeTab === tab.id ? "var(--green)" : "hsl(240 8% 46%)",
-                  borderColor: activeTab === tab.id ? "var(--green)" : "transparent"
+                  borderColor: activeTab === tab.id ? "var(--green)" : "transparent",
+                  background: activeTab === tab.id
+                    ? "linear-gradient(180deg, rgba(0,212,106,0.06) 0%, transparent 100%)"
+                    : "transparent",
+                  transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
                 }}
               >
                 {tab.label}
@@ -562,7 +577,14 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
           </div>
 
           {/* Footer Actions */}
-          <div className="p-5 border-t flex gap-3 flex-shrink-0" style={{ borderColor: "hsl(240 12% 15%)", background: "hsl(240 12% 7%)" }}>
+          <div
+            className="p-5 border-t flex gap-3 flex-shrink-0"
+            style={{
+              borderColor: "rgba(255,255,255,0.09)",
+              background: "rgba(0,0,0,0.25)",
+              backdropFilter: "blur(12px)",
+            }}
+          >
             <button onClick={onClose} className="btn-ghost flex-1 py-2.5 text-sm">
               Cancelar
             </button>
@@ -594,9 +616,30 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
 
   return (
     <div
-      className="rounded-2xl p-4 sm:p-5 pb-5 sm:pb-6 pr-5 sm:pr-8 animate-fade-in-up relative group transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] hover:-translate-y-0.5"
-      style={{ background: style.bg, border: `1px solid ${style.border}` }}
+      className="rounded-2xl p-4 sm:p-5 pb-5 sm:pb-6 pr-5 sm:pr-8 animate-fade-in-up relative group"
+      style={{
+        background: `linear-gradient(135deg, ${style.bg} 0%, rgba(0,0,0,0.15) 100%)`,
+        backdropFilter: "blur(20px) saturate(180%)",
+        WebkitBackdropFilter: "blur(20px) saturate(180%)",
+        border: `1px solid ${style.border}`,
+        borderRadius: "20px",
+        boxShadow: "0 4px 16px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.06)",
+        transition: "all 0.35s cubic-bezier(0.16,1,0.3,1)",
+      }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 30px rgba(0,0,0,0.50), inset 0 1px 0 rgba(255,255,255,0.10)";
+        (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.06)";
+        (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+      }}
     >
+      <div style={{
+        position: "absolute", top: 0, left: "15%", right: "15%", height: "1px",
+        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent)",
+        pointerEvents: "none",
+      }} />
       <div className="flex flex-wrap lg:flex-nowrap items-center gap-4 sm:gap-6">
         
         {/* Left: Icon */}

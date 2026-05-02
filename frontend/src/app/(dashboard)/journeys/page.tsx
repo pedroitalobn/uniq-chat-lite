@@ -53,8 +53,17 @@ export default function JourneysPage() {
           <div className="flex items-center gap-2 flex-wrap">
             <Link
               href="/uniq-ai"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors"
-              style={{ background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.18)", color: "var(--green)" }}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium"
+              style={{
+                background: "linear-gradient(135deg, rgba(0,212,106,0.12) 0%, rgba(0,212,106,0.05) 100%)",
+                backdropFilter: "blur(12px) saturate(180%)",
+                WebkitBackdropFilter: "blur(12px) saturate(180%)",
+                border: "1px solid rgba(0,212,106,0.20)",
+                color: "var(--green)",
+                transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(0,212,106,0.20) 0%, rgba(0,212,106,0.10) 100%)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(0,212,106,0.12) 0%, rgba(0,212,106,0.05) 100%)"; }}
             >
               <Sparkles className="w-4 h-4" />
               <span className="hidden sm:inline">Criar via Uniq AI</span>
@@ -62,16 +71,34 @@ export default function JourneysPage() {
             </Link>
             <button
               onClick={() => setTemplatesOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors"
-              style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.18)", color: "#a78bfa" }}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium"
+              style={{
+                background: "linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(139,92,246,0.05) 100%)",
+                backdropFilter: "blur(12px) saturate(180%)",
+                WebkitBackdropFilter: "blur(12px) saturate(180%)",
+                border: "1px solid rgba(139,92,246,0.20)",
+                color: "#a78bfa",
+                transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(139,92,246,0.20) 0%, rgba(139,92,246,0.10) 100%)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(139,92,246,0.05) 100%)"; }}
             >
               <LayoutTemplate className="w-4 h-4" />
               Templates
             </button>
             <button
               onClick={createBlank}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors"
-              style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium"
+              style={{
+                background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+                backdropFilter: "blur(12px) saturate(180%)",
+                WebkitBackdropFilter: "blur(12px) saturate(180%)",
+                border: "1px solid rgba(255,255,255,0.10)",
+                color: "var(--text-1)",
+                transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.05) 100%)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)"; }}
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Canvas em branco</span>
@@ -82,7 +109,15 @@ export default function JourneysPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 rounded-xl mb-3 sm:mb-4 flex-shrink-0 self-start" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+      <div
+        className="flex gap-1 p-1 rounded-xl mb-3 sm:mb-4 flex-shrink-0 self-start"
+        style={{
+          background: "rgba(255,255,255,0.04)",
+          backdropFilter: "blur(12px) saturate(180%)",
+          WebkitBackdropFilter: "blur(12px) saturate(180%)",
+          border: "1px solid rgba(255,255,255,0.09)",
+        }}
+      >
         {TABS.map((t) => {
           const Icon = t.icon;
           const isActive = tab === t.id;
@@ -91,11 +126,16 @@ export default function JourneysPage() {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                "flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all",
+                "flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium",
               )}
               style={{
-                background: isActive ? "rgba(0,212,106,0.15)" : "transparent",
+                background: isActive
+                  ? "linear-gradient(135deg, rgba(0,212,106,0.18) 0%, rgba(0,212,106,0.08) 100%)"
+                  : "transparent",
+                backdropFilter: isActive ? "blur(8px)" : "none",
+                border: isActive ? "1px solid rgba(0,212,106,0.20)" : "1px solid transparent",
                 color: isActive ? "var(--green)" : "var(--text-3)",
+                transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
               }}
             >
               <Icon className="w-3.5 h-3.5" />

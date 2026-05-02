@@ -88,22 +88,36 @@ function InstanceCard({
     deleteMutation.mutate();
   };
 
+  const [hovered, setHovered] = useState(false);
+
   return (
-    <div className="group relative flex flex-col rounded-2xl overflow-hidden transition-all duration-200 animate-fade-in-up"
+    <div className="group relative flex flex-col rounded-2xl overflow-hidden animate-fade-in-up"
       style={{
-        background: "hsl(240 18% 6%)",
-        border: isConnected ? "1px solid rgba(0,212,106,0.15)" : "1px solid hsl(240 12% 13%)",
-        boxShadow: isConnected
-          ? "0 0 0 1px rgba(0,212,106,0.06), 0 4px 24px rgba(0,0,0,0.3)"
-          : "0 4px 24px rgba(0,0,0,0.25)",
+        background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+        backdropFilter: "blur(20px) saturate(180%)",
+        WebkitBackdropFilter: "blur(20px) saturate(180%)",
+        border: isConnected ? "1px solid rgba(0,212,106,0.20)" : "1px solid rgba(255,255,255,0.10)",
+        borderRadius: "20px",
+        boxShadow: hovered
+          ? isConnected
+            ? "0 12px 32px rgba(0,0,0,0.40), 0 0 0 1px rgba(0,212,106,0.10), inset 0 1px 0 rgba(255,255,255,0.12)"
+            : "0 12px 32px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.12)"
+          : isConnected
+            ? "0 0 0 1px rgba(0,212,106,0.06), 0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.10)"
+            : "0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.10)",
+        transform: hovered ? "translateY(-2px)" : "translateY(0)",
+        transition: "all 0.35s cubic-bezier(0.16,1,0.3,1)",
         animationDelay: `${index * 60}ms`,
         animationFillMode: "both",
       }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      {isConnected && (
-        <div className="absolute top-0 left-0 right-0 h-px"
-          style={{ background: "linear-gradient(90deg, transparent, rgba(0,212,106,0.4), transparent)" }} />
-      )}
+      {/* Light line top */}
+      <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+        style={{ background: isConnected
+          ? "linear-gradient(90deg, transparent, rgba(0,212,106,0.40), transparent)"
+          : "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)" }} />
 
       <div className="p-5 flex flex-col gap-4 flex-1">
         {/* Header */}
@@ -171,7 +185,10 @@ function InstanceCard({
           {/* Status dot */}
           <div className="relative flex-shrink-0 mt-0.5">
             <div className={cn("w-2.5 h-2.5 rounded-full", isConnected && "ring-pulse")}
-              style={{ background: s.dotColor }} />
+              style={{
+                background: s.dotColor,
+                boxShadow: `0 0 8px ${s.dotColor}`,
+              }} />
           </div>
         </div>
 
@@ -182,16 +199,19 @@ function InstanceCard({
             const ch = CHANNEL_META[instance.channel] ?? CHANNEL_META.whatsapp;
             return (
               <span className="status-badge" style={{
-                background: `${ch.color}12`,
+                background: `${ch.color}14`,
+                backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
                 color: ch.color,
-                borderColor: `${ch.color}30`,
+                borderColor: `${ch.color}35`,
+                borderRadius: "10px",
               }}>
                 <Hash className="w-3 h-3" />
                 {ch.label}
               </span>
             );
           })()}
-          <span className={cn("status-badge", s.cls)}>
+          <span className={cn("status-badge", s.cls)} style={{ backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", borderRadius: "10px" }}>
             {currentStatus === "connecting"
               ? <RefreshCw className="w-3 h-3 animate-spin" />
               : <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.dotColor }} />
@@ -445,13 +465,15 @@ function InstancesContent() {
             onClick={() => setCreateOpen(true)}
             className="inline-flex items-center justify-center gap-2 text-sm font-medium px-4 py-2 rounded-xl transition-all duration-150 active:scale-[0.97] whitespace-nowrap flex-1 sm:flex-none"
             style={{
-              background: "rgba(0,212,106,0.12)",
-              border: "1px solid rgba(0,212,106,0.3)",
+              background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+              border: "1px solid rgba(0,212,106,0.30)",
+              boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)",
               color: "var(--green)",
-              backdropFilter: "blur(8px)",
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = "rgba(0,212,106,0.2)"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "rgba(0,212,106,0.12)"; }}
+            onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,212,106,0.28), rgba(0,212,106,0.12))"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))"; }}
           >
             <Plus className="w-4 h-4" />
             {t("instances_new")}
@@ -471,13 +493,19 @@ function InstancesContent() {
                 onClick={() => setChannelFilter(ch)}
                 className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl transition-all duration-150"
                 style={isActive ? {
-                  background: meta ? `${meta.color}15` : "var(--border-default)",
+                  background: meta ? `${meta.color}15` : "rgba(255,255,255,0.08)",
+                  backdropFilter: "blur(8px)",
+                  WebkitBackdropFilter: "blur(8px)",
                   color: meta ? meta.color : "hsl(240 15% 93%)",
-                  border: `1px solid ${meta ? `${meta.color}35` : "var(--border-strong)"}`,
+                  border: `1px solid ${meta ? `${meta.color}35` : "rgba(255,255,255,0.15)"}`,
+                  borderRadius: "10px",
                 } : {
-                  background: "var(--surface-2)",
+                  background: "rgba(255,255,255,0.04)",
+                  backdropFilter: "blur(8px)",
+                  WebkitBackdropFilter: "blur(8px)",
                   color: "hsl(240 8% 50%)",
-                  border: "1px solid var(--border-default)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: "10px",
                 }}
               >
                 {ch === "all" ? "Todos" : meta?.label}
@@ -568,13 +596,15 @@ function InstancesContent() {
             onClick={() => setCreateOpen(true)}
             className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl transition-all active:scale-[0.97]"
             style={{
-              background: "rgba(0,212,106,0.12)",
-              border: "1px solid rgba(0,212,106,0.3)",
+              background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+              border: "1px solid rgba(0,212,106,0.30)",
+              boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)",
               color: "var(--green)",
-              backdropFilter: "blur(8px)",
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = "rgba(0,212,106,0.2)"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "rgba(0,212,106,0.12)"; }}
+            onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,212,106,0.28), rgba(0,212,106,0.12))"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))"; }}
           >
             <Plus className="w-4 h-4" />
             Criar primeira instância

@@ -71,7 +71,16 @@ export default function ShopsPage() {
         <button
           onClick={() => setCreating(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
-          style={{ background: "var(--green)", color: "var(--green-fg)" }}
+          style={{
+            background: "linear-gradient(135deg, rgba(0,212,106,0.20) 0%, rgba(0,212,106,0.10) 100%)",
+            backdropFilter: "blur(12px) saturate(180%)",
+            WebkitBackdropFilter: "blur(12px) saturate(180%)",
+            border: "1px solid rgba(0,212,106,0.25)",
+            color: "var(--green)",
+            transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(0,212,106,0.30) 0%, rgba(0,212,106,0.18) 100%)"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(0,212,106,0.20) 0%, rgba(0,212,106,0.10) 100%)"; }}
         >
           <Plus className="w-4 h-4" /> Nova shop
         </button>
@@ -123,8 +132,26 @@ export default function ShopsPage() {
             <Link
               key={shop.id}
               href={`/shops/${shop.id}`}
-              className="rounded-xl p-4 transition-colors hover:bg-white/5"
-              style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
+              className="rounded-xl p-4 block relative"
+              style={{
+                background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+                backdropFilter: "blur(20px) saturate(180%)",
+                WebkitBackdropFilter: "blur(20px) saturate(180%)",
+                border: "1px solid rgba(255,255,255,0.10)",
+                borderRadius: "20px",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)",
+                transition: "all 0.35s cubic-bezier(0.16,1,0.3,1)",
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.12)";
+                (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.16)";
+                (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)";
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)";
+                (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.10)";
+                (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+              }}
             >
               <div className="flex items-start gap-3">
                 <div
@@ -145,13 +172,24 @@ export default function ShopsPage() {
                   <p className="text-xs truncate" style={{ color: "var(--text-3)" }}>
                     {shop.slug} · {shop.currency}
                   </p>
-                  <p className="text-[10px] mt-1" style={{ color: "var(--text-4)" }}>
+                  <span
+                    className="inline-block text-[10px] mt-1 px-2 py-0.5"
+                    style={{
+                      background: "rgba(255,255,255,0.06)",
+                      backdropFilter: "blur(8px)",
+                      WebkitBackdropFilter: "blur(8px)",
+                      border: "1px solid rgba(255,255,255,0.10)",
+                      borderRadius: "10px",
+                      color: "var(--text-4)",
+                      transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+                    }}
+                  >
                     {shop.visibility === "public"
                       ? "🌐 Pública"
                       : shop.visibility === "link_only"
                         ? "🔗 Link-only"
                         : "🔒 Privada"}
-                  </p>
+                  </span>
                 </div>
                 <ArrowRight className="w-4 h-4" style={{ color: "var(--text-3)" }} />
               </div>
@@ -190,10 +228,22 @@ export default function ShopsPage() {
           onClick={() => setCreating(false)}
         >
           <div
-            className="w-full max-w-md rounded-2xl p-6"
-            style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}
+            className="w-full max-w-md rounded-2xl p-6 relative"
+            style={{
+              background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+              backdropFilter: "blur(20px) saturate(180%)",
+              WebkitBackdropFilter: "blur(20px) saturate(180%)",
+              border: "1px solid rgba(255,255,255,0.10)",
+              borderRadius: "20px",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.10)",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
+            <div style={{
+              position: "absolute", top: 0, left: "15%", right: "15%", height: "1px",
+              background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)",
+              pointerEvents: "none",
+            }} />
             <h3 className="text-lg font-semibold mb-4" style={{ color: "var(--text-1)" }}>
               Nova shop
             </h3>
@@ -208,9 +258,11 @@ export default function ShopsPage() {
                   placeholder="Minha loja"
                   className="w-full px-3 py-2 rounded-lg text-sm outline-none"
                   style={{
-                    background: "var(--surface-3)",
+                    background: "rgba(255,255,255,0.05)",
+                    backdropFilter: "blur(8px)",
                     color: "var(--text-1)",
-                    border: "1px solid var(--surface-border)",
+                    border: "1px solid rgba(255,255,255,0.10)",
+                    transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
                   }}
                 />
               </div>
@@ -224,9 +276,11 @@ export default function ShopsPage() {
                   rows={2}
                   className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none"
                   style={{
-                    background: "var(--surface-3)",
+                    background: "rgba(255,255,255,0.05)",
+                    backdropFilter: "blur(8px)",
                     color: "var(--text-1)",
-                    border: "1px solid var(--surface-border)",
+                    border: "1px solid rgba(255,255,255,0.10)",
+                    transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
                   }}
                 />
               </div>
@@ -239,9 +293,11 @@ export default function ShopsPage() {
                   onChange={(e) => setForm({ ...form, currency: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg text-sm outline-none"
                   style={{
-                    background: "var(--surface-3)",
+                    background: "rgba(255,255,255,0.05)",
+                    backdropFilter: "blur(8px)",
                     color: "var(--text-1)",
-                    border: "1px solid var(--surface-border)",
+                    border: "1px solid rgba(255,255,255,0.10)",
+                    transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
                   }}
                 >
                   <option value="BRL">BRL — Real</option>
@@ -254,7 +310,15 @@ export default function ShopsPage() {
               <button
                 onClick={() => setCreating(false)}
                 className="flex-1 py-2.5 rounded-lg text-sm font-medium"
-                style={{ background: "var(--surface-3)", color: "var(--text-2)" }}
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(255,255,255,0.09)",
+                  color: "var(--text-2)",
+                  transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.09)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; }}
               >
                 Cancelar
               </button>
@@ -262,7 +326,15 @@ export default function ShopsPage() {
                 onClick={() => createMut.mutate(form)}
                 disabled={!form.name.trim() || createMut.isPending}
                 className="flex-1 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center disabled:opacity-50"
-                style={{ background: "var(--green)", color: "var(--green-fg)" }}
+                style={{
+                  background: "linear-gradient(135deg, rgba(0,212,106,0.25) 0%, rgba(0,212,106,0.12) 100%)",
+                  backdropFilter: "blur(12px)",
+                  border: "1px solid rgba(0,212,106,0.30)",
+                  color: "var(--green)",
+                  transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+                }}
+                onMouseEnter={e => { if (!createMut.isPending) (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(0,212,106,0.38) 0%, rgba(0,212,106,0.20) 100%)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(0,212,106,0.25) 0%, rgba(0,212,106,0.12) 100%)"; }}
               >
                 {createMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Criar"}
               </button>
