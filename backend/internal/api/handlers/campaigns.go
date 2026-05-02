@@ -361,6 +361,15 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 			PurchasedStatus    string  `json:"purchased_status,omitempty"`
 			NeverPurchased     bool    `json:"never_purchased,omitempty"`
 			PassedAgentID      string  `json:"passed_agent_id,omitempty"`
+			// Inbox behavior filters
+			InboxAssignedTo           string `json:"inbox_assigned_to,omitempty"`
+			InboxDepartment           string `json:"inbox_department,omitempty"`
+			InboxTeam                 string `json:"inbox_team,omitempty"`
+			InboxQueue                string `json:"inbox_queue,omitempty"`
+			InboxResponseTimeMax      int    `json:"inbox_response_time_max,omitempty"`
+			InboxConversationCountMin int    `json:"inbox_conversation_count_min,omitempty"`
+			InboxLastContactAfter     string `json:"inbox_last_contact_after,omitempty"`
+			ParticipatedCampaignID    string `json:"participated_campaign_id,omitempty"`
 		} `json:"segment_filter"`
 	}
 	if err := c.BodyParser(&req); err != nil {
@@ -512,19 +521,27 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 
 // resolveSegmentedContacts queries contacts matching the segment filter
 func (h *CampaignHandler) resolveSegmentedContacts(userID uuid.UUID, filter struct {
-	Funnel             string   `json:"funnel,omitempty"`
-	Stage              string   `json:"stage,omitempty"`
-	Journey            string   `json:"journey,omitempty"`
-	Tags               []string `json:"tags,omitempty"`
-	Owner              string   `json:"owner,omitempty"`
-	ExternalID         string   `json:"external_id,omitempty"`
-	SegmentID          string   `json:"segment_id,omitempty"`
-	PurchasedShopID    string   `json:"purchased_shop_id,omitempty"`
-	PurchasedSinceDays int      `json:"purchased_since_days,omitempty"`
-	PurchasedMinTotal  float64  `json:"purchased_min_total,omitempty"`
-	PurchasedStatus    string   `json:"purchased_status,omitempty"`
-	NeverPurchased     bool     `json:"never_purchased,omitempty"`
-	PassedAgentID      string   `json:"passed_agent_id,omitempty"`
+	Funnel                   string   `json:"funnel,omitempty"`
+	Stage                    string   `json:"stage,omitempty"`
+	Journey                  string   `json:"journey,omitempty"`
+	Tags                     []string `json:"tags,omitempty"`
+	Owner                    string   `json:"owner,omitempty"`
+	ExternalID               string   `json:"external_id,omitempty"`
+	SegmentID                string   `json:"segment_id,omitempty"`
+	PurchasedShopID          string   `json:"purchased_shop_id,omitempty"`
+	PurchasedSinceDays       int      `json:"purchased_since_days,omitempty"`
+	PurchasedMinTotal        float64  `json:"purchased_min_total,omitempty"`
+	PurchasedStatus          string   `json:"purchased_status,omitempty"`
+	NeverPurchased           bool     `json:"never_purchased,omitempty"`
+	PassedAgentID            string   `json:"passed_agent_id,omitempty"`
+	InboxAssignedTo          string   `json:"inbox_assigned_to,omitempty"`
+	InboxDepartment          string   `json:"inbox_department,omitempty"`
+	InboxTeam                string   `json:"inbox_team,omitempty"`
+	InboxQueue               string   `json:"inbox_queue,omitempty"`
+	InboxResponseTimeMax     int      `json:"inbox_response_time_max,omitempty"`
+	InboxConversationCountMin int     `json:"inbox_conversation_count_min,omitempty"`
+	InboxLastContactAfter    string   `json:"inbox_last_contact_after,omitempty"`
+	ParticipatedCampaignID   string   `json:"participated_campaign_id,omitempty"`
 }) []models.Contact {
 	query := h.db.Where("contacts.user_id = ?", userID)
 
@@ -537,19 +554,19 @@ func (h *CampaignHandler) resolveSegmentedContacts(userID uuid.UUID, filter stru
 	}
 
 	if filter.Funnel != "" {
-		query = query.Where("funnel = ?", filter.Funnel)
+		query = query.Where("contacts.funnel = ?", filter.Funnel)
 	}
 	if filter.Stage != "" {
-		query = query.Where("stage = ?", filter.Stage)
+		query = query.Where("contacts.stage = ?", filter.Stage)
 	}
 	if filter.Journey != "" {
-		query = query.Where("journey = ?", filter.Journey)
+		query = query.Where("contacts.journey = ?", filter.Journey)
 	}
 	if filter.Owner != "" {
-		query = query.Where("owner = ?", filter.Owner)
+		query = query.Where("contacts.owner = ?", filter.Owner)
 	}
 	if filter.ExternalID != "" {
-		query = query.Where("external_id = ?", filter.ExternalID)
+		query = query.Where("contacts.external_id = ?", filter.ExternalID)
 	}
 	if len(filter.Tags) > 0 {
 		query = query.Joins("INNER JOIN contact_tags ON contact_tags.contact_id = contacts.id").
@@ -557,7 +574,7 @@ func (h *CampaignHandler) resolveSegmentedContacts(userID uuid.UUID, filter stru
 			Where("tags.name IN ?", filter.Tags)
 	}
 
-	// Purchase history segmentation — junta com orders quando há ContactID.
+	// Purchase history segmentation
 	hasPurchaseFilter := filter.PurchasedShopID != "" || filter.PurchasedSinceDays > 0 ||
 		filter.PurchasedMinTotal > 0 || filter.PurchasedStatus != ""
 	if hasPurchaseFilter {
@@ -586,9 +603,36 @@ func (h *CampaignHandler) resolveSegmentedContacts(userID uuid.UUID, filter stru
 	// Contatos que interagiram com agente de IA específico
 	if filter.PassedAgentID != "" {
 		if aid, err := uuid.Parse(filter.PassedAgentID); err == nil {
-			query = query.Joins("INNER JOIN conversations ON conversations.contact_id = contacts.id").
-				Where("conversations.agent_id = ?", aid)
+			query = query.Where("EXISTS (SELECT 1 FROM conversations WHERE conversations.contact_id = contacts.id AND conversations.assigned_user_id = ?)", aid)
 		}
+	}
+
+	// Inbox behavior filters
+	if filter.InboxAssignedTo != "" {
+		query = query.Where("EXISTS (SELECT 1 FROM conversations WHERE conversations.contact_id = contacts.id AND conversations.assigned_user_id = ?)", filter.InboxAssignedTo)
+	}
+	if filter.InboxDepartment != "" {
+		query = query.Where("EXISTS (SELECT 1 FROM conversations WHERE conversations.contact_id = contacts.id AND conversations.department_id = ?)", filter.InboxDepartment)
+	}
+	if filter.InboxTeam != "" {
+		query = query.Where("EXISTS (SELECT 1 FROM conversations WHERE conversations.contact_id = contacts.id AND conversations.team_id = ?)", filter.InboxTeam)
+	}
+	if filter.InboxQueue != "" {
+		query = query.Where("EXISTS (SELECT 1 FROM conversations WHERE conversations.contact_id = contacts.id AND conversations.queue_id = ?)", filter.InboxQueue)
+	}
+	if filter.InboxResponseTimeMax > 0 {
+		query = query.Where("EXISTS (SELECT 1 FROM conversations WHERE conversations.contact_id = contacts.id AND conversations.first_response_at IS NOT NULL AND EXTRACT(EPOCH FROM (conversations.first_response_at - conversations.created_at)) <= ?)", filter.InboxResponseTimeMax)
+	}
+	if filter.InboxConversationCountMin > 0 {
+		query = query.Where("(SELECT COUNT(*) FROM conversations WHERE conversations.contact_id = contacts.id) >= ?", filter.InboxConversationCountMin)
+	}
+	if filter.InboxLastContactAfter != "" {
+		query = query.Where("EXISTS (SELECT 1 FROM conversations WHERE conversations.contact_id = contacts.id AND conversations.created_at >= ?)", filter.InboxLastContactAfter)
+	}
+
+	// Campaign participation
+	if filter.ParticipatedCampaignID != "" {
+		query = query.Where("EXISTS (SELECT 1 FROM campaign_recipients cr WHERE cr.phone = contacts.phone AND cr.campaign_id = ?)", filter.ParticipatedCampaignID)
 	}
 
 	var contacts []models.Contact

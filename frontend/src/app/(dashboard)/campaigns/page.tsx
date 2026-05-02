@@ -126,6 +126,16 @@ interface CrmFilter {
   purchased_status?: string;
   never_purchased?: boolean;
   passed_agent_id?: string;
+  // Inbox behavior
+  inbox_assigned_to?: string;
+  inbox_department?: string;
+  inbox_team?: string;
+  inbox_queue?: string;
+  inbox_response_time_max?: number;
+  inbox_conversation_count_min?: number;
+  inbox_last_contact_after?: string;
+  // Campaign participation
+  participated_campaign_id?: string;
 }
 
 function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
@@ -683,6 +693,71 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
                         Apenas contatos que <strong>nunca compraram</strong>
                       </label>
                     </div>
+                  </div>
+
+                  {/* Inbox behavior filters */}
+                  <div>
+                    <p className="text-xs font-medium mb-2" style={{ color: "hsl(240 8% 50%)" }}>Comportamento no Inbox</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 42%)" }}>Atendido pelo atendente (ID)</label>
+                        <input type="text" placeholder="UUID do atendente"
+                          value={crmFilter.inbox_assigned_to || ""}
+                          onChange={(e) => setCrmFilter({ ...crmFilter, inbox_assigned_to: e.target.value || undefined })}
+                          className="input-field w-full text-xs" />
+                      </div>
+                      <div>
+                        <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 42%)" }}>Departamento (ID)</label>
+                        <input type="text" placeholder="UUID do departamento"
+                          value={crmFilter.inbox_department || ""}
+                          onChange={(e) => setCrmFilter({ ...crmFilter, inbox_department: e.target.value || undefined })}
+                          className="input-field w-full text-xs" />
+                      </div>
+                      <div>
+                        <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 42%)" }}>Equipe (ID)</label>
+                        <input type="text" placeholder="UUID da equipe"
+                          value={crmFilter.inbox_team || ""}
+                          onChange={(e) => setCrmFilter({ ...crmFilter, inbox_team: e.target.value || undefined })}
+                          className="input-field w-full text-xs" />
+                      </div>
+                      <div>
+                        <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 42%)" }}>Fila (ID)</label>
+                        <input type="text" placeholder="UUID da fila"
+                          value={crmFilter.inbox_queue || ""}
+                          onChange={(e) => setCrmFilter({ ...crmFilter, inbox_queue: e.target.value || undefined })}
+                          className="input-field w-full text-xs" />
+                      </div>
+                      <div>
+                        <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 42%)" }}>Tempo de resp. ≤ N segundos</label>
+                        <input type="number" min="0" placeholder="ex: 300"
+                          value={crmFilter.inbox_response_time_max || ""}
+                          onChange={(e) => setCrmFilter({ ...crmFilter, inbox_response_time_max: parseInt(e.target.value) || undefined })}
+                          className="input-field w-full text-xs" />
+                      </div>
+                      <div>
+                        <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 42%)" }}>Nº de conversas ≥</label>
+                        <input type="number" min="0" placeholder="ex: 3"
+                          value={crmFilter.inbox_conversation_count_min || ""}
+                          onChange={(e) => setCrmFilter({ ...crmFilter, inbox_conversation_count_min: parseInt(e.target.value) || undefined })}
+                          className="input-field w-full text-xs" />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 42%)" }}>Último contato após</label>
+                        <input type="date"
+                          value={crmFilter.inbox_last_contact_after || ""}
+                          onChange={(e) => setCrmFilter({ ...crmFilter, inbox_last_contact_after: e.target.value || undefined })}
+                          className="input-field w-full text-xs" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Campaign participation */}
+                  <div>
+                    <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>Participou da campanha (ID)</label>
+                    <input type="text" placeholder="UUID da campanha"
+                      value={crmFilter.participated_campaign_id || ""}
+                      onChange={(e) => setCrmFilter({ ...crmFilter, participated_campaign_id: e.target.value || undefined })}
+                      className="input-field w-full text-xs" />
                   </div>
 
                   {/* Preview */}

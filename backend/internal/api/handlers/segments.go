@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/uniq-chat/backend/internal/api/middleware"
@@ -186,51 +188,249 @@ func (h *SegmentHandler) CSVImport(c *fiber.Ctx) error {
 // ─── helpers ──────────────────────────────────────────────────────────
 
 // buildSegmentQuery constrói gorm.DB query a partir do filter JSON.
-// Subset do segment_filter de campaigns.
+// Suporta filtros flat (legados) e groups-based AND/OR.
 func buildSegmentQuery(db *gorm.DB, wsID uuid.UUID, filter map[string]any) *gorm.DB {
-	q := db.Model(&models.Contact{}).Where("workspace_id = ? OR user_id IN (SELECT user_id FROM user_workspaces WHERE workspace_id = ?)", wsID, wsID)
-	if v, ok := filter["funnel"].(string); ok && v != "" {
-		q = q.Where("funnel = ?", v)
-	}
-	if v, ok := filter["stage"].(string); ok && v != "" {
-		q = q.Where("stage = ?", v)
-	}
-	if v, ok := filter["journey"].(string); ok && v != "" {
-		q = q.Where("journey = ?", v)
-	}
-	if v, ok := filter["owner"].(string); ok && v != "" {
-		q = q.Where("owner_id = ?", v)
-	}
-	if v, ok := filter["external_id"].(string); ok && v != "" {
-		q = q.Where("external_id = ?", v)
-	}
-	if v, ok := filter["tags"].([]any); ok && len(v) > 0 {
-		names := make([]string, 0, len(v))
-		for _, t := range v {
-			if s, ok := t.(string); ok {
-				names = append(names, s)
+	q := db.Model(&models.Contact{}).Where("contacts.workspace_id = ? OR contacts.user_id IN (SELECT user_id FROM user_workspaces WHERE workspace_id = ?)", wsID, wsID)
+
+	// ── Legado: filtros flat (sem groups) ────────────────────────────
+	if _, hasGroups := filter["groups"]; !hasGroups {
+		if v, ok := filter["funnel"].(string); ok && v != "" {
+			q = q.Where("contacts.funnel = ?", v)
+		}
+		if v, ok := filter["stage"].(string); ok && v != "" {
+			q = q.Where("contacts.stage = ?", v)
+		}
+		if v, ok := filter["journey"].(string); ok && v != "" {
+			q = q.Where("contacts.journey = ?", v)
+		}
+		if v, ok := filter["owner"].(string); ok && v != "" {
+			q = q.Where("contacts.owner_id = ?", v)
+		}
+		if v, ok := filter["external_id"].(string); ok && v != "" {
+			q = q.Where("contacts.external_id = ?", v)
+		}
+		if v, ok := filter["tags"].([]any); ok && len(v) > 0 {
+			names := make([]string, 0, len(v))
+			for _, t := range v {
+				if s, ok := t.(string); ok {
+					names = append(names, s)
+				}
+			}
+			if len(names) > 0 {
+				q = q.Joins("INNER JOIN contact_tags ct ON ct.contact_id = contacts.id").
+					Joins("INNER JOIN tags t ON t.id = ct.tag_id").
+					Where("t.name IN ?", names).Distinct()
 			}
 		}
-		if len(names) > 0 {
-			q = q.Joins("INNER JOIN contact_tags ct ON ct.contact_id = contacts.id").
-				Joins("INNER JOIN tags t ON t.id = ct.tag_id").
-				Where("t.name IN ?", names).Distinct()
+		if v, ok := filter["min_ltv"].(float64); ok {
+			q = q.Joins("LEFT JOIN contact_computed cc ON cc.contact_id = contacts.id").
+				Where("cc.lifetime_value >= ?", v)
 		}
+		if v, ok := filter["min_orders"].(float64); ok {
+			q = q.Joins("LEFT JOIN contact_computed cc ON cc.contact_id = contacts.id").
+				Where("cc.orders_total >= ?", int(v))
+		}
+		if v, ok := filter["never_purchased"].(bool); ok && v {
+			q = q.Joins("LEFT JOIN contact_computed cc ON cc.contact_id = contacts.id").
+				Where("COALESCE(cc.orders_total, 0) = 0")
+		}
+		return q
 	}
-	// Computed attribute filters
-	if v, ok := filter["min_ltv"].(float64); ok {
-		q = q.Joins("LEFT JOIN contact_computed cc ON cc.contact_id = contacts.id").
-			Where("cc.lifetime_value >= ?", v)
+
+	// ── Novo: group-based AND/OR ──────────────────────────────────────
+	groupsRaw, _ := filter["groups"].([]any)
+	groupsMatch, _ := filter["groups_match"].(string)
+	if groupsMatch == "" {
+		groupsMatch = "all"
 	}
-	if v, ok := filter["min_orders"].(float64); ok {
-		q = q.Joins("LEFT JOIN contact_computed cc ON cc.contact_id = contacts.id").
-			Where("cc.orders_total >= ?", int(v))
+
+	var groupClauses []string
+	var groupArgs []interface{}
+
+	for _, gRaw := range groupsRaw {
+		g, ok := gRaw.(map[string]any)
+		if !ok {
+			continue
+		}
+		clause, args := buildGroupWhereSQL(wsID, g)
+		if clause == "" {
+			continue
+		}
+		groupClauses = append(groupClauses, clause)
+		groupArgs = append(groupArgs, args...)
 	}
-	if v, ok := filter["never_purchased"].(bool); ok && v {
-		q = q.Joins("LEFT JOIN contact_computed cc ON cc.contact_id = contacts.id").
-			Where("COALESCE(cc.orders_total, 0) = 0")
+
+	if len(groupClauses) > 0 {
+		sep := " AND "
+		if groupsMatch == "any" {
+			sep = " OR "
+		}
+		q = q.Where("("+strings.Join(groupClauses, sep)+")", groupArgs...)
 	}
+
 	return q
+}
+
+// buildGroupWhereSQL constrói um fragmento SQL para um grupo de condições.
+func buildGroupWhereSQL(wsID uuid.UUID, group map[string]any) (string, []interface{}) {
+	match, _ := group["match"].(string)
+	if match == "" {
+		match = "all"
+	}
+	condsRaw, _ := group["conditions"].([]any)
+
+	var clauses []string
+	var args []interface{}
+
+	for _, condRaw := range condsRaw {
+		cond, ok := condRaw.(map[string]any)
+		if !ok {
+			continue
+		}
+		field, _ := cond["field"].(string)
+		value := cond["value"]
+
+		clause, condArgs := buildConditionClause(wsID, field, value)
+		if clause == "" {
+			continue
+		}
+		clauses = append(clauses, "("+clause+")")
+		args = append(args, condArgs...)
+	}
+
+	if len(clauses) == 0 {
+		return "", nil
+	}
+
+	sep := " AND "
+	if match == "any" {
+		sep = " OR "
+	}
+	return "(" + strings.Join(clauses, sep) + ")", args
+}
+
+// buildConditionClause retorna SQL e args para uma condição individual.
+func buildConditionClause(wsID uuid.UUID, field string, value any) (string, []interface{}) {
+	str, _ := value.(string)
+	num, _ := value.(float64)
+
+	switch field {
+	case "funnel":
+		if str == "" {
+			return "", nil
+		}
+		return "contacts.funnel = ?", []interface{}{str}
+	case "stage":
+		if str == "" {
+			return "", nil
+		}
+		return "contacts.stage = ?", []interface{}{str}
+	case "journey":
+		if str == "" {
+			return "", nil
+		}
+		return "contacts.journey = ?", []interface{}{str}
+	case "owner":
+		if str == "" {
+			return "", nil
+		}
+		return "contacts.owner_id = ?", []interface{}{str}
+	case "external_id":
+		if str == "" {
+			return "", nil
+		}
+		return "contacts.external_id = ?", []interface{}{str}
+	case "channel":
+		if str == "" {
+			return "", nil
+		}
+		return "contacts.channel = ?", []interface{}{str}
+	case "tag":
+		if str == "" {
+			return "", nil
+		}
+		return "EXISTS (SELECT 1 FROM contact_tags ct INNER JOIN tags t ON t.id = ct.tag_id WHERE ct.contact_id = contacts.id AND t.name = ?)", []interface{}{str}
+	case "never_purchased":
+		return "NOT EXISTS (SELECT 1 FROM orders WHERE orders.contact_id = contacts.id)", nil
+	case "min_ltv":
+		if num == 0 {
+			return "", nil
+		}
+		return "EXISTS (SELECT 1 FROM contact_computed cc WHERE cc.contact_id = contacts.id AND cc.lifetime_value >= ?)", []interface{}{num}
+	case "min_orders":
+		if num == 0 {
+			return "", nil
+		}
+		return "EXISTS (SELECT 1 FROM contact_computed cc WHERE cc.contact_id = contacts.id AND cc.orders_total >= ?)", []interface{}{int(num)}
+	case "signup_after":
+		if str == "" {
+			return "", nil
+		}
+		return "contacts.created_at >= ?", []interface{}{str}
+	case "signup_before":
+		if str == "" {
+			return "", nil
+		}
+		return "contacts.created_at <= ?", []interface{}{str}
+	// ── Inbox behavior ───────────────────────────────────────────────
+	case "inbox_assigned_to":
+		if str == "" {
+			return "", nil
+		}
+		return "EXISTS (SELECT 1 FROM conversations WHERE conversations.contact_id = contacts.id AND conversations.workspace_id = ? AND conversations.assigned_user_id = ?)", []interface{}{wsID, str}
+	case "inbox_department":
+		if str == "" {
+			return "", nil
+		}
+		return "EXISTS (SELECT 1 FROM conversations WHERE conversations.contact_id = contacts.id AND conversations.workspace_id = ? AND conversations.department_id = ?)", []interface{}{wsID, str}
+	case "inbox_team":
+		if str == "" {
+			return "", nil
+		}
+		return "EXISTS (SELECT 1 FROM conversations WHERE conversations.contact_id = contacts.id AND conversations.workspace_id = ? AND conversations.team_id = ?)", []interface{}{wsID, str}
+	case "inbox_queue":
+		if str == "" {
+			return "", nil
+		}
+		return "EXISTS (SELECT 1 FROM conversations WHERE conversations.contact_id = contacts.id AND conversations.workspace_id = ? AND conversations.queue_id = ?)", []interface{}{wsID, str}
+	case "inbox_response_time_max":
+		if num == 0 {
+			return "", nil
+		}
+		return "EXISTS (SELECT 1 FROM conversations WHERE conversations.contact_id = contacts.id AND conversations.workspace_id = ? AND conversations.first_response_at IS NOT NULL AND EXTRACT(EPOCH FROM (conversations.first_response_at - conversations.created_at)) <= ?)", []interface{}{wsID, num}
+	case "inbox_conversation_count_min":
+		if num == 0 {
+			return "", nil
+		}
+		return "(SELECT COUNT(*) FROM conversations WHERE conversations.contact_id = contacts.id AND conversations.workspace_id = ?) >= ?", []interface{}{wsID, int(num)}
+	case "inbox_last_contact_after":
+		if str == "" {
+			return "", nil
+		}
+		return "EXISTS (SELECT 1 FROM conversations WHERE conversations.contact_id = contacts.id AND conversations.workspace_id = ? AND conversations.created_at >= ?)", []interface{}{wsID, str}
+	case "inbox_first_contact_after":
+		if str == "" {
+			return "", nil
+		}
+		return "(SELECT MIN(created_at) FROM conversations WHERE conversations.contact_id = contacts.id AND conversations.workspace_id = ?) >= ?", []interface{}{wsID, str}
+	case "inbox_entered_after":
+		if str == "" {
+			return "", nil
+		}
+		return "EXISTS (SELECT 1 FROM conversations WHERE conversations.contact_id = contacts.id AND conversations.workspace_id = ? AND conversations.created_at >= ?)", []interface{}{wsID, str}
+	// ── Campanhas ───────────────────────────────────────────────────
+	case "participated_campaign":
+		if str == "" {
+			return "", nil
+		}
+		return "EXISTS (SELECT 1 FROM campaign_recipients cr WHERE cr.phone = contacts.phone AND cr.campaign_id = ?)", []interface{}{str}
+	case "passed_agent":
+		if str == "" {
+			return "", nil
+		}
+		return "EXISTS (SELECT 1 FROM conversations WHERE conversations.contact_id = contacts.id AND conversations.workspace_id = ? AND conversations.assigned_user_id = ?)", []interface{}{wsID, str}
+	}
+	return "", nil
 }
 
 // jsonDecode helper
