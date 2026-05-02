@@ -1339,6 +1339,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	admin.Put("/users/:id", adminH.UpdateUser)
 	admin.Post("/users/:id/reset-password", adminH.ResetPassword)
 	admin.Delete("/users/:id", adminH.DeleteUser)
+	admin.Get("/users/:id/delete-diagnose", adminH.UserDeleteDiagnose)
 	admin.Put("/plans/:id", adminH.UpdatePlan)
 	admin.Post("/invites/toggle", inviteH.ToggleSystem)
 	admin.Get("/invites", inviteH.AdminList)

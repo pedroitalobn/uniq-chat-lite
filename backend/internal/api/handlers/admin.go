@@ -9,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/email"
@@ -499,6 +500,65 @@ func (h *AdminHandler) DeleteUser(c *fiber.Ctx) error {
 	})
 }
 
+// UserDeleteDiagnose godoc
+// GET /admin/users/:id/delete-diagnose
+// Retorna quais tabelas têm registros vinculados ao user (dry-run do cascade).
+func (h *AdminHandler) UserDeleteDiagnose(c *fiber.Ctx) error {
+	userID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID inválido"})
+	}
+
+	type rowCount struct {
+		Table  string `json:"table"`
+		Column string `json:"column"`
+		Count  int64  `json:"count"`
+		Via    string `json:"via,omitempty"`
+	}
+	var result []rowCount
+
+	// Workspaces do user
+	var wsIDs []string
+	h.db.Raw(`SELECT id::text FROM workspaces WHERE user_id = ?`, userID).Scan(&wsIDs)
+
+	collectCounts := func(parentTable, parentCol string, parentIDs []string, via string) {
+		if len(parentIDs) == 0 {
+			return
+		}
+		type fk struct{ Table, Column string }
+		var fks []fk
+		h.db.Raw(`
+			SELECT cl.relname AS table, att.attname AS column
+			FROM pg_constraint con
+			JOIN pg_class cl   ON cl.oid  = con.conrelid
+			JOIN pg_class pcl  ON pcl.oid = con.confrelid
+			JOIN pg_attribute att  ON att.attrelid  = cl.oid  AND att.attnum  = ANY(con.conkey)
+			JOIN pg_attribute patt ON patt.attrelid = pcl.oid AND patt.attnum = ANY(con.confkey)
+			WHERE con.contype = 'f' AND pcl.relname = ? AND patt.attname = ?`,
+			parentTable, parentCol).Scan(&fks)
+
+		idList := buildIDList(parentIDs)
+		for _, f := range fks {
+			var cnt int64
+			h.db.Raw(fmt.Sprintf(`SELECT COUNT(*) FROM "%s" WHERE "%s"::text IN (%s)`, f.Table, f.Column, idList)).Scan(&cnt)
+			if cnt > 0 {
+				result = append(result, rowCount{Table: f.Table, Column: f.Column, Count: cnt, Via: via})
+			}
+		}
+	}
+
+	if len(wsIDs) > 0 {
+		collectCounts("workspaces", "id", wsIDs, "workspace")
+	}
+	collectCounts("users", "id", []string{userID.String()}, "user")
+
+	return c.JSON(fiber.Map{
+		"user_id":     userID,
+		"workspaces":  wsIDs,
+		"dependents":  result,
+	})
+}
+
 // cascadeDeleteByFK deleta recursivamente todos os dependentes de (parentTable.parentCol)
 // antes de retornar — permitindo que o caller delete o próprio parent sem violar FKs.
 // Usa recursão em profundidade: para cada filho, coleta os IDs afetados e desce na
@@ -508,7 +568,7 @@ func cascadeDeleteByFK(tx *gorm.DB, parentTable, parentCol string, ids []string,
 }
 
 func cascadeDeleteRecursive(tx *gorm.DB, parentTable, parentCol string, ids []string, counts map[string]int64, visited map[string]bool, depth int) error {
-	if len(ids) == 0 || depth > 15 {
+	if len(ids) == 0 || depth > 20 {
 		return nil
 	}
 
@@ -546,22 +606,32 @@ func cascadeDeleteRecursive(tx *gorm.DB, parentTable, parentCol string, ids []st
 		}
 		visited[visitKey] = true
 
-		// Coleta PKs dos filhos para recursar nos netos.
+		log.Debug().
+			Str("table", f.Table).Str("col", f.Column).
+			Str("parent", parentTable).Int("depth", depth).
+			Msg("cascade: checking child table")
+
+		// Tenta obter IDs usando "id" (coluna padrão GORM).
+		// Para join tables sem "id", retorna vazio e saltamos a recursão.
 		var childPKs []string
 		pkQ := fmt.Sprintf(`SELECT id::text FROM "%s" WHERE "%s"::text IN (%s)`, f.Table, f.Column, idList)
-		_ = tx.Raw(pkQ).Scan(&childPKs) // ignora tabelas sem coluna "id" (join tables)
-
-		if len(childPKs) > 0 {
+		if err := tx.Raw(pkQ).Scan(&childPKs).Error; err != nil {
+			// Tabela sem coluna "id" (join table) — apenas deleta, sem recursão.
+			log.Debug().Str("table", f.Table).Msg("cascade: no id col, skip recursion")
+		} else if len(childPKs) > 0 {
 			if err := cascadeDeleteRecursive(tx, f.Table, "id", childPKs, counts, visited, depth+1); err != nil {
 				return err
 			}
 		}
 
 		stmt := fmt.Sprintf(`DELETE FROM "%s" WHERE "%s"::text IN (%s)`, f.Table, f.Column, idList)
+		log.Debug().Str("stmt_prefix", fmt.Sprintf("DELETE FROM \"%s\" WHERE \"%s\"", f.Table, f.Column)).Msg("cascade: executing delete")
 		res := tx.Exec(stmt)
 		if res.Error != nil {
+			log.Error().Err(res.Error).Str("table", f.Table).Str("col", f.Column).Msg("cascade: delete failed")
 			return fmt.Errorf("delete %s.%s: %w", f.Table, f.Column, res.Error)
 		}
+		log.Debug().Str("table", f.Table).Int64("rows", res.RowsAffected).Msg("cascade: deleted")
 		counts[f.Table] += res.RowsAffected
 	}
 	return nil
