@@ -1145,6 +1145,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	shops.Get("/:shopId/integrations", shopH.ListIntegrations)
 	shops.Post("/:shopId/integrations", shopH.CreateIntegration)
 	shops.Delete("/:shopId/integrations/:id", shopH.DeleteIntegration)
+	shops.Patch("/:shopId/integrations/:id", shopH.PatchIntegration)
 	shops.Post("/:shopId/integrations/:id/test", shopH.TestIntegration)
 	shops.Post("/:shopId/integrations/:id/sync", shopH.SyncIntegration)
 	shops.Post("/:shopId/integrations/:id/connect", shopH.ConnectIntegration)

@@ -525,27 +525,110 @@ func (h *ShopHandler) DeleteIntegration(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"deleted": true})
 }
 
+// ProviderField descreve um campo de formulário que a UI deve exibir
+// antes de conectar um provider (credenciais, domínio, IDs, etc).
+type ProviderField struct {
+	Key         string `json:"key"`
+	Label       string `json:"label"`
+	Placeholder string `json:"placeholder"`
+	Type        string `json:"type"`     // "text" | "password" | "url"
+	Required    bool   `json:"required"`
+}
+
+// PATCH /v1/shops/:shopId/integrations/:id — atualiza credenciais/config/nome.
+func (h *ShopHandler) PatchIntegration(c *fiber.Ctx) error {
+	wsID, err := h.workspaceID(c)
+	if err != nil {
+		return err
+	}
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	// Valida ownership via join
+	var integ models.ShopIntegration
+	if err := h.db.Joins("JOIN shops ON shops.id = shop_integrations.shop_id").
+		Where("shop_integrations.id = ? AND shops.workspace_id = ?", id, wsID).
+		First(&integ).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "integração não encontrada"})
+	}
+	var body struct {
+		Name        string `json:"name"`
+		Credentials string `json:"credentials"`
+		Config      string `json:"config"`
+		IsActive    *bool  `json:"is_active"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+	updates := map[string]any{}
+	if body.Name != "" {
+		updates["name"] = body.Name
+	}
+	if body.Credentials != "" {
+		updates["credentials"] = body.Credentials
+	}
+	if body.Config != "" {
+		updates["config"] = body.Config
+	}
+	if body.IsActive != nil {
+		updates["is_active"] = *body.IsActive
+	}
+	if len(updates) == 0 {
+		return c.JSON(integ)
+	}
+	if err := h.db.Model(&integ).Updates(updates).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	h.db.First(&integ, "id = ?", integ.ID)
+	return c.JSON(integ)
+}
+
 // GET /v1/shops/integrations/providers — catálogo público dos providers
 // suportados (UI mostra cards "Conectar Shopify", "Conectar VTEX", etc).
 func (h *ShopHandler) ListProviders(c *fiber.Ctx) error {
 	type provider struct {
-		ID          string `json:"id"`
-		Name        string `json:"name"`
-		Region      string `json:"region"`
-		Description string `json:"description"`
-		Status      string `json:"status"` // ready / coming_soon
+		ID          string          `json:"id"`
+		Name        string          `json:"name"`
+		AuthMode    string          `json:"auth_mode"` // oauth2 / api_key / custom
+		Fields      []ProviderField `json:"fields"`
+		Region      string          `json:"region"`
+		Description string          `json:"description"`
+		Status      string          `json:"status"` // ready / coming_soon
 	}
 	providers := []provider{
-		{ID: "shopify", Name: "Shopify", Region: "Global", Description: "Sincroniza produtos e pedidos via Admin API.", Status: "ready"},
-		{ID: "mercado_livre", Name: "Mercado Livre", Region: "BR / LATAM", Description: "Importa anúncios e recebe webhooks de pedidos.", Status: "ready"},
-		{ID: "vtex", Name: "VTEX", Region: "BR Enterprise", Description: "Catalog API + OMS — maior plataforma BR de grandes lojas.", Status: "ready"},
-		{ID: "magalu", Name: "Magazine Luiza Marketplace", Region: "BR", Description: "Marketplace BR — sync via API do parceiro.", Status: "ready"},
-		{ID: "shopee", Name: "Shopee", Region: "BR / SEA", Description: "Open Platform API.", Status: "ready"},
-		{ID: "amazon", Name: "Amazon SP-API", Region: "EUA / Global", Description: "Selling Partner API — catalog + orders.", Status: "ready"},
-		{ID: "ebay", Name: "eBay", Region: "EUA / Global", Description: "Sell + Inventory API — listings + orders.", Status: "ready"},
-		{ID: "woocommerce", Name: "WooCommerce", Region: "Global", Description: "REST API self-hosted (WordPress).", Status: "ready"},
-		{ID: "bigcommerce", Name: "BigCommerce", Region: "EUA / Global", Description: "Storefront + Catalog API.", Status: "ready"},
-		{ID: "whatsapp_catalog", Name: "WhatsApp Catalog", Region: "Global", Description: "Sincroniza produtos pro catálogo do WhatsApp Business (Meta Commerce).", Status: "ready"},
+		{ID: "amazon", Name: "Amazon SP-API", AuthMode: "oauth2", Fields: nil, Region: "EUA / Global", Description: "Selling Partner API — catalog + orders.", Status: "ready"},
+		{ID: "bigcommerce", Name: "BigCommerce", AuthMode: "api_key", Fields: []ProviderField{
+			{Key: "store_hash", Label: "Store Hash", Placeholder: "abc123xyz", Type: "text", Required: true},
+			{Key: "client_id", Label: "Client ID", Placeholder: "client_...", Type: "text", Required: true},
+			{Key: "access_token", Label: "Access Token", Placeholder: "token...", Type: "password", Required: true},
+		}, Region: "EUA / Global", Description: "Storefront + Catalog API.", Status: "ready"},
+		{ID: "ebay", Name: "eBay", AuthMode: "oauth2", Fields: nil, Region: "EUA / Global", Description: "Sell + Inventory API — listings + orders.", Status: "ready"},
+		{ID: "magalu", Name: "Magazine Luiza Marketplace", AuthMode: "api_key", Fields: []ProviderField{
+			{Key: "api_key", Label: "API Key", Placeholder: "Chave de API do parceiro Magalu", Type: "password", Required: true},
+		}, Region: "BR", Description: "Marketplace BR — sync via API do parceiro.", Status: "ready"},
+		{ID: "mercado_livre", Name: "Mercado Livre", AuthMode: "oauth2", Fields: nil, Region: "BR / LATAM", Description: "Importa anúncios e recebe webhooks de pedidos.", Status: "ready"},
+		{ID: "shopee", Name: "Shopee", AuthMode: "oauth2", Fields: []ProviderField{
+			{Key: "shop_id", Label: "Shop ID", Placeholder: "ID da loja no painel Shopee", Type: "text", Required: true},
+		}, Region: "BR / SEA", Description: "Open Platform API.", Status: "ready"},
+		{ID: "shopify", Name: "Shopify", AuthMode: "oauth2", Fields: []ProviderField{
+			{Key: "shop_domain", Label: "Domínio da loja", Placeholder: "minha-loja.myshopify.com", Type: "text", Required: true},
+		}, Region: "Global", Description: "Sincroniza produtos e pedidos via Admin API.", Status: "ready"},
+		{ID: "vtex", Name: "VTEX", AuthMode: "custom", Fields: []ProviderField{
+			{Key: "account_name", Label: "Account Name", Placeholder: "minhaloja", Type: "text", Required: true},
+			{Key: "app_key", Label: "App Key", Placeholder: "vtexappkey_...", Type: "text", Required: true},
+			{Key: "app_token", Label: "App Token", Placeholder: "...", Type: "password", Required: true},
+		}, Region: "BR Enterprise", Description: "Catalog API + OMS — maior plataforma BR de grandes lojas.", Status: "ready"},
+		{ID: "whatsapp_catalog", Name: "WhatsApp Catalog", AuthMode: "api_key", Fields: []ProviderField{
+			{Key: "business_id", Label: "Business ID", Placeholder: "ID da conta Business", Type: "text", Required: true},
+			{Key: "catalog_id", Label: "Catalog ID", Placeholder: "ID do catálogo Meta", Type: "text", Required: true},
+			{Key: "access_token", Label: "Access Token", Placeholder: "Token de acesso Meta", Type: "password", Required: true},
+		}, Region: "Global", Description: "Sincroniza produtos pro catálogo do WhatsApp Business (Meta Commerce).", Status: "ready"},
+		{ID: "woocommerce", Name: "WooCommerce", AuthMode: "custom", Fields: []ProviderField{
+			{Key: "store_url", Label: "URL da loja", Placeholder: "https://minha-loja.com", Type: "url", Required: true},
+			{Key: "consumer_key", Label: "Consumer Key", Placeholder: "ck_...", Type: "text", Required: true},
+			{Key: "consumer_secret", Label: "Consumer Secret", Placeholder: "cs_...", Type: "password", Required: true},
+		}, Region: "Global", Description: "REST API self-hosted (WordPress).", Status: "ready"},
 	}
 	return c.JSON(providers)
 }
