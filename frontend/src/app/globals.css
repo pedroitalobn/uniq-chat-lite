@@ -186,12 +186,12 @@
   ────────────────────────────────────────────────────────────────────── */
   html {
     background:
-      radial-gradient(ellipse 55% 40% at 15%  8%,  rgba(0, 212, 106, 0.08) 0%, transparent 70%),
-      radial-gradient(ellipse 50% 35% at 85%  5%,  rgba(99, 102, 241, 0.07) 0%, transparent 65%),
-      radial-gradient(ellipse 40% 50% at 5%  55%,  rgba(139, 92, 246, 0.05) 0%, transparent 70%),
-      radial-gradient(ellipse 45% 40% at 92% 50%,  rgba(59, 130, 246, 0.05) 0%, transparent 65%),
-      radial-gradient(ellipse 60% 30% at 50% 100%, rgba(0, 212, 106, 0.04) 0%, transparent 60%),
-      hsl(240 25% 2%);
+      radial-gradient(ellipse 55% 40% at 15%  8%,  rgba(0, 212, 106, 0.06) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 35% at 85%  5%,  rgba(99, 102, 241, 0.05) 0%, transparent 65%),
+      radial-gradient(ellipse 40% 50% at 5%  55%,  rgba(139, 92, 246, 0.04) 0%, transparent 70%),
+      radial-gradient(ellipse 45% 40% at 92% 50%,  rgba(59, 130, 246, 0.03) 0%, transparent 65%),
+      radial-gradient(ellipse 60% 30% at 50% 100%, rgba(0, 212, 106, 0.03) 0%, transparent 60%),
+      hsl(240 28% 1.5%);
     min-height: 100vh;
   }
 
