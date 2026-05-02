@@ -67,6 +67,28 @@ const FEATURE_KEYS = [
   { key: "mcp",          label: "MCP",          icon: "🤖" },
 ];
 
+const FEATURE_LABELS: Record<string, string> = Object.fromEntries(FEATURE_KEYS.map(({ key, label }) => [key, label]));
+
+function generateAutoHighlights(plan: Plan, featObj: Record<string, unknown>): string[] {
+  const highlights: string[] = [];
+  const maxInst = plan.max_instances === -1 ? "Ilimitadas" : `${plan.max_instances}`;
+  highlights.push(`${maxInst} instância${plan.max_instances !== 1 ? "s" : ""}`);
+  highlights.push(plan.max_messages_per_day === -1 ? "Mensagens ilimitadas" : `${plan.max_messages_per_day.toLocaleString("pt-BR")} msgs/dia`);
+  highlights.push(plan.max_users === -1 ? "Usuários ilimitados" : `${plan.max_users} usuário${plan.max_users !== 1 ? "s" : ""}`);
+  highlights.push(plan.max_workspaces === -1 ? "Workspaces ilimitados" : `${plan.max_workspaces} workspace${plan.max_workspaces !== 1 ? "s" : ""}`);
+  if (plan.allow_proxy) highlights.push("Proxy dedicado");
+  Object.entries(FEATURE_LABELS).forEach(([key, label]) => {
+    if (featObj[key] === true) highlights.push(label);
+  });
+  const channels = Array.isArray(featObj["channels"]) ? (featObj["channels"] as string[]) : [];
+  channels.forEach((ch) => { const label = FEATURE_LABELS[ch]; if (label && !highlights.includes(label)) highlights.push(label); });
+  const support = typeof featObj["support"] === "string" ? featObj["support"] : "";
+  if (support === "priority") highlights.push("Suporte prioritário 24/7");
+  else if (support === "email") highlights.push("Suporte por email");
+  else if (support === "community") highlights.push("Suporte comunidade");
+  return highlights;
+}
+
 const PLAN_STYLES: Record<string, { icon: string; accent: string; bg: string; border: string; gradient: string }> = {
   Free:       { icon: "#64748b", accent: "#64748b", bg: "rgba(100,116,139,0.05)", border: "rgba(100,116,139,0.12)", gradient: "linear-gradient(135deg,rgba(100,116,139,0.12),rgba(100,116,139,0.04))" },
   Starter:    { icon: "#fb923c", accent: "#fb923c", bg: "rgba(251,146,60,0.05)",  border: "rgba(251,146,60,0.15)",  gradient: "linear-gradient(135deg,rgba(251,146,60,0.12),rgba(251,146,60,0.04))" },
@@ -261,7 +283,10 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
     stripe_price_id: p?.stripe_price_id ?? "",
     asaas_product_id: p?.asaas_product_id ?? "",
     description: typeof featObj["description"] === "string" ? featObj["description"] : "",
-    highlights: Array.isArray(featObj["highlights"]) ? (featObj["highlights"] as string[]) : [],
+    highlights: (() => {
+      const saved = Array.isArray(featObj["highlights"]) ? (featObj["highlights"] as string[]) : [];
+      return saved.length > 0 ? saved : (p ? generateAutoHighlights(p, featObj) : []);
+    })(),
     features: JSON.stringify(featObj, null, 2),
   });
 
@@ -585,7 +610,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                 <div className="border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }} />
                 <HighlightsEditor highlights={form.highlights} onChange={(h) => setForm({ ...form, highlights: h })} />
                 <p className="text-[10px]" style={{ color: "hsl(240 8% 36%)" }}>
-                  Esses textos substituem os itens gerados automaticamente. Deixe vazio para usar os valores calculados pelos limites do plano.
+                  Os textos foram pré-preenchidos com o que está exibido ao vivo em /plans. Edite conforme necessário — qualquer alteração substitui os valores automáticos.
                 </p>
               </div>
             )}
