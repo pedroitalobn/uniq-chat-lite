@@ -458,7 +458,7 @@ func (h *AdminHandler) DeleteUser(c *fiber.Ctx) error {
 		// 1. Coleta workspaces que esse user é OWNER (workspaces.user_id).
 		//    Vamos deletar tudo que depende dessas workspaces também.
 		var ownerWsIDs []string
-		tx.Raw(`SELECT id::text FROM workspaces WHERE user_id = ?`, userID).Scan(&ownerWsIDs)
+		tx.Raw(`SELECT id::text FROM workspaces WHERE owner_id = ?`, userID).Scan(&ownerWsIDs)
 
 		// 2. Deleta dependentes das workspaces do user (recursivo via FKs).
 		if len(ownerWsIDs) > 0 {
@@ -519,7 +519,7 @@ func (h *AdminHandler) UserDeleteDiagnose(c *fiber.Ctx) error {
 
 	// Workspaces do user
 	var wsIDs []string
-	h.db.Raw(`SELECT id::text FROM workspaces WHERE user_id = ?`, userID).Scan(&wsIDs)
+	h.db.Raw(`SELECT id::text FROM workspaces WHERE owner_id = ?`, userID).Scan(&wsIDs)
 
 	collectCounts := func(parentTable, parentCol string, parentIDs []string, via string) {
 		if len(parentIDs) == 0 {
