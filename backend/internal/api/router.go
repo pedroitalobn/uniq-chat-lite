@@ -25,6 +25,11 @@ import (
 // SetupRouter configures all routes and returns the Fiber app.
 func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	app := fiber.New(fiber.Config{
+		// CF-Connecting-IP é injetado pela Cloudflare com o IP real do cliente.
+		// Sem isso, c.IP() retorna o IP do proxy (172.67.x.x) e TODOS os
+		// usuários compartilham o mesmo contador de rate-limit — 2 pessoas
+		// logando ao mesmo tempo estouram o limite.
+		ProxyHeader: "CF-Connecting-IP",
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
 			if e, ok := err.(*fiber.Error); ok {
@@ -274,9 +279,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// ─── Auth routes (public) ─────────────────────────────────────────────────
 	// Rate limits agressivos: contas/login/reset são alvo #1 de bots.
 	// 5/min é o suficiente pra usuário humano e barra ataques de massa.
-	authStrict := middleware.RateLimit(5)    // signup/forgot/reset
-	authLogin := middleware.RateLimit(10)    // login pode legitimamente repetir (typo de senha)
-	authValidate := middleware.RateLimit(20) // validate-key/refresh: chamados pela UI
+	authStrict := middleware.RateLimit(10)   // signup/forgot/reset
+	authLogin := middleware.RateLimit(30)   // login: typo de senha, múltiplos devices, SSO retries
+	authValidate := middleware.RateLimit(60) // validate-key/refresh: chamados pela UI em polling
 	auth := app.Group("/auth")
 	auth.Post("/login", authLogin, authH.Login)
 	auth.Post("/register", authStrict, authH.Register)
