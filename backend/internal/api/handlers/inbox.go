@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	zlog "github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/models"
+	"github.com/uniq-chat/backend/internal/storage"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
 )
@@ -867,8 +868,18 @@ func (h *InboxHandler) SendMedia(c *fiber.Ctx) error {
 	}
 
 	// Download dos bytes. Timeout curto — o arquivo já vive no nosso MinIO.
+	// Se a URL pertence ao nosso bucket (bucket privado), troca pela signed URL
+	// antes do GET — URL pública retorna 403 em bucket privado.
+	downloadURL := req.URL
+	if storage.IsConfigured() {
+		if key := storage.GlobalStorage.KeyFromURL(req.URL); key != "" {
+			if signed, err := storage.GlobalStorage.PresignURL(c.Context(), key, 10*time.Minute); err == nil {
+				downloadURL = signed
+			}
+		}
+	}
 	httpClient := &http.Client{Timeout: 60 * time.Second}
-	resp, err := httpClient.Get(req.URL)
+	resp, err := httpClient.Get(downloadURL)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "falha ao baixar a mídia: " + err.Error()})
 	}
