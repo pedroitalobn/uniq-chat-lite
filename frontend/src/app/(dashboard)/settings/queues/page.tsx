@@ -11,6 +11,7 @@ import {
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 
 interface Queue {
   id: string;
@@ -334,9 +335,11 @@ function QueueDrawer({
         </nav>
 
         <div className="flex-1 overflow-auto p-4">
-          {tab === "settings" && <QueueSettings queue={queue} wsId={wsId} canManage={canManage} onSaved={() => qc.invalidateQueries({ queryKey: ["queues", wsId] })} />}
-          {tab === "members" && <QueueMembers queueId={queue.id} wsId={wsId} canManage={canManage} />}
-          {tab === "channels" && <QueueChannels queueId={queue.id} wsId={wsId} canManage={canManage} />}
+          <AnimatedTabContent tabKey={tab}>
+            {tab === "settings" && <QueueSettings queue={queue} wsId={wsId} canManage={canManage} onSaved={() => qc.invalidateQueries({ queryKey: ["queues", wsId] })} />}
+            {tab === "members" && <QueueMembers queueId={queue.id} wsId={wsId} canManage={canManage} />}
+            {tab === "channels" && <QueueChannels queueId={queue.id} wsId={wsId} canManage={canManage} />}
+          </AnimatedTabContent>
         </div>
       </div>
     </div>

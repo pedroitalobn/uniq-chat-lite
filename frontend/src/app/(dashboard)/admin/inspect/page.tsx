@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSession } from "next-auth/react";
+import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api";
 import {
@@ -112,6 +113,7 @@ export default function AdminInspectPage() {
       </div>
 
       {/* List */}
+      <AnimatedTabContent tabKey={tab}>
       {tab === "servers" && (
         <div className="rounded-2xl overflow-hidden" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
           <div className="grid grid-cols-[1fr_1fr_100px_80px_60px] gap-3 px-4 py-2.5 text-[10px] font-medium uppercase tracking-widest"
@@ -175,6 +177,7 @@ export default function AdminInspectPage() {
           )}
         </div>
       )}
+      </AnimatedTabContent>
     </div>
   );
 }

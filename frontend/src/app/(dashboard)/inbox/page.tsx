@@ -135,6 +135,9 @@ export default function InboxPage() {
     window.addEventListener("mouseup", onUp);
   };
 
+  const seenConvsRef = useRef<Set<string>>(new Set());
+  const seenInitializedRef = useRef(false);
+
   const [agentScope, setAgentScope] = useState<string>("all"); // "me" | "<uuid>" | "all"
   const [queueScope, setQueueScope] = useState<string>("all"); // "all" | "none" | uuid
   const [channelFilter, setChannelFilter] = useState<string[]>([]); // multi-select
@@ -254,6 +257,24 @@ export default function InboxPage() {
     enabled: !!wsId && canView,
     refetchInterval: 20_000,
   });
+
+  useEffect(() => {
+    const items = listQ.data?.items ?? [];
+    if (!seenInitializedRef.current) {
+      items.forEach((c) => seenConvsRef.current.add(c.id));
+      seenInitializedRef.current = true;
+      return;
+    }
+    items.forEach((c) => {
+      if (!seenConvsRef.current.has(c.id)) {
+        seenConvsRef.current.add(c.id);
+        toast("Nova conversa", {
+          description: c.contact?.name || c.channel_key || "Nova mensagem recebida",
+          duration: 5000,
+        });
+      }
+    });
+  }, [listQ.data?.items]);
 
   const countsQ = useQuery({
     queryKey: ["conversations-count", wsId],
@@ -422,29 +443,23 @@ export default function InboxPage() {
 
           {viewMode === "conversations" && (
           <div className="ml-auto flex flex-nowrap items-center gap-1.5 sm:gap-2 min-w-0">
-            {/* GlobalSearchButton removido — ficava redundante com o input
-                "Buscar…" local. Quem quer busca full-text de mensagens
-                pode usar /v1/conversations/messages/search via DevTools/API. */}
-            <button
-              type="button"
-              onClick={() => {
-                qc.invalidateQueries({ queryKey: ["conversations", wsId] });
-                qc.invalidateQueries({ queryKey: ["inbox-stats", wsId] });
-                qc.invalidateQueries({ queryKey: ["conversations-count", wsId] });
-              }}
-              title="Atualizar"
-              aria-label="Atualizar lista"
-              className="flex h-7 w-7 items-center justify-center rounded-md"
-              style={{
-                background: "rgba(255,255,255,0.06)",
-                backdropFilter: "blur(8px)",
-                border: "1px solid rgba(255,255,255,0.10)",
-                color: "hsl(240 8% 65%)",
-                transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
-              }}
-            >
-              <RefreshCw className="h-3 w-3" />
-            </button>
+            {/* Atendimentos — status filter dropdown (primeiro na barra) */}
+            <SingleSelectDropdown
+              icon={<MessageSquare className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />}
+              label={statusLabel}
+              items={TABS.map((t) => ({
+                id: t.id,
+                label: t.label,
+                hint: t.id === "unassigned" && countsQ.data?.unassigned_open
+                  ? `${countsQ.data.unassigned_open}`
+                  : t.id === "open" && agentScope === "me" && countsQ.data?.mine_open
+                  ? `${countsQ.data.mine_open}`
+                  : undefined,
+              }))}
+              selected={statusTab}
+              onChange={(id) => setStatusTab(id as StatusTab)}
+            />
+
             {notifPerm === "default" && (
               <button
                 type="button"
@@ -527,23 +542,6 @@ export default function InboxPage() {
                   {t("inbox_manage_queues")}
                 </Link>
               }
-            />
-
-            {/* Atendimentos — status filter dropdown */}
-            <SingleSelectDropdown
-              icon={<MessageSquare className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />}
-              label={statusLabel}
-              items={TABS.map((t) => ({
-                id: t.id,
-                label: t.label,
-                hint: t.id === "unassigned" && countsQ.data?.unassigned_open
-                  ? `${countsQ.data.unassigned_open}`
-                  : t.id === "open" && agentScope === "me" && countsQ.data?.mine_open
-                  ? `${countsQ.data.mine_open}`
-                  : undefined,
-              }))}
-              selected={statusTab}
-              onChange={(id) => setStatusTab(id as StatusTab)}
             />
 
             {/* Clear filters — só aparece quando há ao menos um ativo. Útil

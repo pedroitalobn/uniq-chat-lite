@@ -25,6 +25,7 @@ import {
 } from "recharts";
 import type { Instance } from "@/types";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 
 const MOCK_MSGS  = [120, 340, 210, 480, 90, 310, 175];
 const WEEKDAYS   = ["dom.", "seg.", "ter.", "qua.", "qui.", "sex.", "sáb."];
@@ -430,6 +431,7 @@ export default function DashboardPage() {
         <DashTab id="agents"    label="Agentes"    icon={Bot}              tab={tab} setTab={setTab} />
       </div>
 
+      <AnimatedTabContent tabKey={tab}>
       {tab === "campaigns" && <CampaignsView wsId={wsId} />}
       {tab === "inbox" && <InboxStatsView wsId={wsId} />}
       {tab === "shop" && <ShopStatsView wsId={wsId} />}
@@ -675,6 +677,7 @@ export default function DashboardPage() {
       </div>
       </>
       )}
+      </AnimatedTabContent>
     </div>
   );
 }

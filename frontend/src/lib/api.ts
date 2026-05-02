@@ -1453,6 +1453,7 @@ export const conversationsApi = {
       type?: string;
       media_url?: string;
       media_mime?: string;
+      media_key?: string;
       caption?: string;
       filename?: string;
       template_name?: string;

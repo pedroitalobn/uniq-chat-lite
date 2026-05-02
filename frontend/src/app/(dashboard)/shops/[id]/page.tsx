@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 import api from "@/lib/api";
 
 interface Shop {
@@ -179,6 +180,7 @@ export default function ShopDetailPage({ params }: { params: Promise<{ id: strin
         <TabBtn icon={Settings} label="Configurações" active={tab === "settings"} onClick={() => setTab("settings")} />
       </div>
 
+      <AnimatedTabContent tabKey={tab}>
       {tab === "products" && (
         <div>
           <div className="flex items-center justify-between gap-3 mb-4">
@@ -265,6 +267,7 @@ export default function ShopDetailPage({ params }: { params: Promise<{ id: strin
       {tab === "settings" && (
         <ShopSettingsForm shop={shop} headers={headers} />
       )}
+      </AnimatedTabContent>
 
       {(creatingProduct || editingProduct) && (
         <ProductFormModal

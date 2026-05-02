@@ -12,6 +12,7 @@ import { ShopSection } from "@/components/integrations/ShopSection";
 import { VoicesSection } from "@/components/integrations/VoicesSection";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 import { integrationsApi, apiKeysApi, proxiesApi, adminApi, instancesApi } from "@/lib/api";
 import { toast } from "sonner";
 import { WebhooksPanel } from "@/components/webhooks/WebhooksPanel";
@@ -213,15 +214,17 @@ export default function IntegrationsPage() {
 
           {/* Content */}
           <div className="flex-1 min-w-0 w-full">
-            {section === "llm" && <LLMSection onConnect={setConnecting} />}
-            {section === "agents" && <AgentsSection />}
-            {section === "proxies" && <ProxiesSection />}
-            {section === "mcp" && <MCPSection />}
-            {section === "webhook" && <WebhooksPanel />}
-            {section === "voices" && <VoicesSection />}
-            {section === "shop" && <ShopSection />}
-            {section === "api" && <APIKeysSection />}
-            {section === "docs" && <DocsSection />}
+            <AnimatedTabContent tabKey={section}>
+              {section === "llm" && <LLMSection onConnect={setConnecting} />}
+              {section === "agents" && <AgentsSection />}
+              {section === "proxies" && <ProxiesSection />}
+              {section === "mcp" && <MCPSection />}
+              {section === "webhook" && <WebhooksPanel />}
+              {section === "voices" && <VoicesSection />}
+              {section === "shop" && <ShopSection />}
+              {section === "api" && <APIKeysSection />}
+              {section === "docs" && <DocsSection />}
+            </AnimatedTabContent>
           </div>
         </div>
       </div>

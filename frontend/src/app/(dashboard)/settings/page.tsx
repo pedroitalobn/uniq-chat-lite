@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Plan } from "@/types";
+import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Section = "billing" | "profile" | "security" | "preferences" | "account" | "invites";
@@ -945,12 +946,14 @@ export default function SettingsPage() {
 
         {/* ── Content area ── */}
         <div className="flex-1 min-w-0">
-          {active === "billing"     && <BillingSection session={session} />}
-          {active === "profile"     && <ProfileSection session={session} update={update} t={t} />}
-          {active === "security"    && <SecuritySection />}
-          {active === "preferences" && <PreferencesSection t={t} />}
-          {active === "invites"     && <InviteSection />}
-          {active === "account"     && <AccountSection session={session} />}
+          <AnimatedTabContent tabKey={active}>
+            {active === "billing"     && <BillingSection session={session} />}
+            {active === "profile"     && <ProfileSection session={session} update={update} t={t} />}
+            {active === "security"    && <SecuritySection />}
+            {active === "preferences" && <PreferencesSection t={t} />}
+            {active === "invites"     && <InviteSection />}
+            {active === "account"     && <AccountSection session={session} />}
+          </AnimatedTabContent>
         </div>
       </div>
     </div>

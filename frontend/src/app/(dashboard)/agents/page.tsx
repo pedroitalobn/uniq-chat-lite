@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { instancesApi, integrationsApi, voicesApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { cn } from "@/lib/utils";
+import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -481,6 +482,7 @@ export default function AgentsPage() {
         </aside>
 
         {/* Content */}
+        <AnimatedTabContent tabKey={tab}>
         <section className="space-y-5">
           {/* ── Personality tab ── */}
           {tab === "personality" && (
@@ -742,6 +744,7 @@ export default function AgentsPage() {
             </>
           )}
         </section>
+        </AnimatedTabContent>
       </div>
     </div>
   );

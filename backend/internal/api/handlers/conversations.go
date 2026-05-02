@@ -400,6 +400,7 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		Type               string           `json:"type"`
 		MediaURL           string           `json:"media_url"`
 		MediaMime          string           `json:"media_mime"`
+		MediaKey           string           `json:"media_key"`
 		Caption            string           `json:"caption"`
 		Filename           string           `json:"filename"`
 		TemplateName       string           `json:"template_name"`
@@ -460,6 +461,9 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		payload := map[string]any{
 			"url":       body.MediaURL,
 			"mime_type": body.MediaMime,
+		}
+		if body.MediaKey != "" {
+			payload["media_key"] = body.MediaKey
 		}
 		if body.Filename != "" {
 			payload["filename"] = body.Filename
@@ -615,6 +619,7 @@ func (h *ConversationHandler) SendMessage(c *fiber.Ctx) error {
 		Payload:        `{"direction":"out","type":"` + msgType + `"}`,
 	})
 
+	logRow.Content = storage.ResolveMediaURLs(c.Context(), logRow.Content)
 	h.broadcast(&conv, "conversation.message", map[string]any{"message": logRow})
 	return c.Status(fiber.StatusCreated).JSON(logRow)
 }

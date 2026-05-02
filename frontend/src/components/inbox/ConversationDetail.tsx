@@ -11,14 +11,15 @@ import {
   CheckCheck, AlertCircle, Paperclip, Pin, Sparkles, Users as UsersIcon,
   Maximize2 as Maximize2Icon, Phone, Video as VideoIcon, PhoneMissed,
   UserPlus, MessageSquare, ListChecks, CornerUpLeft, CornerUpRight,
-  Pencil, Trash2, Search, Info, Bell, BellOff,
+  Pencil, Trash2, Search, Info, Bell, BellOff, Eye, Briefcase, Loader2,
 } from "lucide-react";
 import { AudioPlayer } from "@/components/inbox/AudioPlayer";
+import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 import { AudioRecorderButton } from "@/components/inbox/AudioRecorderButton";
 import { MediaViewer, type MediaViewerSource } from "@/components/inbox/MediaViewer";
 import { AgentPanel } from "@/components/inbox/AgentPanel";
 import { WindowKeeperToggle } from "@/components/inbox/WindowKeeperToggle";
-import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi, crmContactsApi, linkPreviewApi } from "@/lib/api";
+import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi, crmContactsApi, linkPreviewApi, dealsApi, crmApi } from "@/lib/api";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TemplatePicker } from "@/components/inbox/TemplatePicker";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -193,6 +194,11 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   const [transferOpen, setTransferOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
 
+  // Mode selector: human / ai / observing
+  type ConvMode = "human" | "ai" | "observing";
+  const [convMode, setConvMode] = useState<ConvMode>("human");
+  const [dealModalOpen, setDealModalOpen] = useState(false);
+
   const convQ = useQuery({
     queryKey: ["conversation", wsId, conversationId],
     queryFn: () => conversationsApi.get(wsId as string, conversationId).then((r) => r.data as Conversation),
@@ -252,6 +258,13 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
         /* não é crítico — o badge atualiza no próximo refetch */
       });
   }, [wsId, canView, conversationId, qc]);
+
+  // Sync convMode with is_bot_active from backend
+  useEffect(() => {
+    if (convQ.data) {
+      setConvMode(convQ.data.is_bot_active ? "ai" : "human");
+    }
+  }, [convQ.data?.is_bot_active]);
 
   // Live updates — any server-side conversation event for this ticket
   // invalidates the relevant queries. Payloads that embed `conversation_id`
@@ -615,12 +628,14 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     <div className="flex h-full min-h-0">
       {/* Main pane: header + timeline + composer */}
       <section className="flex flex-1 min-w-0 flex-col">
-        <header className="flex items-center gap-3 border-b border-zinc-200 px-5 py-3 dark:border-zinc-800">
+        <header className="flex items-center gap-2 px-4 py-2.5 border-b flex-shrink-0"
+          style={{ borderColor: "rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
+          {/* Back button */}
           {onClose ? (
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md p-1.5 hover:bg-white/5 lg:hidden"
+              className="rounded-md p-1.5 hover:bg-white/5 lg:hidden flex-shrink-0"
               style={{ color: "hsl(240 8% 48%)" }}
               aria-label="Voltar"
             >
@@ -629,14 +644,15 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           ) : (
             <Link
               href="/inbox"
-              className="rounded-md p-1.5 hover:bg-white/5"
+              className="rounded-md p-1.5 hover:bg-white/5 flex-shrink-0"
               style={{ color: "hsl(240 8% 48%)" }}
               aria-label="Voltar"
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>
           )}
-          {/* Avatar do contato/grupo — clicável quando tem foto, abre lightbox */}
+
+          {/* Avatar */}
           {(() => {
             const isGroup = (conv?.channel_key || "").toLowerCase().endsWith("@g.us");
             const avatarUrl = conv?.contact?.avatar_url;
@@ -647,26 +663,18 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                   type="button"
                   onClick={() => setViewerSource({ type: "image", url: avatarUrl, filename: `${name}.jpg` })}
                   title="Ver foto de perfil"
-                  className="h-9 w-9 rounded-full overflow-hidden flex-shrink-0 transition-opacity hover:opacity-80"
+                  className="h-8 w-8 rounded-full overflow-hidden flex-shrink-0 transition-opacity hover:opacity-80"
                   style={{ background: "var(--surface-2)" }}
                 >
-                  <img
-                    src={avatarUrl}
-                    alt={name}
-                    className="h-9 w-9 object-cover"
-                  />
+                  <img src={avatarUrl} alt={name} className="h-8 w-8 object-cover" />
                 </button>
               );
             }
             if (isGroup) {
               return (
                 <div
-                  className="flex h-9 w-9 items-center justify-center rounded-full flex-shrink-0"
-                  style={{
-                    background: "rgba(167,139,250,0.12)",
-                    border: "1px solid rgba(167,139,250,0.25)",
-                    color: "#c4b5fd",
-                  }}
+                  className="flex h-8 w-8 items-center justify-center rounded-full flex-shrink-0"
+                  style={{ background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.25)", color: "#c4b5fd" }}
                 >
                   <UsersIcon className="h-4 w-4" />
                 </div>
@@ -679,52 +687,43 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             const initials = (text.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0] || "").join("") || "?").toUpperCase();
             return (
               <div
-                className="flex h-9 w-9 items-center justify-center rounded-full font-medium flex-shrink-0"
-                style={{
-                  background: `hsl(${hue} 50% 22%)`,
-                  color: `hsl(${hue} 70% 75%)`,
-                  fontSize: 14,
-                }}
+                className="flex h-8 w-8 items-center justify-center rounded-full font-medium flex-shrink-0"
+                style={{ background: `hsl(${hue} 50% 22%)`, color: `hsl(${hue} 70% 75%)`, fontSize: 13 }}
               >
                 {initials}
               </div>
             );
           })()}
+
+          {/* Info section */}
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-wrap">
               {(conv?.channel_key || "").toLowerCase().endsWith("@g.us") && (
                 <UsersIcon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#a78bfa" }} aria-label="Grupo" />
               )}
-              <h1 className="truncate text-base font-medium">
+              <h1 className="truncate text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>
                 {conv?.contact?.name || conv?.subject || "Atendimento"}
               </h1>
               {status && (
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${status.cls}`}>
+                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${status.cls}`}>
                   {status.label}
                 </span>
               )}
-              {conv?.is_bot_active && (
-                <span className="flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-xs text-purple-600 dark:text-purple-400">
-                  <Bot className="h-3 w-3" /> bot
-                </span>
-              )}
               {conv?.reopen_count ? (
-                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600 dark:text-amber-400">
+                <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-400">
                   reaberto {conv.reopen_count}×
                 </span>
               ) : null}
               {slaBreached && (
-                <span className="flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
+                <span className="flex items-center gap-1 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:text-red-400">
                   <AlertTriangle className="h-3 w-3" /> SLA
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2 text-xs flex-wrap" style={{ color: "hsl(240 8% 50%)" }}>
-              {/* Presence indicator — typing > online > last seen */}
+            <div className="flex items-center gap-1.5 text-[11px] flex-wrap" style={{ color: "hsl(240 8% 50%)" }}>
               <PresenceLabel presence={presence} />
-              {/* Chip do canal — ícone + cor por tipo */}
               <span
-                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium"
+                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
                 style={{
                   background: channelChipStyle(conv?.channel_type).bg,
                   color: channelChipStyle(conv?.channel_type).color,
@@ -733,50 +732,67 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               >
                 {channelChipStyle(conv?.channel_type).label}
               </span>
-              {/* Pasta do Instagram (Primary / General / Requests) */}
               {conv?.channel_type === "instagram" && igFolderLabel(conv?.thread_key) && (() => {
                 const f = igFolderLabel(conv?.thread_key)!;
                 return (
                   <span
-                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium"
-                    style={{
-                      background: `${f.color}14`,
-                      color: f.color,
-                      border: `1px solid ${f.color}33`,
-                    }}
+                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                    style={{ background: `${f.color}14`, color: f.color, border: `1px solid ${f.color}33` }}
                     title={`Pasta do Instagram: ${f.label}`}
                   >
                     {f.label}
                   </span>
                 );
               })()}
-              {/* Chip da instância — ajuda quando "todas as instâncias" */}
               {conv?.instance?.name && (
                 <span
-                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium truncate max-w-[160px]"
-                  style={{
-                    background: "rgba(0,212,106,0.06)",
-                    color: "#00d46a",
-                    border: "1px solid rgba(0,212,106,0.18)",
-                  }}
+                  className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium truncate max-w-[120px]"
+                  style={{ background: "rgba(0,212,106,0.06)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.18)" }}
                   title={`Instância: ${conv.instance.name}`}
                 >
                   {conv.instance.name}
                 </span>
               )}
-              <span className="truncate" title={conv?.channel_key}>
-                {conv?.channel_type === "instagram" && conv?.channel_key
-                  ? `@${conv.channel_key}`
-                  : conv?.channel_key}
-              </span>
-              <span style={{ color: "hsl(240 8% 35%)" }}>·</span>
               {conv?.assigned_user?.name ? (
-                <span>responsável {conv.assigned_user.name}</span>
+                <span className="truncate">{conv.assigned_user.name}</span>
               ) : (
-                <span style={{ color: "hsl(240 8% 42%)" }}>sem responsável</span>
+                <span style={{ color: "hsl(240 8% 38%)" }}>sem responsável</span>
               )}
             </div>
           </div>
+
+          {/* Mode selector: Humano / IA / Observando */}
+          {conv && (
+            <div className="flex items-center rounded-lg overflow-hidden border flex-shrink-0"
+              style={{ border: "1px solid rgba(255,255,255,0.09)", background: "rgba(255,255,255,0.03)" }}>
+              {([
+                { id: "human",     label: "Humano", icon: UserCheck },
+                { id: "ai",        label: "IA",     icon: Bot },
+                { id: "observing", label: "Obs",    icon: Eye },
+              ] as const).map(({ id, label, icon: Icon }) => (
+                <button key={id}
+                  onClick={() => { setConvMode(id); if (id === "ai") bot.mutate(true); else bot.mutate(false); }}
+                  className="px-2.5 py-1.5 text-[10px] font-medium flex items-center gap-1 transition-all"
+                  style={{
+                    background: convMode === id ? (id === "ai" ? "rgba(167,139,250,0.2)" : id === "human" ? "rgba(0,212,106,0.15)" : "rgba(255,255,255,0.08)") : "transparent",
+                    color: convMode === id ? (id === "ai" ? "#c4b5fd" : id === "human" ? "#00d46a" : "hsl(240 15% 80%)") : "hsl(240 8% 50%)",
+                  }}>
+                  <Icon className="h-3 w-3" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Botão Criar negociação */}
+          {conv?.contact_id && (
+            <button onClick={() => setDealModalOpen(true)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium flex-shrink-0"
+              style={{ background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.2)", color: "#fbbf24" }}>
+              <Briefcase className="h-3 w-3" />
+              <span className="hidden sm:inline">Negociação</span>
+            </button>
+          )}
         </header>
 
         <div
@@ -1111,7 +1127,110 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           isPending={revokeMsg.isPending}
         />
       )}
+
+      <CreateDealModal
+        open={dealModalOpen}
+        onClose={() => setDealModalOpen(false)}
+        contactId={conv?.contact_id ?? ""}
+        wsId={wsId ?? ""}
+      />
     </div>
+  );
+}
+
+function CreateDealModal({
+  open, onClose, contactId, wsId,
+}: {
+  open: boolean; onClose: () => void; contactId: string; wsId: string;
+}) {
+  const qc = useQueryClient();
+  const [title, setTitle] = useState("");
+  const [funnelId, setFunnelId] = useState("");
+  const [stageId, setStageId] = useState("");
+
+  const funnelsQ = useQuery({
+    queryKey: ["crm-funnels", wsId],
+    queryFn: () => crmApi.listFunnels(wsId).then((r) => r.data as { items: Array<{ id: string; name: string }> }),
+    enabled: open && !!wsId,
+  });
+
+  const stagesQ = useQuery({
+    queryKey: ["crm-stages", wsId, funnelId],
+    queryFn: () => crmApi.listFunnelStages(funnelId).then((r) => r.data as { items: Array<{ id: string; name: string; color?: string }> }),
+    enabled: open && !!funnelId,
+  });
+
+  useEffect(() => {
+    if (funnelsQ.data?.items?.length && !funnelId) setFunnelId(funnelsQ.data.items[0].id);
+  }, [funnelsQ.data, funnelId]);
+
+  useEffect(() => {
+    if (stagesQ.data?.items?.length) setStageId(stagesQ.data.items[0].id);
+  }, [stagesQ.data]);
+
+  const createMutation = useMutation({
+    mutationFn: () => dealsApi.create(wsId, { title: title || "Nova negociação", contact_id: contactId, funnel_id: funnelId, stage_id: stageId }),
+    onSuccess: () => {
+      toast.success("Negociação criada!");
+      qc.invalidateQueries({ queryKey: ["crm-deals", wsId] });
+      onClose();
+    },
+    onError: () => toast.error("Erro ao criar negociação"),
+  });
+
+  if (!open) return null;
+  return (
+    <>
+      <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-[201] flex items-center justify-center p-4">
+        <div className="w-full max-w-sm rounded-2xl p-6"
+          style={{
+            background: "linear-gradient(135deg, rgba(20,20,35,0.97) 0%, rgba(10,10,20,0.99) 100%)",
+            backdropFilter: "blur(24px)",
+            border: "1px solid rgba(255,255,255,0.10)",
+            boxShadow: "0 24px 48px rgba(0,0,0,0.6)",
+          }}>
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Nova Negociação</h3>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5" style={{ color: "hsl(240 8% 50%)" }}>
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Nome da negociação</label>
+              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+                placeholder="Ex: Projeto de automação"
+                className="input-field w-full" />
+            </div>
+            <div>
+              <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Funil</label>
+              <select value={funnelId} onChange={(e) => setFunnelId(e.target.value)} className="input-field w-full">
+                {(funnelsQ.data?.items ?? []).map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Estágio</label>
+              <select value={stageId} onChange={(e) => setStageId(e.target.value)} className="input-field w-full">
+                {(stagesQ.data?.items ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() => createMutation.mutate()}
+              disabled={!funnelId || !stageId || createMutation.isPending}
+              className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-40"
+              style={{ background: "rgba(251,191,36,0.15)", border: "1px solid rgba(251,191,36,0.3)", color: "#fbbf24" }}>
+              {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Briefcase className="h-4 w-4" />}
+              Criar Negociação
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -1228,7 +1347,8 @@ function TransferDialog({
             </button>
           ))}
         </div>
-        <div className="max-h-80 overflow-auto">
+        <div className="max-h-80 overflow-auto" style={{ position: "relative" }}>
+          <AnimatedTabContent tabKey={tab}>
           {options.length === 0 ? (
             <div className="p-4 text-sm text-zinc-500">Sem opções disponíveis.</div>
           ) : (
@@ -1251,6 +1371,7 @@ function TransferDialog({
               ))}
             </ul>
           )}
+          </AnimatedTabContent>
         </div>
         <div className="border-t border-zinc-200 p-4 dark:border-zinc-800">
           <label className="block text-xs font-medium text-zinc-500">Motivo (opcional)</label>
@@ -2043,6 +2164,17 @@ function MediaBody({
       <span className="italic" style={{ color: "hsl(240 8% 50%)" }}>
         Mensagem apagada
       </span>
+    );
+  }
+
+  // Fallback: content carries audio mime_type but message type wasn't "audio"
+  // (double-encoded content, inbound from non-WA channels, or type mismatch).
+  if (parsed.url && parsed.mimeType?.startsWith("audio/")) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <AudioPlayer url={parsed.url} variant={isOut ? "out" : "in"} />
+        {parsed.error && <ErrorLine text={parsed.error} />}
+      </div>
     );
   }
 
@@ -2881,7 +3013,16 @@ function parseMessageContent(raw: string): ParsedContent {
   if (!raw) return {};
   try {
     const parsed = JSON.parse(raw);
-    if (typeof parsed === "string") return { text: parsed };
+    // Double-encoded: outer JSON is a string that itself is a JSON object
+    if (typeof parsed === "string") {
+      try {
+        const inner = JSON.parse(parsed);
+        if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+          return parseMessageContent(parsed);
+        }
+      } catch { /* not double-encoded, fall through */ }
+      return { text: parsed };
+    }
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       return {
         text: parsed.text ?? parsed.body,
@@ -3175,7 +3316,7 @@ function Composer({
         const { file } = pending[i];
         try {
           const up = await mediaUploadApi.upload(instanceId, file);
-          const data = up.data as { url: string; mime_type?: string };
+          const data = up.data as { url: string; mime_type?: string; media_key?: string };
           const url = data.url;
           const mime = data.mime_type || file.type || "application/octet-stream";
           const type = inferMediaType(file, mime);
@@ -3183,6 +3324,7 @@ function Composer({
             type,
             media_url: url,
             media_mime: mime,
+            media_key: data.media_key,
             caption: i === 0 && caption ? caption : undefined,
             filename: type === "document" ? file.name : undefined,
           });

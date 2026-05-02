@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api";
+import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 import {
   CreditCard, Shield, Edit2, Check, X, Loader2, Globe, Zap, Plus, GripVertical, Trash2, Flame,
 } from "lucide-react";
@@ -435,7 +436,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
 
           {/* Form Content */}
           <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
-            
+            <AnimatedTabContent tabKey={activeTab}>
             {activeTab === "general" && (
               <div className="space-y-4 animate-fade-in-up">
                 <div>
@@ -615,6 +616,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
               </div>
             )}
 
+            </AnimatedTabContent>
           </div>
 
           {/* Footer Actions */}
