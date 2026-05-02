@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { instancesApi } from "@/lib/api";
 import type { Instance } from "@/types";
@@ -1223,7 +1224,16 @@ function EndpointCard({
               </div>
             </div>
 
+            <AnimatePresence initial={false}>
             {paramsOpen && !showRaw && (
+              <motion.div
+                key="params-table"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                style={{ overflow: "hidden" }}
+              >
               <div className="mt-2 space-y-1.5">
                 {Object.entries(endpoint.body).map(([k, v]) => (
                   <div
@@ -1249,9 +1259,20 @@ function EndpointCard({
                   </div>
                 ))}
               </div>
+              </motion.div>
             )}
+            </AnimatePresence>
 
+            <AnimatePresence initial={false}>
             {paramsOpen && showRaw && (
+              <motion.div
+                key="params-raw"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                style={{ overflow: "hidden" }}
+              >
               <div className="mt-2 relative group">
                 <pre
                   className="text-[11px] font-mono rounded-lg px-3 py-2.5 overflow-x-auto"
@@ -1263,7 +1284,9 @@ function EndpointCard({
                   <CopyBtn value={exampleBody} label="" size="xs" variant="primary" />
                 </div>
               </div>
+              </motion.div>
             )}
+            </AnimatePresence>
           </div>
         )}
 

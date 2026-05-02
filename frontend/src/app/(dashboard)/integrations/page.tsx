@@ -243,12 +243,6 @@ function UniqAICard() {
 
   if (!data?.is_active) return null;
 
-  const providerLabel: Record<string, string> = {
-    openai: "OpenAI", anthropic: "Anthropic", deepseek: "DeepSeek",
-    groq: "Groq", openrouter: "OpenRouter", google: "Google", mistral: "Mistral",
-    cohere: "Cohere", custom: "Custom",
-  };
-
   return (
     <div className="mb-5">
       <div
@@ -283,9 +277,7 @@ function UniqAICard() {
             </span>
           </div>
           <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
-            Provedor de IA da plataforma
-            {data.provider && ` · ${providerLabel[data.provider] ?? data.provider}`}
-            {" · "}Disponível para todos os usuários sem configuração adicional
+            Inteligência artificial da plataforma · Disponível para todos os usuários sem configuração adicional
           </p>
         </div>
       </div>

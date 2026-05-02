@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { instancesApi, webhooksApi, messagesApi, settingsApi, mcpApi, recoveryApi, tiktokApi, globalWebhooksApi, mediaUploadApi, type WebhookPayload } from "@/lib/api";
@@ -234,7 +235,16 @@ function WebhookCard({ wh, instanceId, onDelete }: { wh: Webhook; instanceId: st
       </div>
 
       {/* Expanded bridge config */}
+      <AnimatePresence initial={false}>
       {expanded && (
+        <motion.div
+          key="bridge-config"
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: "auto", opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          style={{ overflow: "hidden" }}
+        >
         <div className="px-4 pb-4 space-y-2 border-t" style={{ borderColor: "hsl(240 12% 11%)" }}>
           <p className="text-[10px] font-medium uppercase tracking-wider mt-3 mb-2" style={{ color: "hsl(240 8% 36%)" }}>
             Bridges — também enviar para:
@@ -293,7 +303,9 @@ function WebhookCard({ wh, instanceId, onDelete }: { wh: Webhook; instanceId: st
             </button>
           </BridgeToggle>
         </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {showingLogs && (
         <WebhookDeliveriesDialog

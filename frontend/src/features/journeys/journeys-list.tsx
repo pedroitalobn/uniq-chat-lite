@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity, ChevronDown, ChevronUp, Circle, Clock, Copy, Edit3, Loader2, Pause,
   Play, Plus, Search, Send, Sparkles as SparklesIcon, Trash2, TrendingUp, User, Wand2,
@@ -546,7 +546,16 @@ export function JourneysList() {
                 </div>
               </div>
 
+              <AnimatePresence initial={false}>
               {expanded[j.id] && (
+                <motion.div
+                  key="details"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                  style={{ overflow: "hidden" }}
+                >
                 <div
                   className="p-3 sm:p-4 border-t"
                   style={{
@@ -603,7 +612,9 @@ export function JourneysList() {
                     </button>
                   </div>
                 </div>
+                </motion.div>
               )}
+              </AnimatePresence>
             </div>
           ))
         )}
