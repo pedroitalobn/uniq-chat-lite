@@ -166,6 +166,7 @@ export function Sidebar() {
     { href: "/admin/plans", label: t("nav_plans"), icon: CreditCard },
     { href: "/admin/payment-settings", label: "Pagamento", icon: Shield },
     { href: "/admin/proxy", label: "Proxy Global", icon: Globe },
+    { href: "/admin/platform-ai", label: "Uniq AI", icon: Sparkles },
   ];
 
   const closeMobile = () => setMobileOpen(false);

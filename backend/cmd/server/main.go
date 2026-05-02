@@ -371,6 +371,8 @@ func autoMigrate(db *gorm.DB) error {
 		&models.ShopIntegration{},
 		&models.Order{},
 		&models.Cart{},
+		// Platform AI (Uniq AI) — singleton config
+		&models.PlatformAI{},
 	)
 }
 

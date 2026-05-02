@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -1639,5 +1641,177 @@ func getDefaultTemplates() []models.EmailTemplate {
 		{Slug: "instance_banned", Name: "Instância Banida", Subject: "Instância banida", HTMLContent: base("Instância banida", `<p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">A instância <strong>{{instance_name}}</strong> ({{phone}}) foi banida. Entre em contato com o suporte.</p>`), IsActive: true},
 		{Slug: "admin_created_account", Name: "Conta Criada por Admin", Subject: "Sua conta foi criada", HTMLContent: base("Conta criada", `<p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">Sua conta foi criada. E-mail: <strong>{{email}}</strong> • Senha temporária: <strong>{{temp_password}}</strong>.</p>`), IsActive: true},
 		{Slug: "admin_reset_password", Name: "Senha Resetada por Admin", Subject: "Sua senha foi redefinida", HTMLContent: base("Senha redefinida", `<p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">Sua nova senha temporária é: <strong>{{new_password}}</strong>.</p>`), IsActive: true},
+	}
+}
+
+// ─── Platform AI (Uniq AI) ────────────────────────────────────────────────────
+
+// GetPlatformAI GET /v1/admin/platform-ai
+// Retorna a config da Uniq AI (sem API key).
+func (h *AdminHandler) GetPlatformAI(c *fiber.Ctx) error {
+	var cfg models.PlatformAI
+	if err := h.db.First(&cfg).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return c.JSON(fiber.Map{"configured": false})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": "erro ao buscar config"})
+	}
+	return c.JSON(fiber.Map{
+		"configured":     true,
+		"id":             cfg.ID,
+		"provider":       cfg.Provider,
+		"name":           cfg.Name,
+		"base_url":       cfg.BaseURL,
+		"models":         cfg.Models,
+		"config":         cfg.Config,
+		"is_active":      cfg.IsActive,
+		"test_status":    cfg.TestStatus,
+		"last_tested_at": cfg.LastTestedAt,
+		"has_api_key":    cfg.APIKey != "",
+	})
+}
+
+// UpdatePlatformAI PUT /v1/admin/platform-ai
+// Cria ou atualiza a config da Uniq AI.
+func (h *AdminHandler) UpdatePlatformAI(c *fiber.Ctx) error {
+	var body struct {
+		Provider string `json:"provider"`
+		Name     string `json:"name"`
+		APIKey   string `json:"api_key"`
+		BaseURL  string `json:"base_url"`
+		Models   string `json:"models"`
+		Config   string `json:"config"`
+		IsActive *bool  `json:"is_active"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "corpo inválido"})
+	}
+	if body.Provider == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "provider é obrigatório"})
+	}
+
+	var cfg models.PlatformAI
+	isNew := false
+	if err := h.db.First(&cfg).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			isNew = true
+		} else {
+			return c.Status(500).JSON(fiber.Map{"error": "erro ao buscar config"})
+		}
+	}
+
+	cfg.Provider = models.IntegrationProvider(body.Provider)
+	if body.Name != "" {
+		cfg.Name = body.Name
+	} else if cfg.Name == "" {
+		cfg.Name = "Uniq AI"
+	}
+	if body.APIKey != "" {
+		cfg.APIKey = body.APIKey
+	}
+	cfg.BaseURL = body.BaseURL
+	if body.Models != "" {
+		cfg.Models = body.Models
+	}
+	if body.Config != "" {
+		cfg.Config = body.Config
+	}
+	if body.IsActive != nil {
+		cfg.IsActive = *body.IsActive
+	} else if isNew {
+		cfg.IsActive = true
+	}
+
+	if isNew {
+		if err := h.db.Create(&cfg).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "erro ao criar config"})
+		}
+	} else {
+		if err := h.db.Save(&cfg).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "erro ao salvar config"})
+		}
+	}
+	return c.JSON(fiber.Map{"ok": true, "id": cfg.ID})
+}
+
+// TestPlatformAI POST /v1/admin/platform-ai/test
+// Testa a conexão com o provider configurado.
+func (h *AdminHandler) TestPlatformAI(c *fiber.Ctx) error {
+	var cfg models.PlatformAI
+	if err := h.db.First(&cfg).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Uniq AI não configurada"})
+	}
+	if cfg.APIKey == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "API key não configurada"})
+	}
+
+	ok, msg := testPlatformAIConnection(&cfg)
+	now := time.Now()
+	status := "ok"
+	if !ok {
+		status = "failed"
+	}
+	h.db.Model(&cfg).Updates(map[string]any{
+		"test_status":    status,
+		"last_tested_at": now,
+	})
+
+	return c.JSON(fiber.Map{"ok": ok, "message": msg})
+}
+
+// GetPlatformAIPublic GET /v1/integrations/platform-ai
+// Retorna info pública da Uniq AI para o card na página de integrações.
+// Não expõe API key.
+func (h *AdminHandler) GetPlatformAIPublic(c *fiber.Ctx) error {
+	var cfg models.PlatformAI
+	if err := h.db.First(&cfg).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return c.JSON(fiber.Map{"configured": false, "is_active": false})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": "erro"})
+	}
+	return c.JSON(fiber.Map{
+		"configured":  true,
+		"provider":    cfg.Provider,
+		"name":        cfg.Name,
+		"is_active":   cfg.IsActive,
+		"test_status": cfg.TestStatus,
+		"models":      cfg.Models,
+	})
+}
+
+// testPlatformAIConnection testa a conexão com o provider configurado.
+func testPlatformAIConnection(cfg *models.PlatformAI) (bool, string) {
+	integration := &models.UserIntegration{
+		Provider: cfg.Provider,
+		APIKey:   cfg.APIKey,
+		BaseURL:  cfg.BaseURL,
+	}
+
+	switch cfg.Provider {
+	case models.ProviderClaude:
+		req, _ := http.NewRequest(http.MethodGet, "https://api.anthropic.com/v1/models", nil)
+		req.Header.Set("anthropic-version", "2023-06-01")
+		req.Header.Set("x-api-key", cfg.APIKey)
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			return false, "falha de conexão: " + err.Error()
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == 200 {
+			return true, "Conexão com Claude API bem-sucedida"
+		}
+		return false, fmt.Sprintf("Claude API retornou status %d", resp.StatusCode)
+	case models.ProviderGemini:
+		return testGemini(cfg.APIKey)
+	case models.ProviderN8N, models.ProviderWebhook:
+		if cfg.BaseURL == "" {
+			return false, "URL não configurada"
+		}
+		return true, "URL configurada (não testável automaticamente)"
+	default:
+		// OpenAI-compatible (OpenAI, DeepSeek, Mistral, etc.)
+		return testOpenAICompat(integration)
 	}
 }

@@ -6,14 +6,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plug, Plus, Trash2, RefreshCw, CheckCircle2,
   Eye, EyeOff, Zap, Globe, Bot, Webhook, Mic,
-  Key, FileJson, ExternalLink, Loader2, Link2, Copy, X, ShoppingBag,
+  Key, FileJson, ExternalLink, Loader2, Link2, Copy, X, ShoppingBag, Sparkles,
 } from "lucide-react";
 import { ShopSection } from "@/components/integrations/ShopSection";
 import { VoicesSection } from "@/components/integrations/VoicesSection";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
-import { integrationsApi, apiKeysApi, proxiesApi, adminApi, instancesApi } from "@/lib/api";
+import { integrationsApi, apiKeysApi, proxiesApi, adminApi, instancesApi, platformAIApi, PlatformAIConfig } from "@/lib/api";
 import { toast } from "sonner";
 import { WebhooksPanel } from "@/components/webhooks/WebhooksPanel";
 import type { APIKey, Proxy } from "@/types";
@@ -234,6 +234,65 @@ export default function IntegrationsPage() {
   );
 }
 
+// ─── Uniq AI Card ─────────────────────────────────────────────────────────────
+function UniqAICard() {
+  const { data } = useQuery<PlatformAIConfig>({
+    queryKey: ["integrations", "platform-ai"],
+    queryFn: () => platformAIApi.getPublic().then((r) => r.data),
+  });
+
+  if (!data?.is_active) return null;
+
+  const providerLabel: Record<string, string> = {
+    openai: "OpenAI", anthropic: "Anthropic", deepseek: "DeepSeek",
+    groq: "Groq", openrouter: "OpenRouter", google: "Google", mistral: "Mistral",
+    cohere: "Cohere", custom: "Custom",
+  };
+
+  return (
+    <div className="mb-5">
+      <div
+        className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-2xl p-4"
+        style={{
+          background: "linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(139,92,246,0.04) 100%)",
+          border: "1px solid rgba(139,92,246,0.25)",
+          borderRadius: "16px",
+          boxShadow: "0 4px 16px rgba(139,92,246,0.08), inset 0 1px 0 rgba(255,255,255,0.06)",
+        }}
+      >
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: "rgba(139,92,246,0.18)" }}
+        >
+          <Sparkles className="w-5 h-5 text-violet-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
+              {data.name || "Uniq AI"}
+            </p>
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+              style={{
+                background: "rgba(0,212,106,0.15)",
+                border: "1px solid rgba(0,212,106,0.25)",
+                color: "#4ade80",
+              }}
+            >
+              <CheckCircle2 className="w-2.5 h-2.5" /> Ativo por padrão
+            </span>
+          </div>
+          <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
+            Provedor de IA da plataforma
+            {data.provider && ` · ${providerLabel[data.provider] ?? data.provider}`}
+            {" · "}Disponível para todos os usuários sem configuração adicional
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── LLM Section ─────────────────────────────────────────────────────────────
 function LLMSection({ onConnect }: { onConnect: (p: ProviderId) => void }) {
   const { data, isLoading } = useQuery<Integration[]>({ queryKey: ["integrations"], queryFn: () => integrationsApi.list().then(r => r.data) });
@@ -260,6 +319,7 @@ function LLMSection({ onConnect }: { onConnect: (p: ProviderId) => void }) {
 
   return (
     <div>
+      <UniqAICard />
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {PROVIDERS.map((p) => (
           <button key={p.id} onClick={() => onConnect(p.id)} className="relative flex flex-col items-start gap-2 rounded-2xl p-4 text-left transition-all hover:scale-[1.01]"

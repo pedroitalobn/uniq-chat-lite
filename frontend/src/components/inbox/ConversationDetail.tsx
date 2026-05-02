@@ -1786,7 +1786,7 @@ function MediaBody({
     // Tenta resolver URL: 1) url direto, 2) constrói via mediaKey + storage
     // público. Áudios devem SEMPRE renderizar player — IconFallback só
     // aparece se não houver nenhuma forma de obter o áudio + houver erro.
-    const audioURL = url || (mediaKey ? buildMediaURL(mediaKey) : "");
+    const audioURL = mediaKey ? buildMediaURL(mediaKey) : url;
     if (audioURL) {
       return (
         <div className="flex flex-col gap-1.5">
@@ -2169,10 +2169,11 @@ function MediaBody({
 
   // Fallback: content carries audio mime_type but message type wasn't "audio"
   // (double-encoded content, inbound from non-WA channels, or type mismatch).
-  if (parsed.url && parsed.mimeType?.startsWith("audio/")) {
+  if ((parsed.url || parsed.mediaKey) && parsed.mimeType?.startsWith("audio/")) {
+    const fallbackAudioURL = parsed.mediaKey ? buildMediaURL(parsed.mediaKey) : parsed.url!;
     return (
       <div className="flex flex-col gap-1.5">
-        <AudioPlayer url={parsed.url} variant={isOut ? "out" : "in"} />
+        <AudioPlayer url={fallbackAudioURL} variant={isOut ? "out" : "in"} />
         {parsed.error && <ErrorLine text={parsed.error} />}
       </div>
     );

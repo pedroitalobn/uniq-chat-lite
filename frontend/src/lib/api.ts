@@ -1875,3 +1875,27 @@ export const voicesApi = {
   testTTS: (workspaceId: string, voice_id: string, text?: string) =>
     api.post("/v1/voices/test", { voice_id, text }, { headers: wsHeaders(workspaceId), responseType: "arraybuffer" }),
 };
+
+// ─── Platform AI (Uniq AI) ────────────────────────────────────────────────────
+export interface PlatformAIConfig {
+  id?: string;
+  provider: string;
+  name: string;
+  base_url?: string;
+  models?: string;
+  config?: string;
+  is_active: boolean;
+  has_api_key?: boolean;
+  test_status?: string;
+  last_tested_at?: string;
+}
+
+export const platformAIApi = {
+  // Admin endpoints
+  get: () => api.get<PlatformAIConfig>("/v1/admin/platform-ai"),
+  update: (data: Partial<PlatformAIConfig> & { api_key?: string }) =>
+    api.put<PlatformAIConfig>("/v1/admin/platform-ai", data),
+  test: () => api.post<{ status: string; message: string }>("/v1/admin/platform-ai/test"),
+  // Public endpoint (for integrations page)
+  getPublic: () => api.get<PlatformAIConfig>("/v1/integrations/platform-ai"),
+};
