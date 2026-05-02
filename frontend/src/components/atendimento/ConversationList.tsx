@@ -1,7 +1,8 @@
 "use client";
 
+import { useRef, useState } from "react";
 import Link from "next/link";
-import { MessageCircle, Users as UsersIcon, UserCheck } from "lucide-react";
+import { MessageCircle, Pencil, Users as UsersIcon, UserCheck } from "lucide-react";
 
 export interface ConversationRow {
   id: string;
@@ -12,19 +13,26 @@ export interface ConversationRow {
   /** Instance UUID — usada pra resolver o nome da instância no chip da lista. */
   instance_id?: string;
   subject?: string;
+  push_name?: string;
   last_message_preview?: string;
   last_message_at?: string;
   last_message_type?: string;
   unread_count: number;
   agent_unread_count: number;
   assigned_user_id?: string | null;
-  contact?: { name: string; avatar_url?: string; phone?: string } | null;
+  contact?: { id?: string; name: string; avatar_url?: string; phone?: string } | null;
   last_message_from_me?: boolean;
   // Routing — preloaded pelo backend em /v1/workspaces/:ws/conversations
   department?: { id: string; name: string; color?: string } | null;
   team?: { id: string; name: string } | null;
   queue?: { id: string; name: string } | null;
 }
+
+const CHANNEL_LABELS: Record<string, string> = {
+  whatsapp: "WhatsApp", waba: "WABA", instagram: "Instagram",
+  instagram_api: "Instagram API", telegram: "Telegram", facebook: "Facebook",
+  linkedin: "LinkedIn", tiktok: "TikTok", kwai: "Kwai",
+};
 
 // isGroupChannelKey — true quando o channel_key parece um grupo do WhatsApp
 // (sufixos @g.us / -g.us / "group:" etc). Detecta sem precisar de coluna
@@ -245,6 +253,7 @@ export function ConversationList({
   density = "comfortable",
   instanceLabel,
   showInstanceChip,
+  onRenameContact,
 }: {
   items: ConversationRow[];
   isLoading?: boolean;
@@ -263,6 +272,8 @@ export function ConversationList({
   /** Mostra o chip da instância em cada linha — usado quando o filtro inclui
    *  mais de uma instância (ou nenhuma seleção, "todas"). */
   showInstanceChip?: boolean;
+  /** Callback para salvar novo nome do contato ao editar inline. */
+  onRenameContact?: (contactId: string, newName: string) => Promise<void>;
 }) {
   if (isLoading) {
     return (
@@ -291,6 +302,25 @@ export function ConversationList({
   const isCompact = density === "compact";
   const pad = isCompact ? "px-3 py-2.5" : "px-6 py-4";
   const avatarSize = isCompact ? 38 : 44;
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  const startEdit = (convId: string, currentName: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingId(convId);
+    setEditingName(currentName);
+    setTimeout(() => editInputRef.current?.select(), 10);
+  };
+
+  const commitEdit = async (conv: ConversationRow) => {
+    const contactId = conv.contact?.id;
+    if (contactId && onRenameContact && editingName.trim()) {
+      await onRenameContact(contactId, editingName.trim()).catch(() => {});
+    }
+    setEditingId(null);
+  };
 
   return (
     <ul>
@@ -310,17 +340,22 @@ export function ConversationList({
         //   4. JID formatado (último recurso)
         // Trim previne string só com espaços passando como "nome válido".
         const contactName = conv.contact?.name?.trim();
+        const pushName = conv.push_name?.trim();
         const subject = conv.subject?.trim();
         const contactPhone = conv.contact?.phone?.trim();
+        const channelKey = formatChannelKey(conv.channel_key);
         const baseName =
           contactName ||
+          pushName ||
           subject ||
           (contactPhone ? formatPhoneNumber(contactPhone) : "") ||
-          formatChannelKey(conv.channel_key);
+          (channelKey !== "Contato sem nome" ? channelKey : "") ||
+          "Nome não identificado";
         // Newsletter sempre prefixado com 📢 pra diferenciar visualmente
         const displayName = isNewsletter && !baseName.startsWith("📢")
           ? `📢 ${baseName}`
           : baseName;
+        const canEditName = !!conv.contact?.id && !!onRenameContact;
         const hasUnread = conv.agent_unread_count > 0;
         const rowInner = (
           <div
@@ -357,17 +392,48 @@ export function ConversationList({
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
-                <span
-                  className="truncate text-sm flex items-center gap-1.5"
-                  style={{
-                    color: hasUnread ? "hsl(240 15% 95%)" : "hsl(240 15% 90%)",
-                    fontWeight: hasUnread ? 600 : 500,
-                  }}
-                >
+                <span className="truncate text-sm flex items-center gap-1.5 min-w-0 flex-1 group/name">
                   {isGroup && (
                     <UsersIcon className="h-3 w-3 flex-shrink-0" style={{ color: "#a78bfa" }} />
                   )}
-                  <span className="truncate">{displayName}</span>
+                  {editingId === conv.id ? (
+                    <input
+                      ref={editInputRef}
+                      value={editingName}
+                      onChange={e => setEditingName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") { e.preventDefault(); commitEdit(conv); }
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                      onBlur={() => commitEdit(conv)}
+                      onClick={e => e.preventDefault()}
+                      className="min-w-0 flex-1 rounded px-1 py-0 text-sm outline-none"
+                      style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(0,212,106,0.35)", color: "hsl(240 15% 95%)" }}
+                      autoFocus
+                    />
+                  ) : (
+                    <span
+                      className="truncate"
+                      style={{
+                        color: hasUnread ? "hsl(240 15% 95%)" : "hsl(240 15% 90%)",
+                        fontWeight: hasUnread ? 600 : 500,
+                        fontStyle: baseName === "Nome não identificado" ? "italic" : undefined,
+                        opacity: baseName === "Nome não identificado" ? 0.55 : undefined,
+                      }}
+                    >
+                      {displayName}
+                    </span>
+                  )}
+                  {canEditName && editingId !== conv.id && (
+                    <button
+                      type="button"
+                      onClick={e => startEdit(conv.id, displayName, e)}
+                      className="flex-shrink-0 opacity-0 group-hover/name:opacity-100 transition-opacity ml-0.5"
+                      title="Editar nome"
+                    >
+                      <Pencil className="h-2.5 w-2.5" style={{ color: "#00d46a" }} />
+                    </button>
+                  )}
                 </span>
                 <time
                   className="flex-shrink-0 text-[10px]"
@@ -402,7 +468,7 @@ export function ConversationList({
                     color: "hsl(240 8% 58%)",
                   }}
                 >
-                  {conv.channel_type}
+                  {CHANNEL_LABELS[conv.channel_type] ?? conv.channel_type}
                 </span>
                 {showInstanceChip && instanceLabel && instanceLabel(conv.instance_id) && (
                   <span

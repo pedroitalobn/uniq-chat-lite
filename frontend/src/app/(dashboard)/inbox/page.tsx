@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { usePreferences } from "@/lib/preferences";
 import {
-  conversationsApi, queuesApi, workspacesApi, channelsApi, instancesApi,
+  conversationsApi, queuesApi, workspacesApi, channelsApi, instancesApi, crmApi,
 } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
@@ -670,6 +670,10 @@ export default function InboxPage() {
                 instanceLabel={(id) =>
                   id ? connectedInstances.find((i) => i.id === id)?.name : undefined
                 }
+                onRenameContact={async (contactId, newName) => {
+                  await crmApi.updateContact(contactId, { name: newName });
+                  qc.invalidateQueries({ queryKey: ["conversations", wsId] });
+                }}
               />
             )}
           </div>
@@ -972,20 +976,35 @@ function Dropdown({
   trigger: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (open && wrapRef.current) {
+      const r = wrapRef.current.getBoundingClientRect();
+      setPos({
+        top: r.bottom + 4,
+        left: Math.max(4, r.right - 256), // 256 = w-64, não sair da tela
+      });
+    }
+  }, [open]);
+
   return (
-    <div className="relative">
+    <div ref={wrapRef}>
       {trigger}
       {open && (
         <>
-          <div className="fixed inset-0 z-30" onClick={onClose} />
+          <div className="fixed inset-0 z-[150]" onClick={onClose} />
           <div
-            className="absolute right-0 top-full z-40 mt-1 w-64 overflow-auto rounded-lg shadow-xl"
+            className="fixed z-[200] w-64 overflow-auto rounded-lg shadow-xl"
             style={{
-              background: "linear-gradient(135deg, rgba(18,18,30,0.95) 0%, rgba(10,10,20,0.98) 100%)",
+              top: pos.top,
+              left: pos.left,
+              background: "linear-gradient(135deg, rgba(18,18,30,0.97) 0%, rgba(10,10,20,0.99) 100%)",
               backdropFilter: "blur(20px) saturate(180%)",
               WebkitBackdropFilter: "blur(20px) saturate(180%)",
               border: "1px solid rgba(255,255,255,0.08)",
-              boxShadow: "0 16px 40px rgba(0,0,0,0.50), inset 0 1px 0 rgba(255,255,255,0.07)",
+              boxShadow: "0 16px 40px rgba(0,0,0,0.60), inset 0 1px 0 rgba(255,255,255,0.07)",
               maxHeight: "60vh",
             }}
           >
