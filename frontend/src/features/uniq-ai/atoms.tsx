@@ -338,54 +338,82 @@ export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: s
       className="flex flex-col items-center justify-center"
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
+      transition={{ duration: 0.5 }}
     >
-      {/* Aura animada — orb pulsante simulando IA ativa, com ícone vivo. */}
+      {/* ── Orb principal — muito maior, multicamadas ── */}
       <motion.div
-        className="relative w-20 h-20 sm:w-24 sm:h-24 mb-5 sm:mb-6 flex items-center justify-center"
-        animate={{ y: [0, -3, 0] }}
-        transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
+        className="relative w-44 h-44 sm:w-56 sm:h-56 mb-8 sm:mb-10 flex items-center justify-center"
+        animate={{ y: [0, -6, 0] }}
+        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
       >
+        {/* Halo externo difuso */}
         <motion.div
-          className="absolute inset-0 rounded-full"
+          className="absolute rounded-full"
           style={{
-            background: "radial-gradient(circle at 30% 30%, rgba(0,212,106,0.55), rgba(0,212,106,0.18) 40%, transparent 70%)",
-            filter: "blur(12px)",
+            inset: "-30%",
+            background: "radial-gradient(circle, rgba(0,212,106,0.12) 0%, transparent 65%)",
+            filter: "blur(24px)",
           }}
-          animate={{ scale: [1, 1.18, 1], opacity: [0.55, 0.85, 0.55] }}
-          transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute inset-2 rounded-full"
-          style={{
-            background: "conic-gradient(from 0deg, rgba(0,212,106,0.45), rgba(0,255,127,0.25), rgba(0,212,106,0.45))",
-            filter: "blur(8px)",
-          }}
-          animate={{ rotate: 360 }}
-          transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+          animate={{ scale: [1, 1.15, 1], opacity: [0.6, 1, 0.6] }}
+          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
         />
 
-        {/* Partículas orbitando — 3 pontos verdes em raios distintos */}
+        {/* Anel aurora giratório — externo */}
+        <motion.div
+          className="absolute rounded-full"
+          style={{
+            inset: "-5%",
+            background: "conic-gradient(from 0deg, transparent 0%, rgba(0,212,106,0.35) 25%, rgba(0,255,130,0.18) 50%, rgba(0,212,106,0.35) 75%, transparent 100%)",
+            filter: "blur(16px)",
+          }}
+          animate={{ rotate: 360 }}
+          transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+        />
+
+        {/* Anel conic médio — gira no sentido contrário */}
+        <motion.div
+          className="absolute inset-[8%] rounded-full"
+          style={{
+            background: "conic-gradient(from 180deg, rgba(0,255,120,0.3) 0%, transparent 40%, rgba(0,212,106,0.4) 70%, transparent 100%)",
+            filter: "blur(10px)",
+          }}
+          animate={{ rotate: -360 }}
+          transition={{ duration: 7, repeat: Infinity, ease: "linear" }}
+        />
+
+        {/* Core glow */}
+        <motion.div
+          className="absolute inset-[20%] rounded-full"
+          style={{
+            background: "radial-gradient(circle, rgba(0,212,106,0.75) 0%, rgba(0,212,106,0.3) 50%, transparent 75%)",
+            filter: "blur(8px)",
+          }}
+          animate={{ scale: [1, 1.25, 1], opacity: [0.7, 1, 0.7] }}
+          transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+        />
+
+        {/* Partículas orbitando — 6 em raios e velocidades distintas */}
         {[
-          { size: 4, radius: 38, duration: 6, delay: 0 },
-          { size: 3, radius: 44, duration: 9, delay: -2, reverse: true },
-          { size: 2.5, radius: 34, duration: 7.5, delay: -4 },
+          { size: 5,   radius: 80,  duration: 7,   delay: 0,    color: "rgba(0,212,106,1)",   glow: "rgba(0,212,106,0.9)" },
+          { size: 3.5, radius: 95,  duration: 11,  delay: -3,   color: "rgba(0,255,120,0.85)", glow: "rgba(0,255,120,0.7)", reverse: true },
+          { size: 4,   radius: 68,  duration: 8.5, delay: -5,   color: "rgba(0,212,106,0.9)",  glow: "rgba(0,212,106,0.8)" },
+          { size: 2.5, radius: 108, duration: 14,  delay: -7,   color: "rgba(160,255,200,0.7)", glow: "rgba(160,255,200,0.6)", reverse: true },
+          { size: 3,   radius: 58,  duration: 6,   delay: -1.5, color: "rgba(0,212,106,0.8)",  glow: "rgba(0,212,106,0.7)" },
+          { size: 2,   radius: 120, duration: 18,  delay: -9,   color: "rgba(0,255,140,0.5)",  glow: "rgba(0,255,140,0.4)" },
         ].map((p, i) => (
           <motion.div
             key={i}
             className="absolute top-1/2 left-1/2 rounded-full"
             style={{
-              width: p.size,
-              height: p.size,
-              background: "var(--green)",
-              boxShadow: "0 0 8px rgba(0,212,106,0.8)",
-              marginTop: -p.size / 2,
-              marginLeft: -p.size / 2,
+              width: p.size, height: p.size,
+              background: p.color,
+              boxShadow: `0 0 ${p.size * 3}px ${p.glow}`,
+              marginTop: -p.size / 2, marginLeft: -p.size / 2,
             }}
             animate={{
               x: Array.from({ length: 60 }, (_, k) => Math.cos((k / 60) * Math.PI * 2 * (p.reverse ? -1 : 1)) * p.radius),
               y: Array.from({ length: 60 }, (_, k) => Math.sin((k / 60) * Math.PI * 2 * (p.reverse ? -1 : 1)) * p.radius),
-              opacity: [0.4, 1, 0.4],
+              opacity: [0.3, 1, 0.3],
             }}
             transition={{
               x: { duration: p.duration, repeat: Infinity, ease: "linear", delay: p.delay },
@@ -395,66 +423,73 @@ export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: s
           />
         ))}
 
+        {/* Ícone central — glass pill grande */}
         <motion.div
-          className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center overflow-hidden"
+          className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex items-center justify-center overflow-hidden"
           style={{
-            background: "rgba(0,212,106,0.18)",
-            border: "1px solid rgba(0,212,106,0.45)",
-            boxShadow: "0 0 20px rgba(0,212,106,0.35)",
+            background: "linear-gradient(135deg, rgba(0,212,106,0.25) 0%, rgba(0,212,106,0.08) 100%)",
+            border: "1px solid rgba(0,212,106,0.5)",
+            boxShadow: "0 0 40px rgba(0,212,106,0.5), 0 0 80px rgba(0,212,106,0.2), inset 0 1px 0 rgba(255,255,255,0.15)",
+            backdropFilter: "blur(12px)",
           }}
-          animate={{ scale: [1, 1.06, 1] }}
-          transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+          animate={{ scale: [1, 1.05, 1] }}
+          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
         >
-          {/* Shimmer giratório dentro do quadrado — dá sensação de "pensando" */}
           <motion.div
             className="absolute inset-0"
-            style={{
-              background:
-                "conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.18) 60deg, transparent 120deg)",
-            }}
+            style={{ background: "conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.15) 60deg, transparent 120deg)" }}
             animate={{ rotate: 360 }}
-            transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+            transition={{ duration: 3.5, repeat: Infinity, ease: "linear" }}
           />
           <motion.div
-            className="relative"
-            animate={{
-              rotate: [0, -8, 0, 8, 0],
-              scale: [1, 1.1, 1],
-            }}
-            transition={{
-              rotate: { duration: 4, repeat: Infinity, ease: "easeInOut" },
-              scale: { duration: 2.4, repeat: Infinity, ease: "easeInOut" },
-            }}
+            className="relative z-10"
+            animate={{ rotate: [0, -10, 0, 10, 0], scale: [1, 1.15, 1] }}
+            transition={{ rotate: { duration: 5, repeat: Infinity }, scale: { duration: 2.8, repeat: Infinity } }}
           >
             <SparklesIcon
-              className="w-6 h-6 sm:w-7 sm:h-7 drop-shadow-[0_0_6px_rgba(0,212,106,0.8)]"
+              className="w-10 h-10 sm:w-12 sm:h-12 drop-shadow-[0_0_12px_rgba(0,212,106,1)]"
               style={{ color: "var(--green)" }}
             />
           </motion.div>
         </motion.div>
       </motion.div>
-      <h2 className="text-lg sm:text-xl font-medium mb-2 text-center" style={{ color: "var(--text-1)" }}>
-        Olá, sou o Uniq AI
+
+      <h2 className="text-xl sm:text-2xl font-semibold mb-2 text-center tracking-tight" style={{ color: "var(--text-1)" }}>
+        Olá, sou o <span style={{ color: "var(--green)" }}>Uniq AI</span>
       </h2>
-      <p className="text-sm text-center mb-6 sm:mb-8 max-w-md" style={{ color: "var(--text-3)" }}>
-        Crie jornadas, gerencie suas instâncias, e em breve dispare campanhas e mensagens — tudo via linguagem natural.
+      <p className="text-sm text-center mb-8 sm:mb-10 max-w-md leading-relaxed" style={{ color: "var(--text-3)" }}>
+        Crie jornadas, gerencie instâncias e dispare campanhas — tudo via linguagem natural.
       </p>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl">
         {WELCOME_SUGGESTIONS.map((item, idx) => (
           <motion.button
             key={idx}
             onClick={() => onSuggestionClick(item.label)}
-            className="p-3 sm:p-4 rounded-xl text-left"
-            style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}
-            initial={{ opacity: 0, y: 10 }}
+            className="p-4 sm:p-5 rounded-2xl text-left relative overflow-hidden"
+            style={{
+              background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+              border: "1px solid rgba(255,255,255,0.09)",
+              backdropFilter: "blur(16px) saturate(180%)",
+              WebkitBackdropFilter: "blur(16px) saturate(180%)",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)",
+            }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 + idx * 0.07 }}
+            transition={{ delay: 0.15 + idx * 0.08 }}
             whileHover={{ scale: 1.02, transition: { duration: 0.15 } }}
             whileTap={{ scale: 0.97 }}
           >
-            <item.icon className="w-5 h-5 mb-2" style={{ color: "var(--green)" }} />
-            <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{item.label}</p>
-            <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>{item.description}</p>
+            <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-300"
+              style={{ background: "linear-gradient(135deg, rgba(0,212,106,0.06) 0%, transparent 60%)" }} />
+            <div className="relative z-10">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3"
+                style={{ background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.2)" }}>
+                <item.icon className="w-4 h-4" style={{ color: "var(--green)" }} />
+              </div>
+              <p className="text-sm font-medium mb-1" style={{ color: "var(--text-1)" }}>{item.label}</p>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--text-3)" }}>{item.description}</p>
+            </div>
           </motion.button>
         ))}
       </div>

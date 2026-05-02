@@ -80,13 +80,18 @@ const EVENT_ICON: Record<AgentEvent["type"], React.ReactNode> = {
 function AgentActivityFeed({ events }: { events: AgentEvent[] }) {
   return (
     <aside
-      className="hidden lg:flex flex-col h-full border-l overflow-hidden w-[280px] flex-shrink-0"
-      style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}
+      className="hidden lg:flex flex-col h-full border-l overflow-hidden w-[260px] flex-shrink-0"
+      style={{
+        background: "linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)",
+        backdropFilter: "blur(20px) saturate(180%)",
+        WebkitBackdropFilter: "blur(20px) saturate(180%)",
+        borderColor: "rgba(255,255,255,0.07)",
+      }}
     >
       {/* Header */}
       <div
         className="flex items-center gap-2 px-4 py-3 border-b flex-shrink-0"
-        style={{ borderColor: "var(--surface-border)" }}
+        style={{ borderColor: "rgba(255,255,255,0.07)" }}
       >
         <Activity className="w-4 h-4 flex-shrink-0" style={{ color: "var(--green)" }} />
         <span className="text-xs font-medium" style={{ color: "var(--text-1)" }}>Atividade do Agente</span>
@@ -104,7 +109,7 @@ function AgentActivityFeed({ events }: { events: AgentEvent[] }) {
             {/* Linha vertical da timeline */}
             <div
               className="absolute left-[7px] top-2 bottom-2 w-[1px]"
-              style={{ background: "var(--surface-border)" }}
+              style={{ background: "rgba(255,255,255,0.07)" }}
             />
             <div className="space-y-3">
               {events.map((event) => (
@@ -119,7 +124,7 @@ function AgentActivityFeed({ events }: { events: AgentEvent[] }) {
                   <div
                     className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 z-10"
                     style={{
-                      background: "var(--surface-2)",
+                      background: "rgba(10,10,18,0.8)",
                       border: `2px solid ${EVENT_DOT[event.status]}`,
                     }}
                   />
@@ -284,12 +289,17 @@ export default function UniqAIPage() {
     <aside
       className={cn(
         "flex flex-col h-full border-r overflow-hidden transition-all duration-200",
-        sidebarCollapsed ? "w-12" : "w-64",
+        sidebarCollapsed ? "w-12" : "w-60",
       )}
-      style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}
+      style={{
+        background: "linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+        backdropFilter: "blur(20px) saturate(180%)",
+        WebkitBackdropFilter: "blur(20px) saturate(180%)",
+        borderColor: "rgba(255,255,255,0.07)",
+      }}
     >
       {/* Top */}
-      <div className="flex items-center justify-between px-3 py-3 border-b flex-shrink-0" style={{ borderColor: "var(--surface-border)" }}>
+      <div className="flex items-center justify-between px-3 py-3 border-b flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
         {!sidebarCollapsed && (
           <div className="flex items-center gap-2 min-w-0">
             <Sparkles className="w-4 h-4 flex-shrink-0" style={{ color: "var(--green)" }} />
@@ -411,41 +421,44 @@ export default function UniqAIPage() {
   );
 
   if (!hydrated) {
-    // Skeleton até o localStorage hidratar — evita flash do empty state.
     return (
-      <div className="flex h-full min-h-0 rounded-2xl overflow-hidden border" style={{ borderColor: "var(--surface-border)" }}>
-        <div className="w-64 border-r animate-pulse" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }} />
-        <div className="flex-1 animate-pulse" style={{ background: "var(--surface-2)" }} />
+      <div className="flex h-full min-h-0 rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.02)" }}>
+        <div className="w-64 animate-pulse" style={{ background: "rgba(255,255,255,0.03)" }} />
+        <div className="flex-1 animate-pulse" style={{ background: "rgba(255,255,255,0.02)" }} />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0">
-      {/* Mobile top bar com botão pra abrir sidebar */}
-      <div className="lg:hidden flex items-center justify-between px-3 py-2 border-b flex-shrink-0" style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
-        <button
-          onClick={() => setMobileSidebarOpen(true)}
-          className="p-2 rounded-lg hover:bg-[var(--surface-3)] transition-colors"
-          style={{ color: "var(--text-2)" }}
-          title="Conversas"
-        >
+    <div className="flex flex-col h-full min-h-0 relative">
+      {/* Ambient background mesh */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px]"
+          style={{ background: "radial-gradient(ellipse at top, rgba(0,212,106,0.05) 0%, transparent 65%)" }} />
+        <div className="absolute bottom-0 right-0 w-[400px] h-[300px]"
+          style={{ background: "radial-gradient(ellipse at bottom right, rgba(0,212,106,0.03) 0%, transparent 60%)" }} />
+      </div>
+
+      {/* Mobile top bar */}
+      <div className="lg:hidden flex items-center justify-between px-3 py-2 border-b flex-shrink-0 relative z-10"
+        style={{
+          background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+          backdropFilter: "blur(20px) saturate(180%)",
+          WebkitBackdropFilter: "blur(20px) saturate(180%)",
+          borderColor: "rgba(255,255,255,0.08)",
+        }}>
+        <button onClick={() => setMobileSidebarOpen(true)} className="p-2 rounded-lg transition-colors hover:bg-white/5" style={{ color: "var(--text-2)" }} title="Conversas">
           <MessageSquare className="w-4 h-4" />
         </button>
         <span className="text-xs font-medium truncate flex-1 text-center" style={{ color: "var(--text-1)" }}>
           {activeConversation?.title || "Uniq AI"}
         </span>
-        <button
-          onClick={startNew}
-          className="p-2 rounded-lg hover:bg-[var(--surface-3)] transition-colors"
-          style={{ color: "var(--green)" }}
-          title="Nova conversa"
-        >
+        <button onClick={startNew} className="p-2 rounded-lg transition-colors hover:bg-white/5" style={{ color: "var(--green)" }} title="Nova conversa">
           <Plus className="w-4 h-4" />
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 flex rounded-2xl overflow-hidden border" style={{ borderColor: "var(--surface-border)" }}>
+      <div className="flex-1 min-h-0 flex relative z-10">
         {/* Sidebar desktop */}
         <div className="hidden lg:flex h-full">{sidebar}</div>
 
@@ -455,7 +468,7 @@ export default function UniqAIPage() {
             <>
               <motion.div
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+                className="lg:hidden fixed inset-0 z-40 bg-black/70 backdrop-blur-sm"
                 onClick={() => setMobileSidebarOpen(false)}
               />
               <motion.div
@@ -482,7 +495,7 @@ export default function UniqAIPage() {
           )}
         </div>
 
-        {/* Activity feed — desktop only (lg+), 280px de largura fixa. */}
+        {/* Activity feed — desktop only */}
         <AgentActivityFeed events={agentEvents} />
       </div>
     </div>
