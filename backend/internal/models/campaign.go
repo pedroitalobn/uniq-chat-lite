@@ -26,8 +26,20 @@ const (
 	RecipientStatusFailed  RecipientStatus = "failed"
 )
 
-// Campaign represents a bulk-send campaign.
-// Recipients can be CRM contacts (phone numbers) or WhatsApp groups (JIDs).
+// CampaignAction defines what the campaign does per recipient.
+type CampaignAction string
+
+const (
+	CampaignActionSendMessage CampaignAction = "send_message" // WhatsApp / WABA / IG DM
+	CampaignActionFollow      CampaignAction = "follow"        // Instagram follow
+	CampaignActionUnfollow    CampaignAction = "unfollow"       // Instagram unfollow
+	CampaignActionLike        CampaignAction = "like"           // Instagram like post
+	CampaignActionComment     CampaignAction = "comment"        // Instagram comment on post
+)
+
+// Campaign represents a bulk-send/action campaign.
+// Recipients can be CRM contacts, WhatsApp groups, CSV uploads or
+// social-media audiences (followers, following, etc.).
 // The scheduler respects StartDate/EndDate, TimesPerDay and ScheduleHours.
 type Campaign struct {
 	ID          uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
@@ -36,28 +48,34 @@ type Campaign struct {
 	InstanceID  uuid.UUID  `gorm:"type:uuid;not null;index" json:"instance_id"`
 	Name        string     `gorm:"not null" json:"name"`
 
-	// "contacts", "groups", "crm" or "segment"
-	RecipientType string `gorm:"type:varchar(20);default:'contacts'" json:"recipient_type"`
+	// Channel derived from the instance (whatsapp|waba|instagram|telegram…)
+	Channel string `gorm:"type:varchar(30)" json:"channel,omitempty"`
+
+	// Action to perform per recipient
+	ActionType CampaignAction `gorm:"type:varchar(30);default:'send_message'" json:"action_type"`
+
+	// Channel-specific config (JSON blob — e.g. post_url for like/comment)
+	ChannelConfig string `gorm:"type:text;default:'{}'" json:"channel_config,omitempty"`
+
+	// "contacts", "groups", "crm", "segment", "followers", "following"
+	RecipientType string `gorm:"type:varchar(30);default:'contacts'" json:"recipient_type"`
 
 	// CRM segmentation filters (JSON)
 	SegmentFilter string `gorm:"type:text;default:'{}'" json:"segment_filter,omitempty"`
 
-	// Message — para canais texto livre (whatsmeow, IG)
+	// Message — para canais texto livre (whatsmeow, IG DM)
 	MessageType string `gorm:"type:varchar(20);default:'text'" json:"message_type"` // text|image|audio|document|template
 	MessageText string `gorm:"type:text" json:"message_text"`
-	Caption     string `gorm:"type:text" json:"caption,omitempty"` // for image/video
+	Caption     string `gorm:"type:text" json:"caption,omitempty"`
 	MediaB64    string `gorm:"type:text" json:"-"`
 	MediaMime   string `gorm:"type:varchar(100)" json:"media_mime,omitempty"`
 	MediaName   string `gorm:"type:varchar(255)" json:"media_name,omitempty"`
 
-	// WABA template — usado quando MessageType="template" (obrigatório pra
-	// canal waba). TemplateVariables é JSON map de nome → valor (Liquid),
-	// ex: {"1":"{{contact.name}}", "2":"PROMO20"}.
+	// WABA template — usado quando MessageType="template".
+	// TemplateVariables é JSON map nome→valor (Liquid).
 	TemplateName      string `gorm:"type:varchar(120)" json:"template_name,omitempty"`
 	TemplateLanguage  string `gorm:"type:varchar(20)" json:"template_language,omitempty"`
 	TemplateVariables string `gorm:"type:text;default:'{}'" json:"template_variables,omitempty"`
-	// URL pública pra header de mídia (image/video/document). Pode ser
-	// fixa ou ter variável Liquid (ex: {{contact.custom.banner_url}}).
 	TemplateHeaderURL string `gorm:"type:text" json:"template_header_url,omitempty"`
 
 	// Scheduling window
@@ -65,13 +83,18 @@ type Campaign struct {
 	EndDate   *time.Time `json:"end_date,omitempty"`
 
 	// Frequency
-	TimesTotal    int    `gorm:"default:1" json:"times_total"`                         // total sends per recipient
-	TimesPerDay   int    `gorm:"default:1" json:"times_per_day"`                       // max per day per recipient
-	ScheduleHours string `gorm:"type:varchar(100);default:'[]'" json:"schedule_hours"` // JSON int array, e.g. "[9,14,18]"; empty = any hour
-	DelaySeconds  int    `gorm:"default:3" json:"delay_seconds"`                       // pause between sends
+	TimesTotal    int    `gorm:"default:1" json:"times_total"`
+	TimesPerDay   int    `gorm:"default:1" json:"times_per_day"`
+	ScheduleHours string `gorm:"type:varchar(100);default:'[]'" json:"schedule_hours"`
+
+	// Safety / rate limiting
+	DelaySeconds         int `gorm:"default:3" json:"delay_seconds"`          // fixed delay (legacy)
+	DelayMinSeconds      int `gorm:"default:3" json:"delay_min_seconds"`       // randomized min delay
+	DelayMaxSeconds      int `gorm:"default:10" json:"delay_max_seconds"`      // randomized max delay
+	DailyLimitPerAccount int `gorm:"default:0" json:"daily_limit_per_account"` // 0 = unlimited
 
 	Status      CampaignStatus `gorm:"type:varchar(20);default:'draft'" json:"status"`
-	ScheduledAt *time.Time     `json:"scheduled_at,omitempty"` // kept for backward compat
+	ScheduledAt *time.Time     `json:"scheduled_at,omitempty"`
 	StartedAt   *time.Time     `json:"started_at,omitempty"`
 	CompletedAt *time.Time     `json:"completed_at,omitempty"`
 
@@ -96,6 +119,18 @@ func (c *Campaign) BeforeCreate(tx *gorm.DB) error {
 	}
 	if c.TimesPerDay < 1 {
 		c.TimesPerDay = 1
+	}
+	if c.ActionType == "" {
+		c.ActionType = CampaignActionSendMessage
+	}
+	if c.DelayMinSeconds < 1 {
+		c.DelayMinSeconds = c.DelaySeconds
+		if c.DelayMinSeconds < 1 {
+			c.DelayMinSeconds = 3
+		}
+	}
+	if c.DelayMaxSeconds < c.DelayMinSeconds {
+		c.DelayMaxSeconds = c.DelayMinSeconds + 7
 	}
 	return nil
 }

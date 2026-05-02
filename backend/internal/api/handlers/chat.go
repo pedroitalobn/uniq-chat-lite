@@ -167,12 +167,22 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 	userID := raw.(uuid.UUID)
 
 	var integration *models.UserIntegration
-	if req.IntegrationID != "" {
+	if req.IntegrationID != "" && req.IntegrationID != "platform-ai" {
 		if err := h.db.Where("id = ? AND user_id = ? AND is_active = true", req.IntegrationID, userID).First(&integration).Error; err != nil {
 			integration = nil
 		}
 	} else {
+		// Tenta integração própria do usuário primeiro.
 		h.db.Where("user_id = ? AND is_active = true AND provider IN ?", userID, []string{"openai", "claude", "deepseek", "gemini", "openrouter", "kilo", "zai", "kimi", "qwen", "minimax", "manus"}).First(&integration)
+	}
+
+	// Fallback: usa a Uniq AI (PlatformAI) quando o usuário não tem integração
+	// própria. Permite consumir o LLM global sem configuração individual.
+	if integration == nil {
+		var pai models.PlatformAI
+		if err := h.db.Where("is_active = true").First(&pai).Error; err == nil && pai.APIKey != "" {
+			integration = services.PlatformAIToIntegration(&pai)
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -216,13 +226,19 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 			instanceID = journeyHandler.resolveInstanceFromPrompt(promptText, userID)
 		}
 
-		// Find integration
+		// Find integration — mesma lógica do fluxo normal: user > PlatformAI.
 		var integration *models.UserIntegration
-		if req.IntegrationID != "" {
+		if req.IntegrationID != "" && req.IntegrationID != "platform-ai" {
 			h.db.Where("id = ? AND user_id = ? AND is_active = true", req.IntegrationID, userID).First(&integration)
 		}
 		if integration == nil {
 			h.db.Where("user_id = ? AND is_active = true AND provider IN ?", userID, []string{"openai", "claude", "deepseek", "gemini", "openrouter", "kilo", "zai", "kimi", "qwen", "minimax", "manus"}).First(&integration)
+		}
+		if integration == nil {
+			var pai models.PlatformAI
+			if err := h.db.Where("is_active = true").First(&pai).Error; err == nil && pai.APIKey != "" {
+				integration = services.PlatformAIToIntegration(&pai)
+			}
 		}
 
 		// Pula a chamada LLM quando já temos trigger + action via menções

@@ -7,8 +7,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Check, Loader2, Zap } from "lucide-react";
-import { integrationsApi } from "@/lib/api";
+import { ChevronDown, Check, Loader2, Sparkles, Zap } from "lucide-react";
+import { integrationsApi, platformAIApi } from "@/lib/api";
 import { loadModelPref, saveModelPref, type ModelPreference } from "./model-preference";
 
 export interface ModelSelectorProps {
@@ -72,17 +72,34 @@ interface Integration {
   models: string[];
 }
 
+// Preferência virtual que representa a Uniq AI (plataforma)
+const PLATFORM_AI_PREF: ModelPreference = {
+  integrationId: "platform-ai",
+  integrationName: "Uniq AI",
+  provider: "platform",
+  model: "",
+};
+
 export function ModelSelector({ value, onChange }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [groups, setGroups] = useState<Record<string, Integration[]>>({});
+  const [hasPlatformAI, setHasPlatformAI] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await integrationsApi.list();
-      const filtered: Integration[] = (res.data || [])
+      const [intRes, paiRes] = await Promise.allSettled([
+        integrationsApi.list(),
+        platformAIApi.getPublic(),
+      ]);
+
+      const pai = paiRes.status === "fulfilled" ? paiRes.value.data : null;
+      const platformActive = !!(pai?.is_active && pai?.provider);
+      setHasPlatformAI(platformActive);
+
+      const filtered: Integration[] = (intRes.status === "fulfilled" ? intRes.value.data || [] : [])
         .filter((i: any) => i.is_active && LLM_PROVIDERS.includes(i.provider?.toLowerCase()))
         .map((i: any) => ({
           id: i.id,
@@ -99,14 +116,13 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
       }
       setGroups(g);
 
-      // Auto-seleciona: primeiro tenta restaurar preferência salva, depois
-      // seleciona a primeira disponível.
-      if (!value && filtered.length > 0) {
+      // Auto-seleção: preferência salva → primeira integração → Uniq AI
+      if (!value) {
         const saved = loadModelPref();
         const stillActive = saved && filtered.find((i) => i.id === saved.integrationId);
         if (stillActive) {
           onChange(saved!);
-        } else {
+        } else if (filtered.length > 0) {
           const first = filtered[0];
           const pref: ModelPreference = {
             integrationId: first.id,
@@ -116,10 +132,14 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
           };
           saveModelPref(pref);
           onChange(pref);
+        } else if (platformActive) {
+          // Sem integração própria — usa Uniq AI como padrão
+          saveModelPref(PLATFORM_AI_PREF);
+          onChange(PLATFORM_AI_PREF);
         }
       }
     } catch {
-      /* silencia — não há integração LLM configurada */
+      /* silencia */
     } finally {
       setLoading(false);
     }
@@ -165,6 +185,13 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
       >
         {loading ? (
           <Loader2 className="w-3 h-3 animate-spin" style={{ color: "var(--text-3)" }} />
+        ) : value?.integrationId === "platform-ai" ? (
+          <>
+            <Sparkles className="w-3 h-3 flex-shrink-0" style={{ color: "var(--green)" }} />
+            <span className="truncate max-w-[120px] sm:max-w-[160px]" style={{ color: "var(--green)" }}>
+              Uniq AI
+            </span>
+          </>
         ) : value ? (
           <>
             <ProviderBadge provider={value.provider} size="xs" />
@@ -202,17 +229,52 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
               boxShadow: "0 16px 48px rgba(0,0,0,0.5)",
             }}
           >
-            {allCount === 0 ? (
-              <div className="px-4 py-6 text-center">
-                <p className="text-xs" style={{ color: "var(--text-3)" }}>
-                  Nenhuma integração LLM ativa.
-                </p>
-                <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
-                  Vá em Integrações para conectar OpenAI, Claude etc.
-                </p>
-              </div>
-            ) : (
-              <div className="py-1">
+            <div className="py-1">
+              {/* Uniq AI — sempre no topo quando ativa */}
+              {hasPlatformAI && (
+                <div>
+                  <div className="px-3 pt-2 pb-0.5 text-[9px] font-bold uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
+                    Plataforma
+                  </div>
+                  <button
+                    onClick={() => {
+                      saveModelPref(PLATFORM_AI_PREF);
+                      onChange(PLATFORM_AI_PREF);
+                      setOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors"
+                    style={{ background: value?.integrationId === "platform-ai" ? "rgba(0,212,106,0.08)" : "transparent" }}
+                    onMouseEnter={(e) => value?.integrationId !== "platform-ai" && (e.currentTarget.style.background = "var(--surface-3)")}
+                    onMouseLeave={(e) => value?.integrationId !== "platform-ai" && (e.currentTarget.style.background = "transparent")}
+                  >
+                    <div className="w-3.5 h-3.5 flex-shrink-0">
+                      {value?.integrationId === "platform-ai"
+                        ? <Check className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
+                        : <Sparkles className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium" style={{ color: value?.integrationId === "platform-ai" ? "var(--green)" : "var(--text-1)" }}>
+                        Uniq AI
+                      </p>
+                      <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
+                        Padrão da plataforma
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              )}
+              {allCount === 0 && !hasPlatformAI ? (
+                <div className="px-4 py-6 text-center">
+                  <p className="text-xs" style={{ color: "var(--text-3)" }}>
+                    Nenhuma integração LLM ativa.
+                  </p>
+                  <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
+                    Vá em Integrações para conectar OpenAI, Claude etc.
+                  </p>
+                </div>
+              ) : (
+                <>
                 {Object.entries(groups).map(([providerLabel, integrations]) => (
                   <div key={providerLabel}>
                     {/* Provider header */}
@@ -303,8 +365,9 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
                     )}
                   </div>
                 ))}
-              </div>
-            )}
+                </>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

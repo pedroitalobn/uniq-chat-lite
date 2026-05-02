@@ -315,17 +315,19 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 
 	var req struct {
-		WorkspaceID   string     `json:"workspace_id"`
-		InstanceID    string     `json:"instance_id"`
-		Name          string     `json:"name"`
-		RecipientType string     `json:"recipient_type"` // "contacts" | "groups" | "crm" | "segment"
-		MessageType   string     `json:"message_type"`   // "text" | "image" | "audio" | "document" | "template"
-		MessageText   string     `json:"message_text"`
-		Caption       string     `json:"caption"`
-		MediaB64      string     `json:"media_base64"`
-		MediaMime     string     `json:"media_mime"`
-		MediaName     string     `json:"media_name"`
-		// WABA template fields (usados quando message_type=template)
+		WorkspaceID   string `json:"workspace_id"`
+		InstanceID    string `json:"instance_id"`
+		Name          string `json:"name"`
+		ActionType    string `json:"action_type"`    // "send_message"|"follow"|"unfollow"|"like"|"comment"
+		RecipientType string `json:"recipient_type"` // "contacts"|"groups"|"crm"|"segment"|"followers"|"following"
+		ChannelConfig string `json:"channel_config"` // JSON blob
+		MessageType   string `json:"message_type"`   // "text"|"image"|"audio"|"document"|"template"
+		MessageText   string `json:"message_text"`
+		Caption       string `json:"caption"`
+		MediaB64      string `json:"media_base64"`
+		MediaMime     string `json:"media_mime"`
+		MediaName     string `json:"media_name"`
+		// WABA template fields
 		TemplateName      string            `json:"template_name"`
 		TemplateLanguage  string            `json:"template_language"`
 		TemplateVariables map[string]string `json:"template_variables"`
@@ -334,13 +336,16 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		EndDate       *time.Time `json:"end_date"`
 		TimesTotal    int        `json:"times_total"`
 		TimesPerDay   int        `json:"times_per_day"`
-		ScheduleHours string     `json:"schedule_hours"` // JSON: "[9,14,18]"
-		DelaySeconds  int        `json:"delay_seconds"`
-		Recipients    []struct {
-			Phone string `json:"phone"` // phone number or group JID
+		ScheduleHours string     `json:"schedule_hours"`
+		// Safety / rate limiting
+		DelaySeconds         int `json:"delay_seconds"`
+		DelayMinSeconds      int `json:"delay_min_seconds"`
+		DelayMaxSeconds      int `json:"delay_max_seconds"`
+		DailyLimitPerAccount int `json:"daily_limit_per_account"`
+		Recipients []struct {
+			Phone string `json:"phone"`
 			Name  string `json:"name"`
 		} `json:"recipients"`
-		// CRM segmentation filters
 		SegmentFilter struct {
 			Funnel     string   `json:"funnel,omitempty"`
 			Stage      string   `json:"stage,omitempty"`
@@ -348,12 +353,14 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 			Tags       []string `json:"tags,omitempty"`
 			Owner      string   `json:"owner,omitempty"`
 			ExternalID string   `json:"external_id,omitempty"`
-			// Shop / Purchase history filters — INNER JOIN com orders
-			PurchasedShopID    string  `json:"purchased_shop_id,omitempty"`    // só compradores dessa shop
-			PurchasedSinceDays int     `json:"purchased_since_days,omitempty"` // janela "últimos N dias"
-			PurchasedMinTotal  float64 `json:"purchased_min_total,omitempty"`  // ticket médio mínimo
-			PurchasedStatus    string  `json:"purchased_status,omitempty"`     // ex: "paid"
-			NeverPurchased     bool    `json:"never_purchased,omitempty"`      // contatos SEM nenhum pedido
+			SegmentID  string   `json:"segment_id,omitempty"`
+			// Shop / purchase history filters
+			PurchasedShopID    string  `json:"purchased_shop_id,omitempty"`
+			PurchasedSinceDays int     `json:"purchased_since_days,omitempty"`
+			PurchasedMinTotal  float64 `json:"purchased_min_total,omitempty"`
+			PurchasedStatus    string  `json:"purchased_status,omitempty"`
+			NeverPurchased     bool    `json:"never_purchased,omitempty"`
+			PassedAgentID      string  `json:"passed_agent_id,omitempty"`
 		} `json:"segment_filter"`
 	}
 	if err := c.BodyParser(&req); err != nil {
@@ -375,9 +382,21 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 	if recipientType == "" {
 		recipientType = "contacts"
 	}
+	actionType := models.CampaignAction(req.ActionType)
+	if actionType == "" {
+		actionType = models.CampaignActionSendMessage
+	}
 	delay := req.DelaySeconds
 	if delay < 1 {
 		delay = 3
+	}
+	delayMin := req.DelayMinSeconds
+	if delayMin < 1 {
+		delayMin = delay
+	}
+	delayMax := req.DelayMaxSeconds
+	if delayMax < delayMin {
+		delayMax = delayMin + 7
 	}
 	timesTotal := req.TimesTotal
 	if timesTotal < 1 {
@@ -391,15 +410,27 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 	if schedHours == "" {
 		schedHours = "[]"
 	}
+	channelConfig := req.ChannelConfig
+	if channelConfig == "" {
+		channelConfig = "{}"
+	}
 
 	status := models.CampaignStatusDraft
 	if req.StartDate != nil && !req.StartDate.After(time.Now()) {
 		status = models.CampaignStatusScheduled
 	}
 
+	// Resolve channel from instance
+	var inst models.Instance
+	var channel string
+	if err := h.db.Select("channel").Where("id = ?", instanceID).First(&inst).Error; err == nil {
+		channel = string(inst.Channel)
+	}
+
 	// Serialize segment filter
 	segmentJSON := "{}"
-	if req.SegmentFilter.Funnel != "" || req.SegmentFilter.Stage != "" || len(req.SegmentFilter.Tags) > 0 {
+	if req.SegmentFilter.Funnel != "" || req.SegmentFilter.Stage != "" ||
+		len(req.SegmentFilter.Tags) > 0 || req.SegmentFilter.SegmentID != "" {
 		b, _ := json.Marshal(req.SegmentFilter)
 		segmentJSON = string(b)
 	}
@@ -413,28 +444,34 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 	}
 
 	campaign := models.Campaign{
-		UserID:            user.ID,
-		InstanceID:        instanceID,
-		Name:              req.Name,
-		RecipientType:     recipientType,
-		SegmentFilter:     segmentJSON,
-		MessageType:       msgType,
-		MessageText:       req.MessageText,
-		Caption:           req.Caption,
-		MediaB64:          req.MediaB64,
-		MediaMime:         req.MediaMime,
-		MediaName:         req.MediaName,
-		TemplateName:      req.TemplateName,
-		TemplateLanguage:  req.TemplateLanguage,
-		TemplateVariables: tplVarsJSON,
-		TemplateHeaderURL: req.TemplateHeaderURL,
-		StartDate:         req.StartDate,
-		EndDate:           req.EndDate,
-		TimesTotal:        timesTotal,
-		TimesPerDay:       timesPerDay,
-		ScheduleHours:     schedHours,
-		DelaySeconds:      delay,
-		Status:            status,
+		UserID:               user.ID,
+		InstanceID:           instanceID,
+		Name:                 req.Name,
+		Channel:              channel,
+		ActionType:           actionType,
+		ChannelConfig:        channelConfig,
+		RecipientType:        recipientType,
+		SegmentFilter:        segmentJSON,
+		MessageType:          msgType,
+		MessageText:          req.MessageText,
+		Caption:              req.Caption,
+		MediaB64:             req.MediaB64,
+		MediaMime:            req.MediaMime,
+		MediaName:            req.MediaName,
+		TemplateName:         req.TemplateName,
+		TemplateLanguage:     req.TemplateLanguage,
+		TemplateVariables:    tplVarsJSON,
+		TemplateHeaderURL:    req.TemplateHeaderURL,
+		StartDate:            req.StartDate,
+		EndDate:              req.EndDate,
+		TimesTotal:           timesTotal,
+		TimesPerDay:          timesPerDay,
+		ScheduleHours:        schedHours,
+		DelaySeconds:         delay,
+		DelayMinSeconds:      delayMin,
+		DelayMaxSeconds:      delayMax,
+		DailyLimitPerAccount: req.DailyLimitPerAccount,
+		Status:               status,
 	}
 	if req.WorkspaceID != "" {
 		if wid, err := uuid.Parse(req.WorkspaceID); err == nil {
@@ -481,13 +518,23 @@ func (h *CampaignHandler) resolveSegmentedContacts(userID uuid.UUID, filter stru
 	Tags               []string `json:"tags,omitempty"`
 	Owner              string   `json:"owner,omitempty"`
 	ExternalID         string   `json:"external_id,omitempty"`
+	SegmentID          string   `json:"segment_id,omitempty"`
 	PurchasedShopID    string   `json:"purchased_shop_id,omitempty"`
 	PurchasedSinceDays int      `json:"purchased_since_days,omitempty"`
 	PurchasedMinTotal  float64  `json:"purchased_min_total,omitempty"`
 	PurchasedStatus    string   `json:"purchased_status,omitempty"`
 	NeverPurchased     bool     `json:"never_purchased,omitempty"`
+	PassedAgentID      string   `json:"passed_agent_id,omitempty"`
 }) []models.Contact {
-	query := h.db.Where("user_id = ?", userID)
+	query := h.db.Where("contacts.user_id = ?", userID)
+
+	// Segment membership filter (manual or dynamic segment)
+	if filter.SegmentID != "" {
+		if sid, err := uuid.Parse(filter.SegmentID); err == nil {
+			query = query.Joins("INNER JOIN segment_members ON segment_members.contact_id = contacts.id").
+				Where("segment_members.segment_id = ?", sid)
+		}
+	}
 
 	if filter.Funnel != "" {
 		query = query.Where("funnel = ?", filter.Funnel)
@@ -532,13 +579,20 @@ func (h *CampaignHandler) resolveSegmentedContacts(userID uuid.UUID, filter stru
 		}
 	}
 	if filter.NeverPurchased {
-		// LEFT JOIN + IS NULL — só contatos sem pedido nenhum.
 		query = query.Joins("LEFT JOIN orders ON orders.contact_id = contacts.id").
 			Where("orders.id IS NULL")
 	}
 
+	// Contatos que interagiram com agente de IA específico
+	if filter.PassedAgentID != "" {
+		if aid, err := uuid.Parse(filter.PassedAgentID); err == nil {
+			query = query.Joins("INNER JOIN conversations ON conversations.contact_id = contacts.id").
+				Where("conversations.agent_id = ?", aid)
+		}
+	}
+
 	var contacts []models.Contact
-	query.Distinct().Find(&contacts)
+	query.Distinct("contacts.*").Find(&contacts)
 	return contacts
 }
 
@@ -720,6 +774,7 @@ func (h *CampaignHandler) SegmentOptions(c *fiber.Ctx) error {
 	var owners []string
 	var externalIDs []string
 	var tags []models.Tag
+	var segments []models.Segment
 
 	h.db.Model(&models.Contact{}).Distinct("funnel").Where("user_id = ? AND funnel != ''", user.ID).Pluck("funnel", &funnels)
 	h.db.Model(&models.Contact{}).Distinct("stage").Where("user_id = ? AND stage != ''", user.ID).Pluck("stage", &stages)
@@ -727,6 +782,7 @@ func (h *CampaignHandler) SegmentOptions(c *fiber.Ctx) error {
 	h.db.Model(&models.Contact{}).Distinct("owner").Where("user_id = ? AND owner != ''", user.ID).Pluck("owner", &owners)
 	h.db.Model(&models.Contact{}).Distinct("external_id").Where("user_id = ? AND external_id != ''", user.ID).Pluck("external_id", &externalIDs)
 	h.db.Where("user_id = ?", user.ID).Find(&tags)
+	h.db.Select("id, name").Where("workspace_id IN (SELECT id FROM workspaces WHERE user_id = ?)", user.ID).Find(&segments)
 
 	return c.JSON(fiber.Map{
 		"funnels":      funnels,
@@ -735,6 +791,7 @@ func (h *CampaignHandler) SegmentOptions(c *fiber.Ctx) error {
 		"owners":       owners,
 		"external_ids": externalIDs,
 		"tags":         tags,
+		"segments":     segments,
 	})
 }
 

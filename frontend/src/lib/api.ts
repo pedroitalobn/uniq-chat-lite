@@ -982,14 +982,15 @@ export const campaignsApi = {
     workspace_id?: string;
     instance_id: string;
     name: string;
-    recipient_type: "contacts" | "groups" | "crm" | "segment";
+    action_type?: string;
+    recipient_type: string;
+    channel_config?: string;
     message_type?: string;
     message_text?: string;
     caption?: string;
     media_base64?: string;
     media_mime?: string;
     media_name?: string;
-    // WABA template campaign (message_type="template")
     template_name?: string;
     template_language?: string;
     template_variables?: Record<string, string>;
@@ -1000,17 +1001,19 @@ export const campaignsApi = {
     times_per_day?: number;
     schedule_hours?: string;
     delay_seconds?: number;
+    delay_min_seconds?: number;
+    delay_max_seconds?: number;
+    daily_limit_per_account?: number;
     recipients?: Array<{ phone: string; name?: string }>;
     segment_filter?: {
       funnel?: string; stage?: string; journey?: string;
       tags?: string[]; owner?: string; external_id?: string;
-      // Shop / purchase history filters (Fase 10)
+      segment_id?: string;
       purchased_shop_id?: string;
       purchased_since_days?: number;
       purchased_min_total?: number;
       purchased_status?: string;
       never_purchased?: boolean;
-      // Agente IA: contatos que conversaram com agente específico
       passed_agent_id?: string;
     };
   }) => api.post("/v1/campaigns", data),

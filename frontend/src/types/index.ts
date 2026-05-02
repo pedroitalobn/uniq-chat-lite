@@ -365,6 +365,9 @@ export interface Campaign {
   user_id: string;
   instance_id: string;
   name: string;
+  channel?: string;
+  action_type?: string;
+  channel_config?: string;
   recipient_type: RecipientType;
   message_type: MessageType;
   message_text: string;
@@ -376,8 +379,11 @@ export interface Campaign {
   end_date?: string;
   times_total: number;
   times_per_day: number;
-  schedule_hours: string; // JSON: "[9,14,18]"
+  schedule_hours: string;
   delay_seconds: number;
+  delay_min_seconds?: number;
+  delay_max_seconds?: number;
+  daily_limit_per_account?: number;
   // State
   status: CampaignStatus;
   scheduled_at?: string;

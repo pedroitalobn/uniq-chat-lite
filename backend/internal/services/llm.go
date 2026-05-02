@@ -227,6 +227,18 @@ func (s *LLMService) callProvider(ctx context.Context, i *models.UserIntegration
 	}
 }
 
+// PlatformAIToIntegration converte o singleton PlatformAI para um
+// *UserIntegration transitório (não persiste no DB), permitindo reusar
+// todos os callProvider existentes sem duplicar lógica.
+func PlatformAIToIntegration(pai *models.PlatformAI) *models.UserIntegration {
+	return &models.UserIntegration{
+		Provider: pai.Provider,
+		APIKey:   pai.APIKey,
+		BaseURL:  pai.BaseURL,
+		Models:   pai.Models,
+	}
+}
+
 // ─── Provider Specific Calls (logic moved from IntegrationHandler) ───────────
 
 func (s *LLMService) callClaude(ctx context.Context, i *models.UserIntegration, system, user string, jsonMode bool) (string, error) {
