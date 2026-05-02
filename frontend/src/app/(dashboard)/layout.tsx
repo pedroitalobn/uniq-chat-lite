@@ -10,6 +10,7 @@ import { PresenceProvider } from "@/contexts/PresenceProvider";
 import { UniqAIIslandProvider } from "@/components/uniq-ai/island-context";
 import { UniqAIIsland } from "@/components/uniq-ai/dynamic-island";
 import { AmbientAIPanel } from "@/components/uniq-ai/ambient-panel";
+import { CursorReactiveBackground } from "@/components/layout/CursorReactiveBackground";
 
 export default async function DashboardLayout({
   children,
@@ -23,6 +24,7 @@ export default async function DashboardLayout({
     <WorkspaceProvider>
       <WorkspacePermissionsProvider>
         <PresenceProvider>
+          <CursorReactiveBackground />
           <UniqAIIslandProvider>
             <div className="flex h-screen overflow-hidden">
               <Sidebar />

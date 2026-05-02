@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, Suspense, useEffect, useRef } from "react";
+import { useTilt } from "@/hooks/useTilt";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { instancesApi, serversApi } from "@/lib/api";
 import { Plus, Globe, AlertTriangle, Smartphone, Trash2, QrCode, RefreshCw, Server as ServerIcon, X, MessageSquare, Hash, Shield, Wifi, Copy, Check } from "lucide-react";
@@ -89,9 +90,15 @@ function InstanceCard({
   };
 
   const [hovered, setHovered] = useState(false);
+  const tilt = useTilt(5);
+
+  const connectedSince = instance.connected_at;
+  const tokenPrefix = instance.token ? instance.token.slice(0, 8) + "…" : null;
 
   return (
-    <div className="group relative flex flex-col rounded-2xl overflow-hidden animate-fade-in-up"
+    <div
+      ref={tilt.ref as React.RefObject<HTMLDivElement>}
+      className="group relative flex flex-col rounded-2xl overflow-hidden animate-fade-in-up"
       style={{
         background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
         backdropFilter: "blur(20px) saturate(180%)",
@@ -105,13 +112,12 @@ function InstanceCard({
           : isConnected
             ? "0 0 0 1px rgba(0,212,106,0.06), 0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.10)"
             : "0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.10)",
-        transform: hovered ? "translateY(-2px)" : "translateY(0)",
-        transition: "all 0.35s cubic-bezier(0.16,1,0.3,1)",
         animationDelay: `${index * 60}ms`,
         animationFillMode: "both",
+        transformStyle: "preserve-3d",
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseMove={e => { setHovered(true); tilt.onMouseMove(e as React.MouseEvent<HTMLElement>); }}
+      onMouseLeave={e => { setHovered(false); tilt.onMouseLeave(); }}
     >
       {/* Light line top */}
       <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
@@ -173,12 +179,6 @@ function InstanceCard({
                   <Copy className="w-3 h-3 flex-shrink-0 opacity-0 group-hover/id:opacity-100 transition-opacity" style={{ color: "hsl(240 8% 40%)" }} />
                 )}
               </button>
-              {profile?.conversations != null && profile.conversations > 0 && (
-                <p className="flex items-center gap-1 text-[10px] mt-1" style={{ color: "hsl(240 8% 38)" }}>
-                  <MessageSquare className="w-2.5 h-2.5" />
-                  {profile.conversations} conversa{profile.conversations !== 1 ? "s" : ""}
-                </p>
-              )}
             </div>
           </div>
 
@@ -283,6 +283,36 @@ function InstanceCard({
               Proxy erro
             </span>
           )}
+        </div>
+
+        {/* Progressive disclosure — revealed on hover */}
+        <div style={{
+          overflow: "hidden",
+          maxHeight: hovered ? "64px" : "0px",
+          opacity: hovered ? 1 : 0,
+          transition: "max-height 0.3s cubic-bezier(0.16,1,0.3,1), opacity 0.25s ease",
+        }}>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 pb-0.5"
+            style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+            {connectedSince && (
+              <span className="flex items-center gap-1 text-[10px]" style={{ color: "hsl(240 8% 42%)" }}>
+                <Wifi className="w-2.5 h-2.5" style={{ color: isConnected ? "var(--green)" : undefined }} />
+                {isConnected ? "Conectado" : "Último"}: {new Date(connectedSince).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
+            {profile?.conversations != null && profile.conversations > 0 && (
+              <span className="flex items-center gap-1 text-[10px]" style={{ color: "hsl(240 8% 42%)" }}>
+                <MessageSquare className="w-2.5 h-2.5" />
+                {profile.conversations} conversa{profile.conversations !== 1 ? "s" : ""}
+              </span>
+            )}
+            {tokenPrefix && (
+              <span className="flex items-center gap-1 text-[10px] font-mono" style={{ color: "hsl(240 8% 35%)" }}>
+                <Shield className="w-2.5 h-2.5" />
+                {tokenPrefix}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Actions */}

@@ -5,7 +5,8 @@
 // Cada visão consome endpoints já existentes; a rota /reports antiga
 // é mantida via tab Inbox/SLA (deeplink ?tab=inbox).
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useTilt } from "@/hooks/useTilt";
 import { useQuery } from "@tanstack/react-query";
 import {
   adminApi, agentsApi, campaignsApi, companiesApi, crmApi, dealsApi,
@@ -144,9 +145,11 @@ function StatCard({
   const numValue = typeof value === "number" ? value : undefined;
   const [pulse, setPulse] = useState(false);
   const triggerPulse = () => { setPulse(true); setTimeout(() => setPulse(false), 700); };
+  const tilt = useTilt(6);
 
   const inner = (
     <div
+      ref={tilt.ref as React.RefObject<HTMLDivElement>}
       className="p-4 sm:p-5 animate-fade-in-up h-full"
       style={{
         background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
@@ -155,20 +158,12 @@ function StatCard({
         border: "1px solid rgba(255,255,255,0.10)",
         borderRadius: "20px",
         boxShadow: "0 8px 24px rgba(0,0,0,0.30), 0 2px 6px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.10)",
-        transition: "all 0.35s cubic-bezier(0.16,1,0.3,1)",
         position: "relative",
-        overflow: "hidden"
+        overflow: "hidden",
+        transformStyle: "preserve-3d",
       }}
-      onMouseEnter={e => {
-        const el = e.currentTarget as HTMLElement;
-        el.style.transform = "translateY(-3px) scale(1.003)";
-        el.style.boxShadow = "0 16px 40px rgba(0,0,0,0.40), 0 4px 12px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.14), 0 0 0 1px rgba(0,212,106,0.10)";
-      }}
-      onMouseLeave={e => {
-        const el = e.currentTarget as HTMLElement;
-        el.style.transform = "";
-        el.style.boxShadow = "0 8px 24px rgba(0,0,0,0.30), 0 2px 6px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.10)";
-      }}
+      onMouseMove={tilt.onMouseMove as React.MouseEventHandler<HTMLDivElement>}
+      onMouseLeave={tilt.onMouseLeave as React.MouseEventHandler<HTMLDivElement>}
     >
       {/* Linha de luz no topo */}
       <div style={{
