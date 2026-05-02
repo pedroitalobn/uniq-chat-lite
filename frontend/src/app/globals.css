@@ -17,7 +17,7 @@
   /* ── Dark theme (default) ──────────────────────────────────────── */
   :root, .dark {
     /* shadcn HSL tokens (mantidos pra retrocompat com botões/inputs) */
-    --background: 240 20% 4%;
+    --background: transparent;
     --foreground: 240 15% 93%;
     --card: 240 18% 6%;
     --card-foreground: 240 15% 93%;
@@ -46,14 +46,15 @@
     --green-border: rgba(0, 212, 106, 0.22);
     --green-fg: #03170a; /* texto sobre o verde */
 
-    /* Surface ladder — 4 níveis (Spotify-style). hover = sobe 1 degrau. */
-    --surface-0: hsl(240 22% 3%);   /* page bg */
-    --surface-1: hsl(240 20% 5%);   /* card padrão */
-    --surface-2: hsl(240 18% 7%);   /* card elevado / hover */
-    --surface-3: hsl(240 14% 10%);  /* input / chip */
-    --surface-4: hsl(240 12% 14%);  /* dropdown / popover elevated */
+    /* Surface ladder — com alpha pra deixar o gradient mesh vazar e dar
+       profundidade ao glass morphism. hsl puro = opaco = mata o efeito. */
+    --surface-0: rgba(8,  9, 18, 0.60);   /* page bg — quase transparente */
+    --surface-1: rgba(10, 11, 22, 0.72);  /* card padrão */
+    --surface-2: rgba(13, 14, 28, 0.78);  /* card elevado / hover */
+    --surface-3: rgba(18, 19, 36, 0.82);  /* input / chip */
+    --surface-4: rgba(24, 25, 46, 0.88);  /* dropdown / popover elevated */
     /* alias mantido pra código legacy */
-    --surface-border: hsl(240 12% 13%);
+    --surface-border: rgba(255, 255, 255, 0.08);
 
     /* Borders — alpha sobre branco (warm-ish) */
     --border-subtle: rgba(255, 255, 255, 0.06);
@@ -76,9 +77,9 @@
     --info: #3b82f6;
     --info-soft: rgba(59, 130, 246, 0.12);
 
-    /* Sidebar */
-    --sidebar-bg: hsl(240 22% 3.2%);
-    --sidebar-border: hsl(240 12% 10%);
+    /* Sidebar — alpha pra deixar gradient mesh vazar */
+    --sidebar-bg: rgba(6, 7, 16, 0.82);
+    --sidebar-border: rgba(255, 255, 255, 0.07);
 
     /* Shadows — escala 4 níveis VoltAgent-inspired pra dar mais
        hierarquia de profundidade. Single source = depth alpha-only. */
@@ -177,8 +178,25 @@
 
 @layer base {
   * { @apply border-border; }
+
+  /* ── Ambient gradient background ──────────────────────────────────────
+     O glass morphism só funciona se houver cor/gradiente ATRÁS do blur.
+     Fundo quase preto puro não deixa nada aparecer no backdrop-filter.
+     Gradient mesh fixo no html (abaixo de tudo) com orbs coloridos.
+  ────────────────────────────────────────────────────────────────────── */
+  html {
+    background:
+      radial-gradient(ellipse 55% 40% at 15%  8%,  rgba(0, 212, 106, 0.13) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 35% at 85%  5%,  rgba(99, 102, 241, 0.10) 0%, transparent 65%),
+      radial-gradient(ellipse 40% 50% at 5%  55%,  rgba(139, 92, 246, 0.08) 0%, transparent 70%),
+      radial-gradient(ellipse 45% 40% at 92% 50%,  rgba(59, 130, 246, 0.07) 0%, transparent 65%),
+      radial-gradient(ellipse 60% 30% at 50% 100%, rgba(0, 212, 106, 0.06) 0%, transparent 60%),
+      hsl(240 22% 3%);
+    min-height: 100vh;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    background: transparent;
     /* Inter:
        - cv11 ativa o 'l' single-storey (mais legível em UI densa)
        - ss01 desliga ligaduras de seta/pontuação que destoam em interface

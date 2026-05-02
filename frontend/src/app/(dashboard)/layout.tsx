@@ -24,7 +24,7 @@ export default async function DashboardLayout({
       <WorkspacePermissionsProvider>
         <PresenceProvider>
           <UniqAIIslandProvider>
-            <div className="flex h-screen overflow-hidden bg-background">
+            <div className="flex h-screen overflow-hidden">
               <Sidebar />
               <LayoutClient>{children}</LayoutClient>
             </div>
