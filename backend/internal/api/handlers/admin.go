@@ -464,7 +464,11 @@ func (h *AdminHandler) DeleteUser(c *fiber.Ctx) error {
 			if err := cascadeDeleteByFK(tx, "workspaces", "id", ownerWsIDs, cleaned); err != nil {
 				return err
 			}
-			res := tx.Exec(`DELETE FROM workspaces WHERE id = ANY($1)`, ownerWsIDs)
+			quotedWs := make([]string, len(ownerWsIDs))
+			for i, id := range ownerWsIDs {
+				quotedWs[i] = "'" + strings.ReplaceAll(id, "'", "") + "'"
+			}
+			res := tx.Exec(`DELETE FROM workspaces WHERE id::text IN (` + strings.Join(quotedWs, ",") + `)`)
 			if res.Error != nil {
 				return res.Error
 			}
@@ -540,17 +544,25 @@ func cascadeDeleteByFK(tx *gorm.DB, parentTable, parentCol string, ids []string,
 		}
 		pending = append(pending, f)
 	}
-	for pass := 0; pass < 6 && len(pending) > 0; pass++ {
+	// Monta a lista de UUIDs como literal Postgres: ('uuid1','uuid2',...)
+	// Evita problemas de type-mismatch entre []string e uuid[] com pgx.
+	quotedIDs := make([]string, len(ids))
+	for i, id := range ids {
+		quotedIDs[i] = "'" + strings.ReplaceAll(id, "'", "") + "'"
+	}
+	idList := strings.Join(quotedIDs, ",")
+
+	for pass := 0; pass < 8 && len(pending) > 0; pass++ {
 		next := pending[:0]
 		progress := false
 		for _, f := range pending {
-			stmt := `DELETE FROM "` + f.Table + `" WHERE "` + f.Column + `" = ANY($1)`
-			// Savepoint pra que erro não aborte a transaction-mãe.
+			// Casta a coluna pra text pra compatibilidade com uuid e varchar.
+			stmt := fmt.Sprintf(`DELETE FROM "%s" WHERE "%s"::text IN (%s)`, f.Table, f.Column, idList)
 			sp := "sp_" + f.Table + "_" + f.Column
 			if err := tx.Exec("SAVEPOINT " + sp).Error; err != nil {
 				return err
 			}
-			res := tx.Exec(stmt, ids)
+			res := tx.Exec(stmt)
 			if res.Error != nil {
 				_ = tx.Exec("ROLLBACK TO SAVEPOINT " + sp).Error
 				next = append(next, f)
