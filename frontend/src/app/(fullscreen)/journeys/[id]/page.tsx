@@ -26,6 +26,7 @@ import {
   MessageSquare, Clock, GitBranch, Tag, Bot, ListTree, Inbox,
   Image as ImageIcon, Globe, Shuffle, UserPlus, Variable, ArrowRightCircle,
   Trash2, X, PlayCircle, Zap,
+  Radio, Users2, Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -41,7 +42,9 @@ type StepType =
   | "update_stage" | "end"
   | "product_search" | "product_carousel"
   // Customer.io-inspired
-  | "wait_until" | "multivariate" | "send_in_timezone" | "unsubscribe";
+  | "wait_until" | "multivariate" | "send_in_timezone" | "unsubscribe"
+  // New types
+  | "cross_channel" | "delay_days" | "crm_update" | "send_email";
 
 interface FlowStep {
   id: string;
@@ -86,71 +89,133 @@ const STEP_META: Record<StepType, {
   update_stage:{ label: "Estágio CRM", color: "#14b8a6", bg: "rgba(20,184,166,0.12)",  icon: GitBranch,     defaultConfig: { stage_id: "" } },
   end:         { label: "Fim",         color: "#6b7280", bg: "rgba(107,114,128,0.12)", icon: X,             defaultConfig: {} },
   // Shop nodes (Fase 10)
-  product_search:    { label: "Buscar produtos", color: "#22c55e", bg: "rgba(34,197,94,0.12)",  icon: Tag, defaultConfig: { query: "{{last_input}}", limit: 5, save_to_var: "products" } },
-  product_carousel:  { label: "Carousel produtos", color: "#22c55e", bg: "rgba(34,197,94,0.12)", icon: ListTree, defaultConfig: { header: "Produtos pra você", message: "Confira:", products_var: "products", button_text: "Ver" } },
+  product_search:   { label: "Buscar produtos",    color: "#22c55e", bg: "rgba(34,197,94,0.12)",  icon: Tag,      defaultConfig: { query: "{{last_input}}", limit: 5, save_to_var: "products" } },
+  product_carousel: { label: "Carousel produtos",  color: "#22c55e", bg: "rgba(34,197,94,0.12)",  icon: ListTree, defaultConfig: { header: "Produtos pra você", message: "Confira:", products_var: "products", button_text: "Ver" } },
   // Customer.io-inspired
-  wait_until:        { label: "Aguardar evento", color: "#f59e0b", bg: "rgba(245,158,11,0.12)", icon: Clock, defaultConfig: { event: "shop.order_paid", timeout_minutes: 1440 } },
-  multivariate:      { label: "A/B/C split", color: "#a855f7", bg: "rgba(168,85,247,0.12)", icon: GitBranch, defaultConfig: { branches: [{ weight: 50, next: "", label: "A" }, { weight: 50, next: "", label: "B" }] } },
-  send_in_timezone:  { label: "Janela horária", color: "#f59e0b", bg: "rgba(245,158,11,0.12)", icon: Clock, defaultConfig: { window_start_hour: 9, window_end_hour: 18 } },
-  unsubscribe:       { label: "Unsubscribe (LGPD)", color: "#ef4444", bg: "rgba(239,68,68,0.12)", icon: X, defaultConfig: { channel: "all", reason: "user_optout" } },
+  wait_until:       { label: "Aguardar evento",    color: "#f59e0b", bg: "rgba(245,158,11,0.12)", icon: Clock,    defaultConfig: { event: "shop.order_paid", timeout_minutes: 1440 } },
+  multivariate:     { label: "A/B/C split",        color: "#a855f7", bg: "rgba(168,85,247,0.12)", icon: GitBranch,defaultConfig: { branches: [{ weight: 50, next: "", label: "A" }, { weight: 50, next: "", label: "B" }] } },
+  send_in_timezone: { label: "Janela horária",     color: "#f59e0b", bg: "rgba(245,158,11,0.12)", icon: Clock,    defaultConfig: { window_start_hour: 9, window_end_hour: 18 } },
+  unsubscribe:      { label: "Unsubscribe (LGPD)", color: "#ef4444", bg: "rgba(239,68,68,0.12)",  icon: X,        defaultConfig: { channel: "all", reason: "user_optout" } },
+  // New types
+  cross_channel: { label: "Multi-canal",   color: "#8b5cf6", bg: "rgba(139,92,246,0.12)", icon: Radio,   defaultConfig: { message: "{{message}}", channels: ["whatsapp", "instagram"], fallback: "whatsapp" } },
+  delay_days:    { label: "Delay (dias)",  color: "#eab308", bg: "rgba(234,179,8,0.12)",  icon: Clock,   defaultConfig: { days: 1, hours: 0 } },
+  crm_update:    { label: "Atualizar CRM", color: "#14b8a6", bg: "rgba(20,184,166,0.12)", icon: Users2,  defaultConfig: { field: "name", value: "{{last_input}}" } },
+  send_email:    { label: "Enviar Email",  color: "#6366f1", bg: "rgba(99,102,241,0.12)", icon: Mail,    defaultConfig: { to: "{{contact.email}}", subject: "Olá {{name}}", body: "" } },
 };
 
-// ─── Custom node ──────────────────────────────────────────────────────────────
+// ─── Custom node (glass-card design) ─────────────────────────────────────────
 function FlowNode({ data, selected }: NodeProps) {
   const step = data.step as FlowStep;
   const meta = STEP_META[step.type] || STEP_META.message;
   const Icon = meta.icon;
   const preview = data.preview as string | undefined;
+  const isStart = step.is_start_step;
 
   return (
     <div
-      className="rounded-xl px-3 py-2.5 min-w-[200px] max-w-[240px] shadow-sm"
       style={{
-        background: "var(--surface-2, #1a1a1a)",
-        border: `2px solid ${selected ? meta.color : "var(--surface-border, #2a2a2a)"}`,
+        background: selected
+          ? `linear-gradient(135deg, ${meta.bg} 0%, rgba(255,255,255,0.04) 100%)`
+          : "linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)",
+        backdropFilter: "blur(20px) saturate(180%)",
+        WebkitBackdropFilter: "blur(20px) saturate(180%)",
+        border: selected ? `1.5px solid ${meta.color}` : "1px solid rgba(255,255,255,0.12)",
+        borderRadius: 16,
+        boxShadow: selected
+          ? `0 0 0 3px ${meta.color}22, 0 8px 24px rgba(0,0,0,0.40)`
+          : "0 4px 16px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.08)",
+        minWidth: 220,
+        maxWidth: 260,
+        padding: "10px 12px",
+        position: "relative",
+        overflow: "hidden",
+        transition: "box-shadow 0.2s ease, border-color 0.2s ease",
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ background: meta.color, width: 8, height: 8 }} />
+      {/* Ambient orb */}
+      <div style={{
+        position: "absolute", top: -20, right: -20, width: 80, height: 80,
+        borderRadius: "50%",
+        background: `radial-gradient(circle, ${meta.color}22 0%, transparent 70%)`,
+        pointerEvents: "none",
+      }} />
 
-      <div className="flex items-center gap-2 mb-1.5">
-        <div
-          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ background: meta.bg, border: `1px solid ${meta.color}44` }}
-        >
-          <Icon className="w-3.5 h-3.5" style={{ color: meta.color }} />
+      {/* Top line accent for start step */}
+      {isStart && (
+        <div style={{
+          position: "absolute", top: 0, left: "20%", right: "20%", height: 2,
+          background: `linear-gradient(90deg, transparent, ${meta.color}, transparent)`,
+          borderRadius: 1,
+        }} />
+      )}
+
+      <Handle type="target" position={Position.Top}
+        style={{ background: meta.color, width: 8, height: 8, border: "2px solid rgba(0,0,0,0.3)", top: -5 }} />
+
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: preview ? 6 : 0 }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+          background: meta.bg, border: `1px solid ${meta.color}44`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <Icon style={{ width: 14, height: 14, color: meta.color }} />
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] uppercase font-semibold tracking-wide opacity-60">{meta.label}</p>
-          <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
+            textTransform: "uppercase", opacity: 0.5, color: meta.color, marginBottom: 1,
+          }}>
+            {meta.label}
+          </div>
+          <div style={{
+            fontSize: 11, fontWeight: 600, overflow: "hidden",
+            textOverflow: "ellipsis", whiteSpace: "nowrap",
+            color: "rgba(255,255,255,0.9)",
+          }}>
             {step.label || meta.label}
-          </p>
+          </div>
         </div>
-        {step.is_start_step && (
-          <div className="text-[8px] px-1.5 py-0.5 rounded" style={{ background: "rgba(0,212,106,0.15)", color: "var(--green)" }}>
-            INÍCIO
+        {isStart && (
+          <div style={{
+            fontSize: 8, fontWeight: 700, letterSpacing: "0.06em",
+            padding: "2px 6px", borderRadius: 6, flexShrink: 0,
+            background: "rgba(0,212,106,0.15)", color: "#00d46a",
+            border: "1px solid rgba(0,212,106,0.3)",
+          }}>
+            START
           </div>
         )}
       </div>
 
       {preview && (
-        <p className="text-[10px] opacity-60 line-clamp-2 mt-1" style={{ color: "var(--text-2)" }}>
+        <div style={{
+          fontSize: 10, opacity: 0.55, lineHeight: 1.4,
+          overflow: "hidden", display: "-webkit-box",
+          WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
+          color: "rgba(255,255,255,0.8)",
+          padding: "4px 6px",
+          background: "rgba(0,0,0,0.20)",
+          borderRadius: 6,
+          marginTop: 4,
+        }}>
           {preview}
-        </p>
+        </div>
       )}
 
       {meta.hasTwoBranches ? (
         <>
           <Handle type="source" position={Position.Bottom} id="true"
-            style={{ background: "#10b981", left: "30%", width: 10, height: 10 }} />
+            style={{ background: "#10b981", left: "28%", width: 10, height: 10, border: "2px solid rgba(0,0,0,0.3)" }} />
           <Handle type="source" position={Position.Bottom} id="false"
-            style={{ background: "#ef4444", left: "70%", width: 10, height: 10 }} />
-          <div className="flex justify-between mt-2 text-[9px] opacity-70 px-1">
-            <span style={{ color: "#10b981" }}>✓ sim</span>
-            <span style={{ color: "#ef4444" }}>✗ não</span>
+            style={{ background: "#ef4444", left: "72%", width: 10, height: 10, border: "2px solid rgba(0,0,0,0.3)" }} />
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, padding: "0 4px" }}>
+            <span style={{ fontSize: 9, color: "#10b981", fontWeight: 600 }}>✓ Sim</span>
+            <span style={{ fontSize: 9, color: "#ef4444", fontWeight: 600 }}>✗ Não</span>
           </div>
         </>
       ) : (
-        <Handle type="source" position={Position.Bottom} style={{ background: meta.color, width: 8, height: 8 }} />
+        <Handle type="source" position={Position.Bottom}
+          style={{ background: meta.color, width: 8, height: 8, border: "2px solid rgba(0,0,0,0.3)", bottom: -5 }} />
       )}
     </div>
   );
@@ -173,6 +238,8 @@ function stepPreview(step: FlowStep): string {
       return `→ ${cfg.variable_name || "?"}`;
     case "wait":
       return `${cfg.duration || "5s"}`;
+    case "delay_days":
+      return `${cfg.days || 0}d ${cfg.hours || 0}h`;
     case "condition":
       return `${cfg.left} ${cfg.operator} ${cfg.right}`;
     case "ai_response":
@@ -186,6 +253,12 @@ function stepPreview(step: FlowStep): string {
       return String(cfg.tag || "");
     case "goto":
       return `→ ${cfg.target_step_id || "?"}`;
+    case "crm_update":
+      return `${cfg.field} = ${cfg.value}`;
+    case "send_email":
+      return String(cfg.subject || cfg.to || "").slice(0, 60);
+    case "cross_channel":
+      return String(cfg.message || "").slice(0, 60);
     default:
       return "";
   }
@@ -248,14 +321,16 @@ function flowToGraph(flow: JourneyFlow | null): { nodes: Node[]; edges: Edge[] }
 
   const edges: Edge[] = [];
   for (const s of flow.steps) {
+    const isCondition = s.type === "condition";
     if (s.next_step_id && byId.has(s.next_step_id)) {
       edges.push({
         id: `${s.id}-next-${s.next_step_id}`,
         source: s.id,
         target: s.next_step_id,
         type: "smoothstep",
-        markerEnd: { type: MarkerType.ArrowClosed, color: "#666" },
-        style: { stroke: "#666", strokeWidth: 2 },
+        animated: isCondition,
+        markerEnd: { type: MarkerType.ArrowClosed, color: "rgba(255,255,255,0.25)" },
+        style: { stroke: "rgba(255,255,255,0.25)", strokeWidth: 2 },
       });
     }
     if (s.branch_true && byId.has(s.branch_true)) {
@@ -264,6 +339,7 @@ function flowToGraph(flow: JourneyFlow | null): { nodes: Node[]; edges: Edge[] }
         source: s.id, sourceHandle: "true",
         target: s.branch_true,
         type: "smoothstep",
+        animated: true,
         label: "sim",
         markerEnd: { type: MarkerType.ArrowClosed, color: "#10b981" },
         style: { stroke: "#10b981", strokeWidth: 2 },
@@ -275,6 +351,7 @@ function flowToGraph(flow: JourneyFlow | null): { nodes: Node[]; edges: Edge[] }
         source: s.id, sourceHandle: "false",
         target: s.branch_false,
         type: "smoothstep",
+        animated: true,
         label: "não",
         markerEnd: { type: MarkerType.ArrowClosed, color: "#ef4444" },
         style: { stroke: "#ef4444", strokeWidth: 2 },
@@ -308,35 +385,143 @@ function graphToFlow(nodes: Node[], edges: Edge[]): JourneyFlow {
   };
 }
 
+// ─── Step library categories ──────────────────────────────────────────────────
+const STEP_CATEGORIES: { label: string; color: string; types: StepType[] }[] = [
+  {
+    label: "Mensagens",
+    color: "#3b82f6",
+    types: ["message", "buttons", "list", "media", "input"],
+  },
+  {
+    label: "Lógica",
+    color: "#a855f7",
+    types: ["wait", "delay_days", "condition", "goto", "randomize", "multivariate", "end"],
+  },
+  {
+    label: "Integrações",
+    color: "#f97316",
+    types: ["ai_response", "http_request", "cross_channel", "send_email", "handoff"],
+  },
+  {
+    label: "CRM & Tags",
+    color: "#10b981",
+    types: ["add_tag", "remove_tag", "update_stage", "crm_update", "set_variable"],
+  },
+  {
+    label: "Avançado",
+    color: "#f59e0b",
+    types: ["wait_until", "send_in_timezone", "unsubscribe", "product_search", "product_carousel"],
+  },
+];
+
 // ─── Step library (sidebar) ───────────────────────────────────────────────────
 function StepLibrary({ onAdd }: { onAdd: (type: StepType) => void }) {
-  const types: StepType[] = [
-    "message", "buttons", "list", "input", "wait", "condition",
-    "ai_response", "http_request", "media", "handoff", "goto",
-    "randomize", "set_variable", "add_tag", "remove_tag", "update_stage", "end",
-  ];
+  const [search, setSearch] = useState("");
+
+  const filtered = search.trim()
+    ? (Object.entries(STEP_META) as [StepType, typeof STEP_META[StepType]][])
+        .filter(([, m]) => m.label.toLowerCase().includes(search.toLowerCase()))
+        .map(([t]) => t)
+    : null;
+
   return (
-    <div className="p-3 overflow-y-auto h-full">
-      <p className="text-[10px] uppercase font-semibold opacity-60 mb-2 px-1">Adicionar Step</p>
-      <div className="grid grid-cols-2 gap-1.5">
-        {types.map(t => {
-          const meta = STEP_META[t];
-          const Icon = meta.icon;
-          return (
-            <button
-              key={t}
-              onClick={() => onAdd(t)}
-              className="flex flex-col items-center gap-1 p-2 rounded-lg text-center transition-all hover:scale-[1.03]"
-              style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}
-            >
-              <div className="w-7 h-7 rounded-md flex items-center justify-center"
-                style={{ background: meta.bg, border: `1px solid ${meta.color}33` }}>
-                <Icon className="w-4 h-4" style={{ color: meta.color }} />
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{
+        padding: "12px 12px 8px",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)",
+      }}>
+        <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", opacity: 0.5, marginBottom: 8 }}>
+          Passos
+        </p>
+        <div style={{ position: "relative" }}>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar..."
+            style={{
+              width: "100%", padding: "5px 8px 5px 28px", borderRadius: 8, fontSize: 11,
+              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)",
+              color: "rgba(255,255,255,0.8)", outline: "none", boxSizing: "border-box",
+            }}
+          />
+          <span style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", fontSize: 11, opacity: 0.4 }}>🔍</span>
+        </div>
+      </div>
+
+      {/* List */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "8px 8px" }}>
+        {filtered ? (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+            {filtered.map(t => {
+              const meta = STEP_META[t];
+              const Icon = meta.icon;
+              return (
+                <button
+                  key={t}
+                  onClick={() => onAdd(t)}
+                  style={{
+                    padding: "8px 6px", borderRadius: 10, textAlign: "center",
+                    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                    cursor: "pointer", transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.background = meta.bg;
+                    (e.currentTarget as HTMLElement).style.borderColor = meta.color + "44";
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
+                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.08)";
+                  }}
+                >
+                  <div style={{ width: 28, height: 28, borderRadius: 8, background: meta.bg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 4px" }}>
+                    <Icon style={{ width: 14, height: 14, color: meta.color }} />
+                  </div>
+                  <span style={{ fontSize: 10, fontWeight: 500, color: "rgba(255,255,255,0.7)", display: "block" }}>{meta.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          STEP_CATEGORIES.map(cat => (
+            <div key={cat.label} style={{ marginBottom: 12 }}>
+              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: cat.color, marginBottom: 4, paddingLeft: 2 }}>
+                {cat.label}
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                {cat.types.filter(t => STEP_META[t]).map(t => {
+                  const meta = STEP_META[t];
+                  const Icon = meta.icon;
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => onAdd(t)}
+                      style={{
+                        padding: "7px 6px", borderRadius: 10, textAlign: "center",
+                        background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
+                        cursor: "pointer", transition: "all 0.15s ease",
+                      }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLElement).style.background = meta.bg;
+                        (e.currentTarget as HTMLElement).style.borderColor = meta.color + "44";
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)";
+                        (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.07)";
+                      }}
+                    >
+                      <div style={{ width: 26, height: 26, borderRadius: 7, background: meta.bg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 3px" }}>
+                        <Icon style={{ width: 13, height: 13, color: meta.color }} />
+                      </div>
+                      <span style={{ fontSize: 9.5, fontWeight: 500, color: "rgba(255,255,255,0.65)", display: "block", lineHeight: 1.2 }}>{meta.label}</span>
+                    </button>
+                  );
+                })}
               </div>
-              <span className="text-[10px] font-medium" style={{ color: "var(--text-1)" }}>{meta.label}</span>
-            </button>
-          );
-        })}
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
@@ -618,6 +803,66 @@ function ConfigPanel({
         </>
       )}
 
+      {step.type === "delay_days" && (
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Dias</label>
+            <input type="number" min={0} className={txt} style={txtStyle}
+              value={Number(cfg.days || 0)}
+              onChange={e => updateCfg({ days: Number(e.target.value) })} />
+          </div>
+          <div className="flex-1">
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Horas</label>
+            <input type="number" min={0} max={23} className={txt} style={txtStyle}
+              value={Number(cfg.hours || 0)}
+              onChange={e => updateCfg({ hours: Number(e.target.value) })} />
+          </div>
+        </div>
+      )}
+
+      {step.type === "crm_update" && (
+        <>
+          <div>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Campo</label>
+            <input className={txt} style={txtStyle}
+              value={String(cfg.field || "")}
+              onChange={e => updateCfg({ field: e.target.value })}
+              placeholder="ex: name, email, phone" />
+          </div>
+          <div>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Valor</label>
+            <input className={txt} style={txtStyle}
+              value={String(cfg.value || "")}
+              onChange={e => updateCfg({ value: e.target.value })}
+              placeholder="{{last_input}}" />
+          </div>
+        </>
+      )}
+
+      {step.type === "send_email" && (
+        <>
+          <div>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Para</label>
+            <input className={txt} style={txtStyle}
+              value={String(cfg.to || "")}
+              onChange={e => updateCfg({ to: e.target.value })}
+              placeholder="{{contact.email}}" />
+          </div>
+          <div>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Assunto</label>
+            <input className={txt} style={txtStyle}
+              value={String(cfg.subject || "")}
+              onChange={e => updateCfg({ subject: e.target.value })} />
+          </div>
+          <div>
+            <label className="text-[10px] uppercase font-semibold opacity-60 block mb-1">Corpo</label>
+            <textarea className={txt + " min-h-[80px]"} style={txtStyle}
+              value={String(cfg.body || "")}
+              onChange={e => updateCfg({ body: e.target.value })} />
+          </div>
+        </>
+      )}
+
       <div className="pt-3 border-t border-[var(--surface-border)] flex gap-2">
         <button
           onClick={onSetStart}
@@ -638,10 +883,52 @@ function ConfigPanel({
   );
 }
 
-// ─── Seletores inline (instância/grupo) para o TriggerPanel ────────────────
-// Alternativa aos <input> manuais — lista as instâncias/grupos via API e
-// mostra o label humano (nome). O valor persistido continua sendo o ID/JID
-// canônico, que é o que o backend consome.
+// ─── Inline journey name editor ───────────────────────────────────────────────
+function JourneyNameEditor({ name, onSave }: { name: string; onSave: (n: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(name);
+  useEffect(() => { if (!editing) setDraft(name); }, [name, editing]);
+  const commit = () => {
+    setEditing(false);
+    const n = draft.trim();
+    if (n && n !== name) onSave(n);
+    else setDraft(name);
+  };
+  if (editing) return (
+    <input
+      value={draft}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => {
+        if (e.key === "Enter") commit();
+        if (e.key === "Escape") { setEditing(false); setDraft(name); }
+      }}
+      autoFocus
+      style={{
+        fontSize: 13, fontWeight: 600, background: "transparent", border: "none",
+        borderBottom: "1px solid #00d46a", outline: "none",
+        color: "rgba(255,255,255,0.9)", width: "100%", padding: "0 2px",
+      }}
+    />
+  );
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      title="Clique para renomear"
+      style={{
+        fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.9)",
+        background: "none", border: "none", cursor: "pointer",
+        textAlign: "left", padding: 0, maxWidth: "100%",
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        display: "block", width: "100%",
+      }}
+    >
+      {name}
+    </button>
+  );
+}
+
+// ─── Instance / Group pickers ────────────────────────────────────────────────
 function InstancePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const { data: instances = [], isLoading } = useQuery<any[]>({
     queryKey: ["builder-instances"],
@@ -718,10 +1005,7 @@ function GroupPicker({ value, onChange, instanceId }: { value: string; onChange:
   );
 }
 
-// ─── Trigger panel ────────────────────────────────────────────────────────────
-// Edita o gatilho da jornada (trigger_type, keywords, instância, grupo,
-// response_mode, status) sem passar por LLM. Persiste via
-// PATCH /v1/journeys/:id/trigger + toggle de status via /status.
+// ─── Trigger types ────────────────────────────────────────────────────────────
 const TRIGGER_TYPES: { value: string; label: string; hint: string }[] = [
   { value: "any_message",            label: "Qualquer mensagem",      hint: "Dispara pra TODA mensagem recebida." },
   { value: "group_keyword",          label: "Palavra-chave em grupo", hint: "Filtra por grupo + keywords." },
@@ -739,8 +1023,17 @@ const TRIGGER_TYPES: { value: string; label: string; hint: string }[] = [
   { value: "contact_call_missed",    label: "Chamada perdida",        hint: "Ligou e ninguém atendeu." },
   { value: "contact_call_rejected",  label: "Chamada rejeitada",      hint: "Ligação rejeitada manualmente." },
   { value: "user_command",           label: "Comando (/start, /menu)",hint: "Comandos reservados no início da msg." },
+  { value: "webhook",                label: "Webhook externo",        hint: "Dispara quando recebe um POST no endpoint do webhook desta jornada." },
+  { value: "cron_schedule",          label: "Agendado (Cron)",        hint: "Dispara em horário fixo. Configure a expressão cron no campo abaixo." },
+  { value: "contact_tag_added",      label: "Tag adicionada",         hint: "Dispara quando uma tag específica é adicionada ao contato." },
+  { value: "contact_tag_removed",    label: "Tag removida",           hint: "Dispara quando uma tag específica é removida do contato." },
+  { value: "deal_stage_changed",     label: "Estágio CRM mudou",      hint: "Dispara quando o estágio de um deal no CRM muda." },
+  { value: "order_placed",           label: "Pedido realizado",       hint: "Dispara quando um pedido é criado na loja." },
+  { value: "order_shipped",          label: "Pedido enviado",         hint: "Dispara quando um pedido tem status 'enviado'." },
+  { value: "contact_birthday",       label: "Aniversário do contato", hint: "Dispara no aniversário do contato (campo birthday no CRM)." },
 ];
 
+// ─── Trigger panel ────────────────────────────────────────────────────────────
 function TriggerPanel({
   journeyId, initial, onSaved,
 }: {
@@ -762,6 +1055,9 @@ function TriggerPanel({
   const [goalEvent, setGoalEvent] = useState(initial?.goal_event ?? "");
   const [exitConditionsRaw, setExitConditionsRaw] = useState(initial?.exit_conditions ?? "[]");
   const [reEntryRule, setReEntryRule] = useState(initial?.re_entry_rule ?? "never");
+  // New fields
+  const [cronExpr, setCronExpr] = useState((initial as any)?.cron_expr ?? "");
+  const [tagName, setTagName] = useState((initial as any)?.tag_name ?? "");
 
   // Re-sync quando a jornada externa recarrega
   useEffect(() => {
@@ -777,10 +1073,15 @@ function TriggerPanel({
     setGoalEvent(initial.goal_event ?? "");
     setExitConditionsRaw(initial.exit_conditions ?? "[]");
     setReEntryRule(initial.re_entry_rule ?? "never");
+    setCronExpr((initial as any)?.cron_expr ?? "");
+    setTagName((initial as any)?.tag_name ?? "");
   }, [initial]);
 
   const needsKeywords = triggerType === "group_keyword" || triggerType === "private_keyword" || triggerType === "user_command";
   const needsGroup = triggerType.startsWith("group_");
+
+  const inputClass = "w-full rounded-lg px-2.5 py-1.5 text-sm outline-none";
+  const inputStyle: React.CSSProperties = { background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" };
 
   const persist = async () => {
     setSaving(true);
@@ -798,6 +1099,8 @@ function TriggerPanel({
         goal_event: goalEvent.trim() || "",
         exit_conditions: exitConditionsRaw,
         re_entry_rule: reEntryRule,
+        cron_expr: triggerType === "cron_schedule" ? cronExpr.trim() : undefined,
+        tag_name: (triggerType === "contact_tag_added" || triggerType === "contact_tag_removed") ? tagName.trim() : undefined,
       } as any);
       toast.success("Gatilho salvo ✓");
       onSaved({
@@ -844,8 +1147,8 @@ function TriggerPanel({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="ex: Onboarding B2B"
-          className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none"
-          style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+          className={inputClass}
+          style={inputStyle}
         />
       </div>
 
@@ -855,7 +1158,7 @@ function TriggerPanel({
           value={triggerType}
           onChange={(e) => setTriggerType(e.target.value)}
           className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none cursor-pointer"
-          style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+          style={inputStyle}
         >
           {TRIGGER_TYPES.map((t) => (
             <option key={t.value} value={t.value} style={{ background: "hsl(240 18% 8%)" }}>{t.label}</option>
@@ -873,8 +1176,8 @@ function TriggerPanel({
             value={keywordsStr}
             onChange={(e) => setKeywordsStr(e.target.value)}
             placeholder="ex: teste, oi, menu"
-            className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none"
-            style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+            className={inputClass}
+            style={inputStyle}
           />
         </div>
       )}
@@ -910,6 +1213,52 @@ function TriggerPanel({
         </div>
       </div>
 
+      {/* ─── Cron & Webhook fields ─────────────────────────────────── */}
+      {triggerType === "cron_schedule" && (
+        <div>
+          <label className="text-[10px] uppercase tracking-wider font-medium mb-1 block opacity-60">Expressão Cron</label>
+          <input
+            value={cronExpr}
+            onChange={e => setCronExpr(e.target.value)}
+            placeholder="0 9 * * 1 (toda segunda 9h)"
+            className={inputClass}
+            style={inputStyle}
+          />
+          <p style={{ fontSize: 9, marginTop: 4, opacity: 0.5, color: "var(--text-3)" }}>
+            Ex: "0 9 * * 1" = toda segunda 9h · "0 8 1 * *" = dia 1 de cada mês 8h
+          </p>
+        </div>
+      )}
+
+      {triggerType === "webhook" && (
+        <div>
+          <label className="text-[10px] uppercase tracking-wider font-medium mb-1 block opacity-60">Endpoint do Webhook</label>
+          <div style={{
+            padding: "6px 10px", borderRadius: 8,
+            background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.20)",
+            fontSize: 10, fontFamily: "monospace", color: "#a78bfa", wordBreak: "break-all",
+          }}>
+            POST /v1/journeys/{journeyId}/webhook
+          </div>
+          <p style={{ fontSize: 9, marginTop: 4, opacity: 0.5, color: "var(--text-3)" }}>
+            Envie um POST para este endpoint com os dados do evento. Os campos do body ficam disponíveis como {"{{"}webhook.campo{"}}"}
+          </p>
+        </div>
+      )}
+
+      {(triggerType === "contact_tag_added" || triggerType === "contact_tag_removed") && (
+        <div>
+          <label className="text-[10px] uppercase tracking-wider font-medium mb-1 block opacity-60">Nome da Tag</label>
+          <input
+            value={tagName}
+            onChange={e => setTagName(e.target.value)}
+            placeholder="ex: cliente-vip, pagou, churned"
+            className={inputClass}
+            style={inputStyle}
+          />
+        </div>
+      )}
+
       {/* ─── Goals & Lifecycle (Customer.io-inspired) ─────────────── */}
       <div className="pt-3 mt-2 border-t" style={{ borderColor: "var(--surface-border)" }}>
         <p className="text-[10px] uppercase tracking-wider font-medium mb-2 opacity-60">Goals & Lifecycle</p>
@@ -919,7 +1268,7 @@ function TriggerPanel({
           <input value={goalEvent} onChange={(e) => setGoalEvent(e.target.value)}
             placeholder="ex: deal.won, shop.order_paid, tag.added:vip"
             className="w-full rounded-lg px-2.5 py-1.5 text-sm font-mono outline-none"
-            style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }} />
+            style={inputStyle} />
           <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
             Conversões: <span className="font-mono">{initial?.goal_count ?? 0}</span>
           </p>
@@ -929,7 +1278,7 @@ function TriggerPanel({
           <label className="text-[10px] block mb-1 opacity-60">Re-entry rule</label>
           <select value={reEntryRule} onChange={(e) => setReEntryRule(e.target.value)}
             className="w-full rounded-lg px-2.5 py-1.5 text-sm outline-none"
-            style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}>
+            style={inputStyle}>
             <option value="never">Apenas uma vez por contato</option>
             <option value="always">Sempre (entra de novo a cada trigger)</option>
             <option value="after_days:7">Após 7 dias do último run</option>
@@ -947,7 +1296,7 @@ function TriggerPanel({
             rows={3}
             placeholder='[{"event":"deal.won"},{"event_prefix":"tag.added:cliente"}]'
             className="w-full rounded-lg px-2.5 py-1.5 text-xs font-mono outline-none"
-            style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }} />
+            style={inputStyle} />
         </div>
       </div>
 
@@ -1057,10 +1406,7 @@ function SimulatorPanel({ journeyId }: { journeyId: string }) {
   );
 }
 
-// Flow inicial padrão — usado quando a jornada chega do backend sem flow
-// (caso de jornadas criadas só pelo prompt sem FlowBuilder rodando, ou
-// de jornadas antigas). Prefere um seed "Olá" a deixar o canvas vazio,
-// que é confuso e dá medo do "edit não funciona".
+// ─── Seed flow ────────────────────────────────────────────────────────────────
 function seedFlow(): JourneyFlow {
   return {
     start_step: "s1",
@@ -1104,16 +1450,13 @@ function BuilderCanvas() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [savedOnce, setSavedOnce] = useState(false); // false = seed ainda não persistido
-  const [dirty, setDirty] = useState(false);         // true = mudanças não salvas
+  const [savedOnce, setSavedOnce] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [llmBusy, setLlmBusy] = useState(false);
   const [llmPrompt, setLlmPrompt] = useState("");
   const [rightTab, setRightTab] = useState<"config" | "trigger" | "simulate">("config");
   const llmInputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Carregar journey + flow. Se o backend devolver null/empty flow, plantamos
-  // um flow mínimo no canvas e marcamos `savedOnce=false` pra sinalizar que
-  // o seed ainda não foi persistido (dirty=true).
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -1151,7 +1494,7 @@ function BuilderCanvas() {
   const onConnect = useCallback(
     (conn: Connection) => {
       const color = conn.sourceHandle === "true" ? "#10b981"
-        : conn.sourceHandle === "false" ? "#ef4444" : "#666";
+        : conn.sourceHandle === "false" ? "#ef4444" : "rgba(255,255,255,0.25)";
       const label = conn.sourceHandle === "true" ? "sim"
         : conn.sourceHandle === "false" ? "não" : undefined;
       setEdges(es => addEdge({
@@ -1223,15 +1566,13 @@ function BuilderCanvas() {
     setDirty(true);
   };
 
-  // onNodesChange/onEdgesChange vindos do ReactFlow disparam pra tudo
-  // (inclusive `select`). Marcamos dirty só em mudanças reais (move, remove,
-  // resize) pra não poluir.
   const handleNodesChange: typeof onNodesChange = useCallback((changes) => {
     onNodesChange(changes);
     if (changes.some((c) => c.type === "position" || c.type === "remove" || c.type === "dimensions")) {
       setDirty(true);
     }
   }, [onNodesChange]);
+
   const handleEdgesChange: typeof onEdgesChange = useCallback((changes) => {
     onEdgesChange(changes);
     if (changes.some((c) => c.type === "remove")) setDirty(true);
@@ -1250,7 +1591,6 @@ function BuilderCanvas() {
       setSavedOnce(true);
       setDirty(false);
     } catch (e: unknown) {
-      // Surface o erro real do backend no toast em vez de mensagem genérica
       const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
         || (e as { message?: string })?.message
         || "Falha ao salvar";
@@ -1260,10 +1600,6 @@ function BuilderCanvas() {
     }
   };
 
-  // Qualquer mutação no grafo marca como dirty — o toast do botão Salvar
-  // indica o estado atual. Usamos um wrapper em volta dos setters de nodes/
-  // edges que já dispara; nos handlers de edit (addStep, updateStep,
-  // deleteStep, setStartStep, onConnect) também.
   const markDirty = useCallback(() => setDirty(true), []);
 
   const editWithLLM = async (info?: MentionPickerHandles) => {
@@ -1273,7 +1609,6 @@ function BuilderCanvas() {
     const mentions = info?.mentions ?? [];
     setLlmBusy(true);
     try {
-      // Salva flow atual primeiro para que o LLM edite a versão correta
       const currentFlow = graphToFlow(nodes, edges);
       if (currentFlow.steps.length > 0) {
         await journeysApi.updateFlow(journeyId, currentFlow);
@@ -1289,7 +1624,7 @@ function BuilderCanvas() {
         setEdges(es);
         toast.success("Fluxo atualizado pela IA");
         setLlmPrompt("");
-        setDirty(true); // o LLM altera o grafo; precisa salvar
+        setDirty(true);
       } else {
         toast.error("IA não retornou fluxo válido");
       }
@@ -1325,10 +1660,24 @@ function BuilderCanvas() {
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] uppercase font-semibold opacity-60">Flow Builder</p>
-          <p className="text-sm font-medium truncate">{journey?.name || "Jornada sem nome"}</p>
+
+        {/* Name — editable inline */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", opacity: 0.4, marginBottom: 2 }}>
+            Flow Builder
+          </p>
+          <JourneyNameEditor
+            name={journey?.name || "Jornada sem nome"}
+            onSave={async (next) => {
+              try {
+                await journeysApi.updateTrigger(journeyId, { name: next } as any);
+                setJourney(j => ({ ...j, name: next }));
+                toast.success("Nome atualizado");
+              } catch { toast.error("Falha ao renomear"); }
+            }}
+          />
         </div>
+
         {/* Save state indicator */}
         <div className="text-[10px] px-2 py-1 rounded-md font-medium flex items-center gap-1"
           style={{
@@ -1340,13 +1689,33 @@ function BuilderCanvas() {
           <span className="w-1.5 h-1.5 rounded-full" style={{ background: dirty ? "#eab308" : "var(--green)" }} />
           {dirty ? "Não salvo" : savedOnce ? "Salvo" : "Pronto para salvar"}
         </div>
-        <div className="text-[10px] px-2 py-1 rounded-md"
+
+        {/* Status badge with animated dot for active */}
+        <div className="text-[10px] px-2 py-1 rounded-md flex items-center gap-1"
           style={{
             background: journey?.status === "active" ? "rgba(0,212,106,0.15)" : "rgba(234,179,8,0.15)",
             color: journey?.status === "active" ? "var(--green)" : "#eab308",
           }}>
+          {journey?.status === "active" && (
+            <span className="relative flex w-1.5 h-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                style={{ background: "var(--green)" }} />
+              <span className="relative inline-flex rounded-full w-1.5 h-1.5"
+                style={{ background: "var(--green)" }} />
+            </span>
+          )}
           {journey?.status}
         </div>
+
+        {/* Step count pill */}
+        <div style={{
+          fontSize: 10, padding: "4px 8px", borderRadius: 6,
+          background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)",
+          border: "1px solid rgba(255,255,255,0.08)",
+        }}>
+          {nodes.length} step{nodes.length !== 1 ? "s" : ""}
+        </div>
+
         <button onClick={save} disabled={saving || !dirty}
           className="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-opacity"
           style={{
@@ -1386,7 +1755,7 @@ function BuilderCanvas() {
             maxZoom={2}
             colorMode="dark"
           >
-            <Background color="#333" gap={20} />
+            <Background color="rgba(255,255,255,0.04)" gap={24} size={1} />
             <Controls className="!bg-[var(--surface-2)] !border-[var(--surface-border)]" />
             <MiniMap className="!bg-[var(--surface-2)]" nodeColor={(n) => {
               const s = n.data?.step as FlowStep | undefined;
@@ -1394,13 +1763,17 @@ function BuilderCanvas() {
             }} />
           </ReactFlow>
 
-          {/* LLM edit bar — usa MentionPicker para referenciar passos,
-              gatilhos, palavras-chave, instâncias etc. Igual ao chat do
-              Uniq AI, só que o onSend aqui dispara edição do flow. */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[min(760px,calc(100%-2rem))]"
+          {/* LLM edit bar */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[min(720px,calc(100%-2rem))]"
             style={{ zIndex: 10 }}>
-            <div className="rounded-2xl shadow-lg overflow-hidden"
-              style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+            <div style={{
+              borderRadius: 20, overflow: "hidden",
+              background: "linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%)",
+              backdropFilter: "blur(24px) saturate(200%)",
+              WebkitBackdropFilter: "blur(24px) saturate(200%)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.10)",
+            }}>
               <div className="flex items-center gap-2 px-4 pt-2 text-[10px] uppercase tracking-wider"
                 style={{ color: "var(--text-3)" }}>
                 <Sparkles className="w-3 h-3" style={{ color: "var(--green)" }} />
