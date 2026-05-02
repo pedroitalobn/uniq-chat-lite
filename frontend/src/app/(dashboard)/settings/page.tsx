@@ -848,7 +848,7 @@ export default function SettingsPage() {
   const activeSection = SECTIONS.find(s => s.id === active)!;
 
   return (
-    <div className="max-w-5xl">
+    <div className="max-w-5xl mx-auto">
       {/* Page header */}
       <div className="mb-6 sm:mb-8">
         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "var(--text-1)" }}>
