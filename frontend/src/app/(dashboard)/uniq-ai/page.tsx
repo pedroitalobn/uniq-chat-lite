@@ -1,9 +1,5 @@
 "use client";
 
-// Home do Uniq AI — chat ao centro estilo Claude/GPT, sidebar lateral
-// com histórico de conversas. Empty state mostra o input centralizado;
-// após mensagens, vira layout normal de chat.
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -13,7 +9,7 @@ import {
 import { UniqAIChatPanel } from "@/features/uniq-ai/chat-panel";
 import type { Message } from "@/features/uniq-ai/atoms";
 import {
-  type Conversation, deriveTitle, getActiveId, loadConversations,
+  type Conversation, deriveTitle, loadConversations,
   migrateLegacyIfNeeded, newConversation, saveConversations, setActiveId,
 } from "@/features/uniq-ai/conversations";
 import { cn } from "@/lib/utils";
@@ -27,7 +23,6 @@ function formatRelative(ts: number): string {
   return new Date(ts).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
-// AgentEvent — evento derivado de uma mensagem do AI para o feed de atividade.
 type AgentEvent = {
   id: string;
   type: "journey_created" | "instance_queried" | "campaign_event" | "contact_event" | "message_sent" | "error";
@@ -36,28 +31,22 @@ type AgentEvent = {
   status: "success" | "running" | "error";
 };
 
-// Deriva eventos de agente a partir das mensagens da conversa ativa.
 function deriveAgentEvents(messages: Message[]): AgentEvent[] {
   const events: AgentEvent[] = [];
   for (const msg of messages) {
     if (msg.role !== "assistant") continue;
     const lower = msg.content.toLowerCase();
     const time = msg.createdAt ?? new Date();
-    if (lower.includes("jornada") && (lower.includes("criada") || lower.includes("criado") || lower.includes("criada com sucesso"))) {
+    if (lower.includes("jornada") && (lower.includes("criada") || lower.includes("criado") || lower.includes("criada com sucesso")))
       events.push({ id: `${msg.id}-journey`, type: "journey_created", label: "Jornada criada", time, status: "success" });
-    }
-    if (lower.includes("instância") || lower.includes("instancia")) {
+    if (lower.includes("instância") || lower.includes("instancia"))
       events.push({ id: `${msg.id}-instance`, type: "instance_queried", label: "Instância consultada", time, status: "success" });
-    }
-    if (lower.includes("campanha")) {
+    if (lower.includes("campanha"))
       events.push({ id: `${msg.id}-campaign`, type: "campaign_event", label: "Evento de campanha", time, status: "success" });
-    }
-    if (lower.includes("contato")) {
+    if (lower.includes("contato"))
       events.push({ id: `${msg.id}-contact`, type: "contact_event", label: "Contato acessado", time, status: "success" });
-    }
-    if (lower.includes("❌") || lower.includes("não consegui")) {
+    if (lower.includes("❌") || lower.includes("não consegui"))
       events.push({ id: `${msg.id}-error`, type: "error", label: "Erro na execução", time, status: "error" });
-    }
   }
   return events;
 }
@@ -77,6 +66,81 @@ const EVENT_ICON: Record<AgentEvent["type"], React.ReactNode> = {
   error: <span className="text-[10px]">❌</span>,
 };
 
+// Animated orb — the visual identity of Uniq AI as a living entity
+function UniqOrb({ size = 120 }: { size?: number }) {
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      {/* Outermost aura — slow pulse */}
+      <motion.div
+        className="absolute rounded-full"
+        style={{
+          width: size * 1.8,
+          height: size * 1.8,
+          background: "radial-gradient(circle, rgba(0,212,106,0.06) 0%, transparent 70%)",
+        }}
+        animate={{ scale: [1, 1.15, 1], opacity: [0.5, 0.8, 0.5] }}
+        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+      />
+      {/* Middle ring */}
+      <motion.div
+        className="absolute rounded-full"
+        style={{
+          width: size * 1.4,
+          height: size * 1.4,
+          background: "radial-gradient(circle, rgba(0,212,106,0.1) 0%, transparent 65%)",
+          border: "1px solid rgba(0,212,106,0.12)",
+        }}
+        animate={{ scale: [1, 1.08, 1], opacity: [0.6, 1, 0.6] }}
+        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+      />
+      {/* Inner glow ring */}
+      <motion.div
+        className="absolute rounded-full"
+        style={{
+          width: size * 1.15,
+          height: size * 1.15,
+          border: "1px solid rgba(0,212,106,0.25)",
+          boxShadow: "0 0 20px rgba(0,212,106,0.15)",
+        }}
+        animate={{ scale: [1, 1.04, 1], opacity: [0.7, 1, 0.7] }}
+        transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
+      />
+      {/* Core orb */}
+      <motion.div
+        className="relative rounded-full overflow-hidden"
+        style={{
+          width: size,
+          height: size,
+          background: "radial-gradient(circle at 35% 35%, rgba(0,212,106,0.4) 0%, rgba(0,180,90,0.25) 40%, rgba(0,10,5,0.9) 100%)",
+          boxShadow: "0 0 30px rgba(0,212,106,0.3), inset 0 0 20px rgba(0,212,106,0.1)",
+          border: "1px solid rgba(0,212,106,0.3)",
+        }}
+        animate={{ scale: [1, 1.02, 1] }}
+        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+      >
+        {/* Shimmer overlay */}
+        <motion.div
+          className="absolute inset-0 rounded-full"
+          style={{
+            background: "linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%, rgba(0,212,106,0.1) 100%)",
+          }}
+          animate={{ rotate: [0, 360] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+        />
+        {/* Inner sparkle */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <motion.div
+            animate={{ scale: [0.8, 1.1, 0.8], opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <Sparkles className="w-6 h-6" style={{ color: "rgba(0,212,106,0.9)" }} />
+          </motion.div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 function AgentActivityFeed({ events }: { events: AgentEvent[] }) {
   return (
     <aside
@@ -88,29 +152,20 @@ function AgentActivityFeed({ events }: { events: AgentEvent[] }) {
         borderColor: "rgba(255,255,255,0.07)",
       }}
     >
-      {/* Header */}
-      <div
-        className="flex items-center gap-2 px-4 py-3 border-b flex-shrink-0"
-        style={{ borderColor: "rgba(255,255,255,0.07)" }}
-      >
+      <div className="flex items-center gap-2 px-4 py-3 border-b flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
         <Activity className="w-4 h-4 flex-shrink-0" style={{ color: "var(--green)" }} />
         <span className="text-xs font-medium" style={{ color: "var(--text-1)" }}>Atividade do Agente</span>
       </div>
 
-      {/* Feed */}
       <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3">
         {events.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
-            <Activity className="w-6 h-6 opacity-20" style={{ color: "var(--text-3)" }} />
+          <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+            <UniqOrb size={48} />
             <p className="text-xs" style={{ color: "var(--text-3)" }}>Nenhuma ação ainda</p>
           </div>
         ) : (
           <div className="relative">
-            {/* Linha vertical da timeline */}
-            <div
-              className="absolute left-[7px] top-2 bottom-2 w-[1px]"
-              style={{ background: "rgba(255,255,255,0.07)" }}
-            />
+            <div className="absolute left-[7px] top-2 bottom-2 w-[1px]" style={{ background: "rgba(255,255,255,0.07)" }} />
             <div className="space-y-3">
               {events.map((event) => (
                 <motion.div
@@ -120,20 +175,14 @@ function AgentActivityFeed({ events }: { events: AgentEvent[] }) {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.2 }}
                 >
-                  {/* Dot */}
                   <div
                     className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 z-10"
-                    style={{
-                      background: "rgba(10,10,18,0.8)",
-                      border: `2px solid ${EVENT_DOT[event.status]}`,
-                    }}
+                    style={{ background: "rgba(10,10,18,0.8)", border: `2px solid ${EVENT_DOT[event.status]}` }}
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 min-w-0">
                       {EVENT_ICON[event.type]}
-                      <span className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>
-                        {event.label}
-                      </span>
+                      <span className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>{event.label}</span>
                     </div>
                     <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>
                       {formatRelative(event.time.getTime())}
@@ -150,7 +199,6 @@ function AgentActivityFeed({ events }: { events: AgentEvent[] }) {
 }
 
 export default function UniqAIPage() {
-  // Hidratamos com [] e populamos no client effect — evita mismatch SSR.
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveIdState] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -160,13 +208,8 @@ export default function UniqAIPage() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
-    // Sempre abrir em "Nova conversa" — usuários reportaram preferir começar
-    // limpo. Histórico continua acessível na sidebar (que está colapsada por
-    // default), mantendo paridade visual com Claude/ChatGPT em mobile.
     const migrated = migrateLegacyIfNeeded();
     const existing = migrated || loadConversations();
-    // Se a primeira conversa estiver vazia, reaproveita pra evitar lixo no
-    // histórico. Caso contrário, cria uma nova no topo.
     const fresh = existing.length > 0 && existing[0].messages.length === 0
       ? existing[0]
       : newConversation();
@@ -178,7 +221,6 @@ export default function UniqAIPage() {
     setHydrated(true);
   }, []);
 
-  // Persiste em localStorage a cada mudança (depois da hidratação inicial).
   useEffect(() => {
     if (!hydrated) return;
     saveConversations(conversations);
@@ -194,20 +236,17 @@ export default function UniqAIPage() {
     [conversations, activeId],
   );
 
-  // Lista ordenada (mais recente primeiro)
   const sortedConvs = useMemo(
     () => [...conversations].sort((a, b) => b.updatedAt - a.updatedAt),
     [conversations],
   );
 
-  // Eventos de atividade derivados das mensagens da conversa ativa.
   const agentEvents = useMemo(
     () => deriveAgentEvents(activeConversation?.messages ?? []),
     [activeConversation?.messages],
   );
 
   const startNew = useCallback(() => {
-    // Se já há uma conversa vazia ativa, só foca nela em vez de criar duplicata.
     if (activeConversation && activeConversation.messages.length === 0) {
       setMobileSidebarOpen(false);
       return;
@@ -226,7 +265,6 @@ export default function UniqAIPage() {
   const deleteConversation = useCallback((id: string) => {
     setConversations((prev) => {
       const next = prev.filter((c) => c.id !== id);
-      // Se deletei a ativa, troca pra próxima ou cria uma nova vazia.
       if (id === activeId) {
         if (next.length > 0) setActiveIdState(next[0].id);
         else {
@@ -248,8 +286,6 @@ export default function UniqAIPage() {
     setRenaming(null);
   }, []);
 
-  // Handler do chat: atualiza messages da conversa ativa. Se ainda não há
-  // ativa, cria uma vazia (e o ChatPanel chama onBeforeFirstSend antes).
   const handleMessagesChange = useCallback(
     (next: Message[] | ((prev: Message[]) => Message[])) => {
       setConversations((prev) => {
@@ -258,7 +294,6 @@ export default function UniqAIPage() {
         return prev.map((c) => {
           if (c.id !== id) return c;
           const newMessages = typeof next === "function" ? next(c.messages) : next;
-          // Atualiza title se ainda é "Nova conversa" e já tem mensagem do user.
           const title = c.title === "Nova conversa" ? deriveTitle(newMessages) : c.title;
           return { ...c, messages: newMessages, title, updatedAt: Date.now() };
         });
@@ -275,7 +310,6 @@ export default function UniqAIPage() {
     }
   }, [activeConversation]);
 
-  // Garantia: sempre tem ao menos uma conversa após hidratar.
   useEffect(() => {
     if (!hydrated) return;
     if (conversations.length === 0) {
@@ -383,11 +417,7 @@ export default function UniqAIPage() {
                     {!isRenaming && (
                       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setRenameDraft(c.title);
-                            setRenaming(c.id);
-                          }}
+                          onClick={(e) => { e.stopPropagation(); setRenameDraft(c.title); setRenaming(c.id); }}
                           className="p-1 rounded hover:bg-[var(--surface-2)]"
                           style={{ color: "var(--text-3)" }}
                           title="Renomear"
@@ -395,10 +425,7 @@ export default function UniqAIPage() {
                           <Pencil className="w-3 h-3" />
                         </button>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteConversation(c.id);
-                          }}
+                          onClick={(e) => { e.stopPropagation(); deleteConversation(c.id); }}
                           className="p-1 rounded hover:bg-[var(--surface-2)] hover:text-red-400"
                           style={{ color: "var(--text-3)" }}
                           title="Excluir"
@@ -429,31 +456,45 @@ export default function UniqAIPage() {
     );
   }
 
+  const isEmpty = !activeConversation || activeConversation.messages.length === 0;
+
   return (
     <div className="flex flex-col h-full min-h-0 relative">
-      {/* Ambient background mesh */}
+      {/* Ambient background — enhanced with orb glow at top */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px]"
-          style={{ background: "radial-gradient(ellipse at top, rgba(0,212,106,0.05) 0%, transparent 65%)" }} />
-        <div className="absolute bottom-0 right-0 w-[400px] h-[300px]"
-          style={{ background: "radial-gradient(ellipse at bottom right, rgba(0,212,106,0.03) 0%, transparent 60%)" }} />
+        <div
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px]"
+          style={{ background: "radial-gradient(ellipse at top, rgba(0,212,106,0.08) 0%, transparent 65%)" }}
+        />
+        <motion.div
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-[400px] h-[300px]"
+          style={{ background: "radial-gradient(ellipse at top, rgba(0,212,106,0.05) 0%, transparent 60%)" }}
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <div
+          className="absolute bottom-0 right-0 w-[400px] h-[300px]"
+          style={{ background: "radial-gradient(ellipse at bottom right, rgba(0,212,106,0.03) 0%, transparent 60%)" }}
+        />
       </div>
 
       {/* Mobile top bar */}
-      <div className="lg:hidden flex items-center justify-between px-3 py-2 border-b flex-shrink-0 relative z-10"
+      <div
+        className="lg:hidden flex items-center justify-between px-3 py-2 border-b flex-shrink-0 relative z-10"
         style={{
           background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
           backdropFilter: "blur(20px) saturate(180%)",
           WebkitBackdropFilter: "blur(20px) saturate(180%)",
           borderColor: "rgba(255,255,255,0.08)",
-        }}>
-        <button onClick={() => setMobileSidebarOpen(true)} className="p-2 rounded-lg transition-colors hover:bg-white/5" style={{ color: "var(--text-2)" }} title="Conversas">
+        }}
+      >
+        <button onClick={() => setMobileSidebarOpen(true)} className="p-2 rounded-lg transition-colors hover:bg-white/5" style={{ color: "var(--text-2)" }}>
           <MessageSquare className="w-4 h-4" />
         </button>
         <span className="text-xs font-medium truncate flex-1 text-center" style={{ color: "var(--text-1)" }}>
           {activeConversation?.title || "Uniq AI"}
         </span>
-        <button onClick={startNew} className="p-2 rounded-lg transition-colors hover:bg-white/5" style={{ color: "var(--green)" }} title="Nova conversa">
+        <button onClick={startNew} className="p-2 rounded-lg transition-colors hover:bg-white/5" style={{ color: "var(--green)" }}>
           <Plus className="w-4 h-4" />
         </button>
       </div>
@@ -483,7 +524,37 @@ export default function UniqAIPage() {
         </AnimatePresence>
 
         {/* Chat area */}
-        <div className="flex-1 min-w-0 min-h-0">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+          {/* Empty state — orb + headline when no messages */}
+          <AnimatePresence>
+            {isEmpty && (
+              <motion.div
+                key="empty-state"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.4 }}
+                className="flex flex-col items-center justify-center pt-10 pb-4 px-4 flex-shrink-0"
+              >
+                <UniqOrb size={96} />
+                <motion.div
+                  className="mt-5 text-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.2, duration: 0.5 }}
+                >
+                  <h2 className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>
+                    Olá, sou a{" "}
+                    <span style={{ color: "var(--green)" }}>Uniq AI</span>
+                  </h2>
+                  <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
+                    Seu assistente inteligente para automação e crescimento
+                  </p>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {activeConversation && (
             <UniqAIChatPanel
               key={activeConversation.id}

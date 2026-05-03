@@ -116,12 +116,19 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
       }
       setGroups(g);
 
-      // Auto-seleção: preferência salva → primeira integração → Uniq AI
+      // Auto-seleção: preferência salva → Uniq AI (quando ativa) → primeira integração
       if (!value) {
         const saved = loadModelPref();
-        const stillActive = saved && filtered.find((i) => i.id === saved.integrationId);
+        const stillActive = saved && (
+          saved.integrationId === "platform-ai" ? platformActive :
+          filtered.find((i) => i.id === saved.integrationId)
+        );
         if (stillActive) {
           onChange(saved!);
+        } else if (platformActive) {
+          // Uniq AI é o padrão quando disponível
+          saveModelPref(PLATFORM_AI_PREF);
+          onChange(PLATFORM_AI_PREF);
         } else if (filtered.length > 0) {
           const first = filtered[0];
           const pref: ModelPreference = {
@@ -132,10 +139,6 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
           };
           saveModelPref(pref);
           onChange(pref);
-        } else if (platformActive) {
-          // Sem integração própria — usa Uniq AI como padrão
-          saveModelPref(PLATFORM_AI_PREF);
-          onChange(PLATFORM_AI_PREF);
         }
       }
     } catch {
