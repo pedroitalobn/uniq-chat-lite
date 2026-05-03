@@ -542,6 +542,8 @@ export const privacyApi = {
 export const callsApi = {
   reject: (instanceId: string, callerJid: string, callId: string) =>
     api.post(`/v1/instances/${instanceId}/calls/reject`, { caller_jid: callerJid, call_id: callId }),
+  offer: (instanceId: string, jid: string, video = false) =>
+    api.post(`/v1/instances/${instanceId}/calls/offer`, { jid, video }),
 };
 
 // Comunidades WhatsApp.

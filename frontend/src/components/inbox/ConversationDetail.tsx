@@ -19,7 +19,7 @@ import { AudioRecorderButton } from "@/components/inbox/AudioRecorderButton";
 import { MediaViewer, type MediaViewerSource } from "@/components/inbox/MediaViewer";
 import { AgentPanel } from "@/components/inbox/AgentPanel";
 import { WindowKeeperToggle } from "@/components/inbox/WindowKeeperToggle";
-import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi, crmContactsApi, linkPreviewApi, dealsApi, crmApi } from "@/lib/api";
+import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi, crmContactsApi, linkPreviewApi, dealsApi, crmApi, callsApi } from "@/lib/api";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TemplatePicker } from "@/components/inbox/TemplatePicker";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -792,6 +792,11 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               <Briefcase className="h-3 w-3" />
               <span className="hidden sm:inline">Negociação</span>
             </button>
+          )}
+
+          {/* Botão Ligar — só para WhatsApp (não WABA) */}
+          {(conv?.channel_type === "whatsapp") && conv?.instance_id && conv?.channel_key && (
+            <CallButton instanceId={conv.instance_id} jid={conv.channel_key} />
           )}
         </header>
 
@@ -4367,5 +4372,37 @@ function SnoozeDialog({
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── CallButton ──────────────────────────────────────────────────────────────
+
+function CallButton({ instanceId, jid }: { instanceId: string; jid: string }) {
+  const [calling, setCalling] = useState(false);
+
+  const offer = async () => {
+    if (calling) return;
+    setCalling(true);
+    try {
+      await callsApi.offer(instanceId, jid, false);
+      toast.success("Chamada iniciada — atenda no telefone vinculado ao número");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || "Falha ao iniciar chamada");
+    } finally {
+      setCalling(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={offer}
+      disabled={calling}
+      title="Ligar para o contato via WhatsApp"
+      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium flex-shrink-0 transition-all disabled:opacity-50"
+      style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)", color: "#00d46a" }}
+    >
+      <Phone className="h-3 w-3" />
+      <span className="hidden sm:inline">{calling ? "Ligando..." : "Ligar"}</span>
+    </button>
   );
 }

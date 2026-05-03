@@ -621,6 +621,26 @@ func (h *MessageHandler) GetNewsletterMessages(c *fiber.Ctx) error {
 
 // ─── Calls ────────────────────────────────────────────────────────
 
+// OfferCall inicia uma chamada de voz ou vídeo para um contato.
+// Body: { "jid": "<contato>", "video": false }
+func (h *MessageHandler) OfferCall(c *fiber.Ctx) error {
+	client, err := h.getClient(c)
+	if err != nil {
+		return err
+	}
+	var req struct {
+		JID   string `json:"jid"`
+		Video bool   `json:"video"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.JID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'jid' é obrigatório"})
+	}
+	if err := client.OfferCall(req.JID, req.Video); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "call_offered"})
+}
+
 func (h *MessageHandler) RejectCall(c *fiber.Ctx) error {
 	client, err := h.getClient(c)
 	if err != nil {

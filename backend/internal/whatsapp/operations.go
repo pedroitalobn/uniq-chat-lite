@@ -387,6 +387,15 @@ func (ic *InstanceClient) GetNewsletterMessages(newsletterJID string, count int,
 
 // ─── Calls ─────────────────────────────────────────────────────────
 
+// OfferCall inicia uma chamada de voz (ou vídeo) para o JID alvo.
+func (ic *InstanceClient) OfferCall(toJID string, video bool) error {
+	jid, err := types.ParseJID(normalizeJID(toJID))
+	if err != nil {
+		return fmt.Errorf("invalid JID: %w", err)
+	}
+	return ic.client.OfferCall(context.Background(), jid, video)
+}
+
 // RejectCall rejeita uma chamada recebida. callerJID é quem ligou
 // (vem no evento events.CallOffer.CallCreator) e callID é o id da
 // chamada.

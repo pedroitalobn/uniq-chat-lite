@@ -10,6 +10,8 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/minio/minio-go/v7 v7.0.99
 	github.com/nats-io/nats.go v1.49.0
+	github.com/osteele/liquid v1.8.1
+	github.com/pquerna/otp v1.5.0
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/rs/zerolog v1.34.0
 	github.com/sashabaranov/go-openai v1.41.2
@@ -52,11 +54,9 @@ require (
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/nats-io/nkeys v0.4.12 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
-	github.com/osteele/liquid v1.8.1 // indirect
 	github.com/osteele/tuesday v1.0.4 // indirect
 	github.com/petermattis/goid v0.0.0-20260113132338-7c7de50cc741 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
-	github.com/pquerna/otp v1.5.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/rs/xid v1.6.0 // indirect

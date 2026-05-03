@@ -493,6 +493,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	v1newsletters.Get("/:jid/messages", msgH.GetNewsletterMessages)
 
 	v1inst.Post("/calls/reject", msgH.RejectCall)
+	v1inst.Post("/calls/offer", msgH.OfferCall)
 
 	// Extras whatsmeow no SDK público
 	v1inst.Get("/business-profile/:jid", msgH.GetBusinessProfile)
@@ -801,6 +802,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 
 	// Calls
 	instance.Post("/calls/reject", msgH.RejectCall)
+	instance.Post("/calls/offer", msgH.OfferCall)
 
 	// ─── Extras whatsmeow (nem Evo-Go expõe) ──────────────────────
 	// Business profile + disappearing + group invites avançados +
