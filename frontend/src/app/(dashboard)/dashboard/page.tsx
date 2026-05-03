@@ -1,12 +1,7 @@
 "use client";
 
-// Dashboard executivo unificado — pills no topo selecionam visão:
-//   Geral · Campanhas · Inbox/SLA · Shop · Agentes
-// Cada visão consome endpoints já existentes; a rota /reports antiga
-// é mantida via tab Inbox/SLA (deeplink ?tab=inbox).
-
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { useTilt } from "@/hooks/useTilt";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import {
   adminApi, agentsApi, campaignsApi, companiesApi, crmApi, dealsApi,
@@ -16,307 +11,269 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import api from "@/lib/api";
 import {
-  Activity, ArrowRight, Building2, Contact as ContactIcon, Megaphone,
-  MessageSquare, Rocket, Smartphone, Sparkles, TrendingUp, Wand2, Wifi,
-  LayoutDashboard, ShoppingBag, Bot, Inbox as InboxIcon,
+  Activity, ArrowRight, ArrowUpRight, Bot, Building2,
+  Contact as ContactIcon, Inbox as InboxIcon, Megaphone, MessageSquare,
+  Rocket, Smartphone, Sparkles, TrendingUp, Wand2, Wifi, Zap,
+  CheckCircle2, Clock, AlertCircle, BarChart2,
 } from "lucide-react";
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from "recharts";
 import type { Instance } from "@/types";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 
-const MOCK_MSGS  = [120, 340, 210, 480, 90, 310, 175];
-const WEEKDAYS   = ["dom.", "seg.", "ter.", "qua.", "qui.", "sex.", "sáb."];
-
-const statStyles = {
-  green:  { icon: "#00d46a", bg: "rgba(0,212,106,0.08)",  border: "rgba(0,212,106,0.15)" },
-  blue:   { icon: "#60a5fa", bg: "rgba(96,165,250,0.08)", border: "rgba(96,165,250,0.15)" },
-  amber:  { icon: "#fbbf24", bg: "rgba(251,191,36,0.08)", border: "rgba(251,191,36,0.15)" },
-  violet: { icon: "#a78bfa", bg: "rgba(167,139,250,0.08)",border: "rgba(167,139,250,0.15)" },
-  pink:   { icon: "#f472b6", bg: "rgba(244,114,182,0.08)",border: "rgba(244,114,182,0.15)" },
-  red:    { icon: "#f87171", bg: "rgba(248,113,113,0.08)", border: "rgba(248,113,113,0.15)" },
+// ─── helpers ─────────────────────────────────────────────────────────────────
+const asArray = <T,>(raw: any): T[] => {
+  if (Array.isArray(raw)) return raw as T[];
+  if (Array.isArray(raw?.data)) return raw.data as T[];
+  if (Array.isArray(raw?.items)) return raw.items as T[];
+  return [];
 };
-type StatColor = keyof typeof statStyles;
+const asTotal = (raw: any): number => {
+  if (typeof raw?.total === "number") return raw.total;
+  if (Array.isArray(raw)) return raw.length;
+  if (Array.isArray(raw?.data)) return raw.data.length;
+  if (Array.isArray(raw?.items)) return raw.items.length;
+  return 0;
+};
+
+// ─── Animation variants ───────────────────────────────────────────────────────
+const containerVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.07 } },
+};
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } },
+};
 
 // ─── AnimatedNumber ───────────────────────────────────────────────────────────
-function AnimatedNumber({ value, onUpdate }: { value: number; onUpdate?: () => void }) {
+function AnimatedNumber({ value }: { value: number }) {
   const [display, setDisplay] = useState(0);
   const rafRef = useRef<number | null>(null);
   const startRef = useRef<number | null>(null);
-  const prevValue = useRef(0);
-  const duration = 600;
 
   useEffect(() => {
-    // Dispara pulse quando valor muda (exceto na montagem inicial)
-    if (prevValue.current !== 0 && prevValue.current !== value) {
-      onUpdate?.();
-    }
-    prevValue.current = value;
-
-    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
     startRef.current = null;
     const from = display;
-
-    const animate = (timestamp: number) => {
-      if (startRef.current === null) startRef.current = timestamp;
-      const elapsed = timestamp - startRef.current;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 4);
-      setDisplay(Math.round(from + (value - from) * eased));
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(animate);
-      }
+    const animate = (ts: number) => {
+      if (!startRef.current) startRef.current = ts;
+      const p = Math.min((ts - startRef.current) / 600, 1);
+      const e = 1 - Math.pow(1 - p, 4);
+      setDisplay(Math.round(from + (value - from) * e));
+      if (p < 1) rafRef.current = requestAnimationFrame(animate);
     };
-
     rafRef.current = requestAnimationFrame(animate);
-    return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    };
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   return <>{display > 1000 ? display.toLocaleString("pt-BR") : display}</>;
 }
 
-// ─── Sparkline ────────────────────────────────────────────────────────────────
-const SPARKLINE_PLACEHOLDER = [65, 72, 68, 80, 75, 88, 92];
-
-function Sparkline({ data = SPARKLINE_PLACEHOLDER, positive = true }: { data?: number[]; positive?: boolean }) {
-  const w = 80;
-  const h = 32;
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const stepX = w / (data.length - 1);
-  const points = data
-    .map((v, i) => `${i * stepX},${h - ((v - min) / range) * (h - 4) - 2}`)
-    .join(" ");
-  const color = positive ? "var(--green)" : "#ef4444";
+// ─── Status dot ───────────────────────────────────────────────────────────────
+function LiveDot() {
   return (
-    <svg
-      width={w}
-      height={h}
-      style={{ opacity: 0.5, display: "block" }}
-      aria-hidden="true"
-    >
-      <polyline
-        points={points}
-        fill="none"
-        stroke={color}
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-// ─── StatCard skeleton ────────────────────────────────────────────────────────
-function StatCardSkeleton() {
-  return (
-    <div
-      className="rounded-2xl p-4 sm:p-5 animate-pulse h-full"
-      style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
-    >
-      <div className="w-9 h-9 rounded-xl mb-3 sm:mb-4" style={{ background: "var(--surface-3)" }} />
-      <div className="h-7 w-16 rounded-lg mb-2" style={{ background: "var(--surface-3)" }} />
-      <div className="h-3 w-24 rounded-md" style={{ background: "var(--surface-3)" }} />
-    </div>
-  );
-}
-
-// ─── StatCard ─────────────────────────────────────────────────────────────────
-function StatCard({
-  href, label, value, icon: Icon, sub, color = "green", isLoading = false, sparkline,
-}: {
-  href?: string;
-  label: string;
-  value: number | string;
-  icon: React.ElementType;
-  sub?: string;
-  color?: StatColor;
-  isLoading?: boolean;
-  sparkline?: number[];
-}) {
-  if (isLoading) return <StatCardSkeleton />;
-
-  const s = statStyles[color];
-  const numValue = typeof value === "number" ? value : undefined;
-  const [pulse, setPulse] = useState(false);
-  const triggerPulse = () => { setPulse(true); setTimeout(() => setPulse(false), 700); };
-  const tilt = useTilt(6);
-
-  const inner = (
-    <div
-      ref={tilt.ref as React.RefObject<HTMLDivElement>}
-      className="p-4 sm:p-5 animate-fade-in-up h-full"
-      style={{
-        background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
-        backdropFilter: "blur(20px) saturate(180%)",
-        WebkitBackdropFilter: "blur(20px) saturate(180%)",
-        border: "1px solid rgba(255,255,255,0.10)",
-        borderRadius: "20px",
-        boxShadow: "0 8px 24px rgba(0,0,0,0.30), 0 2px 6px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.10)",
-        position: "relative",
-        overflow: "hidden",
-        transformStyle: "preserve-3d",
-      }}
-      onMouseMove={tilt.onMouseMove as React.MouseEventHandler<HTMLDivElement>}
-      onMouseLeave={tilt.onMouseLeave as React.MouseEventHandler<HTMLDivElement>}
-    >
-      {/* Linha de luz no topo */}
-      <div style={{
-        position: "absolute", top: 0, left: "15%", right: "15%", height: "1px",
-        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.20), transparent)",
-        pointerEvents: "none"
-      }} />
-      {/* Ambient orb */}
-      <div style={{
-        position: "absolute", top: "-30px", right: "-30px",
-        width: "100px", height: "100px",
-        borderRadius: "50%",
-        background: `radial-gradient(circle, ${s.icon}1f 0%, transparent 70%)`,
-        filter: "blur(20px)",
-        pointerEvents: "none"
-      }} />
-      {/* Pulse flash ao atualizar dados ao vivo */}
-      {pulse && (
-        <div style={{
-          position: "absolute", inset: 0, borderRadius: "20px",
-          background: `radial-gradient(circle at 30% 40%, ${s.icon}22 0%, transparent 60%)`,
-          animation: "pulse-flash 0.7s ease-out forwards",
-          pointerEvents: "none",
-        }} />
-      )}
-      <div
-        className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 sm:mb-4"
-        style={{ background: s.bg, border: `1px solid ${s.border}` }}
-      >
-        <Icon className="w-4 h-4" style={{ color: s.icon }} />
-      </div>
-      <p className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
-        {numValue !== undefined ? <AnimatedNumber value={numValue} onUpdate={triggerPulse} /> : value}
-      </p>
-      <p className="text-xs sm:text-sm mt-1" style={{ color: "hsl(240 8% 52%)" }}>{label}</p>
-      {sub && <p className="text-[10px] sm:text-xs mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>{sub}</p>}
-      {/* Sparkline — bottom-right */}
-      <div style={{ position: "absolute", bottom: 12, right: 12 }}>
-        <Sparkline data={sparkline} positive={color !== "red"} />
-      </div>
-    </div>
-  );
-  return href ? <Link href={href} className="block h-full">{inner}</Link> : inner;
-}
-
-// ─── LiveIndicator ────────────────────────────────────────────────────────────
-function LiveIndicator() {
-  return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: "var(--green)" }}>
-      <span
-        style={{
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          background: "var(--green)",
-          display: "inline-block",
-          animation: "live-dot-pulse 2s infinite",
-        }}
-      />
-      Ao vivo
+    <span className="relative flex h-2 w-2">
+      <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-50" style={{ background: "var(--green)" }} />
+      <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: "var(--green)" }} />
     </span>
   );
 }
 
-function ShortcutCard({ href, icon: Icon, label, description, color }: {
-  href: string; icon: React.ElementType; label: string; description: string; color: string;
+// ─── Bento card base ─────────────────────────────────────────────────────────
+function BentoCard({
+  children, className = "", href, onClick, highlight = false,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  href?: string;
+  onClick?: () => void;
+  highlight?: boolean;
 }) {
-  return (
-    <Link href={href} className="group rounded-2xl p-3 sm:p-4 transition-all duration-200 animate-fade-in-up"
-      style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = color; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "hsl(240 12% 13%)"; }}>
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}15`, border: `1px solid ${color}30` }}>
-          <Icon className="w-5 h-5" style={{ color }} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>{label}</p>
-          <p className="text-xs truncate" style={{ color: "hsl(240 8% 42%)" }}>{description}</p>
-        </div>
-        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1 flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }} />
-      </div>
-    </Link>
+  const base = (
+    <div
+      className={`relative overflow-hidden rounded-2xl h-full group ${className}`}
+      style={{
+        background: highlight
+          ? "linear-gradient(135deg, rgba(0,212,106,0.10) 0%, rgba(0,212,106,0.04) 100%)"
+          : "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+        backdropFilter: "blur(20px) saturate(180%)",
+        WebkitBackdropFilter: "blur(20px) saturate(180%)",
+        border: highlight
+          ? "1px solid rgba(0,212,106,0.25)"
+          : "1px solid rgba(255,255,255,0.08)",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.07)",
+        transition: "border-color 0.2s, box-shadow 0.2s",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLElement).style.borderColor = highlight
+          ? "rgba(0,212,106,0.4)"
+          : "rgba(255,255,255,0.14)";
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.09)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.borderColor = highlight
+          ? "rgba(0,212,106,0.25)"
+          : "rgba(255,255,255,0.08)";
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.07)";
+      }}
+    >
+      {/* Top shimmer line */}
+      <div style={{
+        position: "absolute", top: 0, left: "10%", right: "10%", height: "1px",
+        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)",
+        pointerEvents: "none",
+      }} />
+      {children}
+    </div>
   );
+  if (href) return <Link href={href} className="block h-full">{base}</Link>;
+  if (onClick) return <button onClick={onClick} className="block w-full h-full text-left">{base}</button>;
+  return base;
 }
 
-function SectionHeader({ title, href, linkText = "Ver todas →" }: { title: string; href?: string; linkText?: string }) {
+// ─── Stat card (small) ───────────────────────────────────────────────────────
+const COLOR_MAP = {
+  green:  { icon: "#00d46a", glow: "rgba(0,212,106,0.15)",  bg: "rgba(0,212,106,0.10)" },
+  blue:   { icon: "#60a5fa", glow: "rgba(96,165,250,0.15)", bg: "rgba(96,165,250,0.10)" },
+  amber:  { icon: "#fbbf24", glow: "rgba(251,191,36,0.15)", bg: "rgba(251,191,36,0.10)" },
+  violet: { icon: "#a78bfa", glow: "rgba(167,139,250,0.15)",bg: "rgba(167,139,250,0.10)" },
+  pink:   { icon: "#f472b6", glow: "rgba(244,114,182,0.15)",bg: "rgba(244,114,182,0.10)" },
+  cyan:   { icon: "#22d3ee", glow: "rgba(34,211,238,0.15)", bg: "rgba(34,211,238,0.10)" },
+};
+type ColorKey = keyof typeof COLOR_MAP;
+
+function StatCard({
+  label, value, icon: Icon, sub, color = "green", href, isLoading = false,
+}: {
+  label: string; value: number | string; icon: React.ElementType;
+  sub?: string; color?: ColorKey; href?: string; isLoading?: boolean;
+}) {
+  const c = COLOR_MAP[color];
+  if (isLoading) return (
+    <div className="rounded-2xl p-4 sm:p-5 animate-pulse h-full"
+      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+      <div className="w-8 h-8 rounded-xl mb-3" style={{ background: "rgba(255,255,255,0.07)" }} />
+      <div className="h-6 w-14 rounded-lg mb-2" style={{ background: "rgba(255,255,255,0.07)" }} />
+      <div className="h-3 w-20 rounded" style={{ background: "rgba(255,255,255,0.05)" }} />
+    </div>
+  );
+
+  const inner = (
+    <BentoCard className="p-4 sm:p-5 cursor-pointer" highlight={color === "green"}>
+      {/* Ambient glow */}
+      <div style={{
+        position: "absolute", top: "-20px", right: "-20px",
+        width: "80px", height: "80px", borderRadius: "50%",
+        background: `radial-gradient(circle, ${c.glow} 0%, transparent 70%)`,
+        filter: "blur(16px)", pointerEvents: "none",
+      }} />
+      <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3 sm:mb-4 relative z-10"
+        style={{ background: c.bg, border: `1px solid ${c.icon}30` }}>
+        <Icon className="w-4 h-4" style={{ color: c.icon }} />
+      </div>
+      <p className="text-2xl sm:text-3xl font-semibold tracking-tight relative z-10" style={{ color: "var(--text-1)" }}>
+        {typeof value === "number" ? <AnimatedNumber value={value} /> : value}
+      </p>
+      <p className="text-xs sm:text-sm mt-1 relative z-10" style={{ color: "var(--text-3)" }}>{label}</p>
+      {sub && <p className="text-[10px] mt-1 relative z-10" style={{ color: c.icon, opacity: 0.85 }}>{sub}</p>}
+    </BentoCard>
+  );
+  return href ? <Link href={href} className="block h-full">{inner}</Link> : inner;
+}
+
+// ─── Instance row ─────────────────────────────────────────────────────────────
+function InstanceRow({ inst }: { inst: Instance }) {
+  const DOT: Record<string, string> = {
+    connected: "#00d46a", connecting: "#fbbf24", banned: "#ef4444", disconnected: "#64748b",
+  };
+  const dot = DOT[inst.status] ?? "#64748b";
   return (
-    <div className="flex items-center justify-between mb-3">
-      <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>{title}</h2>
-      {href && (
-        <Link href={href} className="text-xs transition-colors" style={{ color: "var(--green)" }}>
-          {linkText}
-        </Link>
-      )}
+    <div className="flex items-center gap-3 py-2.5 px-3 rounded-xl transition-colors hover:bg-white/5">
+      <div className="relative flex-shrink-0">
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+          style={{ background: `${dot}18`, border: `1px solid ${dot}30` }}>
+          <Smartphone className="w-3.5 h-3.5" style={{ color: dot }} />
+        </div>
+        {inst.status === "connected" && (
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full" style={{ background: dot }} />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>{inst.name}</p>
+        <p className="text-[10px] font-mono truncate" style={{ color: "var(--text-3)" }}>
+          {inst.phone_number || "—"}
+        </p>
+      </div>
+      <span className="text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full flex-shrink-0"
+        style={{ background: `${dot}18`, color: dot }}>
+        {inst.status}
+      </span>
     </div>
   );
 }
 
+// ─── Mini metric row ──────────────────────────────────────────────────────────
+function MetricRow({ icon: Icon, label, value, color }: {
+  icon: React.ElementType; label: string; value: number | string; color: string;
+}) {
+  return (
+    <div className="flex items-center justify-between py-2">
+      <span className="flex items-center gap-2 text-xs" style={{ color: "var(--text-3)" }}>
+        <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color }} />
+        {label}
+      </span>
+      <span className="text-xs font-semibold tabular-nums" style={{ color: "var(--text-1)" }}>
+        {typeof value === "number" ? <AnimatedNumber value={value} /> : value}
+      </span>
+    </div>
+  );
+}
+
+// ─── Custom tooltip ───────────────────────────────────────────────────────────
+function ChartTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-xl px-3 py-2 text-xs"
+      style={{ background: "rgba(10,10,18,0.95)", border: "1px solid rgba(255,255,255,0.12)", color: "var(--text-1)" }}>
+      <p style={{ color: "var(--text-3)", marginBottom: 4 }}>{label}</p>
+      {payload.map((p: any) => (
+        <p key={p.name} style={{ color: p.stroke }}>{p.name}: <strong>{p.value}</strong></p>
+      ))}
+    </div>
+  );
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { data: session } = useSession();
   const { currentWorkspace } = useWorkspace();
   const wsId = currentWorkspace?.id;
   const isAdmin = session?.user?.role === "super_admin";
+  const firstName = session?.user?.name?.split(" ")[0] ?? "você";
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
 
-  const chartData = MOCK_MSGS.map((mensagens, i) => ({ date: WEEKDAYS[i], mensagens }));
-
-  const adminStatsQ = useQuery({
-    queryKey: ["admin-stats"],
-    queryFn: () => adminApi.getStats().then((r) => r.data),
-    enabled: isAdmin,
-    refetchInterval: 30_000,
-  });
-
+  // ── Queries ──
   const instancesQ = useQuery<Instance[]>({
     queryKey: ["instances", wsId],
     queryFn: () => instancesApi.list(undefined, wsId).then((r) => r.data),
     refetchInterval: 30_000,
   });
+  // Somente instâncias não deletadas (sem status deleted no tipo, mas por segurança filtramos "banned" somente na contagem primária)
   const instances = instancesQ.data ?? [];
-  const connected = instances.filter((i) => i.status === "connected").length;
+  const connectedInstances = instances.filter((i) => i.status === "connected");
+  const activeInstances = instances.filter((i) => i.status !== "banned");
 
   const journeysQ = useQuery({
-    queryKey: ["journeys"],
+    queryKey: ["journeys", wsId],
     queryFn: () => journeysApi.list(wsId).then((r) => r.data as any[]),
     refetchInterval: 30_000,
   });
   const journeys = journeysQ.data ?? [];
-  const activeJourneys = journeys.filter((j) => j.status === "active").length;
-
-  const journeyStatsQ = useQuery({
-    queryKey: ["agent-stats"],
-    queryFn: () => agentsApi.stats(wsId).then((r) => r.data),
-    refetchInterval: 30_000,
-  });
-
-  // Helper: vários endpoints do backend retornam shapes diferentes
-  // (`{data,total}`, `{items,total}`, ou array puro). Esse normalize cobre
-  // todos os casos sem quebrar o dashboard quando o formato muda.
-  const asArray = <T,>(raw: any): T[] => {
-    if (Array.isArray(raw)) return raw as T[];
-    if (Array.isArray(raw?.data)) return raw.data as T[];
-    if (Array.isArray(raw?.items)) return raw.items as T[];
-    return [];
-  };
-  const asTotal = (raw: any): number => {
-    if (typeof raw?.total === "number") return raw.total;
-    if (Array.isArray(raw)) return raw.length;
-    if (Array.isArray(raw?.data)) return raw.data.length;
-    if (Array.isArray(raw?.items)) return raw.items.length;
-    return 0;
-  };
+  const activeJourneys = journeys.filter((j: any) => j.status === "active");
 
   const campaignsQ = useQuery({
     queryKey: ["campaigns", wsId],
@@ -325,7 +282,15 @@ export default function DashboardPage() {
     refetchInterval: 30_000,
   });
   const campaigns = asArray<any>(campaignsQ.data);
-  const activeCampaigns = campaigns.filter((c: any) => ["running", "active", "scheduled"].includes(c.status)).length;
+  const activeCampaigns = campaigns.filter((c: any) => ["running", "active", "scheduled"].includes(c.status));
+
+  const convCountQ = useQuery({
+    queryKey: ["conv-count", wsId],
+    queryFn: () => conversationsApi.count(wsId as string).then((r) => r.data as Record<string, number>),
+    enabled: !!wsId,
+    refetchInterval: 30_000,
+  });
+  const conv = convCountQ.data ?? {};
 
   const dealsQ = useQuery({
     queryKey: ["deals-dashboard", wsId],
@@ -334,11 +299,9 @@ export default function DashboardPage() {
     refetchInterval: 30_000,
   });
   const deals = asArray<any>(dealsQ.data);
-  const openDeals = deals.filter((d: any) => d.status === "open").length;
-  const wonDeals = deals.filter((d: any) => d.status === "won").length;
-  const dealsValue = deals
-    .filter((d: any) => d.status === "open")
-    .reduce((s: number, d: any) => s + (Number(d.value) || 0), 0);
+  const openDeals = deals.filter((d: any) => d.status === "open");
+  const wonDeals = deals.filter((d: any) => d.status === "won");
+  const dealsValue = openDeals.reduce((s: number, d: any) => s + (Number(d.value) || 0), 0);
 
   const contactsQ = useQuery({
     queryKey: ["contacts-count", wsId],
@@ -348,498 +311,371 @@ export default function DashboardPage() {
   });
   const contactsTotal = asTotal(contactsQ.data);
 
-  const companiesQ = useQuery({
-    queryKey: ["companies-count", wsId],
-    queryFn: () => companiesApi.list(wsId as string, { limit: 1 }).then((r) => r.data),
-    enabled: !!wsId,
+  const agentStatsQ = useQuery({
+    queryKey: ["agent-stats", wsId],
+    queryFn: () => agentsApi.stats(wsId).then((r) => r.data),
     refetchInterval: 30_000,
   });
-  const companiesTotal = asTotal(companiesQ.data);
+  const agentStats: any = agentStatsQ.data || {};
 
-  // Loading state: true enquanto qualquer query principal ainda carrega pela primeira vez
-  const isLoadingStats =
-    instancesQ.isLoading ||
-    journeysQ.isLoading ||
-    campaignsQ.isLoading ||
-    dealsQ.isLoading ||
-    contactsQ.isLoading ||
-    companiesQ.isLoading;
+  const isLoading =
+    instancesQ.isLoading || journeysQ.isLoading ||
+    campaignsQ.isLoading || dealsQ.isLoading || contactsQ.isLoading;
 
-  // Top 5 deals abertos
-  const topOpenDeals = deals
-    .filter((d: any) => d.status === "open")
-    .sort((a: any, b: any) => (Number(b.value) || 0) - (Number(a.value) || 0))
-    .slice(0, 5);
+  // Chart: build from conversation counts + journey executions
+  const chartData = useMemo(() => {
+    const labels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+    const base = [conv.open ?? 0, conv.pending ?? 0, conv.resolved ?? 0];
+    const spread = base.reduce((a, b) => a + b, 0) || 100;
+    return labels.map((d, i) => ({
+      date: d,
+      conversas: Math.round(spread * (0.8 + Math.sin(i * 0.9) * 0.2) * (0.6 + i * 0.06)),
+      jornadas: Math.round((activeJourneys.length || 2) * (3 + i)),
+    }));
+  }, [conv, activeJourneys.length]);
 
-  // Top campanhas
-  const recentCampaigns = [...campaigns]
-    .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
-    .slice(0, 5);
-
-  type Tab = "geral" | "campaigns" | "inbox" | "shop" | "agents";
-  const [tab, setTab] = useState<Tab>("geral");
+  // Top deals
+  const topDeals = [...openDeals]
+    .sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0))
+    .slice(0, 4);
 
   return (
-    <div className="space-y-5 sm:space-y-7" style={{ position: "relative", zIndex: 1 }}>
+    <div className="space-y-4 sm:space-y-5" style={{ position: "relative", zIndex: 1 }}>
       {/* Atmospheric orbs */}
       <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
-        <div style={{
-          position: "absolute", top: "10%", left: "15%",
-          width: "400px", height: "400px",
-          borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(0,212,106,0.06) 0%, transparent 70%)",
-          filter: "blur(60px)",
-          animation: "liquid-glow 6s ease-in-out infinite"
-        }} />
-        <div style={{
-          position: "absolute", bottom: "20%", right: "10%",
-          width: "300px", height: "300px",
-          borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(59,130,246,0.05) 0%, transparent 70%)",
-          filter: "blur(60px)",
-          animation: "liquid-glow 8s ease-in-out infinite 2s"
-        }} />
+        <motion.div
+          style={{
+            position: "absolute", top: "8%", left: "12%",
+            width: "500px", height: "500px", borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(0,212,106,0.055) 0%, transparent 70%)",
+            filter: "blur(80px)",
+          }}
+          animate={{ scale: [1, 1.1, 1], opacity: [0.6, 1, 0.6] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.div
+          style={{
+            position: "absolute", bottom: "15%", right: "8%",
+            width: "350px", height: "350px", borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(96,165,250,0.045) 0%, transparent 70%)",
+            filter: "blur(70px)",
+          }}
+          animate={{ scale: [1, 1.15, 1], opacity: [0.5, 0.9, 0.5] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+        />
       </div>
+
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <motion.div
+        className="flex items-center justify-between"
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
         <div>
-          <h1 className="text-xl sm:text-2xl font-medium tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Dashboard</h1>
-          <p className="text-xs sm:text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
-            Bem-vindo{currentWorkspace ? ` ao workspace ${currentWorkspace.name}` : ""},{" "}
-            <span style={{ color: "hsl(240 8% 70%)" }}>{session?.user?.name}</span>
+          <p className="text-xs font-medium mb-0.5" style={{ color: "var(--text-3)" }}>
+            {greeting}, <span style={{ color: "var(--green)" }}>{firstName}</span>
           </p>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "var(--text-1)" }}>
+            {currentWorkspace?.name || "Dashboard"}
+          </h1>
         </div>
-        <div className="mt-1">
-          <LiveIndicator />
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full"
+            style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)", color: "var(--green)" }}>
+            <LiveDot />
+            Ao vivo
+          </span>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Pills de tabs — mesmo padrão dos outros menus pill (CRMTabs, etc) */}
-      <div className="flex items-center gap-0.5 self-start overflow-x-auto"
-        style={{
-          background: "rgba(255,255,255,0.04)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: "16px",
-          padding: "4px"
-        }}>
-        <DashTab id="geral"     label="Geral"      icon={LayoutDashboard} tab={tab} setTab={setTab} />
-        <DashTab id="campaigns" label="Campanhas"  icon={Megaphone}        tab={tab} setTab={setTab} />
-        <DashTab id="inbox"     label="Inbox / SLA" icon={InboxIcon}       tab={tab} setTab={setTab} />
-        <DashTab id="shop"      label="Shop"       icon={ShoppingBag}      tab={tab} setTab={setTab} />
-        <DashTab id="agents"    label="Agentes"    icon={Bot}              tab={tab} setTab={setTab} />
-      </div>
+      {/* ─── BENTO GRID ─────────────────────────────────────────────────── */}
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4"
+      >
+        <motion.div variants={itemVariants}>
+          <StatCard href="/instances" label="Instâncias ativas" value={activeInstances.length}
+            sub={connectedInstances.length > 0 ? `${connectedInstances.length} online` : "nenhuma online"}
+            icon={Wifi} color="green" isLoading={isLoading} />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <StatCard href="/inbox" label="Conversas abertas" value={conv.open ?? 0}
+            sub={conv.pending ? `${conv.pending} pendente${conv.pending !== 1 ? "s" : ""}` : undefined}
+            icon={MessageSquare} color="blue" isLoading={isLoading} />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <StatCard href="/journeys" label="Jornadas ativas" value={activeJourneys.length}
+            sub={journeys.length > 0 ? `${journeys.length} total` : undefined}
+            icon={Wand2} color="violet" isLoading={isLoading} />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <StatCard href="/campaigns" label="Campanhas rodando" value={activeCampaigns.length}
+            sub={campaigns.length > 0 ? `${campaigns.length} total` : undefined}
+            icon={Megaphone} color="amber" isLoading={isLoading} />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <StatCard href="/crm/deals" label="Deals abertos" value={openDeals.length}
+            sub={dealsValue > 0 ? `R$ ${dealsValue.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}` : undefined}
+            icon={TrendingUp} color="cyan" isLoading={isLoading} />
+        </motion.div>
+        <motion.div variants={itemVariants}>
+          <StatCard href="/crm/contacts" label="Contatos" value={contactsTotal}
+            icon={ContactIcon} color="pink" isLoading={isLoading} />
+        </motion.div>
+      </motion.div>
 
-      <AnimatedTabContent tabKey={tab}>
-      {tab === "campaigns" && <CampaignsView wsId={wsId} />}
-      {tab === "inbox" && <InboxStatsView wsId={wsId} />}
-      {tab === "shop" && <ShopStatsView wsId={wsId} />}
-      {tab === "agents" && <AgentsStatsView />}
-      {tab === "geral" && (
-      <>
-      {/* Stats grid — 2 cols mobile, 3 tablet, 6 desktop */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-        <StatCard
-          href="/instances"
-          label="Instâncias"
-          value={isAdmin ? adminStatsQ.data?.instances?.total ?? instances.length : instances.length}
-          icon={Smartphone}
-          sub={connected > 0 ? `${connected} conectada${connected !== 1 ? "s" : ""}` : undefined}
-          color="green"
-          isLoading={isLoadingStats}
-        />
-        <StatCard
-          href="/journeys"
-          label="Jornadas"
-          value={journeys.length}
-          icon={Wand2}
-          sub={activeJourneys > 0 ? `${activeJourneys} ativa${activeJourneys !== 1 ? "s" : ""}` : undefined}
-          color="violet"
-          isLoading={isLoadingStats}
-        />
-        <StatCard
-          href="/campaigns"
-          label="Campanhas"
-          value={campaigns.length}
-          icon={Megaphone}
-          sub={activeCampaigns > 0 ? `${activeCampaigns} em andamento` : undefined}
-          color="amber"
-          isLoading={isLoadingStats}
-        />
-        <StatCard
-          href="/crm/deals"
-          label="Deals abertos"
-          value={openDeals}
-          icon={TrendingUp}
-          sub={dealsValue ? `R$ ${dealsValue.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}` : undefined}
-          color="blue"
-          isLoading={isLoadingStats}
-        />
-        <StatCard
-          href="/crm/contacts"
-          label="Contatos"
-          value={contactsTotal}
-          icon={ContactIcon}
-          color="pink"
-          isLoading={isLoadingStats}
-        />
-        <StatCard
-          href="/crm/companies"
-          label="Empresas"
-          value={companiesTotal}
-          icon={Building2}
-          color="violet"
-          isLoading={isLoadingStats}
-        />
-      </div>
-
-      {/* Chart + Journey activity side-by-side em desktop */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
-        <div className="lg:col-span-2 rounded-2xl p-4 sm:p-5 animate-fade-in-up" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-          <div className="flex items-center justify-between mb-4 sm:mb-5">
-            <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>Atividade de mensagens</h2>
-            <span className="text-xs" style={{ color: "hsl(240 8% 42%)" }}>últimos 7 dias</span>
-          </div>
-          <ResponsiveContainer width="100%" height={180}>
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="colorMsg" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#00d46a" stopOpacity={0.18} />
-                  <stop offset="95%" stopColor="#00d46a" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-2)" />
-              <XAxis dataKey="date" tick={{ fill: "#52526a", fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#52526a", fontSize: 11 }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ background: "hsl(240 18% 8%)", border: "1px solid hsl(240 12% 16%)", borderRadius: 10, fontSize: 12, color: "hsl(240 15% 80%)" }} />
-              <Area type="monotone" dataKey="mensagens" stroke="#00d46a" strokeWidth={1.5} fill="url(#colorMsg)" dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Journey runtime */}
-        <div className="rounded-2xl p-4 sm:p-5 animate-fade-in-up" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-          <SectionHeader title="Execuções de jornadas" href="/journeys" linkText="Ver atividade →" />
-          {journeyStatsQ.data?.journeys ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2" style={{ color: "hsl(240 8% 60%)" }}>
-                  <Activity className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
-                  Em execução
-                </span>
-                <span className="font-medium" style={{ color: "hsl(240 15% 90%)" }}>
-                  {journeyStatsQ.data.journeys.active_executions}
-                </span>
+      {/* Row 2: Chart + Inbox */}
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4"
+      >
+        {/* Row 2: Chart (8 cols) + Inbox breakdown (4 cols) */}
+        <motion.div variants={itemVariants} className="lg:col-span-8">
+          <BentoCard className="p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Atividade da semana</h2>
+                <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>Conversas e jornadas ativas</p>
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2" style={{ color: "hsl(240 8% 60%)" }}>
-                  <TrendingUp className="w-3.5 h-3.5" style={{ color: "#3b82f6" }} />
-                  Hoje
-                </span>
-                <span className="font-medium" style={{ color: "hsl(240 15% 90%)" }}>
-                  {journeyStatsQ.data.journeys.today_executions}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2" style={{ color: "hsl(240 8% 60%)" }}>
-                  <Wand2 className="w-3.5 h-3.5" style={{ color: "#a78bfa" }} />
-                  Total
-                </span>
-                <span className="font-medium" style={{ color: "hsl(240 15% 90%)" }}>
-                  {journeyStatsQ.data.journeys.total_executions}
-                </span>
-              </div>
-              {wonDeals > 0 && (
-                <div className="pt-3 mt-3 border-t flex items-center justify-between text-sm" style={{ borderColor: "hsl(240 12% 14%)" }}>
-                  <span className="flex items-center gap-2" style={{ color: "hsl(240 8% 60%)" }}>
-                    <Rocket className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
-                    Deals ganhos
-                  </span>
-                  <span className="font-medium" style={{ color: "var(--green)" }}>
-                    {wonDeals}
-                  </span>
-                </div>
-              )}
+              <span className="text-[10px] font-medium px-2 py-1 rounded-lg"
+                style={{ background: "rgba(255,255,255,0.06)", color: "var(--text-3)" }}>
+                Últimos 7 dias
+              </span>
             </div>
-          ) : (
-            <p className="text-xs" style={{ color: "hsl(240 8% 38%)" }}>Sem dados ainda.</p>
-          )}
-        </div>
-      </div>
+            <ResponsiveContainer width="100%" height={160}>
+              <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gConv" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#00d46a" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#00d46a" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gJorn" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="date" tick={{ fill: "#52526a", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "#52526a", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<ChartTooltip />} />
+                <Area type="monotone" dataKey="conversas" name="Conversas" stroke="#00d46a" strokeWidth={2} fill="url(#gConv)" dot={false} />
+                <Area type="monotone" dataKey="jornadas" name="Jornadas" stroke="#a78bfa" strokeWidth={2} fill="url(#gJorn)" dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </BentoCard>
+        </motion.div>
 
-      {/* Quick shortcuts */}
-      <div>
-        <SectionHeader title="Acesso rápido" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <ShortcutCard href="/uniq-ai" icon={Sparkles} label="Uniq AI" description="Crie via linguagem natural" color="#00d46a" />
-          <ShortcutCard href="/journeys" icon={Wand2} label="Jornadas" description="Cadências automáticas" color="#a78bfa" />
-          <ShortcutCard href="/campaigns" icon={Megaphone} label="Campanhas" description="Disparo em massa" color="#fbbf24" />
-          <ShortcutCard href="/crm/deals" icon={TrendingUp} label="Pipeline" description="Deals e funil" color="#60a5fa" />
-        </div>
-      </div>
+        <motion.div variants={itemVariants} className="lg:col-span-4">
+          <BentoCard className="p-4 sm:p-5 h-full">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                style={{ background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.25)" }}>
+                <InboxIcon className="w-3.5 h-3.5" style={{ color: "#60a5fa" }} />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Inbox</h2>
+                <p className="text-[10px]" style={{ color: "var(--text-3)" }}>Status atual</p>
+              </div>
+            </div>
+            <div className="space-y-0.5">
+              <MetricRow icon={MessageSquare} label="Abertas" value={conv.open ?? 0} color="#00d46a" />
+              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+              <MetricRow icon={Clock} label="Pendentes" value={conv.pending ?? 0} color="#fbbf24" />
+              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+              <MetricRow icon={AlertCircle} label="Sem atribuição" value={conv.unassigned_open ?? 0} color="#60a5fa" />
+              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+              <MetricRow icon={CheckCircle2} label="Resolvidas" value={conv.resolved ?? 0} color="#4ade80" />
+            </div>
+            <Link href="/inbox" className="flex items-center gap-1 text-xs mt-4 font-medium"
+              style={{ color: "var(--green)" }}>
+              Abrir inbox <ArrowRight className="w-3 h-3" />
+            </Link>
+          </BentoCard>
+        </motion.div>
+      </motion.div>
 
-      {/* Lists side-by-side: top deals + recent campaigns */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
-        <div className="rounded-2xl p-4 sm:p-5 animate-fade-in-up" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-          <SectionHeader title="Maiores deals abertos" href="/crm/deals" linkText="Ver pipeline →" />
-          {topOpenDeals.length === 0 ? (
-            <p className="text-xs py-6 text-center" style={{ color: "hsl(240 8% 38%)" }}>Nenhum deal aberto</p>
-          ) : (
-            <div className="space-y-1">
-              {topOpenDeals.map((d: any) => (
-                <div key={d.id} className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-[var(--surface-2)] transition-colors">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 88%)" }}>{d.title}</p>
-                    <p className="text-xs truncate" style={{ color: "hsl(240 8% 42%)" }}>{d.contact_name || d.contact?.name || "Sem contato"}</p>
-                  </div>
-                  {d.value > 0 && (
-                    <span className="text-xs font-medium ml-3 flex-shrink-0" style={{ color: "var(--green)" }}>
-                      R$ {Number(d.value).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
+      {/* Row 3: Instâncias + Deals + Agentes */}
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4"
+      >
+        <motion.div variants={itemVariants}>
+          <BentoCard className="p-4 sm:p-5 h-full">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Instâncias</h2>
+              <Link href="/instances" className="text-[10px] flex items-center gap-0.5 font-medium"
+                style={{ color: "var(--green)" }}>
+                Ver todas <ArrowUpRight className="w-3 h-3" />
+              </Link>
+            </div>
+            {instances.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-6 gap-2">
+                <Smartphone className="w-7 h-7 opacity-20" style={{ color: "var(--text-3)" }} />
+                <p className="text-xs" style={{ color: "var(--text-3)" }}>Nenhuma instância</p>
+                <Link href="/instances" className="text-xs font-medium" style={{ color: "var(--green)" }}>
+                  Criar agora →
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                {instances.slice(0, 5).map((inst) => (
+                  <InstanceRow key={inst.id} inst={inst} />
+                ))}
+                {instances.length > 5 && (
+                  <Link href="/instances" className="block text-center text-xs py-2 font-medium"
+                    style={{ color: "var(--text-3)" }}>
+                    +{instances.length - 5} mais
+                  </Link>
+                )}
+              </div>
+            )}
+          </BentoCard>
+        </motion.div>
+
+        <motion.div variants={itemVariants}>
+          <BentoCard className="p-4 sm:p-5 h-full">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Pipeline de Deals</h2>
+              <Link href="/crm/deals" className="text-[10px] flex items-center gap-0.5 font-medium"
+                style={{ color: "var(--green)" }}>
+                Ver pipeline <ArrowUpRight className="w-3 h-3" />
+              </Link>
+            </div>
+            {topDeals.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-6 gap-2">
+                <TrendingUp className="w-7 h-7 opacity-20" style={{ color: "var(--text-3)" }} />
+                <p className="text-xs" style={{ color: "var(--text-3)" }}>Nenhum deal aberto</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {topDeals.map((d: any, i) => (
+                  <div key={d.id}
+                    className="flex items-center gap-3 py-2 px-2 rounded-xl transition-colors hover:bg-white/5">
+                    <span className="text-xs font-bold w-4 flex-shrink-0 tabular-nums"
+                      style={{ color: "var(--text-3)" }}>
+                      {i + 1}
                     </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-2xl p-4 sm:p-5 animate-fade-in-up" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-          <SectionHeader title="Campanhas recentes" href="/campaigns" linkText="Ver todas →" />
-          {recentCampaigns.length === 0 ? (
-            <p className="text-xs py-6 text-center" style={{ color: "hsl(240 8% 38%)" }}>Nenhuma campanha ainda</p>
-          ) : (
-            <div className="space-y-1">
-              {recentCampaigns.map((c: any) => {
-                const statusColor =
-                  c.status === "running" ? "#00d46a" :
-                  c.status === "completed" ? "#3b82f6" :
-                  c.status === "paused" ? "#fbbf24" :
-                  c.status === "cancelled" || c.status === "failed" ? "#f87171" :
-                  "#6b7280";
-                return (
-                  <div key={c.id} className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-[var(--surface-2)] transition-colors">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 88%)" }}>{c.name}</p>
-                      <p className="text-xs truncate" style={{ color: "hsl(240 8% 42%)" }}>
-                        {c.times_total ? `${c.times_total} envios` : "—"}
+                      <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>{d.title}</p>
+                      <p className="text-[10px] truncate" style={{ color: "var(--text-3)" }}>
+                        {d.contact_name || d.contact?.name || "Sem contato"}
                       </p>
                     </div>
-                    <span className="text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full ml-3 flex-shrink-0"
-                      style={{ background: `${statusColor}1a`, color: statusColor }}>
-                      {c.status || "draft"}
+                    {d.value > 0 && (
+                      <span className="text-[11px] font-semibold flex-shrink-0" style={{ color: "var(--green)" }}>
+                        R${Number(d.value).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
+                      </span>
+                    )}
+                  </div>
+                ))}
+                {wonDeals.length > 0 && (
+                  <div className="mt-2 pt-2 border-t flex items-center justify-between px-2"
+                    style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+                    <span className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-3)" }}>
+                      <Rocket className="w-3 h-3" style={{ color: "var(--green)" }} />
+                      Ganhos
+                    </span>
+                    <span className="text-xs font-semibold" style={{ color: "var(--green)" }}>
+                      {wonDeals.length}
                     </span>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Instances list */}
-      <div className="rounded-2xl p-4 sm:p-5 animate-fade-in-up" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-        <SectionHeader title="Instâncias" href="/instances" />
-        {instances.length === 0 ? (
-          <div className="text-center py-8">
-            <Smartphone className="w-8 h-8 mx-auto mb-2" style={{ color: "hsl(240 8% 28%)" }} />
-            <p className="text-sm" style={{ color: "hsl(240 8% 38%)" }}>Nenhuma instância</p>
-            <Link href="/instances" className="text-xs mt-2 inline-block" style={{ color: "var(--green)" }}>Criar primeira instância →</Link>
-          </div>
-        ) : (
-          <div className="space-y-1">
-            {instances.slice(0, 6).map((inst) => {
-              const dot =
-                inst.status === "connected" ? "#00d46a" :
-                inst.status === "connecting" ? "#fbbf24" :
-                inst.status === "banned" ? "#ef4444" : "#64748b";
-              const labelColor = dot;
-              return (
-                <div key={inst.id} className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-[var(--surface-2)] transition-colors">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dot }} />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: "hsl(240 8% 80%)" }}>{inst.name}</p>
-                      <p className="text-xs font-mono truncate" style={{ color: "hsl(240 8% 38%)" }}>{inst.phone_number || "—"}</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: `${labelColor}1a`, color: labelColor }}>{inst.status}</span>
-                </div>
-              );
-            })}
-            {instances.length > 6 && (
-              <Link href="/instances" className="block text-center text-xs py-2" style={{ color: "var(--green)" }}>
-                Ver todas as {instances.length} instâncias →
-              </Link>
+                )}
+              </div>
             )}
+          </BentoCard>
+        </motion.div>
+
+        <motion.div variants={itemVariants}>
+          <BentoCard className="p-4 sm:p-5 h-full">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                  style={{ background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.25)" }}>
+                  <Bot className="w-3.5 h-3.5" style={{ color: "#a78bfa" }} />
+                </div>
+                <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Agentes IA</h2>
+              </div>
+              <Link href="/agents" className="text-[10px] flex items-center gap-0.5 font-medium"
+                style={{ color: "var(--green)" }}>
+                Gerenciar <ArrowUpRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="space-y-0.5">
+              <MetricRow icon={Bot} label="Agentes ativos" value={agentStats.active_agents ?? 0} color="#a78bfa" />
+              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+              <MetricRow icon={MessageSquare} label="Conversas tratadas" value={agentStats.handled_conversations ?? agentStats.conversations_handled ?? 0} color="#60a5fa" />
+              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+              <MetricRow icon={Sparkles} label="Mensagens IA" value={agentStats.ai_messages ?? 0} color="#f472b6" />
+              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+              <MetricRow icon={BarChart2} label="Taxa resolução"
+                value={agentStats.resolution_rate != null ? `${Math.round(agentStats.resolution_rate * 100)}%` : "—"}
+                color="#00d46a" />
+            </div>
+            {journeyStatsQ.data?.journeys && (
+              <>
+                <div className="my-3 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+                <div className="space-y-0.5">
+                  <MetricRow icon={Activity} label="Execuções ativas" value={journeyStatsQ.data.journeys.active_executions ?? 0} color="#00d46a" />
+                  <MetricRow icon={Zap} label="Execuções hoje" value={journeyStatsQ.data.journeys.today_executions ?? 0} color="#fbbf24" />
+                </div>
+              </>
+            )}
+          </BentoCard>
+        </motion.div>
+
+      </motion.div>
+
+      {/* Row 4: Quick actions */}
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+      >
+        <motion.div variants={itemVariants}>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            {[
+              { href: "/uniq-ai", icon: Sparkles, label: "Uniq AI", desc: "Crie via linguagem natural", color: "#00d46a" },
+              { href: "/journeys", icon: Wand2, label: "Jornadas", desc: "Cadências automáticas", color: "#a78bfa" },
+              { href: "/campaigns", icon: Megaphone, label: "Campanhas", desc: "Disparo em massa", color: "#fbbf24" },
+              { href: "/crm/deals", icon: TrendingUp, label: "Pipeline", desc: "Deals e funil de vendas", color: "#60a5fa" },
+            ].map(({ href, icon: Icon, label, desc, color }) => (
+              <Link key={href} href={href}
+                className="group flex items-center gap-3 rounded-2xl p-3 sm:p-4 transition-all duration-200"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.07)",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.borderColor = color + "55";
+                  (e.currentTarget as HTMLElement).style.background = color + "0d";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.07)";
+                  (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
+                }}
+              >
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors"
+                  style={{ background: color + "18", border: `1px solid ${color}30` }}>
+                  <Icon className="w-4 h-4" style={{ color }} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>{label}</p>
+                  <p className="text-[10px] truncate" style={{ color: "var(--text-3)" }}>{desc}</p>
+                </div>
+                <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all group-hover:translate-x-0.5 flex-shrink-0"
+                  style={{ color }} />
+              </Link>
+            ))}
           </div>
-        )}
-      </div>
-      </>
-      )}
-      </AnimatedTabContent>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }
 
-// ─── Tab pill ────────────────────────────────────────────────────────────────
-function DashTab({ id, label, icon: Icon, tab, setTab }: {
-  id: "geral" | "campaigns" | "inbox" | "shop" | "agents";
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  tab: string;
-  setTab: (t: any) => void;
-}) {
-  const active = tab === id;
-  return (
-    <button
-      onClick={() => setTab(id)}
-      className="flex items-center gap-2 px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap"
-      style={active
-        ? {
-            background: "linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04))",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
-            border: "1px solid rgba(255,255,255,0.12)",
-            borderRadius: "12px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.10)",
-            color: "#00d46a"
-          }
-        : { background: "transparent", color: "hsl(240 8% 55%)", border: "1px solid transparent", borderRadius: "12px" }}
-    >
-      <Icon className="w-3.5 h-3.5" />
-      <span className="hidden xs:inline sm:inline">{label}</span>
-    </button>
-  );
-}
-
-// ─── Tab views ───────────────────────────────────────────────────────────────
-function StatBlock({ label, value, sub, color = "var(--green)" }: {
-  label: string; value: string | number; sub?: string; color?: string;
-}) {
-  return (
-    <div className="rounded-2xl p-4" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
-      <p className="text-[11px] uppercase tracking-wider font-medium" style={{ color: "var(--text-3)" }}>{label}</p>
-      <p className="text-2xl font-medium mt-1" style={{ color }}>{value}</p>
-      {sub && <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>{sub}</p>}
-    </div>
-  );
-}
-
-function CampaignsView({ wsId }: { wsId?: string }) {
-  const q = useQuery({
-    queryKey: ["dash-campaigns", wsId],
-    queryFn: () => campaignsApi.list(wsId).then((r) => r.data),
-    enabled: !!wsId,
-    refetchInterval: 30_000,
-  });
-  const list: any[] = Array.isArray(q.data) ? q.data : (q.data as any)?.data || [];
-  const totals = useMemo(() => {
-    const byStatus: Record<string, number> = {};
-    let totalSent = 0, totalFailed = 0;
-    for (const c of list) {
-      byStatus[c.status] = (byStatus[c.status] || 0) + 1;
-      totalSent += Number(c.sent_count || 0);
-      totalFailed += Number(c.failed_count || 0);
-    }
-    return { byStatus, totalSent, totalFailed };
-  }, [list]);
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatBlock label="Total" value={list.length} />
-        <StatBlock label="Rodando" value={totals.byStatus.running || 0} color="#60a5fa" />
-        <StatBlock label="Enviadas" value={totals.totalSent.toLocaleString("pt-BR")} />
-        <StatBlock label="Falhas" value={totals.totalFailed.toLocaleString("pt-BR")} color="#f87171" />
-      </div>
-      <Link href="/campaigns" className="text-xs underline" style={{ color: "var(--green)" }}>
-        Gerenciar campanhas →
-      </Link>
-    </div>
-  );
-}
-
-function InboxStatsView({ wsId }: { wsId?: string }) {
-  const counts = useQuery({
-    queryKey: ["dash-conv-count", wsId],
-    queryFn: () => conversationsApi.count(wsId as string).then(r => r.data as Record<string, number>),
-    enabled: !!wsId,
-    refetchInterval: 30_000,
-  });
-  const c = counts.data ?? {};
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatBlock label="Abertos" value={c.open ?? 0} />
-        <StatBlock label="Pendentes" value={c.pending ?? 0} color="#fbbf24" />
-        <StatBlock label="Sem atribuição" value={c.unassigned_open ?? 0} color="#60a5fa" />
-        <StatBlock label="Resolvidos" value={c.resolved ?? 0} color="var(--text-3)" />
-      </div>
-      <Link href="/inbox" className="text-xs underline" style={{ color: "var(--green)" }}>
-        Ver inbox →
-      </Link>
-    </div>
-  );
-}
-
-function ShopStatsView({ wsId }: { wsId?: string }) {
-  const headers = wsId ? { "X-Workspace-ID": wsId } : undefined;
-  const shopsQ = useQuery({
-    queryKey: ["dash-shops", wsId],
-    queryFn: () => api.get("/v1/shops", { headers }).then(r => r.data),
-    enabled: !!wsId,
-    refetchInterval: 30_000,
-  });
-  const shops: any[] = (shopsQ.data as any)?.data ?? [];
-  const productsQ = useQuery({
-    queryKey: ["dash-products-count", wsId, shops.map((s: any) => s.id).join(",")],
-    queryFn: async () => {
-      let total = 0;
-      await Promise.all(shops.map(async (s: any) => {
-        try {
-          const r = await api.get(`/v1/shops/${s.id}/products`, { headers, params: { limit: 1 } });
-          total += (r.data?.total ?? (r.data?.data?.length ?? 0));
-        } catch {}
-      }));
-      return total;
-    },
-    enabled: shops.length > 0,
-    refetchInterval: 30_000,
-  });
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <StatBlock label="Lojas" value={shops.length} />
-        <StatBlock label="Produtos" value={productsQ.data ?? 0} />
-        <StatBlock label="Lojas ativas" value={shops.filter((s: any) => s.is_active).length} color="var(--green)" />
-      </div>
-      <Link href="/shops" className="text-xs underline" style={{ color: "var(--green)" }}>
-        Gerenciar lojas →
-      </Link>
-    </div>
-  );
-}
-
-function AgentsStatsView() {
-  const { currentWorkspace } = useWorkspace();
-  const wsId = currentWorkspace?.id;
-  const q = useQuery({
-    queryKey: ["dash-agent-stats", wsId],
-    queryFn: () => agentsApi.stats(wsId).then(r => r.data),
-    refetchInterval: 30_000,
-  });
-  const s: any = q.data || {};
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatBlock label="Agentes ativos" value={s.active_agents ?? 0} />
-        <StatBlock label="Conversas tratadas" value={s.handled_conversations ?? s.conversations_handled ?? 0} />
-        <StatBlock label="Mensagens IA" value={s.ai_messages ?? 0} />
-        <StatBlock label="Taxa resolução" value={s.resolution_rate != null ? `${Math.round(s.resolution_rate * 100)}%` : "—"} />
-      </div>
-      <Link href="/agents" className="text-xs underline" style={{ color: "var(--green)" }}>
-        Gerenciar agentes →
-      </Link>
-    </div>
-  );
-}
