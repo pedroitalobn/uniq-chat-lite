@@ -4,7 +4,7 @@
 // criar uma jornada (Uniq AI / Templates / Canvas em branco). Tabs
 // dividem listagem e atividade em tempo real.
 
-import { useState } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { Activity, LayoutTemplate, Plus, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
@@ -13,6 +13,60 @@ import { JourneysList } from "@/features/journeys/journeys-list";
 import { ActivityPanel } from "@/features/journeys/activity-panel";
 import { TemplatesDialog } from "@/features/journeys/templates-dialog";
 import { cn } from "@/lib/utils";
+
+const JOURNEY_TEMPLATE_PREVIEWS = [
+  { id: "recuperacao-clientes",     name: "Recuperação de Clientes",    description: "Reengaje clientes inativos com mensagem personalizada", emoji: "🔄", color: "#f59e0b", category: "Retenção",    steps: 5 },
+  { id: "boas-vindas-onboarding",   name: "Boas-vindas & Onboarding",   description: "Receba novos contatos e direcione cada um para o caminho certo", emoji: "🚀", color: "#3b82f6", category: "Captação",    steps: 5 },
+  { id: "aniversariantes",          name: "Aniversariantes",            description: "Surpreenda clientes no aniversário com mensagem e cupom exclusivo", emoji: "🎂", color: "#ec4899", category: "Engajamento", steps: 3 },
+  { id: "solicitacao-indicacao",    name: "Solicitação de Indicação",   description: "Ative clientes VIP para indicarem conhecidos e recompense automaticamente", emoji: "🤝", color: "#10b981", category: "Retenção",    steps: 6 },
+  { id: "retencao-pos-compra",      name: "Retenção Pós-compra",        description: "Fidelize compradores com acompanhamento pós-venda e upsell", emoji: "💎", color: "#8b5cf6", category: "Retenção",    steps: 6 },
+  { id: "qualificacao-leads",       name: "Qualificação de Leads",      description: "Classifique leads automaticamente por interesse e comportamento", emoji: "🎯", color: "#f97316", category: "Captação",    steps: 8 },
+];
+
+function JourneyTemplateCards({ onOpenAll, onCreateFromTemplate }: { onOpenAll: () => void; onCreateFromTemplate: (id: string) => void }) {
+  return (
+    <div className="space-y-3 flex-shrink-0">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Templates de Jornada</h2>
+          <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>Comece com uma jornada pré-montada e personalize</p>
+        </div>
+        <button onClick={onOpenAll}
+          className="text-xs px-2.5 py-1.5 rounded-lg transition"
+          style={{ color: "var(--text-3)", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}>
+          Ver todos os templates
+        </button>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+        {JOURNEY_TEMPLATE_PREVIEWS.map((tpl) => (
+          <div key={tpl.id}
+            className="rounded-2xl p-3.5 flex flex-col gap-2 cursor-pointer transition-all duration-200"
+            style={{
+              background: `${tpl.color}08`,
+              border: `1px solid ${tpl.color}18`,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+            }}
+            onClick={() => onCreateFromTemplate(tpl.id)}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 16px ${tpl.color}20, 0 0 0 1px ${tpl.color}28`}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)"}>
+            <div className="flex items-start justify-between gap-1">
+              <span className="text-xl leading-none">{tpl.emoji}</span>
+              <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full shrink-0"
+                style={{ background: `${tpl.color}15`, color: tpl.color }}>
+                {tpl.steps} passos
+              </span>
+            </div>
+            <div>
+              <p className="text-xs font-semibold leading-tight" style={{ color: "var(--text-1)" }}>{tpl.name}</p>
+              <p className="text-[11px] mt-0.5 leading-snug line-clamp-2" style={{ color: "var(--text-3)" }}>{tpl.description}</p>
+            </div>
+            <span className="text-[10px] font-medium mt-auto" style={{ color: tpl.color }}>{tpl.category}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 type Tab = "list" | "activity";
 
@@ -37,7 +91,7 @@ export default function JourneysPage() {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0 overflow-y-auto">
       {/* Header */}
       <div className="mb-3 sm:mb-4 flex-shrink-0">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -106,6 +160,14 @@ export default function JourneysPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Template Cards */}
+      <div className="mb-4 sm:mb-5 flex-shrink-0">
+        <JourneyTemplateCards
+          onOpenAll={() => setTemplatesOpen(true)}
+          onCreateFromTemplate={() => setTemplatesOpen(true)}
+        />
       </div>
 
       {/* Tabs */}

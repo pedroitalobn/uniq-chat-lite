@@ -138,15 +138,22 @@ interface CrmFilter {
   participated_campaign_id?: string;
 }
 
-function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+interface CampaignPrefill {
+  name?: string;
+  channel?: string;
+  msgText?: string;
+  msgType?: "text" | "image" | "audio" | "document";
+}
+
+function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => void; onCreated: () => void; prefill?: CampaignPrefill }) {
   const { currentWorkspace } = useWorkspace();
   const [step, setStep] = useState(1);
 
   // Step 1
-  const [name, setName] = useState("");
+  const [name, setName] = useState(prefill?.name ?? "");
 
   // Step 2: Channel selection
-  const [channel, setChannel]       = useState("");
+  const [channel, setChannel]       = useState(prefill?.channel ?? "");
   const [instanceId, setInstanceId] = useState("");
 
   // Step 3: Action type
@@ -173,8 +180,8 @@ function CreateCampaignModal({ onClose, onCreated }: { onClose: () => void; onCr
   const [igUsername, setIgUsername]   = useState("");
 
   // Step 5: Content
-  const [msgType, setMsgType]   = useState<"text" | "image" | "audio" | "document">("text");
-  const [msgText, setMsgText]   = useState("");
+  const [msgType, setMsgType]   = useState<"text" | "image" | "audio" | "document">(prefill?.msgType ?? "text");
+  const [msgText, setMsgText]   = useState(prefill?.msgText ?? "");
   const [caption, setCaption]   = useState("");
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   // WABA template
@@ -1363,13 +1370,184 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
   );
 }
 
+// ─── Campaign Templates ────────────────────────────────────────────────────────
+
+const CAMPAIGN_TEMPLATES: Array<{
+  id: string;
+  name: string;
+  description: string;
+  emoji: string;
+  channel: string;
+  msgType: "text" | "image" | "audio" | "document";
+  msgText: string;
+  color: string;
+  bg: string;
+}> = [
+  {
+    id: "reativacao",
+    name: "Reativação de Clientes",
+    description: "Reengaje clientes inativos com oferta personalizada",
+    emoji: "🔄",
+    channel: "whatsapp",
+    msgType: "text",
+    msgText: "Oi {{contact.name}}! 😊 Sentimos sua falta. Temos novidades e uma oferta especial só pra você. Vem conferir!",
+    color: "#25d366",
+    bg: "rgba(37,211,102,0.06)",
+  },
+  {
+    id: "carrinho-abandonado",
+    name: "Carrinho Abandonado",
+    description: "Lembre clientes sobre itens esquecidos no carrinho",
+    emoji: "🛒",
+    channel: "whatsapp",
+    msgType: "text",
+    msgText: "Ei {{contact.name}}! Você deixou itens no carrinho 🛍️ Finalize sua compra antes que esgotem. Precisando de ajuda?",
+    color: "#25d366",
+    bg: "rgba(37,211,102,0.06)",
+  },
+  {
+    id: "lancamento",
+    name: "Lançamento de Produto",
+    description: "Anuncie novidades para toda a sua base",
+    emoji: "🚀",
+    channel: "whatsapp",
+    msgType: "text",
+    msgText: "🚀 Novidade chegou! {{contact.name}}, você está entre os primeiros a saber. Acesse agora e garanta antes de esgotar!",
+    color: "#25d366",
+    bg: "rgba(37,211,102,0.06)",
+  },
+  {
+    id: "pos-compra",
+    name: "Pós-compra & Review",
+    description: "Solicite avaliação e fidelize clientes recentes",
+    emoji: "⭐",
+    channel: "whatsapp",
+    msgType: "text",
+    msgText: "{{contact.name}}, obrigado pela compra! 🙏 Tudo certo com seu pedido? Sua avaliação nos ajuda muito. Deixa aqui: [link]",
+    color: "#25d366",
+    bg: "rgba(37,211,102,0.06)",
+  },
+  {
+    id: "confirmacao-pedido",
+    name: "Confirmação de Pedido",
+    description: "Template WABA para confirmar pedidos automaticamente",
+    emoji: "✅",
+    channel: "waba",
+    msgType: "text",
+    msgText: "",
+    color: "#0088ff",
+    bg: "rgba(0,136,255,0.06)",
+  },
+  {
+    id: "atualizacao-entrega",
+    name: "Atualização de Entrega",
+    description: "Notifique clientes sobre o status da entrega",
+    emoji: "🚚",
+    channel: "waba",
+    msgType: "text",
+    msgText: "",
+    color: "#0088ff",
+    bg: "rgba(0,136,255,0.06)",
+  },
+  {
+    id: "engajamento-instagram",
+    name: "Engajamento de Seguidores",
+    description: "DM automatizado para seguidores do seu perfil",
+    emoji: "📸",
+    channel: "instagram",
+    msgType: "text",
+    msgText: "Oi! 👋 Obrigado por nos seguir! Tem alguma dúvida ou quer saber mais sobre nossos produtos? Responde aqui!",
+    color: "#e1306c",
+    bg: "rgba(225,48,108,0.06)",
+  },
+  {
+    id: "newsletter-telegram",
+    name: "Newsletter Semanal",
+    description: "Envie novidades semanais para sua base no Telegram",
+    emoji: "📰",
+    channel: "telegram",
+    msgType: "text",
+    msgText: "📰 *Newsletter Semanal*\n\nOlá {{contact.name}}! Aqui estão as principais novidades desta semana:\n\n👉 [novidade 1]\n👉 [novidade 2]\n\nAté a próxima! 🙌",
+    color: "#2ca5e0",
+    bg: "rgba(44,165,224,0.06)",
+  },
+];
+
+const CH_LABEL: Record<string, string> = {
+  whatsapp: "WhatsApp", waba: "WhatsApp API", instagram: "Instagram", telegram: "Telegram",
+};
+
+function CampaignTemplateCards({ onSelect }: { onSelect: (t: typeof CAMPAIGN_TEMPLATES[number]) => void }) {
+  const [showAll, setShowAll] = React.useState(false);
+  const visible = showAll ? CAMPAIGN_TEMPLATES : CAMPAIGN_TEMPLATES.slice(0, 4);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 80%)" }}>Templates pré-montados</h2>
+          <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 44%)" }}>Comece com uma campanha pronta e personalize</p>
+        </div>
+        <button onClick={() => setShowAll(v => !v)}
+          className="text-xs px-2.5 py-1.5 rounded-lg transition"
+          style={{ color: "hsl(240 8% 50%)", background: "var(--surface-2)", border: "1px solid hsl(240 12% 13%)" }}>
+          {showAll ? "Ver menos" : `Ver todos (${CAMPAIGN_TEMPLATES.length})`}
+        </button>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {visible.map((tpl) => (
+          <div key={tpl.id}
+            className="rounded-2xl p-4 flex flex-col gap-2.5 group transition-all duration-200 cursor-pointer"
+            style={{
+              background: tpl.bg,
+              border: `1px solid ${tpl.color}20`,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+            }}
+            onClick={() => onSelect(tpl)}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 16px ${tpl.color}18, 0 0 0 1px ${tpl.color}25`}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.18)"}>
+            <div className="flex items-start justify-between">
+              <span className="text-2xl leading-none">{tpl.emoji}</span>
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                style={{ background: `${tpl.color}18`, color: tpl.color, border: `1px solid ${tpl.color}30` }}>
+                {CH_LABEL[tpl.channel] ?? tpl.channel}
+              </span>
+            </div>
+            <div>
+              <p className="text-sm font-semibold leading-tight" style={{ color: "hsl(240 15% 90%)" }}>{tpl.name}</p>
+              <p className="text-xs mt-0.5 leading-snug" style={{ color: "hsl(240 8% 48%)" }}>{tpl.description}</p>
+            </div>
+            <button
+              onClick={e => { e.stopPropagation(); onSelect(tpl); }}
+              className="mt-auto text-xs font-medium py-1.5 px-3 rounded-xl w-full text-center transition-all"
+              style={{ background: `${tpl.color}15`, color: tpl.color, border: `1px solid ${tpl.color}25` }}>
+              Usar template →
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function CampaignsPage() {
   const { currentWorkspace } = useWorkspace();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
+  const [prefill, setPrefill] = React.useState<CampaignPrefill | undefined>(undefined);
   const { t, timezone } = usePreferences();
+
+  const handleTemplateSelect = (tpl: typeof CAMPAIGN_TEMPLATES[number]) => {
+    setPrefill({ name: tpl.name, channel: tpl.channel, msgText: tpl.msgText, msgType: tpl.msgType });
+    setCreateOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setCreateOpen(false);
+    setPrefill(undefined);
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ["campaigns", currentWorkspace?.id],
@@ -1405,6 +1583,8 @@ export default function CampaignsPage() {
           </button>
         </div>
       </div>
+
+      <CampaignTemplateCards onSelect={handleTemplateSelect} />
 
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1444,8 +1624,9 @@ export default function CampaignsPage() {
 
       {createOpen && (
         <CreateCampaignModal
-          onClose={() => setCreateOpen(false)}
-          onCreated={() => queryClient.invalidateQueries({ queryKey: ["campaigns"] })} />
+          onClose={handleModalClose}
+          onCreated={() => queryClient.invalidateQueries({ queryKey: ["campaigns"] })}
+          prefill={prefill} />
       )}
     </div>
   );
