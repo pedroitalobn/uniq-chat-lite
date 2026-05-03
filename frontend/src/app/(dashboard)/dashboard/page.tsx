@@ -617,12 +617,12 @@ export default function DashboardPage() {
                 value={agentStats.resolution_rate != null ? `${Math.round(agentStats.resolution_rate * 100)}%` : "—"}
                 color="#00d46a" />
             </div>
-            {journeyStatsQ.data?.journeys && (
+            {agentStatsQ.data?.journeys && (
               <>
                 <div className="my-3 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
                 <div className="space-y-0.5">
-                  <MetricRow icon={Activity} label="Execuções ativas" value={journeyStatsQ.data.journeys.active_executions ?? 0} color="#00d46a" />
-                  <MetricRow icon={Zap} label="Execuções hoje" value={journeyStatsQ.data.journeys.today_executions ?? 0} color="#fbbf24" />
+                  <MetricRow icon={Activity} label="Execuções ativas" value={agentStatsQ.data.journeys.active_executions ?? 0} color="#00d46a" />
+                  <MetricRow icon={Zap} label="Execuções hoje" value={agentStatsQ.data.journeys.today_executions ?? 0} color="#fbbf24" />
                 </div>
               </>
             )}
