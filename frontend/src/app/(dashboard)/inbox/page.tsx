@@ -9,11 +9,11 @@ import Link from "next/link";
 import {
   Lock, Search, ChevronDown, User as UserIcon, MessageSquare,
   Layers, Smartphone, Radio, RefreshCw, Check, BarChart3,
-  MoreVertical, Users, Building2, Zap, Bell, X,
+  MoreVertical, Users, Building2, Zap, Bell, X, Phone, PhoneMissed,
 } from "lucide-react";
 import { usePreferences } from "@/lib/preferences";
 import {
-  conversationsApi, queuesApi, workspacesApi, channelsApi, instancesApi, crmApi,
+  conversationsApi, queuesApi, workspacesApi, channelsApi, instancesApi, crmApi, callsApi,
 } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
@@ -142,6 +142,9 @@ export default function InboxPage() {
   // Timestamp de quando a página foi aberta — só mensagens posteriores disparam notificação.
   const pageOpenedAtRef = useRef(Date.now());
 
+  // Incoming call state: null = no active call, else { instanceId, callFrom, callId }
+  const [incomingCall, setIncomingCall] = useState<{ instanceId: string; callFrom: string; callId: string } | null>(null);
+
   const [agentScope, setAgentScope] = useState<string>("all"); // "me" | "<uuid>" | "all"
   const [queueScope, setQueueScope] = useState<string>("all"); // "all" | "none" | uuid
   const [channelFilter, setChannelFilter] = useState<string[]>([]); // multi-select
@@ -243,6 +246,27 @@ export default function InboxPage() {
     prefixes: ["conversation.", "queue."],
     onEvent: () => {
       scheduleInvalidate();
+    },
+  });
+
+  useConversationWS({
+    prefixes: ["call."],
+    onEvent: (evt) => {
+      if (evt.type === "call.incoming") {
+        const p = evt.payload as { call_id: string; from: string };
+        setIncomingCall({
+          instanceId: evt.instance ?? "",
+          callFrom: p.from,
+          callId: p.call_id,
+        });
+      } else if (
+        evt.type === "call.terminate" ||
+        evt.type === "call.missed" ||
+        evt.type === "call.rejected" ||
+        evt.type === "call.accepted"
+      ) {
+        setIncomingCall(null);
+      }
     },
   });
 
@@ -440,8 +464,52 @@ export default function InboxPage() {
 
   const statusLabel = TABS.find((tb) => tb.id === statusTab)?.label ?? t("inbox_attendances");
 
+  const rejectCallMutation = useMutation({
+    mutationFn: () =>
+      callsApi.reject(incomingCall!.instanceId, incomingCall!.callFrom, incomingCall!.callId),
+    onSettled: () => setIncomingCall(null),
+  });
+
   return (
     <div className="flex h-full flex-col uniq-page rounded-xl overflow-hidden">
+      {/* Incoming call banner */}
+      {incomingCall && (
+        <div
+          className="flex items-center gap-3 px-4 py-3 animate-pulse-once"
+          style={{
+            background: "linear-gradient(90deg, rgba(0,212,106,0.12), rgba(0,212,106,0.06))",
+            borderBottom: "1px solid rgba(0,212,106,0.25)",
+          }}
+        >
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "rgba(0,212,106,0.2)" }}>
+              <Phone className="w-4 h-4 animate-bounce" style={{ color: "var(--green)" }} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold" style={{ color: "var(--green)" }}>Chamada recebida</p>
+              <p className="text-xs truncate" style={{ color: "var(--text-3)" }}>
+                {incomingCall.callFrom.replace("@s.whatsapp.net", "").replace("@c.us", "")}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => rejectCallMutation.mutate()}
+            disabled={rejectCallMutation.isPending}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium"
+            style={{ background: "rgba(239,68,68,0.15)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}
+          >
+            <PhoneMissed className="w-3.5 h-3.5" />
+            Rejeitar
+          </button>
+          <button
+            onClick={() => setIncomingCall(null)}
+            className="p-1.5 rounded-lg"
+            style={{ color: "var(--text-3)" }}
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
       <header
         className="border-b px-4 sm:px-6 py-3 sm:py-4"
         style={{

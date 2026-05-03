@@ -576,3 +576,4 @@ func (ic *InstanceClient) ResolveContactQRLink(code string) (*types.ContactQRLin
 func (ic *InstanceClient) GetContactQRLink(revoke bool) (string, error) {
 	return ic.client.GetContactQRLink(context.Background(), revoke)
 }
+

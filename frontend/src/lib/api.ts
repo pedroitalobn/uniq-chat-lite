@@ -538,6 +538,12 @@ export const privacyApi = {
     api.put(`/v1/instances/${id}/privacy`, { setting, value }),
 };
 
+// Call operations.
+export const callsApi = {
+  reject: (instanceId: string, callerJid: string, callId: string) =>
+    api.post(`/v1/instances/${instanceId}/calls/reject`, { caller_jid: callerJid, call_id: callId }),
+};
+
 // Comunidades WhatsApp.
 export const communityApi = {
   create: (id: string, data: { name: string; description?: string }) =>

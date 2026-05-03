@@ -961,3 +961,5 @@ func (h *MessageHandler) GetSelfQRLink(c *fiber.Ctx) error {
 	}
 	return c.JSON(fiber.Map{"link": link, "revoked": revoke})
 }
+
+

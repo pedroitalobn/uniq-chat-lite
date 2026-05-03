@@ -43,10 +43,13 @@ export function AudioRecorderButton({ onRecorded, disabled, title = "Gravar áud
 
   function pickMimeType(): string {
     const candidates = [
-      "audio/mp4",
+      // Opus em WebM ou OGG é o formato que o WhatsApp interpreta como
+      // voice note (PTT). MP4/AAC é enviado como attachment e causa
+      // "áudio não disponível" em dispositivos mobile.
       "audio/webm;codecs=opus",
-      "audio/webm",
       "audio/ogg;codecs=opus",
+      "audio/webm",
+      "audio/mp4",
     ];
     for (const c of candidates) {
       if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(c)) return c;

@@ -1149,6 +1149,8 @@ func (h *MessageHandler) UploadMedia(c *fiber.Ctx) error {
 			"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
 			"webp": "image/webp", "gif": "image/gif", "mp4": "video/mp4",
 			"mp3": "audio/mpeg", "ogg": "audio/ogg", "pdf": "application/pdf",
+			"webm": "audio/webm", "m4a": "audio/mp4", "wav": "audio/wav",
+			"mov": "video/quicktime", "avi": "video/x-msvideo",
 		}
 		if m, ok := mimes[ext]; ok {
 			mime = m
