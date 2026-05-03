@@ -136,7 +136,11 @@ export default function InboxPage() {
   };
 
   const seenConvsRef = useRef<Set<string>>(new Set());
+  // Guarda o last_message_at por conversa para detectar nova mensagem em conversa existente.
+  const convLastMsgRef = useRef<Map<string, string>>(new Map());
   const seenInitializedRef = useRef(false);
+  // Timestamp de quando a página foi aberta — só mensagens posteriores disparam notificação.
+  const pageOpenedAtRef = useRef(Date.now());
 
   const [agentScope, setAgentScope] = useState<string>("all"); // "me" | "<uuid>" | "all"
   const [queueScope, setQueueScope] = useState<string>("all"); // "all" | "none" | uuid
@@ -259,22 +263,40 @@ export default function InboxPage() {
   });
 
   useEffect(() => {
+    // Aguarda o primeiro fetch completar antes de inicializar o seen set.
+    // Se inicializarmos com array vazio (loading), todas as conversas
+    // carregadas depois disparariam notificação.
+    if (!listQ.isSuccess) return;
     const items = listQ.data?.items ?? [];
     if (!seenInitializedRef.current) {
-      items.forEach((c) => seenConvsRef.current.add(c.id));
+      items.forEach((c) => {
+        seenConvsRef.current.add(c.id);
+        if (c.last_message_at) convLastMsgRef.current.set(c.id, c.last_message_at);
+      });
       seenInitializedRef.current = true;
       return;
     }
     items.forEach((c) => {
-      if (!seenConvsRef.current.has(c.id)) {
+      const prevAt = convLastMsgRef.current.get(c.id);
+      const isNewConv = !seenConvsRef.current.has(c.id);
+      const hasNewMsg = !isNewConv && c.last_message_at && c.last_message_at !== prevAt;
+
+      if (isNewConv || hasNewMsg) {
         seenConvsRef.current.add(c.id);
-        toast("Nova conversa", {
-          description: c.contact?.name || c.channel_key || "Nova mensagem recebida",
-          duration: 5000,
-        });
+        if (c.last_message_at) convLastMsgRef.current.set(c.id, c.last_message_at);
+
+        // Só notifica se a mensagem chegou depois de a página abrir.
+        const msgAt = c.last_message_at ? new Date(c.last_message_at).getTime() : 0;
+        if (msgAt > pageOpenedAtRef.current) {
+          const who = c.contact?.name || c.push_name || c.channel_key || "Contato";
+          toast(isNewConv ? "Nova conversa" : "Nova mensagem", {
+            description: who,
+            duration: 5000,
+          });
+        }
       }
     });
-  }, [listQ.data?.items]);
+  }, [listQ.data?.items, listQ.isSuccess]);
 
   const countsQ = useQuery({
     queryKey: ["conversations-count", wsId],
