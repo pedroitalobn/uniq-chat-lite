@@ -2860,7 +2860,11 @@ function LinkPreviewCard({ url }: { url: string }) {
 function buildMediaURL(mediaKey: string): string {
   if (!mediaKey) return "";
   const base = process.env.NEXT_PUBLIC_API_URL || "";
-  return `${base}/v1/media/${encodeURIComponent(mediaKey)}`;
+  // Codifica cada segmento individualmente preservando as barras como separadores
+  // de path — encodeURIComponent no key inteiro codificaria "/" como "%2F" e
+  // quebraria o wildcard "+" do Fiber que captura por segmentos reais.
+  const safePath = mediaKey.split("/").map(encodeURIComponent).join("/");
+  return `${base}/v1/media/${safePath}`;
 }
 
 function IconFallback({ icon, label }: { icon: React.ReactNode; label: string }) {

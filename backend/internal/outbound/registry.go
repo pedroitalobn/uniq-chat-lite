@@ -20,6 +20,7 @@ import (
 
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/services"
+	"github.com/uniq-chat/backend/internal/storage"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
 )
@@ -207,18 +208,29 @@ func (r *Registry) sendWhatsApp(inst *models.Instance, msg OutboundMessage) (*Se
 
 // fetchMedia baixa o bytes do storage (MinIO) e devolve o mime real quando
 // o content-type do response for mais confiável que o que veio do request.
-func (r *Registry) fetchMedia(url, declaredMime string) ([]byte, string, error) {
+// Se a URL pertencer ao bucket privado, gera presigned URL antes do GET.
+func (r *Registry) fetchMedia(rawURL, declaredMime string) ([]byte, string, error) {
+	url := rawURL
+	if storage.IsConfigured() {
+		if key := storage.GlobalStorage.KeyFromURL(rawURL); key != "" {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if signed, err := storage.GlobalStorage.PresignURL(ctx, key, 10*time.Minute); err == nil {
+				url = signed
+			}
+		}
+	}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, "", err
 	}
 	resp, err := r.http.Do(req)
 	if err != nil {
-		return nil, "", fmt.Errorf("download %s: %w", url, err)
+		return nil, "", fmt.Errorf("download %s: %w", rawURL, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return nil, "", fmt.Errorf("download %s: HTTP %d", url, resp.StatusCode)
+		return nil, "", fmt.Errorf("download %s: HTTP %d", rawURL, resp.StatusCode)
 	}
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
