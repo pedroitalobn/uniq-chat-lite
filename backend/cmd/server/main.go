@@ -583,6 +583,8 @@ func applyPlansMigration(db *gorm.DB) {
 		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_proxy_residencial BOOLEAN NOT NULL DEFAULT false`,
 		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_helpdesk BOOLEAN NOT NULL DEFAULT false`,
 		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_webchat BOOLEAN NOT NULL DEFAULT false`,
+		// Habilita helpdesk e webchat para planos Pro e Business
+		`UPDATE plans SET allow_helpdesk = true, allow_webchat = true WHERE name IN ('Pro', 'Business') AND (allow_helpdesk = false OR allow_webchat = false)`,
 		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS stripe_price_id VARCHAR(255)`,
 		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS asaas_product_id VARCHAR(255)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_plans_slug ON plans(slug) WHERE slug != ''`,

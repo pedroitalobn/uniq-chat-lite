@@ -424,6 +424,25 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	registerPreInst("POST", "/check-number", msgH.CheckNumber)
 	registerPreInst("POST", "/bulk-check", msgH.BulkCheckNumbers)
 
+	// Help Desk + WebChat routes — pre-registradas antes do v1inst group para
+	// evitar que /v1/:server_slug/:instance_slug/* intercepte /v1/helpdesk/*.
+	hdChain := []fiber.Handler{
+		middleware.RequireAuth(db),
+		middleware.RateLimit(1500),
+		middleware.RequireFeature(db, models.FeatureHelpDesk),
+	}
+	app.Get("/v1/helpdesk/categories", append(hdChain, helpDeskH.ListCategories)...)
+	app.Post("/v1/helpdesk/categories", append(hdChain, helpDeskH.CreateCategory)...)
+	app.Patch("/v1/helpdesk/categories/:id", append(hdChain, helpDeskH.UpdateCategory)...)
+	app.Delete("/v1/helpdesk/categories/:id", append(hdChain, helpDeskH.DeleteCategory)...)
+	app.Get("/v1/helpdesk/articles", append(hdChain, helpDeskH.ListArticles)...)
+	app.Post("/v1/helpdesk/articles/generate", append(hdChain, helpDeskH.GenerateArticle)...)
+	app.Post("/v1/helpdesk/articles", append(hdChain, helpDeskH.CreateArticle)...)
+	app.Get("/v1/helpdesk/articles/:id", append(hdChain, helpDeskH.GetArticle)...)
+	app.Patch("/v1/helpdesk/articles/:id", append(hdChain, helpDeskH.UpdateArticle)...)
+	app.Delete("/v1/helpdesk/articles/:id", append(hdChain, helpDeskH.DeleteArticle)...)
+	app.Post("/v1/helpdesk/articles/:id/publish", append(hdChain, helpDeskH.PublishArticle)...)
+
 	// Auth: apikey / X-Instance-Token / Authorization: Bearer <instance_token>.
 	// IMPORTANT: registered BEFORE the protected /v1 group because Fiber's
 	// Group middlewares only apply to routes registered AFTER them — declaring
