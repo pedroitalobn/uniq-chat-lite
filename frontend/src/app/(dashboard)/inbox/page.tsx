@@ -285,9 +285,9 @@ export default function InboxPage() {
         seenConvsRef.current.add(c.id);
         if (c.last_message_at) convLastMsgRef.current.set(c.id, c.last_message_at);
 
-        // Só notifica se a mensagem chegou depois de a página abrir.
+        // Só notifica mensagens recebidas (não enviadas por nós) após a página abrir.
         const msgAt = c.last_message_at ? new Date(c.last_message_at).getTime() : 0;
-        if (msgAt > pageOpenedAtRef.current) {
+        if (msgAt > pageOpenedAtRef.current && !c.last_message_from_me) {
           const who = c.contact?.name || c.push_name || c.channel_key || "Contato";
           toast(isNewConv ? "Nova conversa" : "Nova mensagem", {
             description: who,
