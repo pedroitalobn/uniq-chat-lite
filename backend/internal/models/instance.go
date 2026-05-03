@@ -28,6 +28,7 @@ const (
 	ChannelTikTok    ChannelType = "tiktok"
 	ChannelKwai      ChannelType = "kwai"
 	ChannelWABA      ChannelType = "waba"
+	ChannelWebChat   ChannelType = "webchat"
 )
 
 // ChannelMeta holds display info for each channel.
@@ -45,6 +46,7 @@ var ChannelMeta = map[ChannelType]struct {
 	ChannelTikTok:    {Label: "TikTok", Color: "#ff0050", Description: "Mensagens diretas e comentários via TikTok"},
 	ChannelKwai:      {Label: "Kwai", Color: "#ff6600", Description: "Mensagens e interações via Kwai"},
 	ChannelWABA:      {Label: "WhatsApp API", Color: "#0088ff", Description: "Cloud API oficial da Meta (Embedded Signup) — templates HSM, alta entregabilidade"},
+	ChannelWebChat:   {Label: "WebChat", Color: "#6366f1", Description: "Widget de chat embeddable para sites e landing pages"},
 }
 
 type InstanceStatus string

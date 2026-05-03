@@ -171,6 +171,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 
 	// AI Services
 	llmService := services.NewLLMService()
+	helpDeskH := handlers.NewHelpDeskHandler(db, llmService)
+	webChatH := handlers.NewWebChatHandler(db, llmService)
 	toolsH := handlers.NewToolsHandler(db, manager)
 	chatH := handlers.NewChatHandler(db, llmService)
 	chatH.SetToolsHandler(toolsH)
@@ -333,6 +335,16 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	v1PublicAuth.Post("/2fa/enable", middleware.RequireAuth(db), authH.Enable2FA)
 	v1PublicAuth.Post("/2fa/disable", middleware.RequireAuth(db), authH.Disable2FA)
 
+	// Public WebChat endpoints (no auth — accessed by the widget in the browser)
+	app.Get("/v1/public/webchat/:token", webChatH.PublicGetConfig)
+	app.Post("/v1/public/webchat/:token/message", middleware.RateLimit(30), webChatH.PublicMessage)
+	app.Get("/v1/public/webchat/:token/articles", webChatH.PublicListArticles)
+
+	// Public Help Desk endpoints (no auth — accessed by public knowledge base)
+	app.Get("/v1/public/helpdesk/:workspace_slug/articles", helpDeskH.PublicListArticles)
+	app.Get("/v1/public/helpdesk/:workspace_slug/articles/:slug", helpDeskH.PublicGetArticle)
+	app.Post("/v1/public/helpdesk/:workspace_slug/ask", middleware.RateLimit(20), helpDeskH.PublicAsk)
+
 	// CSAT public endpoints (no auth — customer answers via tokenized link)
 	app.Get("/csat/:token", csatH.GetPublic)
 	app.Post("/csat/:token", csatH.SubmitPublic)
@@ -395,6 +407,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 			app.Post(full, append(preMsgChain, h)...)
 		}
 	}
+	// WebChat config routes (per instance, pre-auth chain).
+	app.Get("/v1/instances/:id/webchat", append(preMsgChain, webChatH.GetConfig)...)
+	app.Put("/v1/instances/:id/webchat", append(preMsgChain, webChatH.UpsertConfig)...)
+	app.Get("/v1/instances/:id/webchat/snippet", append(preMsgChain, webChatH.GetEmbedSnippet)...)
+
 	registerPreInst("GET", "/profile", instanceH.Profile)
 	registerPreInst("GET", "/status", instanceH.Status)
 	registerPreInst("GET", "/qr", instanceH.GetQR)
@@ -1228,6 +1245,20 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	journeys.Delete("/:id", journeyH.DeleteJourney)
 	journeys.Get("/:id", journeyH.GetJourney)
 	journeys.Get("/:id/executions", agentH.GetJourneyExecutions)
+
+	// Help Desk (knowledge base)
+	helpdesk := api.Group("/helpdesk", middleware.RequireFeature(db, models.FeatureHelpDesk))
+	helpdesk.Get("/categories", helpDeskH.ListCategories)
+	helpdesk.Post("/categories", helpDeskH.CreateCategory)
+	helpdesk.Patch("/categories/:id", helpDeskH.UpdateCategory)
+	helpdesk.Delete("/categories/:id", helpDeskH.DeleteCategory)
+	helpdesk.Get("/articles", helpDeskH.ListArticles)
+	helpdesk.Post("/articles", helpDeskH.CreateArticle)
+	helpdesk.Post("/articles/generate", helpDeskH.GenerateArticle)
+	helpdesk.Get("/articles/:id", helpDeskH.GetArticle)
+	helpdesk.Patch("/articles/:id", helpDeskH.UpdateArticle)
+	helpdesk.Delete("/articles/:id", helpDeskH.DeleteArticle)
+	helpdesk.Post("/articles/:id/publish", helpDeskH.PublishArticle)
 
 	// Agent Center
 	agent := api.Group("/agent", middleware.RequireFeature(db, models.FeatureAI))

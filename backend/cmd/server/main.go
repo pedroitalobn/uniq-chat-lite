@@ -373,6 +373,12 @@ func autoMigrate(db *gorm.DB) error {
 		&models.Cart{},
 		// Platform AI (Uniq AI) — singleton config
 		&models.PlatformAI{},
+		// Help Desk (knowledge base)
+		&models.HelpDeskCategory{},
+		&models.HelpDeskArticle{},
+		// WebChat widget
+		&models.WebChatConfig{},
+		&models.WebChatSession{},
 	)
 }
 
@@ -575,6 +581,8 @@ func applyPlansMigration(db *gorm.DB) {
 		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_global_webhook BOOLEAN NOT NULL DEFAULT false`,
 		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_shop BOOLEAN NOT NULL DEFAULT false`,
 		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_proxy_residencial BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_helpdesk BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_webchat BOOLEAN NOT NULL DEFAULT false`,
 		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS stripe_price_id VARCHAR(255)`,
 		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS asaas_product_id VARCHAR(255)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_plans_slug ON plans(slug) WHERE slug != ''`,

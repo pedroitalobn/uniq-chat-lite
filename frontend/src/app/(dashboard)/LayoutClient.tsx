@@ -54,6 +54,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
     pathname === "/journeys" ||
     pathname === "/campaigns" || pathname.startsWith("/campaigns/") ||
     pathname === "/crm" || pathname.startsWith("/crm/") ||
+    pathname === "/help-desk" || pathname.startsWith("/help-desk/") ||
     pathname.startsWith("/admin");
 
   // Fetch session and load instances on mount

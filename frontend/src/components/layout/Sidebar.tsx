@@ -7,7 +7,7 @@ import { signOut, useSession } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
-  Bot, Building2, Calendar, ChevronDown, ChevronLeft, ChevronRight, Contact,
+  BookOpen, Bot, Building2, Calendar, ChevronDown, ChevronLeft, ChevronRight, Contact,
   CreditCard, Globe, Hash, HelpCircle, Home,
   Info, KanbanSquare, Layers, LayoutDashboard, Link2, List, Loader2, LogOut,
   Mail, MapPin, Megaphone, Menu, MessageSquare, Minus, MoreHorizontal,
@@ -152,6 +152,7 @@ export function Sidebar() {
     { href: "/campaigns",    label: t("nav_campaigns"),    icon: Megaphone,       exact: false, show: canSeeCampaigns },
     { href: "/journeys",     label: "Jornadas",            icon: Wand2,           exact: false, show: canSeeJourneys },
     { href: "/agents",       label: "Agentes",             icon: Bot,             exact: false, show: canSeeAgents },
+    { href: "/help-desk",    label: "Help Desk",           icon: BookOpen,        exact: false, show: true },
     { href: "/shops",        label: "Shops",               icon: ShoppingBag,     exact: false, show: true },
     { href: "/servers",      label: t("nav_servers"),      icon: Server,          exact: false, show: canSeeServers },
     { href: "/instances",    label: t("nav_instances"),    icon: Smartphone,      exact: false, show: canSeeInstances },

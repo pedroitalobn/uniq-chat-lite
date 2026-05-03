@@ -50,6 +50,8 @@ type Plan struct {
 
 	// Proxy
 	AllowShop          bool `gorm:"default:false" json:"allow_shop"`           // módulo /shops + /products
+	AllowHelpDesk      bool `gorm:"column:allow_helpdesk;default:false" json:"allow_helpdesk"` // módulo /helpdesk
+	AllowWebChat       bool `gorm:"column:allow_webchat;default:false" json:"allow_webchat"`   // widget de webchat
 	MaxShops           int  `gorm:"default:0" json:"max_shops"`                // -1 ilimitado, 0 bloqueado
 	MaxProducts        int  `gorm:"default:0" json:"max_products"`             // total de produtos por workspace
 	MaxShopIntegrations int  `gorm:"default:0" json:"max_shop_integrations"`   // ex: Shopify + ML simultâneo
@@ -93,6 +95,8 @@ const (
 	FeatureProxy         FeatureKey = "proxy"
 	FeatureProxyResidencial FeatureKey = "proxy_residencial"
 	FeatureShop          FeatureKey = "shop"
+	FeatureHelpDesk      FeatureKey = "helpdesk"
+	FeatureWebChat       FeatureKey = "webchat"
 )
 
 // HasFeature retorna true se o plano libera a feature.
@@ -136,6 +140,10 @@ func (p *Plan) HasFeature(key FeatureKey) bool {
 		return p.AllowProxyResidencial
 	case FeatureShop:
 		return p.AllowShop
+	case FeatureHelpDesk:
+		return p.AllowHelpDesk
+	case FeatureWebChat:
+		return p.AllowWebChat
 	}
 	return false
 }
