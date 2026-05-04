@@ -376,6 +376,7 @@ func autoMigrate(db *gorm.DB) error {
 		// Help Desk (knowledge base)
 		&models.HelpDeskCategory{},
 		&models.HelpDeskArticle{},
+		&models.HelpDeskConfig{},
 		// WebChat widget
 		&models.WebChatConfig{},
 		&models.WebChatSession{},

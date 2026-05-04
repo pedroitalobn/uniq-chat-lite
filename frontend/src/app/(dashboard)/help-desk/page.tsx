@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  BookOpen, ChevronRight, FolderOpen, Loader2, Plus, Search,
-  Sparkles, Tag, Trash2, X,
+  BookOpen, Check, ChevronRight, Code2, Copy, ExternalLink, FolderOpen,
+  Globe, Loader2, Plus, Search, Settings, Sparkles, Tag, Trash2, X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { helpDeskApi, type HelpDeskArticle, type HelpDeskCategory } from "@/lib/helpdesk-api";
+import { helpDeskApi, type HelpDeskArticle, type HelpDeskCategory, type HelpDeskConfig } from "@/lib/helpdesk-api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+
+type PageTab = "articles" | "settings";
 
 // ─── Style helpers ─────────────────────────────────────────────────────────
 
@@ -258,6 +260,274 @@ function NewCategoryDialog({
   );
 }
 
+// ─── Help Center Settings ────────────────────────────────────────────────────
+
+function HelpCenterSettings({ workspaceId }: { workspaceId: string }) {
+  const qc = useQueryClient();
+  const [copied, setCopied] = useState(false);
+  const [snippetCopied, setSnippetCopied] = useState(false);
+
+  const configQuery = useQuery({
+    queryKey: ["helpdesk-config", workspaceId],
+    queryFn: async () => (await helpDeskApi.getConfig(workspaceId)).data,
+    enabled: !!workspaceId,
+  });
+
+  const cfg = configQuery.data?.config;
+  const publicURL = configQuery.data?.public_url ?? "";
+  const effectiveSlug = configQuery.data?.effective_slug ?? "";
+
+  const [form, setForm] = useState<Partial<HelpDeskConfig>>({});
+  const initialised = useRef(false);
+
+  useEffect(() => {
+    if (cfg && !initialised.current) {
+      initialised.current = true;
+      setForm({
+        title: cfg.title,
+        description: cfg.description,
+        custom_slug: cfg.custom_slug,
+        primary_color: cfg.primary_color,
+        logo_url: cfg.logo_url,
+        widget_enabled: cfg.widget_enabled,
+      });
+    }
+  }, [cfg]);
+
+  const saveMutation = useMutation({
+    mutationFn: () => helpDeskApi.updateConfig(form, workspaceId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["helpdesk-config", workspaceId] });
+      initialised.current = false;
+      toast.success("Configurações salvas.");
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Falha ao salvar."),
+  });
+
+  function copyURL() {
+    navigator.clipboard.writeText(publicURL);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  const widgetColor = form.primary_color ?? "#00d46a";
+  const widgetSlug = form.custom_slug || effectiveSlug;
+  const widgetURL = publicURL || (typeof window !== "undefined" ? `${window.location.origin}/help/${widgetSlug}` : "");
+
+  const embedSnippet = `<!-- Uniq Help Center Widget -->
+<script>
+(function(){
+  var HELP_URL = "${widgetURL}";
+  var COLOR = "${widgetColor}";
+  var open = false;
+  var btn = document.createElement('button');
+  btn.innerHTML = '?';
+  btn.title = 'Central de Ajuda';
+  btn.style.cssText = 'position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:'+COLOR+';color:#000;font-size:22px;font-weight:800;border:none;cursor:pointer;box-shadow:0 4px 24px '+COLOR+'66;z-index:99999;transition:transform 0.2s';
+  btn.onmouseenter = function(){ btn.style.transform = 'scale(1.08)' };
+  btn.onmouseleave = function(){ btn.style.transform = 'scale(1)' };
+  var modal = document.createElement('div');
+  modal.style.cssText = 'display:none;position:fixed;bottom:90px;right:24px;width:400px;height:640px;border-radius:20px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.5);z-index:99999;';
+  var iframe = document.createElement('iframe');
+  iframe.src = HELP_URL;
+  iframe.style.cssText = 'width:100%;height:100%;border:none;';
+  modal.appendChild(iframe);
+  btn.addEventListener('click', function(){ open=!open; modal.style.display=open?'block':'none'; btn.innerHTML=open?'✕':'?'; });
+  document.body.appendChild(btn);
+  document.body.appendChild(modal);
+})();
+</\script>`;
+
+  function copySnippet() {
+    navigator.clipboard.writeText(embedSnippet);
+    setSnippetCopied(true);
+    setTimeout(() => setSnippetCopied(false), 2000);
+  }
+
+  if (configQuery.isLoading) return (
+    <div className="flex items-center justify-center py-16">
+      <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--text-3)" }} />
+    </div>
+  );
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
+      {/* Left: config form */}
+      <div className="space-y-5">
+
+        {/* Public URL */}
+        <div className="rounded-2xl p-5 space-y-3" style={glassCard}>
+          <div className="flex items-center gap-2 mb-1">
+            <Globe className="w-4 h-4" style={{ color: "#00d46a" }} />
+            <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>URL pública do Help Center</h3>
+          </div>
+          {publicURL ? (
+            <div className="flex items-center gap-2">
+              <div className="flex-1 rounded-xl px-3 py-2.5 text-sm font-mono truncate"
+                style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-2)" }}>
+                {publicURL}
+              </div>
+              <button onClick={copyURL} className="flex-shrink-0 p-2.5 rounded-xl transition-all"
+                style={{ background: copied ? "rgba(0,212,106,0.15)" : "var(--surface-3)", border: "1px solid var(--surface-border)", color: copied ? "#00d46a" : "var(--text-3)" }}>
+                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              </button>
+              <a href={publicURL} target="_blank" rel="noopener noreferrer"
+                className="flex-shrink-0 p-2.5 rounded-xl transition-all"
+                style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-3)" }}>
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+          ) : (
+            <p className="text-sm" style={{ color: "var(--text-3)" }}>Configure o APP_URL no servidor para gerar a URL pública.</p>
+          )}
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-2)" }}>
+              Slug personalizado (opcional)
+            </label>
+            <div className="flex items-center gap-2">
+              <span className="text-sm flex-shrink-0" style={{ color: "var(--text-3)" }}>/help/</span>
+              <input
+                value={form.custom_slug ?? ""}
+                onChange={(e) => setForm((p) => ({ ...p, custom_slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") }))}
+                placeholder={effectiveSlug}
+                style={{ ...inp, flex: 1 }}
+              />
+            </div>
+            <p className="text-xs mt-1.5" style={{ color: "var(--text-3)" }}>
+              Deixe em branco para usar o slug do workspace ({effectiveSlug}).
+            </p>
+          </div>
+        </div>
+
+        {/* Branding */}
+        <div className="rounded-2xl p-5 space-y-4" style={glassCard}>
+          <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Identidade visual</h3>
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-2)" }}>Título do Help Center</label>
+            <input
+              value={form.title ?? ""}
+              onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+              placeholder="Central de Ajuda"
+              style={inp}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-2)" }}>Descrição</label>
+            <textarea
+              value={form.description ?? ""}
+              onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+              placeholder="Como podemos ajudar?"
+              style={{ ...inp, minHeight: 80, resize: "vertical" }}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-2)" }}>Cor principal</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={form.primary_color ?? "#00d46a"}
+                  onChange={(e) => setForm((p) => ({ ...p, primary_color: e.target.value }))}
+                  style={{ width: 40, height: 36, borderRadius: 8, border: "1px solid var(--surface-border)", background: "var(--surface-3)", cursor: "pointer", padding: 2 }}
+                />
+                <input
+                  value={form.primary_color ?? "#00d46a"}
+                  onChange={(e) => setForm((p) => ({ ...p, primary_color: e.target.value }))}
+                  style={{ ...inp, fontFamily: "monospace", flex: 1 }}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-2)" }}>URL do logotipo</label>
+              <input
+                value={form.logo_url ?? ""}
+                onChange={(e) => setForm((p) => ({ ...p, logo_url: e.target.value }))}
+                placeholder="https://..."
+                style={inp}
+              />
+            </div>
+          </div>
+          <label className="flex items-center gap-2.5 text-sm cursor-pointer" style={{ color: "var(--text-2)" }}>
+            <input
+              type="checkbox"
+              checked={form.widget_enabled ?? true}
+              onChange={(e) => setForm((p) => ({ ...p, widget_enabled: e.target.checked }))}
+            />
+            Widget habilitado (botão flutuante na página pública)
+          </label>
+        </div>
+
+        {/* Save */}
+        <div className="flex justify-end">
+          <button
+            onClick={() => saveMutation.mutate()}
+            disabled={saveMutation.isPending}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all"
+            style={{
+              background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
+              color: "#00d46a", border: "1px solid rgba(0,212,106,0.30)",
+              opacity: saveMutation.isPending ? 0.7 : 1,
+            }}
+          >
+            {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            Salvar configurações
+          </button>
+        </div>
+      </div>
+
+      {/* Right: embed snippet + preview */}
+      <div className="space-y-5">
+        {/* Embed snippet */}
+        <div className="rounded-2xl p-5 space-y-3" style={glassCard}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Code2 className="w-4 h-4" style={{ color: "#a78bfa" }} />
+              <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Embed widget</h3>
+            </div>
+            <button
+              onClick={copySnippet}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+              style={{ background: snippetCopied ? "rgba(0,212,106,0.15)" : "var(--surface-3)", color: snippetCopied ? "#00d46a" : "var(--text-2)", border: "1px solid var(--surface-border)" }}
+            >
+              {snippetCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+              {snippetCopied ? "Copiado!" : "Copiar"}
+            </button>
+          </div>
+          <p className="text-xs" style={{ color: "var(--text-3)" }}>
+            Cole este snippet antes do {"</body>"} do seu site para adicionar um botão flutuante que abre o Help Center.
+          </p>
+          <div className="rounded-xl p-3 overflow-x-auto" style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <pre className="text-xs font-mono whitespace-pre-wrap" style={{ color: "#a78bfa", margin: 0 }}>
+              {embedSnippet}
+            </pre>
+          </div>
+        </div>
+
+        {/* Live preview */}
+        <div className="rounded-2xl p-5 space-y-3" style={glassCard}>
+          <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Preview do widget</h3>
+          <div className="relative rounded-xl overflow-hidden flex items-center justify-center"
+            style={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.08)", height: 200 }}>
+            <div style={{ position: "absolute", bottom: 20, right: 20 }}>
+              <div style={{ width: 52, height: 52, borderRadius: "50%", background: widgetColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 800, color: "#000", boxShadow: `0 4px 20px ${widgetColor}66` }}>?</div>
+            </div>
+            <p className="text-xs text-center px-4" style={{ color: "rgba(255,255,255,0.3)" }}>
+              Botão flutuante aparece no canto inferior direito do seu site
+            </p>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: widgetColor, flexShrink: 0 }} />
+            <div className="min-w-0">
+              <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>{form.title || "Central de Ajuda"}</p>
+              <p className="text-[11px] truncate" style={{ color: "var(--text-3)" }}>{widgetURL || "Configure o APP_URL para gerar a URL"}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function HelpDeskPage() {
@@ -266,6 +536,7 @@ export default function HelpDeskPage() {
   const { currentWorkspace } = useWorkspace();
   const wsId = currentWorkspace?.id ?? "";
 
+  const [activeTab, setActiveTab] = useState<PageTab>("articles");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
@@ -333,42 +604,70 @@ export default function HelpDeskPage() {
             Base de conhecimento centralizada — artigos, tutoriais e FAQs.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowAIDialog(true)}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
-            style={{
-              background: "linear-gradient(135deg, rgba(167,139,250,0.20), rgba(139,92,246,0.10))",
-              color: "#a78bfa",
-              border: "1px solid rgba(139,92,246,0.25)",
-            }}
-          >
-            <Sparkles className="w-4 h-4" />
-            Gerar com IA
-          </button>
-          <button
-            onClick={() => createArticleMutation.mutate()}
-            disabled={createArticleMutation.isPending}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
-            style={{
-              background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
-              color: "#00d46a",
-              border: "1px solid rgba(0,212,106,0.30)",
-              boxShadow: "0 4px 16px rgba(0,212,106,0.12)",
-              opacity: createArticleMutation.isPending ? 0.7 : 1,
-            }}
-          >
-            {createArticleMutation.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Plus className="w-4 h-4" />
-            )}
-            Novo artigo
-          </button>
-        </div>
+        {activeTab === "articles" && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAIDialog(true)}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+              style={{
+                background: "linear-gradient(135deg, rgba(167,139,250,0.20), rgba(139,92,246,0.10))",
+                color: "#a78bfa",
+                border: "1px solid rgba(139,92,246,0.25)",
+              }}
+            >
+              <Sparkles className="w-4 h-4" />
+              Gerar com IA
+            </button>
+            <button
+              onClick={() => createArticleMutation.mutate()}
+              disabled={createArticleMutation.isPending}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+              style={{
+                background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
+                color: "#00d46a",
+                border: "1px solid rgba(0,212,106,0.30)",
+                boxShadow: "0 4px 16px rgba(0,212,106,0.12)",
+                opacity: createArticleMutation.isPending ? 0.7 : 1,
+              }}
+            >
+              {createArticleMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4" />
+              )}
+              Novo artigo
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Two-panel layout */}
+      {/* Tabs */}
+      <div className="flex gap-1 p-1 rounded-xl w-fit" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+        {([
+          { id: "articles", label: "Artigos", icon: BookOpen },
+          { id: "settings", label: "Configurações", icon: Settings },
+        ] as const).map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+            style={{
+              background: activeTab === id ? "var(--surface-2)" : "transparent",
+              color: activeTab === id ? "var(--text-1)" : "var(--text-3)",
+              border: activeTab === id ? "1px solid var(--surface-border)" : "1px solid transparent",
+            }}
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Settings tab */}
+      {activeTab === "settings" && <HelpCenterSettings workspaceId={wsId} />}
+
+      {/* Articles tab — Two-panel layout */}
+      {activeTab === "articles" && (<>
       <div className="flex gap-5 items-start">
         {/* Categories Sidebar */}
         <aside className="flex-shrink-0 w-60 space-y-1" style={{ ...glassCard, padding: "12px 8px" }}>
@@ -595,6 +894,8 @@ export default function HelpDeskPage() {
           />
         )}
       </AnimatePresence>
+      </>)}
     </div>
   );
 }
+

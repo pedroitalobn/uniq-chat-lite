@@ -81,3 +81,31 @@ func (a *HelpDeskArticle) BeforeCreate(tx *gorm.DB) error {
 	}
 	return nil
 }
+
+// HelpDeskConfig holds the branding and access settings for a workspace's public Help Center.
+type HelpDeskConfig struct {
+	ID                uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
+	WorkspaceID       uuid.UUID  `gorm:"type:uuid;uniqueIndex;not null" json:"workspace_id"`
+	Title             string     `gorm:"type:varchar(120);default:'Central de Ajuda'" json:"title"`
+	Description       string     `gorm:"type:varchar(500)" json:"description"`
+	CustomSlug        string     `gorm:"type:varchar(120);uniqueIndex" json:"custom_slug,omitempty"`
+	PrimaryColor      string     `gorm:"type:varchar(20);default:'#00d46a'" json:"primary_color"`
+	LogoURL           string     `gorm:"type:varchar(500)" json:"logo_url"`
+	WebchatInstanceID *uuid.UUID `gorm:"type:uuid" json:"webchat_instance_id,omitempty"`
+	WidgetEnabled     bool       `gorm:"default:true" json:"widget_enabled"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
+func (h *HelpDeskConfig) BeforeCreate(tx *gorm.DB) error {
+	if h.ID == uuid.Nil {
+		h.ID = uuid.New()
+	}
+	if h.PrimaryColor == "" {
+		h.PrimaryColor = "#00d46a"
+	}
+	if h.Title == "" {
+		h.Title = "Central de Ajuda"
+	}
+	return nil
+}

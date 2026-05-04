@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -356,14 +357,144 @@ Responda SOMENTE com um JSON válido com este schema:
 	return c.JSON(result)
 }
 
+// ─── Help Center Config ───────────────────────────────────────────────────────
+
+func appURL() string {
+	if u := os.Getenv("APP_URL"); u != "" {
+		return strings.TrimRight(u, "/")
+	}
+	return ""
+}
+
+// GetConfig GET /v1/helpdesk/config
+func (h *HelpDeskHandler) GetConfig(c *fiber.Ctx) error {
+	wsID, err := workspaceIDFromCtx(c)
+	if err != nil {
+		return fiber.NewError(fiber.StatusUnauthorized, "workspace_id obrigatório")
+	}
+
+	var ws models.Workspace
+	if err := h.db.Where("id = ?", wsID).Select("id,slug,name").First(&ws).Error; err != nil {
+		return fiber.NewError(fiber.StatusNotFound, "workspace não encontrado")
+	}
+
+	var cfg models.HelpDeskConfig
+	if err := h.db.Where("workspace_id = ?", wsID).First(&cfg).Error; err != nil {
+		cfg = models.HelpDeskConfig{
+			WorkspaceID:   wsID,
+			Title:         ws.Name + " · Central de Ajuda",
+			PrimaryColor:  "#00d46a",
+			WidgetEnabled: true,
+		}
+		h.db.Create(&cfg)
+	}
+
+	slug := firstNonEmpty(cfg.CustomSlug, ws.Slug)
+	publicURL := ""
+	if u := appURL(); u != "" {
+		publicURL = u + "/help/" + slug
+	}
+
+	return c.JSON(fiber.Map{
+		"config":         cfg,
+		"workspace_slug": ws.Slug,
+		"effective_slug": slug,
+		"public_url":     publicURL,
+	})
+}
+
+// UpdateConfig PUT /v1/helpdesk/config
+func (h *HelpDeskHandler) UpdateConfig(c *fiber.Ctx) error {
+	wsID, err := workspaceIDFromCtx(c)
+	if err != nil {
+		return fiber.NewError(fiber.StatusUnauthorized, "workspace_id obrigatório")
+	}
+
+	var cfg models.HelpDeskConfig
+	if err := h.db.Where("workspace_id = ?", wsID).First(&cfg).Error; err != nil {
+		cfg = models.HelpDeskConfig{WorkspaceID: wsID, PrimaryColor: "#00d46a", WidgetEnabled: true}
+		h.db.Create(&cfg)
+	}
+
+	var body map[string]interface{}
+	if err := c.BodyParser(&body); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+	delete(body, "id")
+	delete(body, "workspace_id")
+
+	// Validate custom_slug uniqueness if changing
+	if slug, ok := body["custom_slug"].(string); ok && slug != "" && slug != cfg.CustomSlug {
+		var count int64
+		h.db.Model(&models.HelpDeskConfig{}).
+			Where("custom_slug = ? AND workspace_id != ?", slug, wsID).
+			Count(&count)
+		if count > 0 {
+			return fiber.NewError(fiber.StatusConflict, "slug já em uso")
+		}
+	}
+
+	if err := h.db.Model(&cfg).Updates(body).Error; err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(cfg)
+}
+
 // ─── Public endpoints ─────────────────────────────────────────────────────────
 
+// lookupWorkspaceBySlug resolves by workspace.slug OR HelpDeskConfig.custom_slug.
 func (h *HelpDeskHandler) lookupWorkspaceBySlug(slug string) (*models.Workspace, error) {
 	var ws models.Workspace
-	if err := h.db.Where("slug = ?", slug).First(&ws).Error; err != nil {
+	// Try workspace slug first
+	if err := h.db.Where("slug = ?", slug).First(&ws).Error; err == nil {
+		return &ws, nil
+	}
+	// Fallback: custom_slug in helpdesk configs
+	var cfg models.HelpDeskConfig
+	if err := h.db.Where("custom_slug = ?", slug).First(&cfg).Error; err != nil {
+		return nil, fmt.Errorf("workspace not found for slug %q", slug)
+	}
+	if err := h.db.Where("id = ?", cfg.WorkspaceID).First(&ws).Error; err != nil {
 		return nil, err
 	}
 	return &ws, nil
+}
+
+// PublicGetConfig GET /v1/public/helpdesk/:workspace_slug/config
+func (h *HelpDeskHandler) PublicGetConfig(c *fiber.Ctx) error {
+	ws, err := h.lookupWorkspaceBySlug(c.Params("workspace_slug"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusNotFound, "help center não encontrado")
+	}
+
+	var cfg models.HelpDeskConfig
+	if err := h.db.Where("workspace_id = ?", ws.ID).First(&cfg).Error; err != nil {
+		// Return default config
+		return c.JSON(fiber.Map{
+			"title":         ws.Name + " · Central de Ajuda",
+			"description":   "",
+			"primary_color": "#00d46a",
+			"logo_url":      "",
+			"widget_enabled": true,
+		})
+	}
+
+	// Count published articles for meta
+	var articleCount int64
+	h.db.Model(&models.HelpDeskArticle{}).
+		Where("workspace_id = ? AND status = ?", ws.ID, models.ArticlePublished).
+		Count(&articleCount)
+
+	return c.JSON(fiber.Map{
+		"title":             cfg.Title,
+		"description":       cfg.Description,
+		"primary_color":     cfg.PrimaryColor,
+		"logo_url":          cfg.LogoURL,
+		"widget_enabled":    cfg.WidgetEnabled,
+		"webchat_instance_id": cfg.WebchatInstanceID,
+		"article_count":     articleCount,
+		"workspace_name":    ws.Name,
+	})
 }
 
 // PublicListArticles GET /v1/public/helpdesk/:workspace_slug/articles?q=&category=

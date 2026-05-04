@@ -341,6 +341,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	app.Get("/v1/public/webchat/:token/articles", webChatH.PublicListArticles)
 
 	// Public Help Desk endpoints (no auth — accessed by public knowledge base)
+	app.Get("/v1/public/helpdesk/:workspace_slug/config", helpDeskH.PublicGetConfig)
 	app.Get("/v1/public/helpdesk/:workspace_slug/articles", helpDeskH.PublicListArticles)
 	app.Get("/v1/public/helpdesk/:workspace_slug/articles/:slug", helpDeskH.PublicGetArticle)
 	app.Post("/v1/public/helpdesk/:workspace_slug/ask", middleware.RateLimit(20), helpDeskH.PublicAsk)
@@ -431,6 +432,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 		middleware.RateLimit(1500),
 		middleware.RequireFeature(db, models.FeatureHelpDesk),
 	}
+	app.Get("/v1/helpdesk/config", append(hdChain, helpDeskH.GetConfig)...)
+	app.Put("/v1/helpdesk/config", append(hdChain, helpDeskH.UpdateConfig)...)
 	app.Get("/v1/helpdesk/categories", append(hdChain, helpDeskH.ListCategories)...)
 	app.Post("/v1/helpdesk/categories", append(hdChain, helpDeskH.CreateCategory)...)
 	app.Patch("/v1/helpdesk/categories/:id", append(hdChain, helpDeskH.UpdateCategory)...)

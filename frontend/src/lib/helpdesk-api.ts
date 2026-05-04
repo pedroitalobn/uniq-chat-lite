@@ -48,6 +48,27 @@ function wsHeader(workspaceId?: string) {
   return workspaceId ? { "X-Workspace-ID": workspaceId } : {};
 }
 
+export interface HelpDeskConfig {
+  id: string;
+  workspace_id: string;
+  title: string;
+  description: string;
+  custom_slug: string;
+  primary_color: string;
+  logo_url: string;
+  webchat_instance_id?: string;
+  widget_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HelpDeskConfigResponse {
+  config: HelpDeskConfig;
+  workspace_slug: string;
+  effective_slug: string;
+  public_url: string;
+}
+
 export const helpDeskApi = {
   listCategories: (workspaceId?: string) =>
     api.get<HelpDeskCategory[]>("/v1/helpdesk/categories", { headers: wsHeader(workspaceId) }),
@@ -82,6 +103,10 @@ export const helpDeskApi = {
       data,
       { headers: wsHeader(workspaceId) },
     ),
+  getConfig: (workspaceId?: string) =>
+    api.get<HelpDeskConfigResponse>("/v1/helpdesk/config", { headers: wsHeader(workspaceId) }),
+  updateConfig: (data: Partial<HelpDeskConfig>, workspaceId?: string) =>
+    api.put<HelpDeskConfig>("/v1/helpdesk/config", data, { headers: wsHeader(workspaceId) }),
 };
 
 export const webChatApi = {
