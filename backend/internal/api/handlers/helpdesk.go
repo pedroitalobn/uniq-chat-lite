@@ -485,16 +485,25 @@ func (h *HelpDeskHandler) PublicGetConfig(c *fiber.Ctx) error {
 		Where("workspace_id = ? AND status = ?", ws.ID, models.ArticlePublished).
 		Count(&articleCount)
 
-	return c.JSON(fiber.Map{
-		"title":             cfg.Title,
-		"description":       cfg.Description,
-		"primary_color":     cfg.PrimaryColor,
-		"logo_url":          cfg.LogoURL,
-		"widget_enabled":    cfg.WidgetEnabled,
-		"webchat_instance_id": cfg.WebchatInstanceID,
-		"article_count":     articleCount,
-		"workspace_name":    ws.Name,
-	})
+	resp := fiber.Map{
+		"title":          cfg.Title,
+		"description":    cfg.Description,
+		"primary_color":  cfg.PrimaryColor,
+		"logo_url":       cfg.LogoURL,
+		"widget_enabled": cfg.WidgetEnabled,
+		"article_count":  articleCount,
+		"workspace_name": ws.Name,
+	}
+
+	// Resolve webchat token so the public page can embed the floating widget
+	if cfg.WebchatInstanceID != nil {
+		var inst models.Instance
+		if err := h.db.Select("token").Where("id = ?", cfg.WebchatInstanceID).First(&inst).Error; err == nil {
+			resp["webchat_token"] = inst.Token
+		}
+	}
+
+	return c.JSON(resp)
 }
 
 // PublicListArticles GET /v1/public/helpdesk/:workspace_slug/articles?q=&category=

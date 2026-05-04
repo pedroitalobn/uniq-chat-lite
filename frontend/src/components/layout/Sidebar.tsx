@@ -87,6 +87,7 @@ export function Sidebar() {
   const WsIcon = resolveWorkspaceIcon(currentWorkspace?.icon);
   const { hasPerm, hasAnyPerm, isOwner, isSuperAdmin, isLoading: permsLoading } = useWorkspacePermissions();
   const isAdmin = isSuperAdmin;
+  const isBeta = !!(session?.user?.is_beta) || isSuperAdmin;
   const planName = (session?.user?.plan as { name?: string } | undefined)?.name ?? session?.user?.role;
   const initials = session?.user?.name?.[0]?.toUpperCase() || "U";
 
@@ -149,10 +150,10 @@ export function Sidebar() {
     { href: "/dashboard",    label: t("nav_dashboard"),    icon: LayoutDashboard, exact: true,  show: canSeeDashboard },
     { href: "/inbox",        label: t("nav_inbox"),        icon: Headset,         exact: false, show: canSeeInbox },
     { href: "/crm",          label: t("nav_crm"),          icon: Contact,         exact: false, show: canSeeCRM },
-    { href: "/campaigns",    label: t("nav_campaigns"),    icon: Megaphone,       exact: false, show: canSeeCampaigns },
-    { href: "/journeys",     label: "Jornadas",            icon: Wand2,           exact: false, show: canSeeJourneys },
+    { href: "/campaigns",    label: t("nav_campaigns"),    icon: Megaphone,       exact: false, show: isBeta && canSeeCampaigns },
+    { href: "/journeys",     label: "Jornadas",            icon: Wand2,           exact: false, show: isBeta && canSeeJourneys },
     { href: "/agents",       label: "Agentes",             icon: Bot,             exact: false, show: canSeeAgents },
-    { href: "/help-desk",    label: "Help Desk",           icon: BookOpen,        exact: false, show: true },
+    { href: "/help-desk",    label: "Help Desk",           icon: BookOpen,        exact: false, show: isBeta },
     { href: "/shops",        label: "Shops",               icon: ShoppingBag,     exact: false, show: true },
     { href: "/servers",      label: t("nav_servers"),      icon: Server,          exact: false, show: canSeeServers },
     { href: "/instances",    label: t("nav_instances"),    icon: Smartphone,      exact: false, show: canSeeInstances },

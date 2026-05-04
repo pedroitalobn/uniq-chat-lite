@@ -10,6 +10,7 @@ interface Config {
   primary_color: string;
   logo_url: string;
   widget_enabled: boolean;
+  webchat_token?: string;
   article_count: number;
   workspace_name: string;
 }
@@ -45,7 +46,7 @@ function mdToHtml(md: string): string {
     .replace(/`(.+?)`/g, "<code>$1</code>")
     .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
     .replace(/^- (.+)$/gm, "<li>$1</li>")
-    .replace(/(<li>.*<\/li>)/gs, "<ul>$1</ul>")
+    .replace(/(<li>[\s\S]*?<\/li>)/g, "<ul>$1</ul>")
     .replace(/\n{2,}/g, "</p><p>")
     .replace(/^(?!<[hul])(.+)$/gm, "<p>$1</p>")
     .replace(/<p><\/p>/g, "");
@@ -65,6 +66,7 @@ export default function HelpCenterPage({ params }: { params: { slug: string } })
   const [aiAnswer, setAiAnswer] = useState<{ answer: string; sources: { id: string; title: string; slug: string }[] } | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const primaryColor = config?.primary_color ?? "#00d46a";
@@ -361,6 +363,48 @@ export default function HelpCenterPage({ params }: { params: { slug: string } })
           Powered by <span style={{ color: primaryColor }}>Uniq Chat</span>
         </p>
       </footer>
+
+      {/* Floating chat widget */}
+      {config.widget_enabled && config.webchat_token && (
+        <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
+          {chatOpen && (
+            <iframe
+              src={`/embed/chat/${config.webchat_token}`}
+              style={{
+                width: 380, height: 580, border: "none", borderRadius: 16,
+                boxShadow: "0 8px 40px rgba(0,0,0,0.25)", background: "#fff",
+                animation: "chatFadeIn 0.2s ease",
+              }}
+              allow="microphone"
+              title="Chat"
+            />
+          )}
+          <button
+            onClick={() => setChatOpen((v) => !v)}
+            style={{
+              width: 56, height: 56, borderRadius: "50%", border: "none",
+              background: primaryColor, color: "#fff", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: `0 4px 20px ${primaryColor}60`,
+              transition: "transform 0.2s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            aria-label={chatOpen ? "Fechar chat" : "Abrir chat"}
+          >
+            {chatOpen ? (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            ) : (
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            )}
+          </button>
+          <style>{`@keyframes chatFadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}`}</style>
+        </div>
+      )}
     </div>
   );
 }
