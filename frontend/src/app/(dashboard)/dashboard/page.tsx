@@ -246,6 +246,35 @@ function ChartTooltip({ active, payload, label }: any) {
   );
 }
 
+// ─── Activity entry ───────────────────────────────────────────────────────────
+function ActivityEntry({ item }: { item: any }) {
+  const statusColors: Record<string, string> = {
+    running: "#00d46a", completed: "#60a5fa", error: "#ef4444",
+  };
+  const color = statusColors[item.status as string] ?? "#60a5fa";
+  return (
+    <div className="flex items-start gap-3 py-2.5 px-3 rounded-xl hover:bg-white/5 transition-colors">
+      <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+        style={{
+          background: color,
+          boxShadow: item.status === "running" ? `0 0 8px ${color}` : "none",
+        }} />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>
+          {item.description || item.type}
+        </p>
+        <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
+          {item.agent_name || "Agente"} · {new Date(item.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+        </p>
+      </div>
+      <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded-full flex-shrink-0"
+        style={{ background: `${color}18`, color }}>
+        {item.status === "running" ? "ativo" : item.status === "completed" ? "ok" : "erro"}
+      </span>
+    </div>
+  );
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -318,6 +347,14 @@ export default function DashboardPage() {
   });
   const agentStats: any = agentStatsQ.data || {};
 
+  const activityQ = useQuery({
+    queryKey: ["agent-activity", wsId],
+    queryFn: () => agentsApi.activity(8, wsId).then((r) => r.data),
+    enabled: !!wsId,
+    refetchInterval: 15_000,
+  });
+  const activities = asArray<any>(activityQ.data);
+
   const isLoading =
     instancesQ.isLoading || journeysQ.isLoading ||
     campaignsQ.isLoading || dealsQ.isLoading || contactsQ.isLoading;
@@ -345,23 +382,33 @@ export default function DashboardPage() {
       <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
         <motion.div
           style={{
-            position: "absolute", top: "8%", left: "12%",
-            width: "500px", height: "500px", borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(0,212,106,0.055) 0%, transparent 70%)",
-            filter: "blur(80px)",
+            position: "absolute", top: "5%", left: "8%",
+            width: "680px", height: "680px", borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(0,212,106,0.08) 0%, transparent 70%)",
+            filter: "blur(90px)",
           }}
-          animate={{ scale: [1, 1.1, 1], opacity: [0.6, 1, 0.6] }}
+          animate={{ scale: [1, 1.12, 1], opacity: [0.7, 1, 0.7] }}
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
         />
         <motion.div
           style={{
-            position: "absolute", bottom: "15%", right: "8%",
-            width: "350px", height: "350px", borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(96,165,250,0.045) 0%, transparent 70%)",
-            filter: "blur(70px)",
+            position: "absolute", bottom: "12%", right: "5%",
+            width: "520px", height: "520px", borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(96,165,250,0.06) 0%, transparent 70%)",
+            filter: "blur(80px)",
           }}
-          animate={{ scale: [1, 1.15, 1], opacity: [0.5, 0.9, 0.5] }}
+          animate={{ scale: [1, 1.18, 1], opacity: [0.6, 1, 0.6] }}
           transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+        />
+        <motion.div
+          style={{
+            position: "absolute", bottom: "5%", right: "30%",
+            width: "400px", height: "400px", borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(167,139,250,0.055) 0%, transparent 70%)",
+            filter: "blur(75px)",
+          }}
+          animate={{ scale: [1, 1.14, 1], opacity: [0.5, 0.9, 0.5] }}
+          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 4 }}
         />
       </div>
 
@@ -382,9 +429,11 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full"
-            style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)", color: "var(--green)" }}>
+            style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.15)", color: "var(--green)" }}>
             <LiveDot />
-            Ao vivo
+            {agentStats.active_agents > 0
+              ? `${agentStats.active_agents} agente${agentStats.active_agents !== 1 ? "s" : ""} online`
+              : "Sistema operacional"}
           </span>
         </div>
       </motion.div>
@@ -626,12 +675,58 @@ export default function DashboardPage() {
                 </div>
               </>
             )}
+            {/* Próxima automação */}
+            {activeJourneys.length > 0 && (
+              <>
+                <div className="my-3 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+                <div className="rounded-xl px-3 py-2.5"
+                  style={{ background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.15)" }}>
+                  <p className="text-[9px] font-semibold uppercase tracking-wider mb-1"
+                    style={{ color: "#a78bfa" }}>Próxima automação</p>
+                  <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>
+                    {activeJourneys[0]?.name || "Jornada ativa"}
+                  </p>
+                  <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>
+                    {activeJourneys[0]?.status === "active" ? "Em execução contínua" : "Agendada"}
+                  </p>
+                </div>
+              </>
+            )}
           </BentoCard>
         </motion.div>
 
       </motion.div>
 
-      {/* Row 4: Quick actions */}
+      {/* Row 4: Agentes em Ação */}
+      {activities.length > 0 && (
+        <motion.div variants={containerVariants} initial="hidden" animate="show">
+          <motion.div variants={itemVariants}>
+            <BentoCard className="p-4 sm:p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: "var(--green)" }} />
+                  <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Agentes em Ação</h2>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                    style={{ background: "rgba(0,212,106,0.1)", color: "var(--green)" }}>
+                    Ao vivo
+                  </span>
+                </div>
+                <Link href="/agents" className="text-[10px] flex items-center gap-0.5 font-medium"
+                  style={{ color: "var(--green)" }}>
+                  Ver todos <ArrowUpRight className="w-3 h-3" />
+                </Link>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-0.5">
+                {activities.slice(0, 6).map((item: any, i: number) => (
+                  <ActivityEntry key={i} item={item} />
+                ))}
+              </div>
+            </BentoCard>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Row 5: Quick actions */}
       <motion.div
         variants={containerVariants}
         initial="hidden"
@@ -640,11 +735,11 @@ export default function DashboardPage() {
         <motion.div variants={itemVariants}>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             {[
-              { href: "/uniq-ai", icon: Sparkles, label: "Uniq AI", desc: "Crie via linguagem natural", color: "#00d46a" },
-              { href: "/journeys", icon: Wand2, label: "Jornadas", desc: "Cadências automáticas", color: "#a78bfa" },
-              { href: "/campaigns", icon: Megaphone, label: "Campanhas", desc: "Disparo em massa", color: "#fbbf24" },
-              { href: "/crm/deals", icon: TrendingUp, label: "Pipeline", desc: "Deals e funil de vendas", color: "#60a5fa" },
-            ].map(({ href, icon: Icon, label, desc, color }) => (
+              { href: "/uniq-ai", icon: Sparkles, label: "Uniq AI", desc: "Pergunte, peça, automatize", color: "#00d46a", pulse: true },
+              { href: "/journeys", icon: Wand2, label: "Jornadas", desc: "Cadências automáticas", color: "#a78bfa", pulse: false },
+              { href: "/campaigns", icon: Megaphone, label: "Campanhas", desc: "Disparo em massa", color: "#fbbf24", pulse: false },
+              { href: "/crm/deals", icon: TrendingUp, label: "Pipeline", desc: "Deals e funil de vendas", color: "#60a5fa", pulse: false },
+            ].map(({ href, icon: Icon, label, desc, color, pulse }) => (
               <Link key={href} href={href}
                 className="group flex items-center gap-3 rounded-2xl p-3 sm:p-4 transition-all duration-200"
                 style={{
@@ -660,9 +755,15 @@ export default function DashboardPage() {
                   (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
                 }}
               >
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors"
-                  style={{ background: color + "18", border: `1px solid ${color}30` }}>
-                  <Icon className="w-4 h-4" style={{ color }} />
+                <div className="relative w-9 h-9 flex-shrink-0">
+                  {pulse && (
+                    <span className="absolute inset-0 rounded-xl animate-ping"
+                      style={{ background: `${color}30`, animationDuration: "2s" }} />
+                  )}
+                  <div className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
+                    style={{ background: color + "18", border: `1px solid ${color}${pulse ? "50" : "30"}` }}>
+                    <Icon className="w-4 h-4" style={{ color }} />
+                  </div>
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>{label}</p>

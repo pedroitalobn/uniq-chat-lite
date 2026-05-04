@@ -186,12 +186,13 @@
   ────────────────────────────────────────────────────────────────────── */
   html {
     background:
-      radial-gradient(ellipse 55% 40% at 15%  8%,  rgba(0, 212, 106, 0.06) 0%, transparent 70%),
-      radial-gradient(ellipse 50% 35% at 85%  5%,  rgba(99, 102, 241, 0.05) 0%, transparent 65%),
-      radial-gradient(ellipse 40% 50% at 5%  55%,  rgba(139, 92, 246, 0.04) 0%, transparent 70%),
-      radial-gradient(ellipse 45% 40% at 92% 50%,  rgba(59, 130, 246, 0.03) 0%, transparent 65%),
-      radial-gradient(ellipse 60% 30% at 50% 100%, rgba(0, 212, 106, 0.03) 0%, transparent 60%),
-      hsl(240 28% 1.5%);
+      radial-gradient(ellipse 60% 45% at 12%  6%,  rgba(0, 212, 106, 0.08) 0%, transparent 68%),
+      radial-gradient(ellipse 55% 40% at 88%  4%,  rgba(99, 102, 241, 0.07) 0%, transparent 65%),
+      radial-gradient(ellipse 45% 55% at 4%  58%,  rgba(139, 92, 246, 0.05) 0%, transparent 68%),
+      radial-gradient(ellipse 50% 45% at 94% 52%,  rgba(59, 130, 246, 0.045) 0%, transparent 65%),
+      radial-gradient(ellipse 70% 35% at 50% 100%, rgba(0, 212, 106, 0.04) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 50%  48%, rgba(99, 102, 241, 0.025) 0%, transparent 70%),
+      hsl(240 28% 1.2%);
     min-height: 100vh;
   }
 
@@ -768,6 +769,79 @@ html { scroll-behavior: smooth; }
 
 .uniq-page {
   animation: uniq-fade-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ─── Aurora background animation ─────────────────────────────────── */
+@keyframes aurora-drift-1 {
+  0%,100% { transform: translate(0, 0) scale(1); }
+  33%     { transform: translate(3%, 2%) scale(1.06); }
+  66%     { transform: translate(-2%, 4%) scale(0.97); }
+}
+@keyframes aurora-drift-2 {
+  0%,100% { transform: translate(0, 0) scale(1); }
+  40%     { transform: translate(-4%, -3%) scale(1.08); }
+  75%     { transform: translate(2%, 5%) scale(0.96); }
+}
+@keyframes aurora-drift-3 {
+  0%,100% { transform: translate(0, 0) scale(1); }
+  50%     { transform: translate(5%, -4%) scale(1.05); }
+}
+.aurora-1 { animation: aurora-drift-1 18s ease-in-out infinite; }
+.aurora-2 { animation: aurora-drift-2 22s ease-in-out infinite; }
+.aurora-3 { animation: aurora-drift-3 26s ease-in-out infinite; }
+
+/* ─── Sidebar nav active item glow ────────────────────────────────── */
+@keyframes nav-glow {
+  0%,100% { box-shadow: 0 0 12px rgba(0,212,106,0.12); }
+  50%     { box-shadow: 0 0 20px rgba(0,212,106,0.22); }
+}
+.nav-item-active {
+  animation: nav-glow 3s ease-in-out infinite;
+}
+
+/* ─── Futuristic ping for AI active states ─────────────────────────── */
+@keyframes ai-ping {
+  75%, 100% { transform: scale(1.8); opacity: 0; }
+}
+.ai-ping {
+  animation: ai-ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* ─── Smooth page transitions override ────────────────────────────── */
+.page-enter {
+  animation: uniq-scale-in 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ─── Gradient border for premium cards ───────────────────────────── */
+.gradient-border {
+  position: relative;
+}
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(0,212,106,0.4), rgba(99,102,241,0.2), rgba(0,212,106,0.1));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ─── Shimmer text animation ──────────────────────────────────────── */
+@keyframes shimmer-text {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.shimmer-text {
+  background: linear-gradient(90deg, var(--text-3) 0%, var(--green) 40%, var(--text-3) 80%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer-text 3s linear infinite;
 }
 
 .line-clamp-2 {

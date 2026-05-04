@@ -347,10 +347,10 @@ export function Sidebar() {
                 )}
                 style={active
                   ? {
-                      background: "linear-gradient(90deg, rgba(0,212,106,0.15) 0%, rgba(0,212,106,0.05) 100%)",
+                      background: "linear-gradient(90deg, rgba(0,212,106,0.18) 0%, rgba(0,212,106,0.06) 100%)",
                       color: "var(--text-1)",
-                      boxShadow: "inset 2px 0 0 var(--green), 0 0 20px rgba(0,212,106,0.08)",
-                      backdropFilter: "blur(8px)",
+                      boxShadow: "inset 2px 0 0 var(--green), 0 2px 16px rgba(0,212,106,0.12), 0 0 0 1px rgba(0,212,106,0.08)",
+                      backdropFilter: "blur(12px)",
                       transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                     }
                   : {
@@ -370,16 +370,16 @@ export function Sidebar() {
                   className="relative flex items-center justify-center w-5 h-5 flex-shrink-0 rounded-md"
                   style={active
                     ? {
-                        background: "linear-gradient(135deg, rgba(0,212,106,0.25), rgba(0,212,106,0.10))",
-                        backdropFilter: "blur(8px)",
-                        border: "1px solid rgba(0,212,106,0.30)",
-                        boxShadow: "0 0 12px rgba(0,212,106,0.20)",
+                        background: "linear-gradient(135deg, rgba(0,212,106,0.28), rgba(0,212,106,0.12))",
+                        backdropFilter: "blur(12px)",
+                        border: "1px solid rgba(0,212,106,0.35)",
+                        boxShadow: "0 0 16px rgba(0,212,106,0.30), inset 0 1px 0 rgba(255,255,255,0.12)",
                         color: "var(--green)",
                         transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                       }
                     : {
-                        background: "rgba(255,255,255,0.06)",
-                        border: "1px solid rgba(255,255,255,0.08)",
+                        background: "rgba(255,255,255,0.05)",
+                        border: "1px solid rgba(255,255,255,0.07)",
                         color: "inherit",
                         transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                       }

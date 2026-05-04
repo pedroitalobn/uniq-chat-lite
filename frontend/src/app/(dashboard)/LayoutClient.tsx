@@ -141,6 +141,21 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("uniq:instance-stale", onStale);
   }, [qc]);
 
+  // Redirect novos usuários (sem instâncias) para o onboarding agent-first.
+  // Usa chave por user-id para não redirecionar usuários existentes que
+  // simplesmente apagaram instâncias.
+  useEffect(() => {
+    if (sessionLoading || !sessionData) return;
+    if (pathname === "/onboarding" || pathname?.startsWith("/admin")) return;
+    const userId = (sessionData as any)?.id;
+    if (!userId) return;
+    const key = `uniq_onboarding_done_${userId}`;
+    if (localStorage.getItem(key)) return;
+    if (instances !== undefined && (instances as any[]).length === 0) {
+      router.replace("/onboarding");
+    }
+  }, [sessionData, sessionLoading, instances, pathname, router]);
+
   if (sessionLoading) {
     return (
       <main className="flex-1 overflow-hidden">
