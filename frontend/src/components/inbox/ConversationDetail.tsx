@@ -19,7 +19,7 @@ import { AudioRecorderButton } from "@/components/inbox/AudioRecorderButton";
 import { MediaViewer, type MediaViewerSource } from "@/components/inbox/MediaViewer";
 import { AgentPanel } from "@/components/inbox/AgentPanel";
 import { WindowKeeperToggle } from "@/components/inbox/WindowKeeperToggle";
-import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi, crmContactsApi, linkPreviewApi, dealsApi, crmApi, callsApi } from "@/lib/api";
+import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi, crmContactsApi, linkPreviewApi, dealsApi, crmApi, callsApi, departmentsApi } from "@/lib/api";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TemplatePicker } from "@/components/inbox/TemplatePicker";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -1257,8 +1257,9 @@ function CreateDealModal({
 }
 
 // TransferDialog lets the agent transfer a conversation to a Queue, a Team,
-// or a specific User. Team/User variants fall back to POST /transfer with the
-// appropriate body since the backend handler accepts any combination.
+// a Department or a specific User. Backend handler aceita qualquer combinação
+// (department_id, team_id, queue_id, user_id) — manda só o campo da aba ativa.
+type TransferTab = "queue" | "department" | "team" | "user";
 function TransferDialog({
   wsId, conversationId, onClose, onSuccess,
 }: {
@@ -1267,16 +1268,36 @@ function TransferDialog({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [tab, setTab] = useState<"queue" | "team" | "user">("queue");
+  const [tab, setTab] = useState<TransferTab>("queue");
   const [note, setNote] = useState("");
   const [selected, setSelected] = useState<string>("");
+
+  // Fila é a aba inicial — fetch sempre. As outras só carregam quando a aba
+  // é ativada pra economizar request em quem nunca abre.
   const queuesQ = useQuery({
     queryKey: ["queues-for-transfer", wsId],
-    queryFn: () => queuesApi.list(wsId).then((r) => r.data as { items: Array<{ id: string; name: string }> }),
+    queryFn: () => queuesApi.list(wsId).then((r) => r.data as { items: Array<{ id: string; name: string; description?: string }> }),
+  });
+  const departmentsQ = useQuery({
+    queryKey: ["departments-for-transfer", wsId],
+    queryFn: () =>
+      departmentsApi.list(wsId).then((r) => {
+        const raw = r.data as
+          | { items?: Array<{ id: string; name: string; description?: string; color?: string }> }
+          | Array<{ id: string; name: string; description?: string; color?: string }>;
+        return Array.isArray(raw) ? raw : raw.items ?? [];
+      }),
+    enabled: tab === "department",
   });
   const teamsQ = useQuery({
     queryKey: ["teams-for-transfer", wsId],
-    queryFn: () => teamsApi.list(wsId).then((r) => r.data as { items: Array<{ id: string; name: string }> }),
+    queryFn: () =>
+      teamsApi.list(wsId).then((r) => {
+        const raw = r.data as
+          | { items?: Array<{ id: string; name: string; description?: string }> }
+          | Array<{ id: string; name: string; description?: string }>;
+        return Array.isArray(raw) ? raw : raw.items ?? [];
+      }),
     enabled: tab === "team",
   });
   const membersQ = useQuery({
@@ -1289,14 +1310,18 @@ function TransferDialog({
     enabled: tab === "user",
   });
 
+  // Reseta a seleção ao trocar de aba — id de fila não vale pra equipe.
   useEffect(() => setSelected(""), [tab]);
 
   const submit = async () => {
     if (!selected) return;
     try {
-      if (tab === "queue") await conversationsApi.transfer(wsId, conversationId, { queue_id: selected, note });
-      else if (tab === "team") await conversationsApi.transfer(wsId, conversationId, { team_id: selected, note });
-      else await conversationsApi.transfer(wsId, conversationId, { user_id: selected, note });
+      const payload = { note } as { queue_id?: string; team_id?: string; department_id?: string; user_id?: string; note?: string };
+      if (tab === "queue") payload.queue_id = selected;
+      else if (tab === "department") payload.department_id = selected;
+      else if (tab === "team") payload.team_id = selected;
+      else payload.user_id = selected;
+      await conversationsApi.transfer(wsId, conversationId, payload);
       toast.success("Transferido");
       onSuccess();
       onClose();
@@ -1307,114 +1332,229 @@ function TransferDialog({
 
   const options: Array<{ id: string; label: string; hint?: string }> =
     tab === "queue"
-      ? (queuesQ.data?.items ?? []).map((q) => ({ id: q.id, label: q.name }))
+      ? (queuesQ.data?.items ?? []).map((q) => ({ id: q.id, label: q.name, hint: q.description }))
+      : tab === "department"
+      ? (departmentsQ.data ?? []).map((d) => ({ id: d.id, label: d.name, hint: d.description }))
       : tab === "team"
-      ? (teamsQ.data?.items ?? []).map((t) => ({ id: t.id, label: t.name }))
+      ? (teamsQ.data ?? []).map((tm) => ({ id: tm.id, label: tm.name, hint: tm.description }))
       : (membersQ.data ?? []).map((m) => ({
           id: m.user_id,
           label: m.user?.name || m.user?.email || m.user_id.slice(0, 8),
           hint: m.user?.email,
         }));
 
+  const isLoading =
+    (tab === "queue" && queuesQ.isLoading) ||
+    (tab === "department" && departmentsQ.isLoading) ||
+    (tab === "team" && teamsQ.isLoading) ||
+    (tab === "user" && membersQ.isLoading);
+
+  // ESC fecha o modal — UX padrão de dialog. Sem isso o user fica preso até
+  // achar o X (especialmente no laptop sem mouse).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if ((e.key === "Enter") && (e.ctrlKey || e.metaKey) && selected) submit();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div
         className="absolute inset-0 uniq-fade-in"
-        style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}
+        style={{
+          background: "rgba(2,3,8,0.62)",
+          backdropFilter: "blur(12px) saturate(140%)",
+          WebkitBackdropFilter: "blur(12px) saturate(140%)",
+        }}
         onClick={onClose}
       />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="transfer-dialog-title"
         className="relative w-full max-w-lg overflow-hidden rounded-2xl shadow-2xl uniq-scale-in"
         style={{
-          background: "hsl(240 18% 6%)",
-          border: "1px solid hsl(240 12% 14%)",
+          // Mesma paleta do header da inbox (glassmorphism dark).
+          background: "linear-gradient(135deg, rgba(20,22,34,0.92) 0%, rgba(10,12,22,0.96) 100%)",
+          backdropFilter: "blur(24px) saturate(180%)",
+          WebkitBackdropFilter: "blur(24px) saturate(180%)",
+          border: "1px solid rgba(255,255,255,0.10)",
+          boxShadow: "0 24px 60px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)",
+          color: "var(--text-1)",
         }}
       >
         <div
-          className="flex items-center justify-between px-4 py-3"
-          style={{ borderBottom: "1px solid hsl(240 12% 16%)" }}
+          className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}
         >
-          <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>
-            Transferir atendimento
-          </h2>
+          <div className="flex items-center gap-2.5">
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-lg"
+              style={{
+                background: "rgba(0,212,106,0.12)",
+                border: "1px solid rgba(0,212,106,0.22)",
+              }}
+            >
+              <ArrowRightLeft className="h-4 w-4" style={{ color: "#00d46a" }} />
+            </div>
+            <div className="leading-tight">
+              <h2 id="transfer-dialog-title" className="text-sm font-semibold tracking-tight" style={{ color: "var(--text-1)" }}>
+                Transferir atendimento
+              </h2>
+              <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+                Escolha o destino e, se quiser, deixe um motivo.
+              </p>
+            </div>
+          </div>
           <button
             onClick={onClose}
-            className="rounded-md p-1.5 hover:bg-white/5"
-            style={{ color: "hsl(240 8% 48%)" }}
+            className="rounded-lg p-1.5 transition-colors hover:bg-white/8"
+            style={{ color: "var(--text-3)" }}
+            aria-label="Fechar"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="flex" style={{ borderBottom: "1px solid hsl(240 12% 16%)" }}>
-          {(["queue", "team", "user"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className="flex-1 px-4 py-2 text-xs font-medium"
-              style={
-                tab === t
-                  ? {
-                      color: "#00d46a",
-                      borderBottom: "2px solid #00d46a",
-                      marginBottom: "-1px",
-                    }
-                  : {
-                      color: "hsl(240 8% 52%)",
-                      borderBottom: "2px solid transparent",
-                      marginBottom: "-1px",
-                    }
-              }
-            >
-              {t === "queue" ? "Fila" : t === "team" ? "Equipe" : "Agente"}
-            </button>
-          ))}
+
+        {/* Tabs com 4 opções: Fila · Departamento · Equipe · Agente.
+            Departamento foi adicionado nesse refactor — backend já aceitava
+            department_id, só faltava expor na UI. */}
+        <div className="flex" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          {(["queue", "department", "team", "user"] as const).map((t) => {
+            const active = tab === t;
+            const label =
+              t === "queue" ? "Fila" :
+              t === "department" ? "Depto." :
+              t === "team" ? "Equipe" : "Agente";
+            return (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className="relative flex-1 px-3 py-2.5 text-xs font-medium transition-colors"
+                style={{
+                  color: active ? "#00d46a" : "var(--text-3)",
+                  background: active ? "rgba(0,212,106,0.06)" : "transparent",
+                }}
+              >
+                {label}
+                {active && (
+                  <span
+                    className="absolute inset-x-0 bottom-0 h-[2px]"
+                    style={{ background: "#00d46a", boxShadow: "0 0 8px rgba(0,212,106,0.45)" }}
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
+
         <div className="max-h-80 overflow-auto" style={{ position: "relative" }}>
           <AnimatedTabContent tabKey={tab}>
-          {options.length === 0 ? (
-            <div className="p-4 text-sm text-zinc-500">Sem opções disponíveis.</div>
-          ) : (
-            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {options.map((o) => (
-                <li key={o.id}>
-                  <button
-                    onClick={() => setSelected(o.id)}
-                    className={`flex w-full items-center justify-between px-4 py-2 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900 ${
-                      selected === o.id ? "bg-blue-500/10" : ""
-                    }`}
-                  >
-                    <span>
-                      <span className="font-medium">{o.label}</span>
-                      {o.hint && <span className="ml-2 text-xs text-zinc-500">{o.hint}</span>}
-                    </span>
-                    {selected === o.id && <span className="text-xs text-blue-600 dark:text-blue-400">✓</span>}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+            {isLoading ? (
+              <div className="p-5 text-xs" style={{ color: "var(--text-3)" }}>
+                Carregando…
+              </div>
+            ) : options.length === 0 ? (
+              <div className="p-5 text-xs" style={{ color: "var(--text-3)" }}>
+                Sem opções disponíveis nesta categoria.
+              </div>
+            ) : (
+              <ul>
+                {options.map((o) => {
+                  const isSelected = selected === o.id;
+                  return (
+                    <li key={o.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                      <button
+                        onClick={() => setSelected(o.id)}
+                        className="flex w-full items-center justify-between px-5 py-2.5 text-left text-sm transition-colors"
+                        style={{
+                          background: isSelected ? "rgba(0,212,106,0.10)" : "transparent",
+                          color: "var(--text-1)",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isSelected) e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected) e.currentTarget.style.background = "transparent";
+                        }}
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium" style={{ color: "var(--text-1)" }}>
+                            {o.label}
+                          </span>
+                          {o.hint && (
+                            <span className="block truncate text-[11px]" style={{ color: "var(--text-3)" }}>
+                              {o.hint}
+                            </span>
+                          )}
+                        </span>
+                        {isSelected && (
+                          <span
+                            className="ml-3 flex h-4 w-4 items-center justify-center rounded-full"
+                            style={{ background: "#00d46a", color: "#03170a" }}
+                          >
+                            <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </AnimatedTabContent>
         </div>
-        <div className="border-t border-zinc-200 p-4 dark:border-zinc-800">
-          <label className="block text-xs font-medium text-zinc-500">Motivo (opcional)</label>
+
+        <div className="px-5 pt-4 pb-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          <label className="block text-[11px] font-medium uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+            Motivo (opcional)
+          </label>
           <textarea
-            className="mt-1 w-full resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="mt-1.5 w-full resize-y rounded-lg px-3 py-2 text-sm outline-none transition-all"
             rows={2}
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Contexto para quem receber"
+            placeholder="Contexto para quem receber…"
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.10)",
+              color: "var(--text-1)",
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = "rgba(0,212,106,0.45)";
+              e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = "rgba(255,255,255,0.10)";
+              e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+            }}
           />
-          <div className="mt-3 flex justify-end gap-2">
+          <div className="mt-3 flex items-center justify-end gap-2">
             <button
               onClick={onClose}
-              className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              className="rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.10)",
+                color: "var(--text-2)",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
             >
               Cancelar
             </button>
             <button
               onClick={submit}
               disabled={!selected}
-              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-40"
+              style={{
+                background: "#00d46a",
+                color: "#03170a",
+                boxShadow: selected ? "0 0 16px rgba(0,212,106,0.32)" : "none",
+              }}
             >
               Transferir
             </button>

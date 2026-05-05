@@ -1512,7 +1512,7 @@ export const conversationsApi = {
     api.post(`/v1/conversations/${id}/assign`, userId ? { user_id: userId } : {}, { headers: wsHeaders(workspaceId) }),
   unassign: (workspaceId: string, id: string) =>
     api.post(`/v1/conversations/${id}/unassign`, {}, { headers: wsHeaders(workspaceId) }),
-  transfer: (workspaceId: string, id: string, data: { queue_id?: string; team_id?: string; user_id?: string; note?: string }) =>
+  transfer: (workspaceId: string, id: string, data: { queue_id?: string; team_id?: string; department_id?: string; user_id?: string; note?: string }) =>
     api.post(`/v1/conversations/${id}/transfer`, data, { headers: wsHeaders(workspaceId) }),
   resolve: (workspaceId: string, id: string) =>
     api.post(`/v1/conversations/${id}/resolve`, {}, { headers: wsHeaders(workspaceId) }),
