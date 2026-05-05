@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { Sidebar } from "@/components/layout/Sidebar";
+import { SidebarDock } from "@/components/layout/SidebarDock";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { CommandPalette } from "@/components/ui/CommandPalette";
 import { LayoutClient } from "./LayoutClient";
@@ -27,7 +27,7 @@ export default async function DashboardLayout({
           <CursorReactiveBackground />
           <UniqAIIslandProvider>
             <div className="flex h-screen overflow-hidden">
-              <Sidebar />
+              <SidebarDock />
               <LayoutClient>{children}</LayoutClient>
             </div>
             <UniqAIIsland />
