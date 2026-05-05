@@ -364,8 +364,8 @@ export default function AgentsPage() {
 
   // Derive live stats for the header
   const totalInstances = instancesQuery.data?.length ?? 0;
-  const activeAgents = agentQueries.filter((q) => q.data?.is_active).length;
-  const configuredAgents = agentQueries.filter((q) => q.data?.agent_name).length;
+  const activeAgents = agentQueries.filter((q) => (q.data as any)?.is_active).length;
+  const configuredAgents = agentQueries.filter((q) => (q.data as any)?.agent_name).length;
 
   return (
     <div className="flex flex-col gap-4">
