@@ -242,7 +242,7 @@ export function UniqAIChatPanel({
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <div className="flex flex-col h-full" style={{ background: "var(--surface-2)" }}>
+      <div className="flex flex-col h-full" style={{ background: "transparent" }}>
 
         {/* Header */}
         {!hideHeader && (
@@ -374,10 +374,11 @@ function ComposerArea({
           isEmpty && "mx-auto w-full max-w-2xl",
         )}
         style={{
-          background: "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.1)",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.06)",
-          backdropFilter: "blur(20px)",
+          background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)",
+          border: "1px solid rgba(255,255,255,0.13)",
+          boxShadow: "0 8px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10)",
+          backdropFilter: "blur(40px) saturate(200%)",
+          WebkitBackdropFilter: "blur(40px) saturate(200%)",
         }}
       >
         <MentionPicker

@@ -322,8 +322,11 @@ export function UserMessage() {
         <div
           className="rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-relaxed"
           style={{
-            background: "linear-gradient(135deg, rgba(0,212,106,0.18) 0%, rgba(0,212,106,0.1) 100%)",
-            border: "1px solid rgba(0,212,106,0.2)",
+            background: "linear-gradient(135deg, rgba(0,212,106,0.16) 0%, rgba(0,212,106,0.07) 100%)",
+            border: "1px solid rgba(0,212,106,0.22)",
+            backdropFilter: "blur(20px) saturate(160%)",
+            WebkitBackdropFilter: "blur(20px) saturate(160%)",
+            boxShadow: "0 4px 20px rgba(0,212,106,0.08), inset 0 1px 0 rgba(255,255,255,0.06)",
             color: "var(--text-1)",
           }}
         >

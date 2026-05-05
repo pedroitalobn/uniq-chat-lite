@@ -547,7 +547,7 @@ export default function DashboardPage() {
   ], [connectedInstances.length, activeInstances.length, agentStats, conv.open, activeJourneys.length, activeCampaigns.length]);
 
   return (
-    <div className="space-y-4 sm:space-y-5" style={{ position: "relative", zIndex: 1 }}>
+    <div className="flex flex-col gap-4" style={{ position: "relative", zIndex: 1 }}>
       {/* Atmospheric orbs */}
       <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
         <motion.div style={{
@@ -567,341 +567,345 @@ export default function DashboardPage() {
           transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 4 }} />
       </div>
 
-      {/* ── Header + War Room bar ─────────────────────────────────────────── */}
-      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <p className="text-xs font-medium mb-0.5" style={{ color: "var(--text-3)" }}>
-              {greeting}, <span style={{ color: "var(--green)" }}>{firstName}</span>
-            </p>
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "var(--text-1)" }}>
-              {currentWorkspace?.name || "Dashboard"}
-            </h1>
+      {/* ── AI Command Center ────────────────────────────────────────────── */}
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
+        <div className="rounded-2xl overflow-hidden" style={{
+          background: "linear-gradient(135deg, rgba(0,212,106,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+          border: "1px solid rgba(0,212,106,0.14)",
+          backdropFilter: "blur(40px) saturate(180%)",
+          WebkitBackdropFilter: "blur(40px) saturate(180%)",
+          boxShadow: "0 4px 40px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08)",
+        }}>
+          {/* Top row: greeting + live status + quick jumps */}
+          <div className="px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
+            {/* Left */}
+            <div>
+              <p className="text-xs font-medium mb-0.5" style={{ color: "var(--text-3)" }}>
+                {greeting}, <span style={{ color: "var(--green)" }}>{firstName}</span>
+              </p>
+              <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "var(--text-1)" }}>
+                {currentWorkspace?.name || "Dashboard"}
+              </h1>
+            </div>
+
+            {/* Center: war-room pulse */}
+            <div className="hidden sm:block flex-1 min-w-0 max-w-sm">
+              <PulseBar systems={systems} />
+            </div>
+
+            {/* Right: one-click jumps */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {[
+                { href: "/uniq-ai", icon: Sparkles, label: "Uniq AI", color: "#00d46a", pulse: true },
+                { href: "/inbox", icon: InboxIcon, label: "Inbox", color: "#60a5fa", pulse: false },
+                { href: "/journeys", icon: Wand2, label: "Jornadas", color: "#a78bfa", pulse: false },
+                { href: "/campaigns", icon: Megaphone, label: "Campanhas", color: "#fbbf24", pulse: false },
+              ].map(({ href, icon: Icon, label, color, pulse }) => (
+                <Link key={href} href={href}>
+                  <motion.div whileHover={{ scale: 1.05, y: -1 }} whileTap={{ scale: 0.96 }}
+                    className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all"
+                    style={{
+                      background: `${color}12`,
+                      border: `1px solid ${color}30`,
+                      color,
+                      backdropFilter: "blur(16px)",
+                    }}>
+                    {pulse && (
+                      <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full animate-ping"
+                        style={{ background: color, opacity: 0.7 }} />
+                    )}
+                    <Icon className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{label}</span>
+                  </motion.div>
+                </Link>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <motion.span
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full"
-              style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.15)", color: "var(--green)" }}
-              animate={{ boxShadow: ["0 0 0px rgba(0,212,106,0)", "0 0 12px rgba(0,212,106,0.15)", "0 0 0px rgba(0,212,106,0)"] }}
-              transition={{ duration: 3, repeat: Infinity }}
-            >
-              <LiveDot />
-              {agentStats.active_agents > 0
-                ? `${agentStats.active_agents} agente${agentStats.active_agents !== 1 ? "s" : ""} online`
-                : "Sistema operacional"}
-            </motion.span>
+
+          {/* Bottom row: war room on mobile + contextual tip */}
+          <div className="px-5 pb-4 sm:hidden">
+            <PulseBar systems={systems} />
+          </div>
+          <div className="px-4 pb-4 border-t" style={{ borderColor: "rgba(0,212,106,0.08)" }}>
+            <ContextualTip hour={hour} conv={conv} queues={[]} />
           </div>
         </div>
-        {/* War Room Pulse Bar */}
-        <PulseBar systems={systems} />
       </motion.div>
 
-      {/* ── Contextual Tip ────────────────────────────────────────────────── */}
-      <ContextualTip hour={hour} conv={conv} queues={[]} />
-
-      {/* ── Stat Cards ────────────────────────────────────────────────────── */}
-      <motion.div variants={containerVariants} initial="hidden" animate="show"
-        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-        <motion.div variants={itemVariants}>
-          <StatCard href="/instances" label="Instâncias ativas" value={activeInstances.length}
-            sub={connectedInstances.length > 0 ? `${connectedInstances.length} online` : "nenhuma online"}
-            icon={Wifi} color="green" isLoading={isLoading} trend={trends.instances} />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <StatCard href="/inbox" label="Conversas abertas" value={conv.open ?? 0}
-            sub={conv.pending ? `${conv.pending} pendente${conv.pending !== 1 ? "s" : ""}` : undefined}
-            icon={MessageSquare} color="blue" isLoading={isLoading} trend={trends.conversations} />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <StatCard href="/journeys" label="Jornadas ativas" value={activeJourneys.length}
-            sub={journeys.length > 0 ? `${journeys.length} total` : undefined}
-            icon={Wand2} color="violet" isLoading={isLoading} trend={trends.journeys} />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <StatCard href="/campaigns" label="Campanhas" value={activeCampaigns.length}
-            sub={campaigns.length > 0 ? `${campaigns.length} total` : undefined}
-            icon={Megaphone} color="amber" isLoading={isLoading} trend={trends.campaigns} />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <StatCard href="/crm/deals" label="Deals abertos" value={openDeals.length}
-            sub={dealsValue > 0 ? `R$${dealsValue.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}` : undefined}
-            icon={TrendingUp} color="cyan" isLoading={isLoading} trend={trends.deals} />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <StatCard href="/crm/contacts" label="Contatos" value={contactsTotal}
-            icon={ContactIcon} color="pink" isLoading={isLoading} trend={trends.contacts} />
-        </motion.div>
-      </motion.div>
-
-      {/* ── Row 2: Live Timeline + Chart ────────────────────────────────── */}
-      <motion.div variants={containerVariants} initial="hidden" animate="show"
-        className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
-
-        {/* Live Activity Timeline */}
-        <motion.div variants={itemVariants} className="lg:col-span-5">
-          <BentoCard className="p-4 sm:p-5 h-full">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5">
-                  <LiveDot />
-                  <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
-                    Linha do Tempo
-                  </h2>
+      {/* ── Stat pill strip ──────────────────────────────────────────────── */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12, duration: 0.4 }}>
+        <div className="flex gap-2.5 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+          {([
+            { href: "/instances", label: "Instâncias", value: activeInstances.length, sub: `${connectedInstances.length} online`, icon: Wifi, color: "#00d46a", trend: trends.instances },
+            { href: "/inbox", label: "Conversas", value: conv.open ?? 0, sub: conv.pending ? `${conv.pending} pend.` : "0 pend.", icon: MessageSquare, color: "#60a5fa", trend: trends.conversations },
+            { href: "/journeys", label: "Jornadas", value: activeJourneys.length, sub: `${journeys.length} total`, icon: Wand2, color: "#a78bfa", trend: trends.journeys },
+            { href: "/campaigns", label: "Campanhas", value: activeCampaigns.length, sub: `${campaigns.length} total`, icon: Megaphone, color: "#fbbf24", trend: trends.campaigns },
+            { href: "/crm/deals", label: "Deals", value: openDeals.length, sub: dealsValue > 0 ? `R$${dealsValue.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}` : "R$ —", icon: TrendingUp, color: "#22d3ee", trend: trends.deals },
+            { href: "/crm/contacts", label: "Contatos", value: contactsTotal, sub: "cadastrados", icon: ContactIcon, color: "#f472b6", trend: trends.contacts },
+          ] as Array<{ href: string; label: string; value: number; sub: string; icon: React.ElementType; color: string; trend: number[] }>).map(({ href, label, value, sub, icon: Icon, color, trend }) => (
+            <Link key={href} href={href} className="flex-shrink-0">
+              <motion.div whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.97 }}
+                className="flex items-center gap-3 px-4 py-3 rounded-2xl transition-all"
+                style={{
+                  background: "linear-gradient(135deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.02) 100%)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  backdropFilter: "blur(24px)",
+                  WebkitBackdropFilter: "blur(24px)",
+                  boxShadow: "0 2px 16px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.06)",
+                  minWidth: 168,
+                }}>
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: `${color}18`, border: `1px solid ${color}28` }}>
+                  <Icon className="w-4 h-4" style={{ color }} />
                 </div>
-                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                  style={{ background: "rgba(0,212,106,0.1)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.2)" }}>
-                  Ao vivo
-                </span>
-              </div>
-              <Link href="/agents" className="text-[10px] flex items-center gap-0.5 font-medium"
-                style={{ color: "var(--text-3)" }}>
-                Ver tudo <ArrowUpRight className="w-3 h-3" />
-              </Link>
-            </div>
-            {activities.length > 0 ? (
-              <div className="overflow-hidden" style={{ maxHeight: 280 }}>
-                <AnimatePresence initial={false}>
-                  {activities.slice(0, 7).map((item: any, i: number) => (
-                    <TimelineEntry key={item.id ?? i} item={item} index={i} />
-                  ))}
-                </AnimatePresence>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-10 gap-3">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center"
-                  style={{ background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)" }}>
-                  <Activity className="w-5 h-5" style={{ color: "#a78bfa" }} />
+                <div className="min-w-0">
+                  <p className="text-xl font-semibold leading-none tabular-nums" style={{ color: "var(--text-1)" }}>
+                    {isLoading ? "—" : <AnimatedNumber value={value} />}
+                  </p>
+                  <p className="text-[10px] mt-0.5 truncate" style={{ color: "var(--text-3)" }}>{label}</p>
+                  <p className="text-[9px] mt-0.5 truncate font-medium" style={{ color, opacity: 0.85 }}>{sub}</p>
                 </div>
-                <p className="text-xs text-center" style={{ color: "var(--text-3)" }}>
-                  Nenhuma atividade recente.<br />Ative um agente para ver o feed ao vivo.
-                </p>
-              </div>
-            )}
-          </BentoCard>
-        </motion.div>
-
-        {/* Chart + Inbox */}
-        <motion.div variants={itemVariants} className="lg:col-span-4">
-          <BentoCard className="p-4 sm:p-5 h-full">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Semana</h2>
-                <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>Conversas × Jornadas</p>
-              </div>
-            </div>
-            <ResponsiveContainer width="100%" height={140}>
-              <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="gConv" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#00d46a" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#00d46a" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gJorn" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="date" tick={{ fill: "#52526a", fontSize: 9 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "#52526a", fontSize: 9 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTooltip />} />
-                <Area type="monotone" dataKey="conversas" name="Conversas" stroke="#00d46a" strokeWidth={1.5} fill="url(#gConv)" dot={false} />
-                <Area type="monotone" dataKey="jornadas" name="Jornadas" stroke="#a78bfa" strokeWidth={1.5} fill="url(#gJorn)" dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </BentoCard>
-        </motion.div>
-
-        {/* Inbox breakdown */}
-        <motion.div variants={itemVariants} className="lg:col-span-3">
-          <BentoCard className="p-4 sm:p-5 h-full">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                style={{ background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.25)" }}>
-                <InboxIcon className="w-3.5 h-3.5" style={{ color: "#60a5fa" }} />
-              </div>
-              <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Inbox</h2>
-            </div>
-            <div className="space-y-0.5">
-              <MetricRow icon={MessageSquare} label="Abertas" value={conv.open ?? 0} color="#00d46a" />
-              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
-              <MetricRow icon={Clock} label="Pendentes" value={conv.pending ?? 0} color="#fbbf24" />
-              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
-              <MetricRow icon={AlertCircle} label="Sem atribuição" value={conv.unassigned_open ?? 0} color="#60a5fa" />
-              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
-              <MetricRow icon={CheckCircle2} label="Resolvidas" value={conv.resolved ?? 0} color="#4ade80" />
-            </div>
-            <Link href="/inbox" className="flex items-center gap-1 text-xs mt-4 font-medium"
-              style={{ color: "var(--green)" }}>
-              Abrir inbox <ArrowRight className="w-3 h-3" />
+                <div className="ml-auto pl-1" style={{ opacity: 0.55 }}>
+                  <Sparkline data={trend} color={color} height={22} width={44} />
+                </div>
+              </motion.div>
             </Link>
-          </BentoCard>
-        </motion.div>
+          ))}
+        </div>
       </motion.div>
 
-      {/* ── Row 3: Instâncias + Deals + Agentes ──────────────────────────── */}
-      <motion.div variants={containerVariants} initial="hidden" animate="show"
-        className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
-
-        {/* Instâncias */}
-        <motion.div variants={itemVariants}>
-          <BentoCard className="p-4 sm:p-5 h-full">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Instâncias</h2>
-              <Link href="/instances" className="text-[10px] flex items-center gap-0.5 font-medium"
-                style={{ color: "var(--green)" }}>Ver todas <ArrowUpRight className="w-3 h-3" /></Link>
-            </div>
-            {instances.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-6 gap-2">
-                <Smartphone className="w-7 h-7 opacity-20" style={{ color: "var(--text-3)" }} />
-                <p className="text-xs" style={{ color: "var(--text-3)" }}>Nenhuma instância</p>
-                <Link href="/instances" className="text-xs font-medium" style={{ color: "var(--green)" }}>Criar agora →</Link>
-              </div>
-            ) : (
-              <div className="space-y-0.5">
-                {instances.slice(0, 5).map((inst) => <InstanceRow key={inst.id} inst={inst} />)}
-                {instances.length > 5 && (
-                  <Link href="/instances" className="block text-center text-xs py-2 font-medium"
-                    style={{ color: "var(--text-3)" }}>+{instances.length - 5} mais</Link>
-                )}
-              </div>
-            )}
-          </BentoCard>
-        </motion.div>
-
-        {/* Pipeline */}
-        <motion.div variants={itemVariants}>
-          <BentoCard className="p-4 sm:p-5 h-full">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Pipeline de Deals</h2>
-              <Link href="/crm/deals" className="text-[10px] flex items-center gap-0.5 font-medium"
-                style={{ color: "var(--green)" }}>Ver pipeline <ArrowUpRight className="w-3 h-3" /></Link>
-            </div>
-            {topDeals.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-6 gap-2">
-                <TrendingUp className="w-7 h-7 opacity-20" style={{ color: "var(--text-3)" }} />
-                <p className="text-xs" style={{ color: "var(--text-3)" }}>Nenhum deal aberto</p>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {topDeals.map((d: any, i) => (
-                  <div key={d.id}
-                    className="flex items-center gap-3 py-2 px-2 rounded-xl transition-colors hover:bg-white/5">
-                    <span className="text-xs font-bold w-4 flex-shrink-0 tabular-nums" style={{ color: "var(--text-3)" }}>{i + 1}</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>{d.title}</p>
-                      <p className="text-[10px] truncate" style={{ color: "var(--text-3)" }}>
-                        {d.contact_name || d.contact?.name || "Sem contato"}
-                      </p>
-                    </div>
-                    {d.value > 0 && (
-                      <span className="text-[11px] font-semibold flex-shrink-0" style={{ color: "var(--green)" }}>
-                        R${Number(d.value).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
-                      </span>
-                    )}
-                  </div>
-                ))}
-                {wonDeals.length > 0 && (
-                  <div className="mt-2 pt-2 border-t flex items-center justify-between px-2"
-                    style={{ borderColor: "rgba(255,255,255,0.06)" }}>
-                    <span className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-3)" }}>
-                      <Rocket className="w-3 h-3" style={{ color: "var(--green)" }} />Ganhos
-                    </span>
-                    <span className="text-xs font-semibold" style={{ color: "var(--green)" }}>{wonDeals.length}</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </BentoCard>
-        </motion.div>
-
-        {/* Agentes */}
-        <motion.div variants={itemVariants}>
-          <BentoCard className="p-4 sm:p-5 h-full">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                  style={{ background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.25)" }}>
-                  <Bot className="w-3.5 h-3.5" style={{ color: "#a78bfa" }} />
-                </div>
-                <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Agentes IA</h2>
-              </div>
-              <Link href="/agents" className="text-[10px] flex items-center gap-0.5 font-medium"
-                style={{ color: "var(--green)" }}>Gerenciar <ArrowUpRight className="w-3 h-3" /></Link>
-            </div>
-            <div className="space-y-0.5">
-              <MetricRow icon={Bot} label="Agentes ativos" value={agentStats.active_agents ?? 0} color="#a78bfa" />
-              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
-              <MetricRow icon={MessageSquare} label="Conversas tratadas" value={agentStats.handled_conversations ?? agentStats.conversations_handled ?? 0} color="#60a5fa" />
-              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
-              <MetricRow icon={Sparkles} label="Mensagens IA" value={agentStats.ai_messages ?? 0} color="#f472b6" />
-              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
-              <MetricRow icon={BarChart2} label="Taxa resolução"
-                value={agentStats.resolution_rate != null ? `${Math.round(agentStats.resolution_rate * 100)}%` : "—"}
-                color="#00d46a" />
-            </div>
-            {activeJourneys.length > 0 && (
-              <>
-                <div className="my-3 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
-                <div className="rounded-xl px-3 py-2.5"
-                  style={{ background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.15)" }}>
-                  <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#a78bfa" }}>
-                    Em execução
-                  </p>
-                  <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>
-                    {activeJourneys[0]?.name || "Jornada ativa"}
-                  </p>
-                  <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>
-                    {activeJourneys.length > 1 ? `+${activeJourneys.length - 1} outras` : "Em execução contínua"}
-                  </p>
-                </div>
-              </>
-            )}
-          </BentoCard>
-        </motion.div>
-      </motion.div>
-
-      {/* ── Row 4: Quick actions ──────────────────────────────────────────── */}
+      {/* ── Main float row: Timeline (dominant) + right cluster (offset) ─ */}
       <motion.div variants={containerVariants} initial="hidden" animate="show">
-        <motion.div variants={itemVariants}>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-            {[
-              { href: "/uniq-ai", icon: Sparkles, label: "Uniq AI", desc: "Pergunte, peça, automatize", color: "#00d46a", pulse: true },
-              { href: "/journeys", icon: Wand2, label: "Jornadas", desc: "Cadências automáticas", color: "#a78bfa", pulse: false },
-              { href: "/campaigns", icon: Megaphone, label: "Campanhas", desc: "Disparo em massa", color: "#fbbf24", pulse: false },
-              { href: "/crm/deals", icon: TrendingUp, label: "Pipeline", desc: "Deals e funil de vendas", color: "#60a5fa", pulse: false },
-            ].map(({ href, icon: Icon, label, desc, color, pulse }) => (
-              <Link key={href} href={href}
-                className="group flex items-center gap-3 rounded-2xl p-3 sm:p-4 transition-all duration-200"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
-                onMouseEnter={(e) => {
-                  const el = e.currentTarget as HTMLElement;
-                  el.style.borderColor = color + "55";
-                  el.style.background = color + "0d";
-                }}
-                onMouseLeave={(e) => {
-                  const el = e.currentTarget as HTMLElement;
-                  el.style.borderColor = "rgba(255,255,255,0.07)";
-                  el.style.background = "rgba(255,255,255,0.04)";
-                }}
-              >
-                <div className="relative w-9 h-9 flex-shrink-0">
-                  {pulse && <span className="absolute inset-0 rounded-xl animate-ping"
-                    style={{ background: `${color}30`, animationDuration: "2s" }} />}
-                  <div className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
-                    style={{ background: color + "18", border: `1px solid ${color}${pulse ? "50" : "30"}` }}>
-                    <Icon className="w-4 h-4" style={{ color }} />
+        <div className="flex flex-col lg:flex-row gap-4 items-start">
+
+          {/* Live Activity Timeline — dominant left column */}
+          <motion.div variants={itemVariants} className="w-full lg:w-[57%] flex-shrink-0">
+            <BentoCard className="p-4 sm:p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <LiveDot />
+                    <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Linha do Tempo</h2>
+                  </div>
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                    style={{ background: "rgba(0,212,106,0.1)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.2)" }}>
+                    Ao vivo
+                  </span>
+                </div>
+                <Link href="/agents" className="text-[10px] flex items-center gap-0.5 font-medium"
+                  style={{ color: "var(--text-3)" }}>
+                  Ver tudo <ArrowUpRight className="w-3 h-3" />
+                </Link>
+              </div>
+              {activities.length > 0 ? (
+                <div className="overflow-hidden" style={{ maxHeight: 300 }}>
+                  <AnimatePresence initial={false}>
+                    {activities.slice(0, 7).map((item: any, i: number) => (
+                      <TimelineEntry key={item.id ?? i} item={item} index={i} />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center"
+                    style={{ background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)" }}>
+                    <Activity className="w-5 h-5" style={{ color: "#a78bfa" }} />
+                  </div>
+                  <p className="text-xs text-center" style={{ color: "var(--text-3)" }}>
+                    Nenhuma atividade recente.<br />Ative um agente para ver o feed ao vivo.
+                  </p>
+                  <Link href="/agents" className="text-xs font-medium px-3 py-1.5 rounded-lg transition-all"
+                    style={{ background: "rgba(167,139,250,0.1)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.2)" }}>
+                    Configurar agentes →
+                  </Link>
+                </div>
+              )}
+            </BentoCard>
+          </motion.div>
+
+          {/* Right cluster — floated up, stacked chart + inbox */}
+          <div className="w-full lg:flex-1 flex flex-col gap-3 lg:-mt-5">
+            {/* Chart */}
+            <motion.div variants={itemVariants}>
+              <BentoCard className="p-4 sm:p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Semana</h2>
+                    <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>Conversas × Jornadas</p>
                   </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>{label}</p>
-                  <p className="text-[10px] truncate" style={{ color: "var(--text-3)" }}>{desc}</p>
+                <ResponsiveContainer width="100%" height={130}>
+                  <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gConv" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#00d46a" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="#00d46a" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gJorn" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="date" tick={{ fill: "#52526a", fontSize: 9 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: "#52526a", fontSize: 9 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Area type="monotone" dataKey="conversas" name="Conversas" stroke="#00d46a" strokeWidth={1.5} fill="url(#gConv)" dot={false} />
+                    <Area type="monotone" dataKey="jornadas" name="Jornadas" stroke="#a78bfa" strokeWidth={1.5} fill="url(#gJorn)" dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </BentoCard>
+            </motion.div>
+
+            {/* Inbox breakdown — shifted down slightly for layered feel */}
+            <motion.div variants={itemVariants} className="lg:mt-2">
+              <BentoCard className="p-4 sm:p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                    style={{ background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.25)" }}>
+                    <InboxIcon className="w-3.5 h-3.5" style={{ color: "#60a5fa" }} />
+                  </div>
+                  <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Inbox</h2>
+                  <Link href="/inbox" className="ml-auto flex items-center gap-0.5 text-[10px] font-medium"
+                    style={{ color: "var(--green)" }}>
+                    Abrir <ArrowRight className="w-3 h-3" />
+                  </Link>
                 </div>
-                <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all group-hover:translate-x-0.5 flex-shrink-0"
-                  style={{ color }} />
-              </Link>
-            ))}
+                <div className="space-y-0.5">
+                  <MetricRow icon={MessageSquare} label="Abertas" value={conv.open ?? 0} color="#00d46a" />
+                  <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+                  <MetricRow icon={Clock} label="Pendentes" value={conv.pending ?? 0} color="#fbbf24" />
+                  <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+                  <MetricRow icon={AlertCircle} label="Sem atribuição" value={conv.unassigned_open ?? 0} color="#60a5fa" />
+                  <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+                  <MetricRow icon={CheckCircle2} label="Resolvidas" value={conv.resolved ?? 0} color="#4ade80" />
+                </div>
+              </BentoCard>
+            </motion.div>
           </div>
-        </motion.div>
+        </div>
+      </motion.div>
+
+      {/* ── Bottom float cluster: Instances + Pipeline + Agents ─────────── */}
+      <motion.div variants={containerVariants} initial="hidden" animate="show">
+        <div className="flex flex-col lg:flex-row gap-4 items-start">
+
+          {/* Instâncias — 32% */}
+          <motion.div variants={itemVariants} className="w-full lg:w-[32%] flex-shrink-0">
+            <BentoCard className="p-4 sm:p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Instâncias</h2>
+                <Link href="/instances" className="text-[10px] flex items-center gap-0.5 font-medium"
+                  style={{ color: "var(--green)" }}>Ver todas <ArrowUpRight className="w-3 h-3" /></Link>
+              </div>
+              {instances.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-6 gap-2">
+                  <Smartphone className="w-7 h-7 opacity-20" style={{ color: "var(--text-3)" }} />
+                  <p className="text-xs" style={{ color: "var(--text-3)" }}>Nenhuma instância</p>
+                  <Link href="/instances" className="text-xs font-medium" style={{ color: "var(--green)" }}>Criar agora →</Link>
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  {instances.slice(0, 5).map((inst) => <InstanceRow key={inst.id} inst={inst} />)}
+                  {instances.length > 5 && (
+                    <Link href="/instances" className="block text-center text-xs py-2 font-medium"
+                      style={{ color: "var(--text-3)" }}>+{instances.length - 5} mais</Link>
+                  )}
+                </div>
+              )}
+            </BentoCard>
+          </motion.div>
+
+          {/* Pipeline — 38% */}
+          <motion.div variants={itemVariants} className="w-full lg:w-[38%] flex-shrink-0">
+            <BentoCard className="p-4 sm:p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Pipeline de Deals</h2>
+                <Link href="/crm/deals" className="text-[10px] flex items-center gap-0.5 font-medium"
+                  style={{ color: "var(--green)" }}>Ver pipeline <ArrowUpRight className="w-3 h-3" /></Link>
+              </div>
+              {topDeals.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-6 gap-2">
+                  <TrendingUp className="w-7 h-7 opacity-20" style={{ color: "var(--text-3)" }} />
+                  <p className="text-xs" style={{ color: "var(--text-3)" }}>Nenhum deal aberto</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {topDeals.map((d: any, i) => (
+                    <div key={d.id}
+                      className="flex items-center gap-3 py-2 px-2 rounded-xl transition-colors hover:bg-white/5">
+                      <span className="text-xs font-bold w-4 flex-shrink-0 tabular-nums" style={{ color: "var(--text-3)" }}>{i + 1}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>{d.title}</p>
+                        <p className="text-[10px] truncate" style={{ color: "var(--text-3)" }}>
+                          {d.contact_name || d.contact?.name || "Sem contato"}
+                        </p>
+                      </div>
+                      {d.value > 0 && (
+                        <span className="text-[11px] font-semibold flex-shrink-0" style={{ color: "var(--green)" }}>
+                          R${Number(d.value).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                  {wonDeals.length > 0 && (
+                    <div className="mt-2 pt-2 border-t flex items-center justify-between px-2"
+                      style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+                      <span className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-3)" }}>
+                        <Rocket className="w-3 h-3" style={{ color: "var(--green)" }} />Ganhos
+                      </span>
+                      <span className="text-xs font-semibold" style={{ color: "var(--green)" }}>{wonDeals.length}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </BentoCard>
+          </motion.div>
+
+          {/* Agentes — rest of width, floated up for depth */}
+          <motion.div variants={itemVariants} className="w-full lg:flex-1 lg:-mt-7">
+            <BentoCard className="p-4 sm:p-5" highlight accentColor="rgba(167,139,250,0.08)">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                    style={{ background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.3)" }}>
+                    <Bot className="w-3.5 h-3.5" style={{ color: "#a78bfa" }} />
+                  </div>
+                  <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Agentes IA</h2>
+                </div>
+                <Link href="/agents" className="text-[10px] flex items-center gap-0.5 font-medium"
+                  style={{ color: "var(--green)" }}>Gerenciar <ArrowUpRight className="w-3 h-3" /></Link>
+              </div>
+              <div className="space-y-0.5">
+                <MetricRow icon={Bot} label="Agentes ativos" value={agentStats.active_agents ?? 0} color="#a78bfa" />
+                <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+                <MetricRow icon={MessageSquare} label="Conversas tratadas" value={agentStats.handled_conversations ?? agentStats.conversations_handled ?? 0} color="#60a5fa" />
+                <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+                <MetricRow icon={Sparkles} label="Mensagens IA" value={agentStats.ai_messages ?? 0} color="#f472b6" />
+                <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+                <MetricRow icon={BarChart2} label="Taxa resolução"
+                  value={agentStats.resolution_rate != null ? `${Math.round(agentStats.resolution_rate * 100)}%` : "—"}
+                  color="#00d46a" />
+              </div>
+              {activeJourneys.length > 0 && (
+                <>
+                  <div className="my-3 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+                  <div className="rounded-xl px-3 py-2.5"
+                    style={{ background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.15)" }}>
+                    <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#a78bfa" }}>
+                      Em execução
+                    </p>
+                    <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>
+                      {activeJourneys[0]?.name || "Jornada ativa"}
+                    </p>
+                    <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>
+                      {activeJourneys.length > 1 ? `+${activeJourneys.length - 1} outras` : "Em execução contínua"}
+                    </p>
+                  </div>
+                </>
+              )}
+            </BentoCard>
+          </motion.div>
+        </div>
       </motion.div>
     </div>
   );
