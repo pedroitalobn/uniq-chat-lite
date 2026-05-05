@@ -337,6 +337,26 @@ func (m *Manager) SaveMessageEx(in SaveMessageInput) error {
 				}
 			}
 
+			// Última tentativa: pergunta o whatsmeow Store.Contacts. Pega o
+			// nome que o WhatsApp resolveu via histórico/contatos do device.
+			// Útil pra mensagens vindas do history sync (sem push_name no
+			// envelope) e pra contatos novos antes do CRM ser criado.
+			if contactName == "" || contactName == phone {
+				if client := m.GetInstance(instanceID); client != nil && client.IsConnected() {
+					sender := senderJID
+					if sender == "" {
+						sender = toJID
+					}
+					if name, push := client.GetContactInfo(sender); name != "" || push != "" {
+						if push != "" {
+							contactName = push
+						} else {
+							contactName = name
+						}
+					}
+				}
+			}
+
 			// Fallback to phone number
 			if contactName == "" {
 				contactName = phone
@@ -344,10 +364,17 @@ func (m *Manager) SaveMessageEx(in SaveMessageInput) error {
 		}
 	}
 
-	// Try to get avatar from WhatsApp (async, non-blocking for speed)
-	if client := m.GetInstance(instanceID); client != nil && client.IsConnected() {
+	// Try to get avatar from WhatsApp. Cache em memória (avatarCache) por
+	// JID com TTL longo: a URL é signed e dura horas, e o GetProfilePictureInfo
+	// faz IQ pro WhatsApp — chamar a cada mensagem inflava a latência e
+	// disparava rate-limit em conversas ativas. Cache miss → IQ + Store
+	// + log. Cache hit → uso direto.
+	if cached, ok := loadAvatarCache(toJID); ok {
+		contactAvatar = cached
+	} else if client := m.GetInstance(instanceID); client != nil && client.IsConnected() {
 		if picURL := client.GetContactProfilePicture(toJID); picURL != "" {
 			contactAvatar = picURL
+			storeAvatarCache(toJID, picURL)
 		}
 	}
 
@@ -676,6 +703,39 @@ func messageIDs(msgs []models.MessageLog) []uuid.UUID {
 // falhar transitoriamente (rate limit, timeout). Map[jid]name.
 var groupNameCache sync.Map
 
+// avatarCache mantém URL da foto de perfil por JID com TTL — sem isso
+// chamávamos GetProfilePictureInfo a cada mensagem que entra, queimando
+// o quota de IQ contra o WhatsApp e atrasando o pipeline. URLs são
+// signed do CDN da Meta e duram horas; cache de 1h é seguro.
+type avatarEntry struct {
+	url string
+	at  time.Time
+}
+
+const avatarCacheTTL = 1 * time.Hour
+
+var avatarCache sync.Map // jid → avatarEntry
+
+func loadAvatarCache(jid string) (string, bool) {
+	v, ok := avatarCache.Load(jid)
+	if !ok {
+		return "", false
+	}
+	e, ok := v.(avatarEntry)
+	if !ok {
+		return "", false
+	}
+	if time.Since(e.at) > avatarCacheTTL {
+		avatarCache.Delete(jid)
+		return "", false
+	}
+	return e.url, true
+}
+
+func storeAvatarCache(jid, url string) {
+	avatarCache.Store(jid, avatarEntry{url: url, at: time.Now()})
+}
+
 // refetchGroupNameLater tenta de novo após 5s. Se conseguir o nome, atualiza
 // MessageLogs+Conversation desse grupo na instância. Idempotente — não faz
 // nada se o cache já tem o nome ou se o fetch falhar de novo.
@@ -758,6 +818,28 @@ func upsertPushName(m *Manager, instanceID, jid, name string) {
 		Where("instance_id = ? AND channel_key = ? AND (push_name = '' OR push_name IS NULL)",
 			instUUID, jid).
 		Update("push_name", name)
+	// Avatar opportunistic: piggyback no evento de nome pra também preencher
+	// a foto de perfil — same JID, mesmo cache. Se a foto já está cacheada
+	// localmente, escreve direto na Conversation; senão faz IQ uma vez e
+	// cacheia. Sem isso o avatar só aparece depois de uma mensagem nova.
+	if avatar, ok := loadAvatarCache(jid); ok {
+		m.db.Model(&models.Conversation{}).
+			Where("instance_id = ? AND channel_key = ? AND (avatar_url = '' OR avatar_url IS NULL)",
+				instUUID, jid).
+			Update("avatar_url", avatar)
+	} else if client := m.GetInstance(instanceID); client != nil && client.IsConnected() {
+		if pic := client.GetContactProfilePicture(jid); pic != "" {
+			storeAvatarCache(jid, pic)
+			m.db.Model(&models.Conversation{}).
+				Where("instance_id = ? AND channel_key = ? AND (avatar_url = '' OR avatar_url IS NULL)",
+					instUUID, jid).
+				Update("avatar_url", pic)
+			// Também escreve em Contact se ainda vazio
+			m.db.Model(&models.Contact{}).
+				Where("phone LIKE ? AND (avatar_url = '' OR avatar_url IS NULL)", "%"+phone+"%").
+				Update("avatar_url", pic)
+		}
+	}
 	log.Debug().
 		Str("instance_id", instanceID).
 		Str("jid", jid).
@@ -767,7 +849,8 @@ func upsertPushName(m *Manager, instanceID, jid, name string) {
 
 // applyGroupName persiste o nome resolvido em MessageLog/Conversation. Extraído
 // do refetch original pra ser chamável de outros call sites (ex: webhook
-// consumer de events.GroupInfo).
+// consumer de events.GroupInfo). Também propaga avatar do grupo se o
+// client estiver conectado (cache miss) — mata 2 birds com 1 só refetch.
 func applyGroupName(m *Manager, instanceID, groupJID, name string) {
 	if m.db == nil {
 		return
@@ -780,10 +863,25 @@ func applyGroupName(m *Manager, instanceID, groupJID, name string) {
 	m.db.Model(&models.MessageLog{}).
 		Where("instance_id = ? AND to_jid = ? AND contact_name LIKE ?", instUUID, groupJID, "Grupo %").
 		Update("contact_name", name)
-	// Conversation: se contato é nil ou subject vazio, define subject = nome
+	// Conversation: define subject + push_name pro grupo. Push_name é o
+	// fallback de exibição quando ContactID é nulo (grupos não viram Contact).
 	m.db.Model(&models.Conversation{}).
 		Where("instance_id = ? AND channel_key = ? AND (subject = '' OR subject IS NULL)", instUUID, groupJID).
 		Update("subject", name)
+	m.db.Model(&models.Conversation{}).
+		Where("instance_id = ? AND channel_key = ? AND (push_name = '' OR push_name IS NULL)", instUUID, groupJID).
+		Update("push_name", name)
+	// Avatar do grupo — busca se ainda não cacheamos
+	if _, ok := loadAvatarCache(groupJID); !ok {
+		if client := m.GetInstance(instanceID); client != nil && client.IsConnected() {
+			if pic := client.GetContactProfilePicture(groupJID); pic != "" {
+				storeAvatarCache(groupJID, pic)
+				m.db.Model(&models.Conversation{}).
+					Where("instance_id = ? AND channel_key = ? AND (avatar_url = '' OR avatar_url IS NULL)", instUUID, groupJID).
+					Update("avatar_url", pic)
+			}
+		}
+	}
 }
 
 func extractPhoneFromJID(jid string) string {

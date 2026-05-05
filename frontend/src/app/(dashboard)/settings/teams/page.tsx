@@ -8,6 +8,7 @@ import { teamsApi, departmentsApi, workspacesApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { InboxSettingsHeader } from "@/components/inbox/InboxSettingsHeader";
 
 interface Team {
   id: string;
@@ -91,13 +92,11 @@ export default function TeamsPage() {
   if (!canView) return <Forbidden />;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8 p-6">
-      <header>
-        <h1 className="text-2xl font-medium">Equipes</h1>
-        <p className="text-sm text-zinc-500">
-          Agrupe atendentes por equipe. Use departamentos para organização hierárquica.
-        </p>
-      </header>
+    <div className="mx-auto max-w-5xl space-y-8 p-6" style={{ color: "var(--text-1)" }}>
+      <InboxSettingsHeader
+        title="Equipes"
+        description="Agrupe atendentes por equipe. Use departamentos para organização hierárquica."
+      />
 
       {canManage && (
         <form
@@ -105,18 +104,18 @@ export default function TeamsPage() {
             e.preventDefault();
             if (name.trim()) create.mutate();
           }}
-          className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50"
+          className="rounded-lg p-4 uniq-card-dark"
         >
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <input
-              className="col-span-1 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="col-span-1 rounded-md px-3 py-2 text-sm uniq-input-dark"
               placeholder="Nome da equipe"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
             />
             <select
-              className="col-span-1 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="col-span-1 rounded-md px-3 py-2 text-sm uniq-input-dark"
               value={departmentId}
               onChange={(e) => setDepartmentId(e.target.value)}
             >
@@ -141,7 +140,7 @@ export default function TeamsPage() {
       <div className="grid gap-6 md:grid-cols-2">
         <section>
           <h2 className="mb-3 text-sm font-medium text-zinc-500">Equipes</h2>
-          <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+          <ul className="rounded-lg uniq-list-dark">
             {isLoading && <li className="p-4 text-sm text-zinc-500">Carregando…</li>}
             {!isLoading && !teams?.items.length && (
               <li className="p-4 text-sm text-zinc-500">Nenhuma equipe criada ainda.</li>
@@ -248,7 +247,7 @@ function TeamMembers({
         <UserPlus className="h-4 w-4" />
         Membros
       </h2>
-      <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+      <ul className="rounded-lg uniq-list-dark">
         {!members?.items.length && (
           <li className="p-4 text-sm text-zinc-500">Sem membros. Adicione abaixo.</li>
         )}

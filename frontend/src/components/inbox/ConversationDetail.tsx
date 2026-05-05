@@ -851,7 +851,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               Sem mensagens ainda.
             </div>
           ) : (
-            <ol className="mx-auto flex max-w-3xl flex-col gap-3">
+            <ol className="mx-auto flex w-full max-w-[min(80rem,100%)] flex-col gap-3">
               <div ref={topSentinelRef} />
               {timelineQ.isFetchingNextPage && (
                 <div

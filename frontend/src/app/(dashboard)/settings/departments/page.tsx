@@ -8,6 +8,7 @@ import { departmentsApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { InboxSettingsHeader } from "@/components/inbox/InboxSettingsHeader";
 
 interface Department {
   id: string;
@@ -62,13 +63,11 @@ export default function DepartmentsPage() {
   if (!canView) return <Forbidden />;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8 p-6">
-      <header>
-        <h1 className="text-2xl font-medium">Departamentos</h1>
-        <p className="text-sm text-zinc-500">
-          Organize filas e equipes por departamento (Vendas, Suporte, Financeiro…).
-        </p>
-      </header>
+    <div className="mx-auto max-w-3xl space-y-8 p-6" style={{ color: "var(--text-1)" }}>
+      <InboxSettingsHeader
+        title="Departamentos"
+        description="Organize filas e equipes por departamento (Vendas, Suporte, Financeiro…)."
+      />
 
       {canManage && (
         <form
@@ -76,18 +75,18 @@ export default function DepartmentsPage() {
             e.preventDefault();
             if (name.trim()) create.mutate();
           }}
-          className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50"
+          className="rounded-lg p-4 uniq-card-dark"
         >
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <input
-              className="col-span-1 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="col-span-1 rounded-md px-3 py-2 text-sm uniq-input-dark"
               placeholder="Nome do departamento"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
             />
             <input
-              className="col-span-1 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 md:col-span-2"
+              className="col-span-1 rounded-md px-3 py-2 text-sm uniq-input-dark md:col-span-2"
               placeholder="Descrição (opcional)"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -114,7 +113,7 @@ export default function DepartmentsPage() {
         </form>
       )}
 
-      <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+      <ul className="rounded-lg uniq-list-dark">
         {isLoading && <li className="p-6 text-sm text-zinc-500">Carregando…</li>}
         {!isLoading && !data?.items.length && (
           <li className="p-6 text-sm text-zinc-500">Nenhum departamento criado ainda.</li>

@@ -1145,3 +1145,46 @@ html { scroll-behavior: smooth; }
   animation: liquid-shimmer 1.6s ease-in-out infinite;
   border-radius: 12px;
 }
+
+/* ── Settings pages dark theme helpers ────────────────────────────────────
+ * As páginas de gestão (Filas/Equipes/Departamentos/Respostas Rápidas)
+ * foram construídas originalmente com Tailwind light + dark: variants e
+ * davam contraste ruim em alguns viewports (texto preto em fundo
+ * cinza-claro). Estas classes fixam o tema dark do app sem precisar
+ * reescrever cada página. */
+.uniq-input-dark {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  color: var(--text-1);
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.uniq-input-dark:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.uniq-input-dark:focus {
+  border-color: rgba(0, 212, 106, 0.45);
+  background: rgba(255, 255, 255, 0.06);
+}
+.uniq-input-dark::placeholder {
+  color: var(--text-3);
+}
+.uniq-input-dark option {
+  background: #14161e;
+  color: var(--text-1);
+}
+
+.uniq-card-dark {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-1);
+}
+
+.uniq-list-dark {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-1);
+}
+.uniq-list-dark > * + * {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}

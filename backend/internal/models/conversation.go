@@ -52,6 +52,15 @@ type Conversation struct {
 	SubStatus string               `gorm:"type:varchar(40)" json:"sub_status,omitempty"`
 	Subject   string               `gorm:"type:varchar(255)" json:"subject,omitempty"`
 
+	// PushName: nome de exibição capturado de events.PushName/Contact ou
+	// do envelope da mensagem. É o fallback quando ContactID é nulo (ex.:
+	// mensagens recebidas antes do contato ser criado no CRM).
+	// AvatarURL: URL preview da foto de perfil (whatsmeow GetProfilePictureInfo).
+	// Ambos são propagados pra ConversationRow.push_name/contact.avatar_url
+	// no frontend e re-resolvidos por events.* assíncronos.
+	PushName  string `gorm:"type:varchar(255);index" json:"push_name,omitempty"`
+	AvatarURL string `gorm:"type:text" json:"avatar_url,omitempty"`
+
 	FirstResponseAt   *time.Time `json:"first_response_at,omitempty"`
 	LastCustomerMsgAt *time.Time `json:"last_customer_msg_at,omitempty"`
 	LastAgentMsgAt    *time.Time `json:"last_agent_msg_at,omitempty"`

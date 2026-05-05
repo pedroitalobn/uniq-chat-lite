@@ -191,26 +191,57 @@ export function SidebarDock() {
 
   const [mobileOpen,    setMobileOpen]    = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
-  const [expanded, setExpanded]           = useState(false);
+  // userExpanded é a preferência persistida (clique no botão recolher).
+  // hoverExpanded é o estado transient do mouse-over: quando o usuário
+  // passa o mouse no dock recolhido, expande temporariamente como um
+  // dock real do macOS — voltando ao estado salvo quando o mouse sai.
+  const [userExpanded, setUserExpanded] = useState(false);
+  const [hoverExpanded, setHoverExpanded] = useState(false);
+  const expanded = userExpanded || hoverExpanded;
+  const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Persist expand state
   useEffect(() => {
     const saved = localStorage.getItem(LS_KEY);
-    if (saved === "true") setExpanded(true);
+    if (saved === "true") setUserExpanded(true);
   }, []);
   const toggleExpanded = () => {
-    setExpanded((v) => {
+    setUserExpanded((v) => {
       localStorage.setItem(LS_KEY, (!v).toString());
       return !v;
     });
   };
 
-  // Sync CSS vars so Dynamic Island + content area align correctly
+  // Pequeno delay no exit pra evitar flicker quando o cursor passa por
+  // gaps entre items. Entrada é instantânea pra UX responsiva.
+  const handleDockEnter = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setHoverExpanded(true);
+  };
+  const handleDockLeave = () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => {
+      setHoverExpanded(false);
+      hoverTimerRef.current = null;
+    }, 180);
+  };
   useEffect(() => {
-    const w = expanded ? DOCK_W_EXPANDED : DOCK_W_COLLAPSED;
+    return () => {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    };
+  }, []);
+
+  // Sync CSS vars so Dynamic Island + content area align correctly. Usa
+  // userExpanded (não o effective expanded) pelo mesmo motivo do spacer:
+  // hover não pode causar reflow do conteúdo.
+  useEffect(() => {
+    const w = userExpanded ? DOCK_W_EXPANDED : DOCK_W_COLLAPSED;
     document.documentElement.style.setProperty("--sidebar-w", `${w}px`);
     document.documentElement.style.setProperty("--sidebar-w-offset", `${w / 2}px`);
-  }, [expanded]);
+  }, [userExpanded]);
 
   const { currentWorkspace, setCurrentWorkspace, workspaces } = useWorkspace();
   const { hasPerm, hasAnyPerm, isSuperAdmin, isLoading: permsLoading } = useWorkspacePermissions();
@@ -287,10 +318,17 @@ export function SidebarDock() {
   ];
 
   // ─── Desktop dock content ──────────────────────────────────────────────────
+  // dockW = largura visual atual (responde a hover + clique).
+  // spacerW = largura do espaçador que empurra o conteúdo. Mantém só o que
+  // o usuário escolheu — assim o hover não causa layout shift do conteúdo
+  // (o dock é position:fixed; o spacer não precisa acompanhar o hover).
   const dockW = expanded ? DOCK_W_EXPANDED : DOCK_W_COLLAPSED;
+  const spacerW = userExpanded ? DOCK_W_EXPANDED : DOCK_W_COLLAPSED;
 
   const DesktopDock = (
     <motion.div
+      onMouseEnter={handleDockEnter}
+      onMouseLeave={handleDockLeave}
       animate={{ width: dockW }}
       transition={{ type: "spring", damping: 26, stiffness: 280 }}
       style={{
@@ -493,10 +531,12 @@ export function SidebarDock() {
         {DesktopDock}
       </div>
 
-      {/* Spacer so content doesn't overlap the dock */}
+      {/* Spacer so content doesn't overlap the dock. Mantém a largura do
+          estado SAVED (userExpanded) — não acompanha hover, pra não fazer
+          a UI inteira mexer enquanto o dock expande temporariamente. */}
       <motion.div
         className="hidden lg:block"
-        animate={{ width: dockW + 20 }}
+        animate={{ width: spacerW + 20 }}
         transition={{ type: "spring", damping: 26, stiffness: 280 }}
         style={{ flexShrink: 0 }}
       />

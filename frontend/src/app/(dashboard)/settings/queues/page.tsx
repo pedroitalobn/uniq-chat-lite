@@ -12,6 +12,7 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
+import { InboxSettingsHeader } from "@/components/inbox/InboxSettingsHeader";
 
 interface Queue {
   id: string;
@@ -137,13 +138,11 @@ export default function QueuesPage() {
   if (!canView) return <Forbidden />;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 p-6">
-      <header>
-        <h1 className="text-2xl font-medium">Filas</h1>
-        <p className="text-sm text-zinc-500">
-          Defina como os atendimentos são distribuídos: estratégia, horário, SLA e canais.
-        </p>
-      </header>
+    <div className="mx-auto max-w-6xl space-y-8 p-6" style={{ color: "var(--text-1)" }}>
+      <InboxSettingsHeader
+        title="Filas"
+        description="Defina como os atendimentos são distribuídos: estratégia, horário, SLA e canais."
+      />
 
       {canManage && (
         <form
@@ -151,18 +150,18 @@ export default function QueuesPage() {
             e.preventDefault();
             if (name.trim()) create.mutate();
           }}
-          className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50"
+          className="rounded-lg p-4 uniq-card-dark"
         >
           <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             <input
-              className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="rounded-md px-3 py-2 text-sm uniq-input-dark"
               placeholder="Nome da fila"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
             />
             <select
-              className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="rounded-md px-3 py-2 text-sm uniq-input-dark"
               value={strategy}
               onChange={(e) => setStrategy(e.target.value as QueueAssignmentStrategy)}
             >
@@ -173,7 +172,7 @@ export default function QueuesPage() {
               ))}
             </select>
             <select
-              className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="rounded-md px-3 py-2 text-sm uniq-input-dark"
               value={depId}
               onChange={(e) => setDepId(e.target.value)}
             >
@@ -183,7 +182,7 @@ export default function QueuesPage() {
               ))}
             </select>
             <select
-              className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="rounded-md px-3 py-2 text-sm uniq-input-dark"
               value={teamId}
               onChange={(e) => setTeamId(e.target.value)}
             >
@@ -208,7 +207,7 @@ export default function QueuesPage() {
         </form>
       )}
 
-      <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+      <ul className="rounded-lg uniq-list-dark">
         {isLoading && <li className="p-6 text-sm text-zinc-500">Carregando…</li>}
         {!isLoading && !queues?.items.length && (
           <li className="p-6 text-sm text-zinc-500">Nenhuma fila criada ainda.</li>
@@ -382,7 +381,7 @@ function QueueSettings({
     <div className="space-y-4">
       <Field label="Estratégia de atribuição">
         <select
-          className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-full rounded-md px-3 py-2 text-sm uniq-input-dark"
           value={strategy}
           onChange={(e) => setStrategy(e.target.value as QueueAssignmentStrategy)}
           disabled={!canManage}
@@ -399,7 +398,7 @@ function QueueSettings({
           <input
             type="number"
             min={0}
-            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded-md px-3 py-2 text-sm uniq-input-dark"
             value={maxConcurrent}
             onChange={(e) => setMaxConcurrent(Number(e.target.value))}
             disabled={!canManage}
@@ -409,7 +408,7 @@ function QueueSettings({
           <input
             type="number"
             min={0}
-            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full rounded-md px-3 py-2 text-sm uniq-input-dark"
             value={reopenWindow}
             onChange={(e) => setReopenWindow(Number(e.target.value))}
             disabled={!canManage}
@@ -420,7 +419,7 @@ function QueueSettings({
       <Field label="Prioridade (quanto maior, vence em empate)">
         <input
           type="number"
-          className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-full rounded-md px-3 py-2 text-sm uniq-input-dark"
           value={priority}
           onChange={(e) => setPriority(Number(e.target.value))}
           disabled={!canManage}

@@ -7,6 +7,7 @@ import { Plus, Trash2, Lock, Lightbulb } from "lucide-react";
 import { quickRepliesApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
+import { InboxSettingsHeader } from "@/components/inbox/InboxSettingsHeader";
 
 interface QuickReply {
   id: string;
@@ -73,37 +74,35 @@ export default function QuickRepliesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8 p-6">
-      <header>
-        <h1 className="text-2xl font-medium">Respostas rápidas</h1>
-        <p className="text-sm text-zinc-500">
-          Atalhos que o atendente usa no composer digitando <code className="rounded bg-zinc-100 px-1 text-[11px] dark:bg-zinc-800">/shortcut</code>.
-        </p>
-      </header>
+    <div className="mx-auto max-w-3xl space-y-8 p-6" style={{ color: "var(--text-1)" }}>
+      <InboxSettingsHeader
+        title="Respostas rápidas"
+        description="Atalhos que o atendente usa no composer digitando /shortcut."
+      />
 
       <form
         onSubmit={(e) => {
           e.preventDefault();
           if (body.trim()) create.mutate();
         }}
-        className="space-y-3 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/50"
+        className="space-y-3 rounded-lg p-4 uniq-card-dark"
       >
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <input
-            className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="rounded-md px-3 py-2 text-sm uniq-input-dark"
             placeholder="/saudacao"
             value={shortcut}
             onChange={(e) => setShortcut(e.target.value)}
           />
           <input
-            className="col-span-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className="col-span-2 rounded-md px-3 py-2 text-sm uniq-input-dark"
             placeholder="Título (opcional)"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
         </div>
         <textarea
-          className="w-full min-h-24 resize-y rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          className="w-full min-h-24 resize-y rounded-md px-3 py-2 text-sm uniq-input-dark"
           placeholder="Corpo da mensagem. Use variáveis como {{contact.name}} (renderização na Fase 3+)."
           value={body}
           onChange={(e) => setBody(e.target.value)}
@@ -146,7 +145,7 @@ export default function QuickRepliesPage() {
         ))}
       </div>
 
-      <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+      <ul className="rounded-lg uniq-list-dark">
         {isLoading && <li className="p-6 text-sm text-zinc-500">Carregando…</li>}
         {!isLoading && !data?.items.length && (
           <li className="flex items-center gap-2 p-6 text-sm text-zinc-500">
