@@ -175,7 +175,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
         <PageContextRegistrar pathname={pathname || ""} />
         <UsageBanner />
         <div className="flex-1 px-4 sm:px-6 py-6 lg:py-8 pt-16 lg:pt-8 pb-14 md:pb-8 overflow-y-auto">
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={pathname}
               initial={{ opacity: 0, y: 6, scale: 0.998 }}
@@ -201,7 +201,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
         <UsageBanner />
         <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pt-16 lg:pt-8 pb-14 md:pb-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
-            <AnimatePresence mode="wait">
+            <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={pathname}
                 initial={{ opacity: 0, y: 6, scale: 0.998 }}
@@ -227,7 +227,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
       <PageContextRegistrar pathname={pathname || ""} />
       <UsageBanner />
       <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pt-16 lg:pt-8 pb-14 md:pb-8 overflow-y-auto">
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={pathname}
             initial={{ opacity: 0, y: 6, scale: 0.998 }}
