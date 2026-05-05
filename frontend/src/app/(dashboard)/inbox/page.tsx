@@ -39,7 +39,7 @@ import type { ChannelInfo, Instance } from "@/types";
 // header mostra um CTA "Sincronizar histórico" que chama o backfill.
 
 type StatusTab = "all" | "open" | "pending" | "snoozed" | "unassigned" | "resolved" | "closed";
-type ViewKind = "all" | "messages" | "groups" | "contacts" | "channels";
+type ViewKind = "all" | "messages" | "groups" | "contacts" | "channels" | "status";
 
 // Filtros persistidos por workspace — sobrevivem a F5 e troca de janela.
 // Chave inclui wsId pra cada workspace ter sua própria configuração de inbox.
@@ -523,18 +523,21 @@ function InboxPage() {
     }
     const arr = Array.from(seen.values());
     // Filtragem client-side por tipo (mensagens 1:1 / grupos / contatos /
-    // canais). Quando viewKind="all" não filtra. "messages" exclui grupos,
-    // canais e status; "contacts" só conversas com contact resolvido.
-    if (viewKind === "all") return arr;
+    // canais / status). Status do WhatsApp (status@broadcast) ficam SEMPRE
+    // ocultos no modo "all" — a UX antiga colava esses broadcasts no meio
+    // dos atendimentos como se fosse um chat chamado "cad" (channel_key
+    // truncado). Agora só aparecem quando o agente seleciona viewKind="status".
     return arr.filter((c) => {
       const k = c.channel_key;
       const group = isGroupKey(k);
       const newsletter = isNewsletterKey(k);
       const status = isStatusKey(k);
       switch (viewKind) {
+        case "all": return !status;
         case "messages": return !group && !newsletter && !status;
         case "groups": return group;
         case "channels": return newsletter;
+        case "status": return status;
         case "contacts": return !!c.contact?.id && !group && !newsletter && !status;
         default: return true;
       }
@@ -596,6 +599,7 @@ function InboxPage() {
       case "groups": return "Grupos";
       case "contacts": return "Contatos";
       case "channels": return "Canais";
+      case "status": return "Status";
       default: return "Todos os tipos";
     }
   })();
@@ -726,6 +730,7 @@ function InboxPage() {
                 { id: "groups", label: "Grupos" },
                 { id: "contacts", label: "Contatos" },
                 { id: "channels", label: "Canais / Newsletter" },
+                { id: "status", label: "Status (broadcast)" },
               ]}
               selected={viewKind}
               onChange={(id) => setViewKind(id as ViewKind)}

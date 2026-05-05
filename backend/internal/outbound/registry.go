@@ -158,18 +158,24 @@ func (r *Registry) sendWhatsApp(inst *models.Instance, msg OutboundMessage) (*Se
 			}
 			return &SendResult{ExternalID: id, Status: models.MessageStatusSent}, nil
 		case "audio":
-			// WhatsApp recebe áudio via codec Opus; aceita containers
-			// webm/opus e ogg/opus indistintamente porque decoda pelo
-			// codec (não pelo container). Browser MediaRecorder produz
-			// webm/opus em Chrome e mp4/aac em Safari. Forçamos mime
-			// "audio/ogg; codecs=opus" + PTT=true pra mensagens curtas
-			// virarem voice notes nativos. Áudios maiores (anexo
-			// arrastado pelo paperclip, m4a/mp3) mantêm PTT=false.
-			low := strings.ToLower(mime)
-			isOpus := strings.Contains(low, "opus") || strings.Contains(low, "webm") || strings.Contains(low, "ogg")
+			// WhatsApp aceita áudio via codec Opus em containers WebM ou OGG
+			// e marca como voice note (PTT) quando AudioMessage.PTT=true.
+			// Outros formatos (mp3, m4a, wav) DEVEM ir como anexo (PTT=false)
+			// — PTT=true com mime não-Opus faz o destinatário receber como
+			// "áudio indisponível".
+			//
+			// A detecção pelo MIME string é frágil: o frontend manda
+			// "audio/webm;codecs=opus" mas o upload pode descartar o sufixo,
+			// e o Content-Type retornado pelo MinIO depende do que o cliente
+			// salvou. Por isso fazemos detecção em duas fases:
+			//   1) sniff dos primeiros bytes (signature do container);
+			//   2) fallback no MIME declarado.
+			isOpus := isOpusBytes(data) || mimeIsOpus(mime)
 			outMime := mime
 			isPTT := false
 			if isOpus {
+				// Normaliza pra "audio/ogg; codecs=opus" — formato canônico
+				// que o whatsmeow propaga corretamente no protobuf.
 				outMime = "audio/ogg; codecs=opus"
 				isPTT = true
 			}
@@ -204,6 +210,36 @@ func (r *Registry) sendWhatsApp(inst *models.Instance, msg OutboundMessage) (*Se
 		return nil, err
 	}
 	return &SendResult{ExternalID: id, Status: models.MessageStatusSent}, nil
+}
+
+// isOpusBytes inspeciona os primeiros bytes do payload pra reconhecer
+// containers que carregam Opus:
+//   - OGG: assinatura "OggS" nos 4 primeiros bytes (RFC 3533).
+//   - WebM/Matroska: assinatura EBML 0x1A 0x45 0xDF 0xA3.
+// Não é uma análise profunda do codec interno — para o propósito do
+// dispatch é suficiente: o WhatsApp aceita Opus em ambos os containers.
+// Quem envia MP3/AAC nunca bate aqui (assinatura diferente).
+func isOpusBytes(data []byte) bool {
+	if len(data) < 4 {
+		return false
+	}
+	if data[0] == 'O' && data[1] == 'g' && data[2] == 'g' && data[3] == 'S' {
+		return true
+	}
+	if data[0] == 0x1A && data[1] == 0x45 && data[2] == 0xDF && data[3] == 0xA3 {
+		return true
+	}
+	return false
+}
+
+// mimeIsOpus testa o MIME declarado de forma case-insensitive. Aceita as
+// variações que o frontend pode produzir e que o storage pode mutilar:
+// "audio/webm;codecs=opus", "audio/ogg", "audio/opus", "audio/webm" etc.
+func mimeIsOpus(mime string) bool {
+	low := strings.ToLower(mime)
+	return strings.Contains(low, "opus") ||
+		strings.Contains(low, "ogg") ||
+		strings.Contains(low, "webm")
 }
 
 // fetchMedia baixa o bytes do storage (MinIO) e devolve o mime real quando

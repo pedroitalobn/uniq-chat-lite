@@ -798,6 +798,43 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           {(conv?.channel_type === "whatsapp") && conv?.instance_id && conv?.channel_key && (
             <CallButton instanceId={conv.instance_id} jid={conv.channel_key} />
           )}
+
+          {/* Refresh manual — fallback caso o WS caia ou o polling de 30s
+              não traga a última mensagem rápido o suficiente. Roda
+              convQ + timelineQ + invalida lista de conversas pra atualizar
+              o badge de unread no painel esquerdo na mesma ação. */}
+          <button
+            onClick={() => {
+              convQ.refetch();
+              timelineQ.refetch();
+              qc.invalidateQueries({ queryKey: ["conversations", wsId] });
+            }}
+            disabled={timelineQ.isFetching || convQ.isFetching}
+            className="flex items-center justify-center rounded-lg flex-shrink-0 transition-colors disabled:opacity-50"
+            style={{
+              width: 30,
+              height: 30,
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              color: "hsl(240 8% 60%)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(0,212,106,0.10)";
+              e.currentTarget.style.borderColor = "rgba(0,212,106,0.22)";
+              e.currentTarget.style.color = "#00d46a";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+              e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+              e.currentTarget.style.color = "hsl(240 8% 60%)";
+            }}
+            title="Atualizar mensagens"
+            aria-label="Atualizar mensagens"
+          >
+            <RotateCcw
+              className={`h-3.5 w-3.5 ${timelineQ.isFetching || convQ.isFetching ? "animate-spin" : ""}`}
+            />
+          </button>
         </header>
 
         <div

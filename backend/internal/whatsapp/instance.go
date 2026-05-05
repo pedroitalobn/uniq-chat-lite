@@ -2932,6 +2932,14 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		}
 		if v.Name != nil {
 			data["name"] = v.Name.Name
+			// Persistência: o evento já carrega o nome resolvido. Antes só
+			// virava webhook — agora também atualizamos cache + tabelas
+			// pra que conversas que estavam com fallback "Grupo 5511..."
+			// recebam o subject correto sem esperar uma nova mensagem.
+			if v.Name.Name != "" && ic.manager != nil {
+				groupNameCache.Store(v.JID.String(), v.Name.Name)
+				applyGroupName(ic.manager, ic.ID, v.JID.String(), v.Name.Name)
+			}
 		}
 		if len(v.Join) > 0 {
 			jids := make([]string, len(v.Join))
@@ -3113,6 +3121,13 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		}
 		ic.broadcastWS("contact.pushname", data)
 		ic.dispatchEvent("contact.pushname", data, eventContext{})
+		// Persistência: atualiza Contact e propaga em MessageLog/Conversation
+		// pra mensagens que ainda mostravam o número como nome. Sem isso o
+		// evento virava só webhook e o nome só aparecia depois da próxima
+		// mensagem entrar no pipeline.
+		if v.NewPushName != "" && ic.manager != nil {
+			upsertPushName(ic.manager, ic.ID, v.JID.String(), v.NewPushName)
+		}
 
 	case *events.Picture:
 		data := map[string]interface{}{
@@ -3135,6 +3150,11 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		}
 		ic.broadcastWS("contact.update", data)
 		ic.dispatchEvent("contact.update", data, eventContext{})
+		// Persistência: nome resolvido pelo whatsmeow (vem da agenda salva
+		// no celular do usuário). Mesmo motivo do PushName acima.
+		if v.Action != nil && v.Action.GetFullName() != "" && ic.manager != nil {
+			upsertPushName(ic.manager, ic.ID, v.JID.String(), v.Action.GetFullName())
+		}
 
 	// ── Newsletters ───────────────────────────────────────────────────────────
 	case *events.NewsletterJoin:

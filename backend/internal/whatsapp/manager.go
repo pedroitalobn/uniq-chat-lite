@@ -292,7 +292,14 @@ func (m *Manager) SaveMessageEx(in SaveMessageInput) error {
 						groupNameCache.Store(toJID, name)
 					}
 				} else {
-					log.Printf("DEBUG: Error getting group info: %v", err)
+					// Log estruturado pra ficar visível em observability
+					// (rate-limit, timeout, client desconectado). Sem isso
+					// o admin só via "Grupo 5511..." sem pista do motivo.
+					log.Warn().
+						Err(err).
+						Str("instance_id", instanceID).
+						Str("jid", toJID).
+						Msg("manager: GetGroupInfo falhou — usando fallback de nome")
 				}
 			}
 		}
@@ -672,24 +679,96 @@ var groupNameCache sync.Map
 // refetchGroupNameLater tenta de novo após 5s. Se conseguir o nome, atualiza
 // MessageLogs+Conversation desse grupo na instância. Idempotente — não faz
 // nada se o cache já tem o nome ou se o fetch falhar de novo.
+//
+// Faz até 3 tentativas com backoff exponencial (5s, 15s, 45s) — sem isso
+// um único timeout no primeiro fetch deixava o grupo com fallback "Grupo
+// 5511..." pra sempre, porque a goroutine só rodava 1 vez.
 func (m *Manager) refetchGroupNameLater(instanceID, groupJID string) {
-	time.Sleep(5 * time.Second)
-	if _, ok := groupNameCache.Load(groupJID); ok {
-		return // outro caller já cacheou
-	}
-	client := m.GetInstance(instanceID)
-	if client == nil || !client.IsConnected() {
+	delays := []time.Duration{5 * time.Second, 15 * time.Second, 45 * time.Second}
+	for attempt, d := range delays {
+		time.Sleep(d)
+		if _, ok := groupNameCache.Load(groupJID); ok {
+			return // outro caller já cacheou
+		}
+		client := m.GetInstance(instanceID)
+		if client == nil || !client.IsConnected() {
+			continue // tenta de novo no próximo backoff
+		}
+		info, err := client.GetGroupInfo(groupJID)
+		if err != nil {
+			log.Debug().
+				Err(err).
+				Str("instance_id", instanceID).
+				Str("jid", groupJID).
+				Int("attempt", attempt+1).
+				Msg("manager: refetch nome do grupo falhou — vai tentar de novo")
+			continue
+		}
+		name, ok := info["name"].(string)
+		if !ok || name == "" {
+			continue
+		}
+		groupNameCache.Store(groupJID, name)
+		log.Info().
+			Str("instance_id", instanceID).
+			Str("jid", groupJID).
+			Str("name", name).
+			Int("attempt", attempt+1).
+			Msg("manager: nome do grupo resolvido após refetch")
+		applyGroupName(m, instanceID, groupJID, name)
 		return
 	}
-	info, err := client.GetGroupInfo(groupJID)
-	if err != nil {
+}
+
+// upsertPushName persiste o push name capturado em events.PushName/Contact:
+//   - Cria/atualiza Contact pelo phone (extrai do JID).
+//   - Atualiza MessageLog.contact_name onde ainda está com o número/JID.
+//   - Atualiza Conversation.push_name (campo dedicado pro nome de exibição).
+// Idempotente — sobrescreve só quando o registro tem nome vazio ou igual
+// ao número (heurística pra não pisar em renomeações manuais via CRM).
+func upsertPushName(m *Manager, instanceID, jid, name string) {
+	if m == nil || m.db == nil || jid == "" || name == "" {
 		return
 	}
-	name, ok := info["name"].(string)
-	if !ok || name == "" {
+	phone := extractPhoneFromJID(jid)
+	if phone == "" {
 		return
 	}
-	groupNameCache.Store(groupJID, name)
+	// Contact: upsert por phone. Se contact existe com nome real (≠ phone),
+	// não toca — push name é "fonte secundária", não sobrescreve edição CRM.
+	var existing models.Contact
+	err := m.db.Where("phone LIKE ?", "%"+phone+"%").First(&existing).Error
+	if err == nil {
+		if existing.Name == "" || existing.Name == phone || existing.Name == "+"+phone {
+			m.db.Model(&existing).Update("name", name)
+		}
+	}
+	instUUID, parseErr := uuid.Parse(instanceID)
+	if parseErr != nil {
+		return
+	}
+	// MessageLog: troca contact_name onde ainda mostra o número.
+	m.db.Model(&models.MessageLog{}).
+		Where("instance_id = ? AND from_jid = ? AND (contact_name = '' OR contact_name = ? OR contact_name = ?)",
+			instUUID, jid, phone, "+"+phone).
+		Update("contact_name", name)
+	// Conversation: push_name é o nome de exibição quando contact não está
+	// vinculado. Atualiza onde está vazio.
+	m.db.Model(&models.Conversation{}).
+		Where("instance_id = ? AND channel_key = ? AND (push_name = '' OR push_name IS NULL)",
+			instUUID, jid).
+		Update("push_name", name)
+	log.Debug().
+		Str("instance_id", instanceID).
+		Str("jid", jid).
+		Str("name", name).
+		Msg("manager: push name persistido")
+}
+
+// applyGroupName persiste o nome resolvido em MessageLog/Conversation. Extraído
+// do refetch original pra ser chamável de outros call sites (ex: webhook
+// consumer de events.GroupInfo).
+func applyGroupName(m *Manager, instanceID, groupJID, name string) {
 	if m.db == nil {
 		return
 	}

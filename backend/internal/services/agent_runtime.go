@@ -362,7 +362,14 @@ func (r *AgentRuntime) trySendAudio(ctx context.Context, client interface{ SendA
 		return false
 	}
 
-	_, err = client.SendAudioMessage(toJID, audioData, mime, true)
+	// PTT só é válido com containers Opus (ogg/webm). Forçar PTT=true em
+	// MP3/AAC faz o destinatário receber o áudio como "indisponível" porque
+	// o WhatsApp espera Opus quando AudioMessage.PTT=true. Os providers TTS
+	// atuais devolvem MP3, então deixamos PTT=false e caminho como anexo;
+	// quem habilitar TTS Opus no futuro vira voice note via mime opus.
+	low := strings.ToLower(mime)
+	ptt := strings.Contains(low, "opus") || strings.Contains(low, "ogg") || strings.Contains(low, "webm")
+	_, err = client.SendAudioMessage(toJID, audioData, mime, ptt)
 	return err == nil
 }
 
