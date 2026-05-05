@@ -551,163 +551,6 @@ function InstanceCard({
   );
 }
 
-// Phone mockup visualization for a connected instance
-function ConnectionVisualization({ instances, selectedId, onSelect }: {
-  instances: Instance[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}) {
-  const connected = instances.filter(i => i.status === "connected");
-  if (connected.length === 0) return null;
-
-  const instance = connected.find(i => i.id === selectedId) ?? connected[0];
-  const channelMeta = CHANNEL_META[instance.channel ?? "whatsapp"] ?? CHANNEL_META.whatsapp;
-  const now = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      {/* Left: Active connection details */}
-      <div className="rounded-2xl p-5 flex flex-col gap-4"
-        style={{
-          background: "linear-gradient(135deg, rgba(0,212,106,0.06) 0%, rgba(255,255,255,0.02) 100%)",
-          border: "1px solid rgba(0,212,106,0.18)",
-          backdropFilter: "blur(16px)",
-        }}>
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "rgba(0,212,106,0.6)" }}>
-            Conexão Ativa
-          </p>
-          <h3 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>{instance.name}</h3>
-          <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 48%)" }}>{channelMeta.label.toUpperCase()}</p>
-        </div>
-
-        <div className="space-y-2">
-          {/* WhatsApp Connected row */}
-          <div className="flex items-center gap-3 p-3 rounded-xl"
-            style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.15)" }}>
-            <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ background: "rgba(0,212,106,0.15)" }}>
-              <Check className="w-4 h-4" style={{ color: "#00d46a" }} />
-            </div>
-            <div>
-              <p className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>
-                {channelMeta.label} Conectado
-              </p>
-              <p className="text-[11px]" style={{ color: "hsl(240 8% 52%)" }}>Conexão com o número ativa</p>
-            </div>
-          </div>
-
-          {/* Bot Active row */}
-          <div className="flex items-center gap-3 p-3 rounded-xl"
-            style={{ background: "rgba(0,212,106,0.06)", border: "1px solid rgba(0,212,106,0.10)" }}>
-            <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ background: "rgba(0,212,106,0.12)" }}>
-              <Zap className="w-4 h-4" style={{ color: "#00d46a" }} />
-            </div>
-            <div>
-              <p className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>Serviço Ativo</p>
-              <p className="text-[11px]" style={{ color: "hsl(240 8% 52%)" }}>Respondendo automaticamente</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Select different instance if multiple connected */}
-        {connected.length > 1 && (
-          <div className="flex gap-1.5 flex-wrap">
-            {connected.map(c => (
-              <button
-                key={c.id}
-                onClick={() => onSelect(c.id)}
-                className="text-[11px] font-medium px-2.5 py-1 rounded-lg transition-all"
-                style={c.id === instance.id ? {
-                  background: "rgba(0,212,106,0.15)",
-                  border: "1px solid rgba(0,212,106,0.30)",
-                  color: "#00d46a",
-                } : {
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  color: "hsl(240 8% 52%)",
-                }}
-              >
-                {c.name}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Right: Phone mockup */}
-      <div className="rounded-2xl p-5 flex flex-col gap-3 items-center"
-        style={{
-          background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)",
-          border: "1px solid rgba(255,255,255,0.07)",
-          backdropFilter: "blur(16px)",
-        }}>
-        <div className="w-full flex items-center justify-between mb-1">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "hsl(240 8% 42%)" }}>
-              Visualização
-            </p>
-            <p className="text-[10px] mt-0.5" style={{ color: "hsl(240 8% 34%)" }}>STATUS DA CONEXÃO</p>
-          </div>
-          <div className="flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-full"
-            style={{ background: "rgba(0,212,106,0.10)", border: "1px solid rgba(0,212,106,0.20)", color: "#00d46a" }}>
-            <Activity className="w-3 h-3" />
-            ONLINE
-          </div>
-        </div>
-
-        {/* Phone frame */}
-        <div className="relative flex-1 flex items-center justify-center w-full" style={{ maxHeight: 220 }}>
-          <div
-            className="relative rounded-[28px] overflow-hidden flex flex-col"
-            style={{
-              width: 140, height: 200,
-              background: "#1a1a1a",
-              border: "3px solid #2a2a2a",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.05)",
-            }}
-          >
-            {/* Notch */}
-            <div className="flex-shrink-0 flex justify-center pt-2 pb-1">
-              <div className="w-10 h-1.5 rounded-full" style={{ background: "#2a2a2a" }} />
-            </div>
-
-            {/* Screen */}
-            <div
-              className="flex-1 flex flex-col items-center justify-center gap-2 px-3 py-3 mx-1 mb-1 rounded-[20px]"
-              style={{ background: `linear-gradient(160deg, ${channelMeta.color}dd 0%, ${channelMeta.color}99 100%)` }}
-            >
-              {/* Checkmark circle */}
-              <div className="w-10 h-10 rounded-full flex items-center justify-center"
-                style={{ background: "rgba(255,255,255,0.25)", border: "2px solid rgba(255,255,255,0.4)" }}>
-                <Check className="w-5 h-5 text-white" />
-              </div>
-
-              <p className="text-white font-bold text-sm text-center leading-tight">Conectado!</p>
-              <p className="text-white/80 text-[9px] text-center leading-tight">
-                {channelMeta.label} conectado e pronto para uso.
-              </p>
-
-              {/* Status badge */}
-              <div className="w-full rounded-lg p-1.5" style={{ background: "rgba(0,0,0,0.20)" }}>
-                <div className="flex items-center gap-1 mb-1">
-                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#00ff88" }} />
-                  <span className="text-white text-[8px] font-semibold">Serviço Ativo</span>
-                </div>
-                <div className="flex items-center gap-1 text-white/60 text-[7px]">
-                  <RefreshCw className="w-2 h-2" />
-                  <span>Últ. verificação: {now}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // Fleet health bar shown at the top when there are instances
 function FleetHealthBar({ instances, reconnectingIds }: {
   instances: Instance[];
@@ -801,7 +644,6 @@ function InstancesContent() {
   const [qrInstanceId, setQrInstanceId] = useState<string | null>(null);
   const [channelFilter, setChannelFilter] = useState<ChannelType | "all">("all");
   const [reconnectingIds, setReconnectingIds] = useState<Set<string>>(new Set());
-  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const { currentWorkspace } = useWorkspace();
 
   const { data: instances = [], isLoading } = useQuery<Instance[]>({
@@ -910,15 +752,6 @@ function InstancesContent() {
       {/* Fleet health */}
       {!isLoading && instances.length > 0 && (
         <FleetHealthBar instances={filtered} reconnectingIds={reconnectingIds} />
-      )}
-
-      {/* Connection visualization — phone mockup for connected instances */}
-      {!isLoading && (
-        <ConnectionVisualization
-          instances={filtered}
-          selectedId={selectedInstanceId}
-          onSelect={setSelectedInstanceId}
-        />
       )}
 
       {/* Channel filter tabs */}
