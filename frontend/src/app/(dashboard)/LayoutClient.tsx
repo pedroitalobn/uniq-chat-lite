@@ -141,9 +141,16 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("uniq:instance-stale", onStale);
   }, [qc]);
 
-  // Redirect novos usuários (sem instâncias) para o onboarding agent-first.
-  // Usa chave por user-id para não redirecionar usuários existentes que
-  // simplesmente apagaram instâncias.
+  // Redirect novos usuários (sem instâncias PRÓPRIAS) para o onboarding
+  // agent-first. Usa chave por user-id para não redirecionar usuários
+  // existentes que simplesmente apagaram instâncias.
+  //
+  // CUIDADO: GET /v1/instances retorna instâncias OWNED + as visíveis via
+  // workspace shared. Se admin cria um user e o coloca em um workspace que
+  // já tem instâncias, o user "vê" essas instâncias e o onboarding nunca
+  // disparava. Por isso filtramos por `i.user_id === userId` — só conta
+  // instância criada pelo próprio user pra decidir se ele já passou pelo
+  // onboarding inicial.
   useEffect(() => {
     if (sessionLoading || !sessionData) return;
     if (pathname === "/onboarding" || pathname?.startsWith("/admin")) return;
@@ -151,7 +158,11 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
     if (!userId) return;
     const key = `uniq_onboarding_done_${userId}`;
     if (localStorage.getItem(key)) return;
-    if (instances !== undefined && (instances as any[]).length === 0) {
+    if (instances === undefined) return; // ainda carregando
+    const owned = (instances as any[]).filter(
+      (i) => i?.user_id === userId,
+    );
+    if (owned.length === 0) {
       router.replace("/onboarding");
     }
   }, [sessionData, sessionLoading, instances, pathname, router]);
