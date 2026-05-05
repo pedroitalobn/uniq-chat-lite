@@ -33,10 +33,12 @@ func NewStripeHandler(db *gorm.DB, emailSvc *email.Service) *StripeHandler {
 
 func (h *StripeHandler) loadConfig() {
 	var settings models.PaymentSettings
-	if err := h.db.First(&settings).Error; err == nil {
-		if settings.StripeSecretKey != "" {
-			stripe.Key = settings.StripeSecretKey
+	if err := h.db.Where("id = ?", "default").First(&settings).Error; err == nil {
+		key := settings.StripeSecretKey
+		if key == "" {
+			key = config.AppConfig.StripeSecretKey
 		}
+		stripe.Key = key
 		h.stripeCheckoutType = settings.StripeCheckoutType
 		if h.stripeCheckoutType == "" {
 			h.stripeCheckoutType = "redirect"
@@ -49,8 +51,10 @@ func (h *StripeHandler) loadConfig() {
 
 func (h *StripeHandler) getWebhookSecret() string {
 	var settings models.PaymentSettings
-	if err := h.db.First(&settings).Error; err == nil && settings.StripeWebhookSecret != "" {
-		return settings.StripeWebhookSecret
+	if err := h.db.Where("id = ?", "default").First(&settings).Error; err == nil {
+		if settings.StripeWebhookSecret != "" {
+			return settings.StripeWebhookSecret
+		}
 	}
 	return config.AppConfig.StripeWebhookSecret
 }

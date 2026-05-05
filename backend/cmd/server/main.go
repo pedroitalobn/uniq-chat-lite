@@ -55,6 +55,9 @@ func main() {
 	// Seed default plans
 	seedPlans(db)
 
+	// Seed payment settings from env vars (idempotent — only fills empty fields)
+	seedPaymentSettings(db, cfg)
+
 	// Seed default permissions
 	seedPermissions(db)
 
@@ -799,4 +802,54 @@ func seedPermissions(db *gorm.DB) {
 			FirstOrCreate(&perms[i])
 	}
 	log.Info().Msg("permissions seeded")
+}
+
+// seedPaymentSettings persists env-var credentials into the payment_settings
+// table if the DB record has empty fields. Idempotent — never overwrites values
+// that were already saved via the admin panel.
+func seedPaymentSettings(db *gorm.DB, cfg *config.Config) {
+	var settings models.PaymentSettings
+	err := db.Where("id = ?", "default").First(&settings).Error
+	if err != nil {
+		// Record doesn't exist yet — create it with env values
+		settings = models.PaymentSettings{
+			ID:                 "default",
+			ActiveProvider:     models.PaymentProviderStripe,
+			StripeSecretKey:    cfg.StripeSecretKey,
+			StripeWebhookSecret: cfg.StripeWebhookSecret,
+			StripeCheckoutType: "redirect",
+			AsaasAPIKey:        cfg.AsaasAPIKey,
+			AsaasWebhookSecret: cfg.AsaasWebhookSecret,
+			AsaasEnvironment:   cfg.AsaasEnvironment,
+			AsaasCheckoutType:  "transparent",
+		}
+		if err := db.Create(&settings).Error; err != nil {
+			log.Error().Err(err).Msg("seedPaymentSettings: failed to create record")
+		} else {
+			log.Info().Msg("seedPaymentSettings: record created from env vars")
+		}
+		return
+	}
+
+	// Record exists — only fill empty fields from env (never overwrite admin-set values)
+	updates := map[string]interface{}{}
+	if settings.StripeSecretKey == "" && cfg.StripeSecretKey != "" {
+		updates["stripe_secret_key"] = cfg.StripeSecretKey
+	}
+	if settings.StripeWebhookSecret == "" && cfg.StripeWebhookSecret != "" {
+		updates["stripe_webhook_secret"] = cfg.StripeWebhookSecret
+	}
+	if settings.AsaasAPIKey == "" && cfg.AsaasAPIKey != "" {
+		updates["asaas_api_key"] = cfg.AsaasAPIKey
+	}
+	if settings.AsaasWebhookSecret == "" && cfg.AsaasWebhookSecret != "" {
+		updates["asaas_webhook_secret"] = cfg.AsaasWebhookSecret
+	}
+	if len(updates) > 0 {
+		if err := db.Model(&settings).Updates(updates).Error; err != nil {
+			log.Error().Err(err).Msg("seedPaymentSettings: failed to update from env vars")
+		} else {
+			log.Info().Int("fields", len(updates)).Msg("seedPaymentSettings: filled empty fields from env vars")
+		}
+	}
 }
