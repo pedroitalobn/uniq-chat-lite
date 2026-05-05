@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+	"github.com/uniq-chat/backend/internal/audioconvert"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
@@ -311,7 +312,9 @@ func (r *AgentRuntime) recentHistory(instanceID uuid.UUID, fromJID string, limit
 
 // trySendAudio converts reply text to audio via TTS and sends it as a PTT message.
 // Returns true if audio was sent successfully.
-func (r *AgentRuntime) trySendAudio(ctx context.Context, client interface{ SendAudioMessage(string, []byte, string, bool) (string, error) }, agent *models.InstanceAgent, toJID, text string) bool {
+func (r *AgentRuntime) trySendAudio(ctx context.Context, client interface {
+	SendAudioMessage(string, []byte, string, bool, uint32) (string, error)
+}, agent *models.InstanceAgent, toJID, text string) bool {
 	cfg, ok := parseAgentVoiceConfig(agent.Voice)
 	if !ok {
 		return false
@@ -365,11 +368,27 @@ func (r *AgentRuntime) trySendAudio(ctx context.Context, client interface{ SendA
 	// PTT só é válido com containers Opus (ogg/webm). Forçar PTT=true em
 	// MP3/AAC faz o destinatário receber o áudio como "indisponível" porque
 	// o WhatsApp espera Opus quando AudioMessage.PTT=true. Os providers TTS
-	// atuais devolvem MP3, então deixamos PTT=false e caminho como anexo;
-	// quem habilitar TTS Opus no futuro vira voice note via mime opus.
+	// atuais devolvem MP3, então transcodamos pra OGG/Opus quando ffmpeg
+	// estiver disponível (vira voice note real). Sem ffmpeg, mandamos como
+	// anexo MP3 mesmo (PTT=false) — opção segura.
 	low := strings.ToLower(mime)
-	ptt := strings.Contains(low, "opus") || strings.Contains(low, "ogg") || strings.Contains(low, "webm")
-	_, err = client.SendAudioMessage(toJID, audioData, mime, ptt)
+	outBytes := audioData
+	outMime := mime
+	var ptt bool
+	var seconds uint32
+	if strings.Contains(low, "opus") || strings.Contains(low, "ogg") || strings.Contains(low, "webm") {
+		ptt = true
+	} else {
+		// MP3/AAC do TTS — tenta transcodar pra voice note. Se ffmpeg
+		// faltar, mantém anexo MP3 sem PTT.
+		if conv, dur, terr := audioconvert.TranscodeToOggOpus(ctx, audioData); terr == nil {
+			outBytes = conv
+			outMime = "audio/ogg; codecs=opus"
+			ptt = true
+			seconds = dur
+		}
+	}
+	_, err = client.SendAudioMessage(toJID, outBytes, outMime, ptt, seconds)
 	return err == nil
 }
 

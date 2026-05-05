@@ -15,7 +15,12 @@ COPY . .
 RUN CGO_ENABLED=1 GOOS=linux go build -o backend ./cmd/server
 
 FROM alpine:3.19
-RUN apk add --no-cache ca-certificates sqlite-libs tzdata
+# ffmpeg é usado pra transcodar áudio recebido do MediaRecorder do browser
+# (WebM/Opus em Chrome, MP4/AAC em Safari) pro container OGG/Opus que o
+# WhatsApp aceita como voice note. Sem isso, mesmo com mimetype certo,
+# o destinatário recebia "áudio indisponível" porque o container parseado
+# não batia com o declarado (WebM bytes anunciados como OGG).
+RUN apk add --no-cache ca-certificates sqlite-libs tzdata ffmpeg
 
 WORKDIR /app
 COPY --from=builder /app/backend .

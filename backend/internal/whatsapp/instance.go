@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/uniq-chat/backend/internal/audioconvert"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/queue"
 	"github.com/uniq-chat/backend/internal/storage"
@@ -758,8 +759,11 @@ func (ic *InstanceClient) SendDocumentMessage(to string, docData []byte, mimeTyp
 	return res.ID, nil
 }
 
-// SendAudioMessage sends an audio file.
-func (ic *InstanceClient) SendAudioMessage(to string, audioData []byte, mimeType string, ptt bool) (string, error) {
+// SendAudioMessage sends an audio file. seconds é a duração em segundos —
+// 0 omite o campo Seconds do proto. Voice notes (ptt=true) sem Seconds
+// fazem alguns clientes mostrarem "áudio indisponível" porque a UI espera
+// pintar a barra de duração antes mesmo de baixar o blob.
+func (ic *InstanceClient) SendAudioMessage(to string, audioData []byte, mimeType string, ptt bool, seconds uint32) (string, error) {
 	recipient, err := types.ParseJID(normalizeJID(to))
 	if err != nil {
 		return "", fmt.Errorf("invalid JID: %w", err)
@@ -770,18 +774,20 @@ func (ic *InstanceClient) SendAudioMessage(to string, audioData []byte, mimeType
 		return "", fmt.Errorf("upload failed: %w", err)
 	}
 
-	msg := &waE2E.Message{
-		AudioMessage: &waE2E.AudioMessage{
-			URL:           proto.String(upload.URL),
-			DirectPath:    proto.String(upload.DirectPath),
-			Mimetype:      proto.String(mimeType),
-			MediaKey:      upload.MediaKey,
-			FileEncSHA256: upload.FileEncSHA256,
-			FileSHA256:    upload.FileSHA256,
-			FileLength:    proto.Uint64(uint64(len(audioData))),
-			PTT:           proto.Bool(ptt),
-		},
+	audio := &waE2E.AudioMessage{
+		URL:           proto.String(upload.URL),
+		DirectPath:    proto.String(upload.DirectPath),
+		Mimetype:      proto.String(mimeType),
+		MediaKey:      upload.MediaKey,
+		FileEncSHA256: upload.FileEncSHA256,
+		FileSHA256:    upload.FileSHA256,
+		FileLength:    proto.Uint64(uint64(len(audioData))),
+		PTT:           proto.Bool(ptt),
 	}
+	if seconds > 0 {
+		audio.Seconds = proto.Uint32(seconds)
+	}
+	msg := &waE2E.Message{AudioMessage: audio}
 
 	res, err := ic.sendMessage(context.Background(), recipient, msg)
 	if err != nil {
@@ -2199,7 +2205,20 @@ func (ic *InstanceClient) ProcessQueueJob(job queue.SendJob) error {
 		if mime == "" {
 			mime = "audio/ogg; codecs=opus"
 		}
-		_, sendErr = ic.SendAudioMessage(job.Payload.To, audioData, mime, job.Payload.PTT)
+		// Mesmo tratamento dos demais call sites — quando vier áudio Opus
+		// em container errado (WebM, ou bytes opacos com mime "ogg") ou o
+		// job pediu PTT, transcoda pra OGG/Opus pra evitar "indisponível".
+		audioOut, mimeOut, pttOut, secOut := audioData, mime, job.Payload.PTT, uint32(0)
+		low := strings.ToLower(mime)
+		if job.Payload.PTT || strings.Contains(low, "opus") || strings.Contains(low, "webm") || strings.Contains(low, "ogg") {
+			if conv, dur, terr := audioconvert.TranscodeToOggOpus(context.Background(), audioData); terr == nil {
+				audioOut = conv
+				mimeOut = "audio/ogg; codecs=opus"
+				pttOut = true
+				secOut = dur
+			}
+		}
+		_, sendErr = ic.SendAudioMessage(job.Payload.To, audioOut, mimeOut, pttOut, secOut)
 
 	case queue.TypeLocation:
 		_, sendErr = ic.SendLocationMessage(job.Payload.To,

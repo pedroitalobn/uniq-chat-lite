@@ -18,6 +18,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
+	"github.com/uniq-chat/backend/internal/audioconvert"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/services"
 	"github.com/uniq-chat/backend/internal/storage"
@@ -86,7 +88,7 @@ func NewRegistry(db *gorm.DB, waManager *whatsapp.Manager, igSvc *services.Insta
 func (r *Registry) Send(ctx context.Context, inst *models.Instance, msg OutboundMessage) (*SendResult, error) {
 	switch inst.Channel {
 	case models.ChannelWhatsApp:
-		return r.sendWhatsApp(inst, msg)
+		return r.sendWhatsApp(ctx, inst, msg)
 	case models.ChannelWABA:
 		return r.sendWABA(ctx, inst, msg)
 	case models.ChannelInstagram:
@@ -115,7 +117,7 @@ func (r *Registry) WindowOpen(inst *models.Instance, lastCustomerMsgAt *time.Tim
 
 // -- WhatsApp (whatsmeow) ---------------------------------------------------
 
-func (r *Registry) sendWhatsApp(inst *models.Instance, msg OutboundMessage) (*SendResult, error) {
+func (r *Registry) sendWhatsApp(ctx context.Context, inst *models.Instance, msg OutboundMessage) (*SendResult, error) {
 	if r.waManager == nil {
 		return nil, errors.New("whatsapp manager unavailable")
 	}
@@ -158,28 +160,38 @@ func (r *Registry) sendWhatsApp(inst *models.Instance, msg OutboundMessage) (*Se
 			}
 			return &SendResult{ExternalID: id, Status: models.MessageStatusSent}, nil
 		case "audio":
-			// WhatsApp aceita áudio via codec Opus em containers WebM ou OGG
-			// e marca como voice note (PTT) quando AudioMessage.PTT=true.
-			// Outros formatos (mp3, m4a, wav) DEVEM ir como anexo (PTT=false)
-			// — PTT=true com mime não-Opus faz o destinatário receber como
-			// "áudio indisponível".
-			//
-			// A detecção pelo MIME string é frágil: o frontend manda
-			// "audio/webm;codecs=opus" mas o upload pode descartar o sufixo,
-			// e o Content-Type retornado pelo MinIO depende do que o cliente
-			// salvou. Por isso fazemos detecção em duas fases:
-			//   1) sniff dos primeiros bytes (signature do container);
-			//   2) fallback no MIME declarado.
-			isOpus := isOpusBytes(data) || mimeIsOpus(mime)
+			// WhatsApp aceita áudio como voice note (PTT) APENAS quando o
+			// container é OGG carregando Opus. Mesmo se a mensagem proto
+			// declarar Mimetype="audio/ogg; codecs=opus", se os bytes forem
+			// WebM (Matroska), MP4/AAC ou MP3, o cliente do destinatário
+			// parseia o header, encontra container errado e mostra "áudio
+			// indisponível". Por isso transcodamos via ffmpeg pra OGG/Opus
+			// SEMPRE que o input não for OGG nativo. Quando o usuário envia
+			// MP3/M4A como anexo (não voice note), mandamos PTT=false e o
+			// mime original.
+			outBytes := data
 			outMime := mime
 			isPTT := false
-			if isOpus {
-				// Normaliza pra "audio/ogg; codecs=opus" — formato canônico
-				// que o whatsmeow propaga corretamente no protobuf.
+			var seconds uint32
+			isOgg := isOggBytes(data)
+			isOpusContainer := isOgg || isWebMBytes(data) || mimeIsOpus(mime)
+			if isOpusContainer {
+				// Voice note path — transcoda pra OGG/Opus mono 16k.
+				// ffmpeg ausente → cai no fallback (sem transcoding) com
+				// warn, melhor que crashar o envio.
+				converted, dur, terr := audioconvert.TranscodeToOggOpus(ctx, data)
+				if terr == nil {
+					outBytes = converted
+					seconds = dur
+				} else if !errors.Is(terr, audioconvert.ErrFfmpegMissing) {
+					log.Warn().Err(terr).Int("bytes", len(data)).Msg("outbound: transcoding pra OGG/Opus falhou — enviando bytes originais (provável 'áudio indisponível' no destinatário)")
+				} else {
+					log.Warn().Msg("outbound: ffmpeg indisponível — voice note enviada sem transcoding (instale o pacote ffmpeg na imagem)")
+				}
 				outMime = "audio/ogg; codecs=opus"
 				isPTT = true
 			}
-			id, err := client.SendAudioMessage(msg.To, data, outMime, isPTT)
+			id, err := client.SendAudioMessage(msg.To, outBytes, outMime, isPTT, seconds)
 			if err != nil {
 				return nil, err
 			}
@@ -212,24 +224,26 @@ func (r *Registry) sendWhatsApp(inst *models.Instance, msg OutboundMessage) (*Se
 	return &SendResult{ExternalID: id, Status: models.MessageStatusSent}, nil
 }
 
-// isOpusBytes inspeciona os primeiros bytes do payload pra reconhecer
-// containers que carregam Opus:
-//   - OGG: assinatura "OggS" nos 4 primeiros bytes (RFC 3533).
-//   - WebM/Matroska: assinatura EBML 0x1A 0x45 0xDF 0xA3.
-// Não é uma análise profunda do codec interno — para o propósito do
-// dispatch é suficiente: o WhatsApp aceita Opus em ambos os containers.
-// Quem envia MP3/AAC nunca bate aqui (assinatura diferente).
+// isOggBytes detecta o container OGG via assinatura "OggS" (RFC 3533) nos
+// primeiros 4 bytes. Áudio em OGG/Opus já é o formato nativo de voice note
+// do WhatsApp, então pode pular o transcoding.
+func isOggBytes(data []byte) bool {
+	return len(data) >= 4 && data[0] == 'O' && data[1] == 'g' && data[2] == 'g' && data[3] == 'S'
+}
+
+// isWebMBytes detecta WebM/Matroska via assinatura EBML 0x1A 0x45 0xDF 0xA3.
+// Browser MediaRecorder em Chrome/Firefox produz WebM/Opus — mesmos pacotes
+// Opus do OGG mas em container Matroska, que o WhatsApp NÃO aceita como
+// voice note. Precisa transcodar antes do envio.
+func isWebMBytes(data []byte) bool {
+	return len(data) >= 4 && data[0] == 0x1A && data[1] == 0x45 && data[2] == 0xDF && data[3] == 0xA3
+}
+
+// isOpusBytes mantido por compat — true tanto pra OGG quanto WebM (ambos
+// podem carregar Opus). Não use no dispatch novo: prefira a discriminação
+// isOggBytes vs isWebMBytes pra decidir se precisa transcodar.
 func isOpusBytes(data []byte) bool {
-	if len(data) < 4 {
-		return false
-	}
-	if data[0] == 'O' && data[1] == 'g' && data[2] == 'g' && data[3] == 'S' {
-		return true
-	}
-	if data[0] == 0x1A && data[1] == 0x45 && data[2] == 0xDF && data[3] == 0xA3 {
-		return true
-	}
-	return false
+	return isOggBytes(data) || isWebMBytes(data)
 }
 
 // mimeIsOpus testa o MIME declarado de forma case-insensitive. Aceita as

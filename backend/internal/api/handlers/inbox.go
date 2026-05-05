@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	zlog "github.com/rs/zerolog/log"
+	"github.com/uniq-chat/backend/internal/audioconvert"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/storage"
 	"github.com/uniq-chat/backend/internal/whatsapp"
@@ -929,7 +930,27 @@ func (h *InboxHandler) SendMedia(c *fiber.Ctx) error {
 		case "image":
 			waMsgID, sendErr = client.SendImageMessage(jid, data, mime, req.Caption)
 		case "audio":
-			waMsgID, sendErr = client.SendAudioMessage(jid, data, mime, req.PTT)
+			// Mesma lógica do dispatch outbound: se for OGG ou WebM/Opus,
+			// transcoda pra OGG/Opus antes de enviar pra WhatsApp não
+			// rejeitar como "indisponível". Caller passa PTT=true só pra
+			// voice notes; anexos comuns (mp3, m4a) caem no else e vão
+			// como anexo sem PTT.
+			outBytes, outMime, outPTT, outSec := data, mime, req.PTT, uint32(0)
+			low := strings.ToLower(mime)
+			isContainerOpus := false
+			if len(data) >= 4 {
+				isContainerOpus = (data[0] == 'O' && data[1] == 'g' && data[2] == 'g' && data[3] == 'S') ||
+					(data[0] == 0x1A && data[1] == 0x45 && data[2] == 0xDF && data[3] == 0xA3)
+			}
+			if req.PTT || isContainerOpus || strings.Contains(low, "opus") || strings.Contains(low, "ogg") || strings.Contains(low, "webm") {
+				if conv, dur, terr := audioconvert.TranscodeToOggOpus(c.Context(), data); terr == nil {
+					outBytes = conv
+					outMime = "audio/ogg; codecs=opus"
+					outPTT = true
+					outSec = dur
+				}
+			}
+			waMsgID, sendErr = client.SendAudioMessage(jid, outBytes, outMime, outPTT, outSec)
 		case "video":
 			waMsgID, sendErr = client.SendVideoMessage(jid, data, mime, req.Caption)
 		case "document":

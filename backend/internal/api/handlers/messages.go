@@ -13,6 +13,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/uniq-chat/backend/internal/audioconvert"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/queue"
 	"github.com/uniq-chat/backend/internal/services"
@@ -343,7 +344,22 @@ func (h *MessageHandler) SendAudio(c *fiber.Ctx) error {
 		mime = "audio/ogg; codecs=opus"
 	}
 
-	msgID, err := client.SendAudioMessage(req.To, audioData, mime, req.PTT)
+	// PTT exige container OGG/Opus. Quando o caller pede PTT (ou o áudio é
+	// claramente Opus em outro container, ex.: WebM gravado pelo browser),
+	// transcoda antes de enviar — sem isso o destinatário recebe "áudio
+	// indisponível" porque o container declarado não bate com os bytes.
+	outBytes, outMime, outPTT, outSec := audioData, mime, req.PTT, uint32(0)
+	low := strings.ToLower(mime)
+	needsConvert := req.PTT || strings.Contains(low, "opus") || strings.Contains(low, "webm") || strings.Contains(low, "ogg")
+	if needsConvert {
+		if conv, dur, terr := audioconvert.TranscodeToOggOpus(c.Context(), audioData); terr == nil {
+			outBytes = conv
+			outMime = "audio/ogg; codecs=opus"
+			outPTT = true
+			outSec = dur
+		}
+	}
+	msgID, err := client.SendAudioMessage(req.To, outBytes, outMime, outPTT, outSec)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
