@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -9,7 +10,8 @@ import Link from "next/link";
 import {
   Lock, Search, ChevronDown, User as UserIcon, MessageSquare,
   Layers, Smartphone, Radio, RefreshCw, Check, BarChart3,
-  MoreVertical, Users, Building2, Zap, Bell, X, Phone, PhoneMissed, Sparkles,
+  MoreVertical, Users, Building2, Zap, Bell, BellOff, X, Phone, PhoneMissed, Sparkles,
+  Filter, UserCircle2, Megaphone,
 } from "lucide-react";
 import { usePreferences } from "@/lib/preferences";
 import {
@@ -37,6 +39,64 @@ import type { ChannelInfo, Instance } from "@/types";
 // header mostra um CTA "Sincronizar histórico" que chama o backfill.
 
 type StatusTab = "all" | "open" | "pending" | "snoozed" | "unassigned" | "resolved" | "closed";
+type ViewKind = "all" | "messages" | "groups" | "contacts" | "channels";
+
+// Filtros persistidos por workspace — sobrevivem a F5 e troca de janela.
+// Chave inclui wsId pra cada workspace ter sua própria configuração de inbox.
+const FILTERS_KEY_PREFIX = "inbox:filters:v1:";
+type PersistedFilters = {
+  agentScope: string;
+  queueScope: string;
+  channelFilter: string[];
+  instanceFilter: string[];
+  statusTab: StatusTab;
+  viewKind: ViewKind;
+};
+function loadFilters(wsId?: string): Partial<PersistedFilters> | null {
+  if (typeof window === "undefined" || !wsId) return null;
+  try {
+    const raw = window.localStorage.getItem(FILTERS_KEY_PREFIX + wsId);
+    return raw ? (JSON.parse(raw) as Partial<PersistedFilters>) : null;
+  } catch {
+    return null;
+  }
+}
+function saveFilters(wsId: string | undefined, f: PersistedFilters) {
+  if (typeof window === "undefined" || !wsId) return;
+  try {
+    window.localStorage.setItem(FILTERS_KEY_PREFIX + wsId, JSON.stringify(f));
+  } catch { /* quota exceeded — ignora */ }
+}
+
+// Detectores de tipo (espelham os helpers do ConversationList) — usados pra
+// filtrar client-side sem ida no backend. Mantemos local pra evitar
+// dependência circular, mas a lógica precisa bater 1:1 com a lista.
+function isGroupKey(k?: string): boolean {
+  if (!k) return false;
+  const s = k.toLowerCase();
+  return (
+    s.endsWith("@g.us") ||
+    s.endsWith("-g.us") ||
+    s.startsWith("group:") ||
+    /^\d+-\d+@/.test(s)
+  );
+}
+function isNewsletterKey(k?: string): boolean {
+  if (!k) return false;
+  const s = k.toLowerCase();
+  return (
+    s.endsWith("@newsletter") ||
+    s.endsWith("@broadcast") ||
+    s.includes("@broadcast.") ||
+    s.startsWith("newsletter:") ||
+    s.startsWith("channel:")
+  );
+}
+function isStatusKey(k?: string): boolean {
+  if (!k) return false;
+  const s = k.toLowerCase();
+  return s === "status@broadcast" || s.startsWith("status@") || s === "status:broadcast";
+}
 
 interface WorkspaceMember {
   user_id: string;
@@ -84,8 +144,14 @@ function InboxPage() {
   const { hasPerm, isLoading: permsLoading, isOwner } = useWorkspacePermissions();
   const { data: session } = useSession();
   // Desktop notifications + audio ping + title badge para msgs inbound.
-  // Hook é silencioso até o agente clicar em "Ativar notificações".
-  const { permission: notifPerm, requestPermission: requestNotif } = useDesktopNotifications();
+  // Hook é silencioso até o agente clicar em "Ativar notificações". Mute
+  // local persiste no localStorage e é independente da permissão do browser.
+  const {
+    permission: notifPerm,
+    requestPermission: requestNotif,
+    muted: notifMuted,
+    toggleMute: toggleNotifMute,
+  } = useDesktopNotifications();
   const qc = useQueryClient();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -153,12 +219,47 @@ function InboxPage() {
   // Incoming call state: null = no active call, else { instanceId, callFrom, callId }
   const [incomingCall, setIncomingCall] = useState<{ instanceId: string; callFrom: string; callId: string } | null>(null);
 
-  const [agentScope, setAgentScope] = useState<string>("all"); // "me" | "<uuid>" | "all"
-  const [queueScope, setQueueScope] = useState<string>("all"); // "all" | "none" | uuid
-  const [channelFilter, setChannelFilter] = useState<string[]>([]); // multi-select
-  const [instanceFilter, setInstanceFilter] = useState<string[]>([]); // multi-select
-  const [statusTab, setStatusTab] = useState<StatusTab>("open");
+  // Hidrata filtros do localStorage no primeiro render — fora do useState
+  // pra capturar o wsId atual. SSR-safe (loadFilters retorna null no server).
+  const persisted = loadFilters(wsId);
+  const [agentScope, setAgentScope] = useState<string>(persisted?.agentScope ?? "all"); // "me" | "<uuid>" | "all"
+  const [queueScope, setQueueScope] = useState<string>(persisted?.queueScope ?? "all"); // "all" | "none" | uuid
+  const [channelFilter, setChannelFilter] = useState<string[]>(persisted?.channelFilter ?? []); // multi-select
+  const [instanceFilter, setInstanceFilter] = useState<string[]>(persisted?.instanceFilter ?? []); // multi-select
+  const [statusTab, setStatusTab] = useState<StatusTab>(persisted?.statusTab ?? "open");
+  const [viewKind, setViewKind] = useState<ViewKind>(persisted?.viewKind ?? "all");
   const [q, setQ] = useState("");
+
+  // Persiste sempre que algum filtro muda. q (busca) intencionalmente fora —
+  // expectativa é que busca seja efêmera; persistir confunde quem volta.
+  useEffect(() => {
+    if (!wsId) return;
+    saveFilters(wsId, { agentScope, queueScope, channelFilter, instanceFilter, statusTab, viewKind });
+  }, [wsId, agentScope, queueScope, channelFilter, instanceFilter, statusTab, viewKind]);
+
+  // Quando troca de workspace, re-hidrata os filtros do novo ws (caso o user
+  // tenha config diferente em cada). Sem isso, filtros do ws anterior vazam.
+  const lastHydratedWsRef = useRef<string | undefined>(wsId);
+  useEffect(() => {
+    if (!wsId || wsId === lastHydratedWsRef.current) return;
+    lastHydratedWsRef.current = wsId;
+    const f = loadFilters(wsId);
+    if (!f) {
+      setAgentScope("all");
+      setQueueScope("all");
+      setChannelFilter([]);
+      setInstanceFilter([]);
+      setStatusTab("open");
+      setViewKind("all");
+      return;
+    }
+    if (f.agentScope) setAgentScope(f.agentScope);
+    if (f.queueScope) setQueueScope(f.queueScope);
+    if (f.channelFilter) setChannelFilter(f.channelFilter);
+    if (f.instanceFilter) setInstanceFilter(f.instanceFilter);
+    if (f.statusTab) setStatusTab(f.statusTab);
+    if (f.viewKind) setViewKind(f.viewKind);
+  }, [wsId]);
 
   // View mode: "conversations" (padrão) | "reports". Persistido via URL
   // ?view=reports pra ser compartilhável e sobreviver a F5.
@@ -420,7 +521,24 @@ function InboxPage() {
       const b = conv.last_message_at ?? "";
       if (b > a) seen.set(key, conv);
     }
-    return Array.from(seen.values());
+    const arr = Array.from(seen.values());
+    // Filtragem client-side por tipo (mensagens 1:1 / grupos / contatos /
+    // canais). Quando viewKind="all" não filtra. "messages" exclui grupos,
+    // canais e status; "contacts" só conversas com contact resolvido.
+    if (viewKind === "all") return arr;
+    return arr.filter((c) => {
+      const k = c.channel_key;
+      const group = isGroupKey(k);
+      const newsletter = isNewsletterKey(k);
+      const status = isStatusKey(k);
+      switch (viewKind) {
+        case "messages": return !group && !newsletter && !status;
+        case "groups": return group;
+        case "channels": return newsletter;
+        case "contacts": return !!c.contact?.id && !group && !newsletter && !status;
+        default: return true;
+      }
+    });
   })();
 
   // Empty-state grande de backfill — só faz sentido na PRIMEIRA sincronização,
@@ -471,6 +589,16 @@ function InboxPage() {
       : `${instanceFilter.length} instâncias`;
 
   const statusLabel = TABS.find((tb) => tb.id === statusTab)?.label ?? t("inbox_attendances");
+
+  const viewKindLabel = (() => {
+    switch (viewKind) {
+      case "messages": return "Mensagens";
+      case "groups": return "Grupos";
+      case "contacts": return "Contatos";
+      case "channels": return "Canais";
+      default: return "Todos os tipos";
+    }
+  })();
 
   const rejectCallMutation = useMutation({
     mutationFn: () =>
@@ -527,12 +655,14 @@ function InboxPage() {
           WebkitBackdropFilter: "blur(16px) saturate(180%)",
         }}
       >
+        {/* Linha 1: título + sinalizadores ativos + ações globais (notif, menu).
+            Filtros vão na linha 2 abaixo, pra ficarem agrupados visualmente. */}
         <div className="flex flex-wrap items-center gap-3">
-          <div>
+          <div className="min-w-0 flex-1">
             <h1 className="text-xl font-medium" style={{ color: "var(--text-1)" }}>
               {t("inbox_title")}
             </h1>
-            <p className="text-xs" style={{ color: "var(--text-3)" }}>
+            <p className="text-xs truncate" style={{ color: "var(--text-3)" }}>
               {viewMode === "reports"
                 ? t("inbox_reports")
                 : `${agentLabel} · ${channelLabel} · ${instanceLabel} · ${queueLabel}`}
@@ -540,11 +670,38 @@ function InboxPage() {
           </div>
 
           {viewMode === "conversations" && (
-          <div className="ml-auto flex flex-nowrap items-center gap-1.5 sm:gap-2 min-w-0">
-            {/* Atendimentos — status filter dropdown (primeiro na barra) */}
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+              <NotificationsButton
+                permission={notifPerm}
+                muted={notifMuted}
+                onRequest={requestNotif}
+                onToggleMute={toggleNotifMute}
+              />
+              {showBackfillPill && statsQ.data && (
+                <BackfillPillButton
+                  pending={statsQ.data.pending_backfill}
+                  running={backfill.isPending}
+                  onClick={() => backfill.mutate()}
+                />
+              )}
+              <InboxMenu viewMode={viewMode} setViewMode={setViewMode} />
+            </div>
+          )}
+          {viewMode === "reports" && (
+            <div className="flex-shrink-0">
+              <InboxMenu viewMode={viewMode} setViewMode={setViewMode} />
+            </div>
+          )}
+        </div>
+
+        {/* Linha 2: filtros em row próprio, abaixo dos sinalizadores. */}
+        {viewMode === "conversations" && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 sm:gap-2">
+            {/* Atendimentos — status filter dropdown */}
             <SingleSelectDropdown
-              icon={<MessageSquare className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />}
+              icon={<MessageSquare className="h-3.5 w-3.5" />}
               label={statusLabel}
+              active={statusTab !== "open"}
               items={TABS.map((t) => ({
                 id: t.id,
                 label: t.label,
@@ -558,21 +715,22 @@ function InboxPage() {
               onChange={(id) => setStatusTab(id as StatusTab)}
             />
 
-            {notifPerm === "default" && (
-              <button
-                type="button"
-                onClick={requestNotif}
-                title="Ativar notificações desktop e som de mensagens"
-                className="flex items-center justify-center rounded-lg w-7 h-7 flex-shrink-0"
-                style={{
-                  background: "rgba(0,212,106,0.10)",
-                  border: "1px solid rgba(0,212,106,0.22)",
-                  color: "#00d46a",
-                }}
-              >
-                <Bell className="h-3.5 w-3.5" />
-              </button>
-            )}
+            {/* Tipo de visualização — mensagens 1:1, grupos, contatos, canais */}
+            <SingleSelectDropdown
+              icon={<Filter className="h-3.5 w-3.5" />}
+              label={viewKindLabel}
+              active={viewKind !== "all"}
+              items={[
+                { id: "all", label: "Todos os tipos" },
+                { id: "messages", label: "Mensagens" },
+                { id: "groups", label: "Grupos" },
+                { id: "contacts", label: "Contatos" },
+                { id: "channels", label: "Canais / Newsletter" },
+              ]}
+              selected={viewKind}
+              onChange={(id) => setViewKind(id as ViewKind)}
+            />
+
             {/* Agent */}
             <AgentDropdown
               agentScope={agentScope}
@@ -583,44 +741,40 @@ function InboxPage() {
               currentLabel={agentLabel}
             />
 
-            {/* Channels (multi) — esconde em mobile pra economizar largura.
-                User abre via "Mais filtros" (futuro) ou usa /inbox direto. */}
-            <div className="shrink-0">
-              <MultiSelectDropdown
-                icon={<Radio className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />}
-                label={channelLabel}
-                items={availableChannels.map((c) => ({
-                  id: c.id,
-                  label: c.label,
-                  hint: c.color,
-                }))}
-                selected={channelFilter}
-                onChange={setChannelFilter}
-                emptyMsg={t("common_no_results")}
-              />
-            </div>
+            {/* Channels (multi) */}
+            <MultiSelectDropdown
+              icon={<Radio className="h-3.5 w-3.5" />}
+              label={channelLabel}
+              items={availableChannels.map((c) => ({
+                id: c.id,
+                label: c.label,
+                hint: c.color,
+              }))}
+              selected={channelFilter}
+              onChange={setChannelFilter}
+              emptyMsg={t("common_no_results")}
+            />
 
-            {/* Instances (multi) — idem channels, hidden em xs */}
-            <div className="shrink-0">
-              <MultiSelectDropdown
-                icon={<Smartphone className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />}
-                label={instanceLabel}
-                items={connectedInstances.map((inst) => ({
-                  id: inst.id,
-                  label: inst.name,
-                  hint: inst.phone_number || inst.channel,
-                  sub: inst.channel,
-                }))}
-                selected={instanceFilter}
-                onChange={setInstanceFilter}
-                emptyMsg={t("common_no_results")}
-              />
-            </div>
+            {/* Instances (multi) */}
+            <MultiSelectDropdown
+              icon={<Smartphone className="h-3.5 w-3.5" />}
+              label={instanceLabel}
+              items={connectedInstances.map((inst) => ({
+                id: inst.id,
+                label: inst.name,
+                hint: inst.phone_number || inst.channel,
+                sub: inst.channel,
+              }))}
+              selected={instanceFilter}
+              onChange={setInstanceFilter}
+              emptyMsg={t("common_no_results")}
+            />
 
             {/* Queue */}
             <SingleSelectDropdown
-              icon={<Layers className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />}
+              icon={<Layers className="h-3.5 w-3.5" />}
               label={queueLabel}
+              active={queueScope !== "all"}
               items={[
                 { id: "all", label: t("inbox_all_queues") },
                 { id: "none", label: "Sem fila" },
@@ -639,14 +793,15 @@ function InboxPage() {
               }
             />
 
-            {/* Clear filters — só aparece quando há ao menos um ativo. Útil
-                pra desfazer rápido toda a combinação (canal + instância + fila). */}
-            {(channelFilter.length > 0 || instanceFilter.length > 0 || queueScope !== "all") && (
+            {/* Clear filters — só aparece quando há ao menos um ativo */}
+            {(channelFilter.length > 0 || instanceFilter.length > 0 || queueScope !== "all" || viewKind !== "all" || statusTab !== "open") && (
               <button
                 onClick={() => {
                   setChannelFilter([]);
                   setInstanceFilter([]);
                   setQueueScope("all");
+                  setViewKind("all");
+                  setStatusTab("open");
                 }}
                 className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium"
                 style={{
@@ -659,12 +814,12 @@ function InboxPage() {
                 title="Remover todos os filtros"
               >
                 <X className="h-3 w-3" />
-                Limpar filtros
+                Limpar
               </button>
             )}
 
             {/* Search */}
-            <div className="relative">
+            <div className="relative ml-auto">
               <Search
                 className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5"
                 style={{ color: "hsl(240 8% 38%)" }}
@@ -683,37 +838,9 @@ function InboxPage() {
                 }}
               />
             </div>
-
-            {showBackfillPill && statsQ.data && (
-              <button
-                onClick={() => backfill.mutate()}
-                disabled={backfill.isPending}
-                className="relative flex h-7 w-7 items-center justify-center rounded-full disabled:opacity-50"
-                style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.25)" }}
-                title={`Sincronizar histórico · ${statsQ.data.pending_backfill} mensagens antigas pendentes`}
-                aria-label="Sincronizar histórico"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${backfill.isPending ? "animate-spin" : ""}`} />
-                {statsQ.data.pending_backfill > 0 && (
-                  <span
-                    className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-1 rounded-full text-[9px] font-semibold flex items-center justify-center"
-                    style={{ background: "#00d46a", color: "#03170a" }}
-                  >
-                    {statsQ.data.pending_backfill > 99 ? "99+" : statsQ.data.pending_backfill}
-                  </span>
-                )}
-              </button>
-            )}
-
-            <InboxMenu viewMode={viewMode} setViewMode={setViewMode} />
           </div>
-          )}
-          {viewMode === "reports" && (
-            <div className="ml-auto">
-              <InboxMenu viewMode={viewMode} setViewMode={setViewMode} />
-            </div>
-          )}
-        </div>
+        )}
+
       </header>
 
       {viewMode === "reports" ? (
@@ -900,6 +1027,14 @@ function AgentDropdown({
 }) {
   const { t } = usePreferences();
   const [open, setOpen] = useState(false);
+  // "all" é o default do agente (visão geral). Qualquer outro valor é
+  // considerado filtro ativo e ganha a cor verde.
+  const isActive = agentScope !== "all";
+  const bg = isActive ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.06)";
+  const bgHover = isActive ? "rgba(0,212,106,0.18)" : "rgba(255,255,255,0.10)";
+  const border = isActive ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.10)";
+  const borderHover = isActive ? "rgba(0,212,106,0.35)" : "rgba(255,255,255,0.15)";
+  const fg = isActive ? "#00d46a" : "hsl(240 15% 90%)";
   return (
     <Dropdown
       open={open}
@@ -910,17 +1045,18 @@ function AgentDropdown({
           disabled={!canViewAll}
           className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
           style={{
-            background: "rgba(255,255,255,0.06)",
+            background: bg,
             backdropFilter: "blur(8px)",
-            border: "1px solid rgba(255,255,255,0.10)",
-            color: "hsl(240 15% 90%)",
+            border: `1px solid ${border}`,
+            boxShadow: isActive ? "0 0 12px rgba(0,212,106,0.10)" : "none",
+            color: fg,
             opacity: canViewAll ? 1 : 0.6,
             transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
           }}
-          onMouseEnter={e => { if (canViewAll) { e.currentTarget.style.background = "rgba(255,255,255,0.10)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; } }}
-          onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.10)"; }}
+          onMouseEnter={e => { if (canViewAll) { e.currentTarget.style.background = bgHover; e.currentTarget.style.borderColor = borderHover; } }}
+          onMouseLeave={e => { e.currentTarget.style.background = bg; e.currentTarget.style.borderColor = border; }}
         >
-          <UserIcon className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 48%)" }} />
+          <UserIcon className="h-3.5 w-3.5" style={{ color: isActive ? "#00d46a" : "hsl(240 8% 48%)" }} />
           {currentLabel}
           <ChevronDown className="h-3 w-3" />
         </button>
@@ -969,7 +1105,7 @@ function AgentDropdown({
 }
 
 function SingleSelectDropdown({
-  icon, label, items, selected, onChange, footer,
+  icon, label, items, selected, onChange, footer, active,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -977,8 +1113,17 @@ function SingleSelectDropdown({
   selected: string;
   onChange: (id: string) => void;
   footer?: React.ReactNode;
+  /** Se true, pinta o trigger em verde (filtro com valor não-default) */
+  active?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // Cores conforme estado (active = filtro divergindo do default).
+  const triggerBg = active ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.06)";
+  const triggerBgHover = active ? "rgba(0,212,106,0.18)" : "rgba(255,255,255,0.10)";
+  const triggerBorder = active ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.10)";
+  const triggerBorderHover = active ? "rgba(0,212,106,0.35)" : "rgba(255,255,255,0.15)";
+  const triggerColor = active ? "#00d46a" : "hsl(240 15% 90%)";
+  const iconColor = active ? "#00d46a" : "hsl(240 8% 48%)";
   return (
     <Dropdown
       open={open}
@@ -988,16 +1133,17 @@ function SingleSelectDropdown({
           onClick={() => setOpen((o) => !o)}
           className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
           style={{
-            background: "rgba(255,255,255,0.06)",
+            background: triggerBg,
             backdropFilter: "blur(8px)",
-            border: "1px solid rgba(255,255,255,0.10)",
-            color: "hsl(240 15% 90%)",
+            border: `1px solid ${triggerBorder}`,
+            color: triggerColor,
+            boxShadow: active ? "0 0 12px rgba(0,212,106,0.10)" : "none",
             transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.10)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.10)"; }}
+          onMouseEnter={e => { e.currentTarget.style.background = triggerBgHover; e.currentTarget.style.borderColor = triggerBorderHover; }}
+          onMouseLeave={e => { e.currentTarget.style.background = triggerBg; e.currentTarget.style.borderColor = triggerBorder; }}
         >
-          {icon}
+          <span style={{ color: iconColor, display: "inline-flex" }}>{icon}</span>
           {label}
           <ChevronDown className="h-3 w-3" />
         </button>
@@ -1063,7 +1209,7 @@ function MultiSelectDropdown({
             e.currentTarget.style.borderColor = active ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.10)";
           }}
         >
-          {icon}
+          <span style={{ color: selected.length > 0 ? "#00d46a" : "hsl(240 8% 48%)", display: "inline-flex" }}>{icon}</span>
           {label}
           <ChevronDown className="h-3 w-3" />
         </button>
@@ -1130,25 +1276,45 @@ function Dropdown({
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
+  const [mounted, setMounted] = useState(false);
 
+  useEffect(() => { setMounted(true); }, []);
+
+  // Recalcula posição quando abre + acompanha scroll/resize. Isso é
+  // essencial agora que o painel renderiza via Portal: sem listeners
+  // o menu fica "preso" no lugar e sai do alinhamento ao scrollar.
   useEffect(() => {
-    if (open && wrapRef.current) {
+    if (!open) return;
+    const update = () => {
+      if (!wrapRef.current) return;
       const r = wrapRef.current.getBoundingClientRect();
       setPos({
         top: r.bottom + 4,
-        left: Math.max(4, r.right - 256), // 256 = w-64, não sair da tela
+        left: Math.max(4, Math.min(window.innerWidth - 260, r.right - 256)),
       });
-    }
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
   }, [open]);
 
-  return (
-    <div ref={wrapRef}>
-      {trigger}
-      {open && (
+  // O painel é renderizado via createPortal direto no <body>. Sem isso,
+  // o `backdropFilter` no header do inbox vira containing block para
+  // descendentes `position: fixed`, prendendo o dropdown dentro do
+  // header — quando o painel de chat abre por cima, ele cobre o menu.
+  // Portal escapa qualquer ancestor com transform/filter/backdrop-filter
+  // e o `overflow: hidden` da página nunca corta o popup.
+  const portalNode =
+    open && mounted && typeof document !== "undefined" ? (
+      createPortal(
         <>
-          <div className="fixed inset-0 z-[150]" onClick={onClose} />
+          <div className="fixed inset-0 z-[2000]" onClick={onClose} />
           <div
-            className="fixed z-[200] w-64 overflow-auto rounded-lg shadow-xl"
+            className="fixed z-[2001] w-64 overflow-auto rounded-lg shadow-xl"
             style={{
               top: pos.top,
               left: pos.left,
@@ -1162,8 +1328,15 @@ function Dropdown({
           >
             {children}
           </div>
-        </>
-      )}
+        </>,
+        document.body,
+      )
+    ) : null;
+
+  return (
+    <div ref={wrapRef} className="inline-block">
+      {trigger}
+      {portalNode}
     </div>
   );
 }
@@ -1526,6 +1699,82 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     >
       {children}
     </div>
+  );
+}
+
+// NotificationsButton — botão de toggle de notificações desktop. Persiste:
+//   1) lê Notification.permission no mount (sem isso some após F5 com perm
+//      já concedida);
+//   2) quando "default", clique pede permissão;
+//   3) quando "granted", clique alterna mute local (independente do browser);
+//   4) quando "denied", botão fica disabled com tooltip explicando.
+function NotificationsButton({
+  permission, muted, onRequest, onToggleMute,
+}: {
+  permission: NotificationPermission;
+  muted: boolean;
+  onRequest: () => void | Promise<unknown>;
+  onToggleMute: () => void;
+}) {
+  const denied = permission === "denied";
+  const granted = permission === "granted";
+  const showOff = (granted && muted) || denied;
+  const handle = () => {
+    if (denied) return;
+    if (granted) onToggleMute();
+    else onRequest();
+  };
+  const title = denied
+    ? "Notificações bloqueadas no browser — habilite nas preferências do site"
+    : granted
+      ? muted ? "Reativar som e notificações" : "Silenciar notificações"
+      : "Ativar notificações desktop e som de mensagens";
+  // Verde quando ativas (perm granted + não-muted). Cinza quando off/denied.
+  const bg = showOff ? "rgba(255,255,255,0.06)" : "rgba(0,212,106,0.10)";
+  const border = showOff ? "rgba(255,255,255,0.10)" : "rgba(0,212,106,0.22)";
+  const fg = showOff ? "hsl(240 8% 60%)" : "#00d46a";
+  return (
+    <button
+      type="button"
+      onClick={handle}
+      disabled={denied}
+      title={title}
+      aria-label={title}
+      className="flex items-center justify-center rounded-lg w-7 h-7 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+      style={{ background: bg, border: `1px solid ${border}`, color: fg }}
+    >
+      {showOff ? <BellOff className="h-3.5 w-3.5" /> : <Bell className="h-3.5 w-3.5" />}
+    </button>
+  );
+}
+
+// Pill verde de backfill — extraído pra desentupir o JSX do header.
+function BackfillPillButton({
+  pending, running, onClick,
+}: {
+  pending: number;
+  running: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={running}
+      className="relative flex h-7 w-7 items-center justify-center rounded-full disabled:opacity-50"
+      style={{ background: "rgba(0,212,106,0.1)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.25)" }}
+      title={`Sincronizar histórico · ${pending} mensagens antigas pendentes`}
+      aria-label="Sincronizar histórico"
+    >
+      <RefreshCw className={`h-3.5 w-3.5 ${running ? "animate-spin" : ""}`} />
+      {pending > 0 && (
+        <span
+          className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-1 rounded-full text-[9px] font-semibold flex items-center justify-center"
+          style={{ background: "#00d46a", color: "#03170a" }}
+        >
+          {pending > 99 ? "99+" : pending}
+        </span>
+      )}
+    </button>
   );
 }
 

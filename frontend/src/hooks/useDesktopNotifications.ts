@@ -8,8 +8,26 @@ import { useConversationWS, type WSEvent } from "@/hooks/useConversationWS";
 // está fora de foco; zera quando volta.
 //
 // Hook único pra ser usado uma vez no shell da inbox. Não duplicar.
+const MUTE_KEY = "inbox:notifications:muted";
 export function useDesktopNotifications() {
-  const [permission, setPermission] = useState<NotificationPermission>("default");
+  // Estado real lido do browser ao montar — sem isso a UI mostra "default"
+  // mesmo quando o usuário já concedeu permissão em sessão anterior.
+  const [permission, setPermission] = useState<NotificationPermission>(() => {
+    if (typeof window === "undefined" || typeof Notification === "undefined") return "default";
+    return Notification.permission;
+  });
+  // Mute local (persistido) — independente da permissão do browser. Permite
+  // o atendente silenciar sem revogar permissão no Chrome.
+  const [muted, setMuted] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(MUTE_KEY) === "1";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (muted) window.localStorage.setItem(MUTE_KEY, "1");
+    else window.localStorage.removeItem(MUTE_KEY);
+  }, [muted]);
+  const toggleMute = useCallback(() => setMuted((m) => !m), []);
   const [unreadCount, setUnreadCount] = useState(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const baseTitleRef = useRef<string>("");
@@ -113,6 +131,7 @@ export function useDesktopNotifications() {
     prefixes: ["conversation."],
     onEvent: (evt: WSEvent) => {
       if (evt.type !== "conversation.message") return;
+      if (muted) return;
       const payload = (evt.payload ?? {}) as {
         message?: {
           direction?: string;
@@ -137,7 +156,7 @@ export function useDesktopNotifications() {
     },
   });
 
-  return { permission, requestPermission, unreadCount };
+  return { permission, requestPermission, unreadCount, muted, toggleMute };
 }
 
 function previewFromContent(content: string, type: string): string {
