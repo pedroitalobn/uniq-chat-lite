@@ -461,26 +461,37 @@ export function JourneysList() {
                 background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
                 backdropFilter: "blur(20px) saturate(180%)",
                 WebkitBackdropFilter: "blur(20px) saturate(180%)",
-                border: "1px solid rgba(255,255,255,0.10)",
-                boxShadow: "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)",
-                transition: "all 0.35s cubic-bezier(0.16,1,0.3,1)",
+                border: j.status === "active" ? "1px solid rgba(0,212,106,0.20)" : "1px solid rgba(255,255,255,0.09)",
+                borderLeft: j.status === "active" ? "3px solid rgba(0,212,106,0.60)" : "3px solid rgba(255,255,255,0.08)",
+                boxShadow: j.status === "active"
+                  ? "0 4px 16px rgba(0,0,0,0.25), 0 0 0 0 rgba(0,212,106,0.10), inset 0 1px 0 rgba(255,255,255,0.08)"
+                  : "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)",
+                transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
               }}
               onMouseEnter={e => {
                 (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.12)";
-                (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.15)";
               }}
               onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)";
-                (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.10)";
+                (e.currentTarget as HTMLElement).style.boxShadow = j.status === "active"
+                  ? "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)"
+                  : "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)";
               }}
             >
               <div
-                className="p-3 sm:p-4 flex items-center justify-between cursor-pointer hover:bg-[var(--surface-2)] transition-colors gap-2"
+                className="p-3 sm:p-4 flex items-center justify-between cursor-pointer hover:bg-white/[0.02] transition-colors gap-2"
                 onClick={() => setExpanded((p) => ({ ...p, [j.id]: !p[j.id] }))}
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: j.status === "active" ? "#00d46a" : "#6b7280" }} />
+                    {/* Status indicator */}
+                    {j.status === "active" ? (
+                      <span className="relative flex-shrink-0">
+                        <span className="w-2 h-2 rounded-full block" style={{ background: "#00d46a" }} />
+                        <span className="absolute inset-0 rounded-full animate-ping" style={{ background: "#00d46a", opacity: 0.4 }} />
+                      </span>
+                    ) : (
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "#475569" }} />
+                    )}
                     <EditableName
                       value={j.name || j.prompt}
                       onSave={(next) => {
@@ -500,10 +511,16 @@ export function JourneysList() {
                           border: "1px solid rgba(255,255,255,0.10)",
                           borderRadius: "10px",
                           color: "var(--text-3)",
-                          transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
                         }}
                       >
                         {j.instance_name}
+                      </span>
+                    )}
+                    {j.active_executions > 0 && (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-1 flex-shrink-0"
+                        style={{ background: "rgba(0,212,106,0.14)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.22)" }}>
+                        <Activity className="w-2.5 h-2.5" />
+                        {j.active_executions} ativa{j.active_executions > 1 ? "s" : ""}
                       </span>
                     )}
                   </div>
@@ -513,17 +530,28 @@ export function JourneysList() {
                     </span>
                     <span className="text-xs opacity-30 hidden sm:inline">·</span>
                     <span className="text-xs" style={{ color: "var(--text-3)" }}>
-                      {j.invocations || 0} execuções
+                      {(j.invocations || 0).toLocaleString("pt-BR")} execuções
                     </span>
-                    {j.active_executions > 0 && (
+                    {j.invocations > 0 && j.completion_rate != null && (
                       <>
                         <span className="text-xs opacity-30 hidden sm:inline">·</span>
-                        <span className="text-xs flex items-center gap-1 text-emerald-500">
-                          <Activity className="w-3 h-3" /> {j.active_executions} ativa{j.active_executions > 1 ? "s" : ""}
+                        <span className="text-xs font-medium" style={{ color: j.completion_rate >= 70 ? "#00d46a" : j.completion_rate >= 40 ? "#f59e0b" : "#ef4444" }}>
+                          {j.completion_rate.toFixed(0)}% conclusão
                         </span>
                       </>
                     )}
                   </div>
+                  {/* Mini completion bar */}
+                  {j.invocations > 0 && (
+                    <div className="mt-2 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)", maxWidth: 180 }}>
+                      <div className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${Math.min(100, j.completion_rate || 0)}%`,
+                          background: j.completion_rate >= 70 ? "#00d46a" : j.completion_rate >= 40 ? "#f59e0b" : "#ef4444",
+                          boxShadow: j.status === "active" ? "0 0 6px rgba(0,212,106,0.40)" : "none",
+                        }} />
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 ml-2 sm:ml-4 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                   <button

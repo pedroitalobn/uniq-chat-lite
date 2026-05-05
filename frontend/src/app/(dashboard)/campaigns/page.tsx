@@ -1254,21 +1254,42 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
   };
 
   const [hovered, setHovered] = React.useState(false);
+  const isRunning = campaign.status === "running";
 
   return (
     <div className="rounded-2xl overflow-hidden relative"
       style={{
         ...glassCard,
+        border: isRunning
+          ? "1px solid rgba(0,212,106,0.22)"
+          : hovered
+            ? "1px solid rgba(255,255,255,0.14)"
+            : "1px solid rgba(255,255,255,0.08)",
+        transition: "border-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease",
         ...(hovered ? {
           transform: "translateY(-2px)",
-          boxShadow: "0 12px 32px rgba(0,0,0,0.40), 0 0 0 1px rgba(0,212,106,0.08), inset 0 1px 0 rgba(255,255,255,0.12)",
+          boxShadow: isRunning
+            ? "0 12px 32px rgba(0,0,0,0.40), 0 0 24px rgba(0,212,106,0.10), inset 0 1px 0 rgba(255,255,255,0.12)"
+            : "0 12px 32px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.12)",
+        } : isRunning ? {
+          boxShadow: "0 4px 20px rgba(0,212,106,0.12), inset 0 1px 0 rgba(255,255,255,0.08)",
         } : {}),
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
+      {/* Top shimmer */}
       <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
-        style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)" }} />
+        style={{ background: isRunning
+          ? "linear-gradient(90deg, transparent, rgba(0,212,106,0.45), transparent)"
+          : "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)" }} />
+      {/* Running live indicator */}
+      {isRunning && (
+        <div className="absolute top-3 right-3 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+          <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: "#00d46a" }}>ao vivo</span>
+        </div>
+      )}
       <div className="p-5">
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
@@ -1323,16 +1344,52 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
         )}
 
         <div className="mb-3">
-          <div className="flex justify-between text-[11px] mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>
-            <span className="flex items-center gap-1">
-              <Users className="w-3 h-3" /> {campaign.total_count} destinatários
+          <div className="flex justify-between text-[11px] mb-1.5">
+            <span className="flex items-center gap-1" style={{ color: "hsl(240 8% 50%)" }}>
+              <Users className="w-3 h-3" /> {campaign.total_count.toLocaleString("pt-BR")} destinatários
             </span>
-            <span>{campaign.sent_count} ok · {campaign.failed_count} falhos</span>
+            <span className="flex items-center gap-2">
+              {campaign.sent_count > 0 && (
+                <span style={{ color: "#00d46a" }}>{campaign.sent_count.toLocaleString("pt-BR")} ✓</span>
+              )}
+              {campaign.failed_count > 0 && (
+                <span style={{ color: "#ef4444" }}>{campaign.failed_count.toLocaleString("pt-BR")} ✗</span>
+              )}
+            </span>
           </div>
-          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
-            <div className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${progress}%`, background: campaign.failed_count > 0 ? "#f59e0b" : "var(--green)" }} />
+          {/* Segmented progress bar */}
+          <div className="h-2 rounded-full overflow-hidden flex gap-px" style={{ background: "rgba(255,255,255,0.06)" }}>
+            {campaign.sent_count > 0 && (
+              <div className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${(campaign.sent_count / campaign.total_count) * 100}%`,
+                  background: isRunning
+                    ? "linear-gradient(90deg, #00c45f, #00d46a)"
+                    : "linear-gradient(90deg, #00a855, #00d46a)",
+                  boxShadow: isRunning ? "0 0 8px rgba(0,212,106,0.50)" : "none",
+                }} />
+            )}
+            {campaign.failed_count > 0 && (
+              <div className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${(campaign.failed_count / campaign.total_count) * 100}%`,
+                  background: "#ef4444",
+                  opacity: 0.7,
+                }} />
+            )}
           </div>
+          {campaign.total_count > 0 && (
+            <div className="flex justify-between mt-1">
+              <span className="text-[9px] font-mono" style={{ color: "hsl(240 8% 36%)" }}>
+                {progress}% concluído
+              </span>
+              {campaign.sent_count > 0 && campaign.failed_count > 0 && (
+                <span className="text-[9px]" style={{ color: "hsl(240 8% 36%)" }}>
+                  taxa: {Math.round((campaign.sent_count / (campaign.sent_count + campaign.failed_count)) * 100)}%
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex gap-2">

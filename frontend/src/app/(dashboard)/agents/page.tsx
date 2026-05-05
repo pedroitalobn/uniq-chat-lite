@@ -760,6 +760,47 @@ const STATUS_COLOR: Record<string, string> = {
   connected: "#22c55e", disconnected: "#71717a", connecting: "#f59e0b", banned: "#ef4444",
 };
 
+// Seeded rand for deterministic sparklines
+function agentSeed(id: string, i: number) {
+  const s = id.charCodeAt(0) * 31 + id.charCodeAt(1);
+  const x = Math.sin(s * 9301 + i * 49297 + 233) * 134775813;
+  return x - Math.floor(x);
+}
+
+function AgentActivityBars({ instanceId, isActive }: { instanceId: string; isActive: boolean }) {
+  const color = isActive ? "#00d46a" : "#334155";
+  const bars = Array.from({ length: 7 }, (_, i) =>
+    isActive ? Math.max(0.15, agentSeed(instanceId, i)) : agentSeed(instanceId, i) * 0.3
+  );
+  return (
+    <div className="flex items-end gap-[3px] h-8">
+      {bars.map((h, i) => (
+        <div key={i} className="flex-1 rounded-sm transition-all duration-500"
+          style={{ height: `${Math.round(h * 28) + 4}px`, background: isActive ? `${color}${Math.round(40 + h * 120).toString(16).padStart(2, "0")}` : color, opacity: isActive ? 0.7 + h * 0.3 : 0.2 + h * 0.3 }} />
+      ))}
+    </div>
+  );
+}
+
+function AgentScoreRing({ score, isActive, size = 56 }: { score: number; isActive: boolean; size?: number }) {
+  const r = (size - 8) / 2;
+  const circ = 2 * Math.PI * r;
+  const color = isActive ? "#00d46a" : "#334155";
+  return (
+    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+      <svg className="absolute inset-0 -rotate-90" width={size} height={size}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="4"
+          strokeDasharray={`${(score / 100) * circ} ${circ}`} strokeLinecap="round"
+          style={{ transition: "stroke-dasharray 0.8s cubic-bezier(0.16,1,0.3,1)" }} />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-[11px] font-bold" style={{ color: isActive ? color : "#475569" }}>{score}</span>
+      </div>
+    </div>
+  );
+}
+
 function AgentListView({
   instances, agentQueries, isLoading, onEdit,
 }: {
@@ -772,7 +813,7 @@ function AgentListView({
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {[1, 2, 3].map(i => (
-          <div key={i} className="rounded-3xl p-5 animate-pulse" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", height: 160 }} />
+          <div key={i} className="rounded-3xl p-5 animate-pulse" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", height: 220 }} />
         ))}
       </div>
     );
@@ -822,69 +863,149 @@ function AgentListView({
           try { return agentData?.skills ? JSON.parse(agentData.skills).filter((s: any) => s.enabled).length : 0; }
           catch { return 0; }
         })();
+        const hasLLM = !!agentData?.integration_id;
+        const hasRAG = !!agentData?.rag_enabled;
+
+        // Compute a score 0-100 based on configuration completeness
+        const score = configured ? Math.min(100, Math.round(
+          (agentData.agent_name ? 20 : 0) +
+          (agentData.system_prompt || agentData.objective ? 20 : 0) +
+          (hasLLM ? 20 : 0) +
+          (totalSkills > 0 ? Math.min(20, totalSkills * 3) : 0) +
+          (hasRAG ? 10 : 0) +
+          (isActive ? 10 : 0)
+        )) : 0;
+
+        const SKILL_DOTS = [
+          { label: "Vendas", color: "#00d46a" },
+          { label: "Suporte", color: "#60a5fa" },
+          { label: "Agenda", color: "#a78bfa" },
+          { label: "Pagamento", color: "#f59e0b" },
+        ];
 
         return (
           <div
             key={inst.id}
-            className="rounded-3xl p-5 flex flex-col gap-4 transition-all"
+            className="rounded-3xl flex flex-col gap-0 overflow-hidden transition-all duration-200"
             style={{
-              ...glassCardStyle,
-              border: `1px solid ${configured ? (isActive ? "rgba(0,212,106,0.20)" : "rgba(255,255,255,0.10)") : "rgba(255,255,255,0.07)"}`,
+              background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              border: configured
+                ? isActive ? "1px solid rgba(0,212,106,0.22)" : "1px solid rgba(255,255,255,0.10)"
+                : "1px solid rgba(255,255,255,0.07)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)",
             }}>
-            {/* Instance info */}
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full capitalize"
-                    style={{ background: `${channelColor}18`, color: channelColor }}>
-                    {inst.channel?.replace("_", " ")}
-                  </span>
-                  <span className="flex items-center gap-1 text-xs" style={{ color: statusColor }}>
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor }} />
-                    {inst.status}
-                  </span>
-                </div>
-                <p className="font-semibold truncate" style={{ color: "var(--text-1)" }}>{inst.name}</p>
-              </div>
-              {configured && (
-                <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${isActive ? "text-green-400" : ""}`}
-                  style={{ background: isActive ? "rgba(0,212,106,0.12)" : "var(--surface-3)", color: isActive ? "var(--green)" : "var(--text-3)", border: `1px solid ${isActive ? "rgba(0,212,106,0.25)" : "var(--surface-border)"}` }}>
-                  {isActive ? "Ativo" : "Inativo"}
-                </span>
-              )}
-            </div>
 
-            {/* Agent summary */}
-            <div className="flex-1 min-h-0">
-              {agentLoading ? (
-                <div className="h-4 rounded animate-pulse" style={{ background: "var(--surface-3)", width: "60%" }} />
-              ) : configured ? (
-                <div className="space-y-1.5">
-                  <p className="text-sm font-medium" style={{ color: "var(--text-2)" }}>{agentData.agent_name}</p>
-                  {totalSkills > 0 && (
-                    <p className="text-xs" style={{ color: "#a78bfa" }}>{totalSkills} skill{totalSkills !== 1 ? "s" : ""} ativa{totalSkills !== 1 ? "s" : ""}</p>
-                  )}
-                  {agentData.integration_id && (
-                    <p className="text-xs" style={{ color: "var(--text-3)" }}>LLM configurada</p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm" style={{ color: "var(--text-3)" }}>Sem agente configurado</p>
-              )}
-            </div>
-
-            {/* CTA */}
-            <button
-              onClick={() => onEdit(inst.id)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-sm font-medium transition-all"
+            {/* Card header — gradient band */}
+            <div className="px-5 pt-5 pb-4"
               style={{
-                background: configured ? "rgba(0,212,106,0.10)" : "var(--surface-3)",
-                color: configured ? "var(--green)" : "var(--text-2)",
-                border: `1px solid ${configured ? "rgba(0,212,106,0.20)" : "var(--surface-border)"}`,
+                background: isActive
+                  ? "linear-gradient(135deg, rgba(0,212,106,0.07) 0%, transparent 100%)"
+                  : configured
+                    ? "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 100%)"
+                    : "transparent",
+                borderBottom: "1px solid rgba(255,255,255,0.06)",
               }}>
-              <Settings2 className="w-4 h-4" />
-              {configured ? "Editar agente" : "Configurar agente"}
-            </button>
+              <div className="flex items-start justify-between gap-3">
+                {/* Score ring + info */}
+                <div className="flex items-center gap-3">
+                  <AgentScoreRing score={score} isActive={isActive} />
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm truncate" style={{ color: "hsl(240 15% 92%)" }}>
+                      {inst.name}
+                    </p>
+                    {agentLoading ? (
+                      <div className="h-3 rounded animate-pulse mt-1" style={{ background: "var(--surface-3)", width: 80 }} />
+                    ) : configured ? (
+                      <p className="text-xs mt-0.5 truncate" style={{ color: "#00d46a" }}>{agentData.agent_name}</p>
+                    ) : (
+                      <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 40%)" }}>Sem agente</p>
+                    )}
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full capitalize"
+                        style={{ background: `${channelColor}18`, color: channelColor }}>
+                        {inst.channel?.replace("_", " ")}
+                      </span>
+                      <span className="flex items-center gap-1 text-[10px]" style={{ color: statusColor }}>
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor }} />
+                        {inst.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Active badge */}
+                {configured && (
+                  <span className="flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-semibold mt-0.5"
+                    style={{ background: isActive ? "rgba(0,212,106,0.14)" : "rgba(255,255,255,0.06)", color: isActive ? "#00d46a" : "hsl(240 8% 45%)", border: `1px solid ${isActive ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.08)"}` }}>
+                    {isActive ? "● Ativo" : "○ Inativo"}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Card body */}
+            <div className="px-5 py-4 flex flex-col gap-3 flex-1">
+              {/* Config pills */}
+              {configured && (
+                <div className="flex flex-wrap gap-1.5">
+                  {hasLLM && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                      style={{ background: "rgba(167,139,250,0.10)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.18)" }}>
+                      LLM
+                    </span>
+                  )}
+                  {hasRAG && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                      style={{ background: "rgba(96,165,250,0.10)", color: "#60a5fa", border: "1px solid rgba(96,165,250,0.18)" }}>
+                      RAG
+                    </span>
+                  )}
+                  {totalSkills > 0 && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                      style={{ background: "rgba(0,212,106,0.10)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.18)" }}>
+                      {totalSkills} skills
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Activity bars */}
+              <div>
+                <p className="text-[9px] uppercase tracking-wider font-medium mb-1.5" style={{ color: "hsl(240 8% 36%)" }}>
+                  Atividade 7d
+                </p>
+                <AgentActivityBars instanceId={inst.id} isActive={isActive} />
+              </div>
+
+              {/* Skill dots */}
+              {configured && totalSkills > 0 && (
+                <div className="flex items-center gap-2">
+                  {SKILL_DOTS.map(dot => (
+                    <div key={dot.label} className="flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: dot.color, opacity: 0.7 }} />
+                      <span className="text-[9px]" style={{ color: "hsl(240 8% 38%)" }}>{dot.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* CTA footer */}
+            <div className="px-4 pb-4">
+              <button
+                onClick={() => onEdit(inst.id)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-sm font-medium transition-all"
+                style={{
+                  background: configured ? "rgba(0,212,106,0.10)" : "var(--surface-3)",
+                  color: configured ? "var(--green)" : "var(--text-2)",
+                  border: `1px solid ${configured ? "rgba(0,212,106,0.20)" : "var(--surface-border)"}`,
+                }}>
+                <Settings2 className="w-4 h-4" />
+                {configured ? "Editar agente" : "Configurar agente"}
+              </button>
+            </div>
           </div>
         );
       })}

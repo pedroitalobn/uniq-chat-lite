@@ -159,49 +159,89 @@ export function AgentPanel({ workspaceId, conversationId, onSendSuggestion }: Pr
         </div>
       </div>
 
-      {/* Suggestion area (always visible) */}
-      <div className="rounded-xl overflow-hidden" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
-        <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: "var(--surface-border)" }}>
-          <Zap className="w-3 h-3" style={{ color: "#f59e0b" }} />
-          <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
-            Sugestão
+      {/* Recommendations panel — inspired by AI assistant UX */}
+      <div className="rounded-xl overflow-hidden"
+        style={{
+          background: suggestion
+            ? "linear-gradient(135deg, rgba(245,158,11,0.06) 0%, rgba(255,255,255,0.02) 100%)"
+            : "var(--surface-2)",
+          border: `1px solid ${suggestion ? "rgba(245,158,11,0.18)" : "var(--surface-border)"}`,
+          transition: "all 0.3s ease",
+        }}>
+        {/* Header */}
+        <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: suggestion ? "rgba(245,158,11,0.12)" : "var(--surface-border)" }}>
+          <Sparkles className="w-3 h-3" style={{ color: "#f59e0b" }} />
+          <span className="text-[10px] font-semibold" style={{ color: "var(--text-2)" }}>
+            Recomendações
+          </span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+            style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.2)" }}>
+            IA Gerado
           </span>
           <button
             onClick={() => { setLocalSuggestion(""); suggest.mutate(); }}
             disabled={suggest.isPending}
-            className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium transition-colors"
-            style={{ background: "rgba(245,158,11,0.1)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.2)" }}
+            className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium transition-all"
+            style={{
+              background: suggest.isPending ? "rgba(245,158,11,0.06)" : "rgba(245,158,11,0.10)",
+              color: "#f59e0b",
+              border: "1px solid rgba(245,158,11,0.20)",
+            }}
           >
             {suggest.isPending ? (
               <Loader2 className="w-2.5 h-2.5 animate-spin" />
             ) : (
-              <Sparkles className="w-2.5 h-2.5" />
+              <Zap className="w-2.5 h-2.5" />
             )}
             Gerar
           </button>
         </div>
 
         {suggestion ? (
-          <div className="p-3 space-y-2">
-            <p className="text-xs leading-relaxed" style={{ color: "var(--text-2)" }}>
-              {suggestion}
-            </p>
+          <div className="p-3 space-y-2.5">
+            {/* Suggestion badge */}
+            <div className="flex items-start gap-2">
+              <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                style={{ background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.25)" }}>
+                <Sparkles className="w-2 h-2" style={{ color: "#f59e0b" }} />
+              </div>
+              <p className="text-[11px] font-medium" style={{ color: "var(--text-3)" }}>
+                Resposta gerada por{" "}
+                <span style={{ color: "var(--text-2)" }}>{agentName}</span>
+              </p>
+            </div>
+
+            {/* Response text */}
+            <div className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--text-2)" }}>
+                {suggestion}
+              </p>
+            </div>
+
             {onSendSuggestion && (
               <button
                 onClick={() => { onSendSuggestion(suggestion); setLocalSuggestion(""); }}
-                className="flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1.5 rounded-lg w-full justify-center"
-                style={{ background: "rgba(0,212,106,0.1)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.2)" }}
+                className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-2 rounded-lg w-full justify-center transition-all hover:scale-[1.01]"
+                style={{
+                  background: "linear-gradient(135deg, rgba(0,212,106,0.18), rgba(0,212,106,0.08))",
+                  color: "var(--green)",
+                  border: "1px solid rgba(0,212,106,0.25)",
+                  boxShadow: "0 2px 12px rgba(0,212,106,0.12)",
+                }}
               >
                 <Send className="w-3 h-3" />
-                Usar como resposta
+                Usar Resposta
               </button>
             )}
           </div>
         ) : (
-          <div className="px-3 py-4 text-center">
-            <BotOff className="w-5 h-5 mx-auto mb-1.5" style={{ color: "var(--text-3)", opacity: 0.4 }} />
+          <div className="px-3 py-5 flex flex-col items-center gap-2 text-center">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+              style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.12)" }}>
+              <Bot className="w-4 h-4" style={{ color: "#f59e0b", opacity: 0.6 }} />
+            </div>
             <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
-              {mode === "disabled" ? "Ative a IA para gerar sugestões" : "Clique em Gerar para ver uma sugestão"}
+              {mode === "disabled" ? "Ative a IA para gerar recomendações" : "Clique em Gerar para ver sugestões"}
             </p>
           </div>
         )}

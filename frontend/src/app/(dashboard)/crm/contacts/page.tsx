@@ -1641,20 +1641,48 @@ export default function CRMPage() {
         )
       ) : viewMode === "list" ? (
         <div className="rounded-2xl overflow-hidden" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-          {contacts.map((contact, i) => (
+          {contacts.map((contact, i) => {
+            // Temperature based on days since last update
+            const daysSince = contact.updated_at
+              ? Math.floor((Date.now() - new Date(contact.updated_at).getTime()) / 86_400_000)
+              : 999;
+            const temp = daysSince <= 3 ? "hot" : daysSince <= 14 ? "warm" : "cold";
+            const tempColor = temp === "hot" ? "#00d46a" : temp === "warm" ? "#f59e0b" : "#475569";
+            const tempLabel = temp === "hot" ? "Ativo" : temp === "warm" ? "Morno" : "Inativo";
+
+            // Avatar color based on name initial
+            const charCode = (contact.name.charCodeAt(0) || 65) % 6;
+            const avatarColors = [
+              ["rgba(0,212,106,0.15)", "rgba(0,212,106,0.12)", "#00d46a"],
+              ["rgba(96,165,250,0.15)", "rgba(96,165,250,0.12)", "#60a5fa"],
+              ["rgba(167,139,250,0.15)", "rgba(167,139,250,0.12)", "#a78bfa"],
+              ["rgba(245,158,11,0.15)", "rgba(245,158,11,0.12)", "#f59e0b"],
+              ["rgba(236,72,153,0.15)", "rgba(236,72,153,0.12)", "#ec4899"],
+              ["rgba(34,211,238,0.15)", "rgba(34,211,238,0.12)", "#22d3ee"],
+            ];
+            const [avBg, avBorder, avText] = avatarColors[charCode];
+
+            return (
             <div
               key={contact.id}
-              className="flex items-start gap-4 px-5 py-3.5 transition-colors hover:bg-white/[0.02]"
-              style={{ borderTop: i > 0 ? "1px solid hsl(240 12% 11%)" : undefined }}
+              className="group flex items-start gap-4 px-5 py-3.5 transition-colors hover:bg-white/[0.02]"
+              style={{
+                borderTop: i > 0 ? "1px solid hsl(240 12% 11%)" : undefined,
+                borderLeft: `3px solid ${tempColor}30`,
+              }}
             >
               {/* Avatar */}
-              <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-semibold mt-0.5"
+              <div className="relative w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-semibold mt-0.5"
                 style={{
-                  background: "linear-gradient(135deg, rgba(0,212,106,0.15), rgba(0,212,106,0.04))",
-                  border: "1px solid rgba(0,212,106,0.15)",
-                  color: "var(--green)",
+                  background: `linear-gradient(135deg, ${avBg}, transparent)`,
+                  border: `1px solid ${avBorder}`,
+                  color: avText,
                 }}>
                 {contact.name[0]?.toUpperCase()}
+                {/* Temperature dot */}
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
+                  style={{ background: tempColor, borderColor: "hsl(240 18% 6%)" }}
+                  title={tempLabel} />
               </div>
 
               {/* Info */}
@@ -1715,7 +1743,8 @@ export default function CRMPage() {
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <DragDropContext onDragEnd={onDragEnd}>

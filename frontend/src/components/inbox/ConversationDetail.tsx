@@ -888,67 +888,78 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
       </section>
 
       {/* Sidepanel with actions + contact */}
-      <aside className="hidden w-80 flex-col border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 lg:flex">
-        <div className="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
-          <h2 className="text-xs font-medium uppercase tracking-wide text-zinc-500">Contato</h2>
-          <div className="mt-2 flex items-center gap-3">
-            {(() => {
-              const isGroup = (conv?.channel_key || "").toLowerCase().endsWith("@g.us");
-              const avatarUrl = conv?.contact?.avatar_url;
-              const name = conv?.contact?.name || conv?.subject || conv?.channel_key || "?";
-              if (avatarUrl) {
-                return (
-                  <button
-                    type="button"
-                    onClick={() => setViewerSource({ type: "image", url: avatarUrl, filename: `${name}.jpg` })}
-                    title="Ver foto de perfil"
-                    className="h-12 w-12 rounded-full overflow-hidden flex-shrink-0 transition-opacity hover:opacity-80"
-                    style={{ background: "var(--surface-2)" }}
-                  >
-                    <img src={avatarUrl} alt={name} className="h-12 w-12 object-cover" />
-                  </button>
-                );
-              }
-              if (isGroup) {
-                return (
-                  <div
-                    className="flex h-12 w-12 items-center justify-center rounded-full flex-shrink-0"
-                    style={{
-                      background: "rgba(167,139,250,0.12)",
-                      border: "1px solid rgba(167,139,250,0.25)",
-                      color: "#c4b5fd",
-                    }}
-                  >
-                    <UsersIcon className="h-5 w-5" />
-                  </div>
-                );
-              }
-              let hash = 0;
-              for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
-              const hue = Math.abs(hash) % 360;
-              const initials = (name.split(/\s+/).filter(Boolean).slice(0, 2).map((s) => s[0] || "").join("") || "?").toUpperCase();
-              return (
-                <div
-                  className="flex h-12 w-12 items-center justify-center rounded-full font-medium flex-shrink-0"
-                  style={{
-                    background: `hsl(${hue} 50% 22%)`,
-                    color: `hsl(${hue} 70% 75%)`,
-                    fontSize: 16,
-                  }}
-                >
-                  {initials}
+      <aside className="hidden w-72 flex-col border-l lg:flex"
+        style={{ background: "var(--surface-1)", borderColor: "var(--surface-border)" }}>
+        {/* Contact profile header */}
+        <div className="px-4 py-5 flex-shrink-0 border-b" style={{ borderColor: "var(--surface-border)" }}>
+          <p className="text-[10px] font-semibold uppercase tracking-widest mb-4" style={{ color: "var(--text-4)" }}>
+            Perfil
+          </p>
+          {(() => {
+            const isGroup = (conv?.channel_key || "").toLowerCase().endsWith("@g.us");
+            const avatarUrl = conv?.contact?.avatar_url;
+            const name = conv?.contact?.name || conv?.subject || conv?.channel_key || "?";
+            let hash = 0;
+            for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+            const hue = Math.abs(hash) % 360;
+            const initials = (name.split(/\s+/).filter(Boolean).slice(0, 2).map((s) => s[0] || "").join("") || "?").toUpperCase();
+
+            const avatar = avatarUrl ? (
+              <button
+                type="button"
+                onClick={() => setViewerSource({ type: "image", url: avatarUrl, filename: `${name}.jpg` })}
+                title="Ver foto de perfil"
+                className="h-16 w-16 rounded-2xl overflow-hidden flex-shrink-0 transition-all hover:scale-105 hover:shadow-lg ring-2 ring-transparent hover:ring-green-500/20"
+                style={{ background: "var(--surface-2)" }}
+              >
+                <img src={avatarUrl} alt={name} className="h-16 w-16 object-cover" />
+              </button>
+            ) : isGroup ? (
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl flex-shrink-0"
+                style={{ background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.25)", color: "#c4b5fd" }}>
+                <UsersIcon className="h-6 w-6" />
+              </div>
+            ) : (
+              <div
+                className="flex h-16 w-16 items-center justify-center rounded-2xl font-semibold flex-shrink-0"
+                style={{ background: `hsl(${hue} 55% 18%)`, color: `hsl(${hue} 70% 72%)`, fontSize: 20, border: `1px solid hsl(${hue} 55% 28%)` }}
+              >
+                {initials}
+              </div>
+            );
+
+            const lastMsgAt = conv?.last_message_at;
+            const lastSeen = lastMsgAt ? relativeTime(lastMsgAt) : null;
+
+            return (
+              <div className="flex flex-col items-center text-center gap-2">
+                {avatar}
+                <div className="w-full min-w-0">
+                  <p className="font-semibold text-sm truncate" style={{ color: "var(--text-1)" }}>
+                    {name}
+                  </p>
+                  {lastSeen && (
+                    <p className="text-[11px] mt-0.5" style={{ color: "var(--text-4)" }}>
+                      Última mensagem: {lastSeen}
+                    </p>
+                  )}
+                  {(conv?.contact?.phone || conv?.channel_key) && (
+                    <p className="text-[11px] mt-1 font-mono truncate" style={{ color: "var(--text-3)" }}>
+                      {conv?.contact?.phone || conv?.channel_key}
+                    </p>
+                  )}
+                  {conv?.contact?.email && (
+                    <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--text-3)" }}>
+                      {conv.contact.email}
+                    </p>
+                  )}
                 </div>
-              );
-            })()}
-            <div className="min-w-0 flex-1">
-              <div className="font-medium truncate">{conv?.contact?.name || "—"}</div>
-              <div className="text-sm text-zinc-500 truncate">{conv?.contact?.phone || conv?.channel_key}</div>
-              {conv?.contact?.email && <div className="text-xs text-zinc-500 truncate">{conv.contact.email}</div>}
-            </div>
-          </div>
+              </div>
+            );
+          })()}
         </div>
 
-        <div className="space-y-1 border-b border-zinc-200 p-3 dark:border-zinc-800">
+        <div className="space-y-0.5 border-b p-2.5" style={{ borderColor: "var(--surface-border)" }}>
           {!conv?.assigned_user_id && canAssign && (
             <ActionRow onClick={() => claim.mutate()} icon={<UserCheck className="h-4 w-4" />} label="Atender" tone="primary" />
           )}
@@ -1015,7 +1026,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           )}
         </div>
 
-        <div className="flex-1 overflow-auto p-5 text-xs text-zinc-500">
+        <div className="flex-1 overflow-auto p-3 text-xs custom-scrollbar" style={{ color: "var(--text-3)" }}>
           {wsId && conversationId && (
             <div className="mb-4 space-y-3">
               <AgentPanel
@@ -1035,22 +1046,28 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               )}
             </div>
           )}
-          <div className="mb-2 font-medium uppercase tracking-wide">Detalhes</div>
-          <dl className="space-y-1">
+          <div className="mb-2 text-[9px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-4)" }}>Detalhes</div>
+          <dl className="space-y-1.5 rounded-xl p-3 mb-3"
+            style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
             <DRow label="Aberto em" value={conv?.created_at && relativeTime(conv.created_at)} />
             <DRow label="Última mensagem" value={conv?.last_message_at && relativeTime(conv.last_message_at)} />
             <DRow label="Prioridade" value={conv?.priority} />
             <DRow label="Canal" value={conv?.channel_type} />
             <DRow label="Fila" value={queuesQ.data?.items.find((q) => q.id === conv?.queue_id)?.name ?? "—"} />
           </dl>
-          <div className="mt-4 rounded-md border border-dashed border-zinc-300 p-3 text-[11px] dark:border-zinc-700">
-            <div className="font-medium uppercase tracking-wide text-zinc-500">Atalhos</div>
-            <dl className="mt-1 space-y-0.5 text-zinc-500">
-              <div className="flex justify-between"><span>Atender</span><kbd className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">A</kbd></div>
-              <div className="flex justify-between"><span>Transferir</span><kbd className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">T</kbd></div>
-              <div className="flex justify-between"><span>Soneca</span><kbd className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">S</kbd></div>
-              <div className="flex justify-between"><span>Resolver</span><kbd className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">E</kbd></div>
-              <div className="flex justify-between"><span>Resposta rápida</span><kbd className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">/</kbd></div>
+          <div className="mt-3 rounded-xl p-3 text-[11px]"
+            style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+            <div className="font-semibold uppercase tracking-widest mb-1.5" style={{ color: "var(--text-4)", fontSize: 9 }}>Atalhos</div>
+            <dl className="space-y-1" style={{ color: "var(--text-3)" }}>
+              {[["Atender","A"],["Transferir","T"],["Soneca","S"],["Resolver","E"],["Resp. rápida","/"]].map(([label, key]) => (
+                <div key={key} className="flex justify-between items-center">
+                  <span>{label}</span>
+                  <kbd className="rounded-md px-1.5 py-0.5 text-[10px] font-mono"
+                    style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-3)" }}>
+                    {key}
+                  </kbd>
+                </div>
+              ))}
             </dl>
           </div>
         </div>
@@ -3875,10 +3892,13 @@ function ActionRow({
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+      className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-all"
       type="button"
+      style={{ color: "var(--text-2)" }}
+      onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
     >
-      {icon}
+      <span style={{ color: "var(--text-3)" }}>{icon}</span>
       {label}
     </button>
   );
@@ -3887,8 +3907,8 @@ function ActionRow({
 function DRow({ label, value }: { label: string; value?: string | null }) {
   return (
     <div className="flex justify-between gap-2">
-      <dt className="text-zinc-500">{label}</dt>
-      <dd className="text-right text-zinc-700 dark:text-zinc-300">{value || "—"}</dd>
+      <dt style={{ color: "var(--text-4)" }}>{label}</dt>
+      <dd className="text-right" style={{ color: "var(--text-2)" }}>{value || "—"}</dd>
     </div>
   );
 }

@@ -727,6 +727,43 @@ export default function InboxPage() {
             borderRight: isMobile ? "none" : "1px solid rgba(255,255,255,0.06)",
           }}
         >
+          {/* Urgency heat strip — only when we have conversations */}
+          {!listQ.isLoading && list.length > 0 && (() => {
+            const now = Date.now();
+            const urgent = list.filter(c => {
+              if (c.last_message_from_me) return false;
+              const ms = c.last_message_at ? now - new Date(c.last_message_at).getTime() : 0;
+              return ms > 30 * 60_000;
+            }).length;
+            const waiting = list.filter(c => {
+              if (c.last_message_from_me) return false;
+              const ms = c.last_message_at ? now - new Date(c.last_message_at).getTime() : 0;
+              return ms >= 5 * 60_000 && ms <= 30 * 60_000;
+            }).length;
+            if (urgent === 0 && waiting === 0) return null;
+            return (
+              <div className="flex items-center gap-2 px-3 py-2 flex-shrink-0"
+                style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(0,0,0,0.20)" }}>
+                {urgent > 0 && (
+                  <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                    style={{ background: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.20)" }}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                    {urgent} urgente{urgent !== 1 ? "s" : ""}
+                  </span>
+                )}
+                {waiting > 0 && (
+                  <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                    style={{ background: "rgba(245,158,11,0.10)", color: "#fbbf24", border: "1px solid rgba(245,158,11,0.18)" }}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#f59e0b" }} />
+                    {waiting} aguardando
+                  </span>
+                )}
+                <span className="ml-auto text-[9px]" style={{ color: "hsl(240 8% 36%)" }}>
+                  {list.length} total
+                </span>
+              </div>
+            );
+          })()}
           <div className="flex-1 overflow-y-auto uniq-no-bounce">
             {listQ.isError ? (
               <ErrorStateWithProbe

@@ -99,11 +99,27 @@ export function ActivityPanel() {
           <div className="space-y-2 p-3 sm:p-4">
             {items.map((item: any, i: number) => {
               const statusConfig = getStatusConfig(item.status);
+              const stepPct = item.total_steps > 0
+                ? Math.round(((item.step_index || 0) / item.total_steps) * 100)
+                : 0;
+              const isActive = item.status === "active";
               return (
-                <div key={i} className="rounded-xl p-3 sm:p-4 transition-all hover:scale-[1.005]" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+                <div key={i} className="rounded-xl p-3 sm:p-4 transition-all hover:scale-[1.005]"
+                  style={{
+                    background: "var(--surface-3)",
+                    border: `1px solid ${isActive ? "rgba(0,212,106,0.18)" : "var(--surface-border)"}`,
+                    borderLeft: `3px solid ${statusConfig.color}60`,
+                  }}>
                   <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: statusConfig.bg }}>
+                    <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: statusConfig.bg }}>
                       {getActivityIcon(item)}
+                      {isActive && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
+                          style={{ background: statusConfig.color, borderColor: "var(--surface-3)" }}>
+                          <span className="absolute inset-0 rounded-full animate-ping" style={{ background: statusConfig.color, opacity: 0.4 }} />
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -111,14 +127,34 @@ export function ActivityPanel() {
                         <span className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>
                           {item.journey_name || "Jornada"}
                         </span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0" style={{ background: statusConfig.bg, color: statusConfig.color }}>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0"
+                          style={{ background: statusConfig.bg, color: statusConfig.color }}>
                           {statusConfig.label}
                         </span>
                       </div>
 
-                      <p className="text-sm mb-2 break-words" style={{ color: item.last_message_type === "outbound" ? "#00d46a" : "var(--text-2)" }}>
+                      <p className="text-sm mb-2 break-words"
+                        style={{ color: item.last_message_type === "outbound" ? "#00d46a" : "var(--text-2)" }}>
                         {getActivityMessage(item)}
                       </p>
+
+                      {/* Step progress bar */}
+                      {item.total_steps > 0 && (
+                        <div className="mb-2">
+                          <div className="flex items-center justify-between text-[10px] mb-1" style={{ color: "var(--text-3)" }}>
+                            <span>Passo {(item.step_index || 0) + 1} de {item.total_steps}</span>
+                            <span>{stepPct}%</span>
+                          </div>
+                          <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                            <div className="h-full rounded-full transition-all duration-500"
+                              style={{
+                                width: `${stepPct}%`,
+                                background: statusConfig.color,
+                                boxShadow: isActive ? `0 0 6px ${statusConfig.color}60` : "none",
+                              }} />
+                          </div>
+                        </div>
+                      )}
 
                       <div className="flex items-center gap-2 sm:gap-3 text-[11px] flex-wrap" style={{ color: "var(--text-3)" }}>
                         {item.contact_name && (
@@ -137,12 +173,6 @@ export function ActivityPanel() {
                           <span className="flex items-center gap-1">
                             <Users className="w-3 h-3" />
                             {item.group_name}
-                          </span>
-                        )}
-                        {item.total_steps > 0 && (
-                          <span className="flex items-center gap-1">
-                            <TrendingUp className="w-3 h-3" />
-                            Passo {(item.step_index || 0) + 1}/{item.total_steps}
                           </span>
                         )}
                       </div>
