@@ -466,55 +466,162 @@ const SUGGESTIONS = [
   { icon: "✨", label: "O que posso fazer?", text: "O que você pode fazer por mim?" },
 ];
 
+function UniqOrbHero() {
+  const size = 120;
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: size * 2.2, height: size * 2.2 }}>
+      {/* Outermost aurora — slow, large */}
+      <motion.div className="absolute rounded-full"
+        style={{
+          width: size * 2.2, height: size * 2.2,
+          background: "radial-gradient(circle, rgba(0,212,106,0.10) 0%, rgba(0,180,90,0.04) 50%, transparent 75%)",
+        }}
+        animate={{ scale: [1, 1.18, 1], opacity: [0.5, 1, 0.5] }}
+        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }} />
+
+      {/* Mid aurora — counter-pulse */}
+      <motion.div className="absolute rounded-full"
+        style={{
+          width: size * 1.7, height: size * 1.7,
+          background: "radial-gradient(circle, rgba(0,212,106,0.16) 0%, transparent 65%)",
+          border: "1px solid rgba(0,212,106,0.12)",
+          boxShadow: "0 0 60px rgba(0,212,106,0.14)",
+        }}
+        animate={{ scale: [1, 1.1, 1], opacity: [0.6, 1, 0.6] }}
+        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.8 }} />
+
+      {/* Inner ring — crisp border with glow */}
+      <motion.div className="absolute rounded-full"
+        style={{
+          width: size * 1.22, height: size * 1.22,
+          border: "1.5px solid rgba(0,212,106,0.35)",
+          boxShadow: "0 0 32px rgba(0,212,106,0.22), inset 0 0 24px rgba(0,212,106,0.06)",
+        }}
+        animate={{ scale: [1, 1.05, 1], opacity: [0.7, 1, 0.7] }}
+        transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut", delay: 0.3 }} />
+
+      {/* Orbit particle */}
+      <motion.div
+        className="absolute"
+        style={{ width: size * 1.22, height: size * 1.22 }}
+        animate={{ rotate: 360 }}
+        transition={{ duration: 7, repeat: Infinity, ease: "linear" }}
+      >
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
+          <div className="w-2 h-2 rounded-full"
+            style={{ background: "#00d46a", boxShadow: "0 0 8px rgba(0,212,106,0.9), 0 0 20px rgba(0,212,106,0.5)" }} />
+        </div>
+      </motion.div>
+
+      {/* Counter-orbit particle */}
+      <motion.div
+        className="absolute"
+        style={{ width: size * 1.0, height: size * 1.0 }}
+        animate={{ rotate: -360 }}
+        transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
+      >
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
+          <div className="w-1.5 h-1.5 rounded-full"
+            style={{ background: "#00d46a", opacity: 0.6, boxShadow: "0 0 6px rgba(0,212,106,0.8)" }} />
+        </div>
+      </motion.div>
+
+      {/* Core orb */}
+      <motion.div
+        className="relative rounded-full overflow-hidden"
+        style={{
+          width: size, height: size,
+          background: "radial-gradient(circle at 32% 32%, rgba(0,255,140,0.55) 0%, rgba(0,212,106,0.35) 35%, rgba(0,60,30,0.95) 100%)",
+          boxShadow: "0 0 48px rgba(0,212,106,0.45), 0 0 120px rgba(0,212,106,0.18), inset 0 0 32px rgba(0,212,106,0.15)",
+          border: "1.5px solid rgba(0,212,106,0.45)",
+        }}
+        animate={{ scale: [1, 1.03, 1] }}
+        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+      >
+        {/* Rotating highlight */}
+        <motion.div className="absolute inset-0 rounded-full"
+          style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.22) 0%, transparent 45%, rgba(0,212,106,0.12) 100%)" }}
+          animate={{ rotate: [0, 360] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "linear" }} />
+
+        {/* Center icon */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <motion.div
+            animate={{ scale: [0.85, 1.12, 0.85], opacity: [0.7, 1, 0.7] }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <Sparkles className="w-8 h-8" style={{ color: "rgba(255,255,255,0.95)", filter: "drop-shadow(0 0 8px rgba(0,212,106,0.8))" }} />
+          </motion.div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 export function EmptyStateView({ onSuggestionClick }: { onSuggestionClick: (text: string) => void }) {
   return (
     <ThreadPrimitive.Empty>
-      <div className="flex flex-col items-center justify-center h-full gap-6 px-4 py-12 text-center">
-        <div className="relative">
-          <motion.div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg, var(--green) 0%, rgba(0,212,106,0.6) 100%)" }}
-            animate={{ scale: [1, 1.04, 1] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-          >
-            <Sparkles className="w-8 h-8 text-white" />
-          </motion.div>
-          <div
-            className="absolute inset-0 rounded-2xl blur-xl opacity-30"
-            style={{ background: "var(--green)" }}
-          />
-        </div>
+      <div className="flex flex-col items-center justify-center h-full gap-5 px-4 py-8 text-center">
+        {/* Orb */}
+        <UniqOrbHero />
 
-        <div className="space-y-1.5">
-          <h2 className="text-xl font-semibold" style={{ color: "var(--text-1)" }}>
-            Como posso ajudar?
+        {/* Headline */}
+        <motion.div
+          className="space-y-2 -mt-4"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+        >
+          <h2 className="text-2xl font-semibold tracking-tight" style={{ color: "var(--text-1)" }}>
+            Olá, sou a{" "}
+            <span style={{
+              color: "var(--green)",
+              textShadow: "0 0 20px rgba(0,212,106,0.5)",
+            }}>
+              Uniq AI
+            </span>
           </h2>
-          <p className="text-sm max-w-sm mx-auto" style={{ color: "var(--text-3)" }}>
-            Crie automações, gerencie instâncias, consulte contatos e muito mais.
+          <p className="text-sm max-w-xs mx-auto" style={{ color: "var(--text-3)" }}>
+            Seu assistente inteligente para automação, instâncias e crescimento.
           </p>
-        </div>
+        </motion.div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-md">
-          {SUGGESTIONS.map((s) => (
+        {/* Suggestion chips */}
+        <motion.div
+          className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35, duration: 0.5 }}
+        >
+          {SUGGESTIONS.map((s, i) => (
             <motion.button
               key={s.label}
               onClick={() => onSuggestionClick(s.text)}
-              className="flex items-start gap-3 p-3 rounded-xl text-left transition-all hover:scale-[1.02]"
+              className="flex items-start gap-3 p-3.5 rounded-2xl text-left group"
               style={{
                 background: "rgba(255,255,255,0.04)",
                 border: "1px solid rgba(255,255,255,0.08)",
+                transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
               }}
-              whileHover={{ background: "rgba(0,212,106,0.06)", borderColor: "rgba(0,212,106,0.15)" }}
-              transition={{ duration: 0.15 }}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 + i * 0.07, duration: 0.3 }}
+              whileHover={{
+                scale: 1.02,
+                background: "rgba(0,212,106,0.07)",
+                borderColor: "rgba(0,212,106,0.22)",
+                boxShadow: "0 4px 20px rgba(0,212,106,0.10)",
+              }}
+              whileTap={{ scale: 0.98 }}
             >
-              <span className="text-base leading-none mt-0.5">{s.icon}</span>
-              <div>
-                <p className="text-xs font-medium" style={{ color: "var(--text-1)" }}>{s.label}</p>
-                <p className="text-[11px] mt-0.5 line-clamp-1" style={{ color: "var(--text-3)" }}>{s.text}</p>
+              <span className="text-lg leading-none mt-0.5 flex-shrink-0">{s.icon}</span>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>{s.label}</p>
+                <p className="text-[11px] mt-0.5 line-clamp-2 leading-relaxed" style={{ color: "var(--text-3)" }}>{s.text}</p>
               </div>
             </motion.button>
           ))}
-        </div>
+        </motion.div>
       </div>
     </ThreadPrimitive.Empty>
   );

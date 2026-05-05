@@ -6,6 +6,7 @@ import {
   Activity, MessageSquare, Pencil, Plus, Sparkles, Trash2, Wand2, Zap,
   PanelLeftOpen, PanelRightOpen, X,
 } from "lucide-react";
+// Note: Sparkles kept for ActivityDrawer icons via EVENT_ICON record
 import { UniqAIChatPanel } from "@/features/uniq-ai/chat-panel";
 import type { Message } from "@/features/uniq-ai/atoms";
 import {
@@ -71,46 +72,6 @@ const glassStyle: React.CSSProperties = {
   border: "1px solid rgba(255,255,255,0.09)",
   boxShadow: "0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08)",
 };
-
-// Animated orb — Uniq AI entity
-function UniqOrb({ size = 120 }: { size?: number }) {
-  return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <motion.div className="absolute rounded-full"
-        style={{ width: size * 1.9, height: size * 1.9, background: "radial-gradient(circle, rgba(0,212,106,0.06) 0%, transparent 70%)" }}
-        animate={{ scale: [1, 1.2, 1], opacity: [0.4, 0.75, 0.4] }}
-        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }} />
-      <motion.div className="absolute rounded-full"
-        style={{ width: size * 1.45, height: size * 1.45, background: "radial-gradient(circle, rgba(0,212,106,0.1) 0%, transparent 65%)", border: "1px solid rgba(0,212,106,0.1)" }}
-        animate={{ scale: [1, 1.09, 1], opacity: [0.55, 1, 0.55] }}
-        transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }} />
-      <motion.div className="absolute rounded-full"
-        style={{ width: size * 1.16, height: size * 1.16, border: "1px solid rgba(0,212,106,0.22)", boxShadow: "0 0 24px rgba(0,212,106,0.12)" }}
-        animate={{ scale: [1, 1.04, 1], opacity: [0.65, 1, 0.65] }}
-        transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} />
-      <motion.div className="relative rounded-full overflow-hidden"
-        style={{
-          width: size, height: size,
-          background: "radial-gradient(circle at 35% 35%, rgba(0,212,106,0.45) 0%, rgba(0,180,90,0.28) 40%, rgba(0,8,4,0.92) 100%)",
-          boxShadow: "0 0 36px rgba(0,212,106,0.28), inset 0 0 24px rgba(0,212,106,0.1)",
-          border: "1px solid rgba(0,212,106,0.28)",
-        }}
-        animate={{ scale: [1, 1.025, 1] }}
-        transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}>
-        <motion.div className="absolute inset-0 rounded-full"
-          style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.16) 0%, transparent 50%, rgba(0,212,106,0.1) 100%)" }}
-          animate={{ rotate: [0, 360] }}
-          transition={{ duration: 9, repeat: Infinity, ease: "linear" }} />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <motion.div animate={{ scale: [0.8, 1.1, 0.8], opacity: [0.5, 1, 0.5] }}
-            transition={{ duration: 2.1, repeat: Infinity, ease: "easeInOut" }}>
-            <Sparkles className="w-6 h-6" style={{ color: "rgba(0,212,106,0.9)" }} />
-          </motion.div>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
 
 // Drawer panel — conversations history
 function ConversationsDrawer({
@@ -379,8 +340,6 @@ export default function UniqAIPage() {
     }
   }, [hydrated, conversations.length]);
 
-  const isEmpty = !activeConversation || activeConversation.messages.length === 0;
-
   if (!hydrated) {
     return (
       <div className="flex h-full min-h-0 rounded-2xl overflow-hidden animate-pulse"
@@ -431,42 +390,8 @@ export default function UniqAIPage() {
         </motion.button>
       </div>
 
-      {/* Chat area — full height, no sidebars competing */}
+      {/* Chat area — full height */}
       <div className="flex-1 min-h-0 flex flex-col">
-        {/* Empty state orb — only when no messages */}
-        <AnimatePresence>
-          {isEmpty && (
-            <motion.div
-              key="empty"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.4 }}
-              className="flex flex-col items-center justify-center pt-16 pb-4 px-4 flex-shrink-0"
-            >
-              <UniqOrb size={100} />
-              <motion.div className="mt-6 text-center"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25, duration: 0.5 }}>
-                <h2 className="text-xl font-semibold" style={{ color: "var(--text-1)" }}>
-                  Olá, sou a{" "}
-                  <span style={{ color: "var(--green)" }}>Uniq AI</span>
-                </h2>
-                <p className="text-sm mt-1.5 max-w-xs mx-auto" style={{ color: "var(--text-3)" }}>
-                  Seu assistente inteligente para automação e crescimento
-                </p>
-                <div className="flex items-center justify-center gap-2 mt-4 flex-wrap">
-                  {["Criar uma jornada", "Analisar instâncias", "Lançar campanha"].map((s) => (
-                    <span key={s} className="text-xs px-3 py-1.5 rounded-full cursor-default"
-                      style={{ ...glassStyle, color: "var(--text-2)", fontSize: "11px" }}>
-                      {s}
-                    </span>
-                  ))}
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {activeConversation && (
           <UniqAIChatPanel
             key={activeConversation.id}
