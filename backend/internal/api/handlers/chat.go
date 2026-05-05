@@ -167,7 +167,13 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 	userID := raw.(uuid.UUID)
 
 	var integration *models.UserIntegration
-	if req.IntegrationID != "" && req.IntegrationID != "platform-ai" {
+	if strings.HasPrefix(req.IntegrationID, "platform-ai-") {
+		paiID := strings.TrimPrefix(req.IntegrationID, "platform-ai-")
+		var pai models.PlatformAI
+		if err := h.db.First(&pai, "id = ? AND is_active = true", paiID).Error; err == nil && pai.APIKey != "" {
+			integration = services.PlatformAIToIntegration(&pai)
+		}
+	} else if req.IntegrationID != "" && req.IntegrationID != "platform-ai" {
 		if err := h.db.Where("id = ? AND user_id = ? AND is_active = true", req.IntegrationID, userID).First(&integration).Error; err != nil {
 			integration = nil
 		}
@@ -228,7 +234,13 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 
 		// Find integration — mesma lógica do fluxo normal: user > PlatformAI.
 		var integration *models.UserIntegration
-		if req.IntegrationID != "" && req.IntegrationID != "platform-ai" {
+		if strings.HasPrefix(req.IntegrationID, "platform-ai-") {
+			paiID := strings.TrimPrefix(req.IntegrationID, "platform-ai-")
+			var pai models.PlatformAI
+			if err := h.db.First(&pai, "id = ? AND is_active = true", paiID).Error; err == nil && pai.APIKey != "" {
+				integration = services.PlatformAIToIntegration(&pai)
+			}
+		} else if req.IntegrationID != "" && req.IntegrationID != "platform-ai" {
 			h.db.Where("id = ? AND user_id = ? AND is_active = true", req.IntegrationID, userID).First(&integration)
 		}
 		if integration == nil {
@@ -561,7 +573,13 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 
 	if shouldUseTools && h.toolsH != nil {
 		var agentIntegration *models.UserIntegration
-		if req.IntegrationID != "" && req.IntegrationID != "platform-ai" {
+		if strings.HasPrefix(req.IntegrationID, "platform-ai-") {
+			paiID := strings.TrimPrefix(req.IntegrationID, "platform-ai-")
+			var pai models.PlatformAI
+			if err := h.db.First(&pai, "id = ? AND is_active = true", paiID).Error; err == nil && pai.APIKey != "" {
+				agentIntegration = services.PlatformAIToIntegration(&pai)
+			}
+		} else if req.IntegrationID != "" && req.IntegrationID != "platform-ai" {
 			h.db.Where("id = ? AND user_id = ? AND is_active = true", req.IntegrationID, userID).First(&agentIntegration)
 		}
 		if agentIntegration == nil {

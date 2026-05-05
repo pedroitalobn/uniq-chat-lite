@@ -1905,11 +1905,15 @@ export interface PlatformAIConfig {
 }
 
 export const platformAIApi = {
-  // Admin endpoints
-  get: () => api.get<PlatformAIConfig>("/v1/admin/platform-ai"),
-  update: (data: Partial<PlatformAIConfig> & { api_key?: string }) =>
-    api.put<PlatformAIConfig>("/v1/admin/platform-ai", data),
-  test: () => api.post<{ status: string; message: string }>("/v1/admin/platform-ai/test"),
-  // Public endpoint (for integrations page)
-  getPublic: () => api.get<PlatformAIConfig>("/v1/integrations/platform-ai"),
+  // Admin endpoints (multi-config)
+  list: () => api.get<PlatformAIConfig[]>("/v1/admin/platform-ai"),
+  create: (data: Partial<PlatformAIConfig> & { api_key?: string }) =>
+    api.post<{ ok: boolean; id: string }>("/v1/admin/platform-ai", data),
+  update: (id: string, data: Partial<PlatformAIConfig> & { api_key?: string }) =>
+    api.put<{ ok: boolean; id: string }>(`/v1/admin/platform-ai/${id}`, data),
+  delete: (id: string) => api.delete(`/v1/admin/platform-ai/${id}`),
+  test: (id: string) =>
+    api.post<{ ok: boolean; message: string }>(`/v1/admin/platform-ai/${id}/test`),
+  // Public endpoint (active configs for ModelSelector)
+  listPublic: () => api.get<PlatformAIConfig[]>("/v1/integrations/platform-ai"),
 };

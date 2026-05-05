@@ -72,19 +72,26 @@ interface Integration {
   models: string[];
 }
 
-// Preferência virtual que representa a Uniq AI (plataforma)
-const PLATFORM_AI_PREF: ModelPreference = {
-  integrationId: "platform-ai",
-  integrationName: "Uniq AI",
-  provider: "platform",
-  model: "",
-};
+interface PlatformAIEntry {
+  id: string;
+  name: string;
+  provider: string;
+}
+
+function makePlatformAIPref(entry: PlatformAIEntry): ModelPreference {
+  return {
+    integrationId: `platform-ai-${entry.id}`,
+    integrationName: entry.name,
+    provider: "platform",
+    model: "",
+  };
+}
 
 export function ModelSelector({ value, onChange }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [groups, setGroups] = useState<Record<string, Integration[]>>({});
-  const [hasPlatformAI, setHasPlatformAI] = useState(false);
+  const [platformConfigs, setPlatformConfigs] = useState<PlatformAIEntry[]>([]);
   const ref = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -92,12 +99,13 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
     try {
       const [intRes, paiRes] = await Promise.allSettled([
         integrationsApi.list(),
-        platformAIApi.getPublic(),
+        platformAIApi.listPublic(),
       ]);
 
-      const pai = paiRes.status === "fulfilled" ? paiRes.value.data : null;
-      const platformActive = !!(pai?.is_active && pai?.provider);
-      setHasPlatformAI(platformActive);
+      const paiList: PlatformAIEntry[] = (paiRes.status === "fulfilled" ? paiRes.value.data || [] : [])
+        .filter((p: any) => p.is_active && p.provider)
+        .map((p: any) => ({ id: p.id, name: p.name || "Uniq AI", provider: p.provider }));
+      setPlatformConfigs(paiList);
 
       const filtered: Integration[] = (intRes.status === "fulfilled" ? intRes.value.data || [] : [])
         .filter((i: any) => i.is_active && LLM_PROVIDERS.includes(i.provider?.toLowerCase()))
@@ -116,19 +124,22 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
       }
       setGroups(g);
 
-      // Auto-seleção: preferência salva → Uniq AI (quando ativa) → primeira integração
+      // Auto-seleção: preferência salva → primeira Uniq AI ativa → primeira integração
       if (!value) {
         const saved = loadModelPref();
+        const savedPlatformID = saved?.integrationId?.startsWith("platform-ai-")
+          ? saved.integrationId.replace("platform-ai-", "") : null;
         const stillActive = saved && (
-          saved.integrationId === "platform-ai" ? platformActive :
-          filtered.find((i) => i.id === saved.integrationId)
+          savedPlatformID
+            ? paiList.some((p) => p.id === savedPlatformID)
+            : filtered.find((i) => i.id === saved.integrationId)
         );
         if (stillActive) {
           onChange(saved!);
-        } else if (platformActive) {
-          // Uniq AI é o padrão quando disponível
-          saveModelPref(PLATFORM_AI_PREF);
-          onChange(PLATFORM_AI_PREF);
+        } else if (paiList.length > 0) {
+          const pref = makePlatformAIPref(paiList[0]);
+          saveModelPref(pref);
+          onChange(pref);
         } else if (filtered.length > 0) {
           const first = filtered[0];
           const pref: ModelPreference = {
@@ -172,6 +183,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
   };
 
   const allCount = Object.values(groups).reduce((s, arr) => s + arr.reduce((a, i) => a + Math.max(i.models.length, 1), 0), 0);
+  const hasPlatformAI = platformConfigs.length > 0;
 
   return (
     <div className="relative" ref={ref}>
@@ -188,11 +200,11 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
       >
         {loading ? (
           <Loader2 className="w-3 h-3 animate-spin" style={{ color: "var(--text-3)" }} />
-        ) : value?.integrationId === "platform-ai" ? (
+        ) : value?.integrationId?.startsWith("platform-ai-") ? (
           <>
             <Sparkles className="w-3 h-3 flex-shrink-0" style={{ color: "var(--green)" }} />
             <span className="truncate max-w-[120px] sm:max-w-[160px]" style={{ color: "var(--green)" }}>
-              Uniq AI
+              {value.integrationName}
             </span>
           </>
         ) : value ? (
@@ -233,38 +245,41 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
             }}
           >
             <div className="py-1">
-              {/* Uniq AI — sempre no topo quando ativa */}
+              {/* Uniq AI configs — sempre no topo quando ativas */}
               {hasPlatformAI && (
                 <div>
                   <div className="px-3 pt-2 pb-0.5 text-[9px] font-bold uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
                     Plataforma
                   </div>
-                  <button
-                    onClick={() => {
-                      saveModelPref(PLATFORM_AI_PREF);
-                      onChange(PLATFORM_AI_PREF);
-                      setOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors"
-                    style={{ background: value?.integrationId === "platform-ai" ? "rgba(0,212,106,0.08)" : "transparent" }}
-                    onMouseEnter={(e) => value?.integrationId !== "platform-ai" && (e.currentTarget.style.background = "var(--surface-3)")}
-                    onMouseLeave={(e) => value?.integrationId !== "platform-ai" && (e.currentTarget.style.background = "transparent")}
-                  >
-                    <div className="w-3.5 h-3.5 flex-shrink-0">
-                      {value?.integrationId === "platform-ai"
-                        ? <Check className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
-                        : <Sparkles className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
-                      }
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium" style={{ color: value?.integrationId === "platform-ai" ? "var(--green)" : "var(--text-1)" }}>
-                        Uniq AI
-                      </p>
-                      <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
-                        Padrão da plataforma
-                      </p>
-                    </div>
-                  </button>
+                  {platformConfigs.map((pai) => {
+                    const pref = makePlatformAIPref(pai);
+                    const isActive = value?.integrationId === pref.integrationId;
+                    return (
+                      <button
+                        key={pai.id}
+                        onClick={() => { saveModelPref(pref); onChange(pref); setOpen(false); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors"
+                        style={{ background: isActive ? "rgba(0,212,106,0.08)" : "transparent" }}
+                        onMouseEnter={(e) => !isActive && (e.currentTarget.style.background = "var(--surface-3)")}
+                        onMouseLeave={(e) => !isActive && (e.currentTarget.style.background = "transparent")}
+                      >
+                        <div className="w-3.5 h-3.5 flex-shrink-0">
+                          {isActive
+                            ? <Check className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
+                            : <Sparkles className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium" style={{ color: isActive ? "var(--green)" : "var(--text-1)" }}>
+                            {pai.name}
+                          </p>
+                          <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
+                            {pai.provider} · plataforma
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
               {allCount === 0 && !hasPlatformAI ? (

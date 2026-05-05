@@ -1697,34 +1697,34 @@ func getDefaultTemplates() []models.EmailTemplate {
 
 // ─── Platform AI (Uniq AI) ────────────────────────────────────────────────────
 
-// GetPlatformAI GET /v1/admin/platform-ai
-// Retorna a config da Uniq AI (sem API key).
-func (h *AdminHandler) GetPlatformAI(c *fiber.Ctx) error {
-	var cfg models.PlatformAI
-	if err := h.db.First(&cfg).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return c.JSON(fiber.Map{"configured": false})
-		}
-		return c.Status(500).JSON(fiber.Map{"error": "erro ao buscar config"})
+// ListPlatformAI GET /v1/admin/platform-ai
+// Retorna todas as configs de Uniq AI (sem API key).
+func (h *AdminHandler) ListPlatformAI(c *fiber.Ctx) error {
+	var cfgs []models.PlatformAI
+	if err := h.db.Order("created_at ASC").Find(&cfgs).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "erro ao buscar configs"})
 	}
-	return c.JSON(fiber.Map{
-		"configured":     true,
-		"id":             cfg.ID,
-		"provider":       cfg.Provider,
-		"name":           cfg.Name,
-		"base_url":       cfg.BaseURL,
-		"models":         cfg.Models,
-		"config":         cfg.Config,
-		"is_active":      cfg.IsActive,
-		"test_status":    cfg.TestStatus,
-		"last_tested_at": cfg.LastTestedAt,
-		"has_api_key":    cfg.APIKey != "",
-	})
+	out := make([]fiber.Map, 0, len(cfgs))
+	for _, cfg := range cfgs {
+		out = append(out, fiber.Map{
+			"id":             cfg.ID,
+			"provider":       cfg.Provider,
+			"name":           cfg.Name,
+			"base_url":       cfg.BaseURL,
+			"models":         cfg.Models,
+			"config":         cfg.Config,
+			"is_active":      cfg.IsActive,
+			"test_status":    cfg.TestStatus,
+			"last_tested_at": cfg.LastTestedAt,
+			"has_api_key":    cfg.APIKey != "",
+		})
+	}
+	return c.JSON(out)
 }
 
-// UpdatePlatformAI PUT /v1/admin/platform-ai
-// Cria ou atualiza a config da Uniq AI.
-func (h *AdminHandler) UpdatePlatformAI(c *fiber.Ctx) error {
+// CreatePlatformAI POST /v1/admin/platform-ai
+// Cria uma nova config de Uniq AI.
+func (h *AdminHandler) CreatePlatformAI(c *fiber.Ctx) error {
 	var body struct {
 		Provider string `json:"provider"`
 		Name     string `json:"name"`
@@ -1741,21 +1741,59 @@ func (h *AdminHandler) UpdatePlatformAI(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "provider é obrigatório"})
 	}
 
-	var cfg models.PlatformAI
-	isNew := false
-	if err := h.db.First(&cfg).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			isNew = true
-		} else {
-			return c.Status(500).JSON(fiber.Map{"error": "erro ao buscar config"})
-		}
+	cfg := models.PlatformAI{
+		Provider: models.IntegrationProvider(body.Provider),
+		Name:     body.Name,
+		APIKey:   body.APIKey,
+		BaseURL:  body.BaseURL,
+		Models:   body.Models,
+		Config:   body.Config,
+		IsActive: true,
+	}
+	if cfg.Name == "" {
+		cfg.Name = "Uniq AI"
+	}
+	if body.IsActive != nil {
+		cfg.IsActive = *body.IsActive
 	}
 
-	cfg.Provider = models.IntegrationProvider(body.Provider)
+	if err := h.db.Create(&cfg).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "erro ao criar config"})
+	}
+	return c.Status(201).JSON(fiber.Map{"ok": true, "id": cfg.ID})
+}
+
+// UpdatePlatformAIByID PUT /v1/admin/platform-ai/:id
+// Atualiza uma config específica de Uniq AI.
+func (h *AdminHandler) UpdatePlatformAIByID(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "id inválido"})
+	}
+
+	var body struct {
+		Provider string `json:"provider"`
+		Name     string `json:"name"`
+		APIKey   string `json:"api_key"`
+		BaseURL  string `json:"base_url"`
+		Models   string `json:"models"`
+		Config   string `json:"config"`
+		IsActive *bool  `json:"is_active"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "corpo inválido"})
+	}
+
+	var cfg models.PlatformAI
+	if err := h.db.First(&cfg, "id = ?", id).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "config não encontrada"})
+	}
+
+	if body.Provider != "" {
+		cfg.Provider = models.IntegrationProvider(body.Provider)
+	}
 	if body.Name != "" {
 		cfg.Name = body.Name
-	} else if cfg.Name == "" {
-		cfg.Name = "Uniq AI"
 	}
 	if body.APIKey != "" {
 		cfg.APIKey = body.APIKey
@@ -1769,28 +1807,39 @@ func (h *AdminHandler) UpdatePlatformAI(c *fiber.Ctx) error {
 	}
 	if body.IsActive != nil {
 		cfg.IsActive = *body.IsActive
-	} else if isNew {
-		cfg.IsActive = true
 	}
 
-	if isNew {
-		if err := h.db.Create(&cfg).Error; err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "erro ao criar config"})
-		}
-	} else {
-		if err := h.db.Save(&cfg).Error; err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "erro ao salvar config"})
-		}
+	if err := h.db.Save(&cfg).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "erro ao salvar config"})
 	}
 	return c.JSON(fiber.Map{"ok": true, "id": cfg.ID})
 }
 
-// TestPlatformAI POST /v1/admin/platform-ai/test
-// Testa a conexão com o provider configurado.
-func (h *AdminHandler) TestPlatformAI(c *fiber.Ctx) error {
+// DeletePlatformAI DELETE /v1/admin/platform-ai/:id
+// Remove uma config de Uniq AI.
+func (h *AdminHandler) DeletePlatformAI(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "id inválido"})
+	}
+
+	if err := h.db.Delete(&models.PlatformAI{}, "id = ?", id).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "erro ao deletar config"})
+	}
+	return c.JSON(fiber.Map{"ok": true})
+}
+
+// TestPlatformAIByID POST /v1/admin/platform-ai/:id/test
+// Testa a conexão com o provider de uma config específica.
+func (h *AdminHandler) TestPlatformAIByID(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "id inválido"})
+	}
+
 	var cfg models.PlatformAI
-	if err := h.db.First(&cfg).Error; err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "Uniq AI não configurada"})
+	if err := h.db.First(&cfg, "id = ?", id).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "config não encontrada"})
 	}
 	if cfg.APIKey == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "API key não configurada"})
@@ -1810,25 +1859,25 @@ func (h *AdminHandler) TestPlatformAI(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"ok": ok, "message": msg})
 }
 
-// GetPlatformAIPublic GET /v1/integrations/platform-ai
-// Retorna info pública da Uniq AI para o card na página de integrações.
-// Não expõe API key.
-func (h *AdminHandler) GetPlatformAIPublic(c *fiber.Ctx) error {
-	var cfg models.PlatformAI
-	if err := h.db.First(&cfg).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return c.JSON(fiber.Map{"configured": false, "is_active": false})
-		}
+// ListPlatformAIPublic GET /v1/integrations/platform-ai
+// Retorna todas as configs ativas da Uniq AI (sem API key) para o ModelSelector.
+func (h *AdminHandler) ListPlatformAIPublic(c *fiber.Ctx) error {
+	var cfgs []models.PlatformAI
+	if err := h.db.Where("is_active = true").Order("created_at ASC").Find(&cfgs).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "erro"})
 	}
-	return c.JSON(fiber.Map{
-		"configured":  true,
-		"provider":    cfg.Provider,
-		"name":        cfg.Name,
-		"is_active":   cfg.IsActive,
-		"test_status": cfg.TestStatus,
-		"models":      cfg.Models,
-	})
+	out := make([]fiber.Map, 0, len(cfgs))
+	for _, cfg := range cfgs {
+		out = append(out, fiber.Map{
+			"id":          cfg.ID,
+			"provider":    cfg.Provider,
+			"name":        cfg.Name,
+			"is_active":   cfg.IsActive,
+			"test_status": cfg.TestStatus,
+			"models":      cfg.Models,
+		})
+	}
+	return c.JSON(out)
 }
 
 // testPlatformAIConnection testa a conexão com o provider configurado.

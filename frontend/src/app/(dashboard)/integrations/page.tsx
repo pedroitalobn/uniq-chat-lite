@@ -241,12 +241,14 @@ export default function IntegrationsPage() {
 
 // ─── Uniq AI Card ─────────────────────────────────────────────────────────────
 function UniqAICard() {
-  const { data } = useQuery<PlatformAIConfig>({
+  const { data } = useQuery<PlatformAIConfig[]>({
     queryKey: ["integrations", "platform-ai"],
-    queryFn: () => platformAIApi.getPublic().then((r) => r.data),
+    queryFn: () => platformAIApi.listPublic().then((r) => r.data),
   });
 
-  if (!data?.is_active) return null;
+  const activeConfigs = data?.filter((c) => c.is_active) ?? [];
+  if (activeConfigs.length === 0) return null;
+  const data_ = activeConfigs[0]; // show first active config as representative card
 
   return (
     <div className="mb-5">
@@ -268,7 +270,7 @@ function UniqAICard() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
-              {data.name || "Uniq AI"}
+              {activeConfigs.length > 1 ? `Uniq AI (${activeConfigs.length} configs)` : (data_.name || "Uniq AI")}
             </p>
             <span
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"

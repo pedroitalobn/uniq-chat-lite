@@ -1258,7 +1258,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	integrations.Delete("/:id", integrationH.Delete)
 	integrations.Post("/:id/test", integrationH.Test)
 	integrations.Post("/:id/oauth/refresh", integrationH.RefreshClaudeOAuth)
-	integrations.Get("/platform-ai", adminH.GetPlatformAIPublic)
+	integrations.Get("/platform-ai", adminH.ListPlatformAIPublic)
 
 	// AI generation (uses user integrations)
 	api.Post("/ai/generate", integrationH.GenerateVariations)
@@ -1422,10 +1422,12 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	admin.Put("/plans/:id", adminH.UpdatePlan)
 	admin.Post("/invites/toggle", inviteH.ToggleSystem)
 	admin.Get("/invites", inviteH.AdminList)
-	// Platform AI (Uniq AI) — configuração global de IA
-	admin.Get("/platform-ai", adminH.GetPlatformAI)
-	admin.Put("/platform-ai", adminH.UpdatePlatformAI)
-	admin.Post("/platform-ai/test", adminH.TestPlatformAI)
+	// Platform AI (Uniq AI) — configuração global de IA (multi-config)
+	admin.Get("/platform-ai", adminH.ListPlatformAI)
+	admin.Post("/platform-ai", adminH.CreatePlatformAI)
+	admin.Put("/platform-ai/:id", adminH.UpdatePlatformAIByID)
+	admin.Delete("/platform-ai/:id", adminH.DeletePlatformAI)
+	admin.Post("/platform-ai/:id/test", adminH.TestPlatformAIByID)
 
 	// ─── Customer.io / Close-inspired modules ──────────────────────────
 	segH := handlers.NewSegmentHandler(db)
