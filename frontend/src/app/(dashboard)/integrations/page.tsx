@@ -65,6 +65,7 @@ const PROVIDERS = [
   { id: "manus", name: "Manus", description: "Modelos da Manus", color: "#eab308", bg: "rgba(234,179,8,0.08)", border: "rgba(234,179,8,0.2)", models: ["manus-base"] },
   { id: "n8n", name: "n8n", description: "Automações e workflows", color: "#ea5e0e", bg: "rgba(234,94,14,0.08)", border: "rgba(234,94,14,0.2)", models: [], hasBaseURL: true },
   { id: "kilo", name: "Kilo", description: "LLM Kilo - Modelo avançado", color: "#00d46a", bg: "rgba(0,212,106,0.08)", border: "rgba(0,212,106,0.2)", models: ["kilo/kilo-auto/balanced"] },
+  { id: "custom", name: "Custom (OpenAI-compatible)", description: "Qualquer API compatível com OpenAI — Ollama, Groq, Together, LiteLLM…", color: "#94a3b8", bg: "rgba(148,163,184,0.08)", border: "rgba(148,163,184,0.2)", models: [], hasBaseURL: true },
 ] as const;
 
 type ProviderId = typeof PROVIDERS[number]["id"];
@@ -828,6 +829,7 @@ const API_KEY_LINKS: Partial<Record<string, { href: string; label: string }>> = 
   qwen:       { href: "https://dashscope.aliyuncs.com",               label: "dashscope.aliyuncs.com" },
   kimi:       { href: "https://platform.moonshot.cn/console/api-keys", label: "platform.moonshot.cn" },
   zai:        { href: "https://open.bigmodel.cn/usercenter/apikeys",  label: "open.bigmodel.cn" },
+  custom:     { href: "https://platform.openai.com/docs/api-reference", label: "Qualquer API OpenAI-compatible" },
 };
 
 function UnifiedLLMModal({ onClose }: { onClose: () => void }) {
@@ -932,6 +934,23 @@ function UnifiedLLMModal({ onClose }: { onClose: () => void }) {
                   <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>Base URL</label>
                   <input value={form.base_url} onChange={e => setForm(f => ({ ...f, base_url: e.target.value }))}
                     className="input-field w-full" placeholder="https://..." />
+                </div>
+              )}
+
+              {selected.id === "custom" && (
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>
+                    Nome do modelo <span style={{ color: "var(--text-4)", fontWeight: 400 }}>(ex: llama3, gpt-4o, claude-3-5-sonnet)</span>
+                  </label>
+                  <input
+                    value={form.models[0] ?? ""}
+                    onChange={e => setForm(f => ({ ...f, models: e.target.value ? [e.target.value] : [] }))}
+                    className="input-field w-full"
+                    placeholder="ex: llama3.2, gpt-4o-mini, command-r-plus"
+                  />
+                  <p className="text-[11px] mt-1" style={{ color: "var(--text-3)" }}>
+                    Qualquer modelo compatível com a API OpenAI (chat/completions).
+                  </p>
                 </div>
               )}
 

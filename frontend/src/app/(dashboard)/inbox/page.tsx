@@ -563,17 +563,14 @@ function InboxPage() {
                 type="button"
                 onClick={requestNotif}
                 title="Ativar notificações desktop e som de mensagens"
-                className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium"
+                className="flex items-center justify-center rounded-lg w-7 h-7 flex-shrink-0"
                 style={{
-                  background: "rgba(0,212,106,0.12)",
-                  backdropFilter: "blur(8px)",
-                  border: "1px solid rgba(0,212,106,0.25)",
-                  boxShadow: "0 0 12px rgba(0,212,106,0.10)",
+                  background: "rgba(0,212,106,0.10)",
+                  border: "1px solid rgba(0,212,106,0.22)",
                   color: "#00d46a",
-                  transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                 }}
               >
-                <Bell className="h-3 w-3" /> {t("inbox_enable_notif")}
+                <Bell className="h-3.5 w-3.5" />
               </button>
             )}
             {/* Agent */}
