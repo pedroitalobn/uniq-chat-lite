@@ -387,8 +387,14 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
       
       {/* Slide-over Drawer */}
       <div
-        className="fixed top-0 right-0 bottom-0 z-[101] w-full max-w-md h-screen shadow-2xl flex flex-col animate-drawer-in"
+        className="fixed top-0 right-0 z-[101] w-full max-w-md shadow-2xl flex flex-col animate-drawer-in"
         style={{
+          // 100dvh (dynamic viewport height) respeita a barra de URL do
+          // browser mobile — diferente de 100vh/h-screen, que inclui a área
+          // da chrome e fazia o footer "Salvar" ficar oculto atrás da
+          // barra do navegador. Em desktop o comportamento é idêntico.
+          height: "100dvh",
+          maxHeight: "100dvh",
           background: "linear-gradient(180deg, rgba(20,20,35,0.96) 0%, rgba(10,10,20,0.98) 100%)",
           backdropFilter: "blur(24px) saturate(180%)",
           WebkitBackdropFilter: "blur(24px) saturate(180%)",
@@ -619,10 +625,12 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
             </AnimatedTabContent>
           </div>
 
-          {/* Footer Actions */}
+          {/* Footer Actions — paddingBottom inclui safe-area pra não ficar
+              colado na home indicator do iOS. */}
           <div
-            className="p-5 border-t flex gap-3 flex-shrink-0"
+            className="px-5 pt-5 border-t flex gap-3 flex-shrink-0"
             style={{
+              paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))",
               borderColor: "rgba(255,255,255,0.09)",
               background: "rgba(0,0,0,0.25)",
               backdropFilter: "blur(12px)",

@@ -560,8 +560,14 @@ export function SidebarDock() {
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="lg:hidden fixed inset-y-0 left-0 z-50"
+            className="lg:hidden fixed top-0 left-0 z-50"
             style={{
+              // 100dvh respeita a barra do browser mobile (Chrome/Safari) —
+              // inset-y-0 ou 100vh deixavam o rodapé do drawer (logout +
+              // avatar) coberto pela URL bar. Combina com safe-area no
+              // padding interno pra também respeitar a home indicator do
+              // iOS quando está com a barra estática.
+              height: "100dvh",
               width: 240,
               background: C.bg,
               backdropFilter: "blur(24px)",
@@ -569,6 +575,8 @@ export function SidebarDock() {
               boxShadow: "8px 0 32px rgba(0,0,0,0.4)",
               display: "flex",
               flexDirection: "column",
+              paddingTop: "env(safe-area-inset-top)",
+              paddingBottom: "env(safe-area-inset-bottom)",
             }}
           >
             <MobileDrawer
