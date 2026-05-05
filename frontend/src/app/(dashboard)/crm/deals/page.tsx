@@ -265,8 +265,8 @@ export default function DealsPage() {
           </div>
         </div>
 
-        {/* Summary strip */}
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs" style={{ color: uniq.textDim }}>
+        {/* Summary strip — pill row */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <Metric
             label="Em aberto"
             value={String(summaryQ.data?.total_open ?? 0)}
@@ -284,19 +284,19 @@ export default function DealsPage() {
             accent={uniq.statusLost}
           />
           {activeFunnel?.probability_on && (
-            <span className="flex items-center gap-1 rounded-lg px-3 py-1.5" style={{
+            <span className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-medium" style={{
               background: "rgba(255,255,255,0.04)",
               backdropFilter: "blur(8px)",
               border: "1px solid rgba(255,255,255,0.08)",
               color: uniq.textFaint,
             }}>
-              <TrendingUp className="h-3 w-3" /> Probabilidade ativada
+              <TrendingUp className="h-3 w-3" /> Probabilidade ativa
             </span>
           )}
         </div>
       </header>
 
-      <div className="flex-1 overflow-hidden" style={{ background: uniq.bg }}>
+      <div className="flex-1 overflow-hidden" style={{ background: "transparent" }}>
         {viewMode === "kanban" ? (
           <div className="h-full p-3">
             <KanbanBoard

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -9,7 +9,7 @@ import Link from "next/link";
 import {
   Lock, Search, ChevronDown, User as UserIcon, MessageSquare,
   Layers, Smartphone, Radio, RefreshCw, Check, BarChart3,
-  MoreVertical, Users, Building2, Zap, Bell, X, Phone, PhoneMissed,
+  MoreVertical, Users, Building2, Zap, Bell, X, Phone, PhoneMissed, Sparkles,
 } from "lucide-react";
 import { usePreferences } from "@/lib/preferences";
 import {
@@ -69,7 +69,15 @@ function getTabs(t: (k: string) => string): { id: StatusTab; label: string }[] {
   ];
 }
 
-export default function InboxPage() {
+export default function InboxPageWrapper() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <InboxPage />
+    </Suspense>
+  );
+}
+
+function InboxPage() {
   const { t } = usePreferences();
   const TABS = getTabs(t);
   const { currentWorkspace } = useWorkspace();
@@ -521,10 +529,10 @@ export default function InboxPage() {
       >
         <div className="flex flex-wrap items-center gap-3">
           <div>
-            <h1 className="text-xl font-medium" style={{ color: "hsl(240 15% 93%)" }}>
+            <h1 className="text-xl font-medium" style={{ color: "var(--text-1)" }}>
               {t("inbox_title")}
             </h1>
-            <p className="text-xs" style={{ color: "hsl(240 8% 48%)" }}>
+            <p className="text-xs" style={{ color: "var(--text-3)" }}>
               {viewMode === "reports"
                 ? t("inbox_reports")
                 : `${agentLabel} · ${channelLabel} · ${instanceLabel} · ${queueLabel}`}
@@ -723,7 +731,7 @@ export default function InboxPage() {
           style={{
             width: isMobile ? "100%" : listWidth,
             display: isMobile && selectedId ? "none" : "flex",
-            background: "hsl(240 18% 5%)",
+            background: "var(--surface-1)",
             borderRight: isMobile ? "none" : "1px solid rgba(255,255,255,0.06)",
           }}
         >
@@ -846,19 +854,39 @@ export default function InboxPage() {
 
 function NoneSelected({ count }: { count: number }) {
   return (
-    <div
-      className="flex h-full flex-col items-center justify-center gap-2 p-12 text-center"
-      style={{ color: "hsl(240 8% 48%)" }}
-    >
-      <MessageSquare className="h-12 w-12" style={{ color: "hsl(240 8% 24%)" }} />
-      <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 80%)" }}>
-        Selecione um atendimento
-      </h2>
-      <p className="max-w-sm text-xs">
-        {count > 0
-          ? `${count} conversa${count > 1 ? "s" : ""} na lista à esquerda. Clique em uma para abrir aqui.`
-          : "Quando você clicar em um atendimento, ele abre aqui sem perder os filtros do topo."}
-      </p>
+    <div className="flex h-full flex-col items-center justify-center gap-5 p-12 text-center">
+      {/* Ambient glow behind icon */}
+      <div className="relative">
+        <div className="absolute inset-0 rounded-full blur-2xl" style={{ background: "rgba(0,212,106,0.08)" }} />
+        <div className="relative w-16 h-16 rounded-2xl flex items-center justify-center" style={{
+          background: "linear-gradient(135deg, rgba(0,212,106,0.1) 0%, rgba(0,212,106,0.04) 100%)",
+          border: "1px solid rgba(0,212,106,0.15)",
+          backdropFilter: "blur(16px)",
+          boxShadow: "0 0 32px rgba(0,212,106,0.08)",
+        }}>
+          <MessageSquare className="h-7 w-7" style={{ color: "var(--green)", opacity: 0.7 }} />
+        </div>
+      </div>
+      <div className="space-y-1">
+        <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
+          Selecione um atendimento
+        </h2>
+        <p className="max-w-xs text-xs leading-relaxed" style={{ color: "var(--text-3)" }}>
+          {count > 0
+            ? `${count} conversa${count > 1 ? "s" : ""} na lista. Clique em uma para abrir aqui.`
+            : "Clique em um atendimento à esquerda para abrir a conversa completa."}
+        </p>
+      </div>
+      <Link href="/uniq-ai">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all hover:scale-[1.02]" style={{
+          background: "rgba(0,212,106,0.08)",
+          border: "1px solid rgba(0,212,106,0.18)",
+          color: "var(--green)",
+        }}>
+          <Sparkles className="w-3.5 h-3.5" />
+          Perguntar ao Uniq AI →
+        </div>
+      </Link>
     </div>
   );
 }
@@ -1228,12 +1256,13 @@ function EmptyState({ agentScope, statusTab }: { agentScope: string; statusTab: 
     return "Este agente não tem atendimentos neste filtro.";
   })();
   return (
-    <div
-      className="flex h-full flex-col items-center justify-center gap-2 p-12 text-center"
-      style={{ color: "hsl(240 8% 48%)" }}
-    >
-      <MessageSquare className="h-10 w-10 opacity-30" />
-      <p className="text-sm">{message}</p>
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-12 text-center">
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
+        background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)",
+      }}>
+        <MessageSquare className="h-5 w-5" style={{ color: "var(--text-3)", opacity: 0.5 }} />
+      </div>
+      <p className="text-sm" style={{ color: "var(--text-3)" }}>{message}</p>
     </div>
   );
 }
@@ -1505,20 +1534,18 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function Forbidden() {
   return (
-    <div
-      className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center"
-      style={{ color: "hsl(240 8% 52%)" }}
-    >
-      <Lock className="h-10 w-10" style={{ color: "hsl(240 8% 38%)" }} />
-      <h2 className="text-lg font-medium" style={{ color: "hsl(240 15% 90%)" }}>
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+      <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{
+        background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)",
+      }}>
+        <Lock className="h-6 w-6" style={{ color: "#f87171" }} />
+      </div>
+      <h2 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>
         Sem acesso ao módulo de atendimento
       </h2>
-      <p className="max-w-md text-sm">
+      <p className="max-w-md text-sm" style={{ color: "var(--text-3)" }}>
         Peça ao administrador a permissão{" "}
-        <code
-          className="rounded px-1 text-xs"
-          style={{ background: "var(--surface-2)", color: "hsl(240 15% 85%)" }}
-        >
+        <code className="rounded px-1 text-xs" style={{ background: "var(--surface-2)", color: "var(--text-2)" }}>
           tickets:view
         </code>.
       </p>
@@ -1528,23 +1555,17 @@ function Forbidden() {
 
 function PageSkeleton() {
   return (
-    <div className="space-y-3 p-6">
-      <div
-        className="h-8 w-40 animate-pulse rounded"
-        style={{ background: "var(--surface-2)" }}
-      />
-      <div
-        className="h-4 w-64 animate-pulse rounded"
-        style={{ background: "var(--surface-2)" }}
-      />
-      <div className="mt-6 space-y-2">
-        {[...Array(6)].map((_, i) => (
-          <div
-            key={i}
-            className="h-16 w-full animate-pulse rounded"
-            style={{ background: "var(--surface-2)" }}
-          />
-        ))}
+    <div className="flex h-full flex-col">
+      <div className="border-b px-4 py-3 space-y-2" style={{ borderColor: "rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}>
+        <div className="h-6 w-28 animate-pulse rounded-lg" style={{ background: "rgba(255,255,255,0.06)" }} />
+        <div className="h-3 w-56 animate-pulse rounded" style={{ background: "rgba(255,255,255,0.04)" }} />
+      </div>
+      <div className="flex flex-1 min-h-0">
+        <div className="w-80 border-r p-3 space-y-2" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-16 w-full animate-pulse rounded-xl" style={{ background: "rgba(255,255,255,0.04)" }} />
+          ))}
+        </div>
       </div>
     </div>
   );

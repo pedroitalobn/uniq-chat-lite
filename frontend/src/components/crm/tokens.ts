@@ -3,26 +3,26 @@
 // valores em inline-styles para evitar depender de tailwind classes custom.
 
 export const uniq = {
-  // Superfícies
-  bg: "hsl(240 18% 6%)",
-  bgElevated: "hsl(240 18% 7.5%)",
-  panel: "var(--border-subtle)",
-  hover: "var(--border-default)",
+  // Superfícies — agora via CSS vars para respeitar o tema
+  bg: "var(--surface-1)",
+  bgElevated: "var(--surface-2)",
+  panel: "var(--surface-2)",
+  hover: "var(--surface-3)",
 
   // Bordas
-  border: "hsl(240 12% 14%)",
-  borderSoft: "hsl(240 12% 16%)",
-  borderFaint: "var(--border-default)",
+  border: "var(--surface-border)",
+  borderSoft: "rgba(255,255,255,0.07)",
+  borderFaint: "var(--surface-border)",
 
   // Texto
-  textStrong: "hsl(240 15% 93%)",
-  textPrimary: "hsl(240 15% 90%)",
-  textMuted: "hsl(240 8% 52%)",
-  textFaint: "hsl(240 8% 38%)",
-  textDim: "hsl(240 8% 46%)",
+  textStrong: "var(--text-1)",
+  textPrimary: "var(--text-2)",
+  textMuted: "var(--text-3)",
+  textFaint: "var(--text-4)",
+  textDim: "var(--text-3)",
 
   // Accent (verde Uniq)
-  green: "#00d46a",
+  green: "var(--green)",
   greenBg: "rgba(0,212,106,0.08)",
   greenBgSoft: "rgba(0,212,106,0.04)",
   greenBorder: "rgba(0,212,106,0.25)",
@@ -40,6 +40,8 @@ export const uniq = {
 export const surface = (opts?: { elevated?: boolean }): React.CSSProperties => ({
   background: opts?.elevated ? uniq.bgElevated : uniq.bg,
   border: `1px solid ${uniq.borderSoft}`,
+  backdropFilter: "blur(20px) saturate(160%)",
+  WebkitBackdropFilter: "blur(20px) saturate(160%)",
 });
 
 export const cardStyle: React.CSSProperties = {

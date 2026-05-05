@@ -362,53 +362,95 @@ export default function AgentsPage() {
     </div>
   );
 
+  // Derive live stats for the header
+  const totalInstances = instancesQuery.data?.length ?? 0;
+  const activeAgents = agentQueries.filter((q) => q.data?.is_active).length;
+  const configuredAgents = agentQueries.filter((q) => q.data?.agent_name).length;
+
   return (
-    <div className="space-y-4 sm:space-y-5">
-      {/* Header */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0">
-          {view === "editor" && (
-            <button
-              onClick={() => setView("list")}
-              className="inline-flex items-center gap-1.5 text-xs mb-2 px-2 py-1 rounded-lg transition-all"
-              style={{ color: "var(--text-3)", background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
-              <ArrowLeft className="w-3 h-3" /> Agentes
-            </button>
-          )}
-          <h1 className="text-xl sm:text-2xl font-medium flex items-center gap-2 sm:gap-3" style={{ color: "var(--text-1)" }}>
-            <Bot className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: "var(--green)" }} />
-            {view === "editor" && selectedInstance
-              ? (instancesQuery.data?.find((i: any) => i.id === selectedInstance)?.name ?? "Agente")
-              : "Agentes"}
-          </h1>
-          <p className="text-xs sm:text-sm mt-1" style={{ color: "var(--text-3)" }}>
-            {view === "list"
-              ? "Selecione uma instância para configurar ou ativar um agente de IA."
-              : "Personalidade, voz, 30+ skills e integrações — configure em 5 min, ative por instância."}
-          </p>
-        </div>
-        {view === "editor" && (
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl" style={glassPillStyle}>
-              <span className={`w-1.5 h-1.5 rounded-full ${form.is_active ? "bg-green-500" : "bg-zinc-500"}`} />
-              <span style={{ color: "var(--text-2)" }}>{form.is_active ? "Ativo" : "Inativo"}</span>
-            </div>
-            {totalActiveSkills > 0 && (
-              <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl" style={{ ...glassPillStyle, border: "1px solid rgba(139,92,246,0.20)", color: "#a78bfa" }}>
-                <Sparkles className="w-3 h-3" />
-                {totalActiveSkills} skill{totalActiveSkills !== 1 ? "s" : ""} ativa{totalActiveSkills !== 1 ? "s" : ""}
-              </div>
+    <div className="flex flex-col gap-4">
+      {/* AI Command Center header */}
+      <div className="rounded-2xl overflow-hidden" style={{
+        background: "linear-gradient(135deg, rgba(167,139,250,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+        border: "1px solid rgba(167,139,250,0.14)",
+        backdropFilter: "blur(40px) saturate(180%)",
+        WebkitBackdropFilter: "blur(40px) saturate(180%)",
+        boxShadow: "0 4px 40px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08)",
+      }}>
+        <div className="px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            {view === "editor" && (
+              <button
+                onClick={() => setView("list")}
+                className="inline-flex items-center gap-1.5 text-xs mb-2 px-2 py-1 rounded-lg"
+                style={{ color: "var(--text-3)", background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+                <ArrowLeft className="w-3 h-3" /> Agentes
+              </button>
             )}
-            <button
-              onClick={() => saveMutation.mutate()}
-              disabled={!selectedInstance || saveMutation.isPending}
-              className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all"
-              style={{ ...glassBtnStyle, color: "var(--green)", opacity: saveMutation.isPending ? 0.7 : 1, borderRadius: "12px" }}>
-              <Save className="w-4 h-4" />
-              {saveMutation.isPending ? "Salvando..." : "Salvar agente"}
-            </button>
+            <h1 className="text-xl sm:text-2xl font-semibold flex items-center gap-2" style={{ color: "var(--text-1)" }}>
+              <Bot className="w-5 h-5" style={{ color: "#a78bfa" }} />
+              {view === "editor" && selectedInstance
+                ? (instancesQuery.data?.find((i: any) => i.id === selectedInstance)?.name ?? "Agente")
+                : "Agentes IA"}
+            </h1>
+            <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
+              {view === "list"
+                ? "Configure, treine e ative seus agentes de IA por instância."
+                : "Personalidade · voz · 30+ skills · integrações"}
+            </p>
           </div>
-        )}
+
+          {/* Live stat pills */}
+          {view === "list" && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium" style={{
+                background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)", color: "#a78bfa",
+              }}>
+                <Bot className="w-3.5 h-3.5" />
+                {totalInstances} instâncias
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium" style={{
+                background: configuredAgents > 0 ? "rgba(0,212,106,0.08)" : "rgba(255,255,255,0.04)",
+                border: configuredAgents > 0 ? "1px solid rgba(0,212,106,0.18)" : "1px solid rgba(255,255,255,0.07)",
+                color: configuredAgents > 0 ? "var(--green)" : "var(--text-3)",
+              }}>
+                {configuredAgents > 0 && <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />}
+                {configuredAgents} configurados
+              </div>
+              {activeAgents > 0 && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium" style={{
+                  background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.25)", color: "var(--green)",
+                }}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-ping opacity-75" />
+                  {activeAgents} ativo{activeAgents !== 1 ? "s" : ""}
+                </div>
+              )}
+            </div>
+          )}
+
+          {view === "editor" && (
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl" style={glassPillStyle}>
+                <span className={`w-1.5 h-1.5 rounded-full ${form.is_active ? "bg-green-500" : "bg-zinc-500"}`} />
+                <span style={{ color: "var(--text-2)" }}>{form.is_active ? "Ativo" : "Inativo"}</span>
+              </div>
+              {totalActiveSkills > 0 && (
+                <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl" style={{ ...glassPillStyle, border: "1px solid rgba(139,92,246,0.20)", color: "#a78bfa" }}>
+                  <Sparkles className="w-3 h-3" />
+                  {totalActiveSkills} skill{totalActiveSkills !== 1 ? "s" : ""}
+                </div>
+              )}
+              <button
+                onClick={() => saveMutation.mutate()}
+                disabled={!selectedInstance || saveMutation.isPending}
+                className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all"
+                style={{ ...glassBtnStyle, color: "var(--green)", opacity: saveMutation.isPending ? 0.7 : 1, borderRadius: "12px" }}>
+                <Save className="w-4 h-4" />
+                {saveMutation.isPending ? "Salvando..." : "Salvar agente"}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── List view ── */}
@@ -912,15 +954,15 @@ function AgentListView({
                 <div className="flex items-center gap-3">
                   <AgentScoreRing score={score} isActive={isActive} />
                   <div className="min-w-0">
-                    <p className="font-semibold text-sm truncate" style={{ color: "hsl(240 15% 92%)" }}>
+                    <p className="font-semibold text-sm truncate" style={{ color: "var(--text-1)" }}>
                       {inst.name}
                     </p>
                     {agentLoading ? (
                       <div className="h-3 rounded animate-pulse mt-1" style={{ background: "var(--surface-3)", width: 80 }} />
                     ) : configured ? (
-                      <p className="text-xs mt-0.5 truncate" style={{ color: "#00d46a" }}>{agentData.agent_name}</p>
+                      <p className="text-xs mt-0.5 truncate" style={{ color: "var(--green)" }}>{agentData.agent_name}</p>
                     ) : (
-                      <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 40%)" }}>Sem agente</p>
+                      <p className="text-xs mt-0.5" style={{ color: "var(--text-4)" }}>Sem agente</p>
                     )}
                     <div className="flex items-center gap-1.5 mt-1">
                       <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full capitalize"
@@ -973,7 +1015,7 @@ function AgentListView({
 
               {/* Activity bars */}
               <div>
-                <p className="text-[9px] uppercase tracking-wider font-medium mb-1.5" style={{ color: "hsl(240 8% 36%)" }}>
+                <p className="text-[9px] uppercase tracking-wider font-medium mb-1.5" style={{ color: "var(--text-4)" }}>
                   Atividade 7d
                 </p>
                 <AgentActivityBars instanceId={inst.id} isActive={isActive} />
@@ -985,7 +1027,7 @@ function AgentListView({
                   {SKILL_DOTS.map(dot => (
                     <div key={dot.label} className="flex items-center gap-1">
                       <div className="w-1.5 h-1.5 rounded-full" style={{ background: dot.color, opacity: 0.7 }} />
-                      <span className="text-[9px]" style={{ color: "hsl(240 8% 38%)" }}>{dot.label}</span>
+                      <span className="text-[9px]" style={{ color: "var(--text-4)" }}>{dot.label}</span>
                     </div>
                   ))}
                 </div>
