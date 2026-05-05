@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { serversApi, instancesApi, integrationsApi, journeysApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { QRCodeSVG } from "qrcode.react";
 
 // ─── Niches ──────────────────────────────────────────────────────────────────
 const NICHES = [
@@ -368,15 +369,34 @@ export default function OnboardingPage() {
 
     const statusId = addMessage("status", `Gerando jornadas (0/${templates.length})...`, true);
 
+    let success = 0;
+    let featureLocked = false;
     for (let i = 0; i < templates.length; i++) {
       const t = templates[i];
       try {
         await journeysApi.create(t.prompt, undefined, instanceId ?? undefined);
-      } catch {}
+        success++;
+      } catch (err) {
+        // 402 feature_locked: o plano do usuário não inclui jornadas. Não
+        // adianta tentar de novo — corta o loop e avisa pra ir pro upgrade.
+        const e = err as { response?: { status?: number; data?: { feature?: string; upgrade_url?: string } } };
+        if (e.response?.status === 402 && e.response.data?.feature === "journeys") {
+          featureLocked = true;
+          break;
+        }
+        // Outros erros (rede, validação) seguem em silêncio — best-effort.
+      }
       replaceMessage(statusId, `Gerando jornadas (${i + 1}/${templates.length})...`, i < templates.length - 1);
     }
 
-    replaceMessage(statusId, `${templates.length} jornada${templates.length > 1 ? "s" : ""} criada${templates.length > 1 ? "s" : ""} ✅`);
+    if (featureLocked) {
+      replaceMessage(statusId, "⚠️ Jornadas não estão no seu plano atual — pulando essa etapa");
+      addMessage("ai", "Jornadas são parte do plano Pro. Você pode continuar sem elas e fazer upgrade depois em Configurações → Cobrança.");
+    } else if (success === 0) {
+      replaceMessage(statusId, "⚠️ Não foi possível criar as jornadas agora — você pode tentar mais tarde");
+    } else {
+      replaceMessage(statusId, `${success} jornada${success > 1 ? "s" : ""} criada${success > 1 ? "s" : ""} ✅`);
+    }
     setJourneysDone(true);
     setCreatingJourneys(false);
     setDone(true);
@@ -553,11 +573,17 @@ export default function OnboardingPage() {
               >
                 <div className="rounded-2xl p-4 flex flex-col items-center gap-3" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
                   {qrCode ? (
-                    <div className="w-44 h-44 bg-white rounded-xl flex items-center justify-center overflow-hidden">
-                      {(qrCode.startsWith("data:") || qrCode.startsWith("iVBOR") || qrCode.length > 100) ? (
+                    <div className="w-44 h-44 bg-white rounded-xl flex items-center justify-center overflow-hidden p-2">
+                      {/* O backend devolve o texto cru do QR do WhatsApp (formato
+                          "<ref>,<keys...>") — NÃO é PNG. Antes prefixávamos
+                          "data:image/png;base64," nisso e o <img> renderizava
+                          em branco. Renderizamos com QRCodeSVG (mesma lib que
+                          o QRCodeModal usa) que aceita o texto direto. PNG/data
+                          URL ainda funcionam pelo fallback no <img>. */}
+                      {qrCode.startsWith("data:") || qrCode.startsWith("iVBOR") ? (
                         <img src={qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}`} alt="QR Code WhatsApp" className="w-full h-full object-contain" />
                       ) : (
-                        <div className="text-center text-xs text-black/60 p-3 break-all">{qrCode}</div>
+                        <QRCodeSVG value={qrCode} size={160} level="M" />
                       )}
                     </div>
                   ) : (

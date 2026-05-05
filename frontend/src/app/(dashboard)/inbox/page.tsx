@@ -219,46 +219,54 @@ function InboxPage() {
   // Incoming call state: null = no active call, else { instanceId, callFrom, callId }
   const [incomingCall, setIncomingCall] = useState<{ instanceId: string; callFrom: string; callId: string } | null>(null);
 
-  // Hidrata filtros do localStorage no primeiro render — fora do useState
-  // pra capturar o wsId atual. SSR-safe (loadFilters retorna null no server).
-  const persisted = loadFilters(wsId);
-  const [agentScope, setAgentScope] = useState<string>(persisted?.agentScope ?? "all"); // "me" | "<uuid>" | "all"
-  const [queueScope, setQueueScope] = useState<string>(persisted?.queueScope ?? "all"); // "all" | "none" | uuid
-  const [channelFilter, setChannelFilter] = useState<string[]>(persisted?.channelFilter ?? []); // multi-select
-  const [instanceFilter, setInstanceFilter] = useState<string[]>(persisted?.instanceFilter ?? []); // multi-select
-  const [statusTab, setStatusTab] = useState<StatusTab>(persisted?.statusTab ?? "open");
-  const [viewKind, setViewKind] = useState<ViewKind>(persisted?.viewKind ?? "all");
+  // Estado inicial = defaults para SSR e primeiro render no cliente baterem.
+  // A hidratação a partir do localStorage acontece num useEffect logo
+  // abaixo, então não há mismatch (a UI só "muda" depois de hidratada).
+  // Sem essa separação, React #418: server renderiza "all"+"open", cliente
+  // renderiza valores salvos, hydration explode.
+  const [agentScope, setAgentScope] = useState<string>("all"); // "me" | "<uuid>" | "all"
+  const [queueScope, setQueueScope] = useState<string>("all"); // "all" | "none" | uuid
+  const [channelFilter, setChannelFilter] = useState<string[]>([]); // multi-select
+  const [instanceFilter, setInstanceFilter] = useState<string[]>([]); // multi-select
+  const [statusTab, setStatusTab] = useState<StatusTab>("open");
+  const [viewKind, setViewKind] = useState<ViewKind>("all");
   const [q, setQ] = useState("");
+  const filtersHydratedRef = useRef(false);
 
   // Persiste sempre que algum filtro muda. q (busca) intencionalmente fora —
   // expectativa é que busca seja efêmera; persistir confunde quem volta.
+  // Skip antes de hidratar pra não sobrescrever localStorage com defaults.
   useEffect(() => {
     if (!wsId) return;
+    if (!filtersHydratedRef.current) return;
     saveFilters(wsId, { agentScope, queueScope, channelFilter, instanceFilter, statusTab, viewKind });
   }, [wsId, agentScope, queueScope, channelFilter, instanceFilter, statusTab, viewKind]);
 
-  // Quando troca de workspace, re-hidrata os filtros do novo ws (caso o user
-  // tenha config diferente em cada). Sem isso, filtros do ws anterior vazam.
-  const lastHydratedWsRef = useRef<string | undefined>(wsId);
+  // Hidratação do localStorage acontece SEMPRE no cliente, depois do mount.
+  // Re-roda quando wsId muda pra trocar de workspace e pegar a config dele.
+  const lastHydratedWsRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (!wsId || wsId === lastHydratedWsRef.current) return;
+    if (!wsId) return;
+    if (wsId === lastHydratedWsRef.current) return;
     lastHydratedWsRef.current = wsId;
     const f = loadFilters(wsId);
     if (!f) {
+      // Workspace sem config salva — reseta pros defaults.
       setAgentScope("all");
       setQueueScope("all");
       setChannelFilter([]);
       setInstanceFilter([]);
       setStatusTab("open");
       setViewKind("all");
-      return;
+    } else {
+      if (f.agentScope) setAgentScope(f.agentScope);
+      if (f.queueScope) setQueueScope(f.queueScope);
+      if (f.channelFilter) setChannelFilter(f.channelFilter);
+      if (f.instanceFilter) setInstanceFilter(f.instanceFilter);
+      if (f.statusTab) setStatusTab(f.statusTab);
+      if (f.viewKind) setViewKind(f.viewKind);
     }
-    if (f.agentScope) setAgentScope(f.agentScope);
-    if (f.queueScope) setQueueScope(f.queueScope);
-    if (f.channelFilter) setChannelFilter(f.channelFilter);
-    if (f.instanceFilter) setInstanceFilter(f.instanceFilter);
-    if (f.statusTab) setStatusTab(f.statusTab);
-    if (f.viewKind) setViewKind(f.viewKind);
+    filtersHydratedRef.current = true;
   }, [wsId]);
 
   // View mode: "conversations" (padrão) | "reports". Persistido via URL

@@ -203,7 +203,13 @@ func (s *Service) SendInstanceBanned(to, name, instanceName, phone string) {
 }
 
 func (s *Service) SendAdminCreatedAccount(to, name, email, tempPassword string) {
-	if err := s.send(to, "Sua conta foi criada no "+s.appName, adminCreatedAccountHTML(s.appName, name, email, tempPassword, s.appURL), "admin_created_account"); err != nil {
+	// A ordem dos args precisa bater com a assinatura de adminCreatedAccountHTML
+	// — (appName, name, appURL, email, tempPassword). Antes a chamada estava
+	// trocada (email no slot appURL, tempPassword no slot email, appURL no
+	// slot tempPassword) e isso aparecia no email como: campo "Email" com a
+	// senha, campo "Senha temporária" com a URL, e botão "Acessar minha
+	// conta" com a senha como href — abrindo a página de email do usuário.
+	if err := s.send(to, "Sua conta foi criada no "+s.appName, adminCreatedAccountHTML(s.appName, name, s.appURL, email, tempPassword), "admin_created_account"); err != nil {
 		log.Error().Err(err).Str("to", to).Msg("email: failed to send admin created account")
 	}
 }
