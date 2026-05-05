@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   Eye, EyeOff, AlertCircle, ArrowRight, Loader2,
   User, Lock, Mail, AtSign, ChevronLeft, Zap, Building2, MessageSquare,
@@ -113,6 +114,7 @@ function RegisterForm() {
   const [inviteCode, setInviteCode] = useState(inviteFromUrl);
   const [loading, setLoading]   = useState(false);
   const [errors, setErrors]     = useState<Record<string, string>>({});
+  const [emailConflict, setEmailConflict] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
   const [inviteEnabled, setInviteEnabled] = useState(false);
   const [inviteValid, setInviteValid] = useState<boolean | null>(null);
@@ -199,9 +201,17 @@ function RegisterForm() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setErrors({ global: data.error || "Erro ao criar conta" });
+        const msg = data.error || "Erro ao criar conta";
+        if (res.status === 409 && msg.includes("e-mail")) {
+          setEmailConflict(true);
+          setErrors({ global: msg });
+        } else {
+          setEmailConflict(false);
+          setErrors({ global: msg });
+        }
         return;
       }
+      setEmailConflict(false);
 
       // 2. If paid plan, redirect to payment
       if (isPaidPlan && planId) {
@@ -325,10 +335,21 @@ function RegisterForm() {
 
           <form onSubmit={submit} className="p-5 space-y-3.5">
             {errors.global && (
-              <div className="rounded-xl px-3.5 py-2.5 flex items-center gap-2"
+              <div className="rounded-xl px-3.5 py-2.5 flex items-start gap-2"
                 style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.18)" }}>
-                <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
-                <p className="text-xs text-red-400">{errors.global}</p>
+                <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-red-400">{errors.global}</p>
+                  {emailConflict && (
+                    <Link
+                      href={`/login?email=${encodeURIComponent(email)}`}
+                      className="text-xs font-medium mt-1 inline-flex items-center gap-1"
+                      style={{ color: "var(--green)" }}
+                    >
+                      Já tenho conta — fazer login <ArrowRight className="w-3 h-3" />
+                    </Link>
+                  )}
+                </div>
               </div>
             )}
 
