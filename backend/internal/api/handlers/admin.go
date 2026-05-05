@@ -60,26 +60,15 @@ func (h *AdminHandler) GetPaymentSettings(c *fiber.Ctx) error {
 		}
 	}
 
-	// Check if keys are configured (DB or env fallback)
-	stripeConfigured := settings.StripeSecretKey != "" || config.AppConfig.StripeSecretKey != ""
-	asaasConfigured := settings.AsaasAPIKey != "" || config.AppConfig.AsaasAPIKey != ""
+	// Configured = key saved in DB (panel is the single source of truth)
+	stripeConfigured := settings.StripeSecretKey != ""
+	asaasConfigured := settings.AsaasAPIKey != ""
 	hotmartConfigured := settings.HotmartAPIKey != ""
 
-	// Determine active provider based on what's configured
+	// Active provider is exactly what was saved in the panel
 	activeProvider := string(settings.ActiveProvider)
-	if activeProvider == "stripe" && !stripeConfigured {
-		// Stripe selected but not configured, check others
-		if asaasConfigured {
-			activeProvider = "asaas"
-		} else if hotmartConfigured {
-			activeProvider = "hotmart"
-		}
-	} else if activeProvider == "asaas" && !asaasConfigured {
-		if stripeConfigured {
-			activeProvider = "stripe"
-		} else if hotmartConfigured {
-			activeProvider = "hotmart"
-		}
+	if activeProvider == "" {
+		activeProvider = "stripe"
 	}
 
 	// Build webhook URLs
