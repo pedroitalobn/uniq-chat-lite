@@ -36,12 +36,15 @@ const (
 	AuthTypeOAuth  AuthType = "oauth" // Claude.ai, Google accounts, etc.
 )
 
-// UserIntegration stores an account-level LLM/tool integration.
+// UserIntegration stores an LLM/tool integration scoped to a workspace (preferred)
+// or to a user (legacy/personal). WorkspaceID, when set, means the integration
+// belongs to that workspace and all its members can use it.
 type UserIntegration struct {
-	ID       uuid.UUID           `gorm:"type:uuid;primaryKey" json:"id"`
-	UserID   uuid.UUID           `gorm:"type:uuid;not null;index" json:"user_id"`
-	Provider IntegrationProvider `gorm:"type:varchar(50);not null" json:"provider"`
-	Name     string              `gorm:"type:varchar(100);not null" json:"name"`
+	ID          uuid.UUID           `gorm:"type:uuid;primaryKey" json:"id"`
+	UserID      uuid.UUID           `gorm:"type:uuid;not null;index" json:"user_id"`
+	WorkspaceID *uuid.UUID          `gorm:"type:uuid;index" json:"workspace_id,omitempty"`
+	Provider    IntegrationProvider `gorm:"type:varchar(50);not null" json:"provider"`
+	Name        string              `gorm:"type:varchar(100);not null" json:"name"`
 	// Autenticação: api_key (default, legado) ou oauth (Claude.ai, etc.)
 	AuthType  AuthType `gorm:"type:varchar(20);default:'api_key'" json:"auth_type"`
 	APIKey    string   `gorm:"type:text" json:"-"`            // never exposed in JSON

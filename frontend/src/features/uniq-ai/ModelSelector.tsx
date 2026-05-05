@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Check, Loader2, Sparkles, Zap } from "lucide-react";
 import { integrationsApi, platformAIApi } from "@/lib/api";
 import { loadModelPref, saveModelPref, type ModelPreference } from "./model-preference";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 export interface ModelSelectorProps {
   value: ModelPreference | null;
@@ -93,12 +94,13 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
   const [groups, setGroups] = useState<Record<string, Integration[]>>({});
   const [platformConfigs, setPlatformConfigs] = useState<PlatformAIEntry[]>([]);
   const ref = useRef<HTMLDivElement>(null);
+  const { currentWorkspace } = useWorkspace();
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [intRes, paiRes] = await Promise.allSettled([
-        integrationsApi.list(),
+        integrationsApi.list(currentWorkspace?.id),
         platformAIApi.listPublic(),
       ]);
 
@@ -157,7 +159,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
     } finally {
       setLoading(false);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentWorkspace?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load(); }, [load]);
 
@@ -274,7 +276,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
                             {pai.name}
                           </p>
                           <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
-                            {pai.provider} · plataforma
+                            Padrão da plataforma
                           </p>
                         </div>
                       </button>

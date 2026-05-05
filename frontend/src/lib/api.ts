@@ -1091,7 +1091,8 @@ export const contactsMergeApi = {
 };
 
 export const integrationsApi = {
-  list: () => api.get("/v1/integrations"),
+  list: (workspaceId?: string) =>
+    api.get("/v1/integrations", { params: workspaceId ? { workspace_id: workspaceId } : undefined }),
   create: (data: {
     provider: string;
     name: string;
@@ -1099,6 +1100,7 @@ export const integrationsApi = {
     base_url?: string;
     models?: string[];
     config?: string;
+    workspace_id?: string;
   }) => api.post("/v1/integrations", data),
   update: (id: string, data: {
     name?: string;

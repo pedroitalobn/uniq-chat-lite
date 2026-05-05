@@ -282,11 +282,19 @@ func (h *IntegrationHandler) RefreshClaudeOAuth(c *fiber.Ctx) error {
 // GET /integrations
 func (h *IntegrationHandler) List(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
+
+	wsIDs := userWorkspaceIDs(h.db, user.ID)
+
 	var integrations []models.UserIntegration
-	if err := h.db.Where("user_id = ?", user.ID).Order("created_at ASC").Find(&integrations).Error; err != nil {
+	q := h.db.Order("created_at ASC")
+	if len(wsIDs) > 0 {
+		q = q.Where("workspace_id IN ? OR (user_id = ? AND workspace_id IS NULL)", wsIDs, user.ID)
+	} else {
+		q = q.Where("user_id = ?", user.ID)
+	}
+	if err := q.Find(&integrations).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar integrações"})
 	}
-	// Mask API keys before returning
 	for i := range integrations {
 		integrations[i].MaskedKey = models.MaskAPIKey(integrations[i].APIKey)
 		integrations[i].APIKey = ""
@@ -294,16 +302,41 @@ func (h *IntegrationHandler) List(c *fiber.Ctx) error {
 	return c.JSON(integrations)
 }
 
+// userWorkspaceIDs returns all workspace IDs the user is a member of.
+func userWorkspaceIDs(db *gorm.DB, userID uuid.UUID) []uuid.UUID {
+	var uws []models.UserWorkspace
+	db.Where("user_id = ?", userID).Find(&uws)
+	ids := make([]uuid.UUID, 0, len(uws))
+	for _, uw := range uws {
+		ids = append(ids, uw.WorkspaceID)
+	}
+	return ids
+}
+
+// canManageIntegration returns true if the user created the integration (user_id match)
+// or is the owner of the workspace it belongs to.
+func canManageIntegration(db *gorm.DB, userID uuid.UUID, integ *models.UserIntegration) bool {
+	if integ.UserID == userID {
+		return true
+	}
+	if integ.WorkspaceID != nil {
+		var uw models.UserWorkspace
+		return db.Where("user_id = ? AND workspace_id = ? AND is_owner = true", userID, *integ.WorkspaceID).First(&uw).Error == nil
+	}
+	return false
+}
+
 // POST /integrations
 func (h *IntegrationHandler) Create(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 	var req struct {
-		Provider string   `json:"provider"`
-		Name     string   `json:"name"`
-		APIKey   string   `json:"api_key"`
-		BaseURL  string   `json:"base_url"`
-		Models   []string `json:"models"`
-		Config   string   `json:"config"`
+		Provider    string   `json:"provider"`
+		Name        string   `json:"name"`
+		APIKey      string   `json:"api_key"`
+		BaseURL     string   `json:"base_url"`
+		Models      []string `json:"models"`
+		Config      string   `json:"config"`
+		WorkspaceID string   `json:"workspace_id"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -335,6 +368,23 @@ func (h *IntegrationHandler) Create(c *fiber.Ctx) error {
 		integration.Config = "{}"
 	}
 
+	// Associate with workspace if provided and user is a member
+	if req.WorkspaceID != "" {
+		wsID, err := uuid.Parse(req.WorkspaceID)
+		if err == nil {
+			var uw models.UserWorkspace
+			if h.db.Where("user_id = ? AND workspace_id = ?", user.ID, wsID).First(&uw).Error == nil {
+				integration.WorkspaceID = &wsID
+			}
+		}
+	} else {
+		// Auto-associate with the user's first workspace (if any)
+		wsIDs := userWorkspaceIDs(h.db, user.ID)
+		if len(wsIDs) > 0 {
+			integration.WorkspaceID = &wsIDs[0]
+		}
+	}
+
 	if err := h.db.Create(&integration).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar integração"})
 	}
@@ -353,8 +403,11 @@ func (h *IntegrationHandler) Update(c *fiber.Ctx) error {
 	}
 
 	var integration models.UserIntegration
-	if err := h.db.Where("id = ? AND user_id = ?", id, user.ID).First(&integration).Error; err != nil {
+	if err := h.db.First(&integration, "id = ?", id).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "integração não encontrada"})
+	}
+	if !canManageIntegration(h.db, user.ID, &integration) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "sem permissão"})
 	}
 
 	var req struct {
@@ -403,7 +456,14 @@ func (h *IntegrationHandler) Delete(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
 	}
-	if err := h.db.Where("id = ? AND user_id = ?", id, user.ID).Delete(&models.UserIntegration{}).Error; err != nil {
+	var integration models.UserIntegration
+	if err := h.db.First(&integration, "id = ?", id).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "integração não encontrada"})
+	}
+	if !canManageIntegration(h.db, user.ID, &integration) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "sem permissão"})
+	}
+	if err := h.db.Delete(&integration).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao remover integração"})
 	}
 	return c.JSON(fiber.Map{"message": "integração removida"})
@@ -417,8 +477,15 @@ func (h *IntegrationHandler) Test(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
 	}
 
+	wsIDs := userWorkspaceIDs(h.db, user.ID)
 	var integration models.UserIntegration
-	if err := h.db.Where("id = ? AND user_id = ?", id, user.ID).First(&integration).Error; err != nil {
+	q := h.db.Where("id = ?", id)
+	if len(wsIDs) > 0 {
+		q = q.Where("workspace_id IN ? OR user_id = ?", wsIDs, user.ID)
+	} else {
+		q = q.Where("user_id = ?", user.ID)
+	}
+	if err := q.First(&integration).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "integração não encontrada"})
 	}
 

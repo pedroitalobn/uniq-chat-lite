@@ -166,6 +166,8 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 	}
 	userID := raw.(uuid.UUID)
 
+	wsIDs := userWorkspaceIDs(h.db, userID)
+
 	var integration *models.UserIntegration
 	if strings.HasPrefix(req.IntegrationID, "platform-ai-") {
 		paiID := strings.TrimPrefix(req.IntegrationID, "platform-ai-")
@@ -174,16 +176,28 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 			integration = services.PlatformAIToIntegration(&pai)
 		}
 	} else if req.IntegrationID != "" && req.IntegrationID != "platform-ai" {
-		if err := h.db.Where("id = ? AND user_id = ? AND is_active = true", req.IntegrationID, userID).First(&integration).Error; err != nil {
-			integration = nil
+		var tmp models.UserIntegration
+		q := h.db.Where("id = ? AND is_active = true", req.IntegrationID)
+		if len(wsIDs) > 0 {
+			q = q.Where("workspace_id IN ? OR user_id = ?", wsIDs, userID)
+		} else {
+			q = q.Where("user_id = ?", userID)
+		}
+		if q.First(&tmp).Error == nil {
+			integration = &tmp
 		}
 	} else {
-		// Tenta integração própria do usuário primeiro.
-		h.db.Where("user_id = ? AND is_active = true AND provider IN ?", userID, []string{"openai", "claude", "deepseek", "gemini", "openrouter", "kilo", "zai", "kimi", "qwen", "minimax", "manus"}).First(&integration)
+		// Tenta integração do workspace primeiro, depois pessoal.
+		q := h.db.Where("is_active = true AND provider IN ?", []string{"openai", "claude", "deepseek", "gemini", "openrouter", "kilo", "zai", "kimi", "qwen", "minimax", "manus"})
+		if len(wsIDs) > 0 {
+			q = q.Where("workspace_id IN ? OR user_id = ?", wsIDs, userID)
+		} else {
+			q = q.Where("user_id = ?", userID)
+		}
+		q.First(&integration)
 	}
 
-	// Fallback: usa a Uniq AI (PlatformAI) quando o usuário não tem integração
-	// própria. Permite consumir o LLM global sem configuração individual.
+	// Fallback: usa a Uniq AI (PlatformAI) quando o usuário não tem integração.
 	if integration == nil {
 		var pai models.PlatformAI
 		if err := h.db.Where("is_active = true").First(&pai).Error; err == nil && pai.APIKey != "" {
@@ -232,7 +246,7 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 			instanceID = journeyHandler.resolveInstanceFromPrompt(promptText, userID)
 		}
 
-		// Find integration — mesma lógica do fluxo normal: user > PlatformAI.
+		// Find integration — workspace > personal > PlatformAI.
 		var integration *models.UserIntegration
 		if strings.HasPrefix(req.IntegrationID, "platform-ai-") {
 			paiID := strings.TrimPrefix(req.IntegrationID, "platform-ai-")
@@ -241,10 +255,22 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 				integration = services.PlatformAIToIntegration(&pai)
 			}
 		} else if req.IntegrationID != "" && req.IntegrationID != "platform-ai" {
-			h.db.Where("id = ? AND user_id = ? AND is_active = true", req.IntegrationID, userID).First(&integration)
+			q := h.db.Where("id = ? AND is_active = true", req.IntegrationID)
+			if len(wsIDs) > 0 {
+				q = q.Where("workspace_id IN ? OR user_id = ?", wsIDs, userID)
+			} else {
+				q = q.Where("user_id = ?", userID)
+			}
+			q.First(&integration)
 		}
 		if integration == nil {
-			h.db.Where("user_id = ? AND is_active = true AND provider IN ?", userID, []string{"openai", "claude", "deepseek", "gemini", "openrouter", "kilo", "zai", "kimi", "qwen", "minimax", "manus"}).First(&integration)
+			q := h.db.Where("is_active = true AND provider IN ?", []string{"openai", "claude", "deepseek", "gemini", "openrouter", "kilo", "zai", "kimi", "qwen", "minimax", "manus"})
+			if len(wsIDs) > 0 {
+				q = q.Where("workspace_id IN ? OR user_id = ?", wsIDs, userID)
+			} else {
+				q = q.Where("user_id = ?", userID)
+			}
+			q.First(&integration)
 		}
 		if integration == nil {
 			var pai models.PlatformAI
@@ -580,12 +606,23 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 				agentIntegration = services.PlatformAIToIntegration(&pai)
 			}
 		} else if req.IntegrationID != "" && req.IntegrationID != "platform-ai" {
-			h.db.Where("id = ? AND user_id = ? AND is_active = true", req.IntegrationID, userID).First(&agentIntegration)
+			q := h.db.Where("id = ? AND is_active = true", req.IntegrationID)
+			if len(wsIDs) > 0 {
+				q = q.Where("workspace_id IN ? OR user_id = ?", wsIDs, userID)
+			} else {
+				q = q.Where("user_id = ?", userID)
+			}
+			q.First(&agentIntegration)
 		}
 		if agentIntegration == nil {
-			h.db.Where("user_id = ? AND is_active = true AND provider IN ?", userID,
-				[]string{"openai", "claude", "deepseek", "gemini", "openrouter", "kilo", "zai", "kimi", "qwen", "minimax", "manus"}).
-				First(&agentIntegration)
+			q := h.db.Where("is_active = true AND provider IN ?",
+				[]string{"openai", "claude", "deepseek", "gemini", "openrouter", "kilo", "zai", "kimi", "qwen", "minimax", "manus"})
+			if len(wsIDs) > 0 {
+				q = q.Where("workspace_id IN ? OR user_id = ?", wsIDs, userID)
+			} else {
+				q = q.Where("user_id = ?", userID)
+			}
+			q.First(&agentIntegration)
 		}
 		if agentIntegration == nil {
 			var pai models.PlatformAI

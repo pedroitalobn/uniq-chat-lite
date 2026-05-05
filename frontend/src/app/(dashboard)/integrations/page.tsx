@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 import { integrationsApi, apiKeysApi, proxiesApi, adminApi, instancesApi, platformAIApi, PlatformAIConfig } from "@/lib/api";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { toast } from "sonner";
 import { WebhooksPanel } from "@/components/webhooks/WebhooksPanel";
 import type { APIKey, Proxy } from "@/types";
@@ -294,7 +295,12 @@ function UniqAICard() {
 
 // ─── LLM Section ─────────────────────────────────────────────────────────────
 function LLMSection() {
-  const { data, isLoading } = useQuery<Integration[]>({ queryKey: ["integrations"], queryFn: () => integrationsApi.list().then(r => r.data) });
+  const { currentWorkspace } = useWorkspace();
+  const wsId = currentWorkspace?.id;
+  const { data, isLoading } = useQuery<Integration[]>({
+    queryKey: ["integrations", wsId],
+    queryFn: () => integrationsApi.list(wsId).then(r => r.data),
+  });
   const integrations = data ?? [];
   const qc = useQueryClient();
   const [showAddModal, setShowAddModal] = useState(false);
@@ -838,6 +844,7 @@ function UnifiedLLMModal({ onClose }: { onClose: () => void }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = STANDARD_PROVIDERS.find(p => p.id === selectedId);
   const qc = useQueryClient();
+  const { currentWorkspace } = useWorkspace();
   const [form, setForm] = useState({ name: "", api_key: "", base_url: "", models: [] as string[] });
   const [showKey, setShowKey] = useState(false);
 
@@ -852,6 +859,7 @@ function UnifiedLLMModal({ onClose }: { onClose: () => void }) {
       api_key: form.api_key,
       base_url: (selected as any)?.hasBaseURL && form.base_url ? form.base_url : undefined,
       models: form.models.length ? form.models : undefined,
+      workspace_id: currentWorkspace?.id,
     }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["integrations"] }); toast.success("Integração adicionada!"); onClose(); },
     onError: (e: unknown) => toast.error((e as any)?.response?.data?.error || "Erro ao conectar"),
