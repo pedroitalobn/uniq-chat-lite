@@ -13,7 +13,7 @@ import (
 // e popula esta tabela. Frontend faz lookup por URL ao renderizar.
 type LinkPreview struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	URL         string    `gorm:"type:text;not null;uniqueIndex:idx_linkprev_url,length:191" json:"url"`
+	URL         string    `gorm:"type:text;not null;uniqueIndex:idx_linkprev_url" json:"url"`
 	Title       string    `gorm:"type:text" json:"title,omitempty"`
 	Description string    `gorm:"type:text" json:"description,omitempty"`
 	ImageURL    string    `gorm:"type:text" json:"image_url,omitempty"`

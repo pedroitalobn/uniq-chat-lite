@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // AgentMode define o comportamento do agente numa conversa específica.
@@ -22,7 +23,7 @@ const (
 // Resolve a precedência: este registro (se existir) sobrepõe is_bot_active e
 // o agente da fila/instância, permitindo atribuição e modo independentes.
 type ConversationAgentState struct {
-	ID             uuid.UUID  `json:"id"              gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	ID             uuid.UUID  `json:"id"              gorm:"type:uuid;primaryKey"`
 	ConversationID uuid.UUID  `json:"conversation_id" gorm:"type:uuid;uniqueIndex;not null"`
 	AgentID        *uuid.UUID `json:"agent_id"        gorm:"type:uuid"` // nil = usa resolução padrão (queue/instância)
 
@@ -42,3 +43,10 @@ type ConversationAgentState struct {
 }
 
 func (ConversationAgentState) TableName() string { return "conversation_agent_states" }
+
+func (s *ConversationAgentState) BeforeCreate(tx *gorm.DB) error {
+	if s.ID == uuid.Nil {
+		s.ID = uuid.New()
+	}
+	return nil
+}

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // VoiceProviderType identifica o provedor de TTS.
@@ -17,7 +18,7 @@ const (
 
 // VoiceProvider armazena as credenciais de um provedor de TTS por workspace.
 type VoiceProvider struct {
-	ID          uuid.UUID         `json:"id"           gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	ID          uuid.UUID         `json:"id"           gorm:"type:uuid;primaryKey"`
 	WorkspaceID uuid.UUID         `json:"workspace_id" gorm:"type:uuid;not null;index"`
 	Provider    VoiceProviderType `json:"provider"     gorm:"type:varchar(40);not null"`
 	Name        string            `json:"name"`
@@ -31,7 +32,7 @@ type VoiceProvider struct {
 // WorkspaceVoice representa uma voz disponível no workspace.
 // Pode ser uma voz preset listada do provider ou uma voz clonada.
 type WorkspaceVoice struct {
-	ID              uuid.UUID `json:"id"               gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	ID              uuid.UUID `json:"id"               gorm:"type:uuid;primaryKey"`
 	WorkspaceID     uuid.UUID `json:"workspace_id"     gorm:"type:uuid;not null;index"`
 	VoiceProviderID uuid.UUID `json:"voice_provider_id" gorm:"type:uuid;not null;index"`
 	ExternalID      string    `json:"external_id"`       // ID no provider (elevenlabs voice_id, etc.)
@@ -46,4 +47,18 @@ type WorkspaceVoice struct {
 	UpdatedAt       time.Time `json:"updated_at"`
 
 	Provider *VoiceProvider `json:"provider,omitempty" gorm:"foreignKey:VoiceProviderID"`
+}
+
+func (v *VoiceProvider) BeforeCreate(tx *gorm.DB) error {
+	if v.ID == uuid.Nil {
+		v.ID = uuid.New()
+	}
+	return nil
+}
+
+func (v *WorkspaceVoice) BeforeCreate(tx *gorm.DB) error {
+	if v.ID == uuid.Nil {
+		v.ID = uuid.New()
+	}
+	return nil
 }

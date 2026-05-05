@@ -53,6 +53,55 @@ func (h *ToolsHandler) ExecuteToolCall(userID uuid.UUID, toolCall models.ToolCal
 		result.Result = h.sendMessage(userID, args)
 	case "get_user_context":
 		result.Result = h.getUserContext(userID)
+	// CRM
+	case "list_contacts":
+		result.Result = h.toolListContacts(userID, args)
+	case "get_contact":
+		result.Result = h.toolGetContact(userID, args)
+	case "create_contact":
+		result.Result = h.toolCreateContact(userID, args)
+	case "update_contact":
+		result.Result = h.toolUpdateContact(userID, args)
+	case "list_companies":
+		result.Result = h.toolListCompanies(userID, args)
+	case "create_company":
+		result.Result = h.toolCreateCompany(userID, args)
+	case "list_deals":
+		result.Result = h.toolListDeals(userID, args)
+	case "create_deal":
+		result.Result = h.toolCreateDeal(userID, args)
+	case "move_deal_stage":
+		result.Result = h.toolMoveDealStage(userID, args)
+	case "list_funnels":
+		result.Result = h.toolListFunnels(userID, args)
+	// Campaigns
+	case "list_campaigns":
+		result.Result = h.toolListCampaigns(userID, args)
+	case "get_campaign":
+		result.Result = h.toolGetCampaign(userID, args)
+	case "create_campaign":
+		result.Result = h.toolCreateCampaign(userID, args)
+	case "start_campaign":
+		result.Result = h.toolStartCampaign(userID, args)
+	case "pause_campaign":
+		result.Result = h.toolPauseCampaign(userID, args)
+	// Inbox
+	case "list_conversations":
+		result.Result = h.toolListConversations(userID, args)
+	case "get_conversation":
+		result.Result = h.toolGetConversation(userID, args)
+	case "assign_conversation":
+		result.Result = h.toolAssignConversation(userID, args)
+	case "close_conversation":
+		result.Result = h.toolCloseConversation(userID, args)
+	case "list_queues":
+		result.Result = h.toolListQueues(userID, args)
+	// Stats
+	case "get_dashboard_stats":
+		result.Result = h.toolGetDashboardStats(userID, args)
+	case "get_conversation_stats":
+		result.Result = h.toolGetConversationStats(userID, args)
+	// Shop
 	case "list_products":
 		result.Result = h.toolListProducts(userID, args)
 	case "search_products":

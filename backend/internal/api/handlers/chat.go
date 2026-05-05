@@ -554,6 +554,41 @@ func (h *ChatHandler) HandleChat(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"response": response, "journey_created": true, "journey_id": journey.ID})
 	}
 
+	// ─── Agent loop (tool-calling mode) ─────────────────────────────────
+	// Use tools when explicitly requested or when message implies operational intent
+	// (list, create, show, find data across modules).
+	shouldUseTools := req.UseTools || isOperationalRequest(promptText)
+
+	if shouldUseTools && h.toolsH != nil {
+		var agentIntegration *models.UserIntegration
+		if req.IntegrationID != "" && req.IntegrationID != "platform-ai" {
+			h.db.Where("id = ? AND user_id = ? AND is_active = true", req.IntegrationID, userID).First(&agentIntegration)
+		}
+		if agentIntegration == nil {
+			h.db.Where("user_id = ? AND is_active = true AND provider IN ?", userID,
+				[]string{"openai", "claude", "deepseek", "gemini", "openrouter", "kilo", "zai", "kimi", "qwen", "minimax", "manus"}).
+				First(&agentIntegration)
+		}
+		if agentIntegration == nil {
+			var pai models.PlatformAI
+			if err := h.db.Where("is_active = true").First(&pai).Error; err == nil && pai.APIKey != "" {
+				agentIntegration = services.PlatformAIToIntegration(&pai)
+			}
+		}
+
+		if agentIntegration != nil {
+			agentSystem := buildAgentSystemPrompt()
+			executor := func(toolCall models.ToolCall) models.ToolResult {
+				return h.toolsH.ExecuteToolCall(userID, toolCall)
+			}
+			response, err := h.llm.RunAgentLoop(ctx, agentIntegration, agentSystem, promptText, executor)
+			if err == nil && response != "" {
+				return c.JSON(fiber.Map{"response": response})
+			}
+			// Fall through to normal chat on agent loop error
+		}
+	}
+
 	// Normal chat with context
 	var instances []models.Instance
 	var journeys []models.Journey
@@ -743,6 +778,51 @@ func contains(s, substr string) bool {
 		}
 		return false
 	}()
+}
+
+// isOperationalRequest detects messages that need live data from tools.
+func isOperationalRequest(msg string) bool {
+	operationalKeywords := []string{
+		"liste", "listar", "mostrar", "mostra", "quantos", "quantas",
+		"quais", "buscar", "busque", "encontre", "encontrar",
+		"crie um contato", "criar contato", "crie uma empresa", "criar empresa",
+		"crie um deal", "criar deal", "crie uma campanha", "criar campanha",
+		"mova o deal", "mover deal", "feche a conversa", "fechar conversa",
+		"atribua", "atribuir", "pause a campanha", "pausar campanha",
+		"inicie a campanha", "iniciar campanha", "stats", "estatísticas",
+		"dashboard", "relatório", "contatos no crm", "deals abertos",
+		"campanhas ativas", "conversas abertas", "conversas pendentes",
+		"funil", "pipeline", "inbox", "atendimentos",
+	}
+	for _, kw := range operationalKeywords {
+		if contains(msg, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+// buildAgentSystemPrompt returns the system prompt for the operational agent.
+func buildAgentSystemPrompt() string {
+	return `Você é a Uniq AI, assistente operacional da plataforma Uniq Chat.
+
+Você tem acesso a ferramentas que operam diretamente sobre todos os módulos da plataforma:
+- CRM: contatos, empresas, deals, funis/pipelines
+- Campanhas: criar, listar, iniciar, pausar campanhas de disparo
+- Inbox: listar e gerenciar conversas de atendimento
+- Jornadas: automações WhatsApp
+- Produtos/Shop: catálogo de produtos
+- Estatísticas: métricas e dashboards
+
+REGRAS:
+1. Use tools para obter dados em tempo real antes de responder — nunca invente números ou IDs
+2. Para operações destrutivas (deletar, fechar) peça confirmação ao usuário
+3. Encadeie múltiplas tools quando necessário (ex: listar funis → listar deals do funil)
+4. Responda em português brasileiro, de forma objetiva e estruturada
+5. Para listas, use markdown (tabelas ou bullet points)
+6. Quando criar algo (contato, deal, campanha), confirme o que foi criado
+
+Você pode executar múltiplos tool calls em sequência para completar tarefas complexas.`
 }
 
 // GetTools retorna as tools disponíveis
