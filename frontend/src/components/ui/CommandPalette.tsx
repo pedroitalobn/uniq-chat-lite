@@ -136,15 +136,14 @@ export function CommandPalette() {
           {/* Modal */}
           <motion.div
             key="cmd-modal"
-            initial={{ opacity: 0, scale: 0.95, y: -20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: -10 }}
+            initial={{ opacity: 0, scale: 0.95, y: -20, x: "-50%" }}
+            animate={{ opacity: 1, scale: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, scale: 0.96, y: -10, x: "-50%" }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             style={{
               position: "fixed",
               top: "20%",
               left: "50%",
-              transform: "translateX(-50%)",
               width: "min(600px, 90vw)",
               zIndex: 9999,
               background: "linear-gradient(160deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 50%, rgba(0,0,0,0.10) 100%)",
