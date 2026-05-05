@@ -166,8 +166,7 @@ export function Sidebar() {
     { href: "/admin/inspect", label: "Inspect", icon: Server },
     { href: "/admin/users", label: t("nav_users"), icon: Users },
     { href: "/admin/plans", label: t("nav_plans"), icon: CreditCard },
-    { href: "/admin/payment-settings", label: "Pagamento", icon: Shield },
-    { href: "/admin/proxy", label: "Proxy Global", icon: Globe },
+    { href: "/admin/providers", label: "Providers", icon: Layers },
     { href: "/admin/platform-ai", label: "Uniq AI", icon: Sparkles },
   ];
 

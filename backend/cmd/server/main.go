@@ -315,6 +315,10 @@ func autoMigrate(db *gorm.DB) error {
 		&models.SystemSetting{},
 		// Payment
 		&models.PaymentSettings{},
+		// Magic-link registration
+		&models.PendingRegistration{},
+		// Global communication settings
+		&models.GlobalCommunicationSettings{},
 		// WABA
 		&models.WABAInstance{},
 		// Ticketing / Atendimento

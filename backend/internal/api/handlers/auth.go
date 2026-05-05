@@ -278,12 +278,22 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		workspace = createDefaultWorkspace(h.db, &user, workspaceName)
 	}
 
+	// cleanupLead deletes the just-created lead user so retrying with the same
+	// email works correctly if any downstream step (Stripe) fails.
+	cleanupLead := func() {
+		h.db.Unscoped().Delete(&user)
+		if workspace != nil {
+			h.db.Unscoped().Delete(workspace)
+		}
+	}
+
 	// If paid plan, create payment session and return payment URL
 	if isPaidPlan && plan != nil {
 		// Create Stripe customer
 		loadStripeConfigFromDB(h.db)
 		if stripeKey == "" {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Stripe não configurado"})
+			cleanupLead()
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "pagamento não configurado — contacte o suporte"})
 		}
 
 		stripe.Key = stripeKey
@@ -299,6 +309,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		}
 		sc, err := stripecustomer.New(cp)
 		if err != nil {
+			cleanupLead()
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar cliente Stripe"})
 		}
 		h.db.Model(&user).Update("stripe_customer_id", sc.ID)
@@ -326,6 +337,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 
 			pi, err := paymentintent.New(params)
 			if err != nil {
+				cleanupLead()
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar pagamento"})
 			}
 
@@ -365,6 +377,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 
 		session, err := session.New(params)
 		if err != nil {
+			cleanupLead()
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar sessão de pagamento"})
 		}
 
@@ -1049,6 +1062,391 @@ var authHandlerAppURL string
 // SetAuthHandlerAppURL must be called by the router during setup.
 func SetAuthHandlerAppURL(appURL string) {
 	authHandlerAppURL = appURL
+}
+
+// RegisterStart godoc
+// POST /auth/register/start
+// Body: { "email": "...", "plan_id": "..." (optional) }
+// Validates the email, creates a PendingRegistration and sends a magic link.
+func (h *AuthHandler) RegisterStart(c *fiber.Ctx) error {
+	var req struct {
+		Email                string `json:"email"`
+		PlanID               string `json:"plan_id"`
+		InviteCode           string `json:"invite_code"`
+		WorkspaceInviteToken string `json:"workspace_invite_token"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+	if req.Email == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "email é obrigatório"})
+	}
+	if _, err := mail.ParseAddress(req.Email); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "email inválido"})
+	}
+
+	// Check if email is already registered
+	var existing models.User
+	if h.db.Where("email = ?", req.Email).First(&existing).Error == nil {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "e-mail já cadastrado"})
+	}
+
+	// Canonical dedup (Gmail dot-trick)
+	canon := canonicalEmail(req.Email)
+	if canon != req.Email {
+		if h.db.Where("LOWER(email) = ? OR LOWER(email) = ?", canon, req.Email).First(&existing).Error == nil {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "e-mail já cadastrado"})
+		}
+	}
+
+	// Anti-bot
+	if reason := suspiciousSignupEmail(req.Email); reason != "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": reason})
+	}
+
+	// Invalidate any previous pending registrations for this email
+	h.db.Where("email = ? AND completed_at IS NULL", req.Email).
+		Updates(map[string]interface{}{"expires_at": time.Now().Add(-time.Second)})
+
+	pending := models.PendingRegistration{
+		Email:                req.Email,
+		InviteCode:           strings.TrimSpace(req.InviteCode),
+		WorkspaceInviteToken: strings.TrimSpace(req.WorkspaceInviteToken),
+		ExpiresAt:            time.Now().Add(30 * time.Minute),
+	}
+	if req.PlanID != "" {
+		if pid, err := uuid.Parse(req.PlanID); err == nil {
+			pending.PlanID = &pid
+		}
+	}
+	if err := h.db.Create(&pending).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao iniciar cadastro"})
+	}
+
+	appURL := strings.TrimRight(authHandlerAppURL, "/")
+	if appURL == "" {
+		appURL = "https://app.uniq.chat"
+	}
+	magicURL := appURL + "/register/verify?token=" + pending.Token
+	h.emailSvc.SendMagicLink(req.Email, magicURL)
+
+	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
+		"message": "link enviado para " + req.Email,
+	})
+}
+
+// RegisterVerify godoc
+// POST /auth/register/verify
+// Body: { "token": "..." }
+// Validates the magic link token and marks it as verified.
+func (h *AuthHandler) RegisterVerify(c *fiber.Ctx) error {
+	var req struct {
+		Token string `json:"token"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+	req.Token = strings.TrimSpace(req.Token)
+	if req.Token == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "token é obrigatório"})
+	}
+
+	var pending models.PendingRegistration
+	if err := h.db.Where("token = ?", req.Token).First(&pending).Error; err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "link inválido ou expirado"})
+	}
+	if pending.IsExpired() {
+		return c.Status(fiber.StatusGone).JSON(fiber.Map{"error": "link expirado — solicite um novo"})
+	}
+	if pending.IsCompleted() {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "cadastro já concluído"})
+	}
+
+	// Mark as verified (idempotent — re-clicking the link is fine)
+	now := time.Now()
+	if pending.VerifiedAt == nil {
+		h.db.Model(&pending).Update("verified_at", now)
+	}
+
+	return c.JSON(fiber.Map{
+		"pending_registration_id": pending.ID,
+		"email":                   pending.Email,
+		"plan_id":                 pending.PlanID,
+	})
+}
+
+// RegisterComplete godoc
+// POST /auth/register/complete
+// Body: { "pending_registration_id": "...", "name": "...", "username": "...", "workspace_name": "...", "password": "..." }
+// Creates the user account after email is verified.
+func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
+	var req struct {
+		PendingRegistrationID string `json:"pending_registration_id"`
+		Name                  string `json:"name"`
+		Username              string `json:"username"`
+		WorkspaceName         string `json:"workspace_name"`
+		Password              string `json:"password"`
+		PlanID                string `json:"plan_id"` // override plan if different from start
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+	req.Name = strings.TrimSpace(req.Name)
+	req.Username = strings.TrimSpace(strings.ToLower(req.Username))
+	req.WorkspaceName = strings.TrimSpace(req.WorkspaceName)
+	req.Password = strings.TrimSpace(req.Password)
+
+	if req.PendingRegistrationID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "pending_registration_id é obrigatório"})
+	}
+	if req.Name == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nome é obrigatório"})
+	}
+	if len(req.Password) < 8 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "senha deve ter ao menos 8 caracteres"})
+	}
+
+	prID, err := uuid.Parse(req.PendingRegistrationID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "pending_registration_id inválido"})
+	}
+
+	var pending models.PendingRegistration
+	if err := h.db.First(&pending, "id = ?", prID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "sessão de cadastro não encontrada"})
+	}
+	if pending.IsExpired() {
+		return c.Status(fiber.StatusGone).JSON(fiber.Map{"error": "sessão expirada — solicite um novo link"})
+	}
+	if !pending.IsVerified() {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "email não verificado"})
+	}
+	if pending.IsCompleted() {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "cadastro já concluído"})
+	}
+
+	// Double-check email not taken (race guard)
+	var existing models.User
+	if h.db.Where("email = ?", pending.Email).First(&existing).Error == nil {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "e-mail já cadastrado"})
+	}
+
+	// Username uniqueness
+	if req.Username != "" {
+		if h.db.Where("username = ?", req.Username).First(&existing).Error == nil {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "username já em uso"})
+		}
+	}
+
+	// Resolve plan
+	planID := pending.PlanID
+	if req.PlanID != "" {
+		if pid, err := uuid.Parse(req.PlanID); err == nil {
+			planID = &pid
+		}
+	}
+
+	var plan *models.Plan
+	var isPaidPlan bool
+	if planID != nil {
+		var p models.Plan
+		if h.db.First(&p, "id = ?", planID).Error == nil && p.Price > 0 {
+			plan = &p
+			isPaidPlan = true
+		}
+	}
+
+	// Workspace name fallback
+	if req.WorkspaceName == "" {
+		first := strings.Fields(req.Name)
+		if len(first) > 0 {
+			req.WorkspaceName = first[0] + "'s Workspace"
+		} else {
+			req.WorkspaceName = "Meu Workspace"
+		}
+	}
+
+	var user models.User
+	if isPaidPlan {
+		user = models.User{
+			Name:     req.Name,
+			Email:    pending.Email,
+			Role:     models.RoleLead,
+			IsActive: false,
+		}
+		if plan != nil {
+			user.PlanID = &plan.ID
+		}
+	} else {
+		var freePlan models.Plan
+		h.db.First(&freePlan, "name = 'Free'")
+		user = models.User{
+			Name:     req.Name,
+			Email:    pending.Email,
+			Role:     models.RoleCustomer,
+			IsActive: true,
+		}
+		if freePlan.ID != uuid.Nil {
+			user.PlanID = &freePlan.ID
+		}
+	}
+	if req.Username != "" {
+		user.Username = &req.Username
+	}
+	if err := user.SetPassword(req.Password); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao processar senha"})
+	}
+	if err := h.db.Create(&user).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar conta"})
+	}
+
+	// Mark invite code as used
+	if pending.InviteCode != "" {
+		MarkInviteCodeUsed(h.db, pending.InviteCode, user.ID)
+	}
+
+	workspace := createDefaultWorkspace(h.db, &user, req.WorkspaceName)
+
+	// Mark registration as completed
+	now := time.Now()
+	h.db.Model(&pending).Update("completed_at", now)
+
+	// Paid plan → Stripe checkout
+	if isPaidPlan && plan != nil {
+		cleanupLead := func() {
+			h.db.Unscoped().Delete(&user)
+			if workspace != nil {
+				h.db.Unscoped().Delete(workspace)
+			}
+			h.db.Model(&pending).Update("completed_at", nil)
+		}
+
+		loadStripeConfigFromDB(h.db)
+		if stripeKey == "" {
+			cleanupLead()
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "pagamento não configurado — contacte o suporte"})
+		}
+		stripe.Key = stripeKey
+
+		cp := &stripe.CustomerParams{
+			Email: stripe.String(user.Email),
+			Name:  stripe.String(user.Name),
+			Metadata: map[string]string{
+				"user_id": user.ID.String(),
+				"lead_id": user.ID.String(),
+				"is_lead": "true",
+			},
+		}
+		sc, err := stripecustomer.New(cp)
+		if err != nil {
+			cleanupLead()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar cliente Stripe"})
+		}
+		h.db.Model(&user).Update("stripe_customer_id", sc.ID)
+
+		frontendURL := config.AppConfig.FrontendURL
+		checkoutType := getStripeCheckoutType(h.db)
+
+		if checkoutType == "transparent" {
+			params := &stripe.PaymentIntentParams{
+				Amount:      stripe.Int64(int64(plan.Price * 100)),
+				Currency:    stripe.String("brl"),
+				Customer:    stripe.String(sc.ID),
+				Description: stripe.String("Assinatura " + plan.Name),
+				Metadata: map[string]string{
+					"user_id": user.ID.String(),
+					"plan_id": plan.ID.String(),
+					"is_lead": "true",
+					"lead_id": user.ID.String(),
+				},
+				AutomaticPaymentMethods: &stripe.PaymentIntentAutomaticPaymentMethodsParams{
+					Enabled: stripe.Bool(true),
+				},
+			}
+			pi, err := paymentintent.New(params)
+			if err != nil {
+				cleanupLead()
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar pagamento"})
+			}
+			return c.JSON(fiber.Map{
+				"checkout_type":     "transparent",
+				"client_secret":     pi.ClientSecret,
+				"payment_intent_id": pi.ID,
+				"plan_name":         plan.Name,
+				"plan_price":        plan.Price,
+				"amount":            pi.Amount,
+				"lead_id":           user.ID.String(),
+			})
+		}
+
+		params := &stripe.CheckoutSessionParams{
+			Customer: stripe.String(sc.ID),
+			Mode:     stripe.String(string(stripe.CheckoutSessionModeSubscription)),
+			LineItems: []*stripe.CheckoutSessionLineItemParams{
+				{Price: stripe.String(plan.StripePriceID), Quantity: stripe.Int64(1)},
+			},
+			SuccessURL:        stripe.String(frontendURL + "/payment/success?session_id={CHECKOUT_SESSION_ID}&lead_id=" + user.ID.String()),
+			CancelURL:         stripe.String(frontendURL + "/plans"),
+			ClientReferenceID: stripe.String(user.ID.String()),
+			SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
+				Metadata: map[string]string{
+					"user_id": user.ID.String(),
+					"plan_id": plan.ID.String(),
+					"is_lead": "true",
+					"lead_id": user.ID.String(),
+				},
+			},
+		}
+		sess, err := session.New(params)
+		if err != nil {
+			cleanupLead()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar sessão de pagamento"})
+		}
+		return c.JSON(fiber.Map{
+			"checkout_type": "redirect",
+			"url":           sess.URL,
+			"lead_id":       user.ID.String(),
+		})
+	}
+
+	// Free plan — return tokens
+	h.emailSvc.SendWelcome(user.Email, user.Name)
+	h.db.Preload("Plan").First(&user, "id = ?", user.ID)
+
+	accessToken, err := middleware.GenerateAccessToken(&user)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao gerar token"})
+	}
+	refreshToken, _ := middleware.GenerateRefreshToken(user.ID)
+
+	c.Cookie(&fiber.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		HTTPOnly: true,
+		SameSite: "Lax",
+		Expires:  time.Now().Add(7 * 24 * time.Hour),
+		Path:     "/",
+	})
+
+	resp := fiber.Map{
+		"access_token": accessToken,
+		"token_type":   "Bearer",
+		"expires_in":   900,
+		"user": fiber.Map{
+			"id":       user.ID,
+			"name":     user.Name,
+			"email":    user.Email,
+			"username": user.Username,
+			"role":     user.Role,
+			"is_beta":  user.IsBeta,
+			"plan":     user.Plan,
+		},
+	}
+	if workspace != nil {
+		resp["workspace"] = workspace
+	}
+	return c.Status(fiber.StatusCreated).JSON(resp)
 }
 
 // ValidateKey godoc

@@ -1336,8 +1336,11 @@ export const adminApi = {
   }) => api.put(`/v1/admin/email-templates/${slug}`, data),
   testEmailTemplate: (slug: string, to: string) =>
     api.post(`/v1/admin/email-templates/${slug}/test`, { to }),
-  getEmailLogs: (limit?: number, offset?: number) => 
+  getEmailLogs: (limit?: number, offset?: number) =>
     api.get("/v1/admin/email-logs", { params: { limit, offset } }),
+  getCommunicationSettings: () => api.get("/v1/admin/communication-settings"),
+  updateCommunicationSettings: (data: Record<string, unknown>) =>
+    api.put("/v1/admin/communication-settings", data),
 };
 
 export const plansApi = {

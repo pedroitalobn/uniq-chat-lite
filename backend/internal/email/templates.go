@@ -387,6 +387,22 @@ func workspaceInviteHTML(appName, appURL, workspaceName, inviterName, roleName, 
 	return baseTemplate(appName, appURL, BrandPrimary, content)
 }
 
+// Magic link registration email.
+func magicLinkHTML(appName, appURL, magicURL string) string {
+	content := iconEmoji("✨") +
+		h1("Confirme seu email") +
+		p("Clique no botão abaixo pra verificar seu endereço e continuar criando sua conta no <strong>" + appName + "</strong>.") +
+		btn("Confirmar e continuar", magicURL, BrandPrimary) +
+		highlightBox(
+			inlineP("⏰ Este link expira em <strong>30 minutos</strong> e é de uso único."),
+			BrandWarning,
+		) +
+		divider() +
+		pSmall("Se você não solicitou este email, pode ignorá-lo com segurança. Nenhuma conta foi criada.") +
+		fmt.Sprintf(`<p style="margin:12px 0 0;color:%s;font-size:12px;line-height:1.5;">Se o botão não funcionar, copie este link no navegador:<br><span style="color:%s;word-break:break-all;">%s</span></p>`, BrandMuted, BrandPrimary, magicURL)
+	return baseTemplate(appName, appURL, BrandPrimary, content)
+}
+
 // Test email — template mínimo pra validar config Maileroo.
 func TestHTML(appName string) string {
 	content := iconEmoji("✉️") +

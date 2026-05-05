@@ -1866,3 +1866,47 @@ func testPlatformAIConnection(cfg *models.PlatformAI) (bool, string) {
 		return testOpenAICompat(integration)
 	}
 }
+
+// GetCommunicationSettings godoc
+// GET /admin/communication-settings
+func (h *AdminHandler) GetCommunicationSettings(c *fiber.Ctx) error {
+	var settings models.GlobalCommunicationSettings
+	if err := h.db.First(&settings, "id = ?", "default").Error; err != nil {
+		// Return empty defaults
+		return c.JSON(models.GlobalCommunicationSettings{ID: "default", OTPProvider: "email", AutoMsgProvider: "email"})
+	}
+	return c.JSON(settings)
+}
+
+// UpdateCommunicationSettings godoc
+// PUT /admin/communication-settings
+func (h *AdminHandler) UpdateCommunicationSettings(c *fiber.Ctx) error {
+	var req models.GlobalCommunicationSettings
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+	req.ID = "default"
+
+	var existing models.GlobalCommunicationSettings
+	if h.db.First(&existing, "id = ?", "default").Error != nil {
+		if err := h.db.Create(&req).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao salvar"})
+		}
+		return c.JSON(req)
+	}
+	if err := h.db.Model(&existing).Updates(map[string]interface{}{
+		"otp_provider":         req.OTPProvider,
+		"otp_instance_id":      req.OTPInstanceID,
+		"otp_sms_provider":     req.OTPSMSProvider,
+		"otp_sms_key":          req.OTPSMSKey,
+		"otp_sms_secret":       req.OTPSMSSecret,
+		"otp_sms_from":         req.OTPSMSFrom,
+		"auto_msg_provider":    req.AutoMsgProvider,
+		"auto_msg_instance_id": req.AutoMsgInstanceID,
+		"instagram_account_id": req.InstagramAccountID,
+	}).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao atualizar"})
+	}
+	h.db.First(&existing, "id = ?", "default")
+	return c.JSON(existing)
+}

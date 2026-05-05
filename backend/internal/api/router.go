@@ -279,21 +279,30 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	app.Post("/asaas/webhook", asaasH.Webhook)
 
 	// ─── Auth routes (public) ─────────────────────────────────────────────────
-	// Rate limits agressivos: contas/login/reset são alvo #1 de bots.
-	// 5/min é o suficiente pra usuário humano e barra ataques de massa.
-	authStrict := middleware.RateLimit(10)   // signup/forgot/reset
-	authLogin := middleware.RateLimit(30)   // login: typo de senha, múltiplos devices, SSO retries
-	authValidate := middleware.RateLimit(60) // validate-key/refresh: chamados pela UI em polling
+	// Rate limits separados por sensibilidade:
+	//   register: 30/min — cada tentativa cria no máx 1 conta; email/username
+	//     únicos já barram duplicatas. Limite alto pra não bloquear testes.
+	//   forgot/reset: 5/min — alvo de enumeração de e-mails e força bruta.
+	//   login: 30/min — typo de senha + múltiplos devices + SSO retries.
+	//   validate/refresh: 60/min — chamados pela UI em polling contínuo.
+	authRegister := middleware.RateLimit(30)  // registro de conta
+	authSensitive := middleware.RateLimit(5)  // forgot/reset/verify — anti-enum
+	authLogin := middleware.RateLimit(30)     // login: typo de senha, múltiplos devices, SSO retries
+	authValidate := middleware.RateLimit(60)  // validate-key/refresh: chamados pela UI em polling
 	auth := app.Group("/auth")
 	auth.Post("/login", authLogin, authH.Login)
-	auth.Post("/register", authStrict, authH.Register)
+	auth.Post("/register", authRegister, authH.Register)
+	// Magic-link registration flow (new)
+	auth.Post("/register/start", authRegister, authH.RegisterStart)
+	auth.Post("/register/verify", authRegister, authH.RegisterVerify)
+	auth.Post("/register/complete", authRegister, authH.RegisterComplete)
 	auth.Post("/validate-key", authValidate, authH.ValidateKey)
 	auth.Post("/refresh", authValidate, authH.Refresh)
 	auth.Post("/logout", authH.Logout)
-	auth.Post("/forgot-password", authStrict, authH.ForgotPassword)
-	auth.Post("/reset-password", authStrict, authH.ResetPassword)
-	auth.Post("/verify-email", authStrict, authH.VerifyEmail)
-	auth.Post("/resend-verification", authStrict, authH.ResendVerification)
+	auth.Post("/forgot-password", authSensitive, authH.ForgotPassword)
+	auth.Post("/reset-password", authSensitive, authH.ResetPassword)
+	auth.Post("/verify-email", authSensitive, authH.VerifyEmail)
+	auth.Post("/resend-verification", authSensitive, authH.ResendVerification)
 	// 2FA: setup/enable/disable são autenticados; verify é público (chamado
 	// após /login retornar requires_2fa).
 	auth.Post("/2fa/verify", authLogin, authH.Verify2FA)
@@ -322,14 +331,17 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Mantemos os originais em /auth/* também (retrocompat com SDKs).
 	v1PublicAuth := v1Public.Group("/auth")
 	v1PublicAuth.Post("/login", authLogin, authH.Login)
-	v1PublicAuth.Post("/register", authStrict, authH.Register)
+	v1PublicAuth.Post("/register", authRegister, authH.Register)
+	v1PublicAuth.Post("/register/start", authRegister, authH.RegisterStart)
+	v1PublicAuth.Post("/register/verify", authRegister, authH.RegisterVerify)
+	v1PublicAuth.Post("/register/complete", authRegister, authH.RegisterComplete)
 	v1PublicAuth.Post("/validate-key", authValidate, authH.ValidateKey)
 	v1PublicAuth.Post("/refresh", authValidate, authH.Refresh)
 	v1PublicAuth.Post("/logout", authH.Logout)
-	v1PublicAuth.Post("/forgot-password", authStrict, authH.ForgotPassword)
-	v1PublicAuth.Post("/reset-password", authStrict, authH.ResetPassword)
-	v1PublicAuth.Post("/verify-email", authStrict, authH.VerifyEmail)
-	v1PublicAuth.Post("/resend-verification", authStrict, authH.ResendVerification)
+	v1PublicAuth.Post("/forgot-password", authSensitive, authH.ForgotPassword)
+	v1PublicAuth.Post("/reset-password", authSensitive, authH.ResetPassword)
+	v1PublicAuth.Post("/verify-email", authSensitive, authH.VerifyEmail)
+	v1PublicAuth.Post("/resend-verification", authSensitive, authH.ResendVerification)
 	v1PublicAuth.Post("/2fa/verify", authLogin, authH.Verify2FA)
 	v1PublicAuth.Post("/2fa/setup", middleware.RequireAuth(db), authH.Setup2FA)
 	v1PublicAuth.Post("/2fa/enable", middleware.RequireAuth(db), authH.Enable2FA)
@@ -1377,6 +1389,18 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	admin.Post("/plans", adminH.CreatePlan)
 	admin.Get("/payment-settings", adminH.GetPaymentSettings)
 	admin.Put("/payment-settings", adminH.UpdatePaymentSettings)
+	// Email provider & templates
+	admin.Get("/email-settings", adminH.GetEmailSettings)
+	admin.Put("/email-settings", adminH.UpdateEmailSettings)
+	admin.Post("/email-settings/test", adminH.TestEmail)
+	admin.Get("/email-templates", adminH.ListEmailTemplates)
+	admin.Get("/email-templates/:id", adminH.GetEmailTemplate)
+	admin.Put("/email-templates/:id", adminH.UpdateEmailTemplate)
+	admin.Post("/email-templates/:id/test", adminH.TestEmailTemplate)
+	admin.Get("/email-logs", adminH.GetEmailLogs)
+	// Communication settings (OTP + automated messages)
+	admin.Get("/communication-settings", adminH.GetCommunicationSettings)
+	admin.Put("/communication-settings", adminH.UpdateCommunicationSettings)
 	admin.Get("/proxy-config", adminH.GetGlobalProxyConfig)
 	admin.Put("/proxy-config", adminH.UpdateGlobalProxyConfig)
 	admin.Delete("/proxy-config/:id", adminH.DeleteGlobalProxyConfig)

@@ -221,3 +221,9 @@ func (s *Service) SendWorkspaceInvite(to, workspaceName, inviterName, roleName, 
 	html := workspaceInviteHTML(s.appName, s.appURL, workspaceName, inviterName, roleName, acceptURL)
 	return s.send(to, subject, html, "workspace_invite")
 }
+
+func (s *Service) SendMagicLink(to, magicURL string) {
+	subject := "Confirme seu email — " + s.appName
+	html := magicLinkHTML(s.appName, s.appURL, magicURL)
+	go s.send(to, subject, html, "magic_link") //nolint:errcheck
+}
