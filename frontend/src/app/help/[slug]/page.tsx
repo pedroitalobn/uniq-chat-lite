@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -366,11 +367,11 @@ export default function HelpCenterPage({ params }: { params: { slug: string } })
               ) : (
                 <div style={{ display: "grid", gap: 16 }}>
                   {displayedArticles.map((art) => (
-                    <button
+                    <Link
                       key={art.id}
+                      href={`/help/${slug}/${art.slug}`}
                       className="art-card"
-                      onClick={() => setSelectedArticle(art)}
-                      style={{ width: "100%", textAlign: "left", padding: "20px 24px", borderRadius: 14, background: surface, border: `1px solid ${border}`, cursor: "pointer", transition: "all 0.2s" }}
+                      style={{ display: "block", width: "100%", textAlign: "left", padding: "20px 24px", borderRadius: 14, background: surface, border: `1px solid ${border}`, cursor: "pointer", transition: "all 0.2s", textDecoration: "none" }}
                     >
                       <h3 style={{ fontSize: 16, fontWeight: 600, color: text1, marginBottom: 6 }}>{art.title}</h3>
                       {art.summary && <p style={{ fontSize: 14, color: text2, lineHeight: 1.5, marginBottom: 8 }}>{art.summary}</p>}
@@ -378,7 +379,7 @@ export default function HelpCenterPage({ params }: { params: { slug: string } })
                         <span>{art.view_count} views</span>
                         <span>{new Date(art.updated_at).toLocaleDateString("pt-BR")}</span>
                       </div>
-                    </button>
+                    </Link>
                   ))}
                 </div>
               )}
