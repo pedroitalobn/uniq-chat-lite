@@ -9,6 +9,7 @@ import { companiesApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { formatCurrency, uniq, cardStyle } from "@/components/crm/tokens";
+import { CRMFilterBar, type CRMFilters } from "@/components/crm/CRMFilterBar";
 
 interface Company {
   id: string;
@@ -35,11 +36,22 @@ export default function CompaniesPage() {
 
   const [q, setQ] = useState("");
   const [newOpen, setNewOpen] = useState(false);
+  // Filtros adicionais alinhados com Contatos: instância, tag, funil,
+  // jornada — backend resolve via subqueries em contacts. UX espelhada
+  // pra usuário não ter que mudar paradigma entre abas do CRM.
+  const [filters, setFilters] = useState<CRMFilters>({});
 
   const listQ = useQuery({
-    queryKey: ["companies", wsId, q],
+    queryKey: ["companies", wsId, q, filters],
     queryFn: () =>
-      companiesApi.list(wsId as string, { q: q || undefined, limit: 100 }).then((r) =>
+      companiesApi.list(wsId as string, {
+        q: q || undefined,
+        instance_id: filters.instanceId,
+        tag_id: filters.tagId,
+        funnel: filters.funnel,
+        journey: filters.journey,
+        limit: 100,
+      }).then((r) =>
         r.data as { items: Company[]; total: number }
       ),
     enabled: !!wsId && canView,
@@ -56,8 +68,8 @@ export default function CompaniesPage() {
 
   return (
     <div className="flex h-full flex-col uniq-page">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b px-4 sm:px-6 py-3 sm:py-4" style={{ borderColor: uniq.borderSoft }}>
-        <div className="flex items-center gap-4 flex-wrap">
+      <header className="border-b px-4 sm:px-6 py-3 sm:py-4 space-y-3" style={{ borderColor: uniq.borderSoft }}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-medium" style={{ color: "hsl(240 8% 55%)" }}>
               Empresas
@@ -66,30 +78,36 @@ export default function CompaniesPage() {
               {listQ.data?.total ?? 0} empresas cadastradas
             </p>
           </div>
-
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5" style={{ color: uniq.textFaint }} />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Nome, domínio, CNPJ…"
-              className="w-60 rounded-lg py-1.5 pl-8 pr-3 text-xs outline-none"
-              style={{ ...cardStyle, color: uniq.textPrimary }}
-            />
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5" style={{ color: uniq.textFaint }} />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Nome, domínio, CNPJ…"
+                className="w-60 rounded-lg py-1.5 pl-8 pr-3 text-xs outline-none"
+                style={{ ...cardStyle, color: uniq.textPrimary }}
+              />
+            </div>
+            {canCreate && (
+              <button
+                onClick={() => setNewOpen(true)}
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
+                style={{ background: uniq.green, color: "#03170a" }}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Nova empresa
+              </button>
+            )}
           </div>
-          {canCreate && (
-            <button
-              onClick={() => setNewOpen(true)}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
-              style={{ background: uniq.green, color: "#03170a" }}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Nova empresa
-            </button>
-          )}
         </div>
+        {/* Linha 2: filtros compartilhados com a aba Contatos pra paridade
+            visual. Backend já aceita os 4 filtros; aqui expomos todos. */}
+        <CRMFilterBar
+          workspaceId={wsId}
+          value={filters}
+          onChange={setFilters}
+        />
       </header>
 
       <div className="flex-1 overflow-auto p-4">

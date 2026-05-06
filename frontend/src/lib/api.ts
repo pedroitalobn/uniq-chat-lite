@@ -1734,7 +1734,23 @@ export type DealStatus = "open" | "won" | "lost" | "archived";
 export type FunnelViewKind = "kanban" | "list" | "table" | "forecast";
 
 export const companiesApi = {
-  list: (workspaceId: string, params?: { q?: string; owner_id?: string; limit?: number; offset?: number }) =>
+  list: (
+    workspaceId: string,
+    params?: {
+      q?: string;
+      owner_id?: string;
+      /** Empresas cujos contatos vêm de uma instância específica. */
+      instance_id?: string;
+      /** Empresas com pelo menos um contato com a tag. */
+      tag_id?: string;
+      /** Empresas com pelo menos um contato no funil. */
+      funnel?: string;
+      /** Empresas com pelo menos um contato na jornada. */
+      journey?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ) =>
     api.get("/v1/crm/companies", { headers: wsHeaders(workspaceId), params }),
   get: (workspaceId: string, id: string) =>
     api.get(`/v1/crm/companies/${id}`, { headers: wsHeaders(workspaceId) }),

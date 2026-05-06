@@ -14,6 +14,7 @@ import { KanbanBoard, type KanbanStage, type KanbanStageStats } from "@/componen
 import type { DealCardData } from "@/components/crm/DealCard";
 import { formatCurrency, uniq, statusColor, statusLabel, relativeTime } from "@/components/crm/tokens";
 import { NewDealDialog } from "@/components/crm/NewDealDialog";
+import { CRMFilterBar, type CRMFilters } from "@/components/crm/CRMFilterBar";
 
 interface Funnel {
   id: string;
@@ -53,6 +54,10 @@ export default function DealsPage() {
   const [q, setQ] = useState("");
   const [ownerFilter, setOwnerFilter] = useState<"all" | "me">("all");
   const [newOpen, setNewOpen] = useState(false);
+  // Filtros adicionais (instância, tag) que o backend aceita desde
+  // o último PR de filtros. Sem eles a UI tava cega — backend filtrava
+  // só se a request mandasse, mas nada na UI mandava.
+  const [extraFilters, setExtraFilters] = useState<CRMFilters>({});
 
   // Funnels — only deal-type funnels (we filter client-side since the list API
   // doesn't yet expose a type filter).
@@ -100,13 +105,15 @@ export default function DealsPage() {
   });
 
   const dealsQ = useQuery({
-    queryKey: ["deals", wsId, funnelId, ownerFilter, q, viewMode],
+    queryKey: ["deals", wsId, funnelId, ownerFilter, q, viewMode, extraFilters],
     queryFn: () =>
       dealsApi
         .list(wsId as string, {
           funnel_id: funnelId,
           owner_id: ownerFilter === "me" ? "me" : undefined,
           q: q || undefined,
+          instance_id: extraFilters.instanceId,
+          tag_id: extraFilters.tagId,
           // Kanban shows open; list lets you see all (toggle later)
           status: viewMode === "list" ? "open,won,lost" : "open",
           limit: 500,
@@ -288,6 +295,17 @@ export default function DealsPage() {
               </button>
             )}
           </div>
+        </div>
+
+        {/* Filtros adicionais — instance/tag (funnel já tem selector próprio acima) */}
+        <div className="mt-3">
+          <CRMFilterBar
+            workspaceId={wsId}
+            value={extraFilters}
+            onChange={setExtraFilters}
+            showFunnel={false}
+            showJourney={false}
+          />
         </div>
 
         {/* Summary strip — pill row */}
