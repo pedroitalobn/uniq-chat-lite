@@ -313,7 +313,7 @@ export function SidebarDock() {
     { href: "/admin/users",       label: t("nav_users"),  icon: Users },
     { href: "/admin/plans",       label: t("nav_plans"),  icon: CreditCard },
     { href: "/admin/providers",   label: "Providers",     icon: Layers },
-    { href: "/admin/platform-ai", label: "Uniq AI",       icon: Sparkles },
+    // Uniq AI vive como aba dentro de /admin/providers (?tab=ai)
     { href: "/admin/inspect",     label: "Inspect",       icon: Server },
   ];
 

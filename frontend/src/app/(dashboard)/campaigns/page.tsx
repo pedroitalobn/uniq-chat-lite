@@ -224,11 +224,33 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
   const selectedInstance = instances.find((i) => i.id === instanceId);
   const isWABA = selectedInstance?.channel === "waba" || channel === "waba";
 
-  const { data: groups = [], isLoading: groupsLoading } = useQuery<Group[]>({
+  const { data: groups = [], isLoading: groupsLoading, error: groupsError, refetch: refetchGroups } = useQuery<Group[], Error>({
     queryKey: ["groups", instanceId],
-    queryFn: () => groupsApi.list(instanceId).then((r) => r.data.groups ?? []),
-    enabled: !!instanceId && audienceTab === "groups",
+    queryFn: async () => {
+      const r = await groupsApi.list(instanceId);
+      return r.data.groups ?? r.data ?? [];
+    },
+    // Antes restringíamos a `audienceTab === "groups"` e o user mudava
+    // de aba sem nunca disparar a query, achando que estava quebrada.
+    // Agora a query carrega assim que tem instância (eager) e
+    // ficar pré-carregada na aba de grupos.
+    enabled: !!instanceId,
+    retry: 1,
   });
+
+  // Mensagem de erro amigável pra UI saber por que a lista veio vazia.
+  // 409 vem da rota /v1/instances/:id/groups quando a instância não está
+  // conectada ou em execução — antes ficava silencioso e o usuário só
+  // via "nenhum grupo encontrado".
+  const groupsErrorMsg = (() => {
+    if (!groupsError) return null;
+    const e = groupsError as unknown as { response?: { status?: number; data?: { error?: string } } };
+    const status = e?.response?.status;
+    const apiErr = e?.response?.data?.error;
+    if (status === 409) return apiErr || "Instância não está conectada ao WhatsApp. Reconecte e tente novamente.";
+    if (status === 404) return "Instância não encontrada ou removida.";
+    return apiErr || "Erro ao carregar grupos. Tente recarregar.";
+  })();
 
   const { data: wabaTemplatesRes } = useQuery<{ items: Array<{ name: string; language: string; status: string; category: string; components: any[] }> }>({
     queryKey: ["waba-templates", instanceId],
@@ -864,9 +886,20 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                     </div>
                     {groupsLoading ? (
                       <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin" style={{ color: "hsl(240 8% 40%)" }} /></div>
+                    ) : groupsErrorMsg ? (
+                      <div className="rounded-xl py-4 px-3 text-center space-y-2" style={{ border: "1px dashed rgba(248,113,113,0.3)", background: "rgba(248,113,113,0.04)" }}>
+                        <p className="text-xs" style={{ color: "#fca5a5" }}>{groupsErrorMsg}</p>
+                        <button onClick={() => refetchGroups()} className="text-[11px] underline" style={{ color: "var(--green)" }}>
+                          Tentar novamente
+                        </button>
+                      </div>
                     ) : filtered.length === 0 ? (
-                      <div className="rounded-xl py-6 text-center" style={{ border: "1px dashed hsl(240 12% 16%)" }}>
-                        <p className="text-xs" style={{ color: "hsl(240 8% 40%)" }}>Nenhum grupo encontrado</p>
+                      <div className="rounded-xl py-6 text-center space-y-1" style={{ border: "1px dashed hsl(240 12% 16%)" }}>
+                        <p className="text-xs" style={{ color: "hsl(240 8% 40%)" }}>
+                          {groups.length === 0
+                            ? "Esta instância não está em nenhum grupo. Adicione o número aos grupos antes de criar a campanha."
+                            : "Nenhum grupo bate com o filtro atual."}
+                        </p>
                       </div>
                     ) : (
                       <div className="space-y-1 max-h-52 overflow-y-auto">
