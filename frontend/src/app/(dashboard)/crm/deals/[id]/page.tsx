@@ -4,6 +4,7 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { DealTasksMeetings } from "@/components/crm/DealTasksMeetings";
 import {
   ArrowLeft, Check, X, RotateCcw, Briefcase, Building2, User as UserIcon,
   Calendar, DollarSign, Tag as TagIcon, StickyNote, Send, ChevronDown,
@@ -267,9 +268,17 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
 
       {/* Sidebar */}
       <aside
-        className="hidden w-80 flex-col border-l lg:flex"
+        className="hidden w-80 flex-col border-l lg:flex overflow-y-auto"
         style={{ borderColor: uniq.borderSoft, background: uniq.bgElevated }}
       >
+        {/* Tarefas e reuniões deste deal — embed inline com create rápido */}
+        <div className="border-b p-5 space-y-3" style={{ borderColor: uniq.borderSoft }}>
+          <DealTasksMeetings
+            workspaceId={(wsId as string) || ""}
+            dealId={id}
+            contactId={deal.contact?.id}
+          />
+        </div>
         <div className="border-b p-5" style={{ borderColor: uniq.borderSoft }}>
           <SidebarSectionLabel>Contato</SidebarSectionLabel>
           {deal.contact ? (

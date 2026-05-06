@@ -15,6 +15,7 @@ import (
 	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/email"
 	"github.com/uniq-chat/backend/internal/models"
+	"github.com/uniq-chat/backend/internal/crmtasks"
 	"github.com/uniq-chat/backend/internal/outbound"
 	"github.com/uniq-chat/backend/internal/services"
 	"github.com/uniq-chat/backend/internal/storage"
@@ -188,6 +189,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Build outbound registry once and share across handlers.
 	igSvc := services.NewInstagramService(db)
 	outboundReg := outbound.NewRegistry(db, manager, igSvc, taktikSvc)
+	// CRM task runner — executa CrmTasks com assignee_type=agent quando
+	// due_at chega. Boot único; vive enquanto o servidor estiver up.
+	crmtasks.NewCrmTaskRunner(db, llmService, outboundReg).Start(context.Background())
 	// Shared pipeline reference so the backfill endpoint can run it on demand.
 	conversationPipeline := services.NewInboundPipeline(db, whatsapp.GetHub())
 	conversationH := handlers.NewConversationHandler(db, manager, outboundReg, conversationPipeline, llmService)
