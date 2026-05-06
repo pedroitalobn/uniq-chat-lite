@@ -90,6 +90,13 @@ func (h *ContactHandler) ListContacts(c *fiber.Ctx) error {
 	if externalID != "" {
 		query = query.Where("external_id = ?", externalID)
 	}
+	// instance_id: filtra contatos criados via uma instância específica
+	// (Whatsapp/IG/etc). Espelha o filtro adicionado em deals/companies.
+	if v := c.Query("instance_id"); v != "" {
+		if id, err := uuid.Parse(v); err == nil {
+			query = query.Where("instance_id = ?", id)
+		}
+	}
 
 	var total int64
 	query.Count(&total)

@@ -59,6 +59,20 @@ func (h *DealHandler) List(c *fiber.Ctx) error {
 			q = q.Where("company_id = ?", id)
 		}
 	}
+	// instance_id: filtra deals cujos contatos pertencem à instância dada.
+	// Útil pra agentes que operam múltiplas instâncias (ex.: 1 ws com 3
+	// instâncias WhatsApp diferentes pra produtos distintos).
+	if v := c.Query("instance_id"); v != "" {
+		if id, err := uuid.Parse(v); err == nil {
+			q = q.Where("contact_id IN (SELECT id FROM contacts WHERE instance_id = ?)", id)
+		}
+	}
+	// tag_id: deal tem ao menos uma tag específica.
+	if v := c.Query("tag_id"); v != "" {
+		if id, err := uuid.Parse(v); err == nil {
+			q = q.Where("id IN (SELECT deal_id FROM deal_tags WHERE tag_id = ?)", id)
+		}
+	}
 	if term := strings.TrimSpace(c.Query("q")); term != "" {
 		pattern := "%" + term + "%"
 		q = q.Where("title ILIKE ? OR description ILIKE ?", pattern, pattern)

@@ -236,7 +236,32 @@ export default function DealsPage() {
             />
           </div>
 
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            {/* Gerenciar funis: leva ao Funnel Manager (que vive na página
+                de Contatos por enquanto). Sem isso o usuário não tinha como
+                criar/editar funis e suas stages a partir da aba Deals. */}
+            <Link
+              href="/crm/contacts?manage=funnels"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                backdropFilter: "blur(8px)",
+                border: "1px solid rgba(255,255,255,0.10)",
+                color: uniq.textDim,
+                transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+                e.currentTarget.style.color = uniq.textPrimary;
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                e.currentTarget.style.color = uniq.textDim;
+              }}
+              title="Criar e editar funis e estágios"
+            >
+              Gerenciar funis
+            </Link>
             {canCreate && (
               <button
                 onClick={() => setNewOpen(true)}

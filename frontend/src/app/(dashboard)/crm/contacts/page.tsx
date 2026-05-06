@@ -1320,6 +1320,27 @@ export default function CRMPage() {
   const [tagsOpen, setTagsOpen]           = useState(false);
   const [funnelsOpen, setFunnelsOpen]     = useState(false);
   const [journeysOpen, setJourneysOpen]   = useState(false);
+
+  // Auto-abre o modal correspondente quando a URL traz ?manage=funnels|tags|journeys.
+  // Usado pelo botão "Gerenciar funis" da página /crm/deals — em vez de
+  // duplicar o FunnelManager em cada página, levamos o user pra contatos
+  // com o modal já aberto. Roda só uma vez no mount pra não reabrir
+  // depois que o user fecha.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const manage = params.get("manage");
+    if (manage === "funnels") setFunnelsOpen(true);
+    else if (manage === "tags") setTagsOpen(true);
+    else if (manage === "journeys") setJourneysOpen(true);
+    if (manage) {
+      // limpa o param da URL pra não reabrir num refresh
+      params.delete("manage");
+      const next = params.toString() ? `?${params.toString()}` : "";
+      window.history.replaceState(null, "", window.location.pathname + next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [filterOpen, setFilterOpen]       = useState(false);
   const [viewMode, setViewMode]           = useState<"list" | "kanban">("list");
   const [kanbanGroup, setKanbanGroup]     = useState<"stage" | "journey" | "funnel">("stage");

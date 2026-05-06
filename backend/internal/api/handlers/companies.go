@@ -28,6 +28,25 @@ func (h *CompanyHandler) List(c *fiber.Ctx) error {
 			q = q.Where("owner_id = ?", id)
 		}
 	}
+	// Filtros adicionais alinhados com a aba Contatos: filtra empresas
+	// cujos CONTATOS associados batem nos critérios. Assim a UI pode
+	// reusar os mesmos seletores em todas as entidades CRM.
+	if v := c.Query("instance_id"); v != "" {
+		if id, err := uuid.Parse(v); err == nil {
+			q = q.Where("id IN (SELECT DISTINCT company_id FROM contacts WHERE instance_id = ? AND company_id IS NOT NULL)", id)
+		}
+	}
+	if v := c.Query("tag_id"); v != "" {
+		if id, err := uuid.Parse(v); err == nil {
+			q = q.Where("id IN (SELECT DISTINCT c.company_id FROM contacts c JOIN contact_tags ct ON ct.contact_id = c.id WHERE ct.tag_id = ? AND c.company_id IS NOT NULL)", id)
+		}
+	}
+	if v := c.Query("funnel"); v != "" {
+		q = q.Where("id IN (SELECT DISTINCT company_id FROM contacts WHERE funnel = ? AND company_id IS NOT NULL)", v)
+	}
+	if v := c.Query("journey"); v != "" {
+		q = q.Where("id IN (SELECT DISTINCT company_id FROM contacts WHERE journey = ? AND company_id IS NOT NULL)", v)
+	}
 	limit := atoiDefault(c.Query("limit"), 50)
 	if limit < 1 || limit > 500 {
 		limit = 50

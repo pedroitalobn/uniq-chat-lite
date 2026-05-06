@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -1230,12 +1231,20 @@ function CreateDealModal({
     if (stagesQ.data?.items?.length) setStageId(stagesQ.data.items[0].id);
   }, [stagesQ.data]);
 
+  const router = useRouter();
   const createMutation = useMutation({
     mutationFn: () => dealsApi.create(wsId, { title: title || "Nova negociação", contact_id: contactId, funnel_id: funnelId, stage_id: stageId }),
-    onSuccess: () => {
-      toast.success("Negociação criada!");
+    onSuccess: (res) => {
+      toast.success("Negociação criada — abrindo no CRM…");
       qc.invalidateQueries({ queryKey: ["crm-deals", wsId] });
       onClose();
+      // Redireciona pra aba Deals do CRM. O usuário pediu que ao criar
+      // negociação direto do inbox, ele caia automaticamente na visão
+      // Kanban com o deal recém-criado destacado. Se a resposta tem id,
+      // abre direto a página do deal; caso contrário cai na lista.
+      const dealId = (res?.data as { id?: string } | undefined)?.id;
+      if (dealId) router.push(`/crm/deals/${dealId}`);
+      else router.push("/crm/deals");
     },
     onError: () => toast.error("Erro ao criar negociação"),
   });

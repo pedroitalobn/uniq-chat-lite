@@ -1757,6 +1757,10 @@ export interface DealListParams {
   owner_id?: string | "me";
   contact_id?: string;
   company_id?: string;
+  /** Filtra deals cujos contatos pertencem a uma instância específica. */
+  instance_id?: string;
+  /** Filtra deals que tem uma tag específica anexada. */
+  tag_id?: string;
   q?: string;
   limit?: number;
   offset?: number;
