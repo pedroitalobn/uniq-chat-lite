@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -58,6 +59,7 @@ func (h *CampaignHandler) tick() {
 	now := time.Now()
 	today := now.Format("2006-01-02")
 	currentHour := now.Hour()
+	_ = currentHour // evaluateCampaign usa minuto-precisão E timezone do workspace
 
 	var campaigns []models.Campaign
 	h.db.Where("status IN ?", []models.CampaignStatus{
@@ -100,25 +102,111 @@ func (h *CampaignHandler) tick() {
 // evaluateCampaign aplica os filtros de janela/horário e retorna a
 // razão do skip (string vazia = OK pra rodar). Side-effect: marca
 // completed quando passou da end_date.
-func (h *CampaignHandler) evaluateCampaign(c *models.Campaign, now time.Time, currentHour int) string {
+//
+// Timezone: o schedule_hours é interpretado no fuso do workspace
+// (Workspace.Timezone), não em UTC. Antes o tick usava now.Hour()
+// direto — em servidor UTC e workspace São Paulo (UTC-3), o user
+// configurava "18-19h" (local) mas o scheduler comparava com 21h
+// UTC e pulava. Agora convertemos pro TZ do workspace antes de
+// comparar.
+func (h *CampaignHandler) evaluateCampaign(c *models.Campaign, now time.Time, _ int) string {
 	if c.StartDate != nil && now.Before(*c.StartDate) {
-		return fmt.Sprintf("start_date no futuro: %s", c.StartDate.Format("2006-01-02 15:04"))
+		return fmt.Sprintf("start_date no futuro: %s", c.StartDate.Format("2006-01-02 15:04 MST"))
 	}
 	if c.EndDate != nil && now.After(*c.EndDate) {
 		h.db.Model(c).Update("status", models.CampaignStatusCompleted)
-		return fmt.Sprintf("end_date passou: %s — marcado como completed", c.EndDate.Format("2006-01-02 15:04"))
+		return fmt.Sprintf("end_date passou: %s — marcado como completed", c.EndDate.Format("2006-01-02 15:04 MST"))
 	}
-	if !inScheduleHours(c.ScheduleHours, currentHour) {
-		return fmt.Sprintf("hora atual (%dh) fora do schedule_hours: %s", currentHour, c.ScheduleHours)
+
+	// Converte pro fuso do workspace pra avaliar schedule_hours.
+	loc := h.workspaceLocation(c)
+	local := now.In(loc)
+	if !inScheduleNow(c.ScheduleHours, local.Hour(), local.Minute()) {
+		return fmt.Sprintf("horário atual (%02d:%02d %s) fora do schedule_hours: %s",
+			local.Hour(), local.Minute(), loc.String(), c.ScheduleHours)
 	}
 	return ""
 }
 
-// inScheduleHours returns true if hour is in the JSON int array, or if array is empty (= any hour).
+// workspaceLocation devolve o time.Location do workspace dono da
+// campanha. Fallback America/Sao_Paulo, depois UTC.
+func (h *CampaignHandler) workspaceLocation(c *models.Campaign) *time.Location {
+	tzName := ""
+	if c.WorkspaceID != nil {
+		var ws models.Workspace
+		if err := h.db.Select("timezone").First(&ws, "id = ?", c.WorkspaceID).Error; err == nil && ws.Timezone != "" {
+			tzName = ws.Timezone
+		}
+	}
+	if tzName == "" {
+		tzName = "America/Sao_Paulo"
+	}
+	if loc, err := time.LoadLocation(tzName); err == nil {
+		return loc
+	}
+	return time.UTC
+}
+
+// inScheduleHours retorna true se a hora atual está dentro de algum
+// slot autorizado. Suporta DOIS formatos no JSON do schedule_hours
+// pra retrocompat:
+//
+//   1. Legacy "hours array": [9, 10, 14, 15] — granularidade de hora.
+//      Match se hour ∈ array.
+//   2. New "window array":   [{"from":"09:00","to":"11:30"},
+//                             {"from":"14:00","to":"18:00"}]
+//      Granularidade de minuto. Match se now está em qualquer janela
+//      [from, to). Janela cruzando meia-noite (from > to) é tratada
+//      como dois ranges (from→23:59 + 00:00→to).
+//
+// Empty/[] = qualquer hora (sempre true).
+//
+// Pra compat o caller passa só "hour" (int). Pro novo formato precisamos
+// de minutos também — uma versão alternativa mais rica é
+// inScheduleNow abaixo.
 func inScheduleHours(hoursJSON string, hour int) bool {
+	return inScheduleNow(hoursJSON, hour, 0)
+}
+
+// inScheduleNow é a versão completa que recebe hora E minuto. Use ela
+// quando precisar precisão minuto-a-minuto. Acima, inScheduleHours
+// chama com minuto=0 mantendo o comportamento legado.
+func inScheduleNow(hoursJSON string, hour, minute int) bool {
 	if hoursJSON == "" || hoursJSON == "[]" {
 		return true
 	}
+
+	// Tenta primeiro o formato novo (windows). Se falha, cai no legacy.
+	type window struct {
+		From string `json:"from"`
+		To   string `json:"to"`
+	}
+	var windows []window
+	if err := json.Unmarshal([]byte(hoursJSON), &windows); err == nil && len(windows) > 0 && windows[0].From != "" {
+		nowMin := hour*60 + minute
+		for _, w := range windows {
+			fh, fm, fok := parseHHMM(w.From)
+			th, tm, tok := parseHHMM(w.To)
+			if !fok || !tok {
+				continue
+			}
+			fromMin := fh*60 + fm
+			toMin := th*60 + tm
+			if fromMin <= toMin {
+				if nowMin >= fromMin && nowMin < toMin {
+					return true
+				}
+			} else {
+				// Janela cruzando meia-noite (ex.: 22:00 → 02:00).
+				if nowMin >= fromMin || nowMin < toMin {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	// Legacy: int array de horas.
 	var hours []int
 	if err := json.Unmarshal([]byte(hoursJSON), &hours); err != nil || len(hours) == 0 {
 		return true
@@ -129,6 +217,27 @@ func inScheduleHours(hoursJSON string, hour int) bool {
 		}
 	}
 	return false
+}
+
+// parseHHMM aceita "9:30", "09:30", "9", "23:00". Retorna (h, m, ok).
+func parseHHMM(s string) (int, int, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, 0, false
+	}
+	parts := strings.Split(s, ":")
+	h, err := strconv.Atoi(parts[0])
+	if err != nil || h < 0 || h > 23 {
+		return 0, 0, false
+	}
+	m := 0
+	if len(parts) > 1 {
+		m, err = strconv.Atoi(parts[1])
+		if err != nil || m < 0 || m > 59 {
+			return 0, 0, false
+		}
+	}
+	return h, m, true
 }
 
 // processCampaign sends one batch for this tick — up to timesPerDay for each recipient.
@@ -1210,12 +1319,15 @@ func (h *CampaignHandler) Diagnose(c *fiber.Ctx) error {
 	}
 
 	now := time.Now()
-	currentHour := now.Hour()
+	loc := h.workspaceLocation(&camp)
+	local := now.In(loc)
+	currentHour := local.Hour()
 
 	checks := []map[string]any{}
 	add := func(label string, ok bool, detail string) {
 		checks = append(checks, map[string]any{"check": label, "ok": ok, "detail": detail})
 	}
+	add("timezone", true, fmt.Sprintf("workspace = %s · agora local = %s", loc.String(), local.Format("2006-01-02 15:04 MST")))
 
 	// 1. Status
 	statusOK := camp.Status == models.CampaignStatusRunning || camp.Status == models.CampaignStatusScheduled
@@ -1236,8 +1348,9 @@ func (h *CampaignHandler) Diagnose(c *fiber.Ctx) error {
 	}
 
 	// 3. Schedule hours
-	add("schedule_hours", inScheduleHours(camp.ScheduleHours, currentHour),
-		fmt.Sprintf("hora atual = %dh · schedule_hours = %s ([] = qualquer hora)", currentHour, camp.ScheduleHours))
+	add("schedule_hours", inScheduleNow(camp.ScheduleHours, currentHour, local.Minute()),
+		fmt.Sprintf("agora local = %02d:%02d (%s) · schedule_hours = %s ([] = qualquer horário; aceita janelas HH:MM)",
+			currentHour, local.Minute(), loc.String(), camp.ScheduleHours))
 
 	// 4. Instance reachability
 	var inst models.Instance

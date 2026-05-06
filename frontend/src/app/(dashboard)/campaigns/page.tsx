@@ -194,7 +194,11 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
   const [endDate, setEndDate]             = useState("");
   const [timesTotal, setTimesTotal]       = useState(1);
   const [timesPerDay, setTimesPerDay]     = useState(1);
-  const [selectedHours, setSelectedHours] = useState<number[]>([]);
+  // ScheduleWindows: janelas HH:MM exatas que o backend aceita no
+  // novo formato. Antes era array de horas inteiras (ex.: [9,10,14])
+  // — agora é array de {from, to} com precisão de minuto.
+  // Empty = qualquer horário.
+  const [scheduleWindows, setScheduleWindows] = useState<Array<{ from: string; to: string }>>([]);
   const [delayMin, setDelayMin]           = useState(5);
   const [delayMax, setDelayMax]           = useState(15);
   const [dailyLimit, setDailyLimit]       = useState(0);
@@ -305,8 +309,12 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
     toast.success(`${parsed.length} contatos carregados do CSV`);
   };
 
-  const toggleHour = (h: number) =>
-    setSelectedHours((prev) => prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h].sort((a, b) => a - b));
+  const addWindow = () =>
+    setScheduleWindows((prev) => [...prev, { from: "09:00", to: "18:00" }]);
+  const updateWindow = (i: number, field: "from" | "to", value: string) =>
+    setScheduleWindows((prev) => prev.map((w, idx) => idx === i ? { ...w, [field]: value } : w));
+  const removeWindow = (i: number) =>
+    setScheduleWindows((prev) => prev.filter((_, idx) => idx !== i));
 
   const toggleGroup = (g: Group) =>
     setSelectedGroups((prev) => prev.find((x) => x.jid === g.jid) ? prev.filter((x) => x.jid !== g.jid) : [...prev, g]);
@@ -426,7 +434,9 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
         end_date:             endDate   ? new Date(endDate).toISOString()   : undefined,
         times_total:          timesTotal,
         times_per_day:        timesPerDay,
-        schedule_hours:       JSON.stringify(selectedHours),
+        // schedule_hours agora aceita janelas HH:MM (formato novo)
+        // ou int array (legacy). Backend reconhece os dois.
+        schedule_hours:       JSON.stringify(scheduleWindows),
         delay_seconds:        delayMin,
         delay_min_seconds:    delayMin,
         delay_max_seconds:    delayMax,
@@ -1195,31 +1205,70 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                 </div>
               </div>
 
-              {/* Schedule hours */}
+              {/* Janelas de horário — precisão de minuto. Antes era um
+                  grid de 24 botões (hora cheia); agora usa de:HH:MM
+                  até HH:MM com presets de 1-clique. Vazio = qualquer
+                  horário. Avaliado no fuso do workspace, não em UTC. */}
               <div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                   <label className="text-xs font-medium" style={{ color: "hsl(240 8% 50%)" }}>
-                    Horários de envio
-                    {selectedHours.length > 0 && (
-                      <span className="ml-1.5" style={{ color: "var(--green)" }}>({selectedHours.map((h) => `${h}h`).join(" ")})</span>
+                    Janelas de envio
+                    {scheduleWindows.length > 0 && (
+                      <span className="ml-1.5" style={{ color: "var(--green)" }}>
+                        ({scheduleWindows.map((w) => `${w.from}-${w.to}`).join(" · ")})
+                      </span>
+                    )}
+                    {scheduleWindows.length === 0 && (
+                      <span className="ml-1.5 text-[10px]" style={{ color: "hsl(240 8% 42%)" }}>
+                        (qualquer horário)
+                      </span>
                     )}
                   </label>
                   <div className="flex gap-2">
-                    <button className="text-[10px]" style={{ color: "hsl(240 8% 42%)" }} onClick={() => setSelectedHours([])}>qualquer hora</button>
-                    <button className="text-[10px]" style={{ color: "hsl(240 8% 42%)" }} onClick={() => setSelectedHours([8, 9, 10, 11, 14, 15, 16, 17])}>comercial</button>
+                    <button type="button" className="text-[10px]" style={{ color: "hsl(240 8% 42%)" }}
+                      onClick={() => setScheduleWindows([])}>qualquer hora</button>
+                    <button type="button" className="text-[10px]" style={{ color: "hsl(240 8% 42%)" }}
+                      onClick={() => setScheduleWindows([{ from: "08:00", to: "12:00" }, { from: "14:00", to: "18:00" }])}>
+                      comercial
+                    </button>
+                    <button type="button" className="text-[10px]" style={{ color: "hsl(240 8% 42%)" }}
+                      onClick={() => setScheduleWindows([{ from: "09:00", to: "21:00" }])}>
+                      9h-21h
+                    </button>
                   </div>
                 </div>
-                <div className="grid grid-cols-8 gap-1">
-                  {ALL_HOURS.map((h) => (
-                    <button key={h} type="button" onClick={() => toggleHour(h)}
-                      className="text-[11px] py-1.5 rounded-lg font-mono transition-all"
-                      style={selectedHours.includes(h)
-                        ? { background: "rgba(0,212,106,0.12)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.25)" }
-                        : { background: "var(--surface-2)", color: "hsl(240 8% 40%)", border: "1px solid hsl(240 12% 13%)" }}>
-                      {h}h
-                    </button>
+
+                <div className="space-y-1.5">
+                  {scheduleWindows.map((w, i) => (
+                    <div key={i} className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg"
+                      style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 13%)" }}>
+                      <span className="text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>de</span>
+                      <input type="time" value={w.from}
+                        onChange={(e) => updateWindow(i, "from", e.target.value)}
+                        className="text-[11px] font-mono px-2 py-1 rounded outline-none"
+                        style={{ background: "var(--surface-3)", border: "1px solid hsl(240 12% 16%)", color: "var(--text-1)" }} />
+                      <span className="text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>até</span>
+                      <input type="time" value={w.to}
+                        onChange={(e) => updateWindow(i, "to", e.target.value)}
+                        className="text-[11px] font-mono px-2 py-1 rounded outline-none"
+                        style={{ background: "var(--surface-3)", border: "1px solid hsl(240 12% 16%)", color: "var(--text-1)" }} />
+                      <button type="button" onClick={() => removeWindow(i)}
+                        className="ml-auto p-1 rounded"
+                        style={{ color: "#f87171", background: "rgba(248,113,113,0.08)" }}>
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
                   ))}
+                  <button type="button" onClick={addWindow}
+                    className="w-full text-[11px] py-1.5 rounded-lg flex items-center justify-center gap-1"
+                    style={{ background: "rgba(0,212,106,0.06)", color: "var(--green)", border: "1px dashed rgba(0,212,106,0.25)" }}>
+                    <Plus className="w-3 h-3" /> Adicionar janela
+                  </button>
                 </div>
+
+                <p className="text-[10px] mt-2" style={{ color: "hsl(240 8% 42%)" }}>
+                  Horários no fuso da sua conta. Janelas que cruzam meia-noite são suportadas (ex: 22:00-02:00).
+                </p>
               </div>
             </>
           )}
