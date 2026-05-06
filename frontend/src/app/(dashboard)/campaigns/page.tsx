@@ -9,7 +9,7 @@ import {
   AlertCircle, Loader2, Users, Calendar, FileText, Image, Mic,
   File, ChevronLeft, ChevronRight, Users2, Database, UserCheck,
   MessageCircle, UserPlus, UserMinus, Heart, Send, Shield,
-  Upload, Hash, AtSign, Shuffle,
+  Upload, Hash, AtSign, Shuffle, Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { showConfirm } from "@/lib/confirm";
@@ -877,14 +877,45 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                     : a.name.localeCompare(b.name));
                 return (
                   <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <input value={groupSearch} onChange={(e) => setGroupSearch(e.target.value)}
-                        placeholder="Pesquisar grupos..." className="input-field flex-1 text-xs py-2" />
-                      <select value={groupSort} onChange={(e) => setGroupSort(e.target.value as "name" | "members")}
-                        className="input-field text-xs py-1.5">
-                        <option value="name">Nome</option>
-                        <option value="members">Membros</option>
-                      </select>
+                    {/* Search ocupa todo o espaço, ordenação vira segmented
+                        control compacto à direita — antes o input era
+                        flex-1 com text-xs (minúsculo) e o select pegava
+                        muita largura mesmo só com 2 opções. */}
+                    <div className="flex items-stretch gap-2">
+                      <div className="relative flex-1 min-w-0">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                          style={{ color: "hsl(240 8% 40%)" }} />
+                        <input
+                          value={groupSearch}
+                          onChange={(e) => setGroupSearch(e.target.value)}
+                          placeholder="Pesquisar grupos pelo nome…"
+                          className="w-full text-sm rounded-xl pl-9 pr-3 py-2.5 outline-none"
+                          style={{
+                            background: "var(--surface-3)",
+                            border: "1px solid var(--surface-border)",
+                            color: "var(--text-1)",
+                          }}
+                        />
+                      </div>
+                      <div className="flex flex-shrink-0 rounded-xl p-0.5"
+                        style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+                        {([
+                          { id: "name",    label: "Nome" },
+                          { id: "members", label: "Membros" },
+                        ] as const).map((opt) => {
+                          const active = groupSort === opt.id;
+                          return (
+                            <button key={opt.id} type="button"
+                              onClick={() => setGroupSort(opt.id)}
+                              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                              style={active
+                                ? { background: "rgba(0,212,106,0.14)", color: "var(--green)" }
+                                : { background: "transparent", color: "var(--text-3)" }}>
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                     {groupsLoading ? (
                       <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin" style={{ color: "hsl(240 8% 40%)" }} /></div>
