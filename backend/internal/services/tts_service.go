@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
@@ -332,4 +333,182 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n] + "…"
+}
+
+// ─── Provider connectivity test ────────────────────────────────────────────
+
+// TestProvider valida que a API key do provider funciona — usado pra UX
+// dar feedback imediato após salvar credenciais. Retorna nil se OK,
+// erro com motivo se falhou (auth/network/etc).
+func (s *TTSService) TestProvider(ctx context.Context, provider *models.VoiceProvider) error {
+	switch provider.Provider {
+	case models.VoiceProviderElevenLabs:
+		// /v1/user devolve subscription info — endpoint barato e
+		// que sempre exige auth válida.
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.elevenlabs.io/v1/user", nil)
+		req.Header.Set("xi-api-key", provider.APIKey)
+		resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+		if err != nil {
+			return fmt.Errorf("falha de rede: %w", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == 401 || resp.StatusCode == 403 {
+			return fmt.Errorf("api key inválida (HTTP %d)", resp.StatusCode)
+		}
+		if resp.StatusCode >= 300 {
+			b, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("provider retornou %d: %s", resp.StatusCode, truncate(string(b), 200))
+		}
+		return nil
+	case models.VoiceProviderOpenAITTS:
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.openai.com/v1/models", nil)
+		req.Header.Set("Authorization", "Bearer "+provider.APIKey)
+		resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+		if err != nil {
+			return fmt.Errorf("falha de rede: %w", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode >= 300 {
+			return fmt.Errorf("openai retornou %d", resp.StatusCode)
+		}
+		return nil
+	case models.VoiceProviderQwenTTS:
+		// DashScope não tem health endpoint barato; faz uma síntese curta.
+		_, _, err := s.qwenTTS(ctx, provider.APIKey, TTSRequest{Text: "ok", VoiceID: "longxiaoxia", Speed: 1})
+		return err
+	}
+	return fmt.Errorf("provider não suportado: %s", provider.Provider)
+}
+
+// ─── ElevenLabs: usage / subscription / clone / delete ─────────────────────
+
+// ElevenLabsUsage representa info da subscription do usuário no ElevenLabs.
+type ElevenLabsUsage struct {
+	Tier               string `json:"tier"`
+	CharacterCount     int    `json:"character_count"`
+	CharacterLimit     int    `json:"character_limit"`
+	VoiceLimit         int    `json:"voice_limit"`
+	ProfessionalVoices int    `json:"professional_voice_limit"`
+	NextResetAt        int64  `json:"next_character_count_reset_unix"`
+	CanCloneVoice      bool   `json:"can_extend_voice_limit"`
+}
+
+// GetElevenLabsUsage devolve consumo/limite — útil pra UI mostrar
+// "X / Y caracteres usados este mês" e bloquear clonagem se o tier
+// não permitir.
+func (s *TTSService) GetElevenLabsUsage(ctx context.Context, apiKey string) (*ElevenLabsUsage, error) {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.elevenlabs.io/v1/user/subscription", nil)
+	req.Header.Set("xi-api-key", apiKey)
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("elevenlabs %d: %s", resp.StatusCode, truncate(string(b), 200))
+	}
+	var u ElevenLabsUsage
+	if err := json.NewDecoder(resp.Body).Decode(&u); err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+// CloneVoiceInput agrupa os argumentos da clonagem (Instant Voice
+// Cloning do ElevenLabs).
+type CloneVoiceInput struct {
+	Name        string
+	Description string
+	// Samples — pelo menos 1 arquivo de áudio (mp3/wav/m4a/ogg) até 10MB
+	// cada. ElevenLabs recomenda 1-2min total de áudio limpo.
+	Samples []CloneVoiceSample
+	Labels  map[string]string
+}
+
+type CloneVoiceSample struct {
+	Filename string
+	Data     []byte
+}
+
+// CloneElevenLabsVoice cria uma nova voz no ElevenLabs via Instant
+// Voice Cloning (POST /v1/voices/add) e devolve o voice_id resultante,
+// pronto pra ser persistido como WorkspaceVoice category=clone.
+//
+// Tier free do ElevenLabs não permite clone — retorna erro 403 com
+// mensagem clara nesse caso.
+func (s *TTSService) CloneElevenLabsVoice(ctx context.Context, apiKey string, in CloneVoiceInput) (string, string, error) {
+	if len(in.Samples) == 0 {
+		return "", "", fmt.Errorf("pelo menos 1 sample de áudio é obrigatório")
+	}
+	if strings.TrimSpace(in.Name) == "" {
+		return "", "", fmt.Errorf("name obrigatório")
+	}
+
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	_ = w.WriteField("name", in.Name)
+	if in.Description != "" {
+		_ = w.WriteField("description", in.Description)
+	}
+	if len(in.Labels) > 0 {
+		if b, err := json.Marshal(in.Labels); err == nil {
+			_ = w.WriteField("labels", string(b))
+		}
+	}
+	for _, sample := range in.Samples {
+		fw, err := w.CreateFormFile("files", sample.Filename)
+		if err != nil {
+			return "", "", err
+		}
+		if _, err := fw.Write(sample.Data); err != nil {
+			return "", "", err
+		}
+	}
+	w.Close()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		"https://api.elevenlabs.io/v1/voices/add", &buf)
+	if err != nil {
+		return "", "", err
+	}
+	req.Header.Set("xi-api-key", apiKey)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+
+	resp, err := (&http.Client{Timeout: 120 * time.Second}).Do(req)
+	if err != nil {
+		return "", "", fmt.Errorf("elevenlabs clone: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		return "", "", fmt.Errorf("elevenlabs clone %d: %s", resp.StatusCode, truncate(string(body), 400))
+	}
+	var result struct {
+		VoiceID string `json:"voice_id"`
+		Name    string `json:"name"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", "", fmt.Errorf("elevenlabs clone: resposta inválida: %s", truncate(string(body), 200))
+	}
+	return result.VoiceID, result.Name, nil
+}
+
+// DeleteElevenLabsVoice remove a voz do ElevenLabs (irreversível).
+// Useful quando o user remove uma voz clonada do workspace — sem isso
+// o slot continuaria contado contra o tier.
+func (s *TTSService) DeleteElevenLabsVoice(ctx context.Context, apiKey, voiceID string) error {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodDelete,
+		"https://api.elevenlabs.io/v1/voices/"+voiceID, nil)
+	req.Header.Set("xi-api-key", apiKey)
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 && resp.StatusCode != 404 {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("elevenlabs delete %d: %s", resp.StatusCode, truncate(string(b), 200))
+	}
+	return nil
 }

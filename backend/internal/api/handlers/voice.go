@@ -227,6 +227,155 @@ func (h *VoiceHandler) TestTTS(c *fiber.Ctx) error {
 	return c.Send(audioData)
 }
 
+// TestProvider POST /v1/voices/providers/:id/test
+// Bate na API do provider pra confirmar que a key funciona.
+func (h *VoiceHandler) TestProvider(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var p models.VoiceProvider
+	if err := h.db.Where("id = ? AND workspace_id = ?", id, ws).First(&p).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "provider não encontrado"})
+	}
+	ctx, cancel := context.WithTimeout(c.Context(), 15*time.Second)
+	defer cancel()
+	if err := h.tts.TestProvider(ctx, &p); err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"ok": false, "error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"ok": true})
+}
+
+// GetUsage GET /v1/voices/providers/:id/usage
+// Devolve quota / consumo atual do provider (ElevenLabs subscription).
+func (h *VoiceHandler) GetUsage(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var p models.VoiceProvider
+	if err := h.db.Where("id = ? AND workspace_id = ?", id, ws).First(&p).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "provider não encontrado"})
+	}
+	if p.Provider != models.VoiceProviderElevenLabs {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "usage só está disponível para ElevenLabs por enquanto"})
+	}
+	ctx, cancel := context.WithTimeout(c.Context(), 15*time.Second)
+	defer cancel()
+	u, err := h.tts.GetElevenLabsUsage(ctx, p.APIKey)
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(u)
+}
+
+// CloneVoice POST /v1/voices/providers/:id/clone (multipart)
+// Form fields: name, description, labels (json), files[] (1+ samples)
+// Cria a voz no ElevenLabs via IVC e persiste como WorkspaceVoice.
+func (h *VoiceHandler) CloneVoice(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var p models.VoiceProvider
+	if err := h.db.Where("id = ? AND workspace_id = ?", id, ws).First(&p).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "provider não encontrado"})
+	}
+	if p.Provider != models.VoiceProviderElevenLabs {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "clonagem só suportada para ElevenLabs"})
+	}
+
+	form, err := c.MultipartForm()
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "esperado multipart/form-data"})
+	}
+	name := strings.TrimSpace(c.FormValue("name"))
+	if name == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name obrigatório"})
+	}
+	description := c.FormValue("description")
+	files := form.File["files"]
+	if len(files) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ao menos 1 arquivo de áudio (campo 'files') é necessário"})
+	}
+
+	var samples []services.CloneVoiceSample
+	for _, fh := range files {
+		if fh.Size > 25*1024*1024 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "cada arquivo deve ter até 25MB"})
+		}
+		fr, err := fh.Open()
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "falha ao ler arquivo: " + fh.Filename})
+		}
+		buf := make([]byte, fh.Size)
+		_, _ = fr.Read(buf)
+		fr.Close()
+		samples = append(samples, services.CloneVoiceSample{Filename: fh.Filename, Data: buf})
+	}
+
+	labels := map[string]string{}
+	if raw := c.FormValue("labels"); raw != "" {
+		_ = json.Unmarshal([]byte(raw), &labels)
+	}
+
+	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Minute)
+	defer cancel()
+	voiceID, voiceName, err := h.tts.CloneElevenLabsVoice(ctx, p.APIKey, services.CloneVoiceInput{
+		Name:        name,
+		Description: description,
+		Samples:     samples,
+		Labels:      labels,
+	})
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "falha na clonagem: " + err.Error()})
+	}
+
+	wv := models.WorkspaceVoice{
+		WorkspaceID:     ws,
+		VoiceProviderID: p.ID,
+		ExternalID:      voiceID,
+		Name:            voiceName,
+		Category:        "clone",
+		Description:     description,
+		IsActive:        true,
+	}
+	if err := h.db.Create(&wv).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "voz clonada no provider mas falhou ao persistir local"})
+	}
+	return c.Status(fiber.StatusCreated).JSON(wv)
+}
+
+// DeleteVoice DELETE /v1/voices/:id
+// Remove a voz local + chama provider pra liberar o slot (apenas
+// vozes clonadas — vozes preset ficam só desativadas localmente).
+func (h *VoiceHandler) DeleteVoice(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var v models.WorkspaceVoice
+	if err := h.db.Preload("Provider").Where("id = ? AND workspace_id = ?", id, ws).First(&v).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "voz não encontrada"})
+	}
+	// Só apaga no provider quando é uma voz clonada (preset é compartilhado).
+	if v.Category == "clone" && v.Provider != nil && v.Provider.Provider == models.VoiceProviderElevenLabs {
+		ctx, cancel := context.WithTimeout(c.Context(), 30*time.Second)
+		defer cancel()
+		if err := h.tts.DeleteElevenLabsVoice(ctx, v.Provider.APIKey, v.ExternalID); err != nil {
+			// Loga mas segue — soft delete local mesmo com falha remota
+			// (user pode ter já removido manualmente no painel ElevenLabs).
+			c.Set("X-Provider-Delete-Error", err.Error())
+		}
+	}
+	h.db.Delete(&v)
+	return c.JSON(fiber.Map{"ok": true})
+}
+
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
 func maskKey(key string) string {

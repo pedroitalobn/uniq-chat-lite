@@ -2001,12 +2001,22 @@ export const voicesApi = {
     api.post("/v1/voices/providers", data, { headers: wsHeaders(workspaceId) }),
   deleteProvider: (workspaceId: string, id: string) =>
     api.delete(`/v1/voices/providers/${id}`, { headers: wsHeaders(workspaceId) }),
+  testProvider: (workspaceId: string, id: string) =>
+    api.post(`/v1/voices/providers/${id}/test`, {}, { headers: wsHeaders(workspaceId) }),
+  getUsage: (workspaceId: string, id: string) =>
+    api.get(`/v1/voices/providers/${id}/usage`, { headers: wsHeaders(workspaceId) }),
   syncVoices: (workspaceId: string, providerId: string) =>
     api.post(`/v1/voices/providers/${providerId}/sync`, {}, { headers: wsHeaders(workspaceId) }),
+  cloneVoice: (workspaceId: string, providerId: string, form: FormData) =>
+    api.post(`/v1/voices/providers/${providerId}/clone`, form, {
+      headers: { ...wsHeaders(workspaceId), "Content-Type": "multipart/form-data" },
+    }),
   listVoices: (workspaceId: string, params?: { provider_id?: string; active?: string }) =>
     api.get("/v1/voices/", { headers: wsHeaders(workspaceId), params }),
   toggleVoice: (workspaceId: string, id: string, is_active: boolean) =>
     api.patch(`/v1/voices/${id}`, { is_active }, { headers: wsHeaders(workspaceId) }),
+  deleteVoice: (workspaceId: string, id: string) =>
+    api.delete(`/v1/voices/${id}`, { headers: wsHeaders(workspaceId) }),
   testTTS: (workspaceId: string, voice_id: string, text?: string) =>
     api.post("/v1/voices/test", { voice_id, text }, { headers: wsHeaders(workspaceId), responseType: "arraybuffer" }),
 };

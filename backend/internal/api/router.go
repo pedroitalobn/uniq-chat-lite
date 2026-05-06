@@ -1202,9 +1202,13 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	voices.Get("/providers", voiceH.ListProviders)
 	voices.Post("/providers", voiceH.CreateProvider)
 	voices.Delete("/providers/:id", voiceH.DeleteProvider)
+	voices.Post("/providers/:id/test", voiceH.TestProvider)
+	voices.Get("/providers/:id/usage", voiceH.GetUsage)
 	voices.Post("/providers/:id/sync", voiceH.SyncVoices)
+	voices.Post("/providers/:id/clone", voiceH.CloneVoice)
 	voices.Get("/", voiceH.ListVoices)
 	voices.Patch("/:id", voiceH.ToggleVoice)
+	voices.Delete("/:id", voiceH.DeleteVoice)
 	voices.Post("/test", voiceH.TestTTS)
 
 	// ─── Shop module (Fase 1) ─────────────────────────────────────────

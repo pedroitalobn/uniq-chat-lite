@@ -1308,11 +1308,12 @@ type VoiceEntry = {
   name: string;
   language?: string;
   gender?: string;
+  category?: string; // "preset" | "clone" | "generated"
   is_active: boolean;
   provider?: { id: string; provider: string; name: string };
 };
 
-type ProviderEntry = { id: string; provider: string; name: string; is_active: boolean };
+type ProviderEntry = { id: string; provider: string; name: string; is_active: boolean; masked_key?: string };
 
 function VoiceStudioTab({ wsId, selectedVoiceId, onSelect }: {
   wsId: string;
@@ -1324,6 +1325,8 @@ function VoiceStudioTab({ wsId, selectedVoiceId, onSelect }: {
   const [testText, setTestText] = useState("Olá! Eu sou o seu agente de atendimento.");
   const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [showProviderModal, setShowProviderModal] = useState(false);
+  const [showCloneModal, setShowCloneModal] = useState<string | null>(null); // providerId
 
   const providersQuery = useQuery({
     queryKey: ["voice-providers", wsId],
@@ -1341,6 +1344,31 @@ function VoiceStudioTab({ wsId, selectedVoiceId, onSelect }: {
     mutationFn: (providerId: string) => voicesApi.syncVoices(wsId, providerId),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["voices", wsId] }); toast.success("Vozes sincronizadas."); },
     onError: (e: any) => toast.error(e?.response?.data?.error || "Falha ao sincronizar."),
+  });
+
+  const testProviderMutation = useMutation({
+    mutationFn: (id: string) => voicesApi.testProvider(wsId, id),
+    onSuccess: () => toast.success("Conexão OK!"),
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Falha no teste."),
+  });
+
+  const deleteProviderMutation = useMutation({
+    mutationFn: (id: string) => voicesApi.deleteProvider(wsId, id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["voice-providers", wsId] });
+      queryClient.invalidateQueries({ queryKey: ["voices", wsId] });
+      toast.success("Provider removido.");
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Erro ao remover."),
+  });
+
+  const deleteVoiceMutation = useMutation({
+    mutationFn: (id: string) => voicesApi.deleteVoice(wsId, id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["voices", wsId] });
+      toast.success("Voz removida.");
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Erro ao remover voz."),
   });
 
   const toggleMutation = useMutation({
@@ -1386,12 +1414,12 @@ function VoiceStudioTab({ wsId, selectedVoiceId, onSelect }: {
             </h2>
             <p className="text-sm" style={{ color: "var(--text-3)" }}>Configure suas chaves de API para habilitar síntese de voz.</p>
           </div>
-          <a
-            href="/integrations?tab=voices"
+          <button
+            onClick={() => setShowProviderModal(true)}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
             style={{ background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.18)", color: "var(--green)" }}>
             <Plus className="w-4 h-4" /> Adicionar provider
-          </a>
+          </button>
         </div>
 
         {providersQuery.isLoading && (
@@ -1399,10 +1427,15 @@ function VoiceStudioTab({ wsId, selectedVoiceId, onSelect }: {
         )}
 
         {!providersQuery.isLoading && !providersQuery.data?.length && (
-          <div className="rounded-2xl p-4 text-sm" style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
-            <p style={{ color: "var(--text-3)" }}>Nenhum provider configurado. Vá em{" "}
-              <a href="/integrations?tab=voices" className="underline" style={{ color: "var(--green)" }}>Integrações → Vozes</a> para adicionar ElevenLabs, OpenAI TTS ou Qwen TTS.
-            </p>
+          <div className="rounded-2xl p-5 text-center" style={{ background: "var(--surface-3)", border: "1px dashed var(--surface-border)" }}>
+            <Volume2 className="w-8 h-8 mx-auto mb-2" style={{ color: "var(--text-3)" }} />
+            <p className="text-sm font-medium mb-1" style={{ color: "var(--text-2)" }}>Nenhum provider conectado</p>
+            <p className="text-xs mb-3" style={{ color: "var(--text-3)" }}>Conecte ElevenLabs (clonagem), OpenAI TTS ou Qwen TTS pra começar.</p>
+            <button onClick={() => setShowProviderModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
+              style={{ background: "var(--green)", color: "#03170a" }}>
+              <Plus className="w-4 h-4" /> Conectar provider
+            </button>
           </div>
         )}
 
@@ -1411,23 +1444,46 @@ function VoiceStudioTab({ wsId, selectedVoiceId, onSelect }: {
             {providersQuery.data.map((prov) => {
               const color = PROVIDER_COLORS[prov.provider] || "#a78bfa";
               const label = PROVIDER_LABELS[prov.provider] || prov.provider;
+              const canClone = prov.provider === "elevenlabs";
               return (
-                <div key={prov.id} className="rounded-2xl p-4 flex items-center justify-between gap-3" style={{ background: "var(--surface-3)", border: `1px solid ${color}25` }}>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: `${color}18`, color }}>{label}</span>
-                      <span className={`w-1.5 h-1.5 rounded-full ${prov.is_active ? "bg-green-500" : "bg-zinc-500"}`} />
+                <div key={prov.id} className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: "var(--surface-3)", border: `1px solid ${color}25` }}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: `${color}18`, color }}>{label}</span>
+                        <span className={`w-1.5 h-1.5 rounded-full ${prov.is_active ? "bg-green-500" : "bg-zinc-500"}`} />
+                      </div>
+                      <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{prov.name}</p>
+                      {prov.masked_key && (
+                        <p className="text-[10px] font-mono mt-0.5 truncate" style={{ color: "var(--text-3)" }}>{prov.masked_key}</p>
+                      )}
                     </div>
-                    <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{prov.name}</p>
                   </div>
-                  <button
-                    onClick={() => syncMutation.mutate(prov.id)}
-                    disabled={syncMutation.isPending}
-                    title="Sincronizar vozes"
-                    className="p-2 rounded-xl transition-all"
-                    style={{ background: `${color}12`, color, border: `1px solid ${color}25` }}>
-                    <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? "animate-spin" : ""}`} />
-                  </button>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button onClick={() => testProviderMutation.mutate(prov.id)} disabled={testProviderMutation.isPending}
+                      title="Testar conexão" className="px-2 py-1 rounded-lg text-[11px] inline-flex items-center gap-1"
+                      style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-2)" }}>
+                      {testProviderMutation.isPending && testProviderMutation.variables === prov.id
+                        ? <Loader2 className="w-3 h-3 animate-spin" /> : <Shield className="w-3 h-3" />} Testar
+                    </button>
+                    <button onClick={() => syncMutation.mutate(prov.id)} disabled={syncMutation.isPending}
+                      title="Sincronizar vozes" className="px-2 py-1 rounded-lg text-[11px] inline-flex items-center gap-1"
+                      style={{ background: `${color}12`, color, border: `1px solid ${color}25` }}>
+                      <RefreshCw className={`w-3 h-3 ${syncMutation.isPending ? "animate-spin" : ""}`} /> Sincronizar
+                    </button>
+                    {canClone && (
+                      <button onClick={() => setShowCloneModal(prov.id)}
+                        title="Clonar voz" className="px-2 py-1 rounded-lg text-[11px] inline-flex items-center gap-1"
+                        style={{ background: "rgba(168,139,250,0.12)", color: "#a78bfa", border: "1px solid rgba(168,139,250,0.25)" }}>
+                        <Sparkles className="w-3 h-3" /> Clonar voz
+                      </button>
+                    )}
+                    <button onClick={() => { if (confirm("Remover este provider e todas as vozes vinculadas?")) deleteProviderMutation.mutate(prov.id); }}
+                      title="Remover" className="ml-auto p-1.5 rounded-lg"
+                      style={{ background: "rgba(239,68,68,0.10)", color: "#f87171", border: "1px solid rgba(239,68,68,0.20)" }}>
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -1532,6 +1588,18 @@ function VoiceStudioTab({ wsId, selectedVoiceId, onSelect }: {
                       {isSelected ? <CheckCircle2 className="w-3.5 h-3.5" /> : null}
                       {isSelected ? "Selecionada" : "Usar"}
                     </button>
+                    {/* Delete (apenas vozes clonadas — preset não pode ser
+                        apagado, então o botão fica indisponível pra elas
+                        sem cluttering a UI). */}
+                    {voice.category === "clone" && (
+                      <button
+                        onClick={() => { if (confirm(`Remover a voz "${voice.name}"? Isso também a apaga no provider.`)) deleteVoiceMutation.mutate(voice.id); }}
+                        className="p-2 rounded-xl"
+                        title="Remover voz"
+                        style={{ background: "rgba(239,68,68,0.10)", color: "#f87171", border: "1px solid rgba(239,68,68,0.20)" }}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -1539,7 +1607,217 @@ function VoiceStudioTab({ wsId, selectedVoiceId, onSelect }: {
           </div>
         )}
       </div>
+
+      {showProviderModal && (
+        <ProviderConnectModal wsId={wsId} onClose={() => setShowProviderModal(false)}
+          onCreated={() => {
+            queryClient.invalidateQueries({ queryKey: ["voice-providers", wsId] });
+            setShowProviderModal(false);
+          }} />
+      )}
+
+      {showCloneModal && (
+        <CloneVoiceModal wsId={wsId} providerId={showCloneModal}
+          onClose={() => setShowCloneModal(null)}
+          onCloned={() => {
+            queryClient.invalidateQueries({ queryKey: ["voices", wsId] });
+            setShowCloneModal(null);
+          }} />
+      )}
     </>
+  );
+}
+
+// ─── Modal: conectar provider ────────────────────────────────────────────────
+
+function ProviderConnectModal({ wsId, onClose, onCreated }: {
+  wsId: string;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [provider, setProvider] = useState<"elevenlabs" | "openai_tts" | "qwen_tts">("elevenlabs");
+  const [name, setName] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
+
+  const createMut = useMutation({
+    mutationFn: async () => {
+      const res = await voicesApi.createProvider(wsId, { provider, name: name.trim() || provider, api_key: apiKey.trim() });
+      const created = res.data as ProviderEntry;
+      // Test imediato pra validar a key — se falhar, removemos o provider
+      // pra evitar deixar credencial inválida salva.
+      try {
+        await voicesApi.testProvider(wsId, created.id);
+        // Sync inicial pra trazer as vozes preset (ElevenLabs/OpenAI/Qwen
+        // têm vozes públicas que precisamos listar imediatamente).
+        await voicesApi.syncVoices(wsId, created.id);
+      } catch (e: any) {
+        await voicesApi.deleteProvider(wsId, created.id).catch(() => {});
+        throw new Error(e?.response?.data?.error || "Chave inválida — provider removido.");
+      }
+      return created;
+    },
+    onSuccess: () => { toast.success("Provider conectado!"); onCreated(); },
+    onError: (e: any) => toast.error(e?.message || e?.response?.data?.error || "Erro ao conectar."),
+  });
+
+  const PROVIDER_HINTS: Record<string, { label: string; hint: string; href: string }> = {
+    elevenlabs: { label: "ElevenLabs", hint: "Inclui Instant Voice Cloning, vozes premium e multilíngue.", href: "https://elevenlabs.io/app/settings/api-keys" },
+    openai_tts: { label: "OpenAI TTS", hint: "tts-1 e tts-1-hd com 6 vozes neutras prontas.", href: "https://platform.openai.com/api-keys" },
+    qwen_tts:   { label: "Qwen TTS",   hint: "CosyVoice via DashScope (Alibaba) — bom pra mandarim.", href: "https://dashscope.console.aliyun.com/apiKey" },
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl p-5"
+        style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>
+        <h3 className="text-base font-semibold mb-3" style={{ color: "var(--text-1)" }}>Conectar provider de voz</h3>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs block mb-1.5" style={{ color: "var(--text-2)" }}>Provider</label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {(["elevenlabs", "openai_tts", "qwen_tts"] as const).map((p) => (
+                <button key={p} onClick={() => setProvider(p)} type="button"
+                  className="px-2 py-2 rounded-xl text-xs font-medium"
+                  style={provider === p
+                    ? { background: "rgba(0,212,106,0.10)", border: "1px solid rgba(0,212,106,0.30)", color: "var(--green)" }
+                    : { background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-2)" }}>
+                  {PROVIDER_HINTS[p].label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] mt-1.5" style={{ color: "var(--text-3)" }}>{PROVIDER_HINTS[provider].hint}</p>
+          </div>
+          <div>
+            <label className="text-xs block mb-1.5" style={{ color: "var(--text-2)" }}>Apelido (opcional)</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={PROVIDER_HINTS[provider].label}
+              className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+              style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }} />
+          </div>
+          <div>
+            <label className="text-xs block mb-1.5 flex items-center justify-between" style={{ color: "var(--text-2)" }}>
+              <span>API key *</span>
+              <a href={PROVIDER_HINTS[provider].href} target="_blank" rel="noopener noreferrer"
+                className="text-[11px] underline" style={{ color: "#a78bfa" }}>
+                onde encontro?
+              </a>
+            </label>
+            <div className="relative">
+              <input
+                type={showKey ? "text" : "password"}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk_..."
+                className="w-full px-3 py-2 pr-10 rounded-xl text-sm outline-none font-mono"
+                style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }} />
+              <button type="button" onClick={() => setShowKey((s) => !s)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs px-1.5 py-0.5 rounded"
+                style={{ color: "var(--text-3)" }}>
+                {showKey ? "ocultar" : "mostrar"}
+              </button>
+            </div>
+            <p className="text-[11px] mt-1" style={{ color: "var(--text-3)" }}>
+              Validamos a chave imediatamente. Se inválida, o provider não será salvo.
+            </p>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-5">
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm" style={{ color: "var(--text-2)" }}>Cancelar</button>
+          <button onClick={() => createMut.mutate()} disabled={!apiKey.trim() || createMut.isPending}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-60"
+            style={{ background: "var(--green)", color: "#03170a" }}>
+            {createMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            Conectar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal: clonar voz (ElevenLabs IVC) ──────────────────────────────────────
+
+function CloneVoiceModal({ wsId, providerId, onClose, onCloned }: {
+  wsId: string; providerId: string; onClose: () => void; onCloned: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const cloneMut = useMutation({
+    mutationFn: async () => {
+      const fd = new FormData();
+      fd.append("name", name.trim());
+      if (description.trim()) fd.append("description", description.trim());
+      for (const f of files) fd.append("files", f);
+      return voicesApi.cloneVoice(wsId, providerId, fd);
+    },
+    onSuccess: () => { toast.success("Voz clonada com sucesso!"); onCloned(); },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Falha ao clonar voz."),
+  });
+
+  const totalSize = files.reduce((acc, f) => acc + f.size, 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl p-5"
+        style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>
+        <h3 className="text-base font-semibold mb-1 flex items-center gap-2" style={{ color: "var(--text-1)" }}>
+          <Sparkles className="w-4 h-4" style={{ color: "#a78bfa" }} /> Clonar voz (ElevenLabs IVC)
+        </h3>
+        <p className="text-xs mb-4" style={{ color: "var(--text-3)" }}>
+          Envie 1-2 minutos de áudio limpo (sem ruído de fundo, com a pessoa falando naturalmente). Quanto melhor a qualidade, melhor o clone.
+        </p>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs block mb-1.5" style={{ color: "var(--text-2)" }}>Nome da voz *</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: João Comercial"
+              className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+              style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }} />
+          </div>
+          <div>
+            <label className="text-xs block mb-1.5" style={{ color: "var(--text-2)" }}>Descrição (opcional)</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2}
+              placeholder="Ex: tom amigável, ritmo médio, sotaque paulista"
+              className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-none"
+              style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }} />
+          </div>
+          <div>
+            <label className="text-xs block mb-1.5" style={{ color: "var(--text-2)" }}>Áudios de referência *</label>
+            <input ref={fileRef} type="file" accept="audio/*" multiple
+              onChange={(e) => setFiles(Array.from(e.target.files || []))}
+              className="hidden" />
+            <button type="button" onClick={() => fileRef.current?.click()}
+              className="w-full px-3 py-3 rounded-xl text-sm flex items-center justify-center gap-2"
+              style={{ background: "var(--surface-2)", border: "1px dashed var(--surface-border)", color: "var(--text-2)" }}>
+              <Upload className="w-4 h-4" />
+              {files.length === 0 ? "Selecionar áudios (mp3/wav/m4a/ogg)" : `${files.length} arquivo(s) — ${(totalSize / 1024 / 1024).toFixed(1)} MB`}
+            </button>
+            {files.length > 0 && (
+              <ul className="mt-1.5 space-y-0.5">
+                {files.map((f, i) => (
+                  <li key={i} className="text-[11px] flex items-center justify-between gap-2" style={{ color: "var(--text-3)" }}>
+                    <span className="truncate">{f.name}</span>
+                    <span className="font-mono">{(f.size / 1024).toFixed(0)} KB</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-5">
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm" style={{ color: "var(--text-2)" }}>Cancelar</button>
+          <button onClick={() => cloneMut.mutate()}
+            disabled={!name.trim() || files.length === 0 || cloneMut.isPending}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-60"
+            style={{ background: "#a78bfa", color: "#1a1530" }}>
+            {cloneMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {cloneMut.isPending ? "Clonando..." : "Clonar voz"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
