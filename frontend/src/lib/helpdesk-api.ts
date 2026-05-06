@@ -69,14 +69,22 @@ export interface HelpDeskConfigResponse {
   public_url: string;
 }
 
+// IMPORTANTE: TODAS as rotas /v1/helpdesk/* exigem o header X-Workspace-ID.
+// O middleware do backend não popula c.Locals("workspace_id") pra esse
+// chain, então sem o header todo handler retorna 401 "workspace_id não
+// encontrado em context". Antes só list/create/config passavam o header
+// — publish/update/delete/get caíam em 401 silencioso, fazendo parecer
+// que o "Publicar" no dashboard não funcionava (na real era 401 que o
+// front engolia em catch genérico).
 export const helpDeskApi = {
   listCategories: (workspaceId?: string) =>
     api.get<HelpDeskCategory[]>("/v1/helpdesk/categories", { headers: wsHeader(workspaceId) }),
   createCategory: (data: Partial<HelpDeskCategory>, workspaceId?: string) =>
     api.post<HelpDeskCategory>("/v1/helpdesk/categories", data, { headers: wsHeader(workspaceId) }),
-  updateCategory: (id: string, data: Partial<HelpDeskCategory>) =>
-    api.patch<HelpDeskCategory>(`/v1/helpdesk/categories/${id}`, data),
-  deleteCategory: (id: string) => api.delete(`/v1/helpdesk/categories/${id}`),
+  updateCategory: (id: string, data: Partial<HelpDeskCategory>, workspaceId?: string) =>
+    api.patch<HelpDeskCategory>(`/v1/helpdesk/categories/${id}`, data, { headers: wsHeader(workspaceId) }),
+  deleteCategory: (id: string, workspaceId?: string) =>
+    api.delete(`/v1/helpdesk/categories/${id}`, { headers: wsHeader(workspaceId) }),
 
   listArticles: (
     params?: { category_id?: string; status?: string; q?: string },
@@ -88,12 +96,14 @@ export const helpDeskApi = {
     }),
   createArticle: (data: Partial<HelpDeskArticle>, workspaceId?: string) =>
     api.post<HelpDeskArticle>("/v1/helpdesk/articles", data, { headers: wsHeader(workspaceId) }),
-  getArticle: (id: string) => api.get<HelpDeskArticle>(`/v1/helpdesk/articles/${id}`),
-  updateArticle: (id: string, data: Partial<HelpDeskArticle>) =>
-    api.patch<HelpDeskArticle>(`/v1/helpdesk/articles/${id}`, data),
-  deleteArticle: (id: string) => api.delete(`/v1/helpdesk/articles/${id}`),
-  publishArticle: (id: string) =>
-    api.post<HelpDeskArticle>(`/v1/helpdesk/articles/${id}/publish`),
+  getArticle: (id: string, workspaceId?: string) =>
+    api.get<HelpDeskArticle>(`/v1/helpdesk/articles/${id}`, { headers: wsHeader(workspaceId) }),
+  updateArticle: (id: string, data: Partial<HelpDeskArticle>, workspaceId?: string) =>
+    api.patch<HelpDeskArticle>(`/v1/helpdesk/articles/${id}`, data, { headers: wsHeader(workspaceId) }),
+  deleteArticle: (id: string, workspaceId?: string) =>
+    api.delete(`/v1/helpdesk/articles/${id}`, { headers: wsHeader(workspaceId) }),
+  publishArticle: (id: string, workspaceId?: string) =>
+    api.post<HelpDeskArticle>(`/v1/helpdesk/articles/${id}/publish`, undefined, { headers: wsHeader(workspaceId) }),
   generateArticle: (
     data: { prompt: string; category_id?: string },
     workspaceId?: string,

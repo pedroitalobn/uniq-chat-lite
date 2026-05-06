@@ -85,11 +85,12 @@ export default function ArticleEditorPage() {
     enabled: !!wsId,
   });
 
-  // Fetch article
+  // Fetch article. Header X-Workspace-ID é obrigatório no backend (sem
+  // ele as rotas /v1/helpdesk/articles/* respondem 401).
   const articleQuery = useQuery({
-    queryKey: ["helpdesk-article", articleId],
-    queryFn: async () => (await helpDeskApi.getArticle(articleId)).data,
-    enabled: !!articleId,
+    queryKey: ["helpdesk-article", articleId, wsId],
+    queryFn: async () => (await helpDeskApi.getArticle(articleId, wsId)).data,
+    enabled: !!articleId && !!wsId,
   });
 
   useEffect(() => {
@@ -116,7 +117,7 @@ export default function ArticleEditorPage() {
       setSaveStatus("saving");
       saveTimerRef.current = setTimeout(async () => {
         try {
-          await helpDeskApi.updateArticle(articleId, patch);
+          await helpDeskApi.updateArticle(articleId, patch, wsId);
           setSaveStatus("saved");
           setTimeout(() => setSaveStatus("idle"), 2000);
         } catch {
@@ -124,10 +125,11 @@ export default function ArticleEditorPage() {
         }
       }, 1500);
     },
-    [articleId],
+    [articleId, wsId],
   );
 
-  // Mutations
+  // Mutations — todas precisam do wsId pra montar o header X-Workspace-ID.
+  // Sem ele o backend retorna 401 e o "Publicar"/"Salvar" silencia.
   const saveMutation = useMutation({
     mutationFn: () =>
       helpDeskApi.updateArticle(articleId, {
@@ -136,7 +138,7 @@ export default function ArticleEditorPage() {
         summary,
         slug,
         category_id: categoryId || undefined,
-      }),
+      }, wsId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["helpdesk-article", articleId] });
       qc.invalidateQueries({ queryKey: ["helpdesk-articles"] });
@@ -150,8 +152,8 @@ export default function ArticleEditorPage() {
   const publishMutation = useMutation({
     mutationFn: () =>
       articleQuery.data?.status === "published"
-        ? helpDeskApi.updateArticle(articleId, { status: "draft" })
-        : helpDeskApi.publishArticle(articleId),
+        ? helpDeskApi.updateArticle(articleId, { status: "draft" }, wsId)
+        : helpDeskApi.publishArticle(articleId, wsId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["helpdesk-article", articleId] });
       qc.invalidateQueries({ queryKey: ["helpdesk-articles"] });
@@ -163,7 +165,7 @@ export default function ArticleEditorPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => helpDeskApi.deleteArticle(articleId),
+    mutationFn: () => helpDeskApi.deleteArticle(articleId, wsId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["helpdesk-articles"] });
       toast.success("Artigo removido.");

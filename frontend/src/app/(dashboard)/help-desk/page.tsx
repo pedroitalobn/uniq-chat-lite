@@ -677,7 +677,7 @@ export default function HelpDeskPage() {
   });
 
   const deleteCategoryMutation = useMutation({
-    mutationFn: (id: string) => helpDeskApi.deleteCategory(id),
+    mutationFn: (id: string) => helpDeskApi.deleteCategory(id, wsId),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["helpdesk-categories"] }); setSelectedCategoryId(null); toast.success("Categoria removida."); },
     onError: (e: any) => toast.error(e?.response?.data?.error || "Falha ao remover."),
   });
