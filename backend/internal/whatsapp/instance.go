@@ -774,21 +774,20 @@ func (ic *InstanceClient) SendAudioMessage(to string, audioData []byte, mimeType
 		return "", fmt.Errorf("upload failed: %w", err)
 	}
 
-	// MediaKeyTimestamp DEVE ser setado: o cliente do destinatário valida
-	// a janela do MediaKey e, se vier 0/ausente, marca a mídia como
-	// "este áudio não está mais disponível" antes mesmo de baixar.
-	// Tem que ser segundos Unix do MOMENTO do upload (não do envio).
-	now := time.Now().Unix()
+	// MediaKeyTimestamp removido: experimento anterior setava
+	// time.Now().Unix() na hipótese de que clients rejeitavam mídia sem
+	// esse campo. Na prática a regressão "este áudio não está mais
+	// disponível" coincidiu com a adição desse campo. Whatsmeow não
+	// auto-seta esse campo (proto optional), então mantemos omitido.
 	audio := &waE2E.AudioMessage{
-		URL:               proto.String(upload.URL),
-		DirectPath:        proto.String(upload.DirectPath),
-		Mimetype:          proto.String(mimeType),
-		MediaKey:          upload.MediaKey,
-		MediaKeyTimestamp: proto.Int64(now),
-		FileEncSHA256:     upload.FileEncSHA256,
-		FileSHA256:        upload.FileSHA256,
-		FileLength:        proto.Uint64(uint64(len(audioData))),
-		PTT:               proto.Bool(ptt),
+		URL:           proto.String(upload.URL),
+		DirectPath:    proto.String(upload.DirectPath),
+		Mimetype:      proto.String(mimeType),
+		MediaKey:      upload.MediaKey,
+		FileEncSHA256: upload.FileEncSHA256,
+		FileSHA256:    upload.FileSHA256,
+		FileLength:    proto.Uint64(uint64(len(audioData))),
+		PTT:           proto.Bool(ptt),
 	}
 	if seconds > 0 {
 		audio.Seconds = proto.Uint32(seconds)
