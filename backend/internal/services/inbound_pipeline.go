@@ -13,6 +13,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -564,6 +565,55 @@ func buildPreview(msgType, content string) string {
 		return "👍 Reação"
 	case "revoke":
 		return "Mensagem apagada"
+	case "sticker":
+		return "😊 Sticker"
+	case "poll":
+		// Tenta extrair a pergunta do JSON {question, options...}.
+		if strings.HasPrefix(content, "{") {
+			var p struct {
+				Question string `json:"question"`
+			}
+			if json.Unmarshal([]byte(content), &p) == nil && p.Question != "" {
+				return "📊 Enquete · " + truncate280(p.Question)
+			}
+		}
+		return "📊 Enquete"
+	case "contact":
+		// vCard único — content é JSON {display_name, vcard, phones[]}.
+		// Antes caía no fallback de texto e o frontend mostrava o JSON cru
+		// como preview ("{\"display_name\":...}"). Agora extrai o nome.
+		if strings.HasPrefix(content, "{") {
+			var p struct {
+				DisplayName string `json:"display_name"`
+				Name        string `json:"name"`
+			}
+			if json.Unmarshal([]byte(content), &p) == nil {
+				name := p.DisplayName
+				if name == "" {
+					name = p.Name
+				}
+				if name != "" {
+					return "👤 " + truncate280(name)
+				}
+			}
+		}
+		return "👤 Contato"
+	case "contacts":
+		// Vários vCards — content é {contacts: [...]}.
+		if strings.HasPrefix(content, "{") {
+			var p struct {
+				Contacts []struct {
+					DisplayName string `json:"display_name"`
+				} `json:"contacts"`
+			}
+			if json.Unmarshal([]byte(content), &p) == nil && len(p.Contacts) > 0 {
+				if len(p.Contacts) == 1 && p.Contacts[0].DisplayName != "" {
+					return "👤 " + truncate280(p.Contacts[0].DisplayName)
+				}
+				return fmt.Sprintf("👤 %d contatos", len(p.Contacts))
+			}
+		}
+		return "👤 Contatos"
 	}
 	// Try to unwrap JSON-encoded {"text": "..."} payload when present
 	if strings.HasPrefix(content, "{") {
@@ -579,11 +629,14 @@ func buildPreview(msgType, content string) string {
 			}
 		}
 	}
-	content = strings.TrimSpace(content)
-	if len(content) > 280 {
-		return content[:280]
+	return truncate280(strings.TrimSpace(content))
+}
+
+func truncate280(s string) string {
+	if len(s) > 280 {
+		return s[:280]
 	}
-	return content
+	return s
 }
 
 // transcribeAudioAsync baixa o blob da MessageLog (via signed URL do MinIO

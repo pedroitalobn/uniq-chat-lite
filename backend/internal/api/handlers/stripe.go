@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -113,11 +114,26 @@ func (h *StripeHandler) CreateCheckout(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
 	}
 
+	// Preflight: stripe.Key vazia = admin não configurou Stripe em
+	// /admin/providers → Pagamento. Antes a request seguia, batia em
+	// stripe.com com key vazia, recebia auth error e devolvia 500 genérico
+	// "erro ao criar cliente Stripe" — sem pista pro user/admin do real
+	// problema. Agora retornamos 503 com mensagem acionável.
+	if strings.TrimSpace(stripe.Key) == "" {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error":   "stripe_not_configured",
+			"message": "Stripe não está configurado. Admin precisa setar a secret key em /admin/providers → Pagamento.",
+		})
+	}
+
 	var req struct {
 		PlanID string `json:"plan_id"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
+	}
+	if req.PlanID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "plan_id é obrigatório"})
 	}
 
 	var plan models.Plan
@@ -143,7 +159,13 @@ func (h *StripeHandler) CreateCheckout(c *fiber.Ctx) error {
 		}
 		sc, err := stripecustomer.New(cp)
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar cliente Stripe"})
+			// Repassa o erro real do Stripe (ex.: "Invalid API key", "rate
+			// limit exceeded") em vez de mascarar como genérico — admin
+			// precisa do detalhe pra debugar.
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error":   "stripe_customer_failed",
+				"message": "erro ao criar cliente Stripe: " + err.Error(),
+			})
 		}
 		customerID = sc.ID
 		h.db.Model(user).Update("stripe_customer_id", customerID)
