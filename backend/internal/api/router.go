@@ -169,8 +169,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	taktikSvc := services.NewTaktikService(db)
 	tiktokH := handlers.NewTikTokHandler(db, taktikSvc)
 
-	// AI Services
+	// AI Services. Inject DB pra LLMService poder cair pra PlatformAI ativa
+	// quando caller não passa UserIntegration (em vez de errar com
+	// OPENAI_API_KEY ausente).
 	llmService := services.NewLLMService()
+	llmService.SetDB(db)
 	helpDeskH := handlers.NewHelpDeskHandler(db, llmService)
 	webChatH := handlers.NewWebChatHandler(db, llmService)
 	toolsH := handlers.NewToolsHandler(db, manager)

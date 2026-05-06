@@ -8,11 +8,12 @@ import { toast } from "sonner";
 import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 import {
   CreditCard, Mail, MessageSquare, Server, Globe, Shield, Key, Save, Check, X,
-  Loader2, RefreshCw, Edit2, ExternalLink, Smartphone, Settings2,
+  Loader2, RefreshCw, Edit2, ExternalLink, Smartphone, Settings2, Sparkles,
 } from "lucide-react";
+import { PlatformAIPanel } from "@/app/(dashboard)/admin/platform-ai/page";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Tab = "payment" | "communication" | "server" | "proxies";
+type Tab = "payment" | "communication" | "server" | "proxies" | "ai";
 type CommSection = "email" | "templates" | "otp";
 
 interface PaymentSettings {
@@ -116,6 +117,10 @@ function StatusBadge({ ok, label }: { ok: boolean; label?: string }) {
 const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] = [
   { id: "payment",       label: "Pagamento",    icon: CreditCard,    desc: "Stripe, Asaas, Hotmart" },
   { id: "communication", label: "Comunicação",  icon: Mail,          desc: "Email, templates, OTP" },
+  // AI: configura provedores globais (OpenAI, Anthropic, etc.) usados
+  // por todos os módulos da plataforma — Uniq AI chat, transcrição
+  // Whisper de áudios do inbox, agente de instâncias.
+  { id: "ai",            label: "Uniq AI",      icon: Sparkles,      desc: "Provedores LLM globais (OpenAI, Anthropic, etc.)" },
   { id: "server",        label: "Servidor",     icon: Server,        desc: "Servidores e instâncias" },
   { id: "proxies",       label: "Proxies",      icon: Globe,         desc: "Gerenciamento de proxies" },
 ];
@@ -773,6 +778,7 @@ export default function ProvidersPage() {
           <AnimatedTabContent tabKey={active}>
             {active === "payment"       && <PaymentTab />}
             {active === "communication" && <CommunicationTab />}
+            {active === "ai"            && <PlatformAIPanel />}
             {active === "server"        && <ServerTab />}
             {active === "proxies"       && <ProxiesTab />}
           </AnimatedTabContent>

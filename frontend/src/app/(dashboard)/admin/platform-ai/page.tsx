@@ -350,7 +350,12 @@ function EditPanel({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function PlatformAIPage() {
+// PlatformAIPanel — extraído como named export pra ser embedded também
+// na aba "AI" de /admin/providers (centralização de configs do admin
+// numa só página com sub-menus). A page default abaixo continua viva
+// pra rotas legadas (/admin/platform-ai) e apenas re-renderiza esse
+// painel.
+export function PlatformAIPanel() {
   const qc = useQueryClient();
   const [editForm, setEditForm] = useState<FormState | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -569,4 +574,12 @@ export default function PlatformAIPage() {
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
+}
+
+
+// Default export — wrapper pro Next App Router. Mantém /admin/platform-ai
+// funcional pra links/bookmarks legados, mas internamente só renderiza
+// o panel compartilhado.
+export default function PlatformAIPage() {
+  return <PlatformAIPanel />;
 }

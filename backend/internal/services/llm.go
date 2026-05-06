@@ -13,6 +13,7 @@ import (
 
 	"github.com/sashabaranov/go-openai"
 	"github.com/uniq-chat/backend/internal/models"
+	"gorm.io/gorm"
 )
 
 type ParsedTrigger struct {
@@ -35,6 +36,12 @@ type ParsedRules struct {
 type LLMService struct {
 	// We keep a default client for when no integration is provided but env is set
 	defaultClient *openai.Client
+	// db é opcional — quando setado, ativa fallback automático pra
+	// PlatformAI ativa configurada via /admin/platform-ai (ou
+	// /admin/providers → AI). Sem isso o serviço só tinha env
+	// OPENAI_API_KEY como fallback, e quem não tinha env perdia toda
+	// IA ("nenhuma integração configurada e OPENAI_API_KEY ausente").
+	db *gorm.DB
 }
 
 func NewLLMService() *LLMService {
@@ -44,6 +51,32 @@ func NewLLMService() *LLMService {
 		client = openai.NewClient(apiKey)
 	}
 	return &LLMService{defaultClient: client}
+}
+
+// SetDB injeta o ponteiro do GORM pra LLMService poder consultar
+// PlatformAI ativa quando o caller não passa um UserIntegration.
+// Idempotente — chame uma vez no bootstrap.
+func (s *LLMService) SetDB(db *gorm.DB) { s.db = db }
+
+// resolveIntegration recebe a integration que veio do caller. Se for nil
+// ou zero-value, tenta resolver pela PlatformAI ativa do banco. Retorna
+// nil se nenhum dos dois estiver disponível — caller cai no defaultClient
+// (env OPENAI_API_KEY) ou erra.
+func (s *LLMService) resolveIntegration(i *models.UserIntegration) *models.UserIntegration {
+	if i != nil && i.ID != [16]byte{} {
+		return i
+	}
+	if s.db == nil {
+		return nil
+	}
+	var pai models.PlatformAI
+	if err := s.db.
+		Where("is_active = true AND api_key <> ''").
+		Order("created_at ASC").
+		First(&pai).Error; err != nil {
+		return nil
+	}
+	return PlatformAIToIntegration(&pai)
 }
 
 func (s *LLMService) ParseJourneyPrompt(ctx context.Context, integration *models.UserIntegration, prompt string) (ParsedRules, error) {
@@ -66,11 +99,12 @@ func (s *LLMService) CallChatWithSystem(ctx context.Context, i *models.UserInteg
 	if system == "" {
 		system = "Você é um assistente útil e conciso. Responda de forma direta e amigável."
 	}
-	if i != nil && i.ID != [16]byte{} {
-		return s.callProvider(ctx, i, system, user, jsonMode)
+	// Resolve integração: caller > PlatformAI ativa > defaultClient (env).
+	if resolved := s.resolveIntegration(i); resolved != nil {
+		return s.callProvider(ctx, resolved, system, user, jsonMode)
 	}
 	if s.defaultClient == nil {
-		return "", fmt.Errorf("nenhuma integração de IA configurada")
+		return "", fmt.Errorf("nenhuma integração de IA configurada — admin precisa configurar em /admin/providers → Uniq AI")
 	}
 	req := openai.ChatCompletionRequest{
 		Model: openai.GPT4oMini,
@@ -183,13 +217,14 @@ Tag, Users, MessageSquare, Bot, CheckCircle2, Send, Clock, Workflow, Zap, Phone,
 Responda APENAS com JSON, sem markdown.`
 	}
 
-	if i != nil && i.ID != [16]byte{} {
-		return s.callProvider(ctx, i, systemPrompt, prompt, jsonMode)
+	// Resolve integração: caller > PlatformAI ativa > defaultClient (env).
+	if resolved := s.resolveIntegration(i); resolved != nil {
+		return s.callProvider(ctx, resolved, systemPrompt, prompt, jsonMode)
 	}
 
 	// Fallback to default OpenAI
 	if s.defaultClient == nil {
-		return "", fmt.Errorf("nenhuma integração de IA configurada e OPENAI_API_KEY ausente")
+		return "", fmt.Errorf("nenhuma integração de IA configurada — admin precisa configurar em /admin/providers → Uniq AI (ou setar OPENAI_API_KEY)")
 	}
 
 	req := openai.ChatCompletionRequest{

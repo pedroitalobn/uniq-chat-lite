@@ -164,8 +164,11 @@ func main() {
 		hub.SetManager(manager)
 	}
 
-	// Journey executor (ManyChat-style multi-step engine)
+	// Journey executor (ManyChat-style multi-step engine). LLM ganha
+	// fallback automático pra PlatformAI ativa do admin (sem isso
+	// jornadas com IA falhavam quando OPENAI_API_KEY estava vazio).
 	journeyLLM := services.NewLLMService()
+	journeyLLM.SetDB(db)
 	journeySender := whatsapp.NewManagerSender(manager)
 	journeyExec := services.NewJourneyExecutor(db, journeySender, journeyLLM)
 	ttsService := services.NewTTSService()
