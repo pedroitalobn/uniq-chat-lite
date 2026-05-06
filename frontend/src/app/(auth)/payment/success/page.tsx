@@ -20,39 +20,50 @@ function SuccessContent() {
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Fluxo novo (defer-creation): pending_id na URL → finalize a
-    // matrícula no servidor (que confirma com Stripe) e auto-loga.
+    // Fluxo novo (defer-creation): pending_id na URL → poll no
+    // /payments/finalize-registration. O endpoint:
+    //  - 200 → webhook já materializou (ou fallback API confirmou) → token
+    //  - 202 → ainda processando → tenta de novo em alguns segundos
+    //  - 4xx → erro, exibe ao user
     if (pendingId) {
+      let cancelled = false;
+      const attempts = [0, 1500, 3000, 5000, 8000]; // 5 tentativas em ~17s
       (async () => {
-        try {
-          const r = await fetch(`${API}/v1/stripe/finalize-registration`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              pending_id: pendingId,
-              session_id: sessionId || undefined,
-              payment_intent_id: paymentIntentId || undefined,
-            }),
-          });
-          const data = await r.json();
-          if (!r.ok) {
-            setFinalizeError(data.error || "Erro ao finalizar cadastro");
+        for (let i = 0; i < attempts.length; i++) {
+          if (cancelled) return;
+          if (attempts[i] > 0) await new Promise(r => setTimeout(r, attempts[i]));
+          try {
+            const r = await fetch(`${API}/v1/payments/finalize-registration`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                pending_id: pendingId,
+                session_id: sessionId || undefined,
+                payment_intent_id: paymentIntentId || undefined,
+              }),
+            });
+            if (r.status === 202) continue; // ainda processando — espera
+            const data = await r.json();
+            if (!r.ok) {
+              setFinalizeError(data.error || "Erro ao finalizar cadastro");
+              setFinalizing(false);
+              return;
+            }
+            if (data.access_token) {
+              await signIn("credentials", { access_token: data.access_token, redirect: false });
+            }
             setFinalizing(false);
             return;
+          } catch {
+            // segue pra próxima tentativa
           }
-          if (data.access_token) {
-            await signIn("credentials", {
-              access_token: data.access_token,
-              redirect: false,
-            });
-          }
-        } catch (e: any) {
-          setFinalizeError("Erro de rede ao finalizar cadastro");
-        } finally {
+        }
+        if (!cancelled) {
+          setFinalizeError("Não conseguimos confirmar o pagamento ainda. Aguarde alguns minutos e tente fazer login.");
           setFinalizing(false);
         }
       })();
-      return;
+      return () => { cancelled = true; };
     }
     // Fluxo legado (lead_id) — mantém pra cobranças de upgrade de
     // user já existente.

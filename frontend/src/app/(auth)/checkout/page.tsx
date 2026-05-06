@@ -79,7 +79,7 @@ function CheckoutContent() {
     // Frontend faz auto-login com o access_token devolvido.
     if (isTransparentCheckout && pendingId) {
       try {
-        const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/v1/stripe/finalize-registration`, {
+        const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/v1/payments/finalize-registration`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

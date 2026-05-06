@@ -137,53 +137,9 @@ func (h *StripeHandler) FinalizeRegistration(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "pending não encontrado"})
 	}
 
-	loadStripeConfigFromDB(h.db)
-	stripe.Key = stripeKey
-	if stripe.Key == "" {
-		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "stripe não configurado"})
-	}
-
-	piID := req.PaymentIntentID
-	if piID == "" {
-		piID = pending.StripePIID
-	}
-	sessID := req.SessionID
-	if sessID == "" {
-		sessID = pending.StripeSessionID
-	}
-
-	planIDStr := ""
-	if pending.PlanID != nil {
-		planIDStr = pending.PlanID.String()
-	}
-
-	paid := false
-	subscriptionID := ""
-	stripeRef := ""
-
-	if piID != "" {
-		pi, err := paymentintent.Get(piID, nil)
-		if err == nil && pi != nil && pi.Status == stripe.PaymentIntentStatusSucceeded {
-			paid = true
-			stripeRef = pi.ID
-		}
-	}
-	if !paid && sessID != "" {
-		s, err := session.Get(sessID, nil)
-		if err == nil && s != nil && s.PaymentStatus == stripe.CheckoutSessionPaymentStatusPaid {
-			paid = true
-			stripeRef = s.ID
-			if s.Subscription != nil {
-				subscriptionID = s.Subscription.ID
-			}
-		}
-	}
-
-	if !paid {
+	if !h.confirmAndMaterializeFromAPI(&pending, req.PaymentIntentID, req.SessionID) {
 		return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{"error": "pagamento ainda não confirmado pelo Stripe"})
 	}
-
-	h.materializePending(pending.ID.String(), planIDStr, subscriptionID, stripeRef)
 
 	// Recarrega o user materializado e devolve sessão ativa (auto-login).
 	var user models.User
@@ -563,6 +519,61 @@ func (h *StripeHandler) handlePaymentFailed(inv *stripe.Invoice) {
 	if h.db.Where("stripe_customer_id = ?", inv.Customer.ID).First(&user).Error == nil {
 		h.emailSvc.SendPaymentFailed(user.Email, user.Name)
 	}
+}
+
+// confirmAndMaterializeFromAPI consulta o Stripe direto pra saber se
+// o PaymentIntent ou a CheckoutSession associados ao pending estão
+// pagos. Se sim, chama materializePending (idempotente). Devolve
+// true se o pagamento foi confirmado e a conta materializada (ou
+// já estava). Usado tanto pelo endpoint /finalize-registration
+// quanto pelo PaymentHandler genérico como fallback de webhook.
+func (h *StripeHandler) confirmAndMaterializeFromAPI(pending *models.PendingRegistration, piIDArg, sessIDArg string) bool {
+	loadStripeConfigFromDB(h.db)
+	stripe.Key = stripeKey
+	if stripe.Key == "" {
+		return false
+	}
+
+	piID := piIDArg
+	if piID == "" {
+		piID = pending.StripePIID
+	}
+	sessID := sessIDArg
+	if sessID == "" {
+		sessID = pending.StripeSessionID
+	}
+
+	planIDStr := ""
+	if pending.PlanID != nil {
+		planIDStr = pending.PlanID.String()
+	}
+
+	paid := false
+	subscriptionID := ""
+	stripeRef := ""
+
+	if piID != "" {
+		if pi, err := paymentintent.Get(piID, nil); err == nil && pi != nil && pi.Status == stripe.PaymentIntentStatusSucceeded {
+			paid = true
+			stripeRef = pi.ID
+		}
+	}
+	if !paid && sessID != "" {
+		if s, err := session.Get(sessID, nil); err == nil && s != nil && s.PaymentStatus == stripe.CheckoutSessionPaymentStatusPaid {
+			paid = true
+			stripeRef = s.ID
+			if s.Subscription != nil {
+				subscriptionID = s.Subscription.ID
+			}
+		}
+	}
+
+	if !paid {
+		return false
+	}
+
+	h.materializePending(pending.ID.String(), planIDStr, subscriptionID, stripeRef)
+	return true
 }
 
 // handlePaymentIntentSucceeded é o gatilho do fluxo "transparent"

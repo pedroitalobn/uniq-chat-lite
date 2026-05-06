@@ -277,6 +277,13 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 
 	// Activate lead after payment (public)
 	app.Post("/stripe/activate-lead", stripeH.ActivateLead)
+
+	// Endpoint genérico (provider-agnóstico) — webhook é o caminho
+	// preferido (Stripe já materializou o user) e a consulta à API do
+	// provider é fallback. Front faz poll curto até receber 200 ou desistir.
+	app.Post("/v1/payments/finalize-registration", paymentH.FinalizeRegistration)
+	app.Post("/payments/finalize-registration", paymentH.FinalizeRegistration)
+	// Aliases legados (Stripe-específicos) — mantidos por compat
 	app.Post("/stripe/finalize-registration", stripeH.FinalizeRegistration)
 	app.Post("/v1/stripe/finalize-registration", stripeH.FinalizeRegistration)
 
