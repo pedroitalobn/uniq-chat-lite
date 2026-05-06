@@ -103,6 +103,16 @@ function PasswordStrength({ password }: { password: string }) {
 }
 
 // ── Complete form ─────────────────────────────────────────────────────────────
+
+interface PlanOption {
+  id: string;
+  name: string;
+  price: number;
+  currency?: string;
+  description?: string;
+  is_default?: boolean;
+}
+
 function CompleteForm({
   email, pendingId,
 }: {
@@ -113,14 +123,51 @@ function CompleteForm({
   const [username, setUsername] = useState("");
   const [company, setCompany] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  // Plan picker — busca planos públicos e deixa o user escolher (free
+  // ou paid) na hora de completar a conta. Antes o plan_id ficava preso
+  // ao que veio (ou não veio) na /register/start; quando user entrava
+  // direto em /register sem passar por /plans, o pending ficava sem
+  // plan e a conta era criada free SEM passar pelo checkout.
+  const [plans, setPlans] = useState<PlanOption[]>([]);
+  const [selectedPlanID, setSelectedPlanID] = useState<string>("");
+  const [loadingPlans, setLoadingPlans] = useState(true);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPlans() {
+      try {
+        const r = await fetch(`${API}/v1/payments/plans`);
+        if (!r.ok) return;
+        const data = await r.json();
+        if (cancelled) return;
+        const items: PlanOption[] = Array.isArray(data) ? data : data.items ?? data.plans ?? [];
+        setPlans(items);
+        // Pre-seleciona o plano default (price=0) ou o primeiro
+        const def = items.find((p) => p.is_default) ?? items.find((p) => p.price === 0) ?? items[0];
+        if (def) setSelectedPlanID(def.id);
+      } catch {
+        /* sem rede — segue sem plan picker, registra como free */
+      } finally {
+        if (!cancelled) setLoadingPlans(false);
+      }
+    }
+    loadPlans();
+    return () => { cancelled = true; };
+  }, []);
+
+  const selectedPlan = plans.find((p) => p.id === selectedPlanID);
+  const isPaid = !!selectedPlan && selectedPlan.price > 0;
 
   function validate() {
     const e: Record<string, string> = {};
     if (!name.trim()) e.name = "Nome é obrigatório";
     if (password.length < 8) e.password = "Mínimo 8 caracteres";
+    if (confirmPassword !== password) e.confirmPassword = "Senhas não coincidem";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -139,6 +186,11 @@ function CompleteForm({
           username: username.trim().toLowerCase() || undefined,
           workspace_name: company.trim() || undefined,
           password,
+          // plan_id é o que o user escolheu agora; backend aceita como
+          // override do plan_id setado em /register/start. Se o user
+          // clicou no plano pago, o backend cria lead em IsActive=false e
+          // devolve url/client_secret pra Stripe.
+          plan_id: selectedPlanID || undefined,
         }),
       });
       const data = await res.json();
@@ -151,9 +203,21 @@ function CompleteForm({
         return;
       }
 
-      // Paid plan — redirect to Stripe
+      // Paid plan, redirect Stripe Checkout (Stripe hosted)
       if (data.checkout_type === "redirect" && data.url) {
         window.location.href = data.url;
+        return;
+      }
+      // Paid plan, transparent — leva pro próximo passo de pagamento
+      // dentro do app (PaymentElement do Stripe).
+      if (data.checkout_type === "transparent" && data.client_secret) {
+        const params = new URLSearchParams({
+          cs: data.client_secret,
+          plan: data.plan_name ?? "",
+          amount: String(data.amount ?? ""),
+          email,
+        });
+        router.push(`/checkout?${params.toString()}`);
         return;
       }
 
@@ -222,6 +286,64 @@ function CompleteForm({
         <PasswordStrength password={password} />
       </div>
 
+      <Field
+        label="Repita a senha"
+        type={showConfirm ? "text" : "password"}
+        value={confirmPassword}
+        onChange={setConfirmPassword}
+        placeholder="Digite a senha novamente"
+        icon={<Lock className="w-4 h-4" />}
+        error={errors.confirmPassword}
+        rightEl={
+          <button type="button" onClick={() => setShowConfirm(s => !s)}
+            className="text-[hsl(240_8%_40%)] hover:text-[hsl(240_15%_65%)] transition-colors">
+            {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        }
+      />
+
+      {!loadingPlans && plans.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-medium text-[hsl(240_15%_65%)]">Escolha seu plano</label>
+          <div className="grid grid-cols-1 gap-2">
+            {plans.map((p) => {
+              const active = p.id === selectedPlanID;
+              const priceLabel = p.price === 0
+                ? "Grátis"
+                : new Intl.NumberFormat("pt-BR", { style: "currency", currency: p.currency || "BRL" }).format(p.price);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setSelectedPlanID(p.id)}
+                  className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-left transition-all"
+                  style={{
+                    background: active ? "rgba(0,212,106,0.06)" : "hsl(240 18% 5%)",
+                    border: `1px solid ${active ? "#00d46a" : "hsl(240 12% 13%)"}`,
+                    boxShadow: active ? "0 0 0 3px rgba(0,212,106,0.10)" : "none",
+                  }}
+                >
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-[hsl(240_15%_92%)]">{p.name}</span>
+                    {p.description && (
+                      <span className="text-xs text-[hsl(240_8%_50%)]">{p.description}</span>
+                    )}
+                  </div>
+                  <span className="text-sm font-semibold" style={{ color: active ? "#00d46a" : "hsl(240 15% 80%)" }}>
+                    {priceLabel}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {isPaid && (
+            <p className="text-xs text-[hsl(240_8%_50%)] pl-0.5">
+              Você será redirecionado para o pagamento após criar o perfil.
+            </p>
+          )}
+        </div>
+      )}
+
       {errors.global && (
         <div className="flex items-start gap-2 p-3 rounded-xl border text-sm"
           style={{ background: "rgba(239,68,68,0.06)", borderColor: "rgba(239,68,68,0.2)", color: "#fca5a5" }}>
@@ -240,7 +362,7 @@ function CompleteForm({
       >
         {loading
           ? <Loader2 className="w-4 h-4 animate-spin" />
-          : <><span>Criar conta</span><ArrowRight className="w-4 h-4" /></>}
+          : <><span>{isPaid ? "Continuar para pagamento" : "Criar conta"}</span><ArrowRight className="w-4 h-4" /></>}
       </button>
     </form>
   );
