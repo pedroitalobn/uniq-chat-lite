@@ -48,7 +48,8 @@ type Config struct {
 	MailerooSenderName  string
 
 	AppName string
-	AppURL  string
+	AppURL  string // domínio do front (ex: https://app.uniq.chat) — usado em redirects/emails
+	APIURL  string // domínio do backend (ex: https://api.uniq.chat) — usado em URLs de webhook
 
 	// Bright Data — residential proxy
 	BrightDataCustomerID string
@@ -119,6 +120,7 @@ func Load() *Config {
 
 		AppName: getEnv("APP_NAME", "Uniq.chat"),
 		AppURL:  getEnv("APP_URL", getEnv("FRONTEND_URL", "http://localhost:3000")),
+		APIURL:  getEnv("API_URL", getEnv("BACKEND_URL", "http://localhost:8080")),
 
 		// Bright Data
 		BrightDataCustomerID: getEnv("BRIGHTDATA_CUSTOMER_ID", ""),

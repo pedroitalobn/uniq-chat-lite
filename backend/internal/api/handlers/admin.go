@@ -76,10 +76,15 @@ func (h *AdminHandler) GetPaymentSettings(c *fiber.Ctx) error {
 		activeProvider = "stripe"
 	}
 
-	// Build webhook URLs
-	appURL := strings.TrimRight(config.AppConfig.AppURL, "/")
-	stripeWebhookURL := appURL + "/api/stripe/webhook"
-	asaasWebhookURL := appURL + "/api/asaas/webhook"
+	// Build webhook URLs — webhook é endpoint do BACKEND (api.uniq.chat),
+	// não do frontend. APIURL é configurado via env API_URL/BACKEND_URL;
+	// se não estiver setado cai pra AppURL como fallback (dev local).
+	apiURL := strings.TrimRight(config.AppConfig.APIURL, "/")
+	if apiURL == "" {
+		apiURL = strings.TrimRight(config.AppConfig.AppURL, "/")
+	}
+	stripeWebhookURL := apiURL + "/stripe/webhook"
+	asaasWebhookURL := apiURL + "/asaas/webhook"
 
 	return c.JSON(fiber.Map{
 		"id":                   settings.ID,
