@@ -774,11 +774,12 @@ func (ic *InstanceClient) SendAudioMessage(to string, audioData []byte, mimeType
 		return "", fmt.Errorf("upload failed: %w", err)
 	}
 
-	// MediaKeyTimestamp removido: experimento anterior setava
-	// time.Now().Unix() na hipótese de que clients rejeitavam mídia sem
-	// esse campo. Na prática a regressão "este áudio não está mais
-	// disponível" coincidiu com a adição desse campo. Whatsmeow não
-	// auto-seta esse campo (proto optional), então mantemos omitido.
+	// MediaKeyTimestamp removido em commit anterior (regrediu envio).
+	// Seconds também removido aqui — campo opcional no proto, e a
+	// hipótese é que recipients estão validando a duração contra o
+	// arquivo decodificado e rejeitando quando há descasamento. Deixa
+	// o cliente WhatsApp do recipient detectar a duração real do header
+	// OGG durante playback.
 	audio := &waE2E.AudioMessage{
 		URL:           proto.String(upload.URL),
 		DirectPath:    proto.String(upload.DirectPath),
@@ -789,9 +790,7 @@ func (ic *InstanceClient) SendAudioMessage(to string, audioData []byte, mimeType
 		FileLength:    proto.Uint64(uint64(len(audioData))),
 		PTT:           proto.Bool(ptt),
 	}
-	if seconds > 0 {
-		audio.Seconds = proto.Uint32(seconds)
-	}
+	_ = seconds // mantém param da assinatura pra não cascatear refactor
 	msg := &waE2E.Message{AudioMessage: audio}
 
 	res, err := ic.sendMessage(context.Background(), recipient, msg)
