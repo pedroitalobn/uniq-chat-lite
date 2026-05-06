@@ -58,21 +58,23 @@ func Available() bool {
 var ErrFfmpegMissing = errors.New("audioconvert: ffmpeg ausente — instale o pacote ffmpeg na imagem")
 
 // TranscodeToOggOpus normaliza qualquer container de áudio (WebM, MP4, MP3,
-// AAC, WAV) em OGG/Opus mono 16kHz 32kbps — o sweet spot pra voice notes
-// no WhatsApp. Retorna (bytes OGG, duração em segundos, erro).
+// AAC, WAV) em OGG/Opus mono 48kHz 32kbps — o que o WhatsApp aceita como
+// voice note (PTT). Retorna (bytes OGG, duração em segundos, erro).
 //
-// Estratégia em 2 etapas:
+// Histórico: tentamos um lossless repack (`-c:a copy -f ogg`) antes do
+// re-encode, achando que economizaria um round-trip de codec quando
+// o input já era Opus (WebM/MediaRecorder do browser). Não funcionou
+// confiavelmente — alguns mics (USB Fifine, p.ex.) produzem WebM com
+// timestamps/page boundaries que o ffmpeg `copy` remete pro OGG mas
+// que o WhatsApp do recipient rejeita silenciosamente, mostrando
+// "áudio indisponível". Re-encode com libopus corrige porque ele
+// rebuilda o OpusHead, granule positions e page durations num arquivo
+// que sempre passa nos parsers de cliente. Diferença de qualidade é
+// imperceptível em voz a 32kbps voip; ganho de robustez é total.
 //
-//  1. Try lossless repack: `-c:a copy -f ogg`. Funciona quando o input
-//     já contém Opus em outro container (WebM/Matroska — comum no
-//     browser MediaRecorder). Extrai pacotes Opus 1:1 e empacota em
-//     OGG, sem re-encode. Bit-exato. Mais rápido, sem perda.
-//
-//  2. Fallback re-encode: `-c:a libopus -application voip -vbr on
-//     -b:a 32k -ar 16000 -ac 1`. Usado quando o input não é Opus
-//     (MP3, AAC, WAV) — ou quando o copy falhou (ex.: timestamps
-//     inconsistentes do WebM, comum em mics com sample rate
-//     incomum).
+// Sample rate: 48kHz (Opus internamente é 48k de qualquer jeito; forçar
+// downsample pra 16k descarta info sem benefício real e às vezes
+// causa rejeição em algumas builds antigas do WhatsApp).
 //
 // Duração é extraída do stderr do ffmpeg ("Duration: HH:MM:SS.xx").
 func TranscodeToOggOpus(ctx context.Context, in []byte) ([]byte, uint32, error) {
@@ -82,56 +84,12 @@ func TranscodeToOggOpus(ctx context.Context, in []byte) ([]byte, uint32, error) 
 	if len(in) == 0 {
 		return nil, 0, errors.New("audioconvert: input vazio")
 	}
-
-	// Tentativa 1: lossless repack (Opus passa puro pra OGG).
-	if out, dur, err := transcodeOpusCopy(ctx, in); err == nil && len(out) > 0 {
-		return out, dur, nil
-	} else if err != nil {
-		log.Debug().Err(err).Msg("audioconvert: copy fallback pra re-encode")
-	}
-
-	// Tentativa 2: re-encode pra normalizar.
 	return transcodeReencode(ctx, in)
 }
 
-// transcodeOpusCopy tenta -c:a copy. Falha se o input não contém Opus ou
-// se o demuxer/muxer não consegue reorganizar timestamps. Diferença chave
-// vs re-encode: NÃO toca os pacotes Opus, só remete pro container OGG.
-// Isso evita artefatos sutis de encoding que alguns clients WhatsApp
-// rejeitam ("este áudio não está mais disponível").
-func transcodeOpusCopy(ctx context.Context, in []byte) ([]byte, uint32, error) {
-	tctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(tctx, ffmpegPath,
-		"-hide_banner",
-		"-loglevel", "info",
-		"-i", "pipe:0",
-		"-vn",
-		"-c:a", "copy",
-		"-f", "ogg",
-		"pipe:1",
-	)
-	cmd.Stdin = bytes.NewReader(in)
-	var out, stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		tail := tailString(stderr.String(), 3)
-		return nil, 0, fmt.Errorf("ffmpeg copy: %w (stderr: %s)", err, tail)
-	}
-	dur := parseDurationSeconds(stderr.String())
-	if dur == 0 {
-		dur = uint32(len(out.Bytes()) / 4000)
-		if dur == 0 {
-			dur = 1
-		}
-	}
-	return out.Bytes(), dur, nil
-}
-
-// transcodeReencode é o caminho original (re-encode com libopus). Usado
-// quando copy falha — mantém o áudio entregue a custo de qualidade.
+// transcodeReencode roda libopus em modo voip, mono, 48kHz, 32kbps VBR
+// — perfil "voice note do WhatsApp". Page duration de 60ms é o que
+// o cliente mobile espera; sem isso alguns devices truncam o playback.
 func transcodeReencode(ctx context.Context, in []byte) ([]byte, uint32, error) {
 	tctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -145,8 +103,13 @@ func transcodeReencode(ctx context.Context, in []byte) ([]byte, uint32, error) {
 		"-application", "voip",
 		"-vbr", "on",
 		"-b:a", "32k",
-		"-ar", "16000",
+		"-ar", "48000",
 		"-ac", "1",
+		// Page duration de 60ms — alinhado ao que o cliente WhatsApp
+		// usa na hora de gerar voice notes. Páginas mais longas
+		// (default 1s) fizeram alguns devices mostrarem "indisponível".
+		"-page_duration", "60000",
+		"-frame_duration", "60",
 		"-f", "ogg",
 		"pipe:1",
 	)
@@ -155,7 +118,8 @@ func transcodeReencode(ctx context.Context, in []byte) ([]byte, uint32, error) {
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		tail := tailString(stderr.String(), 3)
+		tail := tailString(stderr.String(), 5)
+		log.Error().Err(err).Str("stderr", tail).Int("input_bytes", len(in)).Msg("audioconvert: re-encode falhou")
 		return nil, 0, fmt.Errorf("ffmpeg re-encode: %w (stderr: %s)", err, tail)
 	}
 	dur := parseDurationSeconds(stderr.String())
@@ -167,6 +131,8 @@ func transcodeReencode(ctx context.Context, in []byte) ([]byte, uint32, error) {
 			dur = 1
 		}
 	}
+	log.Debug().Int("input_bytes", len(in)).Int("output_bytes", out.Len()).
+		Uint32("duration_s", dur).Msg("audioconvert: re-encode OK")
 	return out.Bytes(), dur, nil
 }
 

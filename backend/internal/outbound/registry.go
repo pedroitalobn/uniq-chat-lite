@@ -179,24 +179,27 @@ func (r *Registry) sendWhatsApp(ctx context.Context, inst *models.Instance, msg 
 				Bool("ffmpeg_available", audioconvert.Available()).
 				Msg("outbound: dispatching audio")
 			if isOpusContainer {
-				if !isOgg {
-					// Tenta transcodar pra OGG/Opus real. Sucesso → bytes
-					// trocados; falha → mantém bytes originais + label OGG.
-					if conv, dur, terr := audioconvert.TranscodeToOggOpus(ctx, data); terr == nil {
-						outBytes = conv
-						seconds = dur
-						log.Info().
-							Int("input_bytes", len(data)).
-							Int("output_bytes", len(outBytes)).
-							Uint32("seconds", seconds).
-							Msg("outbound: transcoding OK → OGG/Opus")
-					} else if errors.Is(terr, audioconvert.ErrFfmpegMissing) {
-						log.Warn().Msg("outbound: ffmpeg indisponível — voice note enviada sem transcoding (instale o pacote ffmpeg na imagem)")
-					} else {
-						log.Warn().Err(terr).Msg("outbound: transcoding pra OGG/Opus falhou — usando bytes originais")
-					}
+				// Sempre transcoda. Antes pulávamos quando o input já
+				// era OGG, confiando que vinha "limpo" — mas mics USB
+				// (ex.: Fifine) e gravadores nativos do browser
+				// produzem OGGs com page boundaries / granule positions
+				// que o cliente WhatsApp do recipient rejeita silenciosamente
+				// ("áudio indisponível"), enquanto outros mics (mic
+				// integrado, AirPods) produzem OGGs aceitos. Re-encodando
+				// 100% das vezes garantimos OpusHead + framing canônicos.
+				if conv, dur, terr := audioconvert.TranscodeToOggOpus(ctx, data); terr == nil {
+					outBytes = conv
+					seconds = dur
+					log.Info().
+						Int("input_bytes", len(data)).
+						Int("output_bytes", len(outBytes)).
+						Uint32("seconds", seconds).
+						Bool("input_was_ogg", isOgg).
+						Msg("outbound: transcoding OK → OGG/Opus")
+				} else if errors.Is(terr, audioconvert.ErrFfmpegMissing) {
+					log.Warn().Msg("outbound: ffmpeg indisponível — voice note enviada sem transcoding (instale o pacote ffmpeg na imagem)")
 				} else {
-					log.Info().Msg("outbound: input já é OGG nativo — sem transcoding")
+					log.Warn().Err(terr).Msg("outbound: transcoding pra OGG/Opus falhou — usando bytes originais")
 				}
 				outMime = "audio/ogg; codecs=opus"
 				isPTT = true

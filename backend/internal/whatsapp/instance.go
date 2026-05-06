@@ -774,12 +774,18 @@ func (ic *InstanceClient) SendAudioMessage(to string, audioData []byte, mimeType
 		return "", fmt.Errorf("upload failed: %w", err)
 	}
 
-	// MediaKeyTimestamp removido em commit anterior (regrediu envio).
-	// Seconds também removido aqui — campo opcional no proto, e a
-	// hipótese é que recipients estão validando a duração contra o
-	// arquivo decodificado e rejeitando quando há descasamento. Deixa
-	// o cliente WhatsApp do recipient detectar a duração real do header
-	// OGG durante playback.
+	// MediaKeyTimestamp continua de fora — esse foi o campo que regrediu
+	// no envio quando tentamos antes (alguns recipients rejeitam quando
+	// o timestamp não bate com a hora atual do server, ex.: clock skew).
+	//
+	// Seconds: AGORA é setado quando vier > 0 do caller (ffmpeg detectou
+	// a duração real do OGG transcodado). Antes deixávamos vazio,
+	// confiando que o recipient parsearia o OGG header — mas alguns
+	// clientes (iOS, Android antigos) mostram "áudio indisponível"
+	// se Seconds estiver ausente, mesmo com o blob válido. Setar aqui
+	// resolve o caso reportado: mics que produzem container ligeiramente
+	// diferente (ex.: USB Fifine vs mic embutido) onde o cliente
+	// recipient não consegue inferir duração sozinho.
 	audio := &waE2E.AudioMessage{
 		URL:           proto.String(upload.URL),
 		DirectPath:    proto.String(upload.DirectPath),
@@ -790,7 +796,9 @@ func (ic *InstanceClient) SendAudioMessage(to string, audioData []byte, mimeType
 		FileLength:    proto.Uint64(uint64(len(audioData))),
 		PTT:           proto.Bool(ptt),
 	}
-	_ = seconds // mantém param da assinatura pra não cascatear refactor
+	if seconds > 0 {
+		audio.Seconds = proto.Uint32(seconds)
+	}
 	msg := &waE2E.Message{AudioMessage: audio}
 
 	res, err := ic.sendMessage(context.Background(), recipient, msg)
