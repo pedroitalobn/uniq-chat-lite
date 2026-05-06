@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -917,8 +917,17 @@ function ProvidersPageInner() {
   // redirect de /admin/platform-ai e bookmarks que linkam direto.
   const initialTab = (searchParams.get("tab") as Tab) || "payment";
   const validTabs: Tab[] = ["payment", "communication", "ai", "server", "proxies"];
+  const router = useRouter();
   const [active, setActive] = useState<Tab>(validTabs.includes(initialTab) ? initialTab : "payment");
   const isSuperAdmin = (session?.user as { role?: string })?.role === "super_admin";
+
+  // "proxies" não tem painel embutido — só placeholder com link.
+  // Em vez de exibir o placeholder, mandamos direto pra página
+  // dedicada /admin/proxy. Outras abas seguem inline normalmente.
+  const handleTabClick = (id: Tab) => {
+    if (id === "proxies") { router.push("/admin/proxy"); return; }
+    setActive(id);
+  };
 
   if (!isSuperAdmin) {
     return (
@@ -947,7 +956,7 @@ function ProvidersPageInner() {
               const Icon = tab.icon;
               const isActive = active === tab.id;
               return (
-                <button key={tab.id} onClick={() => setActive(tab.id)}
+                <button key={tab.id} onClick={() => handleTabClick(tab.id)}
                   className={`w-full flex items-center gap-3 px-3 lg:px-4 py-3 lg:py-3.5 text-left relative${i < TABS.length - 1 ? " border-b" : ""}`}
                   style={{ borderColor: "rgba(255,255,255,0.06)", background: isActive ? "rgba(0,212,106,0.10)" : "transparent", transition: "background 0.2s" }}
                   onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
@@ -970,7 +979,7 @@ function ProvidersPageInner() {
         {/* Mobile tabs */}
         <div className="sm:hidden flex gap-1 p-1 rounded-xl w-full" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
           {TABS.map(({ id, label, icon: Icon }) => (
-            <button key={id} onClick={() => setActive(id)}
+            <button key={id} onClick={() => handleTabClick(id)}
               className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium"
               style={{ background: active === id ? "rgba(0,212,106,0.15)" : "transparent", color: active === id ? "#00d46a" : "hsl(240 8% 55%)" }}>
               <Icon className="w-3.5 h-3.5" />

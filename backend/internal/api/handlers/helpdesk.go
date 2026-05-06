@@ -441,7 +441,11 @@ func (h *HelpDeskHandler) GetConfig(c *fiber.Ctx) error {
 		h.db.Create(&cfg)
 	}
 
-	slug := firstNonEmpty(cfg.CustomSlug, ws.Slug)
+	// Slug efetivo: custom > workspace > UUID. Cair no UUID quando os
+	// dois estão vazios garante que public_url sempre seja resolvível
+	// pelo lookupWorkspaceBySlug (que aceita UUID), mesmo se admin
+	// nunca configurar um slug humano.
+	slug := firstNonEmpty(cfg.CustomSlug, ws.Slug, ws.ID.String())
 	publicURL := ""
 	if u := appURL(); u != "" {
 		publicURL = u + "/help/" + slug
@@ -494,21 +498,34 @@ func (h *HelpDeskHandler) UpdateConfig(c *fiber.Ctx) error {
 
 // ─── Public endpoints ─────────────────────────────────────────────────────────
 
-// lookupWorkspaceBySlug resolves by workspace.slug OR HelpDeskConfig.custom_slug.
-// Comparação case-insensitive pra tolerar casing diferente entre o que o
-// admin digitou e o que vem na URL.
+// lookupWorkspaceBySlug resolves by workspace.slug OR HelpDeskConfig.custom_slug
+// OR workspace.id (UUID direto). Comparação case-insensitive em todos os
+// lookups. Aceita UUID pra permitir preview funcionar mesmo quando o
+// workspace ainda não tem slug configurado.
 func (h *HelpDeskHandler) lookupWorkspaceBySlug(slug string) (*models.Workspace, error) {
 	slug = strings.TrimSpace(slug)
 	if slug == "" {
 		return nil, fmt.Errorf("slug vazio")
 	}
+
+	// 1. UUID direto — útil quando workspace.slug está vazio.
+	if id, perr := uuid.Parse(slug); perr == nil {
+		var ws models.Workspace
+		if err := h.db.Where("id = ?", id).First(&ws).Error; err == nil {
+			return &ws, nil
+		}
+	}
+
+	// 2. workspace.slug (case-insensitive)
 	var ws models.Workspace
 	if err := h.db.Where("LOWER(slug) = LOWER(?)", slug).First(&ws).Error; err == nil {
 		return &ws, nil
 	}
+
+	// 3. HelpDeskConfig.custom_slug (case-insensitive)
 	var cfg models.HelpDeskConfig
 	if err := h.db.Where("LOWER(custom_slug) = LOWER(?)", slug).First(&cfg).Error; err != nil {
-		return nil, fmt.Errorf("workspace not found for slug %q", slug)
+		return nil, fmt.Errorf("workspace not found for slug %q (não bate com workspace.slug nem helpdesk_config.custom_slug)", slug)
 	}
 	if err := h.db.Where("id = ?", cfg.WorkspaceID).First(&ws).Error; err != nil {
 		return nil, err

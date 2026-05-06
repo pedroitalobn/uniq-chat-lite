@@ -465,6 +465,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	registerPreInst("GET", "/groups/:jid/invite", groupH.InviteLink)
 	registerPreInst("POST", "/groups/:jid/leave", groupH.Leave)
 	app.Put("/v1/instances/:id/groups/:jid", append(preMsgChain, groupH.Update)...)
+	// Calls — mesmo bug do groups (route hijacked pelo v1inst).
+	registerPreInst("POST", "/calls/offer", msgH.OfferCall)
+	registerPreInst("POST", "/calls/reject", msgH.RejectCall)
 	registerPreInst("POST", "/pairing-code", instanceH.GetPairingCode)
 	registerPreInst("POST", "/contact/info", instanceH.ContactInfo)
 	registerPreInst("POST", "/contact/avatar", instanceH.ContactAvatar)
