@@ -495,15 +495,19 @@ func (h *HelpDeskHandler) UpdateConfig(c *fiber.Ctx) error {
 // ─── Public endpoints ─────────────────────────────────────────────────────────
 
 // lookupWorkspaceBySlug resolves by workspace.slug OR HelpDeskConfig.custom_slug.
+// Comparação case-insensitive pra tolerar casing diferente entre o que o
+// admin digitou e o que vem na URL.
 func (h *HelpDeskHandler) lookupWorkspaceBySlug(slug string) (*models.Workspace, error) {
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return nil, fmt.Errorf("slug vazio")
+	}
 	var ws models.Workspace
-	// Try workspace slug first
-	if err := h.db.Where("slug = ?", slug).First(&ws).Error; err == nil {
+	if err := h.db.Where("LOWER(slug) = LOWER(?)", slug).First(&ws).Error; err == nil {
 		return &ws, nil
 	}
-	// Fallback: custom_slug in helpdesk configs
 	var cfg models.HelpDeskConfig
-	if err := h.db.Where("custom_slug = ?", slug).First(&cfg).Error; err != nil {
+	if err := h.db.Where("LOWER(custom_slug) = LOWER(?)", slug).First(&cfg).Error; err != nil {
 		return nil, fmt.Errorf("workspace not found for slug %q", slug)
 	}
 	if err := h.db.Where("id = ?", cfg.WorkspaceID).First(&ws).Error; err != nil {
@@ -594,12 +598,13 @@ func (h *HelpDeskHandler) PublicGetArticle(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusNotFound, "workspace não encontrado")
 	}
 
-	identifier := c.Params("slug")
+	identifier := strings.TrimSpace(c.Params("slug"))
 	var article models.HelpDeskArticle
 
-	// 1. Slug exato
+	// 1. Slug exato (case-insensitive — slugs idealmente já vêm
+	// normalizados, mas defensivo).
 	q := h.db.Where("workspace_id = ? AND status = ?", ws.ID, models.ArticlePublished)
-	if err := q.Where("slug = ?", identifier).First(&article).Error; err == nil {
+	if err := q.Where("LOWER(slug) = LOWER(?)", identifier).First(&article).Error; err == nil {
 		h.db.Model(&article).UpdateColumn("view_count", gorm.Expr("view_count + 1"))
 		return c.JSON(article)
 	}
@@ -615,8 +620,7 @@ func (h *HelpDeskHandler) PublicGetArticle(c *fiber.Ctx) error {
 	}
 
 	// 3. Fuzzy ILIKE — slug pode ter sido renomeado depois de
-	// publicar; tenta encontrar algo com o prefixo. Só pega o
-	// primeiro pra evitar ambiguidade.
+	// publicar; tenta encontrar algo com o prefixo.
 	if err := h.db.Where("workspace_id = ? AND status = ? AND slug ILIKE ?",
 		ws.ID, models.ArticlePublished, identifier+"%").
 		Order("updated_at DESC").
@@ -625,7 +629,35 @@ func (h *HelpDeskHandler) PublicGetArticle(c *fiber.Ctx) error {
 		return c.JSON(article)
 	}
 
-	return fiber.NewError(fiber.StatusNotFound, "artigo não encontrado ou não publicado")
+	// 4. Fuzzy reverso — slug salvo pode ser MAIOR que o requisitado
+	// (acontece quando admin renomeia: URL antiga "como-usar" mas o
+	// slug atual é "como-usar-corrigido").
+	if err := h.db.Where("workspace_id = ? AND status = ? AND slug ILIKE ?",
+		ws.ID, models.ArticlePublished, "%"+identifier+"%").
+		Order("updated_at DESC").
+		First(&article).Error; err == nil {
+		h.db.Model(&article).UpdateColumn("view_count", gorm.Expr("view_count + 1"))
+		return c.JSON(article)
+	}
+
+	// 5. Sem matches — devolve um diagnóstico no payload pra UI ajudar
+	// o admin a entender (ex.: "Você tem 3 artigos publicados, mas
+	// nenhum bate com 'X'. Slugs existentes: ...").
+	var sample []models.HelpDeskArticle
+	h.db.Select("slug, title").Where("workspace_id = ? AND status = ?",
+		ws.ID, models.ArticlePublished).
+		Order("updated_at DESC").Limit(5).Find(&sample)
+	slugs := make([]string, len(sample))
+	for i, a := range sample {
+		slugs[i] = a.Slug
+	}
+	return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+		"error":              "artigo não encontrado ou não publicado",
+		"requested_slug":     identifier,
+		"workspace":          ws.Slug,
+		"sample_published":   slugs,
+		"hint":               "verifique se o artigo está em status='published' e o slug bate.",
+	})
 }
 
 // PublicAsk POST /v1/public/helpdesk/:workspace_slug/ask

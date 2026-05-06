@@ -688,8 +688,11 @@ export default function HelpDeskPage() {
 
   return (
     <div className="space-y-5">
-      {/* Tab selector (small, top-right feel) */}
-      <div className="flex items-center justify-end">
+      {/* Header com link da central pública sempre visível — admin
+          não precisa entrar em "Configurações" só pra copiar/abrir
+          a URL. publicURL vem do mesmo configQuery que o widget usa. */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <PublicCenterLink workspaceId={wsId} />
         <div className="flex gap-1 p-1 rounded-xl w-fit"
           style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
           {([
@@ -814,6 +817,61 @@ export default function HelpDeskPage() {
           <NewCategoryDialog workspaceId={wsId} onClose={() => setShowCategoryDialog(false)} />
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+
+// PublicCenterLink — pill com a URL pública da central. Mostra
+// "Central pública" + chip da URL clicável + botão de copiar.
+// Visível no topo de /help-desk pra admin abrir/compartilhar sem
+// precisar entrar em Configurações.
+function PublicCenterLink({ workspaceId }: { workspaceId: string }) {
+  const cfg = useQuery({
+    queryKey: ["helpdesk-config", workspaceId],
+    queryFn: async () => (await helpDeskApi.getConfig(workspaceId)).data,
+    enabled: !!workspaceId,
+    staleTime: 5 * 60 * 1000,
+  });
+  const url = cfg.data?.public_url ?? "";
+  const slug = cfg.data?.effective_slug ?? "";
+  const [copied, setCopied] = useState(false);
+
+  const copy = () => {
+    if (!url) return;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  if (!url) {
+    return (
+      <div className="text-xs" style={{ color: "var(--text-3)" }}>
+        Configure o slug em <strong style={{ color: "var(--text-2)" }}>Configurações</strong> pra ativar a central pública.
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-[11px] uppercase tracking-wider font-medium" style={{ color: "var(--text-3)" }}>
+        Central pública
+      </span>
+      <a href={url} target="_blank" rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono transition-all"
+        style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-2)" }}
+        title="Abrir em nova aba">
+        <Globe className="w-3 h-3" style={{ color: "#00d46a" }} />
+        /{slug}
+        <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+      </a>
+      <button onClick={copy}
+        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] transition-all"
+        style={{ background: copied ? "rgba(0,212,106,0.10)" : "transparent", border: "1px solid var(--surface-border)", color: copied ? "var(--green)" : "var(--text-3)" }}
+        title="Copiar URL completa">
+        {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+        {copied ? "Copiado" : "Copiar"}
+      </button>
     </div>
   );
 }
