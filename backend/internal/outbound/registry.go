@@ -160,24 +160,24 @@ func (r *Registry) sendWhatsApp(ctx context.Context, inst *models.Instance, msg 
 			}
 			return &SendResult{ExternalID: id, Status: models.MessageStatusSent}, nil
 		case "audio":
-			// WhatsApp prefere bytes em container OGG carregando Opus pra
-			// renderizar como voice note (PTT). Browser MediaRecorder grava
-			// em WebM/Opus (Chrome) ou MP4/AAC (Safari) — mesmos pacotes
-			// Opus, container diferente. Idealmente transcodamos pra OGG
-			// via ffmpeg; quando ffmpeg está ausente ou falha, mandamos
-			// os bytes originais declarando "audio/ogg; codecs=opus" + PTT.
-			// Isso é tecnicamente uma mentira sobre o container mas era
-			// o comportamento antigo que tocava na maioria dos clientes —
-			// reverter pra anexo audio/webm causou regressão (alguns
-			// clients mostraram "este áudio não está mais disponível").
-			//
-			// MP3/M4A genuínos vão como anexo (PTT=false) com mime real.
 			outBytes := data
 			outMime := mime
 			isPTT := false
 			var seconds uint32
 			isOgg := isOggBytes(data)
-			isOpusContainer := isOgg || isWebMBytes(data) || mimeIsOpus(mime)
+			isWebM := isWebMBytes(data)
+			isOpusContainer := isOgg || isWebM || mimeIsOpus(mime)
+			// Log explícito do que recebemos pra ficar claro no observability
+			// se o transcoding está sendo tentado e qual o input.
+			log.Info().
+				Str("to", msg.To).
+				Str("input_mime", mime).
+				Int("input_bytes", len(data)).
+				Bool("is_ogg", isOgg).
+				Bool("is_webm", isWebM).
+				Bool("is_opus_container", isOpusContainer).
+				Bool("ffmpeg_available", audioconvert.Available()).
+				Msg("outbound: dispatching audio")
 			if isOpusContainer {
 				if !isOgg {
 					// Tenta transcodar pra OGG/Opus real. Sucesso → bytes
@@ -185,19 +185,33 @@ func (r *Registry) sendWhatsApp(ctx context.Context, inst *models.Instance, msg 
 					if conv, dur, terr := audioconvert.TranscodeToOggOpus(ctx, data); terr == nil {
 						outBytes = conv
 						seconds = dur
+						log.Info().
+							Int("input_bytes", len(data)).
+							Int("output_bytes", len(outBytes)).
+							Uint32("seconds", seconds).
+							Msg("outbound: transcoding OK → OGG/Opus")
 					} else if errors.Is(terr, audioconvert.ErrFfmpegMissing) {
 						log.Warn().Msg("outbound: ffmpeg indisponível — voice note enviada sem transcoding (instale o pacote ffmpeg na imagem)")
 					} else {
 						log.Warn().Err(terr).Msg("outbound: transcoding pra OGG/Opus falhou — usando bytes originais")
 					}
+				} else {
+					log.Info().Msg("outbound: input já é OGG nativo — sem transcoding")
 				}
 				outMime = "audio/ogg; codecs=opus"
 				isPTT = true
 			}
 			id, err := client.SendAudioMessage(msg.To, outBytes, outMime, isPTT, seconds)
 			if err != nil {
+				log.Error().Err(err).Msg("outbound: SendAudioMessage falhou")
 				return nil, err
 			}
+			log.Info().
+				Str("external_id", id).
+				Bool("ptt", isPTT).
+				Str("out_mime", outMime).
+				Int("out_bytes", len(outBytes)).
+				Msg("outbound: audio enviado")
 			return &SendResult{ExternalID: id, Status: models.MessageStatusSent}, nil
 		case "video":
 			id, err := client.SendVideoMessage(msg.To, data, mime, caption)
