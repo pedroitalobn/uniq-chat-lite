@@ -666,9 +666,12 @@ func (h *AdminHandler) DeleteUser(c *fiber.Ctx) error {
 		return nil
 	})
 	if err != nil {
+		log.Error().Err(err).Str("user_id", userID.String()).Msg("admin: cascade delete user failed")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error":  "erro no cascade delete",
-			"detail": err.Error(),
+			"error":   "erro no cascade delete",
+			"detail":  err.Error(),
+			"hint":    "Veja os logs do backend pra identificar a tabela/coluna que falhou. O detail acima geralmente contém 'delete <tabela>.<coluna>: ERROR ...'.",
+			"cleaned": cleaned,
 		})
 	}
 	LogAudit(h.db, c, "user.delete",
@@ -778,6 +781,32 @@ func cascadeDeleteRecursive(tx *gorm.DB, parentTable, parentCol string, ids []st
 
 	for _, f := range fks {
 		if f.Table == parentTable {
+			// FK auto-referente (ex.: users.invited_by_id → users.id).
+			// Se ignorarmos, o DELETE no parent quebra com FK violation.
+			// Estratégia: tentar setar NULL no parente ainda existente
+			// (column nullable) ANTES de deletar o user. Se a coluna for
+			// NOT NULL, deletamos os filhos recursivamente.
+			nullable := false
+			tx.Raw(`SELECT is_nullable = 'YES' FROM information_schema.columns WHERE table_name = ? AND column_name = ?`,
+				f.Table, f.Column).Scan(&nullable)
+			if nullable {
+				stmt := fmt.Sprintf(`UPDATE "%s" SET "%s" = NULL WHERE "%s"::text IN (%s)`, f.Table, f.Column, f.Column, idList)
+				if res := tx.Exec(stmt); res.Error != nil {
+					return fmt.Errorf("self-fk null %s.%s: %w", f.Table, f.Column, res.Error)
+				}
+				log.Debug().Str("table", f.Table).Str("col", f.Column).Msg("cascade: nulled self-fk")
+			} else {
+				// Coluna NOT NULL — pega os filhos cujo FK aponta pro
+				// parent que estamos deletando e remove eles também.
+				var childPKs []string
+				pkQ := fmt.Sprintf(`SELECT id::text FROM "%s" WHERE "%s"::text IN (%s) AND id::text NOT IN (%s)`, f.Table, f.Column, idList, idList)
+				_ = tx.Raw(pkQ).Scan(&childPKs).Error
+				if len(childPKs) > 0 {
+					if err := cascadeDeleteRecursive(tx, f.Table, "id", childPKs, counts, visited, depth+1); err != nil {
+						return err
+					}
+				}
+			}
 			continue
 		}
 		visitKey := f.Table + "." + f.Column + "<-" + parentTable + "." + parentCol
@@ -791,17 +820,28 @@ func cascadeDeleteRecursive(tx *gorm.DB, parentTable, parentCol string, ids []st
 			Str("parent", parentTable).Int("depth", depth).
 			Msg("cascade: checking child table")
 
-		// Tenta obter IDs usando "id" (coluna padrão GORM).
-		// Para join tables sem "id", retorna vazio e saltamos a recursão.
-		var childPKs []string
-		pkQ := fmt.Sprintf(`SELECT id::text FROM "%s" WHERE "%s"::text IN (%s)`, f.Table, f.Column, idList)
-		if err := tx.Raw(pkQ).Scan(&childPKs).Error; err != nil {
-			// Tabela sem coluna "id" (join table) — apenas deleta, sem recursão.
-			log.Debug().Str("table", f.Table).Msg("cascade: no id col, skip recursion")
-		} else if len(childPKs) > 0 {
-			if err := cascadeDeleteRecursive(tx, f.Table, "id", childPKs, counts, visited, depth+1); err != nil {
-				return err
+		// Verifica ANTES se a tabela tem coluna "id" via information_schema.
+		// Tentar SELECT id direto numa join table aborta a transação inteira
+		// (Postgres SQLSTATE 25P02 — current transaction is aborted) e
+		// propaga em todos os DELETEs seguintes.
+		hasIDCol := false
+		tx.Raw(`SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = 'id')`, f.Table).Scan(&hasIDCol)
+
+		if hasIDCol {
+			var childPKs []string
+			pkQ := fmt.Sprintf(`SELECT id::text FROM "%s" WHERE "%s"::text IN (%s)`, f.Table, f.Column, idList)
+			if err := tx.Raw(pkQ).Scan(&childPKs).Error; err != nil {
+				return fmt.Errorf("scan children %s.%s: %w", f.Table, f.Column, err)
 			}
+			if len(childPKs) > 0 {
+				if err := cascadeDeleteRecursive(tx, f.Table, "id", childPKs, counts, visited, depth+1); err != nil {
+					return err
+				}
+			}
+		} else {
+			// Join table — DELETE direto resolve, ela mesma não tem
+			// dependentes (sem PK próprio que outras tabelas referenciem).
+			log.Debug().Str("table", f.Table).Msg("cascade: join table (no id), direct delete")
 		}
 
 		stmt := fmt.Sprintf(`DELETE FROM "%s" WHERE "%s"::text IN (%s)`, f.Table, f.Column, idList)
