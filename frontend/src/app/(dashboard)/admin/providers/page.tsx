@@ -288,8 +288,13 @@ function PaymentTab() {
   } else {
     apiBase = rawApi || "https://api.uniq.chat";
   }
-  const stripeWebhookURL = `${apiBase}/stripe/webhook`;
-  const asaasWebhookURL = `${apiBase}/asaas/webhook`;
+  // URLs versionadas (/v1/payments/webhook/:provider) — alinha com
+  // o resto da API (/v1/...) e segue o padrão do
+  // /v1/payments/finalize-registration agnóstico. Aliases não-versionados
+  // continuam funcionando no backend pra compat com webhooks já
+  // configurados no Stripe/Asaas.
+  const stripeWebhookURL = `${apiBase}/v1/payments/webhook/stripe`;
+  const asaasWebhookURL = `${apiBase}/v1/payments/webhook/asaas`;
 
   return (
     <div className="space-y-5">

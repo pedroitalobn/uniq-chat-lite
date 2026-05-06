@@ -50,8 +50,28 @@ function toBase64(file: File): Promise<string> {
   });
 }
 
-function parseHours(json: string): number[] {
-  try { return JSON.parse(json); } catch { return []; }
+// parseSchedule retorna uma string legível dos horários autorizados
+// independente do formato salvo em schedule_hours.
+//   - "[]" ou vazio → "" (qualquer horário)
+//   - "[9, 10, 14]" (legacy int hours) → "9h · 10h · 14h"
+//   - '[{"from":"09:00","to":"11:30"}]' → "09:00-11:30"
+function formatSchedule(json: string): string {
+  if (!json || json === "[]") return "";
+  try {
+    const parsed = JSON.parse(json);
+    if (!Array.isArray(parsed) || parsed.length === 0) return "";
+    // Formato novo: array de {from, to}
+    if (typeof parsed[0] === "object" && parsed[0] !== null && "from" in parsed[0]) {
+      return parsed.map((w: { from: string; to: string }) => `${w.from}-${w.to}`).join(" · ");
+    }
+    // Formato legacy: array de números
+    if (typeof parsed[0] === "number") {
+      return parsed.map((h: number) => `${h}h`).join(" · ");
+    }
+    return "";
+  } catch {
+    return "";
+  }
 }
 
 // ─── Channel definitions ──────────────────────────────────────────────────────
@@ -1346,7 +1366,7 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
     ? Math.round(((campaign.sent_count + campaign.failed_count) / campaign.total_count) * 100)
     : 0;
 
-  const hours = parseHours(campaign.schedule_hours ?? "[]");
+  const scheduleLabel = formatSchedule(campaign.schedule_hours ?? "[]");
 
   const handleStart = async () => {
     try { await campaignsApi.start(campaign.id); toast.success("Campanha iniciada!"); onAction(); }
@@ -1455,9 +1475,9 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
                 {campaign.times_total}× total · {campaign.times_per_day}×/dia
               </span>
             )}
-            {hours.length > 0 && (
+            {scheduleLabel && (
               <span className="text-[10px] px-2 py-0.5 rounded font-mono" style={{ background: "rgba(96,165,250,0.08)", color: "#60a5fa" }}>
-                {hours.map((h) => `${h}h`).join(" ")}
+                ⏰ {scheduleLabel}
               </span>
             )}
           </div>

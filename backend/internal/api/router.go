@@ -278,6 +278,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 
 	// Stripe webhook (public — must receive raw body, Stripe signature verified internally)
 	app.Post("/stripe/webhook", stripeH.Webhook)
+	// Aliases versionados/agnósticos — alinha com o resto da API e
+	// segue o padrão de /v1/payments/* (provider-agnostic). Stripe/
+	// Asaas configs no painel agora geram essa URL.
+	app.Post("/v1/stripe/webhook", stripeH.Webhook)
+	app.Post("/v1/payments/webhook/stripe", stripeH.Webhook)
 
 	// Activate lead after payment (public)
 	app.Post("/stripe/activate-lead", stripeH.ActivateLead)
@@ -293,6 +298,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 
 	// Asaas webhook (public)
 	app.Post("/asaas/webhook", asaasH.Webhook)
+	app.Post("/v1/asaas/webhook", asaasH.Webhook)
+	app.Post("/v1/payments/webhook/asaas", asaasH.Webhook)
 
 	// ─── Auth routes (public) ─────────────────────────────────────────────────
 	// Rate limits separados por sensibilidade:

@@ -330,6 +330,15 @@ export default function CampaignDetailPage() {
             <div className="max-h-[400px] overflow-y-auto">
               {recipients.map((r, i) => {
                 const rs = RECIPIENT_STATUS[r.status] ?? RECIPIENT_STATUS.pending;
+                // Pra grupos (JID @g.us) e contatos (@s.whatsapp.net),
+                // o nome vai em destaque e o JID/phone fica como
+                // metadata pequena. Antes o phone vinha grande e o
+                // nome (que existia) ficava em chip secundário —
+                // user via "558587808924-1508601567@g.us" sem saber
+                // qual grupo era.
+                const isJID = r.phone.includes("@");
+                const primary = r.name?.trim() || (isJID ? r.phone.split("@")[0] : r.phone);
+                const secondary = r.name?.trim() ? r.phone : "";
                 return (
                   <div
                     key={r.id}
@@ -337,8 +346,17 @@ export default function CampaignDetailPage() {
                     style={{ borderTop: i > 0 ? "1px solid hsl(240 12% 10%)" : undefined }}
                   >
                     <div className="min-w-0">
-                      <p className="text-xs font-mono truncate" style={{ color: "hsl(240 15% 85%)" }}>{r.phone}</p>
-                      {r.name && <p className="text-[11px] mt-0.5 truncate" style={{ color: "hsl(240 8% 46%)" }}>{r.name}</p>}
+                      <p className="text-xs font-medium truncate flex items-center gap-1.5" style={{ color: "hsl(240 15% 88%)" }}>
+                        {isJID && r.phone.endsWith("@g.us") && (
+                          <Users className="w-3 h-3 flex-shrink-0" style={{ color: "#a78bfa" }} />
+                        )}
+                        {primary}
+                      </p>
+                      {secondary && (
+                        <p className="text-[10px] font-mono mt-0.5 truncate" style={{ color: "hsl(240 8% 38%)" }}>
+                          {secondary}
+                        </p>
+                      )}
                       {r.error && <p className="text-[10px] mt-0.5 truncate" style={{ color: "#f87171" }} title={r.error}>{r.error}</p>}
                     </div>
                     <div className="flex items-center">
