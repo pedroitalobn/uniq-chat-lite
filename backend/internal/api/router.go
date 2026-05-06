@@ -446,6 +446,18 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	registerPreInst("GET", "/qr", instanceH.GetQR)
 	registerPreInst("GET", "/chats", msgH.GetChats)
 	registerPreInst("GET", "/contacts", msgH.GetContacts)
+	// Groups: o pattern /v1/:server_slug/:instance_slug/groups/ era
+	// matchado primeiro pelo v1inst group, que bypassa em "instances"
+	// (reserved namespace) sem setar c.Locals("instance") — handler
+	// devolvia 404. Pre-registrando aqui ganhamos prioridade e o
+	// OwnsInstance middleware seta o instance corretamente.
+	registerPreInst("GET", "/groups", groupH.List)
+	registerPreInst("POST", "/groups", groupH.Create)
+	registerPreInst("GET", "/groups/:jid", groupH.Get)
+	registerPreInst("POST", "/groups/:jid/participants", groupH.UpdateParticipants)
+	registerPreInst("GET", "/groups/:jid/invite", groupH.InviteLink)
+	registerPreInst("POST", "/groups/:jid/leave", groupH.Leave)
+	app.Put("/v1/instances/:id/groups/:jid", append(preMsgChain, groupH.Update)...)
 	registerPreInst("POST", "/pairing-code", instanceH.GetPairingCode)
 	registerPreInst("POST", "/contact/info", instanceH.ContactInfo)
 	registerPreInst("POST", "/contact/avatar", instanceH.ContactAvatar)
