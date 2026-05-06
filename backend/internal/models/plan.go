@@ -36,15 +36,18 @@ type Plan struct {
 	// ── Feature flags (módulos liga/desliga) ──────────────────────────
 	AllowAI            bool `gorm:"default:false" json:"allow_ai"`             // /agents, RAG, OpenRouter, MCP
 	AllowJourneys      bool `gorm:"default:false" json:"allow_journeys"`       // /journeys
-	AllowCRM           bool `gorm:"default:false" json:"allow_crm"`            // /crm/contacts/companies/deals
+	AllowCRM           bool `gorm:"default:false" json:"allow_crm"`            // /crm/contacts/companies/deals/tasks/meetings
 	AllowInbox         bool `gorm:"default:true"  json:"allow_inbox"`          // /inbox + queues + departments + SLA
 	AllowCampaigns     bool `gorm:"default:false" json:"allow_campaigns"`      // /campaigns
 	AllowTriggers      bool `gorm:"default:false" json:"allow_triggers"`       // Sprint 8 — keyword
 	AllowWarmup        bool `gorm:"default:false" json:"allow_warmup"`         // Sprint 7 — anti-ban
 	AllowNewsletters   bool `gorm:"default:false" json:"allow_newsletters"`    // Channels
 	AllowCommunities   bool `gorm:"default:false" json:"allow_communities"`    // WhatsApp Communities
-	AllowInstagram     bool `gorm:"default:false" json:"allow_instagram"`      // multi-canal IG
-	AllowTikTok        bool `gorm:"default:false" json:"allow_tiktok"`         // multi-canal TikTok
+	// Channels (instance types) — habilita criação de instância daquele tipo.
+	AllowWhatsAppQR    bool `gorm:"default:true"  json:"allow_whatsapp_qr"`    // ChannelType=whatsapp (whatsmeow/QR) — core
+	AllowWABA          bool `gorm:"default:false" json:"allow_waba"`           // ChannelType=waba (Cloud API Meta)
+	AllowInstagram     bool `gorm:"default:false" json:"allow_instagram"`      // ChannelType=instagram
+	AllowTikTok        bool `gorm:"default:false" json:"allow_tiktok"`         // ChannelType=tiktok
 	AllowAPIAccess     bool `gorm:"default:true"  json:"allow_api_access"`     // SDK REST + instance token
 	AllowGlobalWebhook bool `gorm:"default:false" json:"allow_global_webhook"` // /webhooks/system (workspace-wide)
 
@@ -89,6 +92,8 @@ const (
 	FeatureWarmup        FeatureKey = "warmup"
 	FeatureNewsletters   FeatureKey = "newsletters"
 	FeatureCommunities   FeatureKey = "communities"
+	FeatureWhatsAppQR    FeatureKey = "whatsapp_qr"
+	FeatureWABA          FeatureKey = "waba"
 	FeatureInstagram     FeatureKey = "instagram"
 	FeatureTikTok        FeatureKey = "tiktok"
 	FeatureAPIAccess     FeatureKey = "api_access"
@@ -127,6 +132,10 @@ func (p *Plan) HasFeature(key FeatureKey) bool {
 		return p.AllowNewsletters
 	case FeatureCommunities:
 		return p.AllowCommunities
+	case FeatureWhatsAppQR:
+		return p.AllowWhatsAppQR
+	case FeatureWABA:
+		return p.AllowWABA
 	case FeatureInstagram:
 		return p.AllowInstagram
 	case FeatureTikTok:

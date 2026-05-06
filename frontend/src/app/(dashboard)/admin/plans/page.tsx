@@ -42,11 +42,15 @@ interface EditState {
   allow_warmup: boolean;
   allow_newsletters: boolean;
   allow_communities: boolean;
+  allow_whatsapp_qr: boolean;
+  allow_waba: boolean;
   allow_instagram: boolean;
   allow_tiktok: boolean;
   allow_api_access: boolean;
   allow_global_webhook: boolean;
   allow_shop: boolean;
+  allow_helpdesk: boolean;
+  allow_webchat: boolean;
   allow_proxy: boolean;
   allow_proxy_residencial: boolean;
   is_active: boolean;
@@ -273,11 +277,15 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
     allow_warmup: p?.allow_warmup ?? false,
     allow_newsletters: p?.allow_newsletters ?? false,
     allow_communities: p?.allow_communities ?? false,
+    allow_whatsapp_qr: p?.allow_whatsapp_qr ?? true,
+    allow_waba: p?.allow_waba ?? false,
     allow_instagram: p?.allow_instagram ?? false,
     allow_tiktok: p?.allow_tiktok ?? false,
     allow_api_access: p?.allow_api_access ?? true,
     allow_global_webhook: p?.allow_global_webhook ?? false,
     allow_shop: p?.allow_shop ?? false,
+    allow_helpdesk: p?.allow_helpdesk ?? false,
+    allow_webchat: p?.allow_webchat ?? false,
     allow_proxy: p?.allow_proxy ?? false,
     allow_proxy_residencial: p?.allow_proxy_residencial ?? false,
     is_active: p?.is_active ?? true,
@@ -291,9 +299,11 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
     features: JSON.stringify(featObj, null, 2),
   });
 
-  const [checkboxes, setCheckboxes] = useState<Record<string, boolean>>(() =>
-    isEditing ? featuresObjToCheckboxes(featObj) : defaultCheckboxes
-  );
+  // O state checkboxes/setCheckboxes existia pra alimentar o grid
+  // "Canais visíveis (UI marketing)" — esse grid foi removido, o
+  // marketing JSON agora é derivado dos toggles reais. Deixamos só
+  // o tipo pra silenciar o linter dos refs antigos no submit.
+  void defaultCheckboxes; void featuresObjToCheckboxes;
 
   const [activeTab, setActiveTab] = useState<"general" | "limits" | "features" | "gateway" | "visuals">("general");
 
@@ -327,17 +337,34 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
         allow_warmup: form.allow_warmup,
         allow_newsletters: form.allow_newsletters,
         allow_communities: form.allow_communities,
+        allow_whatsapp_qr: form.allow_whatsapp_qr,
+        allow_waba: form.allow_waba,
         allow_instagram: form.allow_instagram,
         allow_tiktok: form.allow_tiktok,
         allow_api_access: form.allow_api_access,
         allow_global_webhook: form.allow_global_webhook,
         allow_shop: form.allow_shop,
+        allow_helpdesk: form.allow_helpdesk,
+        allow_webchat: form.allow_webchat,
         allow_proxy: form.allow_proxy,
         allow_proxy_residencial: form.allow_proxy_residencial,
         is_active: form.is_active,
         stripe_price_id: form.stripe_price_id || undefined,
         asaas_product_id: form.asaas_product_id || undefined,
-        features: JSON.stringify(checkboxesToFeaturesObj(checkboxes, {
+        // features JSON é derivado dos toggles reais — antes tinha um
+        // grid de "Canais marketing" separado que duplicava info; foi
+        // removido. Agora a lista pública/cards reflete EXATAMENTE
+        // o que está habilitado no plano.
+        features: JSON.stringify(checkboxesToFeaturesObj({
+          whatsapp:     form.allow_whatsapp_qr,
+          instagram:    form.allow_instagram,
+          crm:          form.allow_crm,
+          campaigns:    form.allow_campaigns,
+          integrations: form.allow_global_webhook || form.allow_api_access,
+          api:          form.allow_api_access,
+          webhooks:     form.allow_global_webhook,
+          mcp:          form.allow_ai,
+        }, {
           description: form.description,
           stripe_price_id: form.stripe_price_id,
           highlights: form.highlights,
@@ -527,49 +554,70 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
             )}
 
             {activeTab === "features" && (
-              <div className="space-y-4 animate-fade-in-up">
-                <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: "hsl(240 8% 50%)" }}>Módulos principais</p>
-                <FeatureToggle label="Inbox / Atendimento" desc="/inbox + queues + departments + SLA"
-                  checked={form.allow_inbox} onChange={(v) => setForm({ ...form, allow_inbox: v })} color="#22c55e" />
-                <FeatureToggle label="Uniq AI / Agentes" desc="/agents, RAG, OpenRouter, MCP"
-                  checked={form.allow_ai} onChange={(v) => setForm({ ...form, allow_ai: v })} color="#a78bfa" />
-                <FeatureToggle label="Jornadas" desc="/journeys — automações"
-                  checked={form.allow_journeys} onChange={(v) => setForm({ ...form, allow_journeys: v })} color="#60a5fa" />
-                <FeatureToggle label="CRM" desc="/crm/contacts/companies/deals/segments"
-                  checked={form.allow_crm} onChange={(v) => setForm({ ...form, allow_crm: v })} color="#f59e0b" />
-                <FeatureToggle label="Campanhas" desc="/campaigns — disparos em massa"
-                  checked={form.allow_campaigns} onChange={(v) => setForm({ ...form, allow_campaigns: v })} color="#fb923c" />
-                <FeatureToggle label="Shop / Produtos" desc="/shops + 10 integrações de e-commerce"
-                  checked={form.allow_shop} onChange={(v) => setForm({ ...form, allow_shop: v })} color="#22c55e" />
+              <div className="space-y-5 animate-fade-in-up">
+                {/* Núcleo de atendimento — sempre visível, padrão */}
+                <FeatureGroup title="Atendimento" hint="Funcionalidades core de inbox e fila">
+                  <FeatureToggle label="Inbox" desc="/inbox + queues + departments + SLA"
+                    checked={form.allow_inbox} onChange={(v) => setForm({ ...form, allow_inbox: v })} color="#22c55e" />
+                  <FeatureToggle label="Help Desk" desc="/help-desk — central de ajuda + artigos públicos"
+                    checked={form.allow_helpdesk} onChange={(v) => setForm({ ...form, allow_helpdesk: v })} color="#22d3ee" />
+                </FeatureGroup>
 
-                <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "hsl(240 8% 50%)" }}>Adicionais</p>
-                <FeatureToggle label="Triggers (autoresponder)" desc="Sprint 8 — keyword matchers"
-                  checked={form.allow_triggers} onChange={(v) => setForm({ ...form, allow_triggers: v })} color="#a855f7" />
-                <FeatureToggle label="Warmup" desc="Anti-ban automático"
-                  checked={form.allow_warmup} onChange={(v) => setForm({ ...form, allow_warmup: v })} color="#ec4899" />
-                <FeatureToggle label="Newsletters / Channels" desc="WhatsApp Channels"
-                  checked={form.allow_newsletters} onChange={(v) => setForm({ ...form, allow_newsletters: v })} color="#06b6d4" />
-                <FeatureToggle label="Communities" desc="WhatsApp Communities"
-                  checked={form.allow_communities} onChange={(v) => setForm({ ...form, allow_communities: v })} color="#10b981" />
-                <FeatureToggle label="Instagram" desc="Multi-canal IG (DM)"
-                  checked={form.allow_instagram} onChange={(v) => setForm({ ...form, allow_instagram: v })} color="#e1306c" />
-                <FeatureToggle label="TikTok" desc="Multi-canal TikTok"
-                  checked={form.allow_tiktok} onChange={(v) => setForm({ ...form, allow_tiktok: v })} color="#000" />
+                {/* Canais — instâncias que o user pode criar */}
+                <FeatureGroup title="Canais (instâncias)" hint="Tipos de instância que o plano libera. Se um canal está OFF, ele some da UI de criação de instância.">
+                  <FeatureToggle label="WhatsApp (QR)" desc="ChannelType=whatsapp — whatsmeow/Baileys via QR/pareamento"
+                    checked={form.allow_whatsapp_qr} onChange={(v) => setForm({ ...form, allow_whatsapp_qr: v })} color="#25d366" />
+                  <FeatureToggle label="WhatsApp Business API" desc="ChannelType=waba — Cloud API da Meta com templates"
+                    checked={form.allow_waba} onChange={(v) => setForm({ ...form, allow_waba: v })} color="#0a8f4d" />
+                  <FeatureToggle label="WhatsApp Communities" desc="Comunidades + grupos linkados (whatsmeow)"
+                    checked={form.allow_communities} onChange={(v) => setForm({ ...form, allow_communities: v })} color="#10b981" />
+                  <FeatureToggle label="Instagram" desc="ChannelType=instagram — DM via Graph API"
+                    checked={form.allow_instagram} onChange={(v) => setForm({ ...form, allow_instagram: v })} color="#e1306c" />
+                  <FeatureToggle label="TikTok" desc="ChannelType=tiktok — Business Messaging"
+                    checked={form.allow_tiktok} onChange={(v) => setForm({ ...form, allow_tiktok: v })} color="#fe2c55" />
+                  <FeatureToggle label="WebChat (widget)" desc="ChannelType=webchat — chat embedável no site"
+                    checked={form.allow_webchat} onChange={(v) => setForm({ ...form, allow_webchat: v })} color="#06b6d4" />
+                  <FeatureToggle label="Newsletters / Channels" desc="WhatsApp Channels (broadcast)"
+                    checked={form.allow_newsletters} onChange={(v) => setForm({ ...form, allow_newsletters: v })} color="#06b6d4" />
+                </FeatureGroup>
 
-                <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "hsl(240 8% 50%)" }}>API & Infra</p>
-                <FeatureToggle label="Acesso API" desc="SDK REST + instance token"
-                  checked={form.allow_api_access} onChange={(v) => setForm({ ...form, allow_api_access: v })} color="#60a5fa" />
-                <FeatureToggle label="Webhooks globais" desc="/webhooks/system (workspace-wide)"
-                  checked={form.allow_global_webhook} onChange={(v) => setForm({ ...form, allow_global_webhook: v })} color="#fbbf24" />
-                <FeatureToggle label="Sessão via Proxy" desc="Proxy padrão na instância"
-                  checked={form.allow_proxy} onChange={(v) => setForm({ ...form, allow_proxy: v })} color="#60a5fa" />
-                <FeatureToggle label="Proxy residencial" desc="Pool premium (mais caro)"
-                  checked={form.allow_proxy_residencial} onChange={(v) => setForm({ ...form, allow_proxy_residencial: v })} color="#a78bfa" />
+                {/* CRM e Vendas — funil + automação de vendas */}
+                <FeatureGroup title="CRM & Vendas">
+                  <FeatureToggle label="CRM" desc="/crm/contacts/companies/deals/segments/tasks/meetings"
+                    checked={form.allow_crm} onChange={(v) => setForm({ ...form, allow_crm: v })} color="#f59e0b" />
+                  <FeatureToggle label="Shop / Produtos" desc="/shops + integrações de e-commerce"
+                    checked={form.allow_shop} onChange={(v) => setForm({ ...form, allow_shop: v })} color="#22c55e" />
+                  <FeatureToggle label="Campanhas" desc="/campaigns — disparos em massa pra contatos/grupos"
+                    checked={form.allow_campaigns} onChange={(v) => setForm({ ...form, allow_campaigns: v })} color="#fb923c" />
+                </FeatureGroup>
 
-                <div className="pt-4 border-t" style={{ borderColor: "var(--border-default)" }}>
-                  <p className="text-[10px] uppercase tracking-wider font-medium mb-2" style={{ color: "hsl(240 8% 50%)" }}>Canais visíveis (UI marketing)</p>
-                  <FeatureGrid checkboxes={checkboxes} onChange={(key, val) => setCheckboxes({ ...checkboxes, [key]: val })} />
-                </div>
+                {/* IA & Automação — agentes, jornadas, triggers */}
+                <FeatureGroup title="Automação & IA">
+                  <FeatureToggle label="Uniq AI / Agentes" desc="/agents — RAG + tools + voz (TTS) + IVC"
+                    checked={form.allow_ai} onChange={(v) => setForm({ ...form, allow_ai: v })} color="#a78bfa" />
+                  <FeatureToggle label="Jornadas" desc="/journeys — flow builder de automações"
+                    checked={form.allow_journeys} onChange={(v) => setForm({ ...form, allow_journeys: v })} color="#60a5fa" />
+                  <FeatureToggle label="Triggers" desc="Autoresponders por keyword/regex"
+                    checked={form.allow_triggers} onChange={(v) => setForm({ ...form, allow_triggers: v })} color="#a855f7" />
+                  <FeatureToggle label="Warmup" desc="Aquecimento anti-ban automático"
+                    checked={form.allow_warmup} onChange={(v) => setForm({ ...form, allow_warmup: v })} color="#ec4899" />
+                </FeatureGroup>
+
+                {/* Integração — API, webhooks, proxy */}
+                <FeatureGroup title="API & Infra">
+                  <FeatureToggle label="Acesso API" desc="SDK REST + instance token (n8n, Zapier, etc.)"
+                    checked={form.allow_api_access} onChange={(v) => setForm({ ...form, allow_api_access: v })} color="#60a5fa" />
+                  <FeatureToggle label="Webhooks globais" desc="/webhooks/system (workspace-wide)"
+                    checked={form.allow_global_webhook} onChange={(v) => setForm({ ...form, allow_global_webhook: v })} color="#fbbf24" />
+                  <FeatureToggle label="Proxy padrão" desc="Sessão WhatsApp via proxy datacenter"
+                    checked={form.allow_proxy} onChange={(v) => setForm({ ...form, allow_proxy: v })} color="#60a5fa" />
+                  <FeatureToggle label="Proxy residencial" desc="Pool premium (anti-ban robusto, custo maior)"
+                    checked={form.allow_proxy_residencial} onChange={(v) => setForm({ ...form, allow_proxy_residencial: v })} color="#a78bfa" />
+                </FeatureGroup>
+
+                <p className="text-[11px] px-3 py-2 rounded-lg" style={{ background: "rgba(96,165,250,0.06)", border: "1px solid rgba(96,165,250,0.18)", color: "#93c5fd" }}>
+                  💡 Módulos desligados aqui são automaticamente escondidos da UI do user (sidebar, menus, criação de instância). Sem flag separada de "marketing".
+                </p>
               </div>
             )}
 
@@ -961,12 +1009,31 @@ function FeatureToggle({ label, desc, checked, onChange, color }: {
   label: string; desc: string; checked: boolean; onChange: (v: boolean) => void; color: string;
 }) {
   return (
-    <label className="flex items-center gap-3 cursor-pointer">
+    <label className="flex items-center gap-3 cursor-pointer py-1.5">
       <Toggle checked={checked} onChange={onChange} color={color} />
-      <div>
+      <div className="flex-1 min-w-0">
         <span className="text-sm font-medium block" style={{ color: checked ? color : "hsl(240 15% 80%)" }}>{label}</span>
-        <span className="text-[10px] block" style={{ color: "hsl(240 8% 46%)" }}>{desc}</span>
+        <span className="text-[10px] block truncate" style={{ color: "hsl(240 8% 46%)" }}>{desc}</span>
       </div>
     </label>
+  );
+}
+
+// FeatureGroup — agrupa toggles correlatos com header e contador
+// "N de M ligados". Substitui o cabeçalho "Módulos principais" /
+// "Adicionais" / "API & Infra" que era só texto.
+function FeatureGroup({ title, hint, children }: {
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl p-3" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border-subtle)" }}>
+      <div className="flex items-baseline justify-between mb-2">
+        <p className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: "hsl(240 15% 70%)" }}>{title}</p>
+      </div>
+      {hint && <p className="text-[11px] mb-2" style={{ color: "hsl(240 8% 50%)" }}>{hint}</p>}
+      <div className="space-y-0">{children}</div>
+    </div>
   );
 }

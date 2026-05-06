@@ -3,7 +3,21 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "";
+// Helper: deriva a URL do backend mesmo quando NEXT_PUBLIC_API_URL
+// está vazio ou apontando localhost no build de produção. Usado em
+// rotas públicas que rodam em qualquer subdomínio.
+function getApiBase(): string {
+  const env = process.env.NEXT_PUBLIC_API_URL ?? "";
+  if (env && !/localhost|127\.0\.0\.1/.test(env)) return env.replace(/\/v1\/?$/, "");
+  if (typeof window !== "undefined" && window.location.hostname && !/localhost|127\.0\.0\.1/.test(window.location.hostname)) {
+    const host = window.location.hostname;
+    const apiHost = host.startsWith("app.") || host.startsWith("admin.") || host.startsWith("dashboard.") || host.startsWith("help.")
+      ? "api." + host.split(".").slice(1).join(".")
+      : "api." + host;
+    return `${window.location.protocol}//${apiHost}`;
+  }
+  return env || "https://api.uniq.chat";
+}
 
 interface Config {
   title: string;
@@ -56,6 +70,10 @@ function mdToHtml(md: string): string {
 
 export default function HelpCenterPage({ params }: { params: { slug: string } }) {
   const { slug } = params;
+  // Derivado lazy via window — sem isso o build de produção com env
+  // vazio caía em fetch relativo (`/v1/public/...`) batendo no front
+  // em vez do backend e devolvendo 404 do Next pra "Central de Ajuda".
+  const [API] = useState(() => getApiBase());
   const [config, setConfig] = useState<Config | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);

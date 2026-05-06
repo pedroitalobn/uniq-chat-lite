@@ -125,11 +125,15 @@ export interface Plan {
   allow_warmup: boolean;
   allow_newsletters: boolean;
   allow_communities: boolean;
+  allow_whatsapp_qr: boolean;
+  allow_waba: boolean;
   allow_instagram: boolean;
   allow_tiktok: boolean;
   allow_api_access: boolean;
   allow_global_webhook: boolean;
   allow_shop: boolean;
+  allow_helpdesk: boolean;
+  allow_webchat: boolean;
   allow_proxy: boolean;
   allow_proxy_residencial: boolean;
   is_active: boolean;

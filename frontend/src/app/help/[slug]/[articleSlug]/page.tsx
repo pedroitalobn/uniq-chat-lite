@@ -14,7 +14,21 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "";
+// Mesmo helper de getApiBase do /help/[slug] — derivado do hostname
+// quando env não está setado/aponta localhost. Sem isso, build prod
+// fazia fetch relativo e batia em 404 do Next.
+function getApiBase(): string {
+  const env = process.env.NEXT_PUBLIC_API_URL ?? "";
+  if (env && !/localhost|127\.0\.0\.1/.test(env)) return env.replace(/\/v1\/?$/, "");
+  if (typeof window !== "undefined" && window.location.hostname && !/localhost|127\.0\.0\.1/.test(window.location.hostname)) {
+    const host = window.location.hostname;
+    const apiHost = host.startsWith("app.") || host.startsWith("admin.") || host.startsWith("dashboard.") || host.startsWith("help.")
+      ? "api." + host.split(".").slice(1).join(".")
+      : "api." + host;
+    return `${window.location.protocol}//${apiHost}`;
+  }
+  return env || "https://api.uniq.chat";
+}
 
 interface Config {
   title: string;
@@ -43,6 +57,7 @@ export default function ArticlePage({
   params: { slug: string; articleSlug: string };
 }) {
   const { slug, articleSlug } = params;
+  const [API] = useState(() => getApiBase());
   const [config, setConfig] = useState<Config | null>(null);
   const [article, setArticle] = useState<Article | null>(null);
   const [error, setError] = useState<string | null>(null);
