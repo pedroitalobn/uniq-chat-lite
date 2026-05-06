@@ -82,12 +82,23 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 }
 
 func (u *User) SetPassword(password string) error {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
+	hash, err := HashPassword(password)
 	if err != nil {
 		return err
 	}
-	u.PasswordHash = string(hash)
+	u.PasswordHash = hash
 	return nil
+}
+
+// HashPassword retorna o bcrypt hash de uma senha em texto puro,
+// útil quando precisamos persistir o hash em outro lugar (ex.: no
+// PendingRegistration enquanto o pagamento não confirma).
+func HashPassword(password string) (string, error) {
+	h, err := bcrypt.GenerateFromPassword([]byte(password), 12)
+	if err != nil {
+		return "", err
+	}
+	return string(h), nil
 }
 
 func (u *User) CheckPassword(password string) bool {

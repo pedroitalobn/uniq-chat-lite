@@ -1180,11 +1180,21 @@ func (h *AuthHandler) RegisterVerify(c *fiber.Ctx) error {
 		h.db.Model(&pending).Update("verified_at", now)
 	}
 
-	return c.JSON(fiber.Map{
+	resp := fiber.Map{
 		"pending_registration_id": pending.ID,
 		"email":                   pending.Email,
 		"plan_id":                 pending.PlanID,
-	})
+	}
+	// Hidrata nome/preço do plano pra UI mostrar a pill correta no
+	// passo final sem precisar de outro round-trip.
+	if pending.PlanID != nil {
+		var plan models.Plan
+		if h.db.First(&plan, "id = ?", pending.PlanID).Error == nil {
+			resp["plan_name"] = plan.Name
+			resp["plan_price"] = plan.Price
+		}
+	}
+	return c.JSON(resp)
 }
 
 // RegisterComplete godoc
@@ -1278,83 +1288,56 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		}
 	}
 
-	var user models.User
-	if isPaidPlan {
-		user = models.User{
-			Name:     req.Name,
-			Email:    pending.Email,
-			Role:     models.RoleLead,
-			IsActive: false,
-		}
-		if plan != nil {
-			user.PlanID = &plan.ID
-		}
-	} else {
-		var freePlan models.Plan
-		h.db.First(&freePlan, "name = 'Free'")
-		user = models.User{
-			Name:     req.Name,
-			Email:    pending.Email,
-			Role:     models.RoleCustomer,
-			IsActive: true,
-		}
-		if freePlan.ID != uuid.Nil {
-			user.PlanID = &freePlan.ID
-		}
-	}
-	if req.Username != "" {
-		user.Username = &req.Username
-	}
-	if err := user.SetPassword(req.Password); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao processar senha"})
-	}
-	if err := h.db.Create(&user).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar conta"})
-	}
-
-	// Mark invite code as used
-	if pending.InviteCode != "" {
-		MarkInviteCodeUsed(h.db, pending.InviteCode, user.ID)
-	}
-
-	workspace := createDefaultWorkspace(h.db, &user, req.WorkspaceName)
-
-	// Mark registration as completed
-	now := time.Now()
-	h.db.Model(&pending).Update("completed_at", now)
-
-	// Paid plan → Stripe checkout
+	// ────────────────────────────────────────────────────────────────
+	// Plano pago → adiamos a criação do User/Workspace até o webhook
+	// confirmar o pagamento. Antes a conta era criada com IsActive=false
+	// antes do checkout — isso vazava registros "fantasmas" quando o
+	// user abandonava o pagamento. Agora persistimos os dados do form
+	// no PendingRegistration; o User+Workspace só nascem em
+	// handleCheckoutCompleted/handlePaymentIntentSucceeded.
+	// ────────────────────────────────────────────────────────────────
 	if isPaidPlan && plan != nil {
-		cleanupLead := func() {
-			h.db.Unscoped().Delete(&user)
-			if workspace != nil {
-				h.db.Unscoped().Delete(workspace)
-			}
-			h.db.Model(&pending).Update("completed_at", nil)
+		if plan.StripePriceID == "" {
+			// Plano configurado como pago no DB mas sem price_id no
+			// Stripe — config errada. Sem isso o subscription mode
+			// retornaria 500 do Stripe sem mensagem clara.
+			return c.Status(fiber.StatusFailedDependency).JSON(fiber.Map{
+				"error": "plano pago sem price_id do Stripe configurado — contacte o suporte",
+			})
+		}
+
+		hashed, err := models.HashPassword(req.Password)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao processar senha"})
 		}
 
 		loadStripeConfigFromDB(h.db)
 		if stripeKey == "" {
-			cleanupLead()
 			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "pagamento não configurado — contacte o suporte"})
 		}
 		stripe.Key = stripeKey
 
 		cp := &stripe.CustomerParams{
-			Email: stripe.String(user.Email),
-			Name:  stripe.String(user.Name),
+			Email: stripe.String(pending.Email),
+			Name:  stripe.String(req.Name),
 			Metadata: map[string]string{
-				"user_id": user.ID.String(),
-				"lead_id": user.ID.String(),
-				"is_lead": "true",
+				"pending_id": pending.ID.String(),
 			},
 		}
 		sc, err := stripecustomer.New(cp)
 		if err != nil {
-			cleanupLead()
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar cliente Stripe"})
 		}
-		h.db.Model(&user).Update("stripe_customer_id", sc.ID)
+
+		// Snapshot do form no pending — vamos materializar User+Workspace
+		// no webhook usando esses dados.
+		h.db.Model(&pending).Updates(map[string]any{
+			"name":               req.Name,
+			"username":           req.Username,
+			"workspace_name":     req.WorkspaceName,
+			"password_hash":      hashed,
+			"stripe_customer_id": sc.ID,
+		})
 
 		frontendURL := config.AppConfig.FrontendURL
 		checkoutType := getStripeCheckoutType(h.db)
@@ -1366,10 +1349,8 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 				Customer:    stripe.String(sc.ID),
 				Description: stripe.String("Assinatura " + plan.Name),
 				Metadata: map[string]string{
-					"user_id": user.ID.String(),
-					"plan_id": plan.ID.String(),
-					"is_lead": "true",
-					"lead_id": user.ID.String(),
+					"pending_id": pending.ID.String(),
+					"plan_id":    plan.ID.String(),
 				},
 				AutomaticPaymentMethods: &stripe.PaymentIntentAutomaticPaymentMethodsParams{
 					Enabled: stripe.Bool(true),
@@ -1377,9 +1358,9 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 			}
 			pi, err := paymentintent.New(params)
 			if err != nil {
-				cleanupLead()
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar pagamento"})
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar pagamento: " + err.Error()})
 			}
+			h.db.Model(&pending).Update("stripe_pi_id", pi.ID)
 			return c.JSON(fiber.Map{
 				"checkout_type":     "transparent",
 				"client_secret":     pi.ClientSecret,
@@ -1387,7 +1368,7 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 				"plan_name":         plan.Name,
 				"plan_price":        plan.Price,
 				"amount":            pi.Amount,
-				"lead_id":           user.ID.String(),
+				"pending_id":        pending.ID.String(),
 			})
 		}
 
@@ -1397,29 +1378,62 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 			LineItems: []*stripe.CheckoutSessionLineItemParams{
 				{Price: stripe.String(plan.StripePriceID), Quantity: stripe.Int64(1)},
 			},
-			SuccessURL:        stripe.String(frontendURL + "/payment/success?session_id={CHECKOUT_SESSION_ID}&lead_id=" + user.ID.String()),
-			CancelURL:         stripe.String(frontendURL + "/plans"),
-			ClientReferenceID: stripe.String(user.ID.String()),
+			SuccessURL:        stripe.String(frontendURL + "/payment/success?session_id={CHECKOUT_SESSION_ID}&pending_id=" + pending.ID.String()),
+			CancelURL:         stripe.String(frontendURL + "/register/verify?token=" + pending.Token),
+			ClientReferenceID: stripe.String(pending.ID.String()),
 			SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
 				Metadata: map[string]string{
-					"user_id": user.ID.String(),
-					"plan_id": plan.ID.String(),
-					"is_lead": "true",
-					"lead_id": user.ID.String(),
+					"pending_id": pending.ID.String(),
+					"plan_id":    plan.ID.String(),
 				},
+			},
+			Metadata: map[string]string{
+				"pending_id": pending.ID.String(),
+				"plan_id":    plan.ID.String(),
 			},
 		}
 		sess, err := session.New(params)
 		if err != nil {
-			cleanupLead()
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar sessão de pagamento"})
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar sessão de pagamento: " + err.Error()})
 		}
+		h.db.Model(&pending).Update("stripe_session_id", sess.ID)
 		return c.JSON(fiber.Map{
 			"checkout_type": "redirect",
 			"url":           sess.URL,
-			"lead_id":       user.ID.String(),
+			"pending_id":    pending.ID.String(),
 		})
 	}
+
+	// ────────────────────────────────────────────────────────────────
+	// Plano grátis — cria User + Workspace agora.
+	// ────────────────────────────────────────────────────────────────
+	var freePlan models.Plan
+	h.db.First(&freePlan, "name = 'Free'")
+	user := models.User{
+		Name:     req.Name,
+		Email:    pending.Email,
+		Role:     models.RoleCustomer,
+		IsActive: true,
+	}
+	if freePlan.ID != uuid.Nil {
+		user.PlanID = &freePlan.ID
+	}
+	if req.Username != "" {
+		user.Username = &req.Username
+	}
+	if err := user.SetPassword(req.Password); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao processar senha"})
+	}
+	if err := h.db.Create(&user).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar conta"})
+	}
+
+	if pending.InviteCode != "" {
+		MarkInviteCodeUsed(h.db, pending.InviteCode, user.ID)
+	}
+	workspace := createDefaultWorkspace(h.db, &user, req.WorkspaceName)
+	now := time.Now()
+	h.db.Model(&pending).Update("completed_at", now)
 
 	// Free plan — return tokens
 	h.emailSvc.SendWelcome(user.Email, user.Name)

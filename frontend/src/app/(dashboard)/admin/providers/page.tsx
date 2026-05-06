@@ -18,25 +18,29 @@ type CommSection = "email" | "templates" | "otp";
 
 interface PaymentSettings {
   active_provider: string;
-  stripe_secret_key?: string;
-  stripe_webhook_secret?: string;
   stripe_checkout_type?: string;
   stripe_configured?: boolean;
   stripe_webhook_url?: string;
+  /** Preview mascarado da secret key (ex: "sk_l••••••••aBc1"). Nunca a key crua. */
+  stripe_secret_key_preview?: string;
+  /** "live" | "test" | "" — derivado do prefixo da secret key. */
+  stripe_secret_key_env?: string;
+  stripe_webhook_secret_preview?: string;
   /** Status real do último teste de conectividade — "ok" | "failed" | "" (nunca testado). */
   stripe_test_status?: string;
   stripe_tested_at?: string | null;
   stripe_test_error?: string;
-  asaas_api_key?: string;
-  asaas_webhook_secret?: string;
   asaas_environment?: string;
   asaas_configured?: boolean;
   asaas_webhook_url?: string;
+  asaas_api_key_preview?: string;
+  asaas_webhook_secret_preview?: string;
   asaas_test_status?: string;
   asaas_tested_at?: string | null;
   asaas_test_error?: string;
-  hotmart_api_key?: string;
   hotmart_configured?: boolean;
+  hotmart_api_key_preview?: string;
+  hotmart_webhook_secret_preview?: string;
   hotmart_test_status?: string;
   hotmart_tested_at?: string | null;
   hotmart_test_error?: string;
@@ -238,14 +242,14 @@ function PaymentTab() {
   useEffect(() => {
     if (settings) {
       setProvider(settings.active_provider || "stripe");
+      // Os campos de credencial ficam vazios — backend não devolve a
+      // key crua mais, só preview mascarado. Se o admin quiser
+      // alterar, digita a nova; se deixar vazio, o save preserva
+      // a atual (handler ignora strings vazias).
       setForm(f => ({
         ...f,
-        stripe_webhook_secret: settings.stripe_webhook_secret || "",
         stripe_checkout_type: settings.stripe_checkout_type || "redirect",
-        asaas_api_key: settings.asaas_api_key || "",
-        asaas_webhook_secret: settings.asaas_webhook_secret || "",
         asaas_environment: settings.asaas_environment || "sandbox",
-        hotmart_api_key: settings.hotmart_api_key || "",
       }));
     }
   }, [settings]);
@@ -324,15 +328,41 @@ function PaymentTab() {
               <div className="relative">
                 <Input type="password" value={form.stripe_secret_key}
                   onChange={e => setForm(f => ({ ...f, stripe_secret_key: e.target.value }))}
-                  placeholder="sk_live_..." />
+                  placeholder={settings?.stripe_secret_key_preview || "sk_live_..."} />
               </div>
+              {settings?.stripe_secret_key_preview && (
+                <div className="flex items-center gap-2 mt-1.5">
+                  <code className="text-[11px] font-mono px-1.5 py-0.5 rounded"
+                    style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 65%)" }}>
+                    {settings.stripe_secret_key_preview}
+                  </code>
+                  {settings.stripe_secret_key_env === "live" && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                      style={{ background: "rgba(0,212,106,0.12)", color: "#00d46a" }}>
+                      Live
+                    </span>
+                  )}
+                  {settings.stripe_secret_key_env === "test" && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                      style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24" }}>
+                      Test
+                    </span>
+                  )}
+                </div>
+              )}
               <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 40%)" }}>Deixe vazio para manter o atual</p>
             </div>
             <div>
               <Label>Webhook Secret</Label>
               <Input type="password" value={form.stripe_webhook_secret}
                 onChange={e => setForm(f => ({ ...f, stripe_webhook_secret: e.target.value }))}
-                placeholder="whsec_..." />
+                placeholder={settings?.stripe_webhook_secret_preview || "whsec_..."} />
+              {settings?.stripe_webhook_secret_preview && (
+                <code className="inline-block mt-1.5 text-[11px] font-mono px-1.5 py-0.5 rounded"
+                  style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 65%)" }}>
+                  {settings.stripe_webhook_secret_preview}
+                </code>
+              )}
             </div>
           </div>
           <div className="mt-4">
@@ -383,7 +413,28 @@ function PaymentTab() {
               <Label>API Key</Label>
               <Input type="password" value={form.asaas_api_key}
                 onChange={e => setForm(f => ({ ...f, asaas_api_key: e.target.value }))}
-                placeholder="$aas_..." />
+                placeholder={settings?.asaas_api_key_preview || "$aas_..."} />
+              {settings?.asaas_api_key_preview && (
+                <div className="flex items-center gap-2 mt-1.5">
+                  <code className="text-[11px] font-mono px-1.5 py-0.5 rounded"
+                    style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 65%)" }}>
+                    {settings.asaas_api_key_preview}
+                  </code>
+                  {settings?.asaas_environment === "production" && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                      style={{ background: "rgba(0,212,106,0.12)", color: "#00d46a" }}>
+                      Produção
+                    </span>
+                  )}
+                  {settings?.asaas_environment === "sandbox" && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                      style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24" }}>
+                      Sandbox
+                    </span>
+                  )}
+                </div>
+              )}
+              <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 40%)" }}>Deixe vazio para manter o atual</p>
             </div>
             <div>
               <Label>Ambiente</Label>
@@ -396,7 +447,13 @@ function PaymentTab() {
               <Label>Webhook Secret</Label>
               <Input type="password" value={form.asaas_webhook_secret}
                 onChange={e => setForm(f => ({ ...f, asaas_webhook_secret: e.target.value }))}
-                placeholder="whsec_..." />
+                placeholder={settings?.asaas_webhook_secret_preview || "whsec_..."} />
+              {settings?.asaas_webhook_secret_preview && (
+                <code className="inline-block mt-1.5 text-[11px] font-mono px-1.5 py-0.5 rounded"
+                  style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 65%)" }}>
+                  {settings.asaas_webhook_secret_preview}
+                </code>
+              )}
             </div>
           </div>
           <div className="mt-4 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>

@@ -82,17 +82,22 @@ func (h *AdminHandler) GetPaymentSettings(c *fiber.Ctx) error {
 	asaasWebhookURL := appURL + "/api/asaas/webhook"
 
 	return c.JSON(fiber.Map{
-		"id":                     settings.ID,
-		"active_provider":        activeProvider,
-		"stripe_secret_key":      settings.StripeSecretKey,
-		"stripe_webhook_secret":  settings.StripeWebhookSecret,
-		"stripe_checkout_type":   settings.StripeCheckoutType,
-		"asaas_api_key":          settings.AsaasAPIKey,
-		"asaas_environment":      settings.AsaasEnvironment,
-		"asaas_webhook_secret":   settings.AsaasWebhookSecret,
-		"asaas_checkout_type":    settings.AsaasCheckoutType,
-		"hotmart_api_key":        settings.HotmartAPIKey,
-		"hotmart_webhook_secret": settings.HotmartWebhookSecret,
+		"id":                   settings.ID,
+		"active_provider":      activeProvider,
+		"stripe_checkout_type": settings.StripeCheckoutType,
+		"asaas_environment":    settings.AsaasEnvironment,
+		"asaas_checkout_type":  settings.AsaasCheckoutType,
+		// Previews mascarados — UI mostra os primeiros/últimos 4
+		// chars pra admin saber qual chave/ambiente está salvo
+		// (ex.: sk_live_*** vs sk_test_***) sem expor o segredo.
+		// Não retornamos a key crua na resposta.
+		"stripe_secret_key_preview":     maskCredential(settings.StripeSecretKey),
+		"stripe_secret_key_env":         detectStripeEnv(settings.StripeSecretKey),
+		"stripe_webhook_secret_preview": maskCredential(settings.StripeWebhookSecret),
+		"asaas_api_key_preview":         maskCredential(settings.AsaasAPIKey),
+		"asaas_webhook_secret_preview":  maskCredential(settings.AsaasWebhookSecret),
+		"hotmart_api_key_preview":       maskCredential(settings.HotmartAPIKey),
+		"hotmart_webhook_secret_preview": maskCredential(settings.HotmartWebhookSecret),
 		// Status de configuração: existe credencial salva (estado fraco).
 		"stripe_configured":  stripeConfigured,
 		"asaas_configured":   asaasConfigured,
@@ -171,6 +176,35 @@ func truncErr(s string, n int) string {
 		return s[:n] + "…"
 	}
 	return s
+}
+
+// maskCredential devolve um preview seguro da credencial — primeiros 4 e
+// últimos 4 caracteres com bullets no meio. Permite ao admin
+// confirmar visualmente qual chave está salva (ex.: distinguir
+// sk_live_… de sk_test_…) sem expor o segredo completo na UI/network.
+func maskCredential(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	if len(s) <= 8 {
+		return strings.Repeat("•", len(s))
+	}
+	return s[:4] + "••••••••" + s[len(s)-4:]
+}
+
+// detectStripeEnv inspeciona o prefixo da secret key. Stripe usa
+// sk_live_/rk_live_ para produção e sk_test_/rk_test_ para teste —
+// é a forma mais confiável de saber em qual ambiente estamos.
+func detectStripeEnv(s string) string {
+	s = strings.TrimSpace(s)
+	switch {
+	case strings.HasPrefix(s, "sk_live_"), strings.HasPrefix(s, "rk_live_"), strings.HasPrefix(s, "pk_live_"):
+		return "live"
+	case strings.HasPrefix(s, "sk_test_"), strings.HasPrefix(s, "rk_test_"), strings.HasPrefix(s, "pk_test_"):
+		return "test"
+	}
+	return ""
 }
 
 // UpdatePaymentSettings godoc
@@ -274,23 +308,24 @@ func (h *AdminHandler) UpdatePaymentSettings(c *fiber.Ctx) error {
 	h.db.First(&settings, "id = ?", "default")
 
 	return c.JSON(fiber.Map{
-		"id":                     settings.ID,
-		"active_provider":        string(settings.ActiveProvider),
-		"stripe_secret_key":      settings.StripeSecretKey,
-		"stripe_webhook_secret":  settings.StripeWebhookSecret,
-		"stripe_checkout_type":   settings.StripeCheckoutType,
-		"stripe_test_status":     settings.StripeTestStatus,
-		"stripe_tested_at":       settings.StripeTestedAt,
-		"stripe_test_error":      settings.StripeTestError,
-		"asaas_api_key":          settings.AsaasAPIKey,
-		"asaas_environment":      settings.AsaasEnvironment,
-		"asaas_webhook_secret":   settings.AsaasWebhookSecret,
-		"asaas_checkout_type":    settings.AsaasCheckoutType,
-		"asaas_test_status":      settings.AsaasTestStatus,
-		"asaas_tested_at":        settings.AsaasTestedAt,
-		"asaas_test_error":       settings.AsaasTestError,
-		"hotmart_api_key":        settings.HotmartAPIKey,
-		"hotmart_webhook_secret": settings.HotmartWebhookSecret,
+		"id":                             settings.ID,
+		"active_provider":                string(settings.ActiveProvider),
+		"stripe_checkout_type":           settings.StripeCheckoutType,
+		"stripe_test_status":             settings.StripeTestStatus,
+		"stripe_tested_at":               settings.StripeTestedAt,
+		"stripe_test_error":              settings.StripeTestError,
+		"asaas_environment":              settings.AsaasEnvironment,
+		"asaas_checkout_type":            settings.AsaasCheckoutType,
+		"asaas_test_status":              settings.AsaasTestStatus,
+		"asaas_tested_at":                settings.AsaasTestedAt,
+		"asaas_test_error":               settings.AsaasTestError,
+		"stripe_secret_key_preview":      maskCredential(settings.StripeSecretKey),
+		"stripe_secret_key_env":          detectStripeEnv(settings.StripeSecretKey),
+		"stripe_webhook_secret_preview":  maskCredential(settings.StripeWebhookSecret),
+		"asaas_api_key_preview":          maskCredential(settings.AsaasAPIKey),
+		"asaas_webhook_secret_preview":   maskCredential(settings.AsaasWebhookSecret),
+		"hotmart_api_key_preview":        maskCredential(settings.HotmartAPIKey),
+		"hotmart_webhook_secret_preview": maskCredential(settings.HotmartWebhookSecret),
 	})
 }
 

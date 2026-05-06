@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { Suspense, useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Mail, ArrowRight, Loader2, AlertCircle,
-  CheckCircle2, RefreshCw, ExternalLink, ArrowLeft,
+  CheckCircle2, RefreshCw, ExternalLink, ArrowLeft, Sparkles,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 
@@ -58,11 +59,22 @@ function InputField({
 }
 
 // ── Step 1: Email ─────────────────────────────────────────────────────────────
-function StepEmail({ onSent }: { onSent: (email: string) => void }) {
+function StepEmail({
+  onSent, planName, planID, planPrice,
+}: {
+  onSent: (email: string) => void;
+  planName?: string;
+  planID?: string;
+  planPrice?: number;
+}) {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isConflict, setIsConflict] = useState(false);
+  const isPaid = !!planName && (planPrice ?? 0) > 0;
+  const priceLabel = (planPrice ?? 0) > 0
+    ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(planPrice as number)
+    : "";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -74,7 +86,7 @@ function StepEmail({ onSent }: { onSent: (email: string) => void }) {
       const res = await fetch(`${API}/v1/auth/register/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmed }),
+        body: JSON.stringify({ email: trimmed, plan_id: planID || undefined }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -96,9 +108,28 @@ function StepEmail({ onSent }: { onSent: (email: string) => void }) {
         <h1 className="text-2xl font-bold text-[hsl(240_15%_92%)] tracking-tight">
           Crie sua conta
         </h1>
-        <p className="text-sm text-[hsl(240_8%_50%)] leading-relaxed">
-          Comece grátis — sem cartão de crédito
-        </p>
+        {planName ? (
+          <div className="flex items-center gap-2 mt-1">
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+              style={{
+                background: isPaid ? "rgba(0,212,106,0.10)" : "rgba(99,91,255,0.10)",
+                border: `1px solid ${isPaid ? "rgba(0,212,106,0.25)" : "rgba(99,91,255,0.25)"}`,
+                color: isPaid ? "#00d46a" : "#a5a3ff",
+              }}
+            >
+              <Sparkles className="w-3 h-3" />
+              Plano {planName}
+              {isPaid && (
+                <span className="ml-1 opacity-80">· {priceLabel}/mês</span>
+              )}
+            </span>
+          </div>
+        ) : (
+          <p className="text-sm text-[hsl(240_8%_50%)] leading-relaxed">
+            Comece grátis — sem cartão de crédito
+          </p>
+        )}
       </div>
 
       <InputField
@@ -292,7 +323,13 @@ function StepCheckEmail({ email, onBack }: { email: string; onBack: () => void }
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
-export default function RegisterPage() {
+function RegisterContent() {
+  const params = useSearchParams();
+  const planName = params.get("plan") || undefined;
+  const planID = params.get("plan_id") || undefined;
+  const priceParam = params.get("price");
+  const planPrice = priceParam ? Number(priceParam) : undefined;
+
   const [step, setStep] = useState<0 | 1>(0);
   const [email, setEmail] = useState("");
   const [dir, setDir] = useState(1);
@@ -354,7 +391,7 @@ export default function RegisterPage() {
               <motion.div key="email" custom={dir} variants={slide}
                 initial="enter" animate="center" exit="exit"
                 transition={{ duration: 0.2, ease: "easeInOut" }}>
-                <StepEmail onSent={goToCheck} />
+                <StepEmail onSent={goToCheck} planName={planName} planID={planID} planPrice={planPrice} />
               </motion.div>
             ) : (
               <motion.div key="check" custom={dir} variants={slide}
@@ -378,5 +415,13 @@ export default function RegisterPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense>
+      <RegisterContent />
+    </Suspense>
   );
 }

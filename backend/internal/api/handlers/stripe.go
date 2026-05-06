@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -280,6 +281,15 @@ func (h *StripeHandler) Webhook(c *fiber.Ctx) error {
 			h.handleCheckoutCompleted(&sess)
 		}
 
+	case "payment_intent.succeeded":
+		// Necessário pro fluxo "transparent" (PaymentIntent puro,
+		// sem Checkout Session). É aqui que materializamos o
+		// User+Workspace quando o pending tem pending_id.
+		var pi stripe.PaymentIntent
+		if err := json.Unmarshal(event.Data.Raw, &pi); err == nil {
+			h.handlePaymentIntentSucceeded(&pi)
+		}
+
 	case "customer.subscription.updated":
 		var sub stripe.Subscription
 		if err := json.Unmarshal(event.Data.Raw, &sub); err == nil {
@@ -303,6 +313,18 @@ func (h *StripeHandler) Webhook(c *fiber.Ctx) error {
 }
 
 func (h *StripeHandler) handleCheckoutCompleted(sess *stripe.CheckoutSession) {
+	// Novo fluxo: pending_id na metadata significa que ainda não
+	// existe User no DB — precisamos materializar agora a partir do
+	// PendingRegistration.
+	if sess.Metadata != nil && sess.Metadata["pending_id"] != "" {
+		subID := ""
+		if sess.Subscription != nil {
+			subID = sess.Subscription.ID
+		}
+		h.materializePending(sess.Metadata["pending_id"], sess.Metadata["plan_id"], subID, sess.ID)
+		return
+	}
+
 	userID := sess.ClientReferenceID
 	planID := ""
 	isLead := false
@@ -428,4 +450,109 @@ func (h *StripeHandler) handlePaymentFailed(inv *stripe.Invoice) {
 	if h.db.Where("stripe_customer_id = ?", inv.Customer.ID).First(&user).Error == nil {
 		h.emailSvc.SendPaymentFailed(user.Email, user.Name)
 	}
+}
+
+// handlePaymentIntentSucceeded é o gatilho do fluxo "transparent"
+// (Stripe Elements). Olha a metadata pra saber se é uma matrícula
+// nova adiada (pending_id presente) e materializa User+Workspace.
+func (h *StripeHandler) handlePaymentIntentSucceeded(pi *stripe.PaymentIntent) {
+	if pi.Metadata == nil {
+		return
+	}
+	pendingID := pi.Metadata["pending_id"]
+	if pendingID == "" {
+		return
+	}
+	h.materializePending(pendingID, pi.Metadata["plan_id"], "", pi.ID)
+}
+
+// materializePending cria User+Workspace a partir do snapshot guardado
+// no PendingRegistration. É idempotente: se já existe um User com
+// aquele email, não duplica (apenas atualiza ativação/plano).
+func (h *StripeHandler) materializePending(pendingIDStr, planIDStr, subscriptionID, sessionOrPIID string) {
+	pendingID, err := uuid.Parse(pendingIDStr)
+	if err != nil {
+		return
+	}
+	var pending models.PendingRegistration
+	if err := h.db.First(&pending, "id = ?", pendingID).Error; err != nil {
+		return
+	}
+	if pending.Name == "" || pending.PasswordHash == "" {
+		// Pending sem snapshot — fluxo não-defer (cobranças de
+		// upgrade de user existente cairiam aqui).
+		return
+	}
+	// Idempotência: se já materializamos uma vez (CompletedAt setado),
+	// só atualiza assinatura.
+	if pending.IsCompleted() {
+		var existing models.User
+		if h.db.Where("email = ?", pending.Email).First(&existing).Error == nil {
+			updates := map[string]any{
+				"is_active":                  true,
+				"role":                       "customer",
+				"stripe_subscription_status": "active",
+			}
+			if subscriptionID != "" {
+				updates["stripe_subscription_id"] = subscriptionID
+			}
+			h.db.Model(&existing).Updates(updates)
+		}
+		return
+	}
+
+	planID, _ := uuid.Parse(planIDStr)
+	var plan models.Plan
+	hasPlan := false
+	if planID != uuid.Nil {
+		if h.db.First(&plan, "id = ?", planID).Error == nil {
+			hasPlan = true
+		}
+	}
+
+	user := models.User{
+		Name:             pending.Name,
+		Email:            pending.Email,
+		Role:             models.RoleCustomer,
+		IsActive:         true,
+		PasswordHash:     pending.PasswordHash,
+		StripeCustomerID: pending.StripeCustomerID,
+	}
+	if pending.Username != "" {
+		u := pending.Username
+		user.Username = &u
+	}
+	if hasPlan {
+		user.PlanID = &plan.ID
+	}
+	if subscriptionID != "" {
+		user.StripeSubscriptionID = subscriptionID
+		user.StripeSubscriptionStatus = "active"
+	}
+	if err := h.db.Create(&user).Error; err != nil {
+		return
+	}
+
+	if pending.InviteCode != "" {
+		MarkInviteCodeUsed(h.db, pending.InviteCode, user.ID)
+	}
+
+	wsName := pending.WorkspaceName
+	if wsName == "" {
+		first := strings.Fields(pending.Name)
+		if len(first) > 0 {
+			wsName = first[0] + "'s Workspace"
+		} else {
+			wsName = "Meu Workspace"
+		}
+	}
+	createDefaultWorkspace(h.db, &user, wsName)
+
+	now := time.Now()
+	h.db.Model(&pending).Update("completed_at", now)
+
+	if hasPlan {
+		h.emailSvc.SendPaymentConfirmed(user.Email, user.Name, plan.Name, plan.Price)
+	}
+	h.emailSvc.SendWelcome(user.Email, user.Name)
 }

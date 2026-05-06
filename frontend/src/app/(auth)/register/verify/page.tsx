@@ -114,9 +114,13 @@ interface PlanOption {
 }
 
 function CompleteForm({
-  email, pendingId,
+  email, pendingId, prefilledPlanID, prefilledPlanName, prefilledPlanPrice,
 }: {
-  email: string; pendingId: string;
+  email: string;
+  pendingId: string;
+  prefilledPlanID?: string;
+  prefilledPlanName?: string;
+  prefilledPlanPrice?: number;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -126,18 +130,18 @@ function CompleteForm({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  // Plan picker — busca planos públicos e deixa o user escolher (free
-  // ou paid) na hora de completar a conta. Antes o plan_id ficava preso
-  // ao que veio (ou não veio) na /register/start; quando user entrava
-  // direto em /register sem passar por /plans, o pending ficava sem
-  // plan e a conta era criada free SEM passar pelo checkout.
+  // Quando o pending já traz plan_id (user veio de /plans → /register?plan_id=...)
+  // pulamos o picker — ele já escolheu, não faz sentido perguntar de novo.
+  // Caso contrário busca a lista pública e deixa escolher.
+  const hasPrefilledPlan = !!prefilledPlanID;
   const [plans, setPlans] = useState<PlanOption[]>([]);
-  const [selectedPlanID, setSelectedPlanID] = useState<string>("");
-  const [loadingPlans, setLoadingPlans] = useState(true);
+  const [selectedPlanID, setSelectedPlanID] = useState<string>(prefilledPlanID ?? "");
+  const [loadingPlans, setLoadingPlans] = useState(!hasPrefilledPlan);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    if (hasPrefilledPlan) return;
     let cancelled = false;
     async function loadPlans() {
       try {
@@ -147,7 +151,6 @@ function CompleteForm({
         if (cancelled) return;
         const items: PlanOption[] = Array.isArray(data) ? data : data.items ?? data.plans ?? [];
         setPlans(items);
-        // Pre-seleciona o plano default (price=0) ou o primeiro
         const def = items.find((p) => p.is_default) ?? items.find((p) => p.price === 0) ?? items[0];
         if (def) setSelectedPlanID(def.id);
       } catch {
@@ -158,10 +161,14 @@ function CompleteForm({
     }
     loadPlans();
     return () => { cancelled = true; };
-  }, []);
+  }, [hasPrefilledPlan]);
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanID);
-  const isPaid = !!selectedPlan && selectedPlan.price > 0;
+  const isPaid = hasPrefilledPlan
+    ? (prefilledPlanPrice ?? 0) > 0
+    : !!selectedPlan && selectedPlan.price > 0;
+  const planLabel = hasPrefilledPlan ? prefilledPlanName : selectedPlan?.name;
+  const planPriceVal = hasPrefilledPlan ? prefilledPlanPrice : selectedPlan?.price;
 
   function validate() {
     const e: Record<string, string> = {};
@@ -302,7 +309,32 @@ function CompleteForm({
         }
       />
 
-      {!loadingPlans && plans.length > 0 && (
+      {hasPrefilledPlan && planLabel && (
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-medium text-[hsl(240_15%_65%)]">Plano selecionado</label>
+          <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl"
+            style={{
+              background: isPaid ? "rgba(0,212,106,0.06)" : "rgba(99,91,255,0.06)",
+              border: `1px solid ${isPaid ? "rgba(0,212,106,0.25)" : "rgba(99,91,255,0.25)"}`,
+            }}>
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-[hsl(240_15%_92%)]">{planLabel}</span>
+              <span className="text-xs text-[hsl(240_8%_50%)]">
+                {isPaid
+                  ? "Você será redirecionado para o pagamento após criar o perfil."
+                  : "Plano grátis — sem cartão de crédito."}
+              </span>
+            </div>
+            <span className="text-sm font-semibold" style={{ color: isPaid ? "#00d46a" : "#a5a3ff" }}>
+              {(planPriceVal ?? 0) > 0
+                ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(planPriceVal as number)
+                : "Grátis"}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {!hasPrefilledPlan && !loadingPlans && plans.length > 0 && (
         <div className="flex flex-col gap-2">
           <label className="text-xs font-medium text-[hsl(240_15%_65%)]">Escolha seu plano</label>
           <div className="grid grid-cols-1 gap-2">
@@ -371,7 +403,7 @@ function CompleteForm({
 // ── Token validation states ───────────────────────────────────────────────────
 type TokenState =
   | { status: "loading" }
-  | { status: "valid"; email: string; pendingId: string }
+  | { status: "valid"; email: string; pendingId: string; planID?: string; planName?: string; planPrice?: number }
   | { status: "invalid"; message: string }
   | { status: "expired" };
 
@@ -391,7 +423,14 @@ function VerifyContent() {
         const data = await res.json();
         if (res.status === 410) { setState({ status: "expired" }); return; }
         if (!res.ok) { setState({ status: "invalid", message: data.error || "Link inválido" }); return; }
-        setState({ status: "valid", email: data.email, pendingId: data.pending_registration_id });
+        setState({
+          status: "valid",
+          email: data.email,
+          pendingId: data.pending_registration_id,
+          planID: data.plan_id ?? undefined,
+          planName: data.plan_name ?? undefined,
+          planPrice: typeof data.plan_price === "number" ? data.plan_price : undefined,
+        });
       })
       .catch(() => setState({ status: "invalid", message: "Erro de conexão" }));
   }, [token]);
@@ -442,7 +481,13 @@ function VerifyContent() {
                     </div>
                   ))}
                 </div>
-                <CompleteForm email={state.email} pendingId={state.pendingId} />
+                <CompleteForm
+                  email={state.email}
+                  pendingId={state.pendingId}
+                  prefilledPlanID={state.planID}
+                  prefilledPlanName={state.planName}
+                  prefilledPlanPrice={state.planPrice}
+                />
               </motion.div>
             )}
 

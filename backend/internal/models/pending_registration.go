@@ -20,8 +20,21 @@ type PendingRegistration struct {
 	WorkspaceInviteToken string     `gorm:"type:varchar(64)" json:"workspace_invite_token,omitempty"`
 	ExpiresAt            time.Time  `json:"expires_at"`
 	VerifiedAt           *time.Time `json:"verified_at,omitempty"`  // set after magic link click
-	CompletedAt          *time.Time `json:"completed_at,omitempty"` // set after profile submitted
+	CompletedAt          *time.Time `json:"completed_at,omitempty"` // set after profile submitted (paid plans: só após webhook de pagamento)
 	CreatedAt            time.Time  `json:"created_at"`
+
+	// Snapshot do form da etapa /register/complete pra planos pagos —
+	// guardamos aqui tudo que é necessário pra materializar User+Workspace
+	// depois que o Stripe confirmar o pagamento via webhook. Antes a conta
+	// era criada inativa antes do checkout, agora só existe se o pagamento
+	// passou.
+	Name              string `gorm:"type:varchar(255)" json:"-"`
+	Username          string `gorm:"type:varchar(60)" json:"-"`
+	WorkspaceName     string `gorm:"type:varchar(120)" json:"-"`
+	PasswordHash      string `gorm:"type:varchar(255)" json:"-"`
+	StripeCustomerID  string `gorm:"type:varchar(64);index" json:"-"`
+	StripeSessionID   string `gorm:"type:varchar(128);index" json:"-"`
+	StripePIID        string `gorm:"type:varchar(128);index" json:"-"`
 }
 
 func (p *PendingRegistration) BeforeCreate(_ *gorm.DB) error {
