@@ -418,17 +418,75 @@ export default function AgentsPage() {
                 <ArrowLeft className="w-3 h-3" /> Agentes
               </button>
             )}
-            <h1 className="text-xl sm:text-2xl font-semibold flex items-center gap-2" style={{ color: "var(--text-1)" }}>
-              <Bot className="w-5 h-5" style={{ color: "#a78bfa" }} />
-              {view === "editor" && selectedInstance
-                ? (instancesQuery.data?.find((i: any) => i.id === selectedInstance)?.name ?? "Agente")
-                : "Agentes IA"}
-            </h1>
-            <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
-              {view === "list"
-                ? "Configure, treine e ative seus agentes de IA por instância."
-                : "Personalidade · voz · 30+ skills · integrações"}
-            </p>
+            {view === "list" && (
+              <>
+                <h1 className="text-xl sm:text-2xl font-semibold flex items-center gap-2" style={{ color: "var(--text-1)" }}>
+                  <Bot className="w-5 h-5" style={{ color: "#a78bfa" }} />
+                  Agentes IA
+                </h1>
+                <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
+                  Configure, treine e ative seus agentes de IA por instância.
+                </p>
+              </>
+            )}
+
+            {view === "editor" && (() => {
+              const inst = instancesQuery.data?.find((i: any) => i.id === selectedInstance);
+              const channelColor = inst ? (CHANNEL_COLOR[inst.channel] || "#a78bfa") : "#a78bfa";
+              const displayName = form.agent_name?.trim() || "Agente sem nome";
+              return (
+                <div className="flex items-start gap-3 min-w-0">
+                  {/* Avatar com cor do canal — reforça vínculo visual */}
+                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 mt-1"
+                    style={{
+                      background: `${channelColor}1a`,
+                      border: `1px solid ${channelColor}40`,
+                    }}>
+                    <Bot className="w-5 h-5" style={{ color: channelColor }} />
+                  </div>
+                  <div className="min-w-0">
+                    {/* Nome do agente em destaque + edição inline.
+                        Antes mostrava o nome da INSTÂNCIA aqui — agora
+                        o nome do agente vem primeiro, instância vai
+                        pra metadata abaixo. */}
+                    <input
+                      value={form.agent_name}
+                      onChange={(e) => setForm((p) => ({ ...p, agent_name: e.target.value }))}
+                      placeholder="Nome do agente"
+                      className="w-full bg-transparent border-0 outline-none text-xl sm:text-2xl font-semibold tracking-tight"
+                      style={{
+                        color: form.agent_name?.trim() ? "var(--text-1)" : "var(--text-3)",
+                        minWidth: 200,
+                      }}
+                      title="Clique para editar o nome do agente"
+                    />
+                    {/* Subtítulo: instância vinculada + canal + status */}
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <span className="text-[11px]" style={{ color: "var(--text-3)" }}>
+                        Conectado a
+                      </span>
+                      {inst ? (
+                        <>
+                          <span className="text-xs font-medium" style={{ color: "var(--text-2)" }}>
+                            {inst.name}
+                          </span>
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full capitalize"
+                            style={{ background: `${channelColor}18`, color: channelColor, border: `1px solid ${channelColor}30` }}>
+                            {String(inst.channel ?? "").replace("_", " ")}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: STATUS_COLOR[inst.status] || "#71717a" }}>
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ background: STATUS_COLOR[inst.status] || "#71717a" }} />
+                            {inst.status}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-xs" style={{ color: "var(--text-3)" }}>Selecione uma instância</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Live stat pills */}
@@ -563,9 +621,11 @@ export default function AgentsPage() {
       <div className="grid grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)] gap-5">
         {/* Sidebar */}
         <aside className="space-y-4">
-          {/* Instance selector */}
+          {/* Instance selector — seguindo a mesma hierarquia da
+              header: agora rotulado como "Trocar de agente" pra
+              deixar claro que cada instância tem seu agente separado. */}
           <div className="rounded-3xl p-4" style={cs(true)}>
-            <p className="text-xs font-medium uppercase tracking-[0.16em] mb-2" style={{ color: "var(--text-3)" }}>Instância</p>
+            <p className="text-xs font-medium uppercase tracking-[0.16em] mb-2" style={{ color: "var(--text-3)" }}>Trocar de agente</p>
             <select
               value={selectedInstance}
               onChange={(e) => setSelectedInstance(e.target.value)}
