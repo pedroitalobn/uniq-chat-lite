@@ -18,6 +18,8 @@ function CheckoutContent() {
   // For transparent checkout from registration
   const clientSecret = searchParams.get("client_secret");
   const leadId = searchParams.get("lead_id");
+  const pendingId = searchParams.get("pending_id");
+  const paymentIntentId = searchParams.get("payment_intent_id");
   const planName = searchParams.get("plan_name");
   const planPrice = searchParams.get("plan_price");
 
@@ -71,9 +73,39 @@ function CheckoutContent() {
 
   const handlePayment = async () => {
     setProcessing(true);
-    
-    if (isTransparentCheckout && leadId) {
-      // Call activate lead after successful payment
+
+    // Fluxo novo (defer-creation): finaliza no servidor confirmando o
+    // PaymentIntent direto na API do Stripe e materializando User+Workspace.
+    // Frontend faz auto-login com o access_token devolvido.
+    if (isTransparentCheckout && pendingId) {
+      try {
+        const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/v1/stripe/finalize-registration`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pending_id: pendingId,
+            payment_intent_id: paymentIntentId || undefined,
+          }),
+        });
+        const data = await r.json();
+        if (!r.ok) {
+          toast.error(data.error || "Erro ao finalizar cadastro");
+          setProcessing(false);
+          return;
+        }
+        if (data.access_token) {
+          // Redireciona pro success com pending_id pra a página de
+          // sucesso fazer signIn e exibir countdown.
+          router.push(`/payment/success?pending_id=${pendingId}`);
+          return;
+        }
+      } catch (e) {
+        toast.error("Erro de rede ao finalizar cadastro");
+        setProcessing(false);
+        return;
+      }
+    } else if (isTransparentCheckout && leadId) {
+      // Fluxo legado (upgrade de user existente)
       try {
         await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/stripe/activate-lead`, {
           method: "POST",
@@ -84,7 +116,7 @@ function CheckoutContent() {
         console.error("Failed to activate lead:", e);
       }
     }
-    
+
     setTimeout(() => {
       setStep("success");
       setProcessing(false);

@@ -107,6 +107,119 @@ func (h *StripeHandler) ActivateLead(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "lead ativado com sucesso", "user_id": user.ID})
 }
 
+// POST /stripe/finalize-registration — endpoint público chamado pelo
+// front depois que o usuário paga no Stripe Elements (transparent) ou
+// volta de uma Checkout Session. Não dependemos só do webhook: aqui
+// consultamos a API do Stripe pra confirmar o status do PI/Session
+// e materializamos o User+Workspace na hora se já estiver pago.
+//
+// Body: { "pending_id": "...", "payment_intent_id": "..." (opt), "session_id": "..." (opt) }
+// Resposta: { access_token, user, workspace } igual ao /register/complete free.
+func (h *StripeHandler) FinalizeRegistration(c *fiber.Ctx) error {
+	var req struct {
+		PendingID       string `json:"pending_id"`
+		PaymentIntentID string `json:"payment_intent_id"`
+		SessionID       string `json:"session_id"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+	if strings.TrimSpace(req.PendingID) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "pending_id é obrigatório"})
+	}
+	pendingID, err := uuid.Parse(req.PendingID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "pending_id inválido"})
+	}
+
+	var pending models.PendingRegistration
+	if err := h.db.First(&pending, "id = ?", pendingID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "pending não encontrado"})
+	}
+
+	loadStripeConfigFromDB(h.db)
+	stripe.Key = stripeKey
+	if stripe.Key == "" {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "stripe não configurado"})
+	}
+
+	piID := req.PaymentIntentID
+	if piID == "" {
+		piID = pending.StripePIID
+	}
+	sessID := req.SessionID
+	if sessID == "" {
+		sessID = pending.StripeSessionID
+	}
+
+	planIDStr := ""
+	if pending.PlanID != nil {
+		planIDStr = pending.PlanID.String()
+	}
+
+	paid := false
+	subscriptionID := ""
+	stripeRef := ""
+
+	if piID != "" {
+		pi, err := paymentintent.Get(piID, nil)
+		if err == nil && pi != nil && pi.Status == stripe.PaymentIntentStatusSucceeded {
+			paid = true
+			stripeRef = pi.ID
+		}
+	}
+	if !paid && sessID != "" {
+		s, err := session.Get(sessID, nil)
+		if err == nil && s != nil && s.PaymentStatus == stripe.CheckoutSessionPaymentStatusPaid {
+			paid = true
+			stripeRef = s.ID
+			if s.Subscription != nil {
+				subscriptionID = s.Subscription.ID
+			}
+		}
+	}
+
+	if !paid {
+		return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{"error": "pagamento ainda não confirmado pelo Stripe"})
+	}
+
+	h.materializePending(pending.ID.String(), planIDStr, subscriptionID, stripeRef)
+
+	// Recarrega o user materializado e devolve sessão ativa (auto-login).
+	var user models.User
+	if err := h.db.Preload("Plan").First(&user, "email = ?", pending.Email).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "conta não materializada"})
+	}
+
+	accessToken, err := middleware.GenerateAccessToken(&user)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao gerar token"})
+	}
+	refreshToken, _ := middleware.GenerateRefreshToken(user.ID)
+	c.Cookie(&fiber.Cookie{
+		Name: "refresh_token", Value: refreshToken, HTTPOnly: true,
+		SameSite: "Lax", Path: "/",
+	})
+
+	var workspace models.Workspace
+	h.db.Where("owner_id = ?", user.ID).Order("created_at ASC").First(&workspace)
+
+	return c.JSON(fiber.Map{
+		"access_token": accessToken,
+		"token_type":   "Bearer",
+		"expires_in":   900,
+		"user": fiber.Map{
+			"id":       user.ID,
+			"name":     user.Name,
+			"email":    user.Email,
+			"username": user.Username,
+			"role":     user.Role,
+			"plan":     user.Plan,
+		},
+		"workspace": workspace,
+	})
+}
+
 // POST /stripe/checkout — create Stripe Checkout session (protected)
 func (h *StripeHandler) CreateCheckout(c *fiber.Ctx) error {
 	h.loadConfig()

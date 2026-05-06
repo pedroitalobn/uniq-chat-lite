@@ -277,6 +277,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 
 	// Activate lead after payment (public)
 	app.Post("/stripe/activate-lead", stripeH.ActivateLead)
+	app.Post("/stripe/finalize-registration", stripeH.FinalizeRegistration)
+	app.Post("/v1/stripe/finalize-registration", stripeH.FinalizeRegistration)
 
 	// Asaas webhook (public)
 	app.Post("/asaas/webhook", asaasH.Webhook)

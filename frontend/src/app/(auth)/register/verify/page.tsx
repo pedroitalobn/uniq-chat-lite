@@ -219,11 +219,13 @@ function CompleteForm({
       // dentro do app (PaymentElement do Stripe).
       if (data.checkout_type === "transparent" && data.client_secret) {
         const params = new URLSearchParams({
-          cs: data.client_secret,
-          plan: data.plan_name ?? "",
-          amount: String(data.amount ?? ""),
+          client_secret: data.client_secret,
+          plan_name: data.plan_name ?? "",
+          plan_price: String(data.plan_price ?? ""),
           email,
         });
+        if (data.pending_id) params.set("pending_id", data.pending_id);
+        if (data.payment_intent_id) params.set("payment_intent_id", data.payment_intent_id);
         router.push(`/checkout?${params.toString()}`);
         return;
       }
