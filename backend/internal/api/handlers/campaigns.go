@@ -65,20 +65,20 @@ func (h *CampaignHandler) tick() {
 		models.CampaignStatusScheduled,
 	}).Find(&campaigns)
 
+	if len(campaigns) > 0 {
+		log.Debug().Int("count", len(campaigns)).Msg("campaign: scheduler tick — campaigns matched")
+	}
+
 	for _, c := range campaigns {
 		c := c // capture
-
-		// Check date window
-		if c.StartDate != nil && now.Before(*c.StartDate) {
-			continue
-		}
-		if c.EndDate != nil && now.After(*c.EndDate) {
-			h.db.Model(&c).Update("status", models.CampaignStatusCompleted)
-			continue
-		}
-
-		// Check schedule hours
-		if !inScheduleHours(c.ScheduleHours, currentHour) {
+		reason := h.evaluateCampaign(&c, now, currentHour)
+		if reason != "" {
+			log.Debug().
+				Str("campaign", c.ID.String()).
+				Str("name", c.Name).
+				Str("status", string(c.Status)).
+				Str("reason", reason).
+				Msg("campaign: skipped this tick")
 			continue
 		}
 
@@ -89,10 +89,29 @@ func (h *CampaignHandler) tick() {
 				"status":     models.CampaignStatusRunning,
 				"started_at": &startedAt,
 			})
+			log.Info().Str("campaign", c.ID.String()).Str("name", c.Name).
+				Msg("campaign: scheduled → running")
 		}
 
 		go h.processCampaign(c, today)
 	}
+}
+
+// evaluateCampaign aplica os filtros de janela/horário e retorna a
+// razão do skip (string vazia = OK pra rodar). Side-effect: marca
+// completed quando passou da end_date.
+func (h *CampaignHandler) evaluateCampaign(c *models.Campaign, now time.Time, currentHour int) string {
+	if c.StartDate != nil && now.Before(*c.StartDate) {
+		return fmt.Sprintf("start_date no futuro: %s", c.StartDate.Format("2006-01-02 15:04"))
+	}
+	if c.EndDate != nil && now.After(*c.EndDate) {
+		h.db.Model(c).Update("status", models.CampaignStatusCompleted)
+		return fmt.Sprintf("end_date passou: %s — marcado como completed", c.EndDate.Format("2006-01-02 15:04"))
+	}
+	if !inScheduleHours(c.ScheduleHours, currentHour) {
+		return fmt.Sprintf("hora atual (%dh) fora do schedule_hours: %s", currentHour, c.ScheduleHours)
+	}
+	return ""
 }
 
 // inScheduleHours returns true if hour is in the JSON int array, or if array is empty (= any hour).
@@ -1175,4 +1194,126 @@ func sortStringsNumeric(keys []string) {
 			keys[j], keys[j-1] = keys[j-1], keys[j]
 		}
 	}
+}
+
+// Diagnose GET /v1/campaigns/:id/diagnose
+// Retorna por que a campanha não está rodando agora — útil pra
+// debug quando user vê "scheduled" mas nada dispara.
+func (h *CampaignHandler) Diagnose(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var camp models.Campaign
+	if err := h.db.First(&camp, "id = ?", id).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "campanha não encontrada"})
+	}
+
+	now := time.Now()
+	currentHour := now.Hour()
+
+	checks := []map[string]any{}
+	add := func(label string, ok bool, detail string) {
+		checks = append(checks, map[string]any{"check": label, "ok": ok, "detail": detail})
+	}
+
+	// 1. Status
+	statusOK := camp.Status == models.CampaignStatusRunning || camp.Status == models.CampaignStatusScheduled
+	add("status", statusOK, fmt.Sprintf("status atual = %q (scheduler só pega running|scheduled)", camp.Status))
+
+	// 2. Date window
+	if camp.StartDate != nil {
+		ok := !now.Before(*camp.StartDate)
+		add("start_date", ok, fmt.Sprintf("start_date = %s · agora = %s", camp.StartDate.Format(time.RFC3339), now.Format(time.RFC3339)))
+	} else {
+		add("start_date", true, "sem start_date — pode iniciar a qualquer momento")
+	}
+	if camp.EndDate != nil {
+		ok := !now.After(*camp.EndDate)
+		add("end_date", ok, fmt.Sprintf("end_date = %s", camp.EndDate.Format(time.RFC3339)))
+	} else {
+		add("end_date", true, "sem end_date")
+	}
+
+	// 3. Schedule hours
+	add("schedule_hours", inScheduleHours(camp.ScheduleHours, currentHour),
+		fmt.Sprintf("hora atual = %dh · schedule_hours = %s ([] = qualquer hora)", currentHour, camp.ScheduleHours))
+
+	// 4. Instance reachability
+	var inst models.Instance
+	if err := h.db.First(&inst, "id = ?", camp.InstanceID).Error; err != nil {
+		add("instance", false, "instância não encontrada no DB")
+	} else {
+		add("instance_db", true, fmt.Sprintf("%s · canal=%s · status=%s", inst.Name, inst.Channel, inst.Status))
+		if inst.Channel != models.ChannelWABA {
+			client := h.manager.GetInstance(inst.ID.String())
+			if client == nil {
+				add("instance_client", false, "instância não está em memória (manager.GetInstance==nil) — reconecte")
+			} else if !client.IsConnected() {
+				add("instance_client", false, "client existe mas IsConnected()==false — reconecte")
+			} else {
+				add("instance_client", true, "instância conectada e em memória")
+			}
+		}
+	}
+
+	// 5. Recipients
+	var totalRcpt, pending, sent, failed int64
+	h.db.Model(&models.CampaignRecipient{}).Where("campaign_id = ?", camp.ID).Count(&totalRcpt)
+	h.db.Model(&models.CampaignRecipient{}).Where("campaign_id = ? AND status = ?", camp.ID, models.RecipientStatusPending).Count(&pending)
+	h.db.Model(&models.CampaignRecipient{}).Where("campaign_id = ? AND status = ?", camp.ID, models.RecipientStatusSent).Count(&sent)
+	h.db.Model(&models.CampaignRecipient{}).Where("campaign_id = ? AND status = ?", camp.ID, models.RecipientStatusFailed).Count(&failed)
+	add("recipients", pending > 0,
+		fmt.Sprintf("total=%d · pending=%d · sent=%d · failed=%d", totalRcpt, pending, sent, failed))
+
+	// Final verdict
+	wouldRun := true
+	for _, ck := range checks {
+		if ok, _ := ck["ok"].(bool); !ok {
+			wouldRun = false
+			break
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"campaign_id":  camp.ID,
+		"name":         camp.Name,
+		"would_run":    wouldRun,
+		"now":          now.Format(time.RFC3339),
+		"checks":       checks,
+		"server_time":  now.Format(time.RFC3339),
+	})
+}
+
+// RunNow POST /v1/campaigns/:id/run-now
+// Força um tick imediato pra essa campanha, ignorando o ciclo de 60s
+// do scheduler. Respeita os filtros (status, janela, hora).
+func (h *CampaignHandler) RunNow(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var camp models.Campaign
+	if err := h.db.First(&camp, "id = ?", id).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "campanha não encontrada"})
+	}
+
+	now := time.Now()
+	if reason := h.evaluateCampaign(&camp, now, now.Hour()); reason != "" {
+		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
+			"error":  "campanha não pode rodar agora",
+			"reason": reason,
+		})
+	}
+
+	if camp.Status != models.CampaignStatusRunning {
+		startedAt := now
+		h.db.Model(&camp).Updates(map[string]interface{}{
+			"status":     models.CampaignStatusRunning,
+			"started_at": &startedAt,
+		})
+	}
+	go h.processCampaign(camp, now.Format("2006-01-02"))
+
+	return c.JSON(fiber.Map{"ok": true, "message": "tick disparado"})
 }

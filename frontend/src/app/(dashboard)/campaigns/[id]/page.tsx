@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { usePreferences } from "@/lib/preferences";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { campaignsApi } from "@/lib/api";
 import { Campaign, CampaignRecipient } from "@/types";
@@ -180,6 +181,29 @@ export default function CampaignDetailPage() {
               Pausar
             </button>
           )}
+          {/* Diagnose + run-now: ajuda quando a campanha está em
+              "scheduled" mas nada dispara — endpoint mostra cada
+              filtro do scheduler e por que pulou. */}
+          {["scheduled", "running"].includes(campaign.status) && (
+            <CampaignDiagnoseButton campaignId={id} />
+          )}
+          {["scheduled", "running"].includes(campaign.status) && (
+            <button onClick={async () => {
+              try {
+                await campaignsApi.runNow(id);
+                toast.success("Tick disparado — verifique os destinatários em alguns segundos.");
+                queryClient.invalidateQueries({ queryKey: ["campaign", id] });
+              } catch (e: unknown) {
+                const err = e as { response?: { data?: { error?: string; reason?: string } } };
+                toast.error(err?.response?.data?.reason || err?.response?.data?.error || "Erro ao executar.");
+              }
+            }}
+              className="flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl transition-all"
+              style={{ background: "rgba(96,165,250,0.10)", border: "1px solid rgba(96,165,250,0.20)", color: "#60a5fa" }}>
+              <Play className="w-3.5 h-3.5" />
+              Executar agora
+            </button>
+          )}
           {["draft", "scheduled", "running", "paused"].includes(campaign.status) && (
             <button onClick={handleCancel}
               className="flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl transition-all"
@@ -337,5 +361,83 @@ export default function CampaignDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function CampaignDiagnoseButton({ campaignId }: { campaignId: string }) {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<{
+    name: string; would_run: boolean; checks: Array<{ check: string; ok: boolean; detail: string }>;
+  } | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const run = async () => {
+    setLoading(true);
+    try {
+      const res = await campaignsApi.diagnose(campaignId);
+      setData(res.data);
+      setOpen(true);
+    } catch {
+      toast.error("Falha ao diagnosticar.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <button onClick={run} disabled={loading}
+        className="flex items-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-xl transition-all disabled:opacity-60"
+        style={{ background: "rgba(168,139,250,0.10)", border: "1px solid rgba(168,139,250,0.20)", color: "#a78bfa" }}
+        title="Por que a campanha não está disparando?">
+        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+        )}
+        Diagnosticar
+      </button>
+
+      {open && data && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg rounded-2xl p-5 max-h-[85vh] overflow-y-auto"
+            style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h3 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>Diagnóstico do scheduler</h3>
+                <p className="text-xs" style={{ color: "var(--text-3)" }}>{data.name}</p>
+              </div>
+              <span className="px-2 py-1 rounded-lg text-[11px] font-semibold"
+                style={data.would_run
+                  ? { background: "rgba(0,212,106,0.10)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.25)" }
+                  : { background: "rgba(248,113,113,0.10)", color: "#f87171", border: "1px solid rgba(248,113,113,0.25)" }}>
+                {data.would_run ? "Pronta pra rodar" : "Bloqueada"}
+              </span>
+            </div>
+            <div className="space-y-2 mt-4">
+              {data.checks.map((ck) => (
+                <div key={ck.check} className="flex items-start gap-2.5 px-3 py-2 rounded-lg"
+                  style={{ background: ck.ok ? "rgba(0,212,106,0.04)" : "rgba(248,113,113,0.04)",
+                          border: `1px solid ${ck.ok ? "rgba(0,212,106,0.15)" : "rgba(248,113,113,0.20)"}` }}>
+                  <span className="text-sm flex-shrink-0 mt-0.5" style={{ color: ck.ok ? "#00d46a" : "#f87171" }}>
+                    {ck.ok ? "✓" : "✗"}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium" style={{ color: "var(--text-2)" }}>{ck.check}</p>
+                    <p className="text-[11px] mt-0.5 break-words" style={{ color: "var(--text-3)" }}>{ck.detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end mt-5">
+              <button onClick={() => setOpen(false)}
+                className="px-4 py-2 rounded-xl text-sm" style={{ color: "var(--text-2)" }}>
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

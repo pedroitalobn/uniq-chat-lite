@@ -1030,6 +1030,15 @@ export const campaignsApi = {
   pause: (id: string) => api.post(`/v1/campaigns/${id}/pause`),
   cancel: (id: string) => api.post(`/v1/campaigns/${id}/cancel`),
   delete: (id: string) => api.delete(`/v1/campaigns/${id}`),
+  diagnose: (id: string) =>
+    api.get<{
+      campaign_id: string;
+      name: string;
+      would_run: boolean;
+      now: string;
+      checks: Array<{ check: string; ok: boolean; detail: string }>;
+    }>(`/v1/campaigns/${id}/diagnose`),
+  runNow: (id: string) => api.post(`/v1/campaigns/${id}/run-now`),
 };
 
 // ─── Customer.io / Close-inspired modules ──────────────────────────

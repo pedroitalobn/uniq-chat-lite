@@ -1207,6 +1207,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	campaigns.Post("/:id/abort", campaignH.Cancel) // alias UazAPI-style
 	campaigns.Post("/:id/clear-sent", campaignH.ClearSent)
 	campaigns.Get("/:id/messages", campaignH.ListMessageStatus)
+	campaigns.Get("/:id/diagnose", campaignH.Diagnose)
+	campaigns.Post("/:id/run-now", campaignH.RunNow)
 
 	// ─── Voice / TTS ─────────────────────────────────────────────────
 	ttsForVoice := services.NewTTSService()
