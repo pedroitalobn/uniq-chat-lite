@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft, Bot, Brain, CheckCircle2, ChevronDown, ChevronRight, Globe, Link2,
-  Mic2, Pause, Play, Plus, RefreshCw, Save, Settings2, Shield, Sparkles, Trash2,
+  ArrowLeft, Bot, Brain, CheckCircle, CheckCircle2, ChevronDown, ChevronRight, Globe, Link2,
+  Loader2, Mic2, Pause, Play, Plus, RefreshCw, Save, Settings2, Shield, Sparkles, Trash2,
   Upload, Volume2, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -300,6 +300,37 @@ export default function AgentsPage() {
     onError: (error: any) => toast.error(error?.response?.data?.error || "Não foi possível salvar."),
   });
 
+  // Toggle de ativação independente do save geral. Antes ativação
+  // ficava amarrada ao "Salvar agente" (PUT inteiro), agora faz só
+  // o PATCH-equivalente do is_active e atualiza o estado local
+  // imediatamente — UX direto, sem perder o resto do form não-salvo.
+  const toggleActiveMutation = useMutation({
+    mutationFn: async (active: boolean) => {
+      if (!selectedInstance) throw new Error("instância não selecionada");
+      await integrationsApi.updateAgent(selectedInstance, { is_active: active });
+      return active;
+    },
+    onSuccess: async (active) => {
+      setForm((p) => ({ ...p, is_active: active }));
+      await queryClient.invalidateQueries({ queryKey: ["instance-agent", selectedInstance] });
+      await queryClient.invalidateQueries({ queryKey: ["agents-instance"] });
+      toast.success(active ? "Agente ativado." : "Agente desativado.");
+    },
+    onError: (error: any) => toast.error(error?.response?.data?.error || "Não foi possível alterar o status."),
+  });
+
+  // Checklist do que está pronto pra ativar com sucesso. Inclui LLM
+  // (integração + modelo), prompt base, e identidade. Sem isso o
+  // agente "ativo" não tem o que responder.
+  const readiness = {
+    hasLLM: !!form.integration_id,
+    hasModel: !!form.model.trim(),
+    hasIdentity: !!form.identity.trim() || !!form.agent_name.trim(),
+    hasInstructions: !!form.system_prompt.trim() || !!form.service_instructions.trim(),
+  };
+  const readyCount = Object.values(readiness).filter(Boolean).length;
+  const readyTotal = Object.keys(readiness).length;
+
   const uploadMutation = useMutation({
     mutationFn: async ({ file, category }: { file: File; category: "knowledge" | "skill" }) => {
       if (!selectedInstance) return;
@@ -430,10 +461,62 @@ export default function AgentsPage() {
 
           {view === "editor" && (
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl" style={glassPillStyle}>
-                <span className={`w-1.5 h-1.5 rounded-full ${form.is_active ? "bg-green-500" : "bg-zinc-500"}`} />
-                <span style={{ color: "var(--text-2)" }}>{form.is_active ? "Ativo" : "Inativo"}</span>
+              {/* Toggle de ativação clicável — antes era pill read-only.
+                  Aplica direto via PATCH (toggleActiveMutation) sem
+                  precisar do botão "Salvar agente". Avisa quando ativa
+                  sem LLM configurada (agente sobe mas não responde). */}
+              <button
+                disabled={!selectedInstance || toggleActiveMutation.isPending}
+                onClick={() => {
+                  if (!form.is_active && !readiness.hasLLM) {
+                    if (!confirm("Você está ativando o agente sem uma LLM configurada. Sem isso ele não responde. Ativar mesmo assim?")) return;
+                  }
+                  toggleActiveMutation.mutate(!form.is_active);
+                }}
+                className="group flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl transition-all"
+                style={{
+                  ...glassPillStyle,
+                  cursor: "pointer",
+                  borderColor: form.is_active ? "rgba(0,212,106,0.35)" : "rgba(255,255,255,0.07)",
+                  background: form.is_active ? "rgba(0,212,106,0.08)" : glassPillStyle.background,
+                  opacity: toggleActiveMutation.isPending ? 0.6 : 1,
+                }}
+                title={form.is_active ? "Clique para desativar o agente" : "Clique para ativar o agente"}>
+                {toggleActiveMutation.isPending ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <span className={`w-1.5 h-1.5 rounded-full ${form.is_active ? "bg-green-500" : "bg-zinc-500"}`} />
+                )}
+                <span style={{ color: form.is_active ? "var(--green)" : "var(--text-2)" }}>
+                  {form.is_active ? "Ativo" : "Inativo"}
+                </span>
+                {/* Mini-switch visual à direita pra reforçar que é interativo */}
+                <span className="ml-1 inline-flex h-4 w-7 rounded-full transition-all"
+                  style={{
+                    background: form.is_active ? "var(--green)" : "rgba(255,255,255,0.1)",
+                    padding: 1.5,
+                  }}>
+                  <span className="h-3 w-3 rounded-full bg-white transition-transform"
+                    style={{ transform: form.is_active ? "translateX(12px)" : "translateX(0)" }} />
+                </span>
+              </button>
+
+              {/* Readiness — quantos passos da config estão prontos.
+                  Clica e leva pra Identidade onde o user resolve. */}
+              <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl"
+                style={{
+                  ...glassPillStyle,
+                  borderColor: readyCount === readyTotal
+                    ? "rgba(0,212,106,0.20)"
+                    : readyCount === 0
+                      ? "rgba(248,113,113,0.20)"
+                      : "rgba(251,191,36,0.20)",
+                  color: readyCount === readyTotal ? "var(--green)" : readyCount === 0 ? "#f87171" : "#fbbf24",
+                }}>
+                <CheckCircle className="w-3 h-3" />
+                Setup {readyCount}/{readyTotal}
               </div>
+
               {totalActiveSkills > 0 && (
                 <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl" style={{ ...glassPillStyle, border: "1px solid rgba(139,92,246,0.20)", color: "#a78bfa" }}>
                   <Sparkles className="w-3 h-3" />
@@ -462,6 +545,15 @@ export default function AgentsPage() {
           onEdit={(instanceId) => {
             setSelectedInstance(instanceId);
             setView("editor");
+          }}
+          onToggleActive={async (instanceId, active) => {
+            try {
+              await integrationsApi.updateAgent(instanceId, { is_active: active });
+              await queryClient.invalidateQueries({ queryKey: ["instance-agent", instanceId] });
+              toast.success(active ? "Agente ativado." : "Agente desativado.");
+            } catch (e: any) {
+              toast.error(e?.response?.data?.error || "Erro ao alterar status.");
+            }
           }}
         />
       )}
@@ -700,13 +792,94 @@ export default function AgentsPage() {
           {/* ── Access tab ── */}
           {tab === "access" && (
             <>
+              {/* Card de Estado — DEDICADO. Antes ativação ficava
+                  amarrada ao card de LLM ("LLM e ativação"), o que
+                  fazia parecer que "ligar agente" e "ligar LLM" eram
+                  a mesma coisa. Agora cada um vive na sua casa: este
+                  card é só status; o outro é só config de LLM. */}
+              <div className="rounded-3xl p-5" style={cs()}>
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+                      style={{
+                        background: form.is_active ? "rgba(0,212,106,0.10)" : "rgba(255,255,255,0.04)",
+                        border: `1px solid ${form.is_active ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.08)"}`,
+                      }}>
+                      <Bot className="w-5 h-5" style={{ color: form.is_active ? "var(--green)" : "var(--text-3)" }} />
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>Estado do agente</h2>
+                      <p className="text-sm" style={{ color: "var(--text-3)" }}>
+                        {form.is_active
+                          ? "Respondendo conversas nesta instância automaticamente."
+                          : "Conversas chegam normal mas o agente não responde sozinho. Humanos atendem."}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    disabled={toggleActiveMutation.isPending}
+                    onClick={() => {
+                      if (!form.is_active && !readiness.hasLLM) {
+                        if (!confirm("Você está ativando o agente sem uma LLM configurada. Sem isso ele não responde. Ativar mesmo assim?")) return;
+                      }
+                      toggleActiveMutation.mutate(!form.is_active);
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+                    style={form.is_active
+                      ? { background: "rgba(248,113,113,0.10)", border: "1px solid rgba(248,113,113,0.25)", color: "#f87171" }
+                      : { background: "var(--green)", color: "#03170a" }}>
+                    {toggleActiveMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {form.is_active ? "Desativar agente" : "Ativar agente"}
+                  </button>
+                </div>
+
+                {/* Checklist visual — o que precisa estar pronto pra
+                    ativação fazer sentido. Cada item é clicável e leva
+                    pra tab onde resolver. */}
+                <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {[
+                    { ok: readiness.hasLLM,          label: "LLM",        hint: "Selecione provedor",  goto: "access" },
+                    { ok: readiness.hasModel,        label: "Modelo",     hint: "Defina o modelo",     goto: "access" },
+                    { ok: readiness.hasIdentity,     label: "Identidade", hint: "Nome do agente",      goto: "identity" },
+                    { ok: readiness.hasInstructions, label: "Instruções", hint: "Prompt base",         goto: "identity" },
+                  ].map((it) => (
+                    <button key={it.label} onClick={() => setTab(it.goto as typeof tab)}
+                      className="flex flex-col items-start gap-1 px-3 py-2.5 rounded-xl text-left transition-all"
+                      style={{
+                        background: it.ok ? "rgba(0,212,106,0.05)" : "var(--surface-2)",
+                        border: `1px solid ${it.ok ? "rgba(0,212,106,0.18)" : "var(--surface-border)"}`,
+                      }}>
+                      <span className="flex items-center gap-1.5 text-[11px] font-medium"
+                        style={{ color: it.ok ? "var(--green)" : "var(--text-3)" }}>
+                        <CheckCircle className="w-3 h-3" />
+                        {it.label}
+                      </span>
+                      <span className="text-[11px]" style={{ color: it.ok ? "var(--text-2)" : "var(--text-3)" }}>
+                        {it.ok ? "Pronto" : it.hint}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {form.is_active && !readiness.hasLLM && (
+                  <div className="mt-4 flex items-start gap-2 px-3 py-2.5 rounded-xl"
+                    style={{ background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.2)" }}>
+                    <Shield className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "#f87171" }} />
+                    <p className="text-xs" style={{ color: "#fca5a5" }}>
+                      Agente está ativo mas sem LLM configurada — ele não vai responder. Configure abaixo ou desative pra atendimento humano.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div className="rounded-3xl p-5 space-y-4" style={cs()}>
-                  <h2 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>LLM e ativação</h2>
-                  <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-2)" }}>
-                    <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((p) => ({ ...p, is_active: e.target.checked }))} />
-                    Ativar agente nesta instância
-                  </label>
+                  <div>
+                    <h2 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>Modelo de linguagem</h2>
+                    <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
+                      Provedor e modelo que geram as respostas. Independente do estado de ativação acima.
+                    </p>
+                  </div>
                   <select value={form.integration_id} onChange={(e) => setForm((p) => ({ ...p, integration_id: e.target.value, model: "" }))} style={inp()}>
                     <option value="">Selecione uma integração de IA</option>
                     {integrationsQuery.data?.map((item: any) => (
@@ -844,12 +1017,13 @@ function AgentScoreRing({ score, isActive, size = 56 }: { score: number; isActiv
 }
 
 function AgentListView({
-  instances, agentQueries, isLoading, onEdit,
+  instances, agentQueries, isLoading, onEdit, onToggleActive,
 }: {
   instances: any[];
   agentQueries: Array<{ data: any; isLoading: boolean }>;
   isLoading: boolean;
   onEdit: (instanceId: string) => void;
+  onToggleActive: (instanceId: string, active: boolean) => void;
 }) {
   if (isLoading) {
     return (
@@ -977,12 +1151,24 @@ function AgentListView({
                   </div>
                 </div>
 
-                {/* Active badge */}
+                {/* Active badge clicável — toggle direto via PATCH
+                    sem precisar entrar no editor. Mostra "ativar"
+                    quando configurado e desativado, "desativar" quando
+                    rodando. Exige LLM configurada pra ativar (UX warn). */}
                 {configured && (
-                  <span className="flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-semibold mt-0.5"
-                    style={{ background: isActive ? "rgba(0,212,106,0.14)" : "rgba(255,255,255,0.06)", color: isActive ? "#00d46a" : "hsl(240 8% 45%)", border: `1px solid ${isActive ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.08)"}` }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isActive && !hasLLM) {
+                        if (!confirm("Sem LLM configurada o agente não responde. Ativar mesmo assim?")) return;
+                      }
+                      onToggleActive(inst.id, !isActive);
+                    }}
+                    className="flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-semibold mt-0.5 transition-all hover:opacity-80"
+                    style={{ background: isActive ? "rgba(0,212,106,0.14)" : "rgba(255,255,255,0.06)", color: isActive ? "#00d46a" : "hsl(240 8% 45%)", border: `1px solid ${isActive ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.08)"}`, cursor: "pointer" }}
+                    title={isActive ? "Clique para desativar" : "Clique para ativar"}>
                     {isActive ? "● Ativo" : "○ Inativo"}
-                  </span>
+                  </button>
                 )}
               </div>
             </div>
