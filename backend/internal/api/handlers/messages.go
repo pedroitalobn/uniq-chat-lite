@@ -113,6 +113,14 @@ func (h *MessageHandler) logMessage(instanceID, direction, msgType, jid, msgID s
 	}
 	h.db.Create(&entry)
 
+	// Liga a Conversation pra que mensagens disparadas via API (não via
+	// /v1/conversations/:id/messages) também apareçam no inbox da
+	// instância. Antes desse upsert, qualquer ferramenta externa (n8n,
+	// Zapier, integração custom) que mandasse via POST /v1/instances/:id/messages/*
+	// criava só MessageLog — a Conversation nunca era criada/atualizada e
+	// a mensagem ficava invisível na inbox UI.
+	h.linkOutboundToConversation(instID, jid, msgType, string(contentJSON), direction, &entry)
+
 	// Sprint billing — incrementa usage counter (msgs do dia) por user.
 	// Acumulado por user_id (todas as instâncias) pra checar limite do plano.
 	// Best-effort: falha aqui não impede o log da mensagem.
@@ -132,6 +140,131 @@ func (h *MessageHandler) logMessage(instanceID, direction, msgType, jid, msgID s
 			}
 		}
 	}
+}
+
+// linkOutboundToConversation upserta a Conversation correspondente ao par
+// (workspace, instance, channel_key=jid) e backfilla os campos de last_*
+// na conversa, conectando a MessageLog. Sem isso, mensagens enviadas via
+// API legacy ficam órfãs (MessageLog sem ConversationID, conversa sem
+// preview atualizado) e o atendente não vê o que foi disparado por
+// integração externa.
+//
+// Best-effort: qualquer falha de DB aqui é silenciada — não invalidamos
+// o log da msg principal por causa de uma escrita secundária.
+func (h *MessageHandler) linkOutboundToConversation(
+	instanceID uuid.UUID, jid, msgType, contentJSON, direction string, msgLog *models.MessageLog,
+) {
+	if h.db == nil || msgLog == nil {
+		return
+	}
+	// Resolve a Instance pra pegar workspace_id + channel_type.
+	var inst models.Instance
+	if err := h.db.Select("id, workspace_id, channel, user_id").First(&inst, "id = ?", instanceID).Error; err != nil {
+		return
+	}
+	if inst.WorkspaceID == nil || *inst.WorkspaceID == uuid.Nil {
+		// Instância sem workspace (legacy) — não tem onde criar conversa.
+		return
+	}
+	wsID := *inst.WorkspaceID
+	channelType := string(inst.Channel)
+
+	// Tenta achar uma conversa "live" (open/pending/snoozed) pra esse JID.
+	var conv models.Conversation
+	err := h.db.
+		Where("workspace_id = ? AND instance_id = ? AND channel_key = ?", wsID, instanceID, jid).
+		Where("status IN ?", []models.ConversationStatus{
+			models.ConversationStatusOpen,
+			models.ConversationStatusPending,
+			models.ConversationStatusSnoozed,
+		}).
+		Order("updated_at DESC").
+		First(&conv).Error
+
+	if err != nil {
+		// Não tem conversa viva — cria uma nova. Não tenta resolver Contact:
+		// quando o cliente responder, o InboundPipeline acha e amarra na
+		// Contact existente; pra outbound puro, mostrar a conversa "vazia"
+		// no inbox já é melhor que silenciar a mensagem inteira.
+		conv = models.Conversation{
+			WorkspaceID: wsID,
+			InstanceID:  instanceID,
+			ChannelType: channelType,
+			ChannelKey:  jid,
+			Status:      models.ConversationStatusOpen,
+			Priority:    models.ConversationPriorityNormal,
+			IsBotActive: false, // outbound manual via API → assume operação humana
+		}
+		if err := h.db.Create(&conv).Error; err != nil {
+			return
+		}
+	}
+
+	// Backfilla a MessageLog com workspace_id + conversation_id pra que ela
+	// apareça nas queries de timeline da conversa.
+	h.db.Model(msgLog).Updates(map[string]any{
+		"workspace_id":    wsID,
+		"conversation_id": conv.ID,
+	})
+
+	// Atualiza last_* na conversa pra mover ela pro topo da inbox.
+	now := time.Now()
+	preview := previewForType(msgType, contentJSON)
+	updates := map[string]any{
+		"last_message_at":      now,
+		"last_message_preview": preview,
+		"last_message_type":    msgType,
+		"last_message_from_me": direction == string(models.DirectionOut),
+		"message_count":        gorm.Expr("message_count + 1"),
+	}
+	if direction == string(models.DirectionOut) {
+		updates["last_agent_msg_at"] = now
+		updates["agent_unread_count"] = 0
+	}
+	h.db.Model(&conv).Updates(updates)
+}
+
+// previewForType produz um label curto pra last_message_preview da
+// conversa. Texto retorna o conteúdo cru (truncado); mídia ganha o
+// emoji canônico que o frontend já espera.
+func previewForType(msgType, contentJSON string) string {
+	switch msgType {
+	case "image":
+		return "📷 Imagem"
+	case "video":
+		return "🎬 Vídeo"
+	case "audio":
+		return "🎤 Áudio"
+	case "document":
+		return "📎 Documento"
+	case "sticker":
+		return "😊 Sticker"
+	case "location":
+		return "📍 Localização"
+	case "contact":
+		return "👤 Contato"
+	}
+	// Texto: tenta extrair o body do JSON. Aceita string crua ou objeto
+	// {body|text|content}.
+	s := contentJSON
+	if len(s) > 1 && s[0] == '"' && s[len(s)-1] == '"' {
+		// JSON-encoded string — strip aspas.
+		s = s[1 : len(s)-1]
+	} else if len(s) > 0 && s[0] == '{' {
+		var obj map[string]any
+		if err := json.Unmarshal([]byte(contentJSON), &obj); err == nil {
+			for _, k := range []string{"body", "text", "content", "caption"} {
+				if v, ok := obj[k].(string); ok && v != "" {
+					s = v
+					break
+				}
+			}
+		}
+	}
+	if len(s) > 280 {
+		s = s[:280]
+	}
+	return s
 }
 
 // checkSendQuota retorna 402 se o user atingiu MaxMessagesPerDay do
