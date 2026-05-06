@@ -454,7 +454,12 @@ type AuthHandler struct {
 // Retorna o workspace criado. Se algo falhar, retorna nil (caller decide o
 // que fazer — no fluxo de registro a gente simplesmente não associa).
 func createDefaultWorkspace(db *gorm.DB, user *models.User, name string) *models.Workspace {
-	ws := &models.Workspace{OwnerID: user.ID, Name: name}
+	// Propaga o plano do user pro Workspace — feature gates de
+	// alguns endpoints (ex.: campanhas com X-Workspace-ID) checam
+	// workspace.plan_id e não user.plan_id, então sem isso a conta
+	// pagava o plano PRO mas o workspace ficava "free", resultando
+	// em "seu plano não permite essa ação".
+	ws := &models.Workspace{OwnerID: user.ID, Name: name, PlanID: user.PlanID}
 	if err := db.Create(ws).Error; err != nil {
 		return nil
 	}
@@ -1330,14 +1335,20 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		}
 
 		// Snapshot do form no pending — vamos materializar User+Workspace
-		// no webhook usando esses dados.
-		h.db.Model(&pending).Updates(map[string]any{
+		// no webhook usando esses dados. plan_id também vai aqui pra
+		// cobrir o caso onde o user escolheu o plano só no passo final
+		// (/register/verify) e não veio com plan_id já no /start —
+		// sem isso o materialize reads pending.PlanID nil e cria o
+		// User sem plano, caindo em "free" no feature gate.
+		patch := map[string]any{
 			"name":               req.Name,
 			"username":           req.Username,
 			"workspace_name":     req.WorkspaceName,
 			"password_hash":      hashed,
 			"stripe_customer_id": sc.ID,
-		})
+			"plan_id":            plan.ID,
+		}
+		h.db.Model(&pending).Updates(patch)
 
 		frontendURL := config.AppConfig.FrontendURL
 		checkoutType := getStripeCheckoutType(h.db)

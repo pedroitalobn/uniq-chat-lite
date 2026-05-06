@@ -42,7 +42,15 @@ func (h *GroupHandler) List(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
-	return c.JSON(fiber.Map{"groups": groups, "total": len(groups)})
+	// Diagnóstico extra: groups vazio em conta logada via QR é
+	// comum pq whatsmeow lê do device store local e o history
+	// sync ainda não puxou a lista. UI precisa entender a diferença
+	// entre "0 grupos" e "ainda sincronizando" — devolvemos hint.
+	hint := ""
+	if len(groups) == 0 {
+		hint = "Lista de grupos vazia. Se você acabou de conectar, aguarde alguns minutos pelo sync do WhatsApp ou abra alguma conversa de grupo no celular pra forçar a sincronização."
+	}
+	return c.JSON(fiber.Map{"groups": groups, "total": len(groups), "hint": hint})
 }
 
 // Create godoc

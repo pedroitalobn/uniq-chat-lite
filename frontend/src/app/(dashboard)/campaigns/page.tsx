@@ -224,11 +224,11 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
   const selectedInstance = instances.find((i) => i.id === instanceId);
   const isWABA = selectedInstance?.channel === "waba" || channel === "waba";
 
-  const { data: groups = [], isLoading: groupsLoading, error: groupsError, refetch: refetchGroups } = useQuery<Group[], Error>({
+  const { data: groupsResp, isLoading: groupsLoading, error: groupsError, refetch: refetchGroups } = useQuery<{ groups: Group[]; hint?: string }, Error>({
     queryKey: ["groups", instanceId],
     queryFn: async () => {
       const r = await groupsApi.list(instanceId);
-      return r.data.groups ?? r.data ?? [];
+      return { groups: r.data.groups ?? [], hint: r.data.hint };
     },
     // Antes restringíamos a `audienceTab === "groups"` e o user mudava
     // de aba sem nunca disparar a query, achando que estava quebrada.
@@ -237,6 +237,8 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
     enabled: !!instanceId,
     retry: 1,
   });
+  const groups: Group[] = groupsResp?.groups ?? [];
+  const groupsHint = groupsResp?.hint;
 
   // Mensagem de erro amigável pra UI saber por que a lista veio vazia.
   // 409 vem da rota /v1/instances/:id/groups quando a instância não está
@@ -894,12 +896,17 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                         </button>
                       </div>
                     ) : filtered.length === 0 ? (
-                      <div className="rounded-xl py-6 text-center space-y-1" style={{ border: "1px dashed hsl(240 12% 16%)" }}>
+                      <div className="rounded-xl py-6 px-4 text-center space-y-2" style={{ border: "1px dashed hsl(240 12% 16%)" }}>
                         <p className="text-xs" style={{ color: "hsl(240 8% 40%)" }}>
                           {groups.length === 0
-                            ? "Esta instância não está em nenhum grupo. Adicione o número aos grupos antes de criar a campanha."
+                            ? (groupsHint || "Esta instância não está em nenhum grupo. Adicione o número aos grupos antes de criar a campanha.")
                             : "Nenhum grupo bate com o filtro atual."}
                         </p>
+                        {groups.length === 0 && (
+                          <button onClick={() => refetchGroups()} className="text-[11px] underline" style={{ color: "var(--green)" }}>
+                            Atualizar lista
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-1 max-h-52 overflow-y-auto">
