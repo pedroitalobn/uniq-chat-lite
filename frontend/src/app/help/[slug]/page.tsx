@@ -30,6 +30,7 @@ interface Article {
   slug: string;
   summary: string;
   content: string;
+  hero_image_url?: string;
   status: string;
   view_count: number;
   category_id?: string;
@@ -307,13 +308,42 @@ export default function HelpCenterPage({ params }: { params: { slug: string } })
                 ← Voltar
               </button>
               <article>
+                {/* Hero image: capa renderizada acima do título quando o
+                    artigo tem hero_image_url. Aspect ratio largo, sombra
+                    sutil pra integrar com o fundo. */}
+                {selectedArticle.hero_image_url && (
+                  <div
+                    style={{
+                      marginBottom: 24,
+                      borderRadius: 16,
+                      overflow: "hidden",
+                      aspectRatio: "16 / 7",
+                      background: "rgba(255,255,255,0.04)",
+                      border: `1px solid ${border}`,
+                    }}
+                  >
+                    <img
+                      src={selectedArticle.hero_image_url}
+                      alt={selectedArticle.title}
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    />
+                  </div>
+                )}
                 <h1 style={{ fontSize: 28, fontWeight: 700, color: text1, marginBottom: 8 }}>{selectedArticle.title}</h1>
                 {selectedArticle.summary && (
                   <p style={{ fontSize: 16, color: text2, marginBottom: 24, paddingBottom: 24, borderBottom: `1px solid ${border}` }}>{selectedArticle.summary}</p>
                 )}
+                {/* O content agora é HTML produzido pelo Tiptap (editor
+                    rich text). Ainda detectamos artigos antigos em Markdown
+                    e os renderizamos via mdToHtml — heurística: começa com
+                    `#` ou não tem nenhuma tag HTML. */}
                 <div
                   className="art-body"
-                  dangerouslySetInnerHTML={{ __html: mdToHtml(selectedArticle.content) }}
+                  dangerouslySetInnerHTML={{
+                    __html: /<[a-zA-Z][^>]*>/.test(selectedArticle.content)
+                      ? selectedArticle.content
+                      : mdToHtml(selectedArticle.content),
+                  }}
                 />
                 <div style={{ marginTop: 48, paddingTop: 24, borderTop: `1px solid ${border}`, display: "flex", gap: 16, fontSize: 13, color: text3 }}>
                   <span>{selectedArticle.view_count} visualizações</span>

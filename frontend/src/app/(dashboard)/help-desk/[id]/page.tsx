@@ -10,6 +10,19 @@ import {
 import { toast } from "sonner";
 import { helpDeskApi, type HelpDeskArticle } from "@/lib/helpdesk-api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { RichTextEditor } from "@/components/helpdesk/RichTextEditor";
+
+// escapeHTML — usado quando o content legado vem em Markdown puro e
+// queremos exibir no Tiptap como texto, sem interpretar caracteres especiais
+// como tags. O & precisa ser escapado primeiro pra não duplicar.
+function escapeHTML(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 // ─── Style helpers ─────────────────────────────────────────────────────────
 
@@ -69,6 +82,7 @@ export default function ArticleEditorPage() {
   const [summary, setSummary] = useState("");
   const [slug, setSlug] = useState("");
   const [categoryId, setCategoryId] = useState<string>("");
+  const [heroImageURL, setHeroImageURL] = useState<string>("");
   const [slugTouched, setSlugTouched] = useState(false);
 
   // UI state
@@ -97,10 +111,15 @@ export default function ArticleEditorPage() {
     const data = articleQuery.data;
     if (!data) return;
     setTitle(data.title ?? "");
-    setContent(data.content ?? "");
+    // Markdown legacy: se o content não tem tags HTML, tratamos como texto
+    // puro e injetamos num parágrafo. O Tiptap normaliza no primeiro save.
+    const raw = data.content ?? "";
+    const looksLikeHTML = /<[a-zA-Z][^>]*>/.test(raw);
+    setContent(looksLikeHTML ? raw : raw.split(/\n{2,}/).map((p) => `<p>${escapeHTML(p)}</p>`).join(""));
     setSummary(data.summary ?? "");
     setSlug(data.slug ?? "");
     setCategoryId(data.category_id ?? "");
+    setHeroImageURL(data.hero_image_url ?? "");
   }, [articleQuery.data]);
 
   // Auto-derive slug from title unless the user touched it
@@ -138,6 +157,7 @@ export default function ArticleEditorPage() {
         summary,
         slug,
         category_id: categoryId || undefined,
+        hero_image_url: heroImageURL || undefined,
       }, wsId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["helpdesk-article", articleId] });
@@ -301,23 +321,80 @@ export default function ArticleEditorPage() {
       {/* Main 70/30 split */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5">
         {/* LEFT — Content */}
-        <div className="space-y-3" style={{ ...glassCard, padding: 20 }}>
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
-              Conteúdo (Markdown)
+        <div className="space-y-4" style={{ ...glassCard, padding: 20 }}>
+          {/* Hero image: capa exibida no topo do artigo público. URL livre
+              (externa ou do storage). Preview ao lado do input. */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-widest mb-1.5" style={{ color: "var(--text-3)" }}>
+              Imagem de capa (hero)
             </label>
-            <span className="text-xs" style={{ color: "var(--text-3)" }}>
-              {content.length} caracteres
-            </span>
+            <div className="flex items-center gap-3">
+              <input
+                value={heroImageURL}
+                onChange={(e) => {
+                  setHeroImageURL(e.target.value);
+                  autoSave({ hero_image_url: e.target.value || undefined });
+                }}
+                placeholder="https://… (URL da imagem hero)"
+                className="flex-1 rounded-lg px-3 py-2 text-sm outline-none"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.10)",
+                  color: "var(--text-1)",
+                }}
+              />
+              {heroImageURL && (
+                <div
+                  className="rounded-lg overflow-hidden flex-shrink-0"
+                  style={{ width: 60, height: 60, border: "1px solid rgba(255,255,255,0.10)" }}
+                >
+                  <img src={heroImageURL} alt="Hero preview" className="w-full h-full object-cover" />
+                </div>
+              )}
+            </div>
+            {heroImageURL && (
+              <p className="text-[11px] mt-1" style={{ color: "var(--text-3)" }}>
+                Aparece como banner no topo do artigo público.
+              </p>
+            )}
           </div>
+
+          {/* Title (já renderizado fora desse bloco como input grande;
+              repetimos o label aqui só pra clareza visual) */}
+
+          {/* Rich text editor — Tiptap. Suporta headings, listas, links,
+              imagens, vídeos do YouTube e HTML embed (iframes / áudio /
+              vídeo). Substitui o textarea de Markdown anterior. */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
+                Corpo do artigo
+              </label>
+              <span className="text-xs" style={{ color: "var(--text-3)" }}>
+                Tip: cole URL do YouTube no botão ▶ pra embedar vídeo
+              </span>
+            </div>
+            <RichTextEditor
+              value={content}
+              onChange={(html) => {
+                setContent(html);
+                autoSave({ content: html });
+              }}
+              placeholder="Comece a escrever… use a barra acima pra formatar (headings, listas, imagens, vídeos, embeds HTML)."
+            />
+          </div>
+
+          {/* Bloco antigo do textarea — mantido escondido pra não quebrar
+              o layout enquanto migra. Removido em commit subsequente. */}
           <textarea
             value={content}
             onChange={(e) => {
               setContent(e.target.value);
               autoSave({ content: e.target.value });
             }}
-            placeholder="Escreva o conteúdo do artigo em Markdown..."
+            placeholder="(legacy — não use)"
             style={{
+              display: "none",
               ...inp,
               minHeight: 500,
               fontFamily: "monospace",

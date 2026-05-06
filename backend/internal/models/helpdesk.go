@@ -60,6 +60,15 @@ type HelpDeskArticle struct {
 	Title      string         `gorm:"type:varchar(255);not null" json:"title"`
 	Slug       string         `gorm:"type:varchar(280);index" json:"slug"`
 	Summary    string         `gorm:"type:varchar(500)" json:"summary,omitempty"`
+	// HeroImageURL: imagem de capa renderizada no topo do artigo (hero
+	// section) na central pública e nas listagens. Texto livre — pode ser
+	// URL externa ou caminho do storage do workspace. Campo opcional.
+	HeroImageURL string `gorm:"type:text" json:"hero_image_url,omitempty"`
+	// Content guarda HTML produzido pelo editor rich-text (Tiptap). Antes
+	// era Markdown; o renderer público renderiza HTML direto agora,
+	// suportando imagens, vídeos, embeds (iframe), áudios, etc. Markdown
+	// salvo previamente continua sendo entregue como texto bruto e o
+	// editor importa transparente quando o user salva de novo.
 	Content    string         `gorm:"type:text" json:"content,omitempty"`
 	Status     ArticleStatus  `gorm:"type:varchar(20);default:'draft';index" json:"status"`
 	ViewCount  int            `gorm:"default:0" json:"view_count"`

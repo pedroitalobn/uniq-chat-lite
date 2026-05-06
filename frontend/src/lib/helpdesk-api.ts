@@ -21,6 +21,9 @@ export interface HelpDeskArticle {
   title: string;
   slug: string;
   summary: string;
+  /** URL da imagem hero (opcional) renderizada no topo do artigo. */
+  hero_image_url?: string;
+  /** HTML do corpo (Tiptap). Antes era markdown — Markdown legacy é exibido como texto e re-salvo como HTML quando o editor abre. */
   content: string;
   status: "draft" | "published" | "archived";
   view_count: number;
