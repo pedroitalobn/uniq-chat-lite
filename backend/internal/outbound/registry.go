@@ -160,36 +160,59 @@ func (r *Registry) sendWhatsApp(ctx context.Context, inst *models.Instance, msg 
 			}
 			return &SendResult{ExternalID: id, Status: models.MessageStatusSent}, nil
 		case "audio":
-			// WhatsApp aceita áudio como voice note (PTT) APENAS quando o
-			// container é OGG carregando Opus. Mesmo se a mensagem proto
-			// declarar Mimetype="audio/ogg; codecs=opus", se os bytes forem
-			// WebM (Matroska), MP4/AAC ou MP3, o cliente do destinatário
-			// parseia o header, encontra container errado e mostra "áudio
-			// indisponível". Por isso transcodamos via ffmpeg pra OGG/Opus
-			// SEMPRE que o input não for OGG nativo. Quando o usuário envia
-			// MP3/M4A como anexo (não voice note), mandamos PTT=false e o
-			// mime original.
+			// WhatsApp aceita áudio como voice note (PTT) APENAS quando os
+			// bytes ENVIADOS são container OGG carregando Opus. Mesmo que
+			// o proto declare Mimetype="audio/ogg; codecs=opus", se os
+			// bytes forem WebM/Matroska (gravação default do Chrome),
+			// MP4/AAC (Safari) ou MP3, o cliente do destinatário parseia
+			// o header, encontra container errado e mostra "este áudio
+			// não está mais disponível". Por isso transcodamos via ffmpeg
+			// pra OGG/Opus SEMPRE que o input não for OGG nativo.
+			//
+			// Sem ffmpeg: NÃO podemos mentir sobre o container. Mandamos
+			// como anexo (PTT=false) com o mime real do input — o
+			// destinatário recebe um attachment normal de áudio que ainda
+			// toca, em vez de um voice note quebrado.
 			outBytes := data
 			outMime := mime
 			isPTT := false
 			var seconds uint32
 			isOgg := isOggBytes(data)
-			isOpusContainer := isOgg || isWebMBytes(data) || mimeIsOpus(mime)
-			if isOpusContainer {
-				// Voice note path — transcoda pra OGG/Opus mono 16k.
-				// ffmpeg ausente → cai no fallback (sem transcoding) com
-				// warn, melhor que crashar o envio.
+			needsTranscode := !isOgg && (isWebMBytes(data) || mimeIsOpus(mime))
+			if isOgg {
+				// Já é OGG/Opus — manda direto como voice note. Se o sender
+				// gravou no browser e isso é Opus de fato, perfeito.
+				outMime = "audio/ogg; codecs=opus"
+				isPTT = true
+				// duração estimada via tamanho/bitrate (~32kbps voice)
+				seconds = uint32(len(data) / 4000)
+				if seconds == 0 {
+					seconds = 1
+				}
+			} else if needsTranscode {
 				converted, dur, terr := audioconvert.TranscodeToOggOpus(ctx, data)
 				if terr == nil {
 					outBytes = converted
+					outMime = "audio/ogg; codecs=opus"
+					isPTT = true
 					seconds = dur
-				} else if !errors.Is(terr, audioconvert.ErrFfmpegMissing) {
-					log.Warn().Err(terr).Int("bytes", len(data)).Msg("outbound: transcoding pra OGG/Opus falhou — enviando bytes originais (provável 'áudio indisponível' no destinatário)")
 				} else {
-					log.Warn().Msg("outbound: ffmpeg indisponível — voice note enviada sem transcoding (instale o pacote ffmpeg na imagem)")
+					// Sem ffmpeg ou erro de conversão: vai como ANEXO MP3-ish
+					// com o mime real do input. Não mente sobre o container.
+					if errors.Is(terr, audioconvert.ErrFfmpegMissing) {
+						log.Warn().Msg("outbound: ffmpeg indisponível — voice note degradada pra anexo (instale o pacote ffmpeg na imagem do backend)")
+					} else {
+						log.Warn().Err(terr).Int("bytes", len(data)).Msg("outbound: transcoding pra OGG/Opus falhou — enviando como anexo no mime original")
+					}
+					if mime == "" || strings.HasPrefix(strings.ToLower(mime), "audio/webm") {
+						// audio/webm é container Matroska + Opus; alguns
+						// clientes WhatsApp não tocam in-app mas baixam OK.
+						outMime = "audio/webm"
+					}
+					outBytes = data
+					isPTT = false
+					seconds = 0
 				}
-				outMime = "audio/ogg; codecs=opus"
-				isPTT = true
 			}
 			id, err := client.SendAudioMessage(msg.To, outBytes, outMime, isPTT, seconds)
 			if err != nil {
