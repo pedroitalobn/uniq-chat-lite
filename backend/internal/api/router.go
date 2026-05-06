@@ -1284,18 +1284,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	journeys.Get("/:id/executions", agentH.GetJourneyExecutions)
 
 	// Help Desk (knowledge base)
-	helpdesk := api.Group("/helpdesk", middleware.RequireFeature(db, models.FeatureHelpDesk))
-	helpdesk.Get("/categories", helpDeskH.ListCategories)
-	helpdesk.Post("/categories", helpDeskH.CreateCategory)
-	helpdesk.Patch("/categories/:id", helpDeskH.UpdateCategory)
-	helpdesk.Delete("/categories/:id", helpDeskH.DeleteCategory)
-	helpdesk.Get("/articles", helpDeskH.ListArticles)
-	helpdesk.Post("/articles", helpDeskH.CreateArticle)
-	helpdesk.Post("/articles/generate", helpDeskH.GenerateArticle)
-	helpdesk.Get("/articles/:id", helpDeskH.GetArticle)
-	helpdesk.Patch("/articles/:id", helpDeskH.UpdateArticle)
-	helpdesk.Delete("/articles/:id", helpDeskH.DeleteArticle)
-	helpdesk.Post("/articles/:id/publish", helpDeskH.PublishArticle)
+	// Help Desk routes ficam registradas APENAS no chain top-level
+	// (linhas 442-462 com hdChain) pra evitar registro duplicado. O bloco
+	// removido aqui declarava /v1/helpdesk/* uma segunda vez via api.Group,
+	// causando ambiguidade de roteamento (mesma URL com middleware levemente
+	// diferente). Mantemos só uma fonte de verdade.
 
 	// Agent Center
 	agent := api.Group("/agent", middleware.RequireFeature(db, models.FeatureAI))

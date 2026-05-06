@@ -316,14 +316,18 @@ func (h *HelpDeskHandler) GenerateArticle(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "prompt é obrigatório")
 	}
 
-	// Find active LLM integration for the workspace.
-	var integration models.UserIntegration
-	err = h.db.
+	// Find active LLM integration for the workspace. Quando não houver,
+	// passamos integration=nil pro CallChatWithSystem que cai no
+	// fallback automático pra PlatformAI ativa configurada em
+	// /admin/providers → Uniq AI. Antes esse early-return barrava o
+	// fluxo mesmo com Uniq AI corretamente configurada.
+	var integration *models.UserIntegration
+	var found models.UserIntegration
+	if err := h.db.
 		Joins("JOIN user_workspaces uw ON uw.user_id = user_integrations.user_id").
 		Where("uw.workspace_id = ? AND user_integrations.is_active = true", wsID).
-		First(&integration).Error
-	if err != nil {
-		return fiber.NewError(fiber.StatusUnprocessableEntity, "nenhuma integração de IA ativa encontrada para este workspace")
+		First(&found).Error; err == nil {
+		integration = &found
 	}
 
 	system := `Você é um redator especializado em bases de conhecimento e help desks.
@@ -340,7 +344,7 @@ Responda SOMENTE com um JSON válido com este schema:
 		userMsg = fmt.Sprintf("Título desejado: %s\n\n%s", body.Title, body.Prompt)
 	}
 
-	raw, err := h.llm.CallChatWithSystem(context.Background(), &integration, system, userMsg, true)
+	raw, err := h.llm.CallChatWithSystem(context.Background(), integration, system, userMsg, true)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, "falha ao gerar artigo: "+err.Error())
 	}
