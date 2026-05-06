@@ -264,7 +264,13 @@ function PaymentTab() {
 
   if (isLoading) return <div className="flex items-center gap-2 py-8"><Loader2 className="w-4 h-4 animate-spin text-[#00d46a]" /><span className="text-sm" style={{ color: "hsl(240 8% 55%)" }}>Carregando...</span></div>;
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace("/v1", "") || "https://api.uniq.chat";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/v1\/?$/, "") || "https://api.uniq.chat";
+  // Webhook tem que apontar pro BACKEND (api.uniq.chat), não pro front.
+  // Frontend é a fonte autoritativa de qual API estamos falando — se o
+  // backend ainda devolve uma URL com app.uniq.chat (config errada de
+  // API_URL no env do server), ignoramos e usamos apiBase.
+  const stripeWebhookURL = `${apiBase}/stripe/webhook`;
+  const asaasWebhookURL = `${apiBase}/asaas/webhook`;
 
   return (
     <div className="space-y-5">
@@ -382,9 +388,9 @@ function PaymentTab() {
             <Label>URL do Webhook</Label>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 60%)" }}>
-                {settings?.stripe_webhook_url || `${apiBase}/stripe/webhook`}
+                {stripeWebhookURL}
               </code>
-              <button onClick={() => copyUrl(settings?.stripe_webhook_url || `${apiBase}/stripe/webhook`)} className="p-2 rounded hover:bg-white/5">
+              <button onClick={() => copyUrl(stripeWebhookURL)} className="p-2 rounded hover:bg-white/5">
                 <Key className="w-4 h-4" style={{ color: "hsl(240 8% 55%)" }} />
               </button>
             </div>
@@ -460,9 +466,9 @@ function PaymentTab() {
             <Label>URL do Webhook</Label>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 60%)" }}>
-                {settings?.asaas_webhook_url || `${apiBase}/asaas/webhook`}
+                {asaasWebhookURL}
               </code>
-              <button onClick={() => copyUrl(settings?.asaas_webhook_url || `${apiBase}/asaas/webhook`)} className="p-2 rounded hover:bg-white/5">
+              <button onClick={() => copyUrl(asaasWebhookURL)} className="p-2 rounded hover:bg-white/5">
                 <Key className="w-4 h-4" style={{ color: "hsl(240 8% 55%)" }} />
               </button>
             </div>
