@@ -315,12 +315,26 @@ func (h *InboxHandler) GetChat(c *fiber.Ctx) error {
 		userID, _ := c.Locals("user_id").(uuid.UUID)
 		workspaceID, _ := c.Locals("workspace_id").(uuid.UUID)
 
+		// Tenta usar o nome+avatar JÁ CAPTURADOS via MessageLog
+		// (push_name → Store.Contacts no manager.SaveMessageEx). Se ainda
+		// não houve mensagem com nome real, cai no telefone como fallback.
+		// Sem essa busca, todo contato novo entrava no CRM com Name=phone
+		// mesmo quando o WhatsApp já tinha o nome capturado, e o agente
+		// via "JID/lid" no CRM em vez do nome real.
+		resolvedName, resolvedAvatar := h.latestContactInfo(instance.ID, jid)
+		name := resolvedName
+		if name == "" || name == phone || name == jid {
+			name = phone
+		}
+
 		newContact := models.Contact{
 			ID:          uuid.New(),
 			UserID:      userID,
 			WorkspaceID: &workspaceID,
-			Name:        phone,
+			Name:        name,
 			Phone:       phone,
+			AvatarURL:   resolvedAvatar,
+			ExternalID:  jid,
 		}
 		if err := h.db.Create(&newContact).Error; err == nil {
 			contact = &newContact

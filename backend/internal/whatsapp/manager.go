@@ -794,12 +794,26 @@ func upsertPushName(m *Manager, instanceID, jid, name string) {
 	if phone == "" {
 		return
 	}
-	// Contact: upsert por phone. Se contact existe com nome real (≠ phone),
-	// não toca — push name é "fonte secundária", não sobrescreve edição CRM.
+	// Contact: upsert. Tenta primeiro por external_id (channel_key) que é
+	// match exato do JID; cai pra phone LIKE pra cobrir contatos antigos
+	// criados sem external_id.
+	// Se existing.Name é vazio, igual ao phone, igual ao JID/lid (caso
+	// inicial buggado), ou começa com prefixo do JID, sobrescrevemos.
+	// Push name não sobrescreve um nome real já editado pelo agente.
 	var existing models.Contact
-	err := m.db.Where("phone LIKE ?", "%"+phone+"%").First(&existing).Error
+	err := m.db.Where("external_id = ?", jid).First(&existing).Error
+	if err != nil {
+		err = m.db.Where("phone LIKE ?", "%"+phone+"%").First(&existing).Error
+	}
 	if err == nil {
-		if existing.Name == "" || existing.Name == phone || existing.Name == "+"+phone {
+		shouldOverwrite := existing.Name == "" ||
+			existing.Name == phone ||
+			existing.Name == "+"+phone ||
+			existing.Name == jid ||
+			strings.HasPrefix(existing.Name, phone) ||
+			strings.Contains(existing.Name, "@s.whatsapp.net") ||
+			strings.Contains(existing.Name, "@lid")
+		if shouldOverwrite {
 			m.db.Model(&existing).Update("name", name)
 		}
 	}
