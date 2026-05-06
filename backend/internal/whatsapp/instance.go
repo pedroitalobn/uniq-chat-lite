@@ -3511,6 +3511,9 @@ func extractButtonsPayload(b *waE2E.ButtonsMessage) string {
 
 // extractListPayload converte ListMessage em JSON estruturado
 // {title, body, footer, button_text, sections:[{title, rows:[{id,title,description}]}]}.
+// Title vai TANTO em list_title (mantém compat) QUANTO em header (frontend
+// renderiza `parsed.listHeader` baseado em parsed.header — sem isso o
+// header ficava vazio na UI).
 func extractListPayload(l *waE2E.ListMessage) string {
 	if l == nil {
 		return ""
@@ -3518,6 +3521,7 @@ func extractListPayload(l *waE2E.ListMessage) string {
 	out := map[string]any{}
 	if v := l.GetTitle(); v != "" {
 		out["list_title"] = v
+		out["header"] = v // duplicação intencional pro frontend listHeader
 	}
 	if v := l.GetDescription(); v != "" {
 		out["body"] = v
@@ -3554,34 +3558,70 @@ func extractListPayload(l *waE2E.ListMessage) string {
 
 // extractInteractivePayload — InteractiveMessage tem um Body+NativeFlow
 // com botões. Converte pro mesmo formato {body, buttons[]} pra unificar
-// renderização no front.
+// renderização no front. NativeFlow buttons trazem ButtonParamsJSON
+// (string JSON com display_text/id/url) — parseamos pra extrair só o
+// texto exibível em vez de mostrar o JSON cru pro agente.
 func extractInteractivePayload(im *waE2E.InteractiveMessage) string {
 	if im == nil {
 		return ""
 	}
 	out := map[string]any{}
+	// interactive como OBJETO (não booleano) pra casar com a tipagem do
+	// front. Antes era `"interactive": true` e o ParsedContent espera
+	// {header, body, footer} — viraja undefined no acesso e header/footer
+	// nunca renderizavam.
+	interactive := map[string]any{}
+	if header := im.GetHeader(); header != nil && header.GetTitle() != "" {
+		interactive["header"] = header.GetTitle()
+		out["header"] = header.GetTitle() // top-level pra parser de listHeader
+	}
 	if body := im.GetBody(); body != nil && body.GetText() != "" {
 		out["body"] = body.GetText()
-	}
-	if header := im.GetHeader(); header != nil && header.GetTitle() != "" {
-		out["header"] = header.GetTitle()
+		interactive["body"] = body.GetText()
 	}
 	if footer := im.GetFooter(); footer != nil && footer.GetText() != "" {
 		out["footer"] = footer.GetText()
+		interactive["footer"] = footer.GetText()
 	}
 	if nf := im.GetNativeFlowMessage(); nf != nil {
 		btns := make([]map[string]string, 0, len(nf.GetButtons()))
 		for _, b := range nf.GetButtons() {
-			btns = append(btns, map[string]string{
-				"id":    b.GetName(),
-				"title": b.GetButtonParamsJSON(),
-			})
+			// ButtonParamsJSON é uma string JSON tipo
+			//   {"display_text":"Click","id":"x"}        (quick_reply)
+			//   {"display_text":"Visit","url":"https..."} (cta_url)
+			// Extraímos display_text/id/url; sem isso o frontend mostrava
+			// o JSON inteiro como rótulo do botão, ilegível.
+			label := ""
+			id := ""
+			url := ""
+			if pj := b.GetButtonParamsJSON(); pj != "" {
+				var params map[string]any
+				if err := json.Unmarshal([]byte(pj), &params); err == nil {
+					if v, ok := params["display_text"].(string); ok {
+						label = v
+					}
+					if v, ok := params["id"].(string); ok {
+						id = v
+					}
+					if v, ok := params["url"].(string); ok {
+						url = v
+					}
+				}
+			}
+			if label == "" {
+				label = b.GetName() // "quick_reply"/"cta_url" como fallback
+			}
+			entry := map[string]string{"id": id, "title": label}
+			if url != "" {
+				entry["url"] = url
+			}
+			btns = append(btns, entry)
 		}
 		if len(btns) > 0 {
 			out["buttons"] = btns
 		}
 	}
-	out["interactive"] = true
+	out["interactive"] = interactive
 	if data, err := json.Marshal(out); err == nil {
 		return string(data)
 	}

@@ -61,16 +61,20 @@ var ErrFfmpegMissing = errors.New("audioconvert: ffmpeg ausente — instale o pa
 // AAC, WAV) em OGG/Opus mono 16kHz 32kbps — o sweet spot pra voice notes
 // no WhatsApp. Retorna (bytes OGG, duração em segundos, erro).
 //
-// Implementação:
-//   - ffmpeg lê de stdin (-i pipe:0) e escreve em stdout (-f ogg pipe:1).
-//   - Encoder libopus sempre (mesmo se input já é Opus) — barato e garante
-//     que o container seja OGG. Re-encoding de Opus pra Opus tem perda mas
-//     é imperceptível em 32kbps voz.
-//   - VBR ativo (-vbr on) com bitrate target 32k.
-//   - application=voip otimiza pra fala (menor latência, menos bits em
-//     silêncio).
-//   - Duração é extraída do stderr do ffmpeg ("Duration: HH:MM:SS.xx").
-//   - Timeout de 30s pra cortar áudios travados/grandes demais.
+// Estratégia em 2 etapas:
+//
+//  1. Try lossless repack: `-c:a copy -f ogg`. Funciona quando o input
+//     já contém Opus em outro container (WebM/Matroska — comum no
+//     browser MediaRecorder). Extrai pacotes Opus 1:1 e empacota em
+//     OGG, sem re-encode. Bit-exato. Mais rápido, sem perda.
+//
+//  2. Fallback re-encode: `-c:a libopus -application voip -vbr on
+//     -b:a 32k -ar 16000 -ac 1`. Usado quando o input não é Opus
+//     (MP3, AAC, WAV) — ou quando o copy falhou (ex.: timestamps
+//     inconsistentes do WebM, comum em mics com sample rate
+//     incomum).
+//
+// Duração é extraída do stderr do ffmpeg ("Duration: HH:MM:SS.xx").
 func TranscodeToOggOpus(ctx context.Context, in []byte) ([]byte, uint32, error) {
 	if !ffmpegOK.Load() {
 		return nil, 0, ErrFfmpegMissing
@@ -79,41 +83,83 @@ func TranscodeToOggOpus(ctx context.Context, in []byte) ([]byte, uint32, error) 
 		return nil, 0, errors.New("audioconvert: input vazio")
 	}
 
+	// Tentativa 1: lossless repack (Opus passa puro pra OGG).
+	if out, dur, err := transcodeOpusCopy(ctx, in); err == nil && len(out) > 0 {
+		return out, dur, nil
+	} else if err != nil {
+		log.Debug().Err(err).Msg("audioconvert: copy fallback pra re-encode")
+	}
+
+	// Tentativa 2: re-encode pra normalizar.
+	return transcodeReencode(ctx, in)
+}
+
+// transcodeOpusCopy tenta -c:a copy. Falha se o input não contém Opus ou
+// se o demuxer/muxer não consegue reorganizar timestamps. Diferença chave
+// vs re-encode: NÃO toca os pacotes Opus, só remete pro container OGG.
+// Isso evita artefatos sutis de encoding que alguns clients WhatsApp
+// rejeitam ("este áudio não está mais disponível").
+func transcodeOpusCopy(ctx context.Context, in []byte) ([]byte, uint32, error) {
 	tctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(tctx, ffmpegPath,
 		"-hide_banner",
-		"-loglevel", "info", // precisa de info pra capturar Duration no stderr
+		"-loglevel", "info",
 		"-i", "pipe:0",
-		"-vn",                       // descarta vídeo se houver (ex.: WebM com track de vídeo)
-		"-c:a", "libopus",
-		"-application", "voip",
-		"-vbr", "on",
-		"-b:a", "32k",
-		"-ar", "16000",              // sample rate típico de voz
-		"-ac", "1",                  // mono — economiza bits e voice notes são mono
+		"-vn",
+		"-c:a", "copy",
 		"-f", "ogg",
 		"pipe:1",
 	)
 	cmd.Stdin = bytes.NewReader(in)
-
-	var out bytes.Buffer
-	var stderr bytes.Buffer
+	var out, stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
-
 	if err := cmd.Run(); err != nil {
-		// Anexa ultimas linhas do stderr — trace real do problema costuma
-		// estar nas últimas 3 linhas (ex.: "Invalid data found", "moov atom not found").
 		tail := tailString(stderr.String(), 3)
-		return nil, 0, fmt.Errorf("ffmpeg falhou: %w (stderr: %s)", err, tail)
+		return nil, 0, fmt.Errorf("ffmpeg copy: %w (stderr: %s)", err, tail)
 	}
-
 	dur := parseDurationSeconds(stderr.String())
 	if dur == 0 {
-		// Estimativa fallback: bytes / (32kbps / 8) = bytes / 4000.
-		// Não é exato mas não deixa o campo zerado pra PTT.
+		dur = uint32(len(out.Bytes()) / 4000)
+		if dur == 0 {
+			dur = 1
+		}
+	}
+	return out.Bytes(), dur, nil
+}
+
+// transcodeReencode é o caminho original (re-encode com libopus). Usado
+// quando copy falha — mantém o áudio entregue a custo de qualidade.
+func transcodeReencode(ctx context.Context, in []byte) ([]byte, uint32, error) {
+	tctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(tctx, ffmpegPath,
+		"-hide_banner",
+		"-loglevel", "info",
+		"-i", "pipe:0",
+		"-vn",
+		"-c:a", "libopus",
+		"-application", "voip",
+		"-vbr", "on",
+		"-b:a", "32k",
+		"-ar", "16000",
+		"-ac", "1",
+		"-f", "ogg",
+		"pipe:1",
+	)
+	cmd.Stdin = bytes.NewReader(in)
+	var out, stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		tail := tailString(stderr.String(), 3)
+		return nil, 0, fmt.Errorf("ffmpeg re-encode: %w (stderr: %s)", err, tail)
+	}
+	dur := parseDurationSeconds(stderr.String())
+	if dur == 0 {
 		est := uint32(len(out.Bytes()) / 4000)
 		if est > 0 {
 			dur = est

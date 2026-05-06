@@ -2257,39 +2257,62 @@ function MediaBody({
   }
 
   // Buttons / Interactive — botões de CTA (read-only no view do agente).
+  // Header/body/footer vêm tanto top-level quanto dentro de `interactive`
+  // (backend duplica pra robustez); preferimos top-level e caímos pro
+  // interactive se top-level não existir.
   if (type === "buttons" || type === "interactive") {
     const btns = parsed.buttons || [];
+    const header = parsed.listHeader || parsed.interactive?.header;
+    const bodyText = text || parsed.interactive?.body;
+    const footer = parsed.listFooter || parsed.interactive?.footer;
     return (
-      <div className="flex flex-col gap-2 max-w-[300px]">
-        {parsed.interactive?.header && (
-          <div className="text-[11px] font-medium uppercase tracking-wider" style={{ color: "hsl(240 8% 60%)" }}>
-            {parsed.interactive.header}
+      <div className="flex flex-col gap-2 max-w-[320px]">
+        {header && (
+          <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "hsl(240 8% 60%)" }}>
+            {header}
           </div>
         )}
-        {(text || parsed.interactive?.body) && (
-          <Text text={text || parsed.interactive?.body || ""} />
-        )}
+        {bodyText && <Text text={bodyText} />}
         {btns.length > 0 && (
           <div className="flex flex-col gap-1 mt-1">
-            {btns.map((b, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-center gap-1.5 rounded-md py-1.5 text-[11px] font-medium"
-                style={{
-                  background: "rgba(0,212,106,0.06)",
-                  border: "1px solid rgba(0,212,106,0.2)",
-                  color: "#00d46a",
-                }}
-                title={b.id ? `id: ${b.id}` : undefined}
-              >
-                <ListChecks className="h-3 w-3" /> {b.title || b.id || "Botão"}
-              </div>
-            ))}
+            {btns.map((b, i) => {
+              const label = b.title || b.id || "Botão";
+              const isURL = !!b.url;
+              const inner = (
+                <>
+                  <ListChecks className="h-3 w-3 flex-shrink-0" />
+                  <span className="truncate">{label}</span>
+                  {isURL && (
+                    <span className="text-[9px] opacity-60 ml-auto">↗</span>
+                  )}
+                </>
+              );
+              const className =
+                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors";
+              const style: React.CSSProperties = {
+                background: "rgba(0,212,106,0.08)",
+                border: "1px solid rgba(0,212,106,0.22)",
+                color: "#00d46a",
+                justifyContent: isURL ? "flex-start" : "center",
+              };
+              if (isURL) {
+                return (
+                  <a key={i} href={b.url} target="_blank" rel="noopener noreferrer" className={className} style={style} title={`URL: ${b.url}`}>
+                    {inner}
+                  </a>
+                );
+              }
+              return (
+                <div key={i} className={className} style={style} title={b.id ? `id: ${b.id}` : undefined}>
+                  {inner}
+                </div>
+              );
+            })}
           </div>
         )}
-        {parsed.listFooter && (
+        {footer && (
           <div className="text-[10px]" style={{ color: "hsl(240 8% 55%)" }}>
-            {parsed.listFooter}
+            {footer}
           </div>
         )}
       </div>
@@ -3256,9 +3279,12 @@ interface ParsedContent {
     media_url?: string;
     mime_type?: string;
   };
-  // Interactive / buttons / list
+  // Interactive / buttons / list. `interactive` é um OBJETO no payload do
+  // backend pra carregar header/body/footer — antes vinha como bool e o
+  // optional chaining .header ficava sempre undefined.
   interactive?: { type?: string; body?: string; header?: string; footer?: string };
-  buttons?: { id?: string; title: string }[];
+  /** Botão com label e (pra cta_url do NativeFlow) URL externa. */
+  buttons?: { id?: string; title: string; url?: string }[];
   listTitle?: string;
   listHeader?: string;
   listFooter?: string;
