@@ -212,10 +212,28 @@ export default function ArticleEditorPage() {
   const currentStatus = articleQuery.data?.status ?? "draft";
   const categories = categoriesQuery.data ?? [];
 
-  if (articleQuery.isLoading) {
+  // Loader cobre 3 estados: workspace context ainda não chegou (wsId
+  // vazio), query carregando, ou query disabled mas dados ainda
+  // ausentes. Antes só checava isLoading — quando a query estava
+  // disabled (porque wsId era ""), isLoading=false e a página
+  // renderizava com defaults vazios. Hard refresh "consertava"
+  // porque o context recarregava antes do primeiro render.
+  if (!wsId || articleQuery.isLoading || (!articleQuery.isFetched && !articleQuery.data)) {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--text-3)" }} />
+      </div>
+    );
+  }
+  if (articleQuery.isError || !articleQuery.data) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-3">
+        <p className="text-sm" style={{ color: "var(--text-2)" }}>Não foi possível carregar este artigo.</p>
+        <button onClick={() => articleQuery.refetch()}
+          className="px-3 py-1.5 rounded-lg text-xs font-medium"
+          style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-2)" }}>
+          Tentar novamente
+        </button>
       </div>
     );
   }

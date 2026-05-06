@@ -477,7 +477,12 @@ func (h *AdminHandler) CreateUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar usuário"})
 	}
 
-	h.emailSvc.SendAdminCreatedAccount(user.Email, user.Name, user.Email, plainPassword)
+	h.emailSvc.SendAdminCreatedAccount(email.AdminCreatedAccountInput{
+		To:           user.Email,
+		Name:         user.Name,
+		UserEmail:    user.Email,
+		TempPassword: plainPassword,
+	})
 
 	h.db.Preload("Plan").First(&user, "id = ?", user.ID)
 	return c.Status(fiber.StatusCreated).JSON(user)

@@ -584,22 +584,48 @@ func (h *HelpDeskHandler) PublicListArticles(c *fiber.Ctx) error {
 }
 
 // PublicGetArticle GET /v1/public/helpdesk/:workspace_slug/articles/:slug
+//
+// Tenta resolver o artigo por slug exato; se não achar, tenta por ID
+// (UUID), depois fuzzy LIKE pra cobrir casos de slug renomeado. Sempre
+// exige status='published' — rascunhos nunca são públicos.
 func (h *HelpDeskHandler) PublicGetArticle(c *fiber.Ctx) error {
 	ws, err := h.lookupWorkspaceBySlug(c.Params("workspace_slug"))
 	if err != nil {
 		return fiber.NewError(fiber.StatusNotFound, "workspace não encontrado")
 	}
 
-	slug := c.Params("slug")
+	identifier := c.Params("slug")
 	var article models.HelpDeskArticle
-	if err := h.db.Where("workspace_id = ? AND slug = ? AND status = ?", ws.ID, slug, models.ArticlePublished).
-		First(&article).Error; err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "artigo não encontrado")
+
+	// 1. Slug exato
+	q := h.db.Where("workspace_id = ? AND status = ?", ws.ID, models.ArticlePublished)
+	if err := q.Where("slug = ?", identifier).First(&article).Error; err == nil {
+		h.db.Model(&article).UpdateColumn("view_count", gorm.Expr("view_count + 1"))
+		return c.JSON(article)
 	}
 
-	h.db.Model(&article).UpdateColumn("view_count", gorm.Expr("view_count + 1"))
+	// 2. UUID — quando o front linka pelo id (preview do editor pode
+	// fazer isso antes do user setar slug).
+	if id, perr := uuid.Parse(identifier); perr == nil {
+		if err := h.db.Where("workspace_id = ? AND id = ? AND status = ?",
+			ws.ID, id, models.ArticlePublished).First(&article).Error; err == nil {
+			h.db.Model(&article).UpdateColumn("view_count", gorm.Expr("view_count + 1"))
+			return c.JSON(article)
+		}
+	}
 
-	return c.JSON(article)
+	// 3. Fuzzy ILIKE — slug pode ter sido renomeado depois de
+	// publicar; tenta encontrar algo com o prefixo. Só pega o
+	// primeiro pra evitar ambiguidade.
+	if err := h.db.Where("workspace_id = ? AND status = ? AND slug ILIKE ?",
+		ws.ID, models.ArticlePublished, identifier+"%").
+		Order("updated_at DESC").
+		First(&article).Error; err == nil {
+		h.db.Model(&article).UpdateColumn("view_count", gorm.Expr("view_count + 1"))
+		return c.JSON(article)
+	}
+
+	return fiber.NewError(fiber.StatusNotFound, "artigo não encontrado ou não publicado")
 }
 
 // PublicAsk POST /v1/public/helpdesk/:workspace_slug/ask

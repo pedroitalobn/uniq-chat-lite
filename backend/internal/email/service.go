@@ -202,15 +202,29 @@ func (s *Service) SendInstanceBanned(to, name, instanceName, phone string) {
 	}
 }
 
-func (s *Service) SendAdminCreatedAccount(to, name, email, tempPassword string) {
-	// A ordem dos args precisa bater com a assinatura de adminCreatedAccountHTML
-	// — (appName, name, appURL, email, tempPassword). Antes a chamada estava
-	// trocada (email no slot appURL, tempPassword no slot email, appURL no
-	// slot tempPassword) e isso aparecia no email como: campo "Email" com a
-	// senha, campo "Senha temporária" com a URL, e botão "Acessar minha
-	// conta" com a senha como href — abrindo a página de email do usuário.
-	if err := s.send(to, "Sua conta foi criada no "+s.appName, adminCreatedAccountHTML(s.appName, name, s.appURL, email, tempPassword), "admin_created_account"); err != nil {
-		log.Error().Err(err).Str("to", to).Msg("email: failed to send admin created account")
+// AdminCreatedAccountInput agrupa os args com nomes — antes era posicional
+// e cada vez que mexíamos cá ou lá os campos saíam trocados (Email no slot
+// da senha, etc.). Struct elimina esse tipo de erro.
+type AdminCreatedAccountInput struct {
+	To           string // destinatário do email (= UserEmail na prática)
+	Name         string // nome do user mostrado em "Olá, X"
+	UserEmail    string // email da nova conta — vai no campo "Email" das credenciais
+	TempPassword string // senha temporária definida pelo admin
+}
+
+// SendAdminCreatedAccount avisa o user que um admin criou a conta e
+// passa as credenciais. Aceita struct nomeada pra impedir trocas
+// posicionais — bug histórico.
+func (s *Service) SendAdminCreatedAccount(in AdminCreatedAccountInput) {
+	html := adminCreatedAccountHTML(s.appName, in.Name, s.appURL, in.UserEmail, in.TempPassword)
+	log.Debug().
+		Str("to", in.To).
+		Str("user_email", in.UserEmail).
+		Int("temp_password_len", len(in.TempPassword)).
+		Str("app_url", s.appURL).
+		Msg("email: dispatching admin_created_account")
+	if err := s.send(in.To, "Sua conta foi criada no "+s.appName, html, "admin_created_account"); err != nil {
+		log.Error().Err(err).Str("to", in.To).Msg("email: failed to send admin created account")
 	}
 }
 
