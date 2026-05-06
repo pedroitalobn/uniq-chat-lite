@@ -395,6 +395,36 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     onSuccess: () => refresh(),
   });
 
+  // Persiste o modo do agente (active/observing/disabled) no backend.
+  // Antes o switch Humano/IA/Observ só mudava state local + chamava
+  // bot.mutate(true|false), o que não preservava o modo "observing"
+  // (ficava igual a "disabled" no DB). Agora o PATCH /agent-state
+  // grava o Mode em ConversationAgentState e o AgentRuntime respeita.
+  const agentStateMut = useMutation({
+    mutationFn: (mode: "active" | "observing" | "disabled") =>
+      conversationsApi.setAgentState(wsId as string, conversationId, { mode }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["conversation", wsId, conversationId] });
+    },
+  });
+
+  // Hidrata convMode a partir do backend ao abrir a conversa pra UI
+  // refletir o estado real (não só o último click). Sem isso, ao
+  // navegar entre conversas o seletor mostrava sempre "Humano".
+  const agentStateQ = useQuery({
+    queryKey: ["agent-state", wsId, conversationId],
+    queryFn: () =>
+      conversationsApi.getAgentState(wsId as string, conversationId).then(
+        (r) => r.data as { mode?: "active" | "observing" | "disabled" },
+      ),
+    enabled: !!wsId && !!conversationId,
+  });
+  useEffect(() => {
+    const m = agentStateQ.data?.mode;
+    if (!m) return;
+    setConvMode(m === "active" ? "ai" : m === "observing" ? "observing" : "human");
+  }, [agentStateQ.data?.mode]);
+
   // Pin / Mute conversation — patch direto na conversation.
   const patchConv = useMutation({
     mutationFn: (patch: { is_pinned?: boolean; is_muted?: boolean; is_archived?: boolean }) =>
@@ -775,7 +805,20 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                 { id: "observing", label: "Obs",    icon: Eye },
               ] as const).map(({ id, label, icon: Icon }) => (
                 <button key={id}
-                  onClick={() => { setConvMode(id); if (id === "ai") bot.mutate(true); else bot.mutate(false); }}
+                  onClick={() => {
+                    setConvMode(id);
+                    // Mapeia UI mode → DB mode:
+                    //   "human"     → disabled (agente não age nem observa)
+                    //   "ai"        → active   (agente responde automaticamente)
+                    //   "observing" → observing (agente sugere mas não envia)
+                    const dbMode = id === "ai" ? "active" : id === "observing" ? "observing" : "disabled";
+                    agentStateMut.mutate(dbMode);
+                    // Mantém compat com is_bot_active legado: enableBot
+                    // pra "ai", disableBot pra "human"/"observing". O
+                    // AgentRuntime usa Mode como fonte da verdade nova,
+                    // mas outros code paths antigos ainda olham is_bot_active.
+                    bot.mutate(id === "ai");
+                  }}
                   className="px-2.5 py-1.5 text-[10px] font-medium flex items-center gap-1 transition-all"
                   style={{
                     background: convMode === id ? (id === "ai" ? "rgba(167,139,250,0.2)" : id === "human" ? "rgba(0,212,106,0.15)" : "rgba(255,255,255,0.08)") : "transparent",

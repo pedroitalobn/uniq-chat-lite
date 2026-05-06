@@ -1890,6 +1890,27 @@ func (h *ConversationHandler) setBot(c *fiber.Ctx, active bool) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
 	}
 	h.db.Model(&models.Conversation{}).Where("id = ?", id).Update("is_bot_active", active)
+
+	// Sincroniza ConversationAgentState.Mode com a flag legada.
+	// AgentRuntime usa Mode como fonte da verdade — sem este sync, o bot
+	// poderia ficar "ativo" por is_bot_active mas Mode=disabled (ou vice
+	// versa), causando comportamento inconsistente. enable→active,
+	// disable→disabled (modo "observing" só vem via PATCH /agent-state
+	// porque enable/disable são binários).
+	mode := models.AgentModeDisabled
+	if active {
+		mode = models.AgentModeActive
+	}
+	var existing models.ConversationAgentState
+	if err := h.db.Where("conversation_id = ?", id).First(&existing).Error; err == nil {
+		h.db.Model(&existing).Update("mode", mode)
+	} else {
+		h.db.Create(&models.ConversationAgentState{
+			ConversationID: id,
+			Mode:           mode,
+		})
+	}
+
 	actor := middleware.GetCurrentUserID(c)
 	evtType := models.ConvEventBotHandoff
 	h.db.Create(&models.ConversationEvent{
@@ -1898,9 +1919,9 @@ func (h *ConversationHandler) setBot(c *fiber.Ctx, active bool) error {
 		ActorType:      models.ActorUser,
 		ActorUserID:    &actor,
 		EventType:      evtType,
-		Payload:        jsonEncode(map[string]any{"bot_active": active}),
+		Payload:        jsonEncode(map[string]any{"bot_active": active, "mode": mode}),
 	})
-	return c.JSON(fiber.Map{"ok": true, "is_bot_active": active})
+	return c.JSON(fiber.Map{"ok": true, "is_bot_active": active, "mode": mode})
 }
 
 // -- backfill + diagnostics -------------------------------------------------
