@@ -127,6 +127,9 @@ interface MessagePayload {
     mime_type?: string;
   };
   delivery_error?: string;
+  /** Transcrição automática (Whisper) — preenchido async pra type=audio. */
+  transcription?: string;
+  transcription_status?: "pending" | "done" | "failed" | "unsupported";
 }
 
 interface NotePayload {
@@ -1682,7 +1685,7 @@ function MessageBubble({
             className={isAudioOnly ? "" : "overflow-hidden"}
             style={isAudioOnly ? undefined : { borderRadius: 12, background: "hsl(240 18% 5%)" }}
           >
-            <MediaBody type={m.type} parsed={parsed} onOpenViewer={onOpenViewer} wsId={wsId} isOut={isOut} />
+            <MediaBody type={m.type} parsed={parsed} onOpenViewer={onOpenViewer} wsId={wsId} isOut={isOut} transcription={m.transcription} transcriptionStatus={m.transcription_status} />
           </div>
 
           {/* Pin / favorite / view-once badges — abs positioned mantém limpo */}
@@ -1820,7 +1823,7 @@ function MessageBubble({
           </div>
         )}
 
-        <MediaBody type={m.type} parsed={parsed} onOpenViewer={onOpenViewer} wsId={wsId} isOut={isOut} />
+        <MediaBody type={m.type} parsed={parsed} onOpenViewer={onOpenViewer} wsId={wsId} isOut={isOut} transcription={m.transcription} transcriptionStatus={m.transcription_status} />
 
         <div
           className="mt-1 flex items-center justify-end gap-1 text-[10px]"
@@ -1862,13 +1865,18 @@ function MessageBubble({
 // de nova aba. Áudios renderizam inline (pequeno) E também ganham um botão
 // de "expandir" que abre o viewer com player maior.
 function MediaBody({
-  type, parsed, onOpenViewer, wsId, isOut,
+  type, parsed, onOpenViewer, wsId, isOut, transcription, transcriptionStatus,
 }: {
   type: string;
   parsed: ParsedContent;
   onOpenViewer: (source: MediaViewerSource) => void;
   wsId?: string;
   isOut?: boolean;
+  /** Transcrição automática do áudio (Whisper). Quando done, render como
+      bloco de texto abaixo do player — espelha a feature nativa do
+      WhatsApp. */
+  transcription?: string;
+  transcriptionStatus?: "pending" | "done" | "failed" | "unsupported";
 }) {
   const { text, url, mediaKey, filename, caption, error, latitude, longitude, mimeType } = parsed;
   const body = caption || text;
@@ -1990,6 +1998,7 @@ function MediaBody({
       return (
         <div className="flex flex-col gap-1.5">
           <AudioPlayer url={audioURL} variant={isOut ? "out" : "in"} />
+          <TranscriptionBlock text={transcription} status={transcriptionStatus} isOut={isOut} />
           {error && <ErrorLine text={error} />}
         </div>
       );
@@ -1997,6 +2006,7 @@ function MediaBody({
     return (
       <div className="flex flex-col gap-1.5">
         <IconFallback icon={<Mic className="h-4 w-4" />} label={body || "Áudio"} />
+        <TranscriptionBlock text={transcription} status={transcriptionStatus} isOut={isOut} />
         {error && <ErrorLine text={error} />}
       </div>
     );
@@ -3081,6 +3091,64 @@ function ErrorLine({ text }: { text: string }) {
       <AlertCircle className="h-3 w-3" />
       {text}
     </span>
+  );
+}
+
+// TranscriptionBlock — bloco compacto exibido abaixo do player de áudio
+// quando a transcrição automática (Whisper / PlatformAI) está disponível.
+// Estados:
+//   - pending: skeleton "Transcrevendo…"
+//   - done: texto cinza-claro itálico, max 8 linhas (collapse depois)
+//   - failed/unsupported: nada (silencia — não polui a bubble)
+//   - undefined: nada (legacy ou não-áudio)
+function TranscriptionBlock({
+  text, status, isOut,
+}: {
+  text?: string;
+  status?: "pending" | "done" | "failed" | "unsupported";
+  isOut?: boolean;
+}) {
+  if (status === "pending") {
+    return (
+      <div
+        className="text-[11px] italic flex items-center gap-1.5 px-2 py-1 rounded-md"
+        style={{
+          color: isOut ? "rgba(255,255,255,0.55)" : "var(--text-3)",
+          background: isOut ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,255,255,0.05)",
+          width: "fit-content",
+          maxWidth: "100%",
+        }}
+      >
+        <span
+          className="inline-block w-1.5 h-1.5 rounded-full"
+          style={{ background: "#00d46a", animation: "pulse 1.4s ease-in-out infinite" }}
+        />
+        Transcrevendo áudio…
+      </div>
+    );
+  }
+  if (status !== "done" || !text) return null;
+  return (
+    <div
+      className="text-[12px] leading-relaxed px-2.5 py-1.5 rounded-md"
+      style={{
+        color: isOut ? "rgba(255,255,255,0.78)" : "var(--text-2)",
+        background: isOut ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.06)",
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+      }}
+      title="Transcrição automática (Uniq AI)"
+    >
+      <span
+        className="text-[9px] uppercase tracking-widest font-semibold mr-1.5 opacity-60"
+        style={{ color: isOut ? "rgba(255,255,255,0.55)" : "var(--text-3)" }}
+      >
+        Transcrição
+      </span>
+      {text}
+    </div>
   );
 }
 

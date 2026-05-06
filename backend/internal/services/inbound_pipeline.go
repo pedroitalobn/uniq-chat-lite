@@ -13,6 +13,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -53,10 +55,11 @@ type InboundPipeline struct {
 	hub      Broadcaster
 	dispatch *DispatchService
 	triggers *TriggerService // optional — wired by SetTriggerService
+	stt      *STTService     // optional — quando set, transcreve voice notes recebidos via Whisper
 }
 
 func NewInboundPipeline(db *gorm.DB, hub Broadcaster) *InboundPipeline {
-	return &InboundPipeline{db: db, hub: hub, dispatch: NewDispatchService(db)}
+	return &InboundPipeline{db: db, hub: hub, dispatch: NewDispatchService(db), stt: NewSTTService(db)}
 }
 
 // SetTriggerService wires the keyword-trigger evaluator into the
@@ -123,6 +126,13 @@ func (p *InboundPipeline) Process(ctx context.Context, in InboundMessage) (*mode
 	p.updateDenorm(ctx, conv, in, msg, false)
 
 	p.broadcastConversation(conv, msg, created, reopened)
+
+	// Transcrição de voice notes via Whisper (Uniq AI). Goroutine pra não
+	// segurar o pipeline inbound — atualiza MessageLog + emite WS event
+	// quando termina pra UI hidratar a bubble in-place.
+	if in.Type == "audio" && p.stt != nil {
+		go p.transcribeAudioAsync(msg, conv)
+	}
 
 	// Sprint 8: avalia triggers configurados (autoresponder por keyword).
 	// Síncrono pra cooldown ficar correto, mas a Action efetiva (envio
@@ -574,4 +584,152 @@ func buildPreview(msgType, content string) string {
 		return content[:280]
 	}
 	return content
+}
+
+// transcribeAudioAsync baixa o blob da MessageLog (via signed URL do MinIO
+// ou HTTP direto) e roda STTService pra transcrever. Atualiza
+// MessageLog.Transcription + TranscriptionStatus + emite WS event
+// "message.transcribed" pra UI hidratar a bubble in-place.
+//
+// Best-effort: falhas são gravadas como status="failed" com erro pra debug
+// mas não retentam — voice notes ficam sem texto e seguem.
+func (p *InboundPipeline) transcribeAudioAsync(msg *models.MessageLog, conv *models.Conversation) {
+	if p.stt == nil || msg == nil {
+		return
+	}
+	// Marca pending pro front mostrar indicador "transcrevendo…" se quiser.
+	p.db.Model(&models.MessageLog{}).
+		Where("id = ?", msg.ID).
+		Update("transcription_status", "pending")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	// Extrai media_url + mime do Content. O conteúdo é JSON gerado pelo
+	// channel handler (whatsmeow, WABA, IG). Tipos diferentes de chave
+	// existem ao longo do tempo — tentamos os mais comuns.
+	mediaURL, mime := extractAudioRefs(msg.Content)
+	if mediaURL == "" {
+		log.Debug().Str("msg_id", msg.ID.String()).Msg("stt: sem media_url no content — skip")
+		p.db.Model(&models.MessageLog{}).
+			Where("id = ?", msg.ID).
+			Update("transcription_status", "failed")
+		return
+	}
+
+	audio, err := downloadAudioBytes(ctx, mediaURL)
+	if err != nil {
+		log.Warn().Err(err).Str("msg_id", msg.ID.String()).Msg("stt: download falhou")
+		p.db.Model(&models.MessageLog{}).
+			Where("id = ?", msg.ID).
+			Update("transcription_status", "failed")
+		return
+	}
+
+	// language vazio = auto-detect. Whisper acerta português/inglês na maioria
+	// dos casos sem hint; deixar genérico evita errar quando o user manda
+	// audio em outro idioma.
+	text, err := p.stt.Transcribe(ctx, audio, mime, "", "")
+	if err != nil {
+		status := "failed"
+		if errors.Is(err, ErrUnsupportedProvider) {
+			status = "unsupported"
+		} else if errors.Is(err, ErrNoPlatformAI) {
+			status = "unsupported"
+		}
+		log.Warn().Err(err).Str("msg_id", msg.ID.String()).Msg("stt: transcrição falhou")
+		p.db.Model(&models.MessageLog{}).
+			Where("id = ?", msg.ID).
+			Update("transcription_status", status)
+		return
+	}
+
+	updates := map[string]any{
+		"transcription":        text,
+		"transcription_status": "done",
+	}
+	if err := p.db.Model(&models.MessageLog{}).Where("id = ?", msg.ID).Updates(updates).Error; err != nil {
+		log.Warn().Err(err).Str("msg_id", msg.ID.String()).Msg("stt: update da MessageLog falhou")
+		return
+	}
+
+	// Emite WS event pro front atualizar a bubble. Mesmo canal das demais
+	// notificações de mensagem; UI escuta `conversation.message_updated`
+	// (reutiliza o invalidador de conversation.* já existente).
+	if p.hub != nil && conv != nil {
+		p.hub.Broadcast(&whatsapp.Event{
+			Type:      "conversation.message_updated",
+			Instance:  msg.InstanceID.String(),
+			Workspace: conv.WorkspaceID.String(),
+			Payload: map[string]any{
+				"conversation_id":      conv.ID.String(),
+				"message_id":           msg.ID.String(),
+				"transcription":        text,
+				"transcription_status": "done",
+			},
+		})
+	}
+
+	log.Info().
+		Str("msg_id", msg.ID.String()).
+		Int("text_len", len(text)).
+		Msg("stt: voice note transcrito")
+}
+
+// extractAudioRefs vasculha o JSON do Content em busca da URL de mídia e do
+// mimetype. Aceita várias chaves usadas historicamente (media_url, url,
+// MediaURL) pra ser resiliente entre channel handlers diferentes.
+func extractAudioRefs(content string) (mediaURL, mime string) {
+	if content == "" || !strings.HasPrefix(strings.TrimSpace(content), "{") {
+		return "", ""
+	}
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(content), &raw); err != nil {
+		return "", ""
+	}
+	for _, k := range []string{"media_url", "url", "MediaURL", "audio_url"} {
+		if v, ok := raw[k].(string); ok && v != "" {
+			mediaURL = v
+			break
+		}
+	}
+	for _, k := range []string{"media_mime", "mime", "mimetype", "MimeType"} {
+		if v, ok := raw[k].(string); ok && v != "" {
+			mime = v
+			break
+		}
+	}
+	return mediaURL, mime
+}
+
+// downloadAudioBytes baixa o blob de áudio. Se a URL é do MinIO interno,
+// gera signed URL antes do GET; senão usa HTTP direto (mídia já pública
+// ou de CDN externo).
+func downloadAudioBytes(ctx context.Context, rawURL string) ([]byte, error) {
+	url := rawURL
+	if storage.IsConfigured() {
+		if key := storage.GlobalStorage.KeyFromURL(rawURL); key != "" {
+			signed, err := storage.GlobalStorage.PresignURL(ctx, key, 5*time.Minute)
+			if err == nil {
+				url = signed
+			}
+		}
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	httpClient := &http.Client{Timeout: 60 * time.Second}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return nil, errors.New("download retornou HTTP " + resp.Status)
+	}
+	// Cap em 25MB — Whisper rejeita >25MB e também não queremos OOM se algo
+	// errado. Voice notes do WhatsApp ficam em <2MB tipicamente.
+	const maxBytes = 25 * 1024 * 1024
+	return io.ReadAll(io.LimitReader(resp.Body, maxBytes))
 }

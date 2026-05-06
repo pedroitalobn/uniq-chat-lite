@@ -57,6 +57,16 @@ type MessageLog struct {
 	// existente via reply_to/external_id.
 	IsEdited      bool   `gorm:"default:false" json:"is_edited"`
 	DeliveryError string `gorm:"type:text" json:"delivery_error,omitempty"`
+	// Transcription preenchido async pra mensagens type=audio. Workflow:
+	//   1. Audio chega → MessageLog persistida com Transcription="" e
+	//      TranscriptionStatus="pending".
+	//   2. Goroutine baixa o blob, transcreve via Whisper (provider da
+	//      Uniq AI) e atualiza estes campos.
+	//   3. WS broadcast "message.transcribed" notifica o front pra
+	//      atualizar a bubble in-place.
+	// Status possíveis: pending | done | failed | unsupported.
+	Transcription       string `gorm:"type:text" json:"transcription,omitempty"`
+	TranscriptionStatus string `gorm:"type:varchar(20);index" json:"transcription_status,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 
 	// ReplyTo é um snapshot in-memory da mensagem citada — preenchido pelo
