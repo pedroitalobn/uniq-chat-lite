@@ -503,6 +503,17 @@ function InboxPage() {
     onError: () => toast.error("Falha ao sincronizar — tente novamente"),
   });
 
+  // CUIDADO: este useMutation precisa ficar ANTES dos early returns. Antes
+  // estava depois do `if (!wsId) return <PageSkeleton />` lá embaixo, o que
+  // violava as Rules of Hooks — quando wsId virava truthy, React via 1 hook
+  // a mais que no render anterior e disparava error #310 ("rendered more
+  // hooks than during the previous render"), quebrando a página inteira.
+  const rejectCallMutation = useMutation({
+    mutationFn: () =>
+      callsApi.reject(incomingCall!.instanceId, incomingCall!.callFrom, incomingCall!.callId),
+    onSettled: () => setIncomingCall(null),
+  });
+
   if (!wsId || permsLoading) return <PageSkeleton />;
   if (!canView) return <Forbidden />;
 
@@ -611,12 +622,6 @@ function InboxPage() {
       default: return "Todos os tipos";
     }
   })();
-
-  const rejectCallMutation = useMutation({
-    mutationFn: () =>
-      callsApi.reject(incomingCall!.instanceId, incomingCall!.callFrom, incomingCall!.callId),
-    onSettled: () => setIncomingCall(null),
-  });
 
   return (
     <div className="flex h-full flex-col uniq-page rounded-xl overflow-hidden">
