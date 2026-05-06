@@ -877,7 +877,14 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 // UpdateMe godoc
 // PUT /auth/me — update own profile (name, username)
 func (h *AuthHandler) UpdateMe(c *fiber.Ctx) error {
-	userID := c.Locals("userID").(uuid.UUID)
+	// Antes: c.Locals("userID").(uuid.UUID) — mas o middleware seta a chave
+	// como "user_id" (com underscore), nunca "userID". A type assertion
+	// crua sem `, ok` panicava com "interface conversion: interface {} is
+	// nil, not uuid.UUID" em todo request, quebrando edição de perfil.
+	userID := middleware.GetCurrentUserID(c)
+	if userID == uuid.Nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+	}
 
 	var req struct {
 		Name     *string `json:"name"`
@@ -934,7 +941,11 @@ func (h *AuthHandler) UpdateMe(c *fiber.Ctx) error {
 // ChangePassword godoc
 // POST /auth/change-password
 func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
-	userID := c.Locals("userID").(uuid.UUID)
+	// Mesma armadilha de UpdateMe: chave correta é "user_id" via helper.
+	userID := middleware.GetCurrentUserID(c)
+	if userID == uuid.Nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+	}
 
 	var req struct {
 		CurrentPassword string `json:"current_password"`

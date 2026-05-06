@@ -27,7 +27,16 @@ export default function ShopsPage() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ name: "", description: "", currency: "BRL" });
 
-  const headers = wsId ? { "X-Workspace-ID": wsId } : undefined;
+  // Sempre lê wsId no momento da request — antes a constante `headers`
+  // era capturada no closure do mutationFn e, se o usuário abrisse a
+  // página antes do WorkspaceContext resolver, headers ficava undefined
+  // (currentWorkspace null). Resultado: POST /v1/shops sem header
+  // X-Workspace-ID → backend respondia "X-Workspace-ID é obrigatório".
+  const buildHeaders = () => {
+    const id = currentWorkspace?.id;
+    return id ? { "X-Workspace-ID": id } : undefined;
+  };
+  const headers = buildHeaders(); // pra requests no render path (GET list)
 
   const { data: shopsRes, isLoading } = useQuery<{ data: Shop[] }>({
     queryKey: ["shops", wsId],
@@ -37,7 +46,13 @@ export default function ShopsPage() {
   const shops = shopsRes?.data ?? [];
 
   const createMut = useMutation({
-    mutationFn: (data: typeof form) => api.post("/v1/shops", data, { headers }),
+    mutationFn: (data: typeof form) => {
+      const h = buildHeaders();
+      if (!h) {
+        throw new Error("Workspace ainda carregando — tente novamente em instantes.");
+      }
+      return api.post("/v1/shops", data, { headers: h });
+    },
     onSuccess: () => {
       toast.success("Shop criada!");
       setCreating(false);
@@ -48,6 +63,7 @@ export default function ShopsPage() {
       const msg =
         (e as { response?: { data?: { error?: string; message?: string } } })?.response?.data?.message ||
         (e as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        (e as Error)?.message ||
         "Erro ao criar";
       toast.error(msg);
     },

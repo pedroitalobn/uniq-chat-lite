@@ -19,6 +19,11 @@ var reservedV1Namespaces = map[string]bool{
 	"admin":               true,
 	"agent":               true,
 	"agents":              true,
+	// "ai" cobre /v1/ai/chat (Uniq AI) e /v1/ai/tools — sem entry aqui o
+	// middleware tentava resolver server.slug="ai", falhava e devolvia
+	// "server not found" pra todo request de chat do platform AI.
+	"ai":                  true,
+	"api-keys":            true, // CRUD de API keys do user
 	"asaas":               true,
 	"auth":                true,
 	"billing":             true,
@@ -30,10 +35,12 @@ var reservedV1Namespaces = map[string]bool{
 	"csat":                true,
 	"departments":         true,
 	"funnels":             true,
+	"helpdesk":            true, // help-desk + central de ajuda pública
 	"instances":           true,
 	"integrations":        true,
 	"invites":             true,
 	"journeys":            true,
+	"link-preview":        true, // OG/preview pra links no composer
 	"mcp":                 true,
 	"me":                  true,
 	"media":               true,
@@ -55,7 +62,9 @@ var reservedV1Namespaces = map[string]bool{
 	"suppressions":        true,
 	"tags":                true,
 	"teams":               true,
+	"tiktok":              true, // OAuth/callbacks do TikTok integration
 	"triggers":            true,
+	"voices":              true, // CRUD de vozes (TTS) por workspace
 	"waba":                true,
 	"warmup":              true,
 	"webhook-config":      true,
