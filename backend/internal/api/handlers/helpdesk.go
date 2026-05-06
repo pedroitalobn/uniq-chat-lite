@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/services"
+	"github.com/uniq-chat/backend/internal/storage"
 	"gorm.io/gorm"
 )
 
@@ -368,6 +369,53 @@ func appURL() string {
 		return strings.TrimRight(u, "/")
 	}
 	return ""
+}
+
+// UploadHeroImage POST /v1/helpdesk/articles/upload-hero (multipart "file")
+// Sobe uma imagem de cover/hero pro bucket e devolve URL pública. UI
+// usa pra setar HeroImageURL no artigo.
+//
+// Aceita imagens até 5MB. Sem isso o user precisava colar uma URL
+// externa, sem controle de retenção/cdn.
+func (h *HelpDeskHandler) UploadHeroImage(c *fiber.Ctx) error {
+	wsID, err := workspaceIDFromCtx(c)
+	if err != nil {
+		return fiber.NewError(fiber.StatusUnauthorized, "workspace_id obrigatório")
+	}
+	if storage.GlobalStorage == nil {
+		return fiber.NewError(fiber.StatusServiceUnavailable, "storage não configurado — admin precisa setar MinIO/S3")
+	}
+	fh, err := c.FormFile("file")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'file' é obrigatório"})
+	}
+	if fh.Size > 5*1024*1024 {
+		return c.Status(fiber.StatusRequestEntityTooLarge).JSON(fiber.Map{"error": "imagem deve ter até 5MB"})
+	}
+	mime := fh.Header.Get("Content-Type")
+	if !strings.HasPrefix(mime, "image/") {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "apenas imagens são permitidas"})
+	}
+	f, err := fh.Open()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao abrir upload"})
+	}
+	defer f.Close()
+	data := make([]byte, fh.Size)
+	if _, err := f.Read(data); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao ler upload"})
+	}
+
+	ext := storage.MimeToExt(mime)
+	if ext == "" {
+		ext = "bin"
+	}
+	objectName := fmt.Sprintf("helpdesk/%s/heros/%s.%s", wsID.String(), uuid.New().String(), ext)
+	url, err := storage.GlobalStorage.UploadBytes(c.Context(), objectName, data, mime)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha no upload: " + err.Error()})
+	}
+	return c.JSON(fiber.Map{"url": url, "object_name": objectName})
 }
 
 // GetConfig GET /v1/helpdesk/config

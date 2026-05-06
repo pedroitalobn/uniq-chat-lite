@@ -468,6 +468,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	app.Delete("/v1/helpdesk/categories/:id", append(hdChain, helpDeskH.DeleteCategory)...)
 	app.Get("/v1/helpdesk/articles", append(hdChain, helpDeskH.ListArticles)...)
 	app.Post("/v1/helpdesk/articles/generate", append(hdChain, helpDeskH.GenerateArticle)...)
+	app.Post("/v1/helpdesk/articles/upload-hero", append(hdChain, helpDeskH.UploadHeroImage)...)
 	app.Post("/v1/helpdesk/articles", append(hdChain, helpDeskH.CreateArticle)...)
 	app.Get("/v1/helpdesk/articles/:id", append(hdChain, helpDeskH.GetArticle)...)
 	app.Patch("/v1/helpdesk/articles/:id", append(hdChain, helpDeskH.UpdateArticle)...)

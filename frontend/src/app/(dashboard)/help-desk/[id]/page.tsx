@@ -267,6 +267,10 @@ export default function ArticleEditorPage() {
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Preview público — abre /help/[ws-slug]/[article-slug] em
+              outra aba. Visível só com slug + status published, senão
+              abre 404. */}
+          <PreviewButton workspaceId={wsId} articleSlug={slug} status={currentStatus} />
           <button
             onClick={() => publishMutation.mutate()}
             disabled={publishMutation.isPending}
@@ -322,42 +326,13 @@ export default function ArticleEditorPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5">
         {/* LEFT — Content */}
         <div className="space-y-4" style={{ ...glassCard, padding: 20 }}>
-          {/* Hero image: capa exibida no topo do artigo público. URL livre
-              (externa ou do storage). Preview ao lado do input. */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-widest mb-1.5" style={{ color: "var(--text-3)" }}>
-              Imagem de capa (hero)
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                value={heroImageURL}
-                onChange={(e) => {
-                  setHeroImageURL(e.target.value);
-                  autoSave({ hero_image_url: e.target.value || undefined });
-                }}
-                placeholder="https://… (URL da imagem hero)"
-                className="flex-1 rounded-lg px-3 py-2 text-sm outline-none"
-                style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.10)",
-                  color: "var(--text-1)",
-                }}
-              />
-              {heroImageURL && (
-                <div
-                  className="rounded-lg overflow-hidden flex-shrink-0"
-                  style={{ width: 60, height: 60, border: "1px solid rgba(255,255,255,0.10)" }}
-                >
-                  <img src={heroImageURL} alt="Hero preview" className="w-full h-full object-cover" />
-                </div>
-              )}
-            </div>
-            {heroImageURL && (
-              <p className="text-[11px] mt-1" style={{ color: "var(--text-3)" }}>
-                Aparece como banner no topo do artigo público.
-              </p>
-            )}
-          </div>
+          {/* Hero image: capa exibida no topo do artigo público.
+              Aceita upload pra bucket (MinIO/S3) OU URL externa. */}
+          <HeroImageField
+            value={heroImageURL}
+            onChange={(v) => { setHeroImageURL(v); autoSave({ hero_image_url: v || undefined }); }}
+            wsId={wsId}
+          />
 
           {/* Title (já renderizado fora desse bloco como input grande;
               repetimos o label aqui só pra clareza visual) */}
@@ -557,6 +532,148 @@ export default function ArticleEditorPage() {
           </motion.div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── PreviewButton ─────────────────────────────────────────────────────────
+// Lê o public_url da config (workspace slug efetivo) e abre /help/<slug>/<article>
+// em nova aba. Mostra warning quando o artigo ainda é rascunho — preview
+// público não funciona até publicar.
+
+function PreviewButton({ workspaceId, articleSlug, status }: {
+  workspaceId: string;
+  articleSlug: string;
+  status: HelpDeskArticle["status"];
+}) {
+  const cfgQuery = useQuery({
+    queryKey: ["helpdesk-config", workspaceId],
+    queryFn: async () => (await helpDeskApi.getConfig(workspaceId)).data,
+    enabled: !!workspaceId,
+    staleTime: 5 * 60 * 1000,
+  });
+  const publicURL = cfgQuery.data?.public_url ?? "";
+  const previewURL = publicURL && articleSlug ? `${publicURL}/${articleSlug}` : "";
+  const disabled = !previewURL;
+
+  return (
+    <a
+      href={previewURL || "#"}
+      target={previewURL ? "_blank" : undefined}
+      rel="noopener noreferrer"
+      onClick={(e) => {
+        if (disabled) { e.preventDefault(); return; }
+        if (status !== "published") {
+          if (!confirm("Este artigo ainda não está publicado. O preview pode mostrar 404. Continuar?")) {
+            e.preventDefault();
+          }
+        }
+      }}
+      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+      style={{
+        background: "rgba(99,91,255,0.10)",
+        color: disabled ? "var(--text-3)" : "#a5a3ff",
+        border: "1px solid rgba(99,91,255,0.20)",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.6 : 1,
+      }}
+      title={disabled ? "Defina um slug pra abrir preview" : "Abrir preview público em nova aba"}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+        <polyline points="15 3 21 3 21 9" />
+        <line x1="10" y1="14" x2="21" y2="3" />
+      </svg>
+      Preview
+    </a>
+  );
+}
+
+// ─── HeroImageField ────────────────────────────────────────────────────────
+// Permite upload pra o bucket OU colar URL externa. Quando o user
+// dropa/seleciona um arquivo, sobe via /v1/helpdesk/articles/upload-hero
+// e seta a URL devolvida. Pre-existente (URL externa) continua funcionando.
+
+function HeroImageField({ value, onChange, wsId }: {
+  value: string;
+  onChange: (v: string) => void;
+  wsId: string;
+}) {
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Apenas imagens.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Imagem deve ter até 5MB.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const res = await helpDeskApi.uploadHeroImage(file, wsId);
+      onChange(res.data.url);
+      toast.success("Capa atualizada.");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || "Falha no upload.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div>
+      <label className="block text-xs font-semibold uppercase tracking-widest mb-1.5" style={{ color: "var(--text-3)" }}>
+        Imagem de capa (hero)
+      </label>
+      <div className="flex items-stretch gap-3">
+        <div className="flex-1 flex flex-col gap-1.5">
+          <input
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="https://… ou faça upload ao lado"
+            className="w-full rounded-lg px-3 py-2 text-sm outline-none"
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.10)",
+              color: "var(--text-1)",
+            }}
+          />
+          <div className="flex gap-1.5">
+            <input ref={fileRef} type="file" accept="image/*" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = ""; }} />
+            <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+              style={{ background: "rgba(0,212,106,0.10)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.20)" }}>
+              {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+              )}
+              {uploading ? "Enviando..." : "Upload"}
+            </button>
+            {value && (
+              <button type="button" onClick={() => onChange("")} className="px-2 py-1.5 rounded-lg text-xs"
+                style={{ background: "rgba(248,113,113,0.10)", color: "#f87171", border: "1px solid rgba(248,113,113,0.20)" }}>
+                Remover
+              </button>
+            )}
+          </div>
+          <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+            Aparece como banner no topo do artigo público. PNG/JPG até 5MB.
+          </p>
+        </div>
+        {value && (
+          <div className="rounded-lg overflow-hidden flex-shrink-0"
+            style={{ width: 96, height: 64, border: "1px solid rgba(255,255,255,0.10)" }}>
+            <img src={value} alt="Hero preview" className="w-full h-full object-cover" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

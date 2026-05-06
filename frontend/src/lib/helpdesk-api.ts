@@ -120,6 +120,15 @@ export const helpDeskApi = {
     api.get<HelpDeskConfigResponse>("/v1/helpdesk/config", { headers: wsHeader(workspaceId) }),
   updateConfig: (data: Partial<HelpDeskConfig>, workspaceId?: string) =>
     api.put<HelpDeskConfig>("/v1/helpdesk/config", data, { headers: wsHeader(workspaceId) }),
+  uploadHeroImage: (file: File, workspaceId?: string) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return api.post<{ url: string; object_name: string }>(
+      "/v1/helpdesk/articles/upload-hero",
+      fd,
+      { headers: { ...wsHeader(workspaceId), "Content-Type": "multipart/form-data" } },
+    );
+  },
 };
 
 export const webChatApi = {
