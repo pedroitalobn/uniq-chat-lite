@@ -1316,6 +1316,11 @@ export const adminApi = {
   getPaymentSettings: () => api.get("/v1/admin/payment-settings"),
   updatePaymentSettings: (data: Record<string, unknown>) =>
     api.put("/v1/admin/payment-settings", data),
+  /** Testa conectividade de um provider (stripe|asaas) sem alterar config.
+   *  Atualiza test_status que a UI consome. Útil pra revalidar credencial
+   *  antiga (rotação de chave do lado do provider) sem precisar re-salvar. */
+  testPaymentProvider: (provider: "stripe" | "asaas") =>
+    api.post(`/v1/admin/payment-settings/test/${provider}`),
   // Inspect/Support - list all servers and instances for super admin
   listAllServers: () => api.get("/v1/admin/inspect/servers"),
   listAllInstances: () => api.get("/v1/admin/inspect/instances"),

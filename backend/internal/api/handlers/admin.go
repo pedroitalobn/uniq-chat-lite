@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -60,7 +61,11 @@ func (h *AdminHandler) GetPaymentSettings(c *fiber.Ctx) error {
 		}
 	}
 
-	// Configured = key saved in DB (panel is the single source of truth)
+	// Configured = key salva no DB. NÃO significa "credencial válida" —
+	// pra isso vem o test_status setado pelo PUT/Test endpoint que
+	// realmente bate no provider. UI deve preferir test_status quando
+	// existir; "configured" é apenas o estado mais fraco "tem algo no
+	// DB".
 	stripeConfigured := settings.StripeSecretKey != ""
 	asaasConfigured := settings.AsaasAPIKey != ""
 	hotmartConfigured := settings.HotmartAPIKey != ""
@@ -88,14 +93,84 @@ func (h *AdminHandler) GetPaymentSettings(c *fiber.Ctx) error {
 		"asaas_checkout_type":    settings.AsaasCheckoutType,
 		"hotmart_api_key":        settings.HotmartAPIKey,
 		"hotmart_webhook_secret": settings.HotmartWebhookSecret,
-		// Status de configuração
+		// Status de configuração: existe credencial salva (estado fraco).
 		"stripe_configured":  stripeConfigured,
 		"asaas_configured":   asaasConfigured,
 		"hotmart_configured": hotmartConfigured,
+		// Status real de conectividade — populado por Test/auto-test.
+		// UI deve mostrar isso como "Conectado/Falhou/Não testado" e
+		// só dizer "Pronto pra cobrar" quando test_status == "ok".
+		"stripe_test_status":  settings.StripeTestStatus,
+		"stripe_tested_at":    settings.StripeTestedAt,
+		"stripe_test_error":   settings.StripeTestError,
+		"asaas_test_status":   settings.AsaasTestStatus,
+		"asaas_tested_at":     settings.AsaasTestedAt,
+		"asaas_test_error":    settings.AsaasTestError,
+		"hotmart_test_status": settings.HotmartTestStatus,
+		"hotmart_tested_at":   settings.HotmartTestedAt,
+		"hotmart_test_error":  settings.HotmartTestError,
 		// Webhook URLs
 		"stripe_webhook_url": stripeWebhookURL,
 		"asaas_webhook_url":  asaasWebhookURL,
 	})
+}
+
+// testPaymentProvider faz uma chamada read-only no provider pra confirmar
+// que a credencial é aceita. Stripe: GET /v1/balance (precisa da secret).
+// Asaas: GET /api/v3/customers?limit=1 (lista trivial). Retorna ok=true
+// se a chamada bateu auth corretamente, false + razão se falhou.
+// Best-effort: usa client.Timeout=10s pra não travar o save quando o
+// provider está fora do ar.
+func (h *AdminHandler) testPaymentProvider(provider string, settings *models.PaymentSettings) (ok bool, errMsg string) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	switch provider {
+	case "stripe":
+		key := strings.TrimSpace(settings.StripeSecretKey)
+		if key == "" {
+			return false, "secret_key vazia"
+		}
+		req, _ := http.NewRequest("GET", "https://api.stripe.com/v1/balance", nil)
+		req.Header.Set("Authorization", "Bearer "+key)
+		resp, err := client.Do(req)
+		if err != nil {
+			return false, "erro de rede: " + err.Error()
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == 200 {
+			return true, ""
+		}
+		body, _ := io.ReadAll(resp.Body)
+		return false, fmt.Sprintf("HTTP %d — %s", resp.StatusCode, truncErr(string(body), 200))
+	case "asaas":
+		key := strings.TrimSpace(settings.AsaasAPIKey)
+		if key == "" {
+			return false, "api_key vazia"
+		}
+		baseURL := "https://api.asaas.com"
+		if settings.AsaasEnvironment == "sandbox" {
+			baseURL = "https://sandbox.asaas.com"
+		}
+		req, _ := http.NewRequest("GET", baseURL+"/api/v3/customers?limit=1", nil)
+		req.Header.Set("access_token", key)
+		resp, err := client.Do(req)
+		if err != nil {
+			return false, "erro de rede: " + err.Error()
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == 200 {
+			return true, ""
+		}
+		body, _ := io.ReadAll(resp.Body)
+		return false, fmt.Sprintf("HTTP %d — %s", resp.StatusCode, truncErr(string(body), 200))
+	}
+	return false, "provider não suportado"
+}
+
+func truncErr(s string, n int) string {
+	if len(s) > n {
+		return s[:n] + "…"
+	}
+	return s
 }
 
 // UpdatePaymentSettings godoc
@@ -169,18 +244,94 @@ func (h *AdminHandler) UpdatePaymentSettings(c *fiber.Ctx) error {
 	}
 
 	h.db.First(&settings, "id = ?", "default")
+
+	// Auto-teste das credenciais que MUDARAM nesta request. Roda síncrono
+	// porque o admin tá esperando a resposta e quer ver na hora se a
+	// credencial foi aceita pelo provider — antes a UI mostrava
+	// "configurado ✓" mesmo com chave errada (porque só checava se o
+	// secret_key estava preenchido no DB).
+	now := time.Now()
+	if req.StripeSecretKey != "" {
+		ok, errMsg := h.testPaymentProvider("stripe", &settings)
+		patch := map[string]any{"stripe_tested_at": now, "stripe_test_error": errMsg}
+		if ok {
+			patch["stripe_test_status"] = "ok"
+		} else {
+			patch["stripe_test_status"] = "failed"
+		}
+		h.db.Model(&settings).Updates(patch)
+	}
+	if req.AsaasAPIKey != "" {
+		ok, errMsg := h.testPaymentProvider("asaas", &settings)
+		patch := map[string]any{"asaas_tested_at": now, "asaas_test_error": errMsg}
+		if ok {
+			patch["asaas_test_status"] = "ok"
+		} else {
+			patch["asaas_test_status"] = "failed"
+		}
+		h.db.Model(&settings).Updates(patch)
+	}
+	h.db.First(&settings, "id = ?", "default")
+
 	return c.JSON(fiber.Map{
 		"id":                     settings.ID,
 		"active_provider":        string(settings.ActiveProvider),
 		"stripe_secret_key":      settings.StripeSecretKey,
 		"stripe_webhook_secret":  settings.StripeWebhookSecret,
 		"stripe_checkout_type":   settings.StripeCheckoutType,
+		"stripe_test_status":     settings.StripeTestStatus,
+		"stripe_tested_at":       settings.StripeTestedAt,
+		"stripe_test_error":      settings.StripeTestError,
 		"asaas_api_key":          settings.AsaasAPIKey,
 		"asaas_environment":      settings.AsaasEnvironment,
 		"asaas_webhook_secret":   settings.AsaasWebhookSecret,
 		"asaas_checkout_type":    settings.AsaasCheckoutType,
+		"asaas_test_status":      settings.AsaasTestStatus,
+		"asaas_tested_at":        settings.AsaasTestedAt,
+		"asaas_test_error":       settings.AsaasTestError,
 		"hotmart_api_key":        settings.HotmartAPIKey,
 		"hotmart_webhook_secret": settings.HotmartWebhookSecret,
+	})
+}
+
+// TestPaymentProvider POST /admin/payment-settings/test/:provider
+// Roda o test de conectividade na hora pra um provider específico,
+// sem precisar re-salvar credenciais. Útil quando admin quer revalidar
+// uma config antiga (ex.: rotação de chave do lado do provider).
+func (h *AdminHandler) TestPaymentProvider(c *fiber.Ctx) error {
+	provider := c.Params("provider")
+	if provider != "stripe" && provider != "asaas" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "provider inválido (use stripe|asaas)"})
+	}
+	var settings models.PaymentSettings
+	if err := h.db.Where("id = ?", "default").First(&settings).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "configurações não encontradas"})
+	}
+	ok, errMsg := h.testPaymentProvider(provider, &settings)
+	now := time.Now()
+	patch := map[string]any{}
+	if provider == "stripe" {
+		patch["stripe_tested_at"] = now
+		patch["stripe_test_error"] = errMsg
+		if ok {
+			patch["stripe_test_status"] = "ok"
+		} else {
+			patch["stripe_test_status"] = "failed"
+		}
+	} else {
+		patch["asaas_tested_at"] = now
+		patch["asaas_test_error"] = errMsg
+		if ok {
+			patch["asaas_test_status"] = "ok"
+		} else {
+			patch["asaas_test_status"] = "failed"
+		}
+	}
+	h.db.Model(&settings).Updates(patch)
+	return c.JSON(fiber.Map{
+		"ok":        ok,
+		"error":     errMsg,
+		"tested_at": now,
 	})
 }
 

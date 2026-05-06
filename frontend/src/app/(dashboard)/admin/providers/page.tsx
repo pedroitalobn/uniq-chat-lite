@@ -23,13 +23,23 @@ interface PaymentSettings {
   stripe_checkout_type?: string;
   stripe_configured?: boolean;
   stripe_webhook_url?: string;
+  /** Status real do último teste de conectividade — "ok" | "failed" | "" (nunca testado). */
+  stripe_test_status?: string;
+  stripe_tested_at?: string | null;
+  stripe_test_error?: string;
   asaas_api_key?: string;
   asaas_webhook_secret?: string;
   asaas_environment?: string;
   asaas_configured?: boolean;
   asaas_webhook_url?: string;
+  asaas_test_status?: string;
+  asaas_tested_at?: string | null;
+  asaas_test_error?: string;
   hotmart_api_key?: string;
   hotmart_configured?: boolean;
+  hotmart_test_status?: string;
+  hotmart_tested_at?: string | null;
+  hotmart_test_error?: string;
 }
 
 interface EmailSettings {
@@ -113,6 +123,85 @@ function StatusBadge({ ok, label }: { ok: boolean; label?: string }) {
   );
 }
 
+// TestConnectionButton — chama POST /admin/payment-settings/test/<provider>
+// que faz uma chamada read-only no provider (Stripe: GET /v1/balance,
+// Asaas: GET /api/v3/customers?limit=1) e atualiza test_status. Refresh
+// do query "admin-payment-settings" pra UI re-renderizar com o novo
+// status assim que volta.
+function TestConnectionButton({ provider, disabled }: { provider: "stripe" | "asaas"; disabled?: boolean }) {
+  const queryClient = useQueryClient();
+  const testMut = useMutation({
+    mutationFn: () => adminApi.testPaymentProvider(provider),
+    onSuccess: (res) => {
+      const ok = (res.data as { ok?: boolean })?.ok;
+      const errMsg = (res.data as { error?: string })?.error;
+      queryClient.invalidateQueries({ queryKey: ["admin-payment-settings"] });
+      if (ok) toast.success(`Conexão ${provider} OK`);
+      else toast.error(`Falhou: ${errMsg || "verifique credenciais"}`);
+    },
+    onError: () => toast.error("Erro ao testar conexão"),
+  });
+  return (
+    <button
+      type="button"
+      onClick={() => testMut.mutate()}
+      disabled={disabled || testMut.isPending}
+      className="text-[10px] px-2.5 py-1 rounded-md font-medium disabled:opacity-50"
+      style={{
+        background: "rgba(255,255,255,0.05)",
+        border: "1px solid rgba(255,255,255,0.10)",
+        color: "hsl(240 15% 80%)",
+      }}
+    >
+      {testMut.isPending ? "Testando…" : "Testar conexão"}
+    </button>
+  );
+}
+
+// PaymentProviderBadge — distingue entre 4 estados visuais de um
+// provider de pagamento na UI do admin:
+//   - disabled (provedor ainda não suportado no backend)
+//   - sem credencial salva → "Não configurado" (amarelo)
+//   - credencial salva mas nunca testada → "Não testado" (cinza)
+//   - test_status="ok" → "Conectado" (verde)
+//   - test_status="failed" → "Falhou" (vermelho)
+// Antes a UI mostrava apenas "Configurado/Não configurado" baseado em
+// is_configured do backend, que apenas checava se tinha key no DB —
+// chave inválida aparecia como "Configurado ✓" e o admin só descobria
+// quando o checkout estourava 500.
+function PaymentProviderBadge({
+  configured, testStatus, disabled,
+}: {
+  configured: boolean;
+  testStatus?: string;
+  disabled?: boolean;
+}) {
+  if (disabled) return <StatusBadge ok={false} label="Em breve" />;
+  if (!configured) return <StatusBadge ok={false} label="Não configurado" />;
+  if (testStatus === "ok") {
+    return (
+      <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+        style={{ background: "rgba(0,212,106,0.12)", color: "#00d46a" }}>
+        Conectado
+      </span>
+    );
+  }
+  if (testStatus === "failed") {
+    return (
+      <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+        style={{ background: "rgba(248,113,113,0.12)", color: "#f87171" }}>
+        Falhou
+      </span>
+    );
+  }
+  return (
+    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+      style={{ background: "rgba(255,255,255,0.07)", color: "hsl(240 8% 55%)" }}>
+      Não testado
+    </span>
+  );
+}
+
 // ─── Sidebar nav ──────────────────────────────────────────────────────────────
 const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] = [
   { id: "payment",       label: "Pagamento",    icon: CreditCard,    desc: "Stripe, Asaas, Hotmart" },
@@ -186,6 +275,12 @@ function PaymentTab() {
             const isConfigured = p.id === "stripe" ? settings?.stripe_configured
               : p.id === "asaas" ? settings?.asaas_configured
               : settings?.hotmart_configured;
+            // test_status reflete o resultado real do último teste de
+            // conectividade contra o provider — diferente de
+            // isConfigured que só checa se há key no DB.
+            const testStatus = p.id === "stripe" ? settings?.stripe_test_status
+              : p.id === "asaas" ? settings?.asaas_test_status
+              : settings?.hotmart_test_status;
             return (
               <button key={p.id} onClick={() => !p.disabled && setProvider(p.id)}
                 disabled={p.disabled}
@@ -197,9 +292,10 @@ function PaymentTab() {
                 }}>
                 <div className="text-2xl mb-1">{p.icon}</div>
                 <div className="text-sm font-medium" style={{ color: isActive ? p.color : "hsl(240 15% 85%)" }}>{p.label}</div>
-                {isConfigured && <Check className="w-3 h-3 absolute top-2 right-2 text-[#00d46a]" />}
+                {testStatus === "ok" && <Check className="w-3 h-3 absolute top-2 right-2 text-[#00d46a]" />}
+                {testStatus === "failed" && <X className="w-3 h-3 absolute top-2 right-2" style={{ color: "#f87171" }} />}
                 {!isConfigured && !p.disabled && <Shield className="w-3 h-3 absolute top-2 left-2" style={{ color: "#fbbf24" }} />}
-                <div className="mt-1"><StatusBadge ok={!!isConfigured} /></div>
+                <div className="mt-1"><PaymentProviderBadge configured={!!isConfigured} testStatus={testStatus} disabled={!!p.disabled} /></div>
               </button>
             );
           })}
@@ -211,8 +307,17 @@ function PaymentTab() {
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Stripe</h3>
-            <StatusBadge ok={!!settings?.stripe_configured} />
+            <div className="flex items-center gap-2">
+              <PaymentProviderBadge configured={!!settings?.stripe_configured} testStatus={settings?.stripe_test_status} />
+              <TestConnectionButton provider="stripe" disabled={!settings?.stripe_configured} />
+            </div>
           </div>
+          {settings?.stripe_test_status === "failed" && settings?.stripe_test_error && (
+            <div className="mb-4 p-3 rounded-lg text-xs"
+              style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.22)", color: "#fca5a5" }}>
+              <strong className="font-semibold">Último teste falhou:</strong> {settings.stripe_test_error}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Secret Key</Label>
@@ -262,8 +367,17 @@ function PaymentTab() {
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Asaas</h3>
-            <StatusBadge ok={!!settings?.asaas_configured} />
+            <div className="flex items-center gap-2">
+              <PaymentProviderBadge configured={!!settings?.asaas_configured} testStatus={settings?.asaas_test_status} />
+              <TestConnectionButton provider="asaas" disabled={!settings?.asaas_configured} />
+            </div>
           </div>
+          {settings?.asaas_test_status === "failed" && settings?.asaas_test_error && (
+            <div className="mb-4 p-3 rounded-lg text-xs"
+              style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.22)", color: "#fca5a5" }}>
+              <strong className="font-semibold">Último teste falhou:</strong> {settings.asaas_test_error}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <Label>API Key</Label>

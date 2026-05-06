@@ -36,6 +36,22 @@ type PaymentSettings struct {
 	HotmartAPIKey        string `gorm:"type:text" json:"hotmart_api_key,omitempty"`
 	HotmartWebhookSecret string `gorm:"type:text" json:"hotmart_webhook_secret,omitempty"`
 
+	// Status do último teste de conectividade por provider. UI usa pra
+	// distinguir "credencial salva no DB" vs "credencial valida que o
+	// provider aceita". Antes a UI mostrava "configurado ✓" só porque
+	// o secret_key existia no DB — mesmo que fosse inválido. Setado por
+	// PUT /admin/payment-settings (auto-test) e POST /admin/payment-settings/test/:provider.
+	// Valores: "" (nunca testado) | "ok" | "failed"
+	StripeTestStatus    string     `gorm:"type:varchar(20)" json:"stripe_test_status,omitempty"`
+	StripeTestedAt      *time.Time `json:"stripe_tested_at,omitempty"`
+	StripeTestError     string     `gorm:"type:text" json:"stripe_test_error,omitempty"`
+	AsaasTestStatus     string     `gorm:"type:varchar(20)" json:"asaas_test_status,omitempty"`
+	AsaasTestedAt       *time.Time `json:"asaas_tested_at,omitempty"`
+	AsaasTestError      string     `gorm:"type:text" json:"asaas_test_error,omitempty"`
+	HotmartTestStatus   string     `gorm:"type:varchar(20)" json:"hotmart_test_status,omitempty"`
+	HotmartTestedAt     *time.Time `json:"hotmart_tested_at,omitempty"`
+	HotmartTestError    string     `gorm:"type:text" json:"hotmart_test_error,omitempty"`
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

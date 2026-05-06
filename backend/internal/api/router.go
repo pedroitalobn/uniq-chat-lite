@@ -1385,6 +1385,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	admin.Post("/plans", adminH.CreatePlan)
 	admin.Get("/payment-settings", adminH.GetPaymentSettings)
 	admin.Put("/payment-settings", adminH.UpdatePaymentSettings)
+	// Test endpoint: chama o provider em read-only pra confirmar que a
+	// credencial é aceita. Atualiza test_status que a UI consome.
+	admin.Post("/payment-settings/test/:provider", adminH.TestPaymentProvider)
 	// Email provider & templates
 	admin.Get("/email-settings", adminH.GetEmailSettings)
 	admin.Put("/email-settings", adminH.UpdateEmailSettings)
