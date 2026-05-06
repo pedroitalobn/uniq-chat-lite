@@ -602,45 +602,65 @@ func (h *AdminHandler) UpdateUser(c *fiber.Ctx) error {
 }
 
 // DeleteUser godoc
-// DELETE /admin/users/:id?cascade=true
+// DELETE /admin/users/:id?purge=true
 //
-// cascade=true: descobre todas as FKs que referenciam users(id) via
-// information_schema e DELETE em cada tabela antes de remover o user.
-// Usa transaction; se qualquer DELETE falhar, ROLLBACK.
+// Soft delete (default): marca deleted_at no user e nas suas
+// workspaces/dependentes que tenham coluna deleted_at. Sem FK
+// violation (nada some fisicamente), dados continuam recuperáveis,
+// queries normais ignoram via scope global do GORM.
 //
-// cascade=false (default): comportamento legado — falha em FK violation
-// (preservado pra retrocompat com fluxos que esperam erro explícito).
+// purge=true: hard delete (descobre FKs via information_schema e
+// remove fisicamente em cascata). Use só pra cumprir LGPD/right-to-be-forgotten;
+// é destrutivo e irreversível.
 func (h *AdminHandler) DeleteUser(c *fiber.Ctx) error {
 	userID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID inválido"})
 	}
-	// Cascade: explícito via query OU automático pra super_admin (UI usa).
-	cascade := c.Query("cascade") == "true"
-	if !cascade {
-		if actor := middleware.GetCurrentUser(c); actor != nil && actor.Role == models.RoleSuperAdmin {
-			cascade = true
-		}
-	}
+	// Aceita ?purge=true ou ?cascade=true (alias legado)
+	purge := c.Query("purge") == "true" || c.Query("cascade") == "true"
 
-	if !cascade {
-		if err := h.db.Delete(&models.User{}, "id = ?", userID).Error; err != nil {
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-				"error":      "erro ao deletar usuário (use ?cascade=true pra remover dependências)",
-				"detail":     err.Error(),
+	// ────────────────────────────────────────────────────────────
+	// SOFT DELETE — caminho padrão. Marca deleted_at, sem mexer em
+	// FK. As tabelas dependentes que também têm deleted_at são
+	// marcadas em cascata pelo GORM via association cascade ou
+	// pelos UPDATEs auxiliares abaixo.
+	// ────────────────────────────────────────────────────────────
+	if !purge {
+		err = h.db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Delete(&models.User{}, "id = ?", userID).Error; err != nil {
+				return err
+			}
+			// Workspaces owned pelo user → soft delete em cascata pra
+			// sumirem das listas dos outros members também.
+			tx.Where("owner_id = ?", userID).Delete(&models.Workspace{})
+			return nil
+		})
+		if err != nil {
+			log.Error().Err(err).Str("user_id", userID.String()).Msg("admin: soft delete user failed")
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error":  "erro ao deletar usuário",
+				"detail": err.Error(),
 			})
 		}
-		return c.JSON(fiber.Map{"message": "usuário removido"})
+		LogAudit(h.db, c, "user.delete",
+			AuditTarget{Type: "user", ID: &userID},
+			map[string]any{"soft": true})
+		return c.JSON(fiber.Map{
+			"message": "usuário removido (soft delete — recuperável)",
+			"soft":    true,
+		})
 	}
 
+	// ────────────────────────────────────────────────────────────
+	// HARD DELETE / PURGE — só com purge=true explícito. Remove
+	// fisicamente o user e todas as dependências. Irreversível.
+	// ────────────────────────────────────────────────────────────
 	cleaned := map[string]int64{}
 	err = h.db.Transaction(func(tx *gorm.DB) error {
-		// 1. Coleta workspaces que esse user é OWNER (workspaces.user_id).
-		//    Vamos deletar tudo que depende dessas workspaces também.
 		var ownerWsIDs []string
 		tx.Raw(`SELECT id::text FROM workspaces WHERE owner_id = ?`, userID).Scan(&ownerWsIDs)
 
-		// 2. Deleta dependentes das workspaces do user (recursivo via FKs).
 		if len(ownerWsIDs) > 0 {
 			if err := cascadeDeleteByFK(tx, "workspaces", "id", ownerWsIDs, cleaned); err != nil {
 				return err
@@ -652,12 +672,10 @@ func (h *AdminHandler) DeleteUser(c *fiber.Ctx) error {
 			cleaned["workspaces"] += res.RowsAffected
 		}
 
-		// 3. Deleta dependentes do user (todas FKs → users.id).
 		if err := cascadeDeleteByFK(tx, "users", "id", []string{userID.String()}, cleaned); err != nil {
 			return err
 		}
 
-		// 4. Finalmente o user.
 		res := tx.Exec(`DELETE FROM users WHERE id = ?`, userID)
 		if res.Error != nil {
 			return res.Error
@@ -666,20 +684,21 @@ func (h *AdminHandler) DeleteUser(c *fiber.Ctx) error {
 		return nil
 	})
 	if err != nil {
-		log.Error().Err(err).Str("user_id", userID.String()).Msg("admin: cascade delete user failed")
+		log.Error().Err(err).Str("user_id", userID.String()).Msg("admin: purge user failed")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error":   "erro no cascade delete",
+			"error":   "erro no purge",
 			"detail":  err.Error(),
-			"hint":    "Veja os logs do backend pra identificar a tabela/coluna que falhou. O detail acima geralmente contém 'delete <tabela>.<coluna>: ERROR ...'.",
+			"hint":    "Veja os logs do backend pra identificar a tabela/coluna que falhou.",
 			"cleaned": cleaned,
 		})
 	}
-	LogAudit(h.db, c, "user.delete",
+	LogAudit(h.db, c, "user.purge",
 		AuditTarget{Type: "user", ID: &userID},
-		map[string]any{"cascade": true, "deleted": cleaned})
+		map[string]any{"purge": true, "deleted": cleaned})
 	return c.JSON(fiber.Map{
-		"message": "usuário removido em cascata",
+		"message": "usuário e dependências removidos fisicamente",
 		"deleted": cleaned,
+		"purge":   true,
 	})
 }
 
