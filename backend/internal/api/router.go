@@ -1016,6 +1016,28 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	crmGroups.Get("/:id/members", middleware.RequireWorkspacePermission(db, models.PermCRMView), contactGroupH.Members)
 	crm.Get("/contacts/:id/groups", middleware.RequireWorkspacePermission(db, models.PermCRMView), contactGroupH.ContactGroups)
 
+	// CRM Tasks — tarefas humanas/agente vinculadas a Deal/Contact/Company.
+	// Reusam a permissão genérica de CRM (view/edit) — não há perm
+	// dedicada por enquanto.
+	crmTaskH := handlers.NewCrmTaskHandler(db)
+	tasks := crm.Group("/tasks")
+	tasks.Get("/", middleware.RequireWorkspacePermission(db, models.PermCRMView), crmTaskH.List)
+	tasks.Post("/", middleware.RequireWorkspacePermission(db, models.PermCRMEdit), crmTaskH.Create)
+	tasks.Get("/:id", middleware.RequireWorkspacePermission(db, models.PermCRMView), crmTaskH.Get)
+	tasks.Patch("/:id", middleware.RequireWorkspacePermission(db, models.PermCRMEdit), crmTaskH.Update)
+	tasks.Delete("/:id", middleware.RequireWorkspacePermission(db, models.PermCRMEdit), crmTaskH.Delete)
+	tasks.Post("/:id/complete", middleware.RequireWorkspacePermission(db, models.PermCRMEdit), crmTaskH.Complete)
+
+	// CRM Meetings — agendamentos vinculados a Deal/Contact/Company,
+	// com slots pra sync de Google Calendar/Outlook (campos external_*).
+	crmMeetingH := handlers.NewCrmMeetingHandler(db)
+	meetings := crm.Group("/meetings")
+	meetings.Get("/", middleware.RequireWorkspacePermission(db, models.PermCRMView), crmMeetingH.List)
+	meetings.Post("/", middleware.RequireWorkspacePermission(db, models.PermCRMEdit), crmMeetingH.Create)
+	meetings.Get("/:id", middleware.RequireWorkspacePermission(db, models.PermCRMView), crmMeetingH.Get)
+	meetings.Patch("/:id", middleware.RequireWorkspacePermission(db, models.PermCRMEdit), crmMeetingH.Update)
+	meetings.Delete("/:id", middleware.RequireWorkspacePermission(db, models.PermCRMEdit), crmMeetingH.Delete)
+
 	// ─── Ticketing / Atendimento ──────────────────────────────────────────────
 	// All routes require an active workspace passed via X-Workspace-ID header
 	// (or ?workspace_id=). RequireWorkspacePermission enforces the RBAC key.

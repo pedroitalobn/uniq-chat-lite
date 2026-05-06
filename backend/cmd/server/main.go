@@ -346,6 +346,8 @@ func autoMigrate(db *gorm.DB) error {
 		&models.DealActivity{},
 		&models.FunnelView{},
 		&models.ContactGroup{},
+		&models.CrmTask{},
+		&models.CrmMeeting{},
 		&models.ContactGroupMembership{},
 		// Sprint 8 — triggers (autoresponder por keyword)
 		&models.Trigger{},

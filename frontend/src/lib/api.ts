@@ -1826,6 +1826,100 @@ export const dealsApi = {
     api.post(`/v1/crm/deals/${id}/notes`, { body }, { headers: wsHeaders(workspaceId) }),
 };
 
+// ─── CRM Tasks ────────────────────────────────────────────────────────────────
+export interface CrmTask {
+  id: string;
+  workspace_id: string;
+  created_by_id: string;
+  title: string;
+  description?: string;
+  type: "call" | "follow_up" | "message" | "meeting_prep" | "email" | "custom";
+  status: "pending" | "in_progress" | "completed" | "cancelled";
+  priority: "low" | "medium" | "high";
+  due_at?: string;
+  completed_at?: string;
+  assignee_type: "user" | "agent";
+  assignee_user_id?: string;
+  assignee_agent_id?: string;
+  contact_id?: string;
+  company_id?: string;
+  deal_id?: string;
+  meeting_id?: string;
+  conversation_id?: string;
+  agent_instructions?: string;
+  agent_instance_id?: string;
+  agent_executed_at?: string;
+  agent_result?: string;
+  agent_error?: string;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export const crmTasksApi = {
+  list: (workspaceId: string, params?: Record<string, unknown>) =>
+    api.get("/v1/crm/tasks", { headers: wsHeaders(workspaceId), params }),
+  get: (workspaceId: string, id: string) =>
+    api.get(`/v1/crm/tasks/${id}`, { headers: wsHeaders(workspaceId) }),
+  create: (workspaceId: string, data: Partial<CrmTask>) =>
+    api.post("/v1/crm/tasks", data, { headers: wsHeaders(workspaceId) }),
+  patch: (workspaceId: string, id: string, data: Partial<CrmTask>) =>
+    api.patch(`/v1/crm/tasks/${id}`, data, { headers: wsHeaders(workspaceId) }),
+  delete: (workspaceId: string, id: string) =>
+    api.delete(`/v1/crm/tasks/${id}`, { headers: wsHeaders(workspaceId) }),
+  complete: (workspaceId: string, id: string) =>
+    api.post(`/v1/crm/tasks/${id}/complete`, {}, { headers: wsHeaders(workspaceId) }),
+};
+
+// ─── CRM Meetings ─────────────────────────────────────────────────────────────
+export interface CrmMeeting {
+  id: string;
+  workspace_id: string;
+  created_by_id: string;
+  title: string;
+  description?: string;
+  location?: string;
+  status: "scheduled" | "completed" | "cancelled" | "no_show";
+  start_at: string;
+  end_at: string;
+  timezone: string;
+  deal_id?: string;
+  contact_id?: string;
+  company_id?: string;
+  attendees?: Array<{
+    user_id?: string;
+    contact_id?: string;
+    email?: string;
+    name?: string;
+    status?: string;
+    is_organizer?: boolean;
+  }>;
+  meeting_url?: string;
+  meeting_provider_name?: string;
+  provider: "manual" | "google" | "outlook";
+  external_calendar?: string;
+  external_event_id?: string;
+  external_event_link?: string;
+  last_synced_at?: string;
+  reminder_minutes?: number[];
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export const crmMeetingsApi = {
+  list: (workspaceId: string, params?: Record<string, unknown>) =>
+    api.get("/v1/crm/meetings", { headers: wsHeaders(workspaceId), params }),
+  get: (workspaceId: string, id: string) =>
+    api.get(`/v1/crm/meetings/${id}`, { headers: wsHeaders(workspaceId) }),
+  create: (workspaceId: string, data: Partial<CrmMeeting>) =>
+    api.post("/v1/crm/meetings", data, { headers: wsHeaders(workspaceId) }),
+  patch: (workspaceId: string, id: string, data: Partial<CrmMeeting>) =>
+    api.patch(`/v1/crm/meetings/${id}`, data, { headers: wsHeaders(workspaceId) }),
+  delete: (workspaceId: string, id: string) =>
+    api.delete(`/v1/crm/meetings/${id}`, { headers: wsHeaders(workspaceId) }),
+};
+
 export const funnelViewsApi = {
   list: (workspaceId: string, funnelId: string) =>
     api.get(`/v1/crm/funnels/${funnelId}/views`, { headers: wsHeaders(workspaceId) }),

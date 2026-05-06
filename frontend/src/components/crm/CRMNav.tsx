@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Contact, Briefcase, Building2, Filter, Upload, GitMerge, ChevronRight } from "lucide-react";
+import { Contact, Briefcase, Building2, Filter, Upload, GitMerge, ChevronRight, ListTodo, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const MAIN_ITEMS = [
@@ -26,6 +26,20 @@ const MAIN_ITEMS = [
     description: "Organizações",
     icon: Building2,
     match: (p: string) => p.startsWith("/crm/companies"),
+  },
+  {
+    href: "/crm/tasks",
+    label: "Tarefas",
+    description: "Follow-ups e ações",
+    icon: ListTodo,
+    match: (p: string) => p.startsWith("/crm/tasks"),
+  },
+  {
+    href: "/crm/meetings",
+    label: "Reuniões",
+    description: "Agendamentos",
+    icon: CalendarClock,
+    match: (p: string) => p.startsWith("/crm/meetings"),
   },
   {
     href: "/crm/segments",
