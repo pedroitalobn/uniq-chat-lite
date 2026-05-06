@@ -24,6 +24,7 @@ type PlatformAI struct {
 	LastTestedAt *time.Time `json:"last_tested_at,omitempty"`
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (p *PlatformAI) BeforeCreate(tx *gorm.DB) error {

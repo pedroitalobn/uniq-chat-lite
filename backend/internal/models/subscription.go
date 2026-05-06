@@ -27,6 +27,7 @@ type SubscriptionTopic struct {
 	IsActive    bool       `gorm:"default:true" json:"is_active"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (t *SubscriptionTopic) BeforeCreate(tx *gorm.DB) error {

@@ -47,6 +47,7 @@ type Shop struct {
 	IsActive  bool      `gorm:"default:true" json:"is_active"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (s *Shop) BeforeCreate(tx *gorm.DB) error {

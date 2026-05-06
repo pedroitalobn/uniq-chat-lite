@@ -33,6 +33,7 @@ type Server struct {
 	WebhookURL string    `gorm:"type:varchar(500)" json:"webhook_url,omitempty"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (s *Server) BeforeCreate(tx *gorm.DB) error {

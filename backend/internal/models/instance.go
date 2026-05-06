@@ -122,6 +122,7 @@ type Instance struct {
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 
 	WABA *WABAInstance `gorm:"foreignKey:InstanceID" json:"waba,omitempty"`
 

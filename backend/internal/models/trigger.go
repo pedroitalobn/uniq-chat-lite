@@ -62,6 +62,7 @@ type Trigger struct {
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (t *Trigger) BeforeCreate(tx *gorm.DB) error {

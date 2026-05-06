@@ -61,6 +61,7 @@ type User struct {
 	Workspaces []UserWorkspace `gorm:"foreignKey:UserID" json:"workspaces,omitempty"`
 	CreatedAt  time.Time       `json:"created_at"`
 	UpdatedAt  time.Time       `json:"updated_at"`
+	DeletedAt  gorm.DeletedAt  `gorm:"index" json:"-"`
 }
 
 // IsBlocked returns true if the user is either permanently inactive or temporarily blocked.

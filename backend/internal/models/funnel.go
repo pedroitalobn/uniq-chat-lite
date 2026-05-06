@@ -31,6 +31,7 @@ type Funnel struct {
 	Stages        []FunnelStage `gorm:"foreignKey:FunnelID" json:"stages,omitempty"`
 	CreatedAt     time.Time     `json:"created_at"`
 	UpdatedAt     time.Time     `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (f *Funnel) BeforeCreate(tx *gorm.DB) error {

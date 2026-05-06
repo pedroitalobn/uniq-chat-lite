@@ -44,6 +44,7 @@ type Journey struct {
 	ReEntryRule     string     `gorm:"type:varchar(40);default:'never'" json:"re_entry_rule"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (j *Journey) BeforeCreate(tx *gorm.DB) error {

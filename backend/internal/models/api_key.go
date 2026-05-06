@@ -19,8 +19,9 @@ type APIKey struct {
 	KeyHash    string     `gorm:"not null;uniqueIndex" json:"-"`
 	KeyPrefix  string     `gorm:"not null" json:"key_prefix"`
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
-	IsActive   bool       `gorm:"default:true" json:"is_active"`
-	CreatedAt  time.Time  `json:"created_at"`
+	IsActive   bool           `gorm:"default:true" json:"is_active"`
+	CreatedAt  time.Time      `json:"created_at"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (k *APIKey) BeforeCreate(tx *gorm.DB) error {

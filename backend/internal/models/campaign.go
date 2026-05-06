@@ -105,6 +105,7 @@ type Campaign struct {
 	Recipients []CampaignRecipient `gorm:"foreignKey:CampaignID" json:"recipients,omitempty"`
 	CreatedAt  time.Time           `json:"created_at"`
 	UpdatedAt  time.Time           `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (c *Campaign) BeforeCreate(tx *gorm.DB) error {

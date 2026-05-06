@@ -29,6 +29,7 @@ type AgentAsset struct {
 	IsActive        bool               `gorm:"default:true" json:"is_active"`
 	CreatedAt       time.Time          `json:"created_at"`
 	UpdatedAt       time.Time          `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (a *AgentAsset) BeforeCreate(tx *gorm.DB) error {

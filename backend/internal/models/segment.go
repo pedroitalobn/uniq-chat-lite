@@ -37,6 +37,7 @@ type Segment struct {
 	TriggerJourneyID *uuid.UUID `gorm:"type:uuid" json:"trigger_journey_id,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (s *Segment) BeforeCreate(tx *gorm.DB) error {

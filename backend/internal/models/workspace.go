@@ -34,8 +34,9 @@ type Workspace struct {
 	FreqCapPerHour    int `gorm:"default:0" json:"freq_cap_per_hour"`
 	FreqCapPerDay     int `gorm:"default:0" json:"freq_cap_per_day"`
 	FreqCapPerWeek    int `gorm:"default:0" json:"freq_cap_per_week"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (w *Workspace) BeforeCreate(tx *gorm.DB) error {

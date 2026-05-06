@@ -63,6 +63,7 @@ type UserIntegration struct {
 	TestStatus        string     `gorm:"type:varchar(20)" json:"test_status,omitempty"` // "ok" | "failed" | ""
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // HasOAuth retorna true se a integração tem tokens OAuth válidos.

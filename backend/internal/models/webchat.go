@@ -22,6 +22,7 @@ type WebChatConfig struct {
 	HelpDeskEnabled        bool      `gorm:"default:false" json:"help_desk_enabled"`
 	CreatedAt              time.Time `json:"created_at"`
 	UpdatedAt              time.Time `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (w *WebChatConfig) BeforeCreate(tx *gorm.DB) error {
