@@ -577,9 +577,17 @@ export function PlatformAIPanel() {
 }
 
 
-// Default export — wrapper pro Next App Router. Mantém /admin/platform-ai
-// funcional pra links/bookmarks legados, mas internamente só renderiza
-// o panel compartilhado.
+// Default export — redireciona pra /admin/providers?tab=ai (página
+// canônica) preservando bookmarks/links legados. Antes essa rota
+// renderizava o panel solto, mas a configuração agora vive dentro
+// dos submenus de "Provedores".
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
 export default function PlatformAIPage() {
-  return <PlatformAIPanel />;
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/admin/providers?tab=ai");
+  }, [router]);
+  return null;
 }

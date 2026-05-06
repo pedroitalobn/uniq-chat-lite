@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -264,11 +265,29 @@ function PaymentTab() {
 
   if (isLoading) return <div className="flex items-center gap-2 py-8"><Loader2 className="w-4 h-4 animate-spin text-[#00d46a]" /><span className="text-sm" style={{ color: "hsl(240 8% 55%)" }}>Carregando...</span></div>;
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL?.replace(/\/v1\/?$/, "") || "https://api.uniq.chat";
-  // Webhook tem que apontar pro BACKEND (api.uniq.chat), não pro front.
-  // Frontend é a fonte autoritativa de qual API estamos falando — se o
-  // backend ainda devolve uma URL com app.uniq.chat (config errada de
-  // API_URL no env do server), ignoramos e usamos apiBase.
+  // apiBase pra montar a URL de webhook que vai colar no Stripe/Asaas:
+  //  1) Se NEXT_PUBLIC_API_URL está setado e NÃO é localhost → usa.
+  //  2) Se estamos rodando num host público (ex: app.uniq.chat),
+  //     deriva trocando "app." por "api." (mesmo subdomínio root).
+  //  3) Fallback final: api.uniq.chat (prod default).
+  // Casos cobertos:
+  //   - dev local rodando frontend e backend → localhost:8080 explícito no .env
+  //   - prod com env mal configurado (ainda apontando localhost) → ainda
+  //     mostra api.uniq.chat baseado no hostname do browser.
+  const rawApi = process.env.NEXT_PUBLIC_API_URL?.replace(/\/v1\/?$/, "") || "";
+  let apiBase: string;
+  if (rawApi && !/localhost|127\.0\.0\.1/.test(rawApi)) {
+    apiBase = rawApi;
+  } else if (typeof window !== "undefined" && window.location.hostname && !/localhost|127\.0\.0\.1/.test(window.location.hostname)) {
+    // ex.: app.uniq.chat → api.uniq.chat ; admin.foo.com → api.foo.com
+    const host = window.location.hostname;
+    const apiHost = host.startsWith("app.") || host.startsWith("admin.") || host.startsWith("dashboard.")
+      ? "api." + host.split(".").slice(1).join(".")
+      : "api." + host;
+    apiBase = `${window.location.protocol}//${apiHost}`;
+  } else {
+    apiBase = rawApi || "https://api.uniq.chat";
+  }
   const stripeWebhookURL = `${apiBase}/stripe/webhook`;
   const asaasWebhookURL = `${apiBase}/asaas/webhook`;
 
@@ -886,9 +905,14 @@ function ProxiesTab() {
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
-export default function ProvidersPage() {
+function ProvidersPageInner() {
   const { data: session } = useSession();
-  const [active, setActive] = useState<Tab>("payment");
+  const searchParams = useSearchParams();
+  // Aba inicial vem do query (?tab=ai por exemplo) — usado pelo
+  // redirect de /admin/platform-ai e bookmarks que linkam direto.
+  const initialTab = (searchParams.get("tab") as Tab) || "payment";
+  const validTabs: Tab[] = ["payment", "communication", "ai", "server", "proxies"];
+  const [active, setActive] = useState<Tab>(validTabs.includes(initialTab) ? initialTab : "payment");
   const isSuperAdmin = (session?.user as { role?: string })?.role === "super_admin";
 
   if (!isSuperAdmin) {
@@ -962,5 +986,13 @@ export default function ProvidersPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ProvidersPage() {
+  return (
+    <Suspense fallback={null}>
+      <ProvidersPageInner />
+    </Suspense>
   );
 }
