@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { authApi, instancesApi } from "@/lib/api";
 import { UsageBanner } from "@/components/billing/UsageBanner";
@@ -35,6 +35,15 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const qc = useQueryClient();
+  // Mounted gate — fix definitivo pro React #418 que persistia mesmo
+  // após initial=false no AnimatePresence. Algum componente filho
+  // (ConversationList/CRM cards) usa Date.now()/toLocaleString em
+  // render e mismatch entre SSR (sem dados) e hydration. Returnar
+  // null no primeiro render do client elimina TUDO — server renderiza
+  // árvore vazia, client primeiro paint também vazia, hydration passa,
+  // useEffect dispara, setMounted(true) vira a UI real.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   // Full-width SEM box: viewport inteiro (sem padding, sem card).
   // Inbox messenger e canvas de Journey precisam disso.
   const isFullWidth =
@@ -167,7 +176,10 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
     }
   }, [sessionData, sessionLoading, instances, pathname, router]);
 
-  if (sessionLoading) {
+  // Server e primeiro render do client retornam um shell vazio. Isso
+  // garante zero hydration mismatch — o conteúdo real só monta depois
+  // do useEffect setar mounted=true, em puro client-side.
+  if (!mounted || sessionLoading) {
     return (
       <main className="flex-1 overflow-hidden">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 lg:py-8 pt-16 lg:pt-8 h-full flex items-center justify-center">

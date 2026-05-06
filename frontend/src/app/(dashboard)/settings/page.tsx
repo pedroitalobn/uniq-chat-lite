@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import QRCode from "qrcode";
 import { authApi, plansApi } from "@/lib/api";
 import { usePreferences, TIMEZONES, type Language, type ThemeMode } from "@/lib/preferences";
@@ -290,10 +290,17 @@ function ProfileSection({ session, update, t }: {
     (user as unknown as Record<string, unknown>)?.username as string || ""
   );
 
+  const qc = useQueryClient();
   const mutation = useMutation({
     mutationFn: () => authApi.updateMe({ name: name.trim() || undefined, username: username.trim() || undefined }),
     onSuccess: async (res) => {
+      // Sync next-auth session com os novos campos.
       await update({ name: res.data.name, username: res.data.username });
+      // Invalida o cache react-query do /v1/auth/session usado pelo
+      // LayoutClient — sem isso a UI continuava mostrando os dados
+      // antigos até o user fazer logout/login. Outros componentes que
+      // dependem de session via useQuery agora veem o valor novo.
+      await qc.invalidateQueries({ queryKey: ["session"] });
       toast.success("Perfil atualizado!");
     },
     onError: (err: unknown) => {

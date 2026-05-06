@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -36,18 +37,35 @@ func (h *SegmentHandler) Create(c *fiber.Ctx) error {
 	if user == nil {
 		return c.Status(401).JSON(fiber.Map{"error": "auth required"})
 	}
-	var req models.Segment
-	if err := c.BodyParser(&req); err != nil || req.Name == "" {
+	// Antes: c.BodyParser(&req) com Segment.Filter sendo string falhava
+	// quando o frontend manda "filter" como objeto JSON. O erro do parser
+	// caía no `||` do check e devolvia "name obrigatório" mesmo com nome
+	// presente — confundia o user. Agora aceita filter como objeto E
+	// re-serializa pra string que vai pro DB.
+	var raw struct {
+		Name   string          `json:"name"`
+		Type   string          `json:"type"`
+		Filter json.RawMessage `json:"filter"`
+	}
+	if err := c.BodyParser(&raw); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "body inválido: " + err.Error()})
+	}
+	if strings.TrimSpace(raw.Name) == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "name obrigatório"})
 	}
-	req.ID = uuid.Nil
-	req.WorkspaceID = wsID
-	req.OwnerUserID = user.ID
+	filterStr := string(raw.Filter)
+	if filterStr == "" || filterStr == "null" {
+		filterStr = "{}"
+	}
+	req := models.Segment{
+		Name:        raw.Name,
+		Type:        raw.Type,
+		Filter:      filterStr,
+		WorkspaceID: wsID,
+		OwnerUserID: user.ID,
+	}
 	if req.Type == "" {
 		req.Type = "dynamic"
-	}
-	if req.Filter == "" {
-		req.Filter = "{}"
 	}
 	if err := h.db.Create(&req).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
