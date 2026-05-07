@@ -45,6 +45,11 @@ func (c *ComputedCron) loop() {
 }
 
 func (c *ComputedCron) tick() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error().Interface("panic", r).Msg("computed cron tick: panic recovered")
+		}
+	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	if err := c.refreshAll(ctx); err != nil {

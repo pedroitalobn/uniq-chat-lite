@@ -52,6 +52,11 @@ func (c *CleanupCron) loop() {
 }
 
 func (c *CleanupCron) tick() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error().Interface("panic", r).Msg("cleanup cron tick: panic recovered")
+		}
+	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	c.cleanupUnverified(ctx)

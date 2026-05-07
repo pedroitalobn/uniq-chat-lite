@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"crypto/subtle"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/email"
@@ -276,14 +278,33 @@ func (h *AsaasHandler) GetSubscription(c *fiber.Ctx) error {
 	})
 }
 
-// POST /asaas/webhook — handle Asaas events (public)
+// POST /asaas/webhook — handle Asaas events (public).
+// Auth: Asaas envia o token configurado em "Token de autenticação" via
+// header `asaas-access-token`. Antes a validação só checava se o header
+// EXISTIA — atacante mandava qualquer string e ativava qualquer plano.
+// Agora compara em tempo constante contra o secret configurado.
 func (h *AsaasHandler) Webhook(c *fiber.Ctx) error {
-	webhookSecret := h.getWebhookSecret()
-	if webhookSecret != "" {
-		signature := c.Get("asaas-signature")
-		if signature == "" {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "assinatura ausente"})
-		}
+	webhookSecret := strings.TrimSpace(h.getWebhookSecret())
+	if webhookSecret == "" {
+		// Sem secret configurado, recusa o webhook em vez de aceitar
+		// payloads não autenticados. Admin precisa setar o token em
+		// /admin/providers → Asaas pra ativar a integração.
+		log.Warn().Msg("asaas webhook recebido sem secret configurado — rejeitando pra evitar fake events")
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error": "asaas webhook secret não configurado — admin precisa setar em /admin/providers",
+		})
+	}
+	// Asaas envia o token em `asaas-access-token` (hifen, lowercase).
+	// Tentamos as duas grafias por compatibilidade com setups antigos.
+	provided := strings.TrimSpace(c.Get("asaas-access-token"))
+	if provided == "" {
+		provided = strings.TrimSpace(c.Get("asaas-signature"))
+	}
+	if provided == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "token ausente"})
+	}
+	if subtle.ConstantTimeCompare([]byte(provided), []byte(webhookSecret)) != 1 {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "token inválido"})
 	}
 
 	var event map[string]interface{}
@@ -293,6 +314,19 @@ func (h *AsaasHandler) Webhook(c *fiber.Ctx) error {
 
 	eventType, _ := event["event"].(string)
 	paymentEvent, _ := event["payment"].(map[string]interface{})
+
+	// Idempotência: Asaas pode reenviar webhook em retry. ID do evento
+	// vem em event["id"] (UUID asaas). INSERT ON CONFLICT garante
+	// processamento single.
+	if eventID, _ := event["id"].(string); eventID != "" {
+		res := h.db.Exec(
+			"INSERT INTO processed_webhook_events (event_id, provider, processed_at) VALUES (?, 'asaas', ?) ON CONFLICT DO NOTHING",
+			eventID, time.Now(),
+		)
+		if res.Error == nil && res.RowsAffected == 0 {
+			return c.JSON(fiber.Map{"received": true, "duplicate": true})
+		}
+	}
 
 	switch eventType {
 	case "PAYMENT_RECEIVED", "PAYMENT_CONFIRMED":

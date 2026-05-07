@@ -389,7 +389,26 @@ func (h *StripeHandler) Webhook(c *fiber.Ctx) error {
 
 	event, err := webhook.ConstructEvent(payload, sigHeader, webhookSecret)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "assinatura inválida: " + err.Error()})
+		// Não vaza err.Error() pra cliente — pode incluir hint do
+		// secret. Loga internamente.
+		log.Warn().Err(err).Msg("stripe webhook: assinatura inválida")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "assinatura inválida"})
+	}
+
+	// Idempotência: Stripe reenvia o mesmo event.ID em retries (timeout
+	// nosso, deploy no meio, etc). Sem dedup o handler executa 2x →
+	// User materializado em duplicata, plano upgrade duplicado, etc.
+	// INSERT ON CONFLICT DO NOTHING vira "lock" — se outra instância já
+	// gravou esse ID, RowsAffected=0 e nós paramos.
+	if event.ID != "" {
+		res := h.db.Exec(
+			"INSERT INTO processed_webhook_events (event_id, provider, processed_at) VALUES (?, 'stripe', ?) ON CONFLICT DO NOTHING",
+			event.ID, time.Now(),
+		)
+		if res.Error == nil && res.RowsAffected == 0 {
+			// Evento já processado. Retorna 200 pra Stripe não retentar.
+			return c.JSON(fiber.Map{"received": true, "duplicate": true})
+		}
 	}
 
 	switch event.Type {
@@ -652,13 +671,21 @@ func (h *StripeHandler) materializePending(pendingIDStr, planIDStr, subscription
 		return
 	}
 	if pending.Name == "" || pending.PasswordHash == "" {
-		// Pending sem snapshot — fluxo não-defer (cobranças de
-		// upgrade de user existente cairiam aqui).
 		return
 	}
-	// Idempotência: se já materializamos uma vez (CompletedAt setado),
-	// só atualiza assinatura.
-	if pending.IsCompleted() {
+	// Race condition: dois webhooks (checkout.session.completed +
+	// invoice.payment_succeeded) podem rodar paralelos. UPDATE atômico
+	// "claim" — só o primeiro a executar grava completed_at; o segundo
+	// vê RowsAffected=0 e sai. Combina com a tabela processed_webhook_events
+	// pra dedup ainda mais cedo (no Webhook handler), mas esse claim
+	// segura o caso onde o webhook event.ID é diferente mas o pending é
+	// o mesmo (ex: checkout + payment_intent).
+	now := time.Now()
+	res := h.db.Model(&models.PendingRegistration{}).
+		Where("id = ? AND completed_at IS NULL", pendingID).
+		Update("completed_at", now)
+	if res.Error == nil && res.RowsAffected == 0 {
+		// Outro webhook já materializou. Apenas atualiza assinatura.
 		var existing models.User
 		if h.db.Where("email = ?", pending.Email).First(&existing).Error == nil {
 			updates := map[string]any{
@@ -673,6 +700,9 @@ func (h *StripeHandler) materializePending(pendingIDStr, planIDStr, subscription
 		}
 		return
 	}
+	// Marca o pending em memória pra o restante do fluxo continuar
+	// vendo o estado consistente (ex: log mostrando ws_name correto).
+	pending.CompletedAt = &now
 
 	planID, _ := uuid.Parse(planIDStr)
 	var plan models.Plan
@@ -728,11 +758,13 @@ func (h *StripeHandler) materializePending(pendingIDStr, planIDStr, subscription
 			Msg("materializePending: createDefaultWorkspace falhou — user materializado pago sem workspace; auto-heal vai recriar")
 	}
 
-	now := time.Now()
-	h.db.Model(&pending).Update("completed_at", now)
+	// completed_at já foi gravado no claim atomic acima (linha ~684).
+	// Não regravamos aqui pra não poluir updated_at.
 
+	// Emails async — não travam o webhook (Stripe tem timeout de 10s
+	// de resposta antes de marcar webhook failed e reentregar).
 	if hasPlan {
-		h.emailSvc.SendPaymentConfirmed(user.Email, user.Name, plan.Name, plan.Price)
+		go h.emailSvc.SendPaymentConfirmed(user.Email, user.Name, plan.Name, plan.Price)
 	}
-	h.emailSvc.SendWelcome(user.Email, user.Name)
+	go h.emailSvc.SendWelcome(user.Email, user.Name)
 }

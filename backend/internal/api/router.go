@@ -375,10 +375,14 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	//   forgot/reset: 5/min — alvo de enumeração de e-mails e força bruta.
 	//   login: 30/min — typo de senha + múltiplos devices + SSO retries.
 	//   validate/refresh: 60/min — chamados pela UI em polling contínuo.
-	authRegister := middleware.RateLimit(30)  // registro de conta
-	authSensitive := middleware.RateLimit(5)  // forgot/reset/verify — anti-enum
-	authLogin := middleware.RateLimit(30)     // login: typo de senha, múltiplos devices, SSO retries
-	authValidate := middleware.RateLimit(60)  // validate-key/refresh: chamados pela UI em polling
+	// Limites apertados em endpoints públicos pra mitigar brute-force,
+	// enumeração de emails e DoS via cadastro em massa. Antes eram
+	// generosos demais (30/min em register permitia 1800 tentativas/h
+	// vindo de 1 IP — basta usar proxy pool pra escalar).
+	authRegister := middleware.RateLimit(5)   // 5/min — cadastros legítimos são raros por IP
+	authSensitive := middleware.RateLimit(3)  // 3/min — forgot/reset/verify (anti-enum)
+	authLogin := middleware.RateLimit(10)     // 10/min — typo + múltiplos devices toleráveis; brute force inviável
+	authValidate := middleware.RateLimit(60)  // 60/min — UI faz polling, mantém alto
 	auth := app.Group("/auth")
 	auth.Post("/login", authLogin, authH.Login)
 	auth.Post("/register", authRegister, authH.Register)

@@ -60,6 +60,14 @@ func (c *AsaasCron) loop() {
 
 // tick processa todos os users com asaas_cancel_at <= now.
 func (c *AsaasCron) tick() {
+	defer func() {
+		// Panic recovery: sem isso uma falha (ex: row corrompido, JSON
+		// inválido em Subscription.metadata) mata a goroutine do loop()
+		// e ninguém processa cancelamentos até reboot.
+		if r := recover(); r != nil {
+			log.Error().Interface("panic", r).Msg("asaas cron tick: panic recovered")
+		}
+	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 

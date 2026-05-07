@@ -410,13 +410,13 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 			appURL = "https://app.uniq.chat"
 		}
 		verifyLink := appURL + "/verify-email?token=" + verifyToken
-		h.emailSvc.SendEmailVerification(user.Email, user.Name, verifyLink)
+		go h.emailSvc.SendEmailVerification(user.Email, user.Name, verifyLink)
 		return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
 			"verification_required": true,
 			"message":               "enviamos um e-mail de confirmação para " + user.Email,
 		})
 	}
-	h.emailSvc.SendWelcome(user.Email, user.Name)
+	go h.emailSvc.SendWelcome(user.Email, user.Name)
 	h.db.Preload("Plan").First(&user, "id = ?", user.ID)
 
 	accessToken, err := middleware.GenerateAccessToken(&user)
@@ -1032,7 +1032,7 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao salvar senha"})
 	}
 
-	h.emailSvc.SendPasswordChanged(user.Email, user.Name)
+	go h.emailSvc.SendPasswordChanged(user.Email, user.Name)
 
 	return c.JSON(fiber.Map{"message": "senha alterada com sucesso"})
 }
@@ -1072,7 +1072,7 @@ func (h *AuthHandler) ForgotPassword(c *fiber.Ctx) error {
 
 	// Import config lazily via package-level reference — appURL set in router
 	resetLink := fmt.Sprintf("%s/reset-password?token=%s", authHandlerAppURL, token.Token)
-	h.emailSvc.SendForgotPassword(user.Email, user.Name, resetLink)
+	go h.emailSvc.SendForgotPassword(user.Email, user.Name, resetLink)
 
 	return c.JSON(fiber.Map{"message": "se o e-mail estiver cadastrado, você receberá as instruções em breve"})
 }
@@ -1197,7 +1197,7 @@ func (h *AuthHandler) RegisterStart(c *fiber.Ctx) error {
 		appURL = "https://app.uniq.chat"
 	}
 	magicURL := appURL + "/register/verify?token=" + pending.Token
-	h.emailSvc.SendMagicLink(req.Email, magicURL)
+	go h.emailSvc.SendMagicLink(req.Email, magicURL)
 
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
 		"message": "link enviado para " + req.Email,
@@ -1503,7 +1503,7 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 	h.db.Model(&pending).Update("completed_at", now)
 
 	// Free plan — return tokens
-	h.emailSvc.SendWelcome(user.Email, user.Name)
+	go h.emailSvc.SendWelcome(user.Email, user.Name)
 	h.db.Preload("Plan").First(&user, "id = ?", user.ID)
 
 	accessToken, err := middleware.GenerateAccessToken(&user)

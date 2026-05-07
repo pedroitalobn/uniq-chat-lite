@@ -453,6 +453,35 @@ func (h *CampaignHandler) List(c *fiber.Ctx) error {
 func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 
+	// Plan limit enforcement — antes Free user (MaxCampaigns=0) criava
+	// ilimitadas campanhas e elas rodavam normalmente no scheduler.
+	// MaxCampaigns: -1 = ilimitado, 0 = bloqueado, N = limite.
+	if user != nil && user.PlanID != nil {
+		var plan models.Plan
+		if err := h.db.First(&plan, "id = ?", *user.PlanID).Error; err == nil {
+			if plan.MaxCampaigns == 0 {
+				return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
+					"error":   "plan_does_not_allow_campaigns",
+					"message": "seu plano não permite criar campanhas — faça upgrade",
+				})
+			}
+			if plan.MaxCampaigns > 0 {
+				var count int64
+				h.db.Model(&models.Campaign{}).
+					Where("user_id = ? AND status NOT IN ?", user.ID, []string{"completed", "cancelled", "failed"}).
+					Count(&count)
+				if int(count) >= plan.MaxCampaigns {
+					return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
+						"error":   "campaigns_limit_reached",
+						"message": fmt.Sprintf("limite de %d campanhas ativas atingido — faça upgrade ou pause/cancele uma existente", plan.MaxCampaigns),
+						"limit":   plan.MaxCampaigns,
+						"current": count,
+					})
+				}
+			}
+		}
+	}
+
 	var req struct {
 		WorkspaceID   string `json:"workspace_id"`
 		InstanceID    string `json:"instance_id"`

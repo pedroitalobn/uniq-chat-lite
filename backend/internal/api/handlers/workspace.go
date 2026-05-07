@@ -302,21 +302,40 @@ func (h *WorkspaceHandler) ListMembers(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"members": members})
 }
 
-// RemoveMember removes a user from the workspace
+// RemoveMember removes a user from the workspace.
+// Apenas owner OU super-admin podem remover membros — antes qualquer
+// membership existente passava no check, permitindo que um colaborador
+// removesse o próprio dono do workspace.
 func (h *WorkspaceHandler) RemoveMember(c *fiber.Ctx) error {
-	userID := middleware.GetCurrentUserID(c)
+	user := middleware.GetCurrentUser(c)
+	if user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+	}
+	userID := user.ID
 	workspaceID := c.Params("id")
 	memberID := c.Params("member_id")
 
-	// Check if caller has permission
-	var uw models.UserWorkspace
-	if err := h.db.Where("user_id = ? AND workspace_id = ?", userID, workspaceID).First(&uw).Error; err != nil {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado"})
+	// Caller deve ser owner desse workspace (ou super-admin global).
+	isPrivileged := user.Role == models.RoleSuperAdmin
+	var callerUW models.UserWorkspace
+	if !isPrivileged {
+		if err := h.db.Where("user_id = ? AND workspace_id = ?", userID, workspaceID).First(&callerUW).Error; err != nil {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado"})
+		}
+		if !callerUW.IsOwner {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "apenas o proprietário pode remover membros"})
+		}
 	}
 
-	// Can't remove yourself if you're the owner
-	if memberID == userID.String() && uw.IsOwner {
+	// Não dá pra remover o owner do workspace (incluindo o próprio caller).
+	if memberID == userID.String() && callerUW.IsOwner {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "proprietário não pode ser removido"})
+	}
+	var target models.UserWorkspace
+	if err := h.db.Where("user_id = ? AND workspace_id = ?", memberID, workspaceID).First(&target).Error; err == nil {
+		if target.IsOwner {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "proprietário não pode ser removido"})
+		}
 	}
 
 	h.db.Where("user_id = ? AND workspace_id = ?", memberID, workspaceID).
@@ -400,13 +419,28 @@ func generateToken(prefix string) string {
 
 // CreateInvite creates an invitation to join the workspace
 func (h *WorkspaceHandler) CreateInvite(c *fiber.Ctx) error {
-	userID := middleware.GetCurrentUserID(c)
+	user := middleware.GetCurrentUser(c)
+	if user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+	}
+	userID := user.ID
 	workspaceID := c.Params("id")
+	wsUUID, err := uuid.Parse(workspaceID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
 
-	// Check access
-	var uw models.UserWorkspace
-	if err := h.db.Where("user_id = ? AND workspace_id = ?", userID, workspaceID).First(&uw).Error; err != nil {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado"})
+	// Apenas owner ou super-admin pode convidar. Antes qualquer
+	// membro existente passava — escalada de privilégio trivial.
+	isPrivileged := user.Role == models.RoleSuperAdmin
+	if !isPrivileged {
+		var uw models.UserWorkspace
+		if err := h.db.Where("user_id = ? AND workspace_id = ?", userID, wsUUID).First(&uw).Error; err != nil {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado"})
+		}
+		if !uw.IsOwner {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "apenas o proprietário pode convidar membros"})
+		}
 	}
 
 	var req struct {
@@ -415,6 +449,14 @@ func (h *WorkspaceHandler) CreateInvite(c *fiber.Ctx) error {
 	}
 	if err := c.BodyParser(&req); err != nil || req.Email == "" || req.RoleID == uuid.Nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "email e role são obrigatórios"})
+	}
+
+	// RoleID precisa pertencer a ESTE workspace — antes aceitava role
+	// de outro workspace, permitindo que o convidado caísse num role
+	// com permissões herdadas indevidamente.
+	var role models.Role
+	if err := h.db.Where("id = ? AND workspace_id = ?", req.RoleID, wsUUID).First(&role).Error; err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "role inválida pra este workspace"})
 	}
 
 	// Check if user is already a member
@@ -431,7 +473,7 @@ func (h *WorkspaceHandler) CreateInvite(c *fiber.Ctx) error {
 		Update("status", "expired")
 
 	invite := models.Invite{
-		WorkspaceID: uuid.MustParse(workspaceID),
+		WorkspaceID: wsUUID,
 		Email:       req.Email,
 		RoleID:      req.RoleID,
 		InvitedBy:   userID,
@@ -461,7 +503,8 @@ func (h *WorkspaceHandler) CreateInvite(c *fiber.Ctx) error {
 	h.db.Select("id, name").First(&workspace, "id = ?", workspaceID)
 	var inviter models.User
 	h.db.Select("id, name, email").First(&inviter, "id = ?", userID)
-	var role models.Role
+	// `role` já carregado mais cedo na validação; refresh com Select
+	// minimizado pra payload de email.
 	h.db.Select("id, name").First(&role, "id = ?", req.RoleID)
 
 	inviterName := inviter.Name

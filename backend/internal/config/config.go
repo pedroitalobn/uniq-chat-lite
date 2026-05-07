@@ -114,7 +114,10 @@ func Load() *Config {
 		FromEmail:    getEnv("FROM_EMAIL", "mail@mrstpry.org"),
 
 		// Maileroo - transactional email
-		MailerooAPIKey:      getEnv("MAILEROO_API_KEY", "f7afa02bf8b442e9369d83d3315e20013876b97146f31cac65e8fe2b1d398eb8"),
+		// Sem default — chave em código aberto vazava credencial. Em
+		// dev pode ficar vazia (handler logs warning e segue), em prod
+		// admin deve setar via /admin/providers ou env MAILEROO_API_KEY.
+		MailerooAPIKey:      getEnv("MAILEROO_API_KEY", ""),
 		MailerooSenderEmail: getEnv("MAILEROO_SENDER_EMAIL", "mail@uniq.chat"),
 		MailerooSenderName:  getEnv("MAILEROO_SENDER_NAME", "Uniq.chat"),
 

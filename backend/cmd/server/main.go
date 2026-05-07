@@ -292,7 +292,24 @@ func connectDB(cfg *config.Config) (*gorm.DB, error) {
 	}
 
 	if cfg.DatabaseURL != "" {
-		return gorm.Open(postgres.Open(cfg.DatabaseURL), gormCfg)
+		db, err := gorm.Open(postgres.Open(cfg.DatabaseURL), gormCfg)
+		if err != nil {
+			return nil, err
+		}
+		// Pool config — antes default (Postgres ~30 conns) saturava em
+		// ~100 RPS porque cada request abre 1-2 queries em paralelo
+		// (autenticação + handler + rate limit). Setting explícito:
+		//   100 max — suporta ~50 req/s sustentado com headroom
+		//   25 idle — manter pool quente, abre cold start menos
+		//   1h lifetime — refresh conn pra evitar TCP keepalive issues
+		//   30min idle timeout — libera conn ociosa pra economizar RAM
+		if sqlDB, errDB := db.DB(); errDB == nil {
+			sqlDB.SetMaxOpenConns(100)
+			sqlDB.SetMaxIdleConns(25)
+			sqlDB.SetConnMaxLifetime(time.Hour)
+			sqlDB.SetConnMaxIdleTime(30 * time.Minute)
+		}
+		return db, nil
 	}
 
 	// Fallback to SQLite for dev
@@ -385,6 +402,8 @@ func autoMigrate(db *gorm.DB) error {
 		// Sprint billing — usage counters
 		&models.UsageCounter{},
 		&models.PlanChangeLog{},
+		// Webhook dedup (Stripe/Asaas/Hotmart event.id idempotência)
+		&models.ProcessedWebhookEvent{},
 		// Audit log de ações sensíveis (auth/admin/billing)
 		&models.AuditLog{},
 		// Customer.io-inspired: suppression, subscription, segments, identity, computed
