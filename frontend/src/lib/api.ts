@@ -1239,6 +1239,10 @@ export const integrationsApi = {
     role?: string;
     handoff_skills?: string[];
     action_confirmation?: "client" | "auto" | "human";
+    // Janelas de ativação (item 4 do épico)
+    activation_mode?: "always" | "business_hours" | "off_hours" | "new_contact_only" | "custom";
+    schedule?: { timezone: string; days: Record<string, Array<{ from: string; to: string }>> };
+    context_rules?: Record<string, unknown>;
   }, agentId?: string) => api.put(
     `/v1/instances/${instanceId}/agent`,
     data,

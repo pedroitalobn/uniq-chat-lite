@@ -241,6 +241,26 @@ func (r *AgentRuntime) resolveAgent(instanceID uuid.UUID, fromJID string) (*mode
 		Order("updated_at DESC").
 		First(&conv).Error
 
+	// Janela de ativação: gate antes de retornar qualquer agente. Usa
+	// time.Now() + msgCount da conversa pra decidir new_contact_only.
+	now := time.Now()
+	msgCount := 0
+	if convErr == nil {
+		var c int64
+		r.db.Model(&models.MessageLog{}).Where("conversation_id = ?", conv.ID).Count(&c)
+		msgCount = int(c)
+	}
+	gate := func(a *models.InstanceAgent) bool {
+		if !isAgentActiveNow(a, now, msgCount) {
+			log.Debug().
+				Str("agent", a.AgentName).
+				Str("mode", a.ActivationMode).
+				Msg("agent-runtime: fora da janela de ativação — handoff pra humano")
+			return false
+		}
+		return true
+	}
+
 	// Check per-conversation agent state (highest precedence)
 	if convErr == nil {
 		var state models.ConversationAgentState
@@ -255,13 +275,19 @@ func (r *AgentRuntime) resolveAgent(instanceID uuid.UUID, fromJID string) (*mode
 			// Agent override
 			if state.AgentID != nil {
 				if a, ok := preloadAgent(r.db, "id = ? AND is_active = ?", *state.AgentID, true); ok {
-					return a, mode, true
+					if gate(a) {
+						return a, mode, true
+					}
+					return nil, models.AgentModeDisabled, false
 				}
 			}
 			// No agent override but mode is set — fall through to queue/instance resolution
 			// but preserve the mode.
 			if a, ok := r.resolveQueueOrInstance(conv, instanceID, preloadAgent); ok {
-				return a, mode, true
+				if gate(a) {
+					return a, mode, true
+				}
+				return nil, models.AgentModeDisabled, false
 			}
 			return nil, models.AgentModeDisabled, false
 		}
@@ -273,7 +299,9 @@ func (r *AgentRuntime) resolveAgent(instanceID uuid.UUID, fromJID string) (*mode
 	}
 
 	if a, ok := r.resolveQueueOrInstance(conv, instanceID, preloadAgent); ok {
-		return a, models.AgentModeActive, true
+		if gate(a) {
+			return a, models.AgentModeActive, true
+		}
 	}
 	return nil, models.AgentModeDisabled, false
 }
@@ -677,4 +705,127 @@ func (r *AgentRuntime) loadSiblingsForPrompt(agent *models.InstanceAgent) string
 		b.WriteString(line + "\n")
 	}
 	return b.String()
+}
+
+// ─── Janelas de ativação ─────────────────────────────────────────────────
+
+// agentScheduleDay representa um intervalo HH:MM dentro de um dia.
+type agentScheduleRange struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+type agentSchedule struct {
+	Timezone string                          `json:"timezone"`
+	Days     map[string][]agentScheduleRange `json:"days"`
+}
+
+var weekdayKey = map[time.Weekday]string{
+	time.Sunday: "sun", time.Monday: "mon", time.Tuesday: "tue",
+	time.Wednesday: "wed", time.Thursday: "thu", time.Friday: "fri", time.Saturday: "sat",
+}
+
+// isAgentActiveNow decide se o agente DEVE responder neste momento.
+// Returns true quando:
+//   - ActivationMode vazio ou "always" (sempre responde se IsActive=true).
+//   - "business_hours" e o now (no TZ do schedule) cai DENTRO de algum range.
+//   - "off_hours" e o now cai FORA de TODOS os ranges (cobre noite/fim de
+//     semana — quando deveria ser handoff humano).
+//   - "new_contact_only" — caller passa contactMessageCount; true se ≤1.
+//   - "custom" — usa schedule + tolerância simples; expansões futuras vão
+//     em ContextRules.
+//
+// Pra qualquer JSON inválido cai pra "always" — falha aberta é melhor que
+// trancar todo o atendimento por typo no schedule.
+func isAgentActiveNow(agent *models.InstanceAgent, now time.Time, contactMessageCount int) bool {
+	if agent == nil {
+		return false
+	}
+	mode := strings.ToLower(strings.TrimSpace(agent.ActivationMode))
+	if mode == "" || mode == "always" {
+		return true
+	}
+	if mode == "new_contact_only" {
+		return contactMessageCount <= 1
+	}
+
+	var sched agentSchedule
+	if strings.TrimSpace(agent.Schedule) != "" {
+		_ = json.Unmarshal([]byte(agent.Schedule), &sched)
+	}
+
+	loc, err := time.LoadLocation(strings.TrimSpace(sched.Timezone))
+	if err != nil || loc == nil {
+		loc = time.Local
+	}
+	local := now.In(loc)
+	dayKey := weekdayKey[local.Weekday()]
+	ranges := sched.Days[dayKey]
+
+	insideAnyRange := false
+	for _, r := range ranges {
+		if rangeContains(r, local) {
+			insideAnyRange = true
+			break
+		}
+	}
+
+	switch mode {
+	case "business_hours":
+		return insideAnyRange
+	case "off_hours":
+		return !insideAnyRange
+	case "custom":
+		// Sem schedule definido → trata como "always" pra evitar trancar.
+		if len(ranges) == 0 && len(sched.Days) == 0 {
+			return true
+		}
+		return insideAnyRange
+	}
+	return true
+}
+
+// rangeContains — checa se HH:MM (local) está dentro de [from, to). Suporta
+// ranges que cruzam meia-noite (ex: from=22:00 to=06:00) interpretando
+// como "do início até 23:59 OU 00:00 até fim".
+func rangeContains(r agentScheduleRange, local time.Time) bool {
+	from, ok1 := parseHHMM(r.From)
+	to, ok2 := parseHHMM(r.To)
+	if !ok1 || !ok2 {
+		return false
+	}
+	cur := local.Hour()*60 + local.Minute()
+	if from <= to {
+		return cur >= from && cur < to
+	}
+	// Cruza meia-noite
+	return cur >= from || cur < to
+}
+
+func parseHHMM(s string) (int, bool) {
+	s = strings.TrimSpace(s)
+	if len(s) < 4 || !strings.Contains(s, ":") {
+		return 0, false
+	}
+	parts := strings.SplitN(s, ":", 2)
+	if len(parts) != 2 {
+		return 0, false
+	}
+	h, err1 := atoiSafe(parts[0])
+	m, err2 := atoiSafe(parts[1])
+	if err1 != nil || err2 != nil || h < 0 || h > 23 || m < 0 || m > 59 {
+		return 0, false
+	}
+	return h*60 + m, true
+}
+
+func atoiSafe(s string) (int, error) {
+	n := 0
+	for _, c := range strings.TrimSpace(s) {
+		if c < '0' || c > '9' {
+			return 0, fmt.Errorf("invalid digit")
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n, nil
 }

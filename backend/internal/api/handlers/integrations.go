@@ -643,6 +643,10 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		Role               *string   `json:"role"`
 		HandoffSkills      *[]string `json:"handoff_skills"`
 		ActionConfirmation *string   `json:"action_confirmation"`
+		// Janelas de ativação (item 4 do roadmap)
+		ActivationMode *string                 `json:"activation_mode"`
+		Schedule       *map[string]interface{} `json:"schedule"`
+		ContextRules   *map[string]interface{} `json:"context_rules"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -778,6 +782,18 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		case "client", "auto", "human":
 			agent.ActionConfirmation = strings.ToLower(*req.ActionConfirmation)
 		}
+	}
+	if req.ActivationMode != nil {
+		switch strings.ToLower(strings.TrimSpace(*req.ActivationMode)) {
+		case "always", "business_hours", "off_hours", "new_contact_only", "custom":
+			agent.ActivationMode = strings.ToLower(*req.ActivationMode)
+		}
+	}
+	if req.Schedule != nil {
+		agent.Schedule = marshalJSONString(*req.Schedule, "{}")
+	}
+	if req.ContextRules != nil {
+		agent.ContextRules = marshalJSONString(*req.ContextRules, "{}")
 	}
 
 	if err := h.db.Save(&agent).Error; err != nil {

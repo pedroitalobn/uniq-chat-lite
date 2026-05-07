@@ -13,10 +13,11 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { cn } from "@/lib/utils";
 import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 import { AgentSwitcher } from "@/components/agents/AgentSwitcher";
+import { ActivationTab } from "@/components/agents/ActivationTab";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type TabId = "personality" | "knowledge" | "skills" | "access" | "voice_studio";
+type TabId = "personality" | "knowledge" | "skills" | "access" | "voice_studio" | "activation";
 
 type AgentAsset = {
   id: string;
@@ -52,6 +53,16 @@ type AgentForm = {
   mcp_server_url: string;
   compiled_prompt: string;
   assets: AgentAsset[];
+  // Multi-agente
+  role: string;
+  handoff_skills: string[];
+  action_confirmation: "client" | "auto" | "human";
+  // Janelas de ativação
+  activation_mode: "always" | "business_hours" | "off_hours" | "new_contact_only" | "custom";
+  schedule: {
+    timezone: string;
+    days: Record<string, Array<{ from: string; to: string }>>;
+  };
 };
 
 // ─── Skills catalog ─────────────────────────────────────────────────────────
@@ -133,6 +144,9 @@ function emptyForm(): AgentForm {
     voice: { workspace_voice_id: "", audio_enabled: false, provider: "", voice: "", stability: 0.5, similarity: 0.7, style: 0.5, speed: 1 },
     skills: [], app_access: [], rag_enabled: true, is_active: false,
     webhook_url: "", webhook_secret: "", mcp_server_url: "", compiled_prompt: "", assets: [],
+    role: "primary", handoff_skills: [], action_confirmation: "client",
+    activation_mode: "always",
+    schedule: { timezone: "America/Sao_Paulo", days: {} },
   };
 }
 
@@ -167,6 +181,17 @@ function mapAgent(data: any): AgentForm {
     mcp_server_url: data?.mcp_server_url || "",
     compiled_prompt: data?.compiled_prompt || "",
     assets: data?.assets || [],
+    role: data?.role || "primary",
+    handoff_skills: parseJSONArray<string[]>(data?.handoff_skills, []),
+    action_confirmation: (data?.action_confirmation === "auto" || data?.action_confirmation === "human") ? data.action_confirmation : "client",
+    activation_mode: ["always", "business_hours", "off_hours", "new_contact_only", "custom"].includes(data?.activation_mode) ? data.activation_mode : "always",
+    schedule: (() => {
+      const raw = typeof data?.schedule === "string" ? parseJSONArray<any>(data.schedule, {}) : (data?.schedule || {});
+      return {
+        timezone: raw.timezone || "America/Sao_Paulo",
+        days: raw.days || {},
+      };
+    })(),
   };
 }
 
@@ -222,6 +247,7 @@ const TABS: Array<{ id: TabId; label: string; icon: React.ElementType; descripti
   { id: "skills",        label: "Skills",        icon: Sparkles, description: "30+ capacidades prontas" },
   { id: "access",        label: "Access",        icon: Globe,   description: "LLM, MCP, apps e integrações" },
   { id: "voice_studio",  label: "Voice Studio",  icon: Volume2, description: "Vozes, clones e providers" },
+  { id: "activation",    label: "Ativação",      icon: Zap,     description: "Quando o agente responde" },
 ];
 
 // ─── Page ────────────────────────────────────────────────────────────────────
@@ -300,7 +326,12 @@ export default function AgentsPage() {
         rag_enabled: form.rag_enabled, is_active: form.is_active,
         webhook_url: form.webhook_url, webhook_secret: form.webhook_secret,
         mcp_server_url: form.mcp_server_url,
-      }, selectedAgentId || undefined);
+        // Multi-agente + ativação (item 1 e 4 do roadmap de agentes).
+        role: form.role, handoff_skills: form.handoff_skills,
+        action_confirmation: form.action_confirmation,
+        activation_mode: form.activation_mode,
+        schedule: form.schedule,
+      } as any, selectedAgentId || undefined);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["instance-agent", selectedInstance, selectedAgentId] });
@@ -870,6 +901,14 @@ export default function AgentsPage() {
 
           {/* ── Voice Studio tab ── */}
           {tab === "voice_studio" && <VoiceStudioTab wsId={wsId} selectedVoiceId={form.voice.workspace_voice_id} onSelect={(id) => setForm(p => ({ ...p, voice: { ...p.voice, workspace_voice_id: id } }))} />}
+          {tab === "activation" && (
+            <ActivationTab
+              mode={form.activation_mode}
+              schedule={form.schedule}
+              onChangeMode={(m) => setForm((p) => ({ ...p, activation_mode: m }))}
+              onChangeSchedule={(s) => setForm((p) => ({ ...p, schedule: s }))}
+            />
+          )}
 
           {/* ── Access tab ── */}
           {tab === "access" && (

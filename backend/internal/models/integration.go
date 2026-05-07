@@ -156,6 +156,27 @@ type InstanceAgent struct {
 	// próprio chat WhatsApp; "auto" executa sem perguntar; "human" pede
 	// aprovação no painel. Default conservador.
 	ActionConfirmation string `gorm:"type:varchar(20);default:'client'" json:"action_confirmation,omitempty"`
+	// Janelas de ativação — quando o agente responde:
+	//   "always"            → 24/7 enquanto IsActive=true (default).
+	//   "business_hours"    → só durante horário configurado em Schedule.
+	//   "off_hours"         → o oposto (responde só FORA do horário,
+	//                          útil pra cobrir noite/fim de semana).
+	//   "new_contact_only"  → só responde se Contact.MessageCount<=1.
+	//   "custom"            → combina Schedule + regras adicionais em
+	//                          ContextRules (JSON livre, hoje opcional).
+	// Default "always" preserva comportamento legado.
+	ActivationMode string `gorm:"type:varchar(30);default:'always'" json:"activation_mode,omitempty"`
+	// Schedule — JSON com timezone + ranges por dia da semana. Formato:
+	//   { "timezone": "America/Sao_Paulo",
+	//     "days": { "mon": [{"from":"09:00","to":"18:00"}], "tue": [...] } }
+	// Dias ausentes/empty = fora da janela. Idiomático no business_hours/
+	// off_hours/custom; ignorado em always/new_contact_only.
+	Schedule string `gorm:"type:text;default:'{}'" json:"schedule,omitempty"`
+	// ContextRules — JSON livre pra regras compostas no modo "custom":
+	//   { "min_messages": 0, "max_messages": null, "only_unassigned": true,
+	//     "skip_if_human_replied_within_min": 30 }
+	// Por enquanto só serializa pra evolução incremental sem migration.
+	ContextRules string `gorm:"type:text;default:'{}'" json:"context_rules,omitempty"`
 	// n8n / webhook passthrough
 	WebhookURL    string `gorm:"type:varchar(255)" json:"webhook_url,omitempty"`
 	WebhookSecret string `gorm:"type:varchar(255)" json:"webhook_secret,omitempty"`
