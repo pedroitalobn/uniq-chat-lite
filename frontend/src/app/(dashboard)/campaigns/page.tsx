@@ -194,6 +194,17 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
 
   // CRM filters
   const [crmFilter, setCrmFilter] = useState<CrmFilter>({});
+  // Post-actions: ações aplicadas pra cada destinatário após envio.
+  // Ex: [{ type:"add_tag", tag:"Contatado-2025-Q1" }]
+  type PostAction = {
+    type: "add_tag" | "move_stage";
+    tag?: string;
+    color?: string;
+    funnel_id?: string;
+    stage_id?: string;
+    create_if_missing?: boolean;
+  };
+  const [postActions, setPostActions] = useState<PostAction[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   // Instagram channel config (post URL for like/comment; username for followers/following)
@@ -478,6 +489,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
           never_purchased:      crmFilter.never_purchased || undefined,
           passed_agent_id:      crmFilter.passed_agent_id || undefined,
         } : undefined,
+        post_actions: postActions.length > 0 ? JSON.stringify(postActions) : undefined,
       });
       toast.success("Campanha criada!");
       onCreated();
@@ -1316,6 +1328,88 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                 <p className="text-[10px] mt-2" style={{ color: "hsl(240 8% 42%)" }}>
                   Horários no fuso da sua conta. Janelas que cruzam meia-noite são suportadas (ex: 22:00-02:00).
                 </p>
+              </div>
+
+              {/* Post-actions: ações automáticas no CRM ao terminar o envio.
+                  Aplicadas POR DESTINATÁRIO depois que a mensagem sai com
+                  sucesso (idempotente — re-envio não duplica). */}
+              <div className="rounded-xl p-3.5 space-y-2"
+                style={{ background: "rgba(0,212,106,0.04)", border: "1px solid rgba(0,212,106,0.18)" }}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium" style={{ color: "var(--green)" }}>
+                    Ações automáticas após envio (CRM)
+                  </span>
+                  <button type="button"
+                    onClick={() => setPostActions((p) => [...p, { type: "add_tag", tag: "" }])}
+                    className="text-[10px] inline-flex items-center gap-1 px-2 py-0.5 rounded"
+                    style={{ background: "var(--green-dim)", color: "var(--green)" }}>
+                    + Adicionar
+                  </button>
+                </div>
+                {postActions.length === 0 && (
+                  <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+                    Nenhuma ação. Quando configurado, cada destinatário enviado recebe a tag/estágio escolhido.
+                  </p>
+                )}
+                {postActions.map((a, idx) => (
+                  <div key={idx} className="rounded-lg p-2 space-y-1.5"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <div className="flex gap-2 items-center">
+                      <select
+                        value={a.type}
+                        onChange={(e) => {
+                          const t = e.target.value as "add_tag" | "move_stage";
+                          setPostActions((p) => p.map((x, i) => i === idx ? { type: t } : x));
+                        }}
+                        className="input-field text-xs"
+                        style={{ width: 160 }}
+                      >
+                        <option value="add_tag">Adicionar tag</option>
+                        <option value="move_stage">Mover de estágio</option>
+                      </select>
+                      <button type="button"
+                        onClick={() => setPostActions((p) => p.filter((_, i) => i !== idx))}
+                        className="ml-auto text-[10px] px-2 py-1 rounded"
+                        style={{ background: "rgba(239,68,68,0.10)", color: "#ef4444" }}>
+                        Remover
+                      </button>
+                    </div>
+                    {a.type === "add_tag" ? (
+                      <input
+                        type="text"
+                        placeholder="Nome da tag (ex: Contatado-2025-Q1)"
+                        value={a.tag || ""}
+                        onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, tag: e.target.value } : x))}
+                        className="input-field w-full text-xs"
+                      />
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="funnel_id (opcional)"
+                          value={a.funnel_id || ""}
+                          onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, funnel_id: e.target.value } : x))}
+                          className="input-field w-full text-xs font-mono"
+                        />
+                        <input
+                          type="text"
+                          placeholder="stage_id"
+                          value={a.stage_id || ""}
+                          onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, stage_id: e.target.value } : x))}
+                          className="input-field w-full text-xs font-mono"
+                        />
+                        <label className="col-span-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-2)" }}>
+                          <input
+                            type="checkbox"
+                            checked={!!a.create_if_missing}
+                            onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, create_if_missing: e.target.checked } : x))}
+                          />
+                          Criar deal se contato não tiver no funil
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </>
           )}

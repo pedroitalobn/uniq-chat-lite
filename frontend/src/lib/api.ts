@@ -1033,6 +1033,10 @@ export const campaignsApi = {
       never_purchased?: boolean;
       passed_agent_id?: string;
     };
+    // post_actions: JSON array stringificado.
+    // Ex: [{ "type":"add_tag", "tag":"Contatado-Q1" },
+    //      { "type":"move_stage", "funnel_id":"...", "stage_id":"...", "create_if_missing":true }]
+    post_actions?: string;
   }) => api.post("/v1/campaigns", data),
   get: (id: string) => api.get(`/v1/campaigns/${id}`),
   start: (id: string) => api.post(`/v1/campaigns/${id}/start`),

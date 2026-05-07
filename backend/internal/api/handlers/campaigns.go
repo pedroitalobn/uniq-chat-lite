@@ -413,6 +413,9 @@ func (h *CampaignHandler) processCampaign(c models.Campaign, today string) {
 				h.db.Model(&c).UpdateColumn("sent_count", gorm.Expr("sent_count + 1"))
 			}
 			h.db.Model(r).Updates(updates)
+			if newSendCount >= c.TimesTotal {
+				applyCampaignPostActions(h.db, &c, r)
+			}
 		}
 
 		time.Sleep(time.Duration(delayMs) * time.Millisecond)
@@ -506,6 +509,7 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 			InboxLastContactAfter     string `json:"inbox_last_contact_after,omitempty"`
 			ParticipatedCampaignID    string `json:"participated_campaign_id,omitempty"`
 		} `json:"segment_filter"`
+		PostActions string `json:"post_actions,omitempty"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
@@ -596,6 +600,7 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		ChannelConfig:        channelConfig,
 		RecipientType:        recipientType,
 		SegmentFilter:        segmentJSON,
+		PostActions:          req.PostActions,
 		MessageType:          msgType,
 		MessageText:          req.MessageText,
 		Caption:              req.Caption,
@@ -1289,6 +1294,7 @@ func (h *CampaignHandler) processCampaignWABA(c models.Campaign, today string) {
 			"message_id":     messageID,
 		})
 		h.db.Model(&c).Update("sent_count", gorm.Expr("sent_count + 1"))
+		applyCampaignPostActions(h.db, &c, r)
 
 		// Create/link conversation in inbox so agents see the campaign outbound
 		if h.pipeline != nil && c.InstanceID != uuid.Nil {

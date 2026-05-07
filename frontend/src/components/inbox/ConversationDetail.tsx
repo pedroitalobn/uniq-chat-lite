@@ -15,6 +15,7 @@ import {
   Pencil, Trash2, Search, Info, Bell, BellOff, Eye, Briefcase, Loader2,
 } from "lucide-react";
 import { AudioPlayer } from "@/components/inbox/AudioPlayer";
+import { ContactCRMPanel } from "@/components/inbox/ContactCRMPanel";
 import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 import { AudioRecorderButton } from "@/components/inbox/AudioRecorderButton";
 import { MediaViewer, type MediaViewerSource } from "@/components/inbox/MediaViewer";
@@ -1128,6 +1129,13 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                   message={conv.window_keeper_message ?? ""}
                 />
               )}
+            </div>
+          )}
+          {/* CRM context — funil/estágio/jornada, deals do contato e tags
+              editáveis. Aparece quando temos contact_id resolvido. */}
+          {wsId && conv?.contact?.id && (
+            <div className="mb-3">
+              <ContactCRMPanel workspaceId={wsId as string} contactId={conv.contact.id} />
             </div>
           )}
           <div className="mb-2 text-[9px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-4)" }}>Detalhes</div>

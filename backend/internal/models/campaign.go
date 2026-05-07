@@ -98,6 +98,12 @@ type Campaign struct {
 	StartedAt   *time.Time     `json:"started_at,omitempty"`
 	CompletedAt *time.Time     `json:"completed_at,omitempty"`
 
+	// PostActions — ações aplicadas a cada destinatário após envio bem-sucedido.
+	// JSON array, ex: [{"type":"add_tag","tag":"Contatado-2025-01"},
+	//                  {"type":"move_stage","funnel_id":"...","stage_id":"...","create_if_missing":true}]
+	// Tipos: add_tag (cria/anexa), move_stage (atualiza Deal aberto, opcional cria).
+	PostActions string `gorm:"type:text;default:'[]'" json:"post_actions,omitempty"`
+
 	TotalCount  int `json:"total_count"`
 	SentCount   int `json:"sent_count"`
 	FailedCount int `json:"failed_count"`
