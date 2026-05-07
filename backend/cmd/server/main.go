@@ -429,6 +429,8 @@ func autoMigrate(db *gorm.DB) error {
 		&models.PlanChangeLog{},
 		// Webhook dedup (Stripe/Asaas/Hotmart event.id idempotência)
 		&models.ProcessedWebhookEvent{},
+		// Email/Maileroo config — tabela armazenada no /admin/providers
+		&models.EmailSettings{},
 		// Audit log de ações sensíveis (auth/admin/billing)
 		&models.AuditLog{},
 		// Customer.io-inspired: suppression, subscription, segments, identity, computed

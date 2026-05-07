@@ -1700,8 +1700,15 @@ func (h *AdminHandler) UpdateEmailSettings(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
 	}
 
+	// Defaults — antes a API rejeitava sender_email vazio com 400, mas
+	// o GET retorna ""=mascarado em alguns casos e o frontend nunca via
+	// erro claro (toast genérico "Erro ao salvar"). Agora aceitamos
+	// vazio e caímos em fallback do domínio principal.
 	if req.SenderEmail == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "sender_email é obrigatório"})
+		req.SenderEmail = "mail@uniq.chat"
+	}
+	if req.SenderName == "" {
+		req.SenderName = "Uniq.chat"
 	}
 
 	var settings models.EmailSettings
@@ -1715,18 +1722,27 @@ func (h *AdminHandler) UpdateEmailSettings(c *fiber.Ctx) error {
 			SenderName:  req.SenderName,
 			IsEnabled:   req.IsEnabled,
 		}
-		h.db.Create(&settings)
+		if err := h.db.Create(&settings).Error; err != nil {
+			return SafeErr(c, fiber.StatusInternalServerError, "email_settings_create_failed",
+				"erro ao salvar configurações de email — verifique se a tabela email_settings existe (execute migração)", err)
+		}
 	} else if result.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar configurações"})
+		return SafeErr(c, fiber.StatusInternalServerError, "email_settings_read_failed",
+			"erro ao ler configurações de email", result.Error)
 	} else {
-		// Update existing - only update APIKey if provided
+		// Update existing - só sobrescreve APIKey se for fornecida.
+		// (GET mascara como "" — sem essa proteção a UI zerava a chave
+		// existente no salvamento.)
 		if req.APIKey != "" {
 			settings.APIKey = req.APIKey
 		}
 		settings.SenderEmail = req.SenderEmail
 		settings.SenderName = req.SenderName
 		settings.IsEnabled = req.IsEnabled
-		h.db.Save(&settings)
+		if err := h.db.Save(&settings).Error; err != nil {
+			return SafeErr(c, fiber.StatusInternalServerError, "email_settings_update_failed",
+				"erro ao atualizar configurações de email", err)
+		}
 	}
 
 	// Update the email service config
@@ -1738,7 +1754,13 @@ func (h *AdminHandler) UpdateEmailSettings(c *fiber.Ctx) error {
 		h.emailSvc.SetConfig(apiKey, settings.SenderEmail, settings.SenderName)
 	}
 
-	return c.JSON(fiber.Map{"message": "configurações atualizadas"})
+	return c.JSON(fiber.Map{
+		"message":      "configurações atualizadas",
+		"sender_email": settings.SenderEmail,
+		"sender_name":  settings.SenderName,
+		"is_enabled":   settings.IsEnabled,
+		"has_api_key":  settings.APIKey != "",
+	})
 }
 
 // TestEmail godoc

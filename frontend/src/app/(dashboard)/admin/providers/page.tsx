@@ -606,7 +606,10 @@ function EmailSection() {
   const saveMut = useMutation({
     mutationFn: () => adminApi.updateEmailSettings(form),
     onSuccess: () => { toast.success("Configurações de email salvas!"); queryClient.invalidateQueries({ queryKey: ["admin-email-settings"] }); },
-    onError: () => toast.error("Erro ao salvar"),
+    onError: (e: unknown) => {
+      const r = (e as { response?: { data?: { message?: string; error?: string } } })?.response?.data;
+      toast.error(r?.message || r?.error || "Erro ao salvar configurações de email");
+    },
   });
 
   const testMut = useMutation({
