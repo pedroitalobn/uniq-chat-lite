@@ -89,6 +89,20 @@ export function Sidebar() {
   const isAdmin = isSuperAdmin;
   const isBeta = !!(session?.user?.is_beta) || isSuperAdmin;
   const planName = (session?.user?.plan as { name?: string } | undefined)?.name ?? session?.user?.role;
+  // Flags do plano (allow_*) — gate primário pra módulos pagos. Antes a
+  // sidebar usava só `isBeta` e perm, então plano Business com
+  // allow_campaigns=true não via Campanhas porque não tinha is_beta.
+  // Super-admin e isBeta seguem como bypass pra QA / staff.
+  // Política de fallback: se a flag NÃO veio no payload (undefined),
+  // assumimos true — evita esconder módulos pra usuários antigos cujo
+  // session ainda não tem o objeto plan completo. Só esconde quando
+  // o flag chega EXPLICITAMENTE false.
+  const plan = (session?.user?.plan ?? {}) as Record<string, boolean | undefined>;
+  const planAllows = (key: string) => {
+    if (isSuperAdmin || isBeta) return true;
+    const v = plan[key];
+    return v !== false;
+  };
   const initials = session?.user?.name?.[0]?.toUpperCase() || "U";
 
   // Gradiente dinâmico de avatar baseado no nome — cada usuário tem sua cor
@@ -146,15 +160,15 @@ export function Sidebar() {
   // executa o trabalho), depois Agentes (configuração de personalidade), e
   // por último a infra (Servers/Instances/Integrations) e Conta.
   const navItems: NavItem[] = [
-    { href: "/uniq-ai",      label: "Uniq AI",             icon: Sparkles,        exact: false, show: canSeeUniqAi },
+    { href: "/uniq-ai",      label: "Uniq AI",             icon: Sparkles,        exact: false, show: canSeeUniqAi && planAllows("allow_ai") },
     { href: "/dashboard",    label: t("nav_dashboard"),    icon: LayoutDashboard, exact: true,  show: canSeeDashboard },
-    { href: "/inbox",        label: t("nav_inbox"),        icon: Headset,         exact: false, show: canSeeInbox },
-    { href: "/crm",          label: t("nav_crm"),          icon: Contact,         exact: false, show: canSeeCRM },
-    { href: "/campaigns",    label: t("nav_campaigns"),    icon: Megaphone,       exact: false, show: isBeta && canSeeCampaigns },
-    { href: "/journeys",     label: "Jornadas",            icon: Wand2,           exact: false, show: isBeta && canSeeJourneys },
-    { href: "/agents",       label: "Agentes",             icon: Bot,             exact: false, show: canSeeAgents },
-    { href: "/help-desk",    label: "Help Desk",           icon: BookOpen,        exact: false, show: isBeta },
-    { href: "/shops",        label: "Shops",               icon: ShoppingBag,     exact: false, show: true },
+    { href: "/inbox",        label: t("nav_inbox"),        icon: Headset,         exact: false, show: canSeeInbox && planAllows("allow_inbox") },
+    { href: "/crm",          label: t("nav_crm"),          icon: Contact,         exact: false, show: canSeeCRM && planAllows("allow_crm") },
+    { href: "/campaigns",    label: t("nav_campaigns"),    icon: Megaphone,       exact: false, show: canSeeCampaigns && planAllows("allow_campaigns") },
+    { href: "/journeys",     label: "Jornadas",            icon: Wand2,           exact: false, show: canSeeJourneys && planAllows("allow_journeys") },
+    { href: "/agents",       label: "Agentes",             icon: Bot,             exact: false, show: canSeeAgents && planAllows("allow_ai") },
+    { href: "/help-desk",    label: "Help Desk",           icon: BookOpen,        exact: false, show: planAllows("allow_helpdesk") },
+    { href: "/shops",        label: "Shops",               icon: ShoppingBag,     exact: false, show: planAllows("allow_shop") },
     { href: "/servers",      label: t("nav_servers"),      icon: Server,          exact: false, show: canSeeServers },
     { href: "/instances",    label: t("nav_instances"),    icon: Smartphone,      exact: false, show: canSeeInstances },
     { href: "/integrations", label: t("nav_integrations"), icon: Plug,            exact: false, show: canSeeIntegrations },
