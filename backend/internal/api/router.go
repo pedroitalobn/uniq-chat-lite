@@ -45,15 +45,25 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
 		AllowOriginsFunc: func(origin string) bool {
-			// Allow configured frontend URL(s) — supports comma-separated list
+			// 1. Configured frontend URL(s) — supports comma-separated list.
 			for _, allowed := range strings.Split(config.AppConfig.FrontendURL, ",") {
 				if strings.TrimSpace(allowed) == origin {
 					return true
 				}
 			}
-			// Always allow any localhost origin for local development
-			return strings.HasPrefix(origin, "http://localhost:") ||
-				strings.HasPrefix(origin, "http://127.0.0.1:")
+			// 2. Localhost (qualquer porta) pra dev.
+			if strings.HasPrefix(origin, "http://localhost:") ||
+				strings.HasPrefix(origin, "http://127.0.0.1:") {
+				return true
+			}
+			// 3. Subdomínios .uniq.chat — fallback robusto pra prod
+			//    sobreviver mesmo se FRONTEND_URL estiver mal configurado
+			//    (app.uniq.chat, admin.uniq.chat, etc.). Restringe ao
+			//    HTTPS do nosso domínio raiz pra continuar seguro.
+			if strings.HasPrefix(origin, "https://") && strings.HasSuffix(origin, ".uniq.chat") {
+				return true
+			}
+			return false
 		},
 		AllowCredentials: true,
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, apikey, X-API-Key, X-Instance-Token, X-Workspace-ID, Upgrade, Sec-WebSocket-Key, Sec-WebSocket-Version, Sec-WebSocket-Extensions",
