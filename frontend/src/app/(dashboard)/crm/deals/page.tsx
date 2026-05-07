@@ -197,25 +197,25 @@ export default function DealsPage() {
       <CrmHeader
         icon={<Briefcase className="w-4 h-4" style={{ color: "var(--green)" }} />}
         title="Deals"
-        subtitle={`${summaryQ.data?.total_open ?? 0} em aberto · ${summaryQ.data?.won_count ?? 0} ganhos · ${summaryQ.data?.lost_count ?? 0} perdidos`}
+        subtitle={activeFunnel ? `Funil: ${activeFunnel.name}` : "Carregando funis…"}
         actions={
-          canCreate ? (
-            <CrmHeaderButton accent onClick={() => setNewOpen(true)}>
-              <Plus className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Novo deal</span>
-              <span className="sm:hidden">Novo</span>
-            </CrmHeaderButton>
-          ) : null
+          <>
+            <FunnelSelector
+              funnels={funnelsQ.data ?? []}
+              activeId={funnelId}
+              onChange={setFunnelId}
+            />
+            {canCreate && (
+              <CrmHeaderButton accent onClick={() => setNewOpen(true)}>
+                <Plus className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Novo deal</span>
+                <span className="sm:hidden">Novo</span>
+              </CrmHeaderButton>
+            )}
+          </>
         }
         toolbar={
           <div className="flex flex-wrap items-center gap-2">
-            <div className="min-w-[160px]">
-              <FunnelSelector
-                funnels={funnelsQ.data ?? []}
-                activeId={funnelId}
-                onChange={setFunnelId}
-              />
-            </div>
             <div
               className="flex items-center gap-0.5 rounded-xl p-0.5"
               style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}
@@ -244,14 +244,19 @@ export default function DealsPage() {
                 }}
               />
             </div>
-            {activeFunnel?.probability_on && (
-              <span
-                className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-[10px] font-medium"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--text-3)" }}
-              >
-                <TrendingUp className="h-3 w-3" /> Probabilidade ativa
-              </span>
-            )}
+            <div className="flex items-center gap-2 ml-auto">
+              {activeFunnel?.probability_on && (
+                <span
+                  className="hidden md:flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-[10px] font-medium"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--text-3)" }}
+                >
+                  <TrendingUp className="h-3 w-3" /> Probabilidade ativa
+                </span>
+              )}
+              <CompactMetric label="Aberto" value={summaryQ.data?.total_open ?? 0} color={uniq.statusOpen} />
+              <CompactMetric label="Ganho" value={formatCurrency(summaryQ.data?.won_value ?? 0, activeFunnel?.currency ?? "BRL")} color={uniq.statusWon} />
+              <CompactMetric label="Perdido" value={summaryQ.data?.lost_count ?? 0} color={uniq.statusLost} />
+            </div>
           </div>
         }
       >
@@ -262,16 +267,6 @@ export default function DealsPage() {
           showFunnel={false}
           showJourney={false}
         />
-        <div className="flex flex-wrap items-center gap-2">
-          <Metric label="Em aberto" value={String(summaryQ.data?.total_open ?? 0)} accent={uniq.statusOpen} />
-          <Metric
-            label="Ganhos"
-            value={formatCurrency(summaryQ.data?.won_value ?? 0, activeFunnel?.currency ?? "BRL")}
-            sub={`${summaryQ.data?.won_count ?? 0} deals`}
-            accent={uniq.statusWon}
-          />
-          <Metric label="Perdidos" value={String(summaryQ.data?.lost_count ?? 0)} accent={uniq.statusLost} />
-        </div>
       </CrmHeader>
 
       <div className="flex-1 overflow-hidden" style={{ background: "transparent" }}>
@@ -340,6 +335,19 @@ function ViewToggle({ active, onClick, label, icon }: {
       {icon}
       {label}
     </button>
+  );
+}
+
+function CompactMetric({ label, value, color }: { label: string; value: string | number; color: string }) {
+  return (
+    <div
+      className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] flex-shrink-0"
+      style={{ background: `${color}10`, border: `1px solid ${color}25` }}
+    >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
+      <span style={{ color: "var(--text-3)" }}>{label}</span>
+      <span className="font-semibold" style={{ color: "var(--text-1)" }}>{value}</span>
+    </div>
   );
 }
 

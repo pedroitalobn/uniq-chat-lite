@@ -128,10 +128,10 @@ export function NewDealDialog({
       <div
         className="relative w-full md:max-w-xl rounded-t-2xl md:rounded-2xl flex flex-col"
         style={{
-          background: "var(--surface-1)",
+          background: "var(--surface-solid)",
           border: "1px solid var(--surface-border)",
           maxHeight: "90dvh",
-          boxShadow: "0 24px 48px rgba(0,0,0,0.45)",
+          boxShadow: "0 24px 48px rgba(0,0,0,0.55)",
         }}
       >
         {/* Header */}
@@ -369,7 +369,7 @@ function ContactPicker({ wsId, query, onQueryChange, items, selectedId, onSelect
       {open && (
         <div
           className="absolute left-0 right-0 top-full mt-1 z-40 rounded-xl shadow-2xl max-h-72 overflow-y-auto"
-          style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}
+          style={{ background: "var(--surface-solid)", border: "1px solid var(--surface-border)" }}
         >
           {items.length === 0 && (
             <div className="px-3 py-3 text-xs text-center" style={{ color: "var(--text-3)" }}>
@@ -408,7 +408,7 @@ function ContactPicker({ wsId, query, onQueryChange, items, selectedId, onSelect
           <div
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-sm rounded-2xl p-5 space-y-3"
-            style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}
+            style={{ background: "var(--surface-solid)", border: "1px solid var(--surface-border)" }}
           >
             <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Novo contato</h3>
             <Field label="Nome *">
@@ -516,7 +516,7 @@ function CompanyPicker({ wsId, query, onQueryChange, items, selectedId, onSelect
       {open && (
         <div
           className="absolute left-0 right-0 top-full mt-1 z-40 rounded-xl shadow-2xl max-h-72 overflow-y-auto"
-          style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}
+          style={{ background: "var(--surface-solid)", border: "1px solid var(--surface-border)" }}
         >
           {selected && (
             <button

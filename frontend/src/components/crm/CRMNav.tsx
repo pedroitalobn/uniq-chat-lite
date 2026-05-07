@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Contact, Briefcase, Building2, Filter, Upload, GitMerge,
-  ListTodo, CalendarClock, GitBranch,
+  ListTodo, CalendarClock, SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +20,7 @@ const MAIN_ITEMS: NavItem[] = [
   { href: "/crm/deals",     label: "Deals",     description: "Pipeline de vendas",  icon: Briefcase,     match: (p) => p === "/crm" || p.startsWith("/crm/deals") },
   { href: "/crm/contacts",  label: "Contatos",  description: "Pessoas e leads",     icon: Contact,       match: (p) => p.startsWith("/crm/contacts") },
   { href: "/crm/companies", label: "Empresas",  description: "Organizações",        icon: Building2,     match: (p) => p.startsWith("/crm/companies") },
-  { href: "/crm/funnels",   label: "Funis",     description: "Pipelines + etapas",  icon: GitBranch,     match: (p) => p.startsWith("/crm/funnels") },
+  { href: "/crm/properties", label: "Propriedades", description: "Funis, tags e campos", icon: SlidersHorizontal, match: (p) => p.startsWith("/crm/properties") || p.startsWith("/crm/funnels") },
   { href: "/crm/tasks",     label: "Tarefas",   description: "Follow-ups",          icon: ListTodo,      match: (p) => p.startsWith("/crm/tasks") },
   { href: "/crm/meetings",  label: "Reuniões",  description: "Agendamentos",        icon: CalendarClock, match: (p) => p.startsWith("/crm/meetings") },
   { href: "/crm/segments",  label: "Segmentos", description: "Grupos e filtros",    icon: Filter,        match: (p) => p.startsWith("/crm/segments") },

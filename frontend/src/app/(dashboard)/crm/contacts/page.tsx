@@ -1441,20 +1441,9 @@ export default function CRMPage() {
         }
         actions={
           <>
-            {!isMobile && (
-              <>
-                <CrmHeaderButton onClick={() => setTagsOpen(true)} title="Tags"><TagIcon className="w-3.5 h-3.5" /> Tags</CrmHeaderButton>
-                <CrmHeaderButton onClick={() => setFunnelsOpen(true)} title="Funis"><GitBranch className="w-3.5 h-3.5" /> Funis</CrmHeaderButton>
-                <CrmHeaderButton onClick={() => setJourneysOpen(true)} title="Jornadas"><Route className="w-3.5 h-3.5" /> Jornadas</CrmHeaderButton>
-              </>
-            )}
-            {isMobile && (
-              <CRMOverflowMenu
-                onTags={() => setTagsOpen(true)}
-                onFunnels={() => setFunnelsOpen(true)}
-                onJourneys={() => setJourneysOpen(true)}
-              />
-            )}
+            <CrmHeaderButton onClick={() => setJourneysOpen(true)} title="Jornadas">
+              <Route className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Jornadas</span>
+            </CrmHeaderButton>
             <CrmHeaderButton accent onClick={() => setCreateOpen(true)}>
               <Plus className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Novo contato</span>
