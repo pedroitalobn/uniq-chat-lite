@@ -59,7 +59,8 @@ export function WorkspacePermissionsProvider({ children }: { children: ReactNode
   const isSuperAdmin = session?.user?.role === "super_admin";
   const workspaceId = currentWorkspace?.id;
 
-  const { data, isLoading } = useQuery({
+  const queryEnabled = !!workspaceId && !!session?.user?.id;
+  const { data, isLoading, isFetching } = useQuery({
     queryKey: ["workspace-permissions", workspaceId, session?.user?.id],
     queryFn: async () => {
       if (!workspaceId) return null;
@@ -68,7 +69,7 @@ export function WorkspacePermissionsProvider({ children }: { children: ReactNode
       const mine = members.find((m) => m.user_id === session?.user?.id);
       return mine || null;
     },
-    enabled: !!workspaceId && !!session?.user?.id,
+    enabled: queryEnabled,
     staleTime: 2 * 60 * 1000,
   });
 
@@ -82,8 +83,14 @@ export function WorkspacePermissionsProvider({ children }: { children: ReactNode
       if (isOwner) return true;
       return perms.has(key);
     };
+    // TanStack Query reporta isLoading=true enquanto NÃO há data, mesmo
+    // se a query está disabled (enabled=false). Resultado: páginas que
+    // usam permsLoading como gate (ex: /inbox) ficam no <PageSkeleton/>
+    // pra sempre quando workspaceId/session.user.id ainda não chegaram.
+    // Loading "real" = query habilitada E não tem data E está buscando.
+    const realLoading = queryEnabled && isLoading && isFetching;
     return {
-      isLoading,
+      isLoading: realLoading,
       isOwner,
       isSuperAdmin,
       roleName: data?.role?.name ?? null,
@@ -92,7 +99,7 @@ export function WorkspacePermissionsProvider({ children }: { children: ReactNode
       hasAnyPerm: (keys) => keys.some(hasPerm),
       hasAllPerms: (keys) => keys.every(hasPerm),
     };
-  }, [data, isLoading, isSuperAdmin]);
+  }, [data, isLoading, isFetching, isSuperAdmin, queryEnabled]);
 
   return (
     <WorkspacePermissionsContext.Provider value={value}>
