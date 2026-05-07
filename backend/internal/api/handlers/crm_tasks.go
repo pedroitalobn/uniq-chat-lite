@@ -124,6 +124,18 @@ func (h *CrmTaskHandler) Create(c *fiber.Ctx) error {
 	if strings.TrimSpace(body.Title) == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "title é obrigatório"})
 	}
+	// Tarefa precisa estar atrelada a algo: deal/contact/company/meeting/conversation,
+	// OU ter um responsável (user/agent), pra evitar tarefas órfãs sem
+	// contexto. Antes era trivial criar uma task sem nenhum vínculo —
+	// resultado: lista geral de tasks tinha lixo.
+	hasEntity := body.DealID != nil || body.ContactID != nil || body.CompanyID != nil ||
+		body.MeetingID != nil || body.ConversationID != nil
+	hasAssignee := body.AssigneeUserID != nil || body.AssigneeAgentID != nil
+	if !hasEntity && !hasAssignee {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "task precisa estar vinculada a uma entidade (deal/contact/company/meeting) OU ter um responsável (user/agent)",
+		})
+	}
 	body.WorkspaceID = wsID
 	body.CreatedByID = userID
 	body.ID = uuid.Nil

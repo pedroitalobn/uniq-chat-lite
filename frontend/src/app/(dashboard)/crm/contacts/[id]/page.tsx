@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { crmApi, dealsApi, contactGroupsApi, conversationsApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { EntityTasksMeetings } from "@/components/crm/DealTasksMeetings";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import {
   formatCurrency, relativeTime, uniq, cardStyle, statusColor, statusLabel,
@@ -288,9 +289,12 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
 
         {/* Sidebar: atendimentos + CRM fields */}
         <aside
-          className="overflow-auto border-t p-5 lg:border-l lg:border-t-0"
+          className="overflow-auto border-t p-5 lg:border-l lg:border-t-0 space-y-4"
           style={{ borderColor: uniq.borderSoft, background: uniq.bgElevated }}
         >
+          {/* Tarefas e reuniões deste contato (cross-entity) */}
+          <EntityTasksMeetings workspaceId={(wsId as string) || ""} scope={{ contactId: id }} />
+
           <SidebarLabel>Pipeline</SidebarLabel>
           <div className="mt-2 rounded-xl p-3 text-xs" style={cardStyle}>
             <div className="flex justify-between">

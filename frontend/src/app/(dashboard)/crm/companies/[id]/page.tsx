@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { companiesApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { EntityTasksMeetings } from "@/components/crm/DealTasksMeetings";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { formatCurrency, relativeTime, uniq, cardStyle, statusColor, statusLabel } from "@/components/crm/tokens";
 
@@ -242,11 +243,13 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </section>
 
-        {/* Right: contacts */}
+        {/* Right: contacts + tasks/meetings desta empresa */}
         <aside
-          className="hidden w-80 flex-col border-l overflow-auto p-5 lg:flex"
+          className="hidden w-80 flex-col border-l overflow-auto p-5 lg:flex space-y-4"
           style={{ borderColor: uniq.borderSoft, background: uniq.bgElevated }}
         >
+          <EntityTasksMeetings workspaceId={(wsId as string) || ""} scope={{ companyId: id }} />
+
           <h2 className="mb-3 text-xs font-medium uppercase tracking-widest" style={{ color: uniq.textFaint }}>
             Contatos ({contactsQ.data?.length ?? 0})
           </h2>

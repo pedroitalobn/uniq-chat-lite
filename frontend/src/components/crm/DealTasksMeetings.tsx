@@ -1,5 +1,16 @@
 "use client";
 
+// Embed compacto de Tarefas + Reuniões vinculadas a uma entidade do
+// CRM (Deal, Contact ou Company). Substitui o antigo DealTasksMeetings
+// (que só aceitava dealId) — agora qualquer entidade do CRM pode
+// embedar este card no detalhe pra ver/criar tarefas e meetings
+// no contexto certo.
+//
+// Renderiza 2 sub-cards: Tarefas (com create rápido inline) e
+// Reuniões (idem). Filtra pelos IDs passados — se o user passa
+// dealId, lista tasks/meetings com deal_id=X. Se passa contactId,
+// filtra por contact_id=X. Etc.
+
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -7,53 +18,88 @@ import { crmTasksApi, crmMeetingsApi, CrmTask, CrmMeeting } from "@/lib/api";
 import { Plus, ListTodo, CalendarClock, CheckCircle2, Bot, Loader2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
-// Embed compacto pra mostrar tarefas e reuniões vinculadas a um deal
-// dentro do drawer/detalhe. Cria rápido inline (título + due/start)
-// e linka pra página completa pra edição mais elaborada.
-export function DealTasksMeetings({ workspaceId, dealId, contactId }: {
-  workspaceId: string;
-  dealId: string;
+type EntityScope = {
+  dealId?: string;
   contactId?: string;
-}) {
+  companyId?: string;
+};
+
+function buildListParams(scope: EntityScope, limit = 20): Record<string, unknown> {
+  const p: Record<string, unknown> = { limit };
+  if (scope.dealId) p.deal_id = scope.dealId;
+  if (scope.contactId && !scope.dealId) p.contact_id = scope.contactId;
+  if (scope.companyId && !scope.dealId && !scope.contactId) p.company_id = scope.companyId;
+  return p;
+}
+
+function buildCreatePayload<T extends Record<string, unknown>>(scope: EntityScope, base: T): T {
+  return {
+    ...base,
+    deal_id: scope.dealId,
+    contact_id: scope.contactId,
+    company_id: scope.companyId,
+  };
+}
+
+function scopeKey(scope: EntityScope): string {
+  return [scope.dealId ?? "", scope.contactId ?? "", scope.companyId ?? ""].join("|");
+}
+
+function emptyMessage(scope: EntityScope, kind: "tarefa" | "reunião"): string {
+  if (scope.dealId) return `Nenhuma ${kind} neste deal.`;
+  if (scope.contactId) return `Nenhuma ${kind} para este contato.`;
+  if (scope.companyId) return `Nenhuma ${kind} desta empresa.`;
+  return `Nenhuma ${kind}.`;
+}
+
+export function EntityTasksMeetings({ workspaceId, scope }: { workspaceId: string; scope: EntityScope }) {
   return (
     <div className="space-y-4">
-      <TasksSection workspaceId={workspaceId} dealId={dealId} contactId={contactId} />
-      <MeetingsSection workspaceId={workspaceId} dealId={dealId} contactId={contactId} />
+      <TasksSection workspaceId={workspaceId} scope={scope} />
+      <MeetingsSection workspaceId={workspaceId} scope={scope} />
     </div>
   );
 }
 
+// Alias retrocompat — DealTasksMeetings existente continua funcionando.
+// Wrapper traduz dealId/contactId pra scope.
+export function DealTasksMeetings({ workspaceId, dealId, contactId }: {
+  workspaceId: string; dealId: string; contactId?: string;
+}) {
+  return <EntityTasksMeetings workspaceId={workspaceId} scope={{ dealId, contactId }} />;
+}
+
 // ─── Tasks ────────────────────────────────────────────────────────────────────
-function TasksSection({ workspaceId, dealId, contactId }: { workspaceId: string; dealId: string; contactId?: string }) {
+function TasksSection({ workspaceId, scope }: { workspaceId: string; scope: EntityScope }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [dueAt, setDueAt] = useState("");
+  const sk = scopeKey(scope);
+
   const { data, isLoading } = useQuery({
-    queryKey: ["deal-tasks", workspaceId, dealId],
-    queryFn: () => crmTasksApi.list(workspaceId, { deal_id: dealId, limit: 20 }).then((r) => r.data),
-    enabled: !!workspaceId && !!dealId,
+    queryKey: ["entity-tasks", workspaceId, sk],
+    queryFn: () => crmTasksApi.list(workspaceId, buildListParams(scope)).then((r) => r.data),
+    enabled: !!workspaceId && !!sk.replace(/\|/g, ""),
   });
   const tasks: CrmTask[] = data?.items ?? [];
 
   const createMut = useMutation({
-    mutationFn: () => crmTasksApi.create(workspaceId, {
+    mutationFn: () => crmTasksApi.create(workspaceId, buildCreatePayload(scope, {
       title: title.trim(),
-      type: "follow_up",
-      deal_id: dealId,
-      contact_id: contactId,
+      type: "follow_up" as const,
       due_at: dueAt ? new Date(dueAt).toISOString() : undefined,
-    }),
+    })),
     onSuccess: () => {
       setTitle(""); setDueAt(""); setShowForm(false);
-      qc.invalidateQueries({ queryKey: ["deal-tasks", workspaceId, dealId] });
+      qc.invalidateQueries({ queryKey: ["entity-tasks", workspaceId, sk] });
     },
     onError: () => toast.error("Erro ao criar tarefa"),
   });
 
   const completeMut = useMutation({
     mutationFn: (id: string) => crmTasksApi.complete(workspaceId, id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["deal-tasks", workspaceId, dealId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["entity-tasks", workspaceId, sk] }),
   });
 
   return (
@@ -94,7 +140,7 @@ function TasksSection({ workspaceId, dealId, contactId }: { workspaceId: string;
       {isLoading ? (
         <div className="py-3 flex justify-center"><Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: "var(--text-3)" }} /></div>
       ) : tasks.length === 0 ? (
-        <p className="text-[11px] py-1" style={{ color: "var(--text-3)" }}>Nenhuma tarefa neste deal.</p>
+        <p className="text-[11px] py-1" style={{ color: "var(--text-3)" }}>{emptyMessage(scope, "tarefa")}</p>
       ) : (
         <ul className="space-y-1">
           {tasks.slice(0, 5).map((t) => {
@@ -130,31 +176,30 @@ function TasksSection({ workspaceId, dealId, contactId }: { workspaceId: string;
 }
 
 // ─── Meetings ─────────────────────────────────────────────────────────────────
-function MeetingsSection({ workspaceId, dealId, contactId }: { workspaceId: string; dealId: string; contactId?: string }) {
+function MeetingsSection({ workspaceId, scope }: { workspaceId: string; scope: EntityScope }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
+  const sk = scopeKey(scope);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["deal-meetings", workspaceId, dealId],
-    queryFn: () => crmMeetingsApi.list(workspaceId, { deal_id: dealId, limit: 20 }).then((r) => r.data),
-    enabled: !!workspaceId && !!dealId,
+    queryKey: ["entity-meetings", workspaceId, sk],
+    queryFn: () => crmMeetingsApi.list(workspaceId, buildListParams(scope)).then((r) => r.data),
+    enabled: !!workspaceId && !!sk.replace(/\|/g, ""),
   });
   const meetings: CrmMeeting[] = data?.items ?? [];
 
   const createMut = useMutation({
-    mutationFn: () => crmMeetingsApi.create(workspaceId, {
+    mutationFn: () => crmMeetingsApi.create(workspaceId, buildCreatePayload(scope, {
       title: title.trim(),
-      deal_id: dealId,
-      contact_id: contactId,
       start_at: new Date(startAt).toISOString(),
       end_at: new Date(endAt).toISOString(),
-    }),
+    })),
     onSuccess: () => {
       setTitle(""); setStartAt(""); setEndAt(""); setShowForm(false);
-      qc.invalidateQueries({ queryKey: ["deal-meetings", workspaceId, dealId] });
+      qc.invalidateQueries({ queryKey: ["entity-meetings", workspaceId, sk] });
     },
     onError: (e: { response?: { data?: { error?: string } } }) =>
       toast.error(e?.response?.data?.error || "Erro ao agendar reunião"),
@@ -202,7 +247,7 @@ function MeetingsSection({ workspaceId, dealId, contactId }: { workspaceId: stri
       {isLoading ? (
         <div className="py-3 flex justify-center"><Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: "var(--text-3)" }} /></div>
       ) : meetings.length === 0 ? (
-        <p className="text-[11px] py-1" style={{ color: "var(--text-3)" }}>Nenhuma reunião agendada.</p>
+        <p className="text-[11px] py-1" style={{ color: "var(--text-3)" }}>{emptyMessage(scope, "reunião")}</p>
       ) : (
         <ul className="space-y-1">
           {meetings.slice(0, 5).map((m) => (
@@ -210,7 +255,7 @@ function MeetingsSection({ workspaceId, dealId, contactId }: { workspaceId: stri
               <CalendarClock className="w-3 h-3 flex-shrink-0" style={{ color: "var(--text-3)" }} />
               <span className="flex-1 text-xs truncate" style={{ color: "var(--text-2)" }}>{m.title}</span>
               <span className="text-[10px] flex-shrink-0" style={{ color: "var(--text-3)" }}>
-                {new Date(m.start_at).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                {new Date(m.start_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
               </span>
             </li>
           ))}

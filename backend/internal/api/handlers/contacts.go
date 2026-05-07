@@ -202,8 +202,13 @@ func (h *ContactHandler) CreateContact(c *fiber.Ctx) error {
 		Email       string `json:"email"`
 		Notes       string `json:"notes"`
 		AvatarURL   string `json:"avatar_url"`
+		// LEGACY: Funnel/Stage como string. CRM v2 usa só FunnelID/StageID
+		// como FK. Aceito ainda no payload pra retrocompat de clients
+		// antigos, mas NÃO persistimos mais — força a UI a migrar pro FK.
 		Funnel      string `json:"funnel"`
 		Stage       string `json:"stage"`
+		FunnelID    string `json:"funnel_id"`
+		StageID     string `json:"stage_id"`
 		Journey     string `json:"journey"`
 		ExternalID  string `json:"external_id"`
 		OwnerID     string `json:"owner_id"`
@@ -218,10 +223,28 @@ func (h *ContactHandler) CreateContact(c *fiber.Ctx) error {
 		Email:      req.Email,
 		Notes:      req.Notes,
 		AvatarURL:  req.AvatarURL,
-		Funnel:     req.Funnel,
-		Stage:      req.Stage,
 		Journey:    req.Journey,
 		ExternalID: req.ExternalID,
+	}
+	// Resolve FK (preferido) — se vier string legacy mas sem ID, tenta
+	// achar o funil correspondente pra preencher o FK.
+	if req.FunnelID != "" {
+		if fid, err := uuid.Parse(req.FunnelID); err == nil {
+			contact.FunnelID = &fid
+		}
+	}
+	if req.StageID != "" {
+		if sid, err := uuid.Parse(req.StageID); err == nil {
+			contact.StageID = &sid
+		}
+	}
+	// Backward-compat: aceita strings só pra UI antiga continuar funcionando.
+	// Esses campos são DEPRECATED — vão sair na próxima major.
+	if contact.FunnelID == nil && req.Funnel != "" {
+		contact.Funnel = req.Funnel
+	}
+	if contact.StageID == nil && req.Stage != "" {
+		contact.Stage = req.Stage
 	}
 	if req.WorkspaceID != "" {
 		if wid, err := uuid.Parse(req.WorkspaceID); err == nil {

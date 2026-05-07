@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { crmTasksApi, CrmTask } from "@/lib/api";
+import { crmTasksApi, CrmTask, workspacesApi } from "@/lib/api";
 import {
   Plus, ListTodo, Phone, MessageSquare, Calendar, Mail, Bot, User, Loader2,
   CheckCircle2, Clock, AlertCircle, Trash2, Sparkles,
@@ -314,6 +314,14 @@ function TaskModal({ workspaceId, task, onClose, onSaved }: {
             </div>
           </div>
 
+          {form.assignee_type === "user" && (
+            <WorkspaceMemberPicker
+              workspaceId={workspaceId}
+              value={form.assignee_user_id ?? ""}
+              onChange={(uid) => setForm({ ...form, assignee_user_id: uid || undefined })}
+            />
+          )}
+
           {isAgent && (
             <div className="rounded-xl p-3 space-y-2"
               style={{ background: "rgba(168,139,250,0.05)", border: "1px solid rgba(168,139,250,0.2)" }}>
@@ -384,6 +392,47 @@ function Select({ label, value, onChange, options }: {
         style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}>
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
+    </div>
+  );
+}
+
+// WorkspaceMemberPicker — dropdown de members do workspace pra
+// atribuir uma task. Usado quando assignee_type=user. Vazio = task
+// "do workspace" (sem dono específico, qualquer member pode pegar).
+function WorkspaceMemberPicker({ workspaceId, value, onChange }: {
+  workspaceId: string;
+  value: string;
+  onChange: (uid: string) => void;
+}) {
+  const { data, isLoading } = useQuery<Array<{ user_id: string; name: string; email: string; role?: string }>>({
+    queryKey: ["workspace-members", workspaceId],
+    queryFn: () => workspacesApi.listMembers(workspaceId).then((r) => r.data?.members ?? r.data ?? []),
+    enabled: !!workspaceId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const members = data ?? [];
+
+  return (
+    <div>
+      <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>
+        Responsável
+      </label>
+      <select value={value} onChange={(e) => onChange(e.target.value)} disabled={isLoading}
+        className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+        style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}>
+        <option value="">Sem responsável (qualquer um do time)</option>
+        {members.map((m) => (
+          <option key={m.user_id} value={m.user_id}>
+            {m.name || m.email} {m.role ? `· ${m.role}` : ""}
+          </option>
+        ))}
+      </select>
+      {!isLoading && members.length === 0 && (
+        <p className="text-[11px] mt-1" style={{ color: "var(--text-3)" }}>
+          Nenhum member encontrado neste workspace.
+        </p>
+      )}
     </div>
   );
 }

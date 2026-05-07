@@ -112,6 +112,15 @@ func (h *CrmMeetingHandler) Create(c *fiber.Ctx) error {
 	if body.EndAt.Before(body.StartAt) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "end_at deve ser após start_at"})
 	}
+	// Reunião deve estar atrelada a deal/contact/company OU ter
+	// attendees explícitos — sem isso vira evento órfão sem contexto.
+	hasEntity := body.DealID != nil || body.ContactID != nil || body.CompanyID != nil
+	hasAttendees := len(body.Attendees) > 0
+	if !hasEntity && !hasAttendees {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "reunião precisa estar vinculada a um deal/contact/company OU ter pelo menos 1 attendee",
+		})
+	}
 	body.WorkspaceID = wsID
 	body.CreatedByID = userID
 	body.ID = uuid.Nil
