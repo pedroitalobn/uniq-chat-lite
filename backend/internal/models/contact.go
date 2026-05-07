@@ -1,7 +1,6 @@
 package models
 
 import (
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -105,22 +104,7 @@ func (c *Contact) BeforeCreate(tx *gorm.DB) error {
 	if c.ID == uuid.Nil {
 		c.ID = uuid.New()
 	}
-	c.coerceCustomFields()
 	return nil
-}
-
-func (c *Contact) BeforeUpdate(tx *gorm.DB) error {
-	c.coerceCustomFields()
-	return nil
-}
-
-// coerceCustomFields garante que custom_fields nunca seja string vazia
-// — Postgres rejeita "" em colunas jsonb (SQLSTATE 22P02). Coerção pra
-// "{}" mantém a semântica "nenhum campo definido".
-func (c *Contact) coerceCustomFields() {
-	if strings.TrimSpace(c.CustomFields) == "" {
-		c.CustomFields = "{}"
-	}
 }
 
 type Tag struct {

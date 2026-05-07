@@ -1,7 +1,6 @@
 package models
 
 import (
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -88,16 +87,6 @@ func (d *Deal) BeforeCreate(tx *gorm.DB) error {
 	}
 	if d.Priority == "" {
 		d.Priority = "normal"
-	}
-	if strings.TrimSpace(d.CustomFields) == "" {
-		d.CustomFields = "{}"
-	}
-	return nil
-}
-
-func (d *Deal) BeforeUpdate(tx *gorm.DB) error {
-	if strings.TrimSpace(d.CustomFields) == "" {
-		d.CustomFields = "{}"
 	}
 	return nil
 }

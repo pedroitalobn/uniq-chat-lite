@@ -14,32 +14,10 @@ type rateLimitEntry struct {
 	mu      sync.Mutex
 }
 
-// Replaced sync.Map → RWMutex+map em Go 1.25: o HashTrieMap interno do
-// sync.Map vinha estourando "ran out of hash bits while inserting" sob
-// volume normal de login (regressão conhecida da reescrita do sync.Map).
-// Mapa protegido manualmente é trivial pro nosso uso (chave por IP/user).
 var (
-	limitersMu sync.RWMutex
-	limiters   = make(map[string]*rateLimitEntry)
+	limiters   = sync.Map{}
 	windowSize = time.Minute
 )
-
-func getOrCreateLimiter(key string) *rateLimitEntry {
-	limitersMu.RLock()
-	if e, ok := limiters[key]; ok {
-		limitersMu.RUnlock()
-		return e
-	}
-	limitersMu.RUnlock()
-	limitersMu.Lock()
-	defer limitersMu.Unlock()
-	if e, ok := limiters[key]; ok {
-		return e
-	}
-	e := &rateLimitEntry{resetAt: time.Now().Add(windowSize)}
-	limiters[key] = e
-	return e
-}
 
 // RateLimit provides a simple in-memory rate limiter per IP or user ID.
 // limit = max requests per minute.
@@ -66,7 +44,10 @@ func RateLimit(limit int) fiber.Handler {
 			key = "user:" + user.ID.String()
 		}
 
-		entry := getOrCreateLimiter(key)
+		val, _ := limiters.LoadOrStore(key, &rateLimitEntry{
+			resetAt: time.Now().Add(windowSize),
+		})
+		entry := val.(*rateLimitEntry)
 
 		// CRÍTICO: trava só pra incrementar counter e ler resetAt. Nunca
 		// segurar o mutex durante c.Next() — uma request lenta (ex.: envio

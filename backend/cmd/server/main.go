@@ -49,31 +49,11 @@ func main() {
 	// json". Drop seguro com IF EXISTS antes da AutoMigrate; ela
 	// recria limpa logo depois sem default. Idempotente.
 	if db.Dialector.Name() == "postgres" {
-		// Repara custom_fields corrompido (literal "'{}'::jsonb" como texto,
-		// vazio, etc) drop+recreate. Hooks BeforeSave em Contact/Deal/Company
-		// agora coercem zero-value pra "{}" prevenindo re-corrupção.
-		// Idempotente — DROP IF EXISTS é no-op quando já tá ok.
 		for _, table := range []string{"contacts", "deals", "companies"} {
 			if err := db.Exec("ALTER TABLE " + table + " DROP COLUMN IF EXISTS custom_fields").Error; err != nil {
 				log.Warn().Err(err).Str("table", table).Msg("repair: drop custom_fields falhou — seguindo")
 			}
 		}
-		// Multi-agente: remove o uniqueIndex legado em instance_agents.instance_id
-		// pra permitir N agentes por instância. Idempotente — só roda se o
-		// índice ainda existir. AutoMigrate logo abaixo recria como índice
-		// não-único. Backfill de is_primary acontece depois.
-		_ = db.Exec(`DO $$
-			DECLARE idx_name text;
-			BEGIN
-				SELECT indexname INTO idx_name
-				FROM pg_indexes
-				WHERE schemaname='public' AND tablename='instance_agents'
-				  AND indexdef ILIKE '%UNIQUE%' AND indexdef ILIKE '%instance_id%'
-				LIMIT 1;
-				IF idx_name IS NOT NULL THEN
-					EXECUTE 'DROP INDEX IF EXISTS ' || quote_ident(idx_name);
-				END IF;
-			END $$;`).Error
 	}
 
 	// Auto-migrate. Em prod uma migration ruim (ex: default JSONB
@@ -84,19 +64,6 @@ func main() {
 	// investigada nos logs.
 	if err := autoMigrate(db); err != nil {
 		log.Error().Err(err).Msg("AutoMigrate falhou — servidor segue de pé pra debug, mas tabelas podem estar fora de sync")
-	}
-
-	// Backfill multi-agente: cada instância que tinha 1 agente vira ele
-	// is_primary=true. Idempotente. Roda só uma vez na prática — depois
-	// que o flag está setado, o WHERE filtra.
-	if db.Dialector.Name() == "postgres" {
-		_ = db.Exec(`UPDATE instance_agents SET is_primary = true
-			WHERE id IN (
-				SELECT DISTINCT ON (instance_id) id
-				FROM instance_agents
-				WHERE instance_id NOT IN (SELECT instance_id FROM instance_agents WHERE is_primary = true)
-				ORDER BY instance_id, created_at ASC
-			)`).Error
 	}
 
 	// Apply raw-SQL ticketing indexes that AutoMigrate cannot express

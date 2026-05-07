@@ -268,7 +268,6 @@ func (h *WebChatHandler) PublicMessage(c *fiber.Ctx) error {
 	// 5. Look for InstanceAgent on this instance.
 	var agent models.InstanceAgent
 	agentErr := h.db.Where("instance_id = ? AND is_active = true", inst.ID).
-		Order("is_primary DESC, priority ASC, created_at ASC").
 		Preload("Integration").
 		First(&agent).Error
 

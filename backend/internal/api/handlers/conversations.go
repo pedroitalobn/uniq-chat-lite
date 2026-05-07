@@ -2843,8 +2843,7 @@ func (h *ConversationHandler) SuggestAgentReply(c *fiber.Ctx) error {
 		// Fallback: instance agent
 		if err := h.db.Preload("Integration").Preload("Assets", func(tx *gorm.DB) *gorm.DB {
 			return tx.Where("is_active = ?", true)
-		}).Where("instance_id = ? AND is_active = ?", conv.InstanceID, true).
-			Order("is_primary DESC, priority ASC, created_at ASC").First(&agent).Error; err != nil {
+		}).Where("instance_id = ? AND is_active = ?", conv.InstanceID, true).First(&agent).Error; err != nil {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "nenhum agente ativo nesta instância"})
 		}
 	}
