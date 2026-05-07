@@ -7,7 +7,7 @@ import { Campaign, Instance } from "@/types";
 import {
   Plus, Megaphone, Play, Pause, X, Trash2, Clock, CheckCircle2,
   AlertCircle, Loader2, Users, Calendar, FileText, Image, Mic,
-  File, ChevronLeft, ChevronRight, Users2, Database, UserCheck,
+  File, FileVideo, Download, ChevronLeft, ChevronRight, Users2, Database, UserCheck,
   MessageCircle, UserPlus, UserMinus, Heart, Send, Shield,
   Upload, Hash, AtSign, Shuffle, Search,
 } from "lucide-react";
@@ -37,6 +37,7 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string; ico
 const MSG_TYPES = [
   { value: "text",     label: "Texto",     icon: FileText },
   { value: "image",    label: "Imagem",    icon: Image },
+  { value: "video",    label: "Vídeo",     icon: FileVideo },
   { value: "audio",    label: "Áudio",     icon: Mic },
   { value: "document", label: "Documento", icon: File },
 ] as const;
@@ -164,7 +165,7 @@ interface CampaignPrefill {
   name?: string;
   channel?: string;
   msgText?: string;
-  msgType?: "text" | "image" | "audio" | "document";
+  msgType?: "text" | "image" | "video" | "audio" | "document";
 }
 
 function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => void; onCreated: () => void; prefill?: CampaignPrefill }) {
@@ -213,7 +214,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
   const [igUsername, setIgUsername]   = useState("");
 
   // Step 5: Content
-  const [msgType, setMsgType]   = useState<"text" | "image" | "audio" | "document">(prefill?.msgType ?? "text");
+  const [msgType, setMsgType]   = useState<"text" | "image" | "video" | "audio" | "document">(prefill?.msgType ?? "text");
   const [msgText, setMsgText]   = useState(prefill?.msgText ?? "");
   const [caption, setCaption]   = useState("");
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -340,6 +341,28 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
     }).filter((r) => r.phone);
     setCsvRecipients(parsed);
     toast.success(`${parsed.length} contatos carregados do CSV`);
+  };
+
+  // Gera e baixa um CSV template com header + 3 linhas de exemplo. UTF-8
+  // BOM (﻿) na frente garante que Excel/Numbers abram com acentuação
+  // correta sem o user precisar configurar import. Os exemplos usam DDI
+  // brasileiro (55) e DDI dos EUA (1) pra mostrar que o phone aceita
+  // qualquer formato E.164.
+  const downloadCsvTemplate = () => {
+    const csv = "﻿phone,name\n"
+      + "5511999998888,João Silva\n"
+      + "5521988887777,Maria Souza\n"
+      + "13055551234,John Doe\n";
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "uniq-campanha-template.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Template baixado");
   };
 
   const addWindow = () =>
@@ -899,10 +922,18 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
               {/* CSV upload tab */}
               {audienceTab === "csv" && (
                 <div className="space-y-3">
-                  <div className="rounded-xl px-3.5 py-2.5" style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.12)" }}>
+                  <div className="rounded-xl px-3.5 py-2.5 flex items-center justify-between gap-3 flex-wrap" style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.12)" }}>
                     <p className="text-xs" style={{ color: "#60a5fa" }}>
                       CSV com colunas: <code className="font-mono">phone,name</code> (header obrigatório)
                     </p>
+                    <button
+                      type="button"
+                      onClick={downloadCsvTemplate}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors"
+                      style={{ background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.28)", color: "#93c5fd" }}
+                    >
+                      <Download className="w-3 h-3" /> Baixar template
+                    </button>
                   </div>
                   <div
                     className="rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all"
@@ -920,6 +951,11 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                       <>
                         <Upload className="w-6 h-6" style={{ color: "hsl(240 8% 36%)" }} />
                         <p className="text-xs" style={{ color: "hsl(240 8% 48%)" }}>Clique ou arraste o arquivo CSV</p>
+                        <p className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>
+                          Não tem o arquivo? <button type="button"
+                            onClick={(e) => { e.stopPropagation(); downloadCsvTemplate(); }}
+                            className="underline" style={{ color: "#60a5fa" }}>baixe o template</button> e preencha.
+                        </p>
                       </>
                     )}
                     <input ref={csvRef} type="file" accept=".csv,text/csv" className="hidden"
@@ -1158,10 +1194,10 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                     </div>
                   )}
 
-                  {(msgType === "image" || msgType === "document") && (
+                  {(msgType === "image" || msgType === "video" || msgType === "document") && (
                     <div>
                       <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>
-                        {msgType === "image" ? "Imagem *" : "Documento *"}
+                        {msgType === "image" ? "Imagem *" : msgType === "video" ? "Vídeo *" : "Documento *"}
                       </label>
                       <div
                         className="rounded-xl p-4 flex flex-col items-center gap-2 cursor-pointer"
@@ -1173,21 +1209,35 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                           <>
                             <CheckCircle2 className="w-5 h-5" style={{ color: "var(--green)" }} />
                             <p className="text-xs font-medium" style={{ color: "hsl(240 15% 80%)" }}>{mediaFile.name}</p>
+                            {msgType === "video" && (
+                              <video
+                                src={URL.createObjectURL(mediaFile)}
+                                className="mt-2 max-h-40 rounded-lg"
+                                controls
+                              />
+                            )}
                           </>
                         ) : (
                           <>
-                            {msgType === "image" ? <Image className="w-5 h-5" style={{ color: "hsl(240 8% 36%)" }} /> : <File className="w-5 h-5" style={{ color: "hsl(240 8% 36%)" }} />}
+                            {msgType === "image" ? <Image className="w-5 h-5" style={{ color: "hsl(240 8% 36%)" }} />
+                              : msgType === "video" ? <FileVideo className="w-5 h-5" style={{ color: "hsl(240 8% 36%)" }} />
+                              : <File className="w-5 h-5" style={{ color: "hsl(240 8% 36%)" }} />}
                             <p className="text-xs" style={{ color: "hsl(240 8% 42%)" }}>Clique ou arraste</p>
+                            {msgType === "video" && (
+                              <p className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>
+                                MP4 recomendado · até ~16MB pra WhatsApp
+                              </p>
+                            )}
                           </>
                         )}
                         <input ref={fileRef} type="file" className="hidden"
-                          accept={msgType === "image" ? "image/*" : "*"}
+                          accept={msgType === "image" ? "image/*" : msgType === "video" ? "video/*" : "*"}
                           onChange={(e) => e.target.files?.[0] && setMediaFile(e.target.files[0])} />
                       </div>
                     </div>
                   )}
 
-                  {msgType === "image" && (
+                  {(msgType === "image" || msgType === "video") && (
                     <div>
                       <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>Legenda (opcional)</label>
                       <textarea value={caption} onChange={(e) => setCaption(e.target.value)}
@@ -1501,7 +1551,7 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
     catch { toast.error("Erro ao remover"); }
   };
 
-  const msgIconMap: Record<string, React.ElementType> = { text: FileText, image: Image, audio: Mic, document: File };
+  const msgIconMap: Record<string, React.ElementType> = { text: FileText, image: Image, video: FileVideo, audio: Mic, document: File };
   const MsgIcon = msgIconMap[campaign.message_type] ?? FileText;
 
   // Channel color/icon
@@ -1694,7 +1744,7 @@ const CAMPAIGN_TEMPLATES: Array<{
   description: string;
   emoji: string;
   channel: string;
-  msgType: "text" | "image" | "audio" | "document";
+  msgType: "text" | "image" | "video" | "audio" | "document";
   msgText: string;
   color: string;
   bg: string;

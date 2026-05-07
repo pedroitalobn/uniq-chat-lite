@@ -354,6 +354,14 @@ func (h *CampaignHandler) processCampaign(c models.Campaign, today string) {
 			if payload.Caption == "" {
 				payload.Caption = c.MessageText
 			}
+		case "video":
+			msgType = queue.TypeVideo
+			payload.MediaB64 = c.MediaB64
+			payload.MimeType = c.MediaMime
+			payload.Caption = c.Caption
+			if payload.Caption == "" {
+				payload.Caption = c.MessageText
+			}
 		case "audio":
 			msgType = queue.TypeAudio
 			payload.MediaB64 = c.MediaB64

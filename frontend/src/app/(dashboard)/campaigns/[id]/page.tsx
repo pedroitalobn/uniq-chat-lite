@@ -9,7 +9,7 @@ import { Campaign, CampaignRecipient } from "@/types";
 import {
   ArrowLeft, Play, Pause, X, Trash2, Users, CheckCircle2,
   AlertCircle, Clock, Loader2, Calendar, MessageSquare,
-  Timer, Users2, FileText, Image, Mic, File, RefreshCw,
+  Timer, Users2, FileText, Image, Mic, File, FileVideo, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { showConfirm } from "@/lib/confirm";
@@ -41,7 +41,7 @@ const RECIPIENT_STATUS: Record<string, { label: string; color: string }> = {
 };
 
 const MSG_ICON: Record<string, React.ElementType> = {
-  text: FileText, image: Image, audio: Mic, document: File,
+  text: FileText, image: Image, video: FileVideo, audio: Mic, document: File,
 };
 
 function StatCard({ label, value, sub, color }: { label: string; value: number; sub?: string; color?: string }) {

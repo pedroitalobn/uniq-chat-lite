@@ -2148,6 +2148,16 @@ func (ic *InstanceClient) SendWithFallback(job queue.SendJob) (string, error) {
 			mime = "image/jpeg"
 		}
 		return ic.SendImageMessage(job.Payload.To, data, mime, job.Payload.Caption)
+	case queue.TypeVideo:
+		data, err := ic.resolveMedia(job.Payload)
+		if err != nil {
+			return "", err
+		}
+		mime := job.Payload.MimeType
+		if mime == "" {
+			mime = "video/mp4"
+		}
+		return ic.SendVideoMessage(job.Payload.To, data, mime, job.Payload.Caption)
 	case queue.TypeDocument:
 		data, err := ic.resolveMedia(job.Payload)
 		if err != nil {
@@ -2171,7 +2181,7 @@ func (ic *InstanceClient) ProcessQueueJob(job queue.SendJob) error {
 	// 1. Typing simulation — only for text/image/document/audio
 	if job.Options.SimulateTyping {
 		switch job.Type {
-		case queue.TypeText, queue.TypeImage, queue.TypeDocument, queue.TypeAudio:
+		case queue.TypeText, queue.TypeImage, queue.TypeVideo, queue.TypeDocument, queue.TypeAudio:
 			ic.simulateTyping(job.Payload.To, job.Payload.Text, job.Options.TypingDurationMs)
 		}
 	}
@@ -2192,6 +2202,17 @@ func (ic *InstanceClient) ProcessQueueJob(job queue.SendJob) error {
 			mime = "image/jpeg"
 		}
 		_, sendErr = ic.SendImageMessage(job.Payload.To, imageData, mime, job.Payload.Caption)
+
+	case queue.TypeVideo:
+		videoData, err := ic.resolveMedia(job.Payload)
+		if err != nil {
+			return fmt.Errorf("video data: %w", err)
+		}
+		mime := job.Payload.MimeType
+		if mime == "" {
+			mime = "video/mp4"
+		}
+		_, sendErr = ic.SendVideoMessage(job.Payload.To, videoData, mime, job.Payload.Caption)
 
 	case queue.TypeDocument:
 		docData, err := ic.resolveMedia(job.Payload)
