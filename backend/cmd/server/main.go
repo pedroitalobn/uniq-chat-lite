@@ -224,6 +224,11 @@ func main() {
 	computedCron := services.NewComputedCron(db)
 	computedCron.Start()
 
+	// CRM Stats Sync — recalcula denormalizações de Company (contact_count,
+	// deal_count, open_deal_sum) e Contact (deals_open, deals_won) a cada
+	// 5 min. UI lê esses campos direto sem precisar de JOIN.
+	services.NewCrmStatsSync(db).Start(context.Background())
+
 	// Journey Event Dispatcher — singleton global pra outros services
 	// emitirem eventos de Goal/ExitConditions (shop.order_paid, deal.won, …).
 	services.NewJourneyEventDispatcher(db)

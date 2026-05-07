@@ -10,6 +10,9 @@ type GroupMatch = "all" | "any";
 
 type Field =
   | "funnel" | "stage" | "journey" | "tag" | "owner" | "channel"
+  // CRM v2 — filtros cross-entity (FK-based, JOIN com deals)
+  | "funnel_id" | "stage_id" | "deal_status" | "company_id"
+  | "min_deal_value" | "max_deal_value"
   | "purchased_shop" | "purchased_since_days" | "purchased_min_total" | "never_purchased"
   | "passed_agent" | "signup_after" | "signup_before"
   | "inbox_assigned_to" | "inbox_department" | "inbox_team" | "inbox_queue"
@@ -30,11 +33,19 @@ interface FieldDef {
 }
 
 const FIELDS: FieldDef[] = [
-  { value: "funnel",                    label: "Está no funil",                group: "CRM" },
-  { value: "stage",                     label: "Está no estágio",              group: "CRM" },
+  { value: "funnel",                    label: "Está no funil (legacy)",       group: "CRM" },
+  { value: "stage",                     label: "Está no estágio (legacy)",     group: "CRM" },
   { value: "tag",                       label: "Tem a tag",                    group: "CRM" },
   { value: "owner",                     label: "Owner é o usuário (ID)",       group: "CRM" },
   { value: "channel",                   label: "Veio pelo canal",              group: "CRM" },
+  // CRM v2 — combinam com deals (cross-entity). Backend faz INNER JOIN
+  // contacts → deals e aplica esses filtros.
+  { value: "funnel_id",                 label: "Tem deal no funil (UUID)",     group: "Deals", placeholder: "UUID do funil" },
+  { value: "stage_id",                  label: "Tem deal no estágio (UUID)",   group: "Deals", placeholder: "UUID do stage" },
+  { value: "deal_status",               label: "Status do deal",               group: "Deals", placeholder: "open | won | lost" },
+  { value: "company_id",                label: "Pertence à empresa (UUID)",    group: "Deals", placeholder: "UUID da company" },
+  { value: "min_deal_value",            label: "Deal valor ≥ (cents)",         group: "Deals", type: "number", placeholder: "ex: 100000 = R$1.000" },
+  { value: "max_deal_value",            label: "Deal valor ≤ (cents)",         group: "Deals", type: "number" },
   { value: "journey",                   label: "Está/passou na jornada",       group: "Jornada" },
   { value: "passed_agent",              label: "Atendido pelo agente IA (ID)", group: "Jornada" },
   { value: "purchased_shop",            label: "Comprou na loja (shop ID)",    group: "Compras" },

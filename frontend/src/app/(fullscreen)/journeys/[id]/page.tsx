@@ -1027,7 +1027,14 @@ const TRIGGER_TYPES: { value: string; label: string; hint: string }[] = [
   { value: "cron_schedule",          label: "Agendado (Cron)",        hint: "Dispara em horário fixo. Configure a expressão cron no campo abaixo." },
   { value: "contact_tag_added",      label: "Tag adicionada",         hint: "Dispara quando uma tag específica é adicionada ao contato." },
   { value: "contact_tag_removed",    label: "Tag removida",           hint: "Dispara quando uma tag específica é removida do contato." },
-  { value: "deal_stage_changed",     label: "Estágio CRM mudou",      hint: "Dispara quando o estágio de um deal no CRM muda." },
+  { value: "deal_stage_changed",     label: "Estágio CRM mudou (legacy)", hint: "DEPRECATED — use deal_stage_enter abaixo." },
+  // CRM v2 — triggers granulares de Deal lifecycle. trigger_filter
+  // (JSON) aceita { funnel_id, stage_id, status, min_value, max_value }.
+  { value: "deal_stage_enter",       label: "Deal entrou em estágio", hint: "Quando um deal cai num stage específico (CRM v2). Filtre por funnel_id + stage_id." },
+  { value: "deal_stage_exit",        label: "Deal saiu de estágio",   hint: "Quando um deal sai de determinado stage (CRM v2)." },
+  { value: "deal_created",           label: "Deal criado",            hint: "Quando um novo deal é criado (CRM v2). Pode filtrar por funnel_id." },
+  { value: "deal_won",               label: "Deal ganho",             hint: "Quando um deal vira status=won (CRM v2)." },
+  { value: "deal_lost",              label: "Deal perdido",           hint: "Quando um deal vira status=lost (CRM v2)." },
   { value: "order_placed",           label: "Pedido realizado",       hint: "Dispara quando um pedido é criado na loja." },
   { value: "order_shipped",          label: "Pedido enviado",         hint: "Dispara quando um pedido tem status 'enviado'." },
   { value: "contact_birthday",       label: "Aniversário do contato", hint: "Dispara no aniversário do contato (campo birthday no CRM)." },
