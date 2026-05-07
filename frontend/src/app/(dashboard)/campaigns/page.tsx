@@ -666,12 +666,37 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
               {/* CRM tab */}
               {audienceTab === "crm" && (
                 <div className="space-y-3">
-                  <div className="rounded-xl px-3.5 py-2.5" style={{ background: "rgba(168,85,247,0.06)", border: "1px solid rgba(168,85,247,0.12)" }}>
-                    <p className="text-xs flex items-center gap-2" style={{ color: "#a855f7" }}>
-                      <Database className="w-3.5 h-3.5" />
-                      Segmente contatos do CRM — deixe vazio para todos
+                  {/* Top: pick a saved segment (most common path). */}
+                  <div className="rounded-xl p-3.5 space-y-2" style={{ background: "rgba(168,85,247,0.06)", border: "1px solid rgba(168,85,247,0.18)" }}>
+                    <div className="flex items-center gap-2">
+                      <Database className="w-3.5 h-3.5" style={{ color: "#a855f7" }} />
+                      <p className="text-xs font-medium" style={{ color: "#a855f7" }}>Usar segmento salvo</p>
+                      <a href="/crm/segments" target="_blank" className="text-[10px] ml-auto underline" style={{ color: "#a855f7" }}>
+                        Gerenciar
+                      </a>
+                    </div>
+                    <select
+                      value={crmFilter.segment_id || ""}
+                      onChange={(e) => setCrmFilter({ ...crmFilter, segment_id: e.target.value || undefined })}
+                      className="input-field w-full text-xs"
+                    >
+                      <option value="">— escolha um segmento —</option>
+                      {(segmentOptions?.segments || []).map((s: { id: string; name: string }) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+                      Os segmentos são definidos uma vez no CRM e reutilizados em campanhas, jornadas e relatórios.
                     </p>
                   </div>
+
+                  {/* Toggle pra exibir filtros manuais quando não tem segmento salvo
+                      ou quando o user quer combinar. */}
+                  <details className="rounded-xl" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <summary className="cursor-pointer px-3.5 py-2.5 text-xs font-medium" style={{ color: "var(--text-2)" }}>
+                      Ou filtre manualmente (funil, tags, compras...)
+                    </summary>
+                    <div className="px-3.5 pb-3.5 pt-1 space-y-3">
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -696,16 +721,6 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                         className="input-field w-full text-xs">
                         <option value="">Qualquer</option>
                         {(segmentOptions?.journeys || []).map((j: string) => <option key={j} value={j}>{j}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>Segmento</label>
-                      <select value={crmFilter.segment_id || ""} onChange={(e) => setCrmFilter({ ...crmFilter, segment_id: e.target.value || undefined })}
-                        className="input-field w-full text-xs">
-                        <option value="">Qualquer</option>
-                        {(segmentOptions?.segments || []).map((s: { id: string; name: string }) => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
                       </select>
                     </div>
                   </div>
@@ -821,6 +836,8 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                       onChange={(e) => setCrmFilter({ ...crmFilter, participated_campaign_id: e.target.value || undefined })}
                       className="input-field w-full text-xs" />
                   </div>
+                    </div>
+                  </details>
 
                   {/* Preview */}
                   {segmentPreview ? (

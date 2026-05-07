@@ -1349,18 +1349,24 @@ func (e *JourneyExecutor) stepSetVariable(ctx *execCtx, step *models.FlowStep) (
 	return ctx.flow.FindStep(step.NextStepID), false, nil
 }
 
+// stepAddTag — agora MUTA o CRM: localiza o contato pelo JID, garante a
+// existência da Tag (cria se faltando) e cria a associação na tabela
+// contact_tags. Idempotente: tag já presente é no-op silencioso.
 func (e *JourneyExecutor) stepAddTag(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
 	var cfg struct {
-		Tag string `json:"tag"`
+		Tag   string `json:"tag"`
+		Color string `json:"color,omitempty"`
 	}
 	_ = json.Unmarshal(step.Config, &cfg)
-	tag := e.interpolate(cfg.Tag, ctx.vars)
-	ctx.emit(step.ID, string(step.Type), "add_tag", map[string]interface{}{"tag": tag, "contact": ctx.fromJID})
+	tagName := strings.TrimSpace(e.interpolate(cfg.Tag, ctx.vars))
+	ctx.emit(step.ID, string(step.Type), "add_tag", map[string]interface{}{"tag": tagName, "contact": ctx.fromJID})
 
-	if !ctx.simulate && tag != "" {
-		// Best-effort: localizar Contact por JID e adicionar tag — depende do schema CRM.
-		// Grava na metadata da execução para auditoria.
-		ctx.vars.Flow["_last_tag_added"] = tag
+	if !ctx.simulate && tagName != "" {
+		if err := e.applyAddTag(ctx, tagName, cfg.Color); err != nil {
+			log.Warn().Err(err).Str("tag", tagName).Str("contact", ctx.fromJID).
+				Msg("journey: stepAddTag falhou — seguindo o flow mesmo assim")
+		}
+		ctx.vars.Flow["_last_tag_added"] = tagName
 	}
 	return ctx.flow.FindStep(step.NextStepID), false, nil
 }
@@ -1370,19 +1376,164 @@ func (e *JourneyExecutor) stepRemoveTag(ctx *execCtx, step *models.FlowStep) (*m
 		Tag string `json:"tag"`
 	}
 	_ = json.Unmarshal(step.Config, &cfg)
-	tag := e.interpolate(cfg.Tag, ctx.vars)
-	ctx.emit(step.ID, string(step.Type), "remove_tag", map[string]interface{}{"tag": tag})
+	tagName := strings.TrimSpace(e.interpolate(cfg.Tag, ctx.vars))
+	ctx.emit(step.ID, string(step.Type), "remove_tag", map[string]interface{}{"tag": tagName})
+	if !ctx.simulate && tagName != "" {
+		if err := e.applyRemoveTag(ctx, tagName); err != nil {
+			log.Warn().Err(err).Str("tag", tagName).Str("contact", ctx.fromJID).
+				Msg("journey: stepRemoveTag falhou")
+		}
+	}
 	return ctx.flow.FindStep(step.NextStepID), false, nil
 }
 
+// stepUpdateStage — atualiza o estágio de um Deal do contato. Aceita:
+//   - stage_id (UUID): vai pra esse estágio (descobre funnel via stage)
+//   - funnel_id (UUID): se passado, restringe a busca/criação ao funil
+//   - create_if_missing (bool): se contato não tem deal aberto no funil,
+//     cria um deal novo nesse estágio (título = nome da journey)
 func (e *JourneyExecutor) stepUpdateStage(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
 	var cfg struct {
-		StageID string `json:"stage_id"`
+		StageID         string `json:"stage_id"`
+		FunnelID        string `json:"funnel_id,omitempty"`
+		CreateIfMissing bool   `json:"create_if_missing,omitempty"`
 	}
 	_ = json.Unmarshal(step.Config, &cfg)
-	ctx.emit(step.ID, string(step.Type), "update_stage", map[string]interface{}{"stage_id": cfg.StageID})
-	ctx.vars.Flow["_last_stage"] = cfg.StageID
+	stageID := strings.TrimSpace(e.interpolate(cfg.StageID, ctx.vars))
+	funnelID := strings.TrimSpace(e.interpolate(cfg.FunnelID, ctx.vars))
+	ctx.emit(step.ID, string(step.Type), "update_stage", map[string]interface{}{
+		"stage_id": stageID, "funnel_id": funnelID,
+	})
+	if !ctx.simulate && stageID != "" {
+		if err := e.applyUpdateStage(ctx, stageID, funnelID, cfg.CreateIfMissing); err != nil {
+			log.Warn().Err(err).Str("stage", stageID).Str("contact", ctx.fromJID).
+				Msg("journey: stepUpdateStage falhou")
+		}
+		ctx.vars.Flow["_last_stage"] = stageID
+	}
 	return ctx.flow.FindStep(step.NextStepID), false, nil
+}
+
+// ─── CRM mutations (chamadas pelos steps acima) ──────────────────────────────
+
+// findContactByJID — resolve Contact pelo JID/phone. Tenta phone primeiro,
+// depois external_id (IG, etc.). Como Journey não tem WorkspaceID próprio
+// (vive por UserID), aceitamos qualquer workspace e seguimos o contato.
+func (e *JourneyExecutor) findContactByJID(jid string) (*models.Contact, error) {
+	phone := strings.SplitN(jid, "@", 2)[0]
+	var c models.Contact
+	if err := e.db.Where("phone = ? OR external_id = ?", phone, jid).First(&c).Error; err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+// resolveWorkspace deriva o workspace do contato — necessário pra criar
+// Tag/Deal scoped corretamente. Cai em uuid.Nil se contato não tem ws.
+func contactWorkspace(c *models.Contact) uuid.UUID {
+	if c.WorkspaceID != nil {
+		return *c.WorkspaceID
+	}
+	return uuid.Nil
+}
+
+func (e *JourneyExecutor) applyAddTag(ctx *execCtx, name, color string) error {
+	contact, err := e.findContactByJID(ctx.fromJID)
+	if err != nil {
+		return fmt.Errorf("contact não encontrado: %w", err)
+	}
+	wsID := contactWorkspace(contact)
+	if color == "" {
+		color = "#00d46a"
+	}
+	var tag models.Tag
+	wsPtr := &wsID
+	if wsID == uuid.Nil {
+		wsPtr = nil
+	}
+	q := e.db.Where("name = ? AND (workspace_id = ? OR workspace_id IS NULL)", name, wsID).First(&tag)
+	if q.Error != nil {
+		tag = models.Tag{Name: name, Color: color, WorkspaceID: wsPtr}
+		if err := e.db.Create(&tag).Error; err != nil {
+			return fmt.Errorf("create tag: %w", err)
+		}
+	}
+	// Associate via raw SQL (evita o reset de relations do Append em alguns dialects).
+	if err := e.db.Exec(
+		"INSERT INTO contact_tags (contact_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+		contact.ID, tag.ID).Error; err != nil {
+		return fmt.Errorf("attach tag: %w", err)
+	}
+	return nil
+}
+
+func (e *JourneyExecutor) applyRemoveTag(ctx *execCtx, name string) error {
+	contact, err := e.findContactByJID(ctx.fromJID)
+	if err != nil {
+		return err
+	}
+	wsID := contactWorkspace(contact)
+	var tag models.Tag
+	if err := e.db.Where("name = ? AND (workspace_id = ? OR workspace_id IS NULL)", name, wsID).First(&tag).Error; err != nil {
+		return nil // tag não existe → nada pra remover
+	}
+	return e.db.Exec("DELETE FROM contact_tags WHERE contact_id = ? AND tag_id = ?", contact.ID, tag.ID).Error
+}
+
+func (e *JourneyExecutor) applyUpdateStage(ctx *execCtx, stageID, funnelID string, createIfMissing bool) error {
+	contact, err := e.findContactByJID(ctx.fromJID)
+	if err != nil {
+		return err
+	}
+	wsID := contactWorkspace(contact)
+	stageUUID, err := uuid.Parse(stageID)
+	if err != nil {
+		return fmt.Errorf("stage_id inválido")
+	}
+	// Resolve funnel a partir do stage se não foi fornecido.
+	var stage models.FunnelStage
+	if err := e.db.First(&stage, "id = ?", stageUUID).Error; err != nil {
+		return fmt.Errorf("stage não encontrado")
+	}
+	funnelUUID := stage.FunnelID
+	if funnelID != "" {
+		if fid, err := uuid.Parse(funnelID); err == nil {
+			funnelUUID = fid
+		}
+	}
+	// Procura deal aberto desse contato nesse funil.
+	var deal models.Deal
+	q := e.db.Where("workspace_id = ? AND contact_id = ? AND funnel_id = ? AND status = 'open'",
+		wsID, contact.ID, funnelUUID).First(&deal)
+	if q.Error != nil {
+		if !createIfMissing {
+			return fmt.Errorf("contato não tem deal aberto no funil — habilite create_if_missing")
+		}
+		now := time.Now()
+		deal = models.Deal{
+			WorkspaceID:   wsID,
+			Title:         ctx.journey.Name,
+			ContactID:     contact.ID,
+			FunnelID:      funnelUUID,
+			StageID:       stageUUID,
+			Status:        models.DealStatusOpen,
+			Currency:      "BRL",
+			StageChangeAt: &now,
+			Source:        "journey",
+		}
+		if err := e.db.Create(&deal).Error; err != nil {
+			return fmt.Errorf("create deal: %w", err)
+		}
+	} else {
+		now := time.Now()
+		if err := e.db.Model(&deal).Updates(map[string]any{
+			"stage_id":         stageUUID,
+			"stage_change_at":  now,
+		}).Error; err != nil {
+			return fmt.Errorf("update stage: %w", err)
+		}
+	}
+	return nil
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
