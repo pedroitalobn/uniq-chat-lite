@@ -35,6 +35,32 @@ func (h *WorkspaceHandler) List(c *fiber.Ctx) error {
 		Where("user_id = ?", userID).
 		Find(&userWorkspaces)
 
+	// Auto-heal: user autenticado mas sem workspace = onboarding falhou
+	// na hora de criar o default (slug collision silenciosa, webhook
+	// Stripe que não rodou createDefaultWorkspace, etc). Em vez de
+	// devolver lista vazia (que trava o frontend inteiro — inbox/CRM/
+	// campanhas filtram por workspace_id), criamos um na hora.
+	// Idempotente: só dispara se realmente não tem nenhum.
+	if len(userWorkspaces) == 0 {
+		var user models.User
+		if err := h.db.First(&user, "id = ?", userID).Error; err == nil {
+			name := strings.TrimSpace(user.Name)
+			if name == "" {
+				name = "Meu Workspace"
+			} else {
+				first := strings.Fields(name)
+				if len(first) > 0 {
+					name = first[0] + "'s Workspace"
+				}
+			}
+			if ws := createDefaultWorkspace(h.db, &user, name); ws != nil {
+				h.db.Preload("Workspace").Preload("Role").
+					Where("user_id = ?", userID).
+					Find(&userWorkspaces)
+			}
+		}
+	}
+
 	workspaces := make([]fiber.Map, len(userWorkspaces))
 	for i, uw := range userWorkspaces {
 		workspaces[i] = fiber.Map{

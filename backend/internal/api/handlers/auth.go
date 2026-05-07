@@ -447,20 +447,42 @@ type AuthHandler struct {
 }
 
 // createDefaultWorkspace cria (idempotente) um workspace "default" pro usuário:
-//   - cria a linha em workspaces
+//   - cria a linha em workspaces (com retry de slug em colisão)
 //   - cria um role Admin com todas as permissions
 //   - adiciona o usuário como owner do workspace
 //
-// Retorna o workspace criado. Se algo falhar, retorna nil (caller decide o
-// que fazer — no fluxo de registro a gente simplesmente não associa).
+// Retorna o workspace criado. Se algo falhar, retorna nil.
+//
+// Slug uniqueness: SlugFrom(name) gera o mesmo valor pra nomes parecidos
+// ("João's Workspace" → "joao-s-workspace"). O segundo user com workspace
+// igual quebrava o INSERT por unique violation e a função retornava nil
+// silencioso — user ficava sem workspace, /v1/workspaces vazio, inbox
+// não carregava. Agora retry com sufixo aleatório até achar slug livre.
 func createDefaultWorkspace(db *gorm.DB, user *models.User, name string) *models.Workspace {
-	// Propaga o plano do user pro Workspace — feature gates de
-	// alguns endpoints (ex.: campanhas com X-Workspace-ID) checam
-	// workspace.plan_id e não user.plan_id, então sem isso a conta
-	// pagava o plano PRO mas o workspace ficava "free", resultando
-	// em "seu plano não permite essa ação".
-	ws := &models.Workspace{OwnerID: user.ID, Name: name, PlanID: user.PlanID}
-	if err := db.Create(ws).Error; err != nil {
+	baseSlug := models.SlugFrom(name)
+	ws := &models.Workspace{OwnerID: user.ID, Name: name, PlanID: user.PlanID, Slug: baseSlug}
+	var lastErr error
+	for attempt := 0; attempt < 6; attempt++ {
+		if attempt > 0 {
+			suffix := uuid.New().String()[:6]
+			ws.Slug = baseSlug + "-" + suffix
+			if len(ws.Slug) > 63 {
+				ws.Slug = ws.Slug[:63]
+			}
+			ws.ID = uuid.Nil // BeforeCreate atribui novo
+		}
+		err := db.Create(ws).Error
+		if err == nil {
+			lastErr = nil
+			break
+		}
+		lastErr = err
+		msg := strings.ToLower(err.Error())
+		if !strings.Contains(msg, "unique") && !strings.Contains(msg, "duplicate") {
+			break // não é colisão de slug — outro problema, aborta
+		}
+	}
+	if lastErr != nil {
 		return nil
 	}
 	adminRole := models.Role{
