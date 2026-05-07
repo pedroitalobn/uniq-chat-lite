@@ -265,26 +265,38 @@ function PaymentTab() {
 
   if (isLoading) return <div className="flex items-center gap-2 py-8"><Loader2 className="w-4 h-4 animate-spin text-[#00d46a]" /><span className="text-sm" style={{ color: "hsl(240 8% 55%)" }}>Carregando...</span></div>;
 
-  // apiBase pra montar a URL de webhook que vai colar no Stripe/Asaas:
-  //  1) Se NEXT_PUBLIC_API_URL está setado e NÃO é localhost → usa.
-  //  2) Se estamos rodando num host público (ex: app.uniq.chat),
-  //     deriva trocando "app." por "api." (mesmo subdomínio root).
-  //  3) Fallback final: api.uniq.chat (prod default).
-  // Casos cobertos:
-  //   - dev local rodando frontend e backend → localhost:8080 explícito no .env
-  //   - prod com env mal configurado (ainda apontando localhost) → ainda
-  //     mostra api.uniq.chat baseado no hostname do browser.
+  // apiBase pra montar a URL de webhook que vai colar no Stripe/Asaas.
+  // Estratégia: derivar SEMPRE do hostname público quando disponível —
+  // antes confiávamos em NEXT_PUBLIC_API_URL, mas envs mal configurados
+  // (ex: build do front com NEXT_PUBLIC_API_URL=https://app.uniq.chat)
+  // mostravam a URL errada e o webhook caía em 404. Agora qualquer
+  // hostname `app.*` / `admin.*` / `dashboard.*` é normalizado pra
+  // `api.*` independente do env.
+  const swapAppToApi = (raw: string): string => {
+    try {
+      const u = new URL(raw);
+      const h = u.hostname;
+      if (h.startsWith("app.") || h.startsWith("admin.") || h.startsWith("dashboard.")) {
+        u.hostname = "api." + h.split(".").slice(1).join(".");
+      }
+      return `${u.protocol}//${u.hostname}`;
+    } catch {
+      return raw;
+    }
+  };
+
   const rawApi = process.env.NEXT_PUBLIC_API_URL?.replace(/\/v1\/?$/, "") || "";
   let apiBase: string;
   if (rawApi && !/localhost|127\.0\.0\.1/.test(rawApi)) {
-    apiBase = rawApi;
+    apiBase = swapAppToApi(rawApi);
   } else if (typeof window !== "undefined" && window.location.hostname && !/localhost|127\.0\.0\.1/.test(window.location.hostname)) {
-    // ex.: app.uniq.chat → api.uniq.chat ; admin.foo.com → api.foo.com
-    const host = window.location.hostname;
-    const apiHost = host.startsWith("app.") || host.startsWith("admin.") || host.startsWith("dashboard.")
-      ? "api." + host.split(".").slice(1).join(".")
-      : "api." + host;
-    apiBase = `${window.location.protocol}//${apiHost}`;
+    apiBase = swapAppToApi(`${window.location.protocol}//${window.location.hostname}`);
+    // Se o host raiz não tinha sub (ex: uniq.chat direto), prepende `api.`.
+    if (!new URL(apiBase).hostname.startsWith("api.")) {
+      const u = new URL(apiBase);
+      u.hostname = "api." + u.hostname;
+      apiBase = `${u.protocol}//${u.hostname}`;
+    }
   } else {
     apiBase = rawApi || "https://api.uniq.chat";
   }
@@ -414,9 +426,60 @@ function PaymentTab() {
               <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 60%)" }}>
                 {stripeWebhookURL}
               </code>
-              <button onClick={() => copyUrl(stripeWebhookURL)} className="p-2 rounded hover:bg-white/5">
+              <button onClick={() => copyUrl(stripeWebhookURL)} className="p-2 rounded hover:bg-white/5" title="Copiar URL">
                 <Key className="w-4 h-4" style={{ color: "hsl(240 8% 55%)" }} />
               </button>
+            </div>
+
+            {/* Instruções passo-a-passo — cobre as dúvidas comuns:
+                qual URL colar, quais eventos selecionar, onde achar
+                o signing secret. Reduz tickets de suporte. */}
+            <div className="mt-3 rounded-lg p-3 space-y-2.5"
+              style={{ background: "rgba(99,91,255,0.06)", border: "1px solid rgba(99,91,255,0.18)" }}>
+              <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "#a5a0ff" }}>
+                Como configurar na Stripe
+              </p>
+              <ol className="text-[11px] space-y-1.5 list-decimal pl-4" style={{ color: "hsl(240 8% 70%)" }}>
+                <li>
+                  No <a href="https://dashboard.stripe.com/webhooks" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "#a5a0ff" }}>Dashboard → Developers → Webhooks</a>, clique em <span className="font-semibold">Add endpoint</span>.
+                </li>
+                <li>
+                  Cole a URL acima no campo <span className="font-mono">Endpoint URL</span>.
+                </li>
+                <li>
+                  Em <span className="font-semibold">Events to listen to</span>, selecione:
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {[
+                      "checkout.session.completed",
+                      "customer.subscription.created",
+                      "customer.subscription.updated",
+                      "customer.subscription.deleted",
+                      "invoice.payment_succeeded",
+                      "invoice.payment_failed",
+                      "payment_intent.succeeded",
+                      "payment_intent.payment_failed",
+                    ].map((ev) => (
+                      <code key={ev} className="text-[10px] px-1.5 py-0.5 rounded font-mono"
+                        style={{ background: "rgba(99,91,255,0.10)", color: "#c0bdff", border: "1px solid rgba(99,91,255,0.20)" }}>
+                        {ev}
+                      </code>
+                    ))}
+                  </div>
+                </li>
+                <li>
+                  Após criar, copie o <span className="font-semibold">Signing secret</span> (<span className="font-mono">whsec_...</span>) e cole no campo <span className="font-semibold">Webhook Secret</span> abaixo.
+                </li>
+              </ol>
+              <div className="text-[10px] pt-1.5" style={{ color: "hsl(240 8% 50%)", borderTop: "1px solid rgba(99,91,255,0.12)" }}>
+                <p className="mt-1.5">
+                  Aliases aceitos pelo backend (escolha qualquer um — todos vão pro mesmo handler):
+                </p>
+                <ul className="mt-0.5 space-y-0.5 font-mono">
+                  <li>· {apiBase}/v1/payments/webhook/stripe</li>
+                  <li>· {apiBase}/v1/stripe/webhook</li>
+                  <li>· {apiBase}/stripe/webhook <span className="opacity-60">(legacy)</span></li>
+                </ul>
+              </div>
             </div>
           </div>
         </Card>
@@ -492,9 +555,29 @@ function PaymentTab() {
               <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 60%)" }}>
                 {asaasWebhookURL}
               </code>
-              <button onClick={() => copyUrl(asaasWebhookURL)} className="p-2 rounded hover:bg-white/5">
+              <button onClick={() => copyUrl(asaasWebhookURL)} className="p-2 rounded hover:bg-white/5" title="Copiar URL">
                 <Key className="w-4 h-4" style={{ color: "hsl(240 8% 55%)" }} />
               </button>
+            </div>
+            <div className="mt-3 rounded-lg p-3 space-y-2.5"
+              style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.18)" }}>
+              <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "#86efac" }}>
+                Como configurar no Asaas
+              </p>
+              <ol className="text-[11px] space-y-1.5 list-decimal pl-4" style={{ color: "hsl(240 8% 70%)" }}>
+                <li>
+                  No <a href="https://www.asaas.com/integracoes/webhooks" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "#86efac" }}>Painel Asaas → Integrações → Webhooks</a>, clique em <span className="font-semibold">Adicionar webhook</span>.
+                </li>
+                <li>
+                  Cole a URL acima em <span className="font-mono">URL de notificação</span>.
+                </li>
+                <li>
+                  Defina um <span className="font-semibold">Token de autenticação</span> qualquer (ex: <span className="font-mono">uniq-secret-xyz</span>) e cole o mesmo valor no campo <span className="font-semibold">Webhook Secret</span> abaixo.
+                </li>
+                <li>
+                  Eventos recomendados: <span className="font-mono">PAYMENT_CONFIRMED</span>, <span className="font-mono">PAYMENT_RECEIVED</span>, <span className="font-mono">PAYMENT_OVERDUE</span>, <span className="font-mono">PAYMENT_REFUNDED</span>, <span className="font-mono">SUBSCRIPTION_CREATED</span>, <span className="font-mono">SUBSCRIPTION_DELETED</span>.
+                </li>
+              </ol>
             </div>
           </div>
         </Card>
