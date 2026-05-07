@@ -1198,7 +1198,21 @@ export const integrationsApi = {
     api.post("/v1/integrations/openrouter/oauth/start", { callback_url: callbackUrl }),
   completeOpenRouterOAuth: (data: { code: string; state: string; name?: string }) =>
     api.post("/v1/integrations/openrouter/oauth/callback", data),
-  getAgent: (instanceId: string) => api.get(`/v1/instances/${instanceId}/agent`),
+  getAgent: (instanceId: string, agentId?: string) =>
+    api.get(`/v1/instances/${instanceId}/agent`, agentId ? { params: { agent_id: agentId } } : undefined),
+  // Multi-agente: lista/cria/remove/promove agentes da instância.
+  listAgents: (instanceId: string) =>
+    api.get(`/v1/instances/${instanceId}/agents`),
+  createAgent: (instanceId: string, data: {
+    agent_name: string;
+    role?: string;
+    handoff_skills?: string[];
+    action_confirmation?: "client" | "auto" | "human";
+  }) => api.post(`/v1/instances/${instanceId}/agents`, data),
+  deleteAgent: (instanceId: string, agentId: string) =>
+    api.delete(`/v1/instances/${instanceId}/agents/${agentId}`),
+  setPrimaryAgent: (instanceId: string, agentId: string) =>
+    api.post(`/v1/instances/${instanceId}/agents/${agentId}/set-primary`),
   updateAgent: (instanceId: string, data: {
     integration_id?: string | null;
     model?: string;

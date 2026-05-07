@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -86,6 +87,9 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 	}
 
 	systemPrompt := BuildAgentSystemPrompt(agent, agent.Assets)
+	if siblings := r.loadSiblingsForPrompt(agent); siblings != "" {
+		systemPrompt += "\n\n" + siblings
+	}
 	userPrompt := r.buildUserPrompt(instUUID, fromJID, fromName, text, messageType)
 	if strings.TrimSpace(systemPrompt) == "" {
 		systemPrompt = "Você é um assistente de atendimento útil, profissional e objetivo."
@@ -103,6 +107,27 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 	reply = sanitizeAssistantReply(reply)
 	if reply == "" {
 		return false
+	}
+
+	// Multi-agente: detecta marcador [[handoff:role]], pina sibling em
+	// ConversationAgentState e remove o token da resposta visível.
+	{
+		var conv models.Conversation
+		if err := r.db.Where("instance_id = ? AND channel_key = ?", instUUID, fromJID).
+			Where("status IN ?", []models.ConversationStatus{
+				models.ConversationStatusOpen,
+				models.ConversationStatusPending,
+				models.ConversationStatusSnoozed,
+			}).
+			Order("updated_at DESC").First(&conv).Error; err == nil {
+			reply = r.detectAndApplyHandoff(agent, &conv, reply)
+		} else {
+			reply = handoffMarkerRe.ReplaceAllString(reply, "")
+			reply = strings.TrimSpace(reply)
+		}
+		if reply == "" {
+			return false
+		}
 	}
 
 	// Modo "observing": salva sugestão no estado da conversa, não envia.
@@ -193,9 +218,14 @@ func (r *AgentRuntime) saveSuggestion(instanceID uuid.UUID, fromJID, msgID, sugg
 func (r *AgentRuntime) resolveAgent(instanceID uuid.UUID, fromJID string) (*models.InstanceAgent, models.AgentMode, bool) {
 	preloadAgent := func(db *gorm.DB, cond string, args ...interface{}) (*models.InstanceAgent, bool) {
 		var a models.InstanceAgent
+		// Multi-agente: quando o filtro é por instance_id, queremos o agente
+		// primário. ORDER BY é defensivo pra todos os casos — ID lookup
+		// retorna 1 row de qualquer jeito.
 		err := db.Preload("Integration").Preload("Assets", func(tx *gorm.DB) *gorm.DB {
 			return tx.Where("is_active = ?", true).Order("created_at DESC")
-		}).Where(cond, args...).First(&a).Error
+		}).Where(cond, args...).
+			Order("is_primary DESC, priority ASC, created_at ASC").
+			First(&a).Error
 		return &a, err == nil
 	}
 
@@ -557,4 +587,94 @@ func firstNRunes(s string, n int) string {
 		return s
 	}
 	return string(runes[:n]) + "…"
+}
+
+// ─── Multi-agente: handoff entre agentes da mesma instância ─────────────
+
+// handoffMarkerRe captura tokens [[handoff:<role>]] na resposta do LLM.
+// Convenção curta e fácil pro modelo emitir; permite letras, números,
+// hífen e underscore no role.
+var handoffMarkerRe = regexp.MustCompile(`(?i)\[\[handoff:([a-z0-9_\-]+)\]\]`)
+
+// detectAndApplyHandoff procura marcador [[handoff:role]] na reply do LLM.
+// Se achou e existe outro agente nesta instância com `role` ou skill
+// equivalente em handoff_skills, pina ele em ConversationAgentState pra
+// que a próxima mensagem inbound caia direto nele. Retorna a reply com o
+// marcador removido (sempre — o cliente nunca deve ver o token cru).
+func (r *AgentRuntime) detectAndApplyHandoff(currentAgent *models.InstanceAgent, conv *models.Conversation, reply string) string {
+	matches := handoffMarkerRe.FindStringSubmatch(reply)
+	stripped := handoffMarkerRe.ReplaceAllString(reply, "")
+	stripped = strings.TrimSpace(stripped)
+	if len(matches) < 2 || conv == nil || currentAgent == nil {
+		return stripped
+	}
+	target := strings.ToLower(strings.TrimSpace(matches[1]))
+	if target == "" || target == strings.ToLower(currentAgent.Role) {
+		return stripped // já é esse agente, nada a fazer
+	}
+
+	// Procura sibling: mesmo instance_id, ativo, role bate OU handoff_skills
+	// contém o target. JSON contains via LIKE pra evitar dependência de
+	// extensão jsonb_array_elements (compat com SQLite em dev).
+	var sibling models.InstanceAgent
+	q := r.db.Where("instance_id = ? AND id <> ? AND is_active = ?",
+		currentAgent.InstanceID, currentAgent.ID, true).
+		Where("LOWER(role) = ? OR LOWER(handoff_skills) LIKE ?",
+			target, "%\""+target+"\"%").
+		Order("priority ASC, created_at ASC")
+	if err := q.First(&sibling).Error; err != nil {
+		log.Debug().Str("target", target).Str("conv", conv.ID.String()).
+			Msg("agent-runtime: handoff requisitado mas nenhum sibling bate")
+		return stripped
+	}
+
+	// Upsert ConversationAgentState com o novo agente. Mode active.
+	state := models.ConversationAgentState{
+		ConversationID: conv.ID,
+		AgentID:        &sibling.ID,
+		Mode:           models.AgentModeActive,
+	}
+	r.db.Where("conversation_id = ?", conv.ID).
+		Assign(map[string]any{"agent_id": sibling.ID, "mode": models.AgentModeActive}).
+		FirstOrCreate(&state)
+
+	log.Info().
+		Str("from_agent", currentAgent.AgentName).
+		Str("to_agent", sibling.AgentName).
+		Str("conv", conv.ID.String()).
+		Str("target_role", target).
+		Msg("agent-runtime: handoff aplicado")
+
+	return stripped
+}
+
+// loadSiblingsForPrompt — devolve [{role, name, skills}] dos outros agentes
+// da mesma instância pra incluir no system prompt e instruir o modelo a
+// emitir [[handoff:role]] quando apropriado.
+func (r *AgentRuntime) loadSiblingsForPrompt(agent *models.InstanceAgent) string {
+	if agent == nil {
+		return ""
+	}
+	var siblings []models.InstanceAgent
+	r.db.Select("id, agent_name, role, handoff_skills").
+		Where("instance_id = ? AND id <> ? AND is_active = ?", agent.InstanceID, agent.ID, true).
+		Order("priority ASC").
+		Find(&siblings)
+	if len(siblings) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("AGENTES PARCEIROS DESTA INSTÂNCIA\n")
+	b.WriteString("Você pode transferir a conversa pra um deles emitindo a tag literal [[handoff:ROLE]] no final da sua resposta. ")
+	b.WriteString("Use SOMENTE quando a demanda do cliente for claramente fora do seu escopo.\n")
+	for _, s := range siblings {
+		var skills []string
+		_ = json.Unmarshal([]byte(s.HandoffSkills), &skills)
+		line := fmt.Sprintf("- role=%s nome=%s", s.Role, s.AgentName)
+		if len(skills) > 0 {
+			line += " skills=" + strings.Join(skills, ",")
+		}
+		b.WriteString(line + "\n")
+	}
+	return b.String()
 }

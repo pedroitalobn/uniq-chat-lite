@@ -116,9 +116,14 @@ func MaskAPIKey(key string) string {
 }
 
 // InstanceAgent stores agent/LLM config attached to a specific instance.
+//
+// Multi-agente: cada instância pode ter N agentes (atendimento, fechamento,
+// pós-venda etc). InstanceID NÃO é mais uniqueIndex — substituído por uma
+// flag IsPrimary que marca o agente fallback quando a conversa ainda não
+// foi atribuída via handoff.
 type InstanceAgent struct {
 	ID                      uuid.UUID        `gorm:"type:uuid;primaryKey" json:"id"`
-	InstanceID              uuid.UUID        `gorm:"type:uuid;not null;uniqueIndex" json:"instance_id"`
+	InstanceID              uuid.UUID        `gorm:"type:uuid;not null;index" json:"instance_id"`
 	IntegrationID           *uuid.UUID       `gorm:"type:uuid" json:"integration_id,omitempty"`
 	Integration             *UserIntegration `gorm:"foreignKey:IntegrationID" json:"integration,omitempty"`
 	Model                   string           `gorm:"type:varchar(120)" json:"model,omitempty"`
@@ -137,6 +142,20 @@ type InstanceAgent struct {
 	AppAccess               string           `gorm:"type:text;default:'[]'" json:"app_access,omitempty"`
 	RAGEnabled              bool             `gorm:"default:true" json:"rag_enabled"`
 	IsActive                bool             `gorm:"default:false" json:"is_active"`
+	// Multi-agente — Role classifica a função (atendimento/fechamento/pós-venda),
+	// Priority desempata quando múltiplos podem responder, IsPrimary marca o
+	// fallback quando a conversa ainda não tem agente pinado.
+	Role        string `gorm:"type:varchar(40);default:'primary'" json:"role,omitempty"`
+	Priority    int    `gorm:"default:100" json:"priority,omitempty"`
+	IsPrimary   bool   `gorm:"default:false;index" json:"is_primary"`
+	// HandoffSkills — lista JSON de "skills" que outros agentes podem invocar
+	// pra transferir a conversa pra este agente (ex: ["fechamento", "vendas"]).
+	HandoffSkills string `gorm:"type:text;default:'[]'" json:"handoff_skills,omitempty"`
+	// ActionConfirmation — política padrão pra ações que o agente executa
+	// (agendar, criar campanha, tag CRM): "client" exige confirmação no
+	// próprio chat WhatsApp; "auto" executa sem perguntar; "human" pede
+	// aprovação no painel. Default conservador.
+	ActionConfirmation string `gorm:"type:varchar(20);default:'client'" json:"action_confirmation,omitempty"`
 	// n8n / webhook passthrough
 	WebhookURL    string `gorm:"type:varchar(255)" json:"webhook_url,omitempty"`
 	WebhookSecret string `gorm:"type:varchar(255)" json:"webhook_secret,omitempty"`

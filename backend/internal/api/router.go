@@ -1502,6 +1502,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	}))
 
 	// Instance agent (AI agent config per instance)
+	// Singular /agent endpoints continuam batendo no agente PRIMÁRIO da
+	// instância (compat single-agent). Suportam ?agent_id= pra editar
+	// agentes secundários.
 	instance.Get("/agent", integrationH.GetAgent)
 	instance.Put("/agent", integrationH.UpdateAgent)
 	instance.Post("/agent/assets", integrationH.UploadAgentAsset)
@@ -1509,6 +1512,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Sprint 9 — RAG ingestion sem upload de arquivo
 	instance.Post("/agent/ingest-url", integrationH.IngestAgentURL)
 	instance.Post("/agent/ingest-text", integrationH.IngestAgentText)
+	// Multi-agente: lista/cria/remove/promove agentes da instância.
+	instance.Get("/agents", integrationH.ListInstanceAgents)
+	instance.Post("/agents", integrationH.CreateInstanceAgent)
+	instance.Delete("/agents/:agent_id", integrationH.DeleteInstanceAgent)
+	instance.Post("/agents/:agent_id/set-primary", integrationH.SetPrimaryInstanceAgent)
 
 	// DEPRECATED legacy inbox routes (WhatsApp-style per-instance chat).
 	// Mantidas para clientes externos via API key — o dashboard já migrou

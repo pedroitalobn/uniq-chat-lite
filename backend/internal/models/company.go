@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -60,6 +61,16 @@ func (c *Company) BeforeCreate(tx *gorm.DB) error {
 	}
 	if c.Currency == "" {
 		c.Currency = "BRL"
+	}
+	if strings.TrimSpace(c.CustomFields) == "" {
+		c.CustomFields = "{}"
+	}
+	return nil
+}
+
+func (c *Company) BeforeUpdate(tx *gorm.DB) error {
+	if strings.TrimSpace(c.CustomFields) == "" {
+		c.CustomFields = "{}"
 	}
 	return nil
 }
