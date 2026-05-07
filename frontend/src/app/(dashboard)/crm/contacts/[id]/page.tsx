@@ -10,6 +10,7 @@ import {
 import { crmApi, dealsApi, contactGroupsApi, conversationsApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { EntityTasksMeetings } from "@/components/crm/DealTasksMeetings";
+import { ContactTagPicker } from "@/components/crm/ContactTagPicker";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import {
   formatCurrency, relativeTime, uniq, cardStyle, statusColor, statusLabel,
@@ -198,20 +199,14 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
               </div>
             )}
 
-            {c.tags && c.tags.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-1.5">
-                {c.tags.map((t) => (
-                  <span
-                    key={t.id}
-                    className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                    style={{ background: t.color + "22", color: t.color, border: `1px solid ${t.color}44` }}
-                  >
-                    <TagIcon className="mr-1 inline h-2.5 w-2.5" />
-                    {t.name}
-                  </span>
-                ))}
-              </div>
-            )}
+            {/* Tags — picker editável (substitui display read-only) */}
+            <div className="mt-4">
+              <ContactTagPicker
+                contactId={c.id}
+                workspaceId={wsId as string | undefined}
+                currentTags={c.tags ?? []}
+              />
+            </div>
           </Section>
 
           {/* Deals */}

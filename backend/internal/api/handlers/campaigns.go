@@ -477,6 +477,13 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		SegmentFilter struct {
 			Funnel     string   `json:"funnel,omitempty"`
 			Stage      string   `json:"stage,omitempty"`
+			// CRM v2: filtros via FK (cross-entity)
+			FunnelID     string `json:"funnel_id,omitempty"`
+			StageID      string `json:"stage_id,omitempty"`
+			DealStatus   string `json:"deal_status,omitempty"`
+			CompanyID    string `json:"company_id,omitempty"`
+			MinDealValue int64  `json:"min_deal_value,omitempty"`
+			MaxDealValue int64  `json:"max_deal_value,omitempty"`
 			Journey    string   `json:"journey,omitempty"`
 			Tags       []string `json:"tags,omitempty"`
 			Owner      string   `json:"owner,omitempty"`
@@ -647,10 +654,21 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(campaign)
 }
 
-// resolveSegmentedContacts queries contacts matching the segment filter
+// resolveSegmentedContacts queries contacts matching the segment filter.
+// CRM v2: aceita filtros cross-entity (funnel_id, stage_id, deal_status,
+// company_id, min/max_deal_value) — contato é resolvido via JOIN com
+// deals, então um filtro por stage_id retorna todos os contatos que
+// têm deal naquele stage.
 func (h *CampaignHandler) resolveSegmentedContacts(userID uuid.UUID, filter struct {
 	Funnel                   string   `json:"funnel,omitempty"`
 	Stage                    string   `json:"stage,omitempty"`
+	// CRM v2: FKs preferidas (cross-entity via JOIN com deals)
+	FunnelID                 string   `json:"funnel_id,omitempty"`
+	StageID                  string   `json:"stage_id,omitempty"`
+	DealStatus               string   `json:"deal_status,omitempty"`     // open/won/lost/all
+	CompanyID                string   `json:"company_id,omitempty"`
+	MinDealValue             int64    `json:"min_deal_value,omitempty"`
+	MaxDealValue             int64    `json:"max_deal_value,omitempty"`
 	Journey                  string   `json:"journey,omitempty"`
 	Tags                     []string `json:"tags,omitempty"`
 	Owner                    string   `json:"owner,omitempty"`
@@ -686,6 +704,42 @@ func (h *CampaignHandler) resolveSegmentedContacts(userID uuid.UUID, filter stru
 	}
 	if filter.Stage != "" {
 		query = query.Where("contacts.stage = ?", filter.Stage)
+	}
+
+	// CRM v2: filtros cross-entity via JOIN com deals.
+	// Acopla contact → deal: o contato é incluído se tiver deal que
+	// bate o filtro. DISTINCT no final garante que cada contato
+	// apareça uma vez mesmo com múltiplos deals.
+	hasDealFilter := filter.FunnelID != "" || filter.StageID != "" ||
+		filter.DealStatus != "" || filter.CompanyID != "" ||
+		filter.MinDealValue > 0 || filter.MaxDealValue > 0
+	if hasDealFilter {
+		query = query.Joins("INNER JOIN deals ON deals.contact_id = contacts.id AND deals.deleted_at IS NULL").
+			Distinct("contacts.*")
+		if filter.FunnelID != "" {
+			if fid, err := uuid.Parse(filter.FunnelID); err == nil {
+				query = query.Where("deals.funnel_id = ?", fid)
+			}
+		}
+		if filter.StageID != "" {
+			if sid, err := uuid.Parse(filter.StageID); err == nil {
+				query = query.Where("deals.stage_id = ?", sid)
+			}
+		}
+		if filter.DealStatus != "" && filter.DealStatus != "all" {
+			query = query.Where("deals.status = ?", filter.DealStatus)
+		}
+		if filter.CompanyID != "" {
+			if cid, err := uuid.Parse(filter.CompanyID); err == nil {
+				query = query.Where("deals.company_id = ?", cid)
+			}
+		}
+		if filter.MinDealValue > 0 {
+			query = query.Where("deals.value >= ?", filter.MinDealValue)
+		}
+		if filter.MaxDealValue > 0 {
+			query = query.Where("deals.value <= ?", filter.MaxDealValue)
+		}
 	}
 	if filter.Journey != "" {
 		query = query.Where("contacts.journey = ?", filter.Journey)
