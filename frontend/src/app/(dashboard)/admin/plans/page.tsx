@@ -405,40 +405,44 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
         @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
         .animate-drawer-in { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       `}</style>
-      
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm transition-opacity" 
-        onClick={onClose} 
-      />
-      
-      {/* Slide-over Drawer */}
+
+      {/* Backdrop — z-[200] pra cobrir o WorkspaceSwitcher fixo do
+          topo (que rodava em z-50/z-100 e ficava visível por cima do
+          backdrop antigo, dando aparência de "drawer cortado"). */}
       <div
-        className="fixed top-0 right-0 z-[101] w-full max-w-md shadow-2xl flex flex-col animate-drawer-in"
+        className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm transition-opacity"
+        onClick={onClose}
+      />
+
+      {/* Slide-over Drawer — usa tokens do design system
+          (var(--surface-1), var(--surface-border), var(--text-*)) em
+          vez de cores hardcoded; assim acompanha automaticamente
+          mudanças de tema. */}
+      <div
+        className="fixed top-0 right-0 z-[201] w-full max-w-md flex flex-col animate-drawer-in"
         style={{
-          // 100dvh (dynamic viewport height) respeita a barra de URL do
-          // browser mobile — diferente de 100vh/h-screen, que inclui a área
-          // da chrome e fazia o footer "Salvar" ficar oculto atrás da
-          // barra do navegador. Em desktop o comportamento é idêntico.
+          // 100dvh respeita a barra de URL do browser mobile —
+          // diferente de 100vh que inclui chrome e fazia o footer
+          // "Salvar" sumir atrás da barra. Em desktop é idêntico.
           height: "100dvh",
           maxHeight: "100dvh",
-          background: "linear-gradient(180deg, rgba(20,20,35,0.96) 0%, rgba(10,10,20,0.98) 100%)",
-          backdropFilter: "blur(24px) saturate(180%)",
-          WebkitBackdropFilter: "blur(24px) saturate(180%)",
-          borderLeft: "1px solid rgba(255,255,255,0.10)",
-          boxShadow: "-8px 0 32px rgba(0,0,0,0.50)",
+          background: "var(--surface-1)",
+          borderLeft: "1px solid var(--surface-border)",
+          boxShadow: "-12px 0 40px rgba(0,0,0,0.45)",
         }}
       >
-          
+
           {/* Header */}
-          <div className="flex items-center justify-between p-5 border-b flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.09)" }}>
+          <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0"
+            style={{ borderColor: "var(--surface-border)" }}>
             <div>
-              <h2 className="text-lg font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
+              <h2 className="text-base font-semibold tracking-tight" style={{ color: "var(--text-1)" }}>
                 {isEditing ? "Editar Plano" : "Novo Plano"}
               </h2>
-              {isEditing && <p className="text-[10px] text-zinc-500 font-mono mt-0.5">{p!.id}</p>}
+              {isEditing && <p className="text-[10px] font-mono mt-0.5" style={{ color: "var(--text-3)" }}>{p!.id}</p>}
             </div>
-            <button onClick={onClose} className="p-2 rounded-xl transition-colors hover:bg-white/5 text-zinc-400">
+            <button onClick={onClose} className="p-2 rounded-xl transition-colors hover:bg-white/5"
+              style={{ color: "var(--text-3)" }}>
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -446,7 +450,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
           {/* Tab Navigation */}
           <div
             className="flex px-2 pt-2 border-b overflow-x-auto flex-shrink-0 custom-scrollbar"
-            style={{ borderColor: "rgba(255,255,255,0.07)" }}
+            style={{ borderColor: "var(--surface-border)" }}
           >
             {TABS.map((tab) => (
               <button
@@ -454,7 +458,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                 onClick={() => setActiveTab(tab.id)}
                 className="px-4 py-2.5 text-xs font-medium whitespace-nowrap border-b-2"
                 style={{
-                  color: activeTab === tab.id ? "var(--green)" : "hsl(240 8% 46%)",
+                  color: activeTab === tab.id ? "var(--green)" : "var(--text-3)",
                   borderColor: activeTab === tab.id ? "var(--green)" : "transparent",
                   background: activeTab === tab.id
                     ? "linear-gradient(180deg, rgba(0,212,106,0.06) 0%, transparent 100%)"
@@ -468,7 +472,8 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
           </div>
 
           {/* Form Content */}
-          <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-5 custom-scrollbar"
+            style={{ background: "var(--surface-2)" }}>
             <AnimatedTabContent tabKey={activeTab}>
             {activeTab === "general" && (
               <div className="space-y-4 animate-fade-in-up">
@@ -676,12 +681,11 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
           {/* Footer Actions — paddingBottom inclui safe-area pra não ficar
               colado na home indicator do iOS. */}
           <div
-            className="px-5 pt-5 border-t flex gap-3 flex-shrink-0"
+            className="px-5 pt-4 border-t flex gap-3 flex-shrink-0"
             style={{
-              paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))",
-              borderColor: "rgba(255,255,255,0.09)",
-              background: "rgba(0,0,0,0.25)",
-              backdropFilter: "blur(12px)",
+              paddingBottom: "calc(1rem + env(safe-area-inset-bottom))",
+              borderColor: "var(--surface-border)",
+              background: "var(--surface-1)",
             }}
           >
             <button onClick={onClose} className="btn-ghost flex-1 py-2.5 text-sm">
