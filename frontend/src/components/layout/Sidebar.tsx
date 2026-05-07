@@ -177,6 +177,11 @@ export function Sidebar() {
     { href: "/servers",      label: t("nav_servers"),      icon: Server,          exact: false, show: canSeeServers },
     { href: "/instances",    label: t("nav_instances"),    icon: Smartphone,      exact: false, show: canSeeInstances },
     { href: "/integrations", label: t("nav_integrations"), icon: Plug,            exact: false, show: canSeeIntegrations },
+    // /workspace é onde mora time, papéis, mensageria/timezone, bloqueios
+    // e tópicos de assinatura. Antes só dava pra acessar via botão pequeno
+    // dentro do card de workspace (escondia em sidebar collapsed). Agora
+    // entrada primária pra qualquer membro do workspace.
+    { href: "/workspace",    label: "Workspace",           icon: Building2,       exact: false, show: !!currentWorkspace },
     { href: "/settings",     label: t("nav_settings"),     icon: Settings,        exact: false, show: true },
   ];
   const visibleNavItems = navItems.filter((n) => n.show);

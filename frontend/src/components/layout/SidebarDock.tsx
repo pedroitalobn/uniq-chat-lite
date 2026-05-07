@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Bot, BookOpen, ChevronDown, ChevronRight, Contact, CreditCard,
+  Bot, BookOpen, Building2, ChevronDown, ChevronRight, Contact, CreditCard,
   Headset, Layers, LayoutDashboard, LogOut, Megaphone, Menu, Plug,
   Search, Server, Settings, Shield, ShoppingBag, Smartphone,
   Sparkles, Users, Wand2, X, Zap,
@@ -318,6 +318,7 @@ export function SidebarDock() {
     { href: "/servers",      label: t("nav_servers"),       icon: Server,          show: canSeeServers },
     { href: "/instances",    label: t("nav_instances"),     icon: Smartphone,      show: canSeeInstances },
     { href: "/integrations", label: t("nav_integrations"),  icon: Plug,            show: canSeeIntegrations },
+    { href: "/workspace",    label: "Workspace",            icon: Building2,       show: !!currentWorkspace },
     { href: "/settings",     label: t("nav_settings"),      icon: Settings,        show: true },
   ].filter((n) => n.show);
 

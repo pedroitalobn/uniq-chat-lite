@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard, Headset, Contact, Megaphone, MoreHorizontal,
-  Wand2, Bot, Smartphone, Plug, Settings, X,
+  Wand2, Bot, Smartphone, Plug, Settings, Building2, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +28,7 @@ const MORE: NavEntry[] = [
   { href: "/agents",       label: "Agentes",     icon: Bot },
   { href: "/instances",    label: "Instâncias",  icon: Smartphone },
   { href: "/integrations", label: "Integrações", icon: Plug },
+  { href: "/workspace",    label: "Workspace",   icon: Building2 },
   { href: "/settings",     label: "Settings",    icon: Settings },
 ];
 
