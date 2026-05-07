@@ -5,6 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { workspacesApi } from "@/lib/api";
 import type { Workspace } from "@/types";
 
+const LS_KEY = "uniq.currentWorkspaceId";
+
 interface WorkspaceContextType {
   currentWorkspace: Workspace | null;
   setCurrentWorkspace: (ws: Workspace | null) => void;
@@ -20,7 +22,7 @@ const WorkspaceContext = createContext<WorkspaceContextType>({
 });
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
+  const [currentWorkspace, setCurrentWorkspaceState] = useState<Workspace | null>(null);
 
   const { data: workspaces = [], isLoading } = useQuery<Workspace[]>({
     queryKey: ["workspaces"],
@@ -28,11 +30,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Auto-select first workspace if none selected
-  useEffect(() => {
-    if (!isLoading && workspaces.length > 0 && !currentWorkspace) {
-      setCurrentWorkspace(workspaces[0]);
+  // Persiste o ID em localStorage assim que muda — interceptor global
+  // do api client usa isso pra injetar X-Workspace-ID em TODA request,
+  // independente da página passar header explícito ou não. Antes, se
+  // o componente não montasse o header manualmente, o backend respondia
+  // 400 "X-Workspace-ID é obrigatório".
+  const setCurrentWorkspace = (ws: Workspace | null) => {
+    setCurrentWorkspaceState(ws);
+    if (typeof window !== "undefined") {
+      if (ws?.id) localStorage.setItem(LS_KEY, ws.id);
+      else localStorage.removeItem(LS_KEY);
     }
+  };
+
+  // Auto-select: prefere o workspace persistido em localStorage; se
+  // não bate com nenhum disponível, cai no primeiro da lista.
+  useEffect(() => {
+    if (isLoading || workspaces.length === 0 || currentWorkspace) return;
+    const persistedId = typeof window !== "undefined" ? localStorage.getItem(LS_KEY) : null;
+    const restored = persistedId ? workspaces.find((w) => w.id === persistedId) : null;
+    setCurrentWorkspace(restored ?? workspaces[0]);
   }, [isLoading, workspaces, currentWorkspace]);
 
   return (

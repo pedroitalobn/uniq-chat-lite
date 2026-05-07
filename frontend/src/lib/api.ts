@@ -58,6 +58,15 @@ api.interceptors.request.use(async (config) => {
   const startedAt = performance.now();
   (config as any).metadata = { startedAt };
 
+  // Auto-injeta X-Workspace-ID quando a request não setou explícito.
+  // Persistido em localStorage pelo WorkspaceContext. Cobre todas as
+  // chamadas que esquecerem de passar o header — antes davam 400
+  // "X-Workspace-ID é obrigatório" e era difícil rastrear caller.
+  if (typeof window !== "undefined" && config.headers && !config.headers["X-Workspace-ID"] && !config.headers["x-workspace-id"]) {
+    const wsId = localStorage.getItem("uniq.currentWorkspaceId");
+    if (wsId) config.headers["X-Workspace-ID"] = wsId;
+  }
+
   if (memoryToken) {
     config.headers.Authorization = `Bearer ${memoryToken}`;
     return config;
