@@ -16,6 +16,7 @@ import { showConfirm } from "@/lib/confirm";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { usePreferences } from "@/lib/preferences";
+import { AudioInput } from "@/components/campaigns/AudioInput";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 function fmtDate(s: string) {
@@ -1118,10 +1119,19 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                     </div>
                   )}
 
-                  {(msgType === "image" || msgType === "audio" || msgType === "document") && (
+                  {msgType === "audio" && (
                     <div>
                       <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>
-                        {msgType === "image" ? "Imagem *" : msgType === "audio" ? "Áudio *" : "Documento *"}
+                        Áudio *
+                      </label>
+                      <AudioInput file={mediaFile} onChange={setMediaFile} />
+                    </div>
+                  )}
+
+                  {(msgType === "image" || msgType === "document") && (
+                    <div>
+                      <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>
+                        {msgType === "image" ? "Imagem *" : "Documento *"}
                       </label>
                       <div
                         className="rounded-xl p-4 flex flex-col items-center gap-2 cursor-pointer"
@@ -1136,12 +1146,12 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                           </>
                         ) : (
                           <>
-                            {msgType === "image" ? <Image className="w-5 h-5" style={{ color: "hsl(240 8% 36%)" }} /> : msgType === "audio" ? <Mic className="w-5 h-5" style={{ color: "hsl(240 8% 36%)" }} /> : <File className="w-5 h-5" style={{ color: "hsl(240 8% 36%)" }} />}
+                            {msgType === "image" ? <Image className="w-5 h-5" style={{ color: "hsl(240 8% 36%)" }} /> : <File className="w-5 h-5" style={{ color: "hsl(240 8% 36%)" }} />}
                             <p className="text-xs" style={{ color: "hsl(240 8% 42%)" }}>Clique ou arraste</p>
                           </>
                         )}
                         <input ref={fileRef} type="file" className="hidden"
-                          accept={msgType === "image" ? "image/*" : msgType === "audio" ? "audio/*" : "*"}
+                          accept={msgType === "image" ? "image/*" : "*"}
                           onChange={(e) => e.target.files?.[0] && setMediaFile(e.target.files[0])} />
                       </div>
                     </div>
