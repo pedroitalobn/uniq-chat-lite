@@ -7,6 +7,7 @@ const PAGE_META: Array<{ match: (p: string) => boolean; label: string; descripti
   { match: (p) => p === "/crm" || p.startsWith("/crm/deals"),      label: "Deals",      description: "Pipeline e oportunidades de venda" },
   { match: (p) => p.startsWith("/crm/contacts"),                    label: "Contatos",   description: "Pessoas e leads do seu CRM" },
   { match: (p) => p.startsWith("/crm/companies"),                   label: "Empresas",   description: "Organizações e contas" },
+  { match: (p) => p.startsWith("/crm/funnels"),                     label: "Funis",      description: "Pipelines e etapas compartilhados entre Contatos e Deals" },
   { match: (p) => p.startsWith("/crm/tasks"),                       label: "Tarefas",    description: "Follow-ups e ações executadas por humanos ou agentes IA" },
   { match: (p) => p.startsWith("/crm/meetings"),                    label: "Reuniões",   description: "Agendamentos vinculados aos deals (Google/Outlook)" },
   { match: (p) => p.startsWith("/crm/segments"),                    label: "Segmentos",  description: "Grupos e filtros avançados" },
