@@ -1564,6 +1564,12 @@ export const conversationsApi = {
     api.patch(`/v1/conversations/${id}/messages/${msgId}/content`, { body }, { headers: wsHeaders(workspaceId) }),
   reactToMessage: (workspaceId: string, id: string, msgId: string, emoji: string) =>
     api.post(`/v1/conversations/${id}/messages/${msgId}/react`, { emoji }, { headers: wsHeaders(workspaceId) }),
+  retryTranscription: (workspaceId: string, id: string, msgId: string) =>
+    api.post<{ ok: boolean; status: "pending" }>(
+      `/v1/conversations/${id}/messages/${msgId}/transcribe`,
+      {},
+      { headers: wsHeaders(workspaceId) },
+    ),
   forwardMessage: (workspaceId: string, id: string, msgId: string, conversationIds: string[]) =>
     api.post(
       `/v1/conversations/${id}/messages/${msgId}/forward`,

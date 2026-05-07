@@ -1176,6 +1176,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	conversations.Post("/:id/messages/:msgId/react", middleware.RequireWorkspacePermission(db, models.PermInboxSend), conversationH.ReactToMessage)
 	conversations.Post("/:id/messages/:msgId/forward", middleware.RequireWorkspacePermission(db, models.PermInboxSend), conversationH.ForwardMessage)
 	conversations.Get("/:id/messages/:msgId/receipts", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.GetMessageReceipts)
+	// Re-tenta transcrição manualmente. Usado pra mensagens que chegaram
+	// antes do PlatformAI estar configurado (status=unsupported) ou que
+	// falharam por erro transitório (status=failed). Sem permissão de send,
+	// um operador pode pedir a transcrição.
+	conversations.Post("/:id/messages/:msgId/transcribe", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.RetryTranscription)
 	conversations.Post("/:id/typing", middleware.RequireWorkspacePermission(db, models.PermInboxSend), conversationH.Typing)
 	conversations.Post("/:id/read", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.MarkRead)
 	conversations.Post("/:id/unread", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.MarkUnread)

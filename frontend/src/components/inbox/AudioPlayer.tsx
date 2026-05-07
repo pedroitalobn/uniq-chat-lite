@@ -6,6 +6,10 @@
 //
 // Workaround duração: muitos áudios opus/webm aparecem com duration
 // Infinity até primeira reprodução — fix via seek-to-end.
+//
+// UX mobile-style: botão de velocidade (1x/1.5x/2x) à direita, tipo
+// WhatsApp Web/iOS. Pra clicar no waveform e fazer seek mantemos o
+// comportamento padrão.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Play, Pause } from "lucide-react";
@@ -19,6 +23,9 @@ interface Props {
 }
 
 const BAR_COUNT = 28;
+const SPEEDS = [1, 1.5, 2] as const;
+type Speed = (typeof SPEEDS)[number];
+const SPEED_KEY = "uniq.audio.playback-rate";
 
 // Hash simples de string → número [0, 1]. Usado pra gerar barras
 // determinísticas por URL (mesma URL = mesmo waveform).
@@ -39,12 +46,20 @@ function generateBars(url: string): number[] {
   });
 }
 
+function loadStoredSpeed(): Speed {
+  if (typeof window === "undefined") return 1;
+  const raw = window.localStorage.getItem(SPEED_KEY);
+  const n = Number(raw);
+  return SPEEDS.includes(n as Speed) ? (n as Speed) : 1;
+}
+
 export function AudioPlayer({ url, className, variant = "in" }: Props) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [duration, setDuration] = useState<number | null>(null);
   const [current, setCurrent] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [seekFixed, setSeekFixed] = useState(false);
+  const [speed, setSpeed] = useState<Speed>(() => loadStoredSpeed());
 
   const bars = useMemo(() => generateBars(url), [url]);
 
@@ -59,6 +74,8 @@ export function AudioPlayer({ url, className, variant = "in" }: Props) {
         barIdle: "rgba(255,255,255,0.35)",
         barActive: "#ffffff",
         text: "rgba(255,255,255,0.85)",
+        speedBg: "rgba(255,255,255,0.18)",
+        speedFg: "#ffffff",
       }
     : {
         bg: "#1f2c34",
@@ -67,6 +84,8 @@ export function AudioPlayer({ url, className, variant = "in" }: Props) {
         barIdle: "rgba(255,255,255,0.25)",
         barActive: "#53bdeb",
         text: "rgba(255,255,255,0.7)",
+        speedBg: "rgba(255,255,255,0.12)",
+        speedFg: "#ffffff",
       };
 
   useEffect(() => {
@@ -103,6 +122,10 @@ export function AudioPlayer({ url, className, variant = "in" }: Props) {
       setPlaying(false);
       setCurrent(0);
     };
+    const onRateChange = () => {
+      const r = el.playbackRate;
+      if (SPEEDS.includes(r as Speed)) setSpeed(r as Speed);
+    };
 
     el.addEventListener("loadedmetadata", onMetadata);
     el.addEventListener("durationchange", onDurationChange);
@@ -110,6 +133,7 @@ export function AudioPlayer({ url, className, variant = "in" }: Props) {
     el.addEventListener("play", onPlay);
     el.addEventListener("pause", onPause);
     el.addEventListener("ended", onEnded);
+    el.addEventListener("ratechange", onRateChange);
 
     return () => {
       el.removeEventListener("loadedmetadata", onMetadata);
@@ -118,14 +142,30 @@ export function AudioPlayer({ url, className, variant = "in" }: Props) {
       el.removeEventListener("play", onPlay);
       el.removeEventListener("pause", onPause);
       el.removeEventListener("ended", onEnded);
+      el.removeEventListener("ratechange", onRateChange);
     };
   }, [seekFixed]);
+
+  // Aplica a velocidade salva no <audio> quando ele monta e quando muda.
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    el.playbackRate = speed;
+  }, [speed]);
 
   const toggle = () => {
     const el = audioRef.current;
     if (!el) return;
     if (el.paused) el.play().catch(() => {});
     else el.pause();
+  };
+
+  const cycleSpeed = () => {
+    const next = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length];
+    setSpeed(next);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(SPEED_KEY, String(next));
+    }
   };
 
   const onBarClick = (idx: number) => {
@@ -196,6 +236,23 @@ export function AudioPlayer({ url, className, variant = "in" }: Props) {
           {duration ? fmt(playing || current > 0 ? current : duration) : "—:—"}
         </span>
       </div>
+
+      {/* Botão de velocidade — só visível depois que algo tocou pelo menos
+          uma vez OU se velocidade ≠ 1x. Visual estilo WhatsApp mobile. */}
+      <button
+        type="button"
+        onClick={cycleSpeed}
+        className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold tabular-nums leading-none"
+        style={{
+          background: colors.speedBg,
+          color: colors.speedFg,
+          minWidth: 32,
+          opacity: speed !== 1 || playing || current > 0 ? 1 : 0.7,
+        }}
+        title={`Velocidade ${speed}x — clique para alternar`}
+      >
+        {speed.toString().replace(/\.0$/, "")}x
+      </button>
     </div>
   );
 }

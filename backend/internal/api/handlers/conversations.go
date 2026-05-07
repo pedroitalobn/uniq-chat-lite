@@ -2964,3 +2964,49 @@ func (h *ConversationHandler) SetWindowKeeper(c *fiber.Ctx) error {
 	}
 	return c.JSON(fiber.Map{"ok": true, "enabled": body.Enabled})
 }
+
+// RetryTranscription — POST /v1/conversations/:id/messages/:msgId/transcribe
+// Reagenda Whisper pra uma MessageLog de áudio. Útil quando:
+//   - PlatformAI ainda não estava configurado quando o áudio chegou
+//     (status atual = "unsupported")
+//   - Falha transitória (Whisper 5xx, rede), status = "failed"
+//   - Status = "pending" travado (sem evento WS após N minutos)
+//
+// Resposta:
+//   200 — agendado, status="pending" (frontend deve aguardar WS)
+//   409 — provider não configurado: status="unsupported", retorne 409
+//   404 — message não encontrada / não é áudio
+func (h *ConversationHandler) RetryTranscription(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	convID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	msgID, err := uuid.Parse(c.Params("msgId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "msgId inválido"})
+	}
+	if h.pipeline == nil || !h.pipeline.HasSTT() {
+		return c.Status(fiber.StatusServiceUnavailable).
+			JSON(fiber.Map{"error": "transcrição indisponível — pipeline ou STT não configurados"})
+	}
+	var msg models.MessageLog
+	if err := h.db.Where("id = ? AND conversation_id = ? AND workspace_id = ?",
+		msgID, convID, ws).First(&msg).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "mensagem não encontrada"})
+	}
+	if msg.Type != "audio" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "mensagem não é áudio"})
+	}
+	var conv models.Conversation
+	if err := h.db.First(&conv, "id = ?", convID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "conversa não encontrada"})
+	}
+	// Roda em goroutine pra não segurar o request; UI atualiza via WS quando
+	// terminar (mesmo evento que o fluxo automático usa).
+	go h.pipeline.RetryTranscribe(&msg, &conv)
+	return c.JSON(fiber.Map{
+		"ok":     true,
+		"status": "pending",
+	})
+}

@@ -932,6 +932,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                     <MessageBubble
                       m={e.payload as MessagePayload}
                       wsId={wsId}
+                      conversationId={conversationId}
                       reactions={reactionsByTarget.get((e.payload as MessagePayload).id)}
                       onPatch={(patch) =>
                         patchMsg.mutate({ msgId: (e.payload as MessagePayload).id, patch })
@@ -1674,12 +1675,13 @@ interface ReactionEntry {
 }
 
 function MessageBubble({
-  m, onPatch, onOpenViewer, wsId, onReply, onRevoke, onForward, onReact, onEdit, onInfo, reactions,
+  m, onPatch, onOpenViewer, wsId, conversationId, onReply, onRevoke, onForward, onReact, onEdit, onInfo, reactions,
 }: {
   m: MessagePayload;
   onPatch?: (patch: { is_pinned?: boolean; is_favorite?: boolean }) => void;
   onOpenViewer: (source: MediaViewerSource) => void;
   wsId?: string;
+  conversationId?: string;
   onReply?: (m: MessagePayload) => void;
   onRevoke?: (m: MessagePayload) => void;
   onForward?: (m: MessagePayload) => void;
@@ -1745,7 +1747,7 @@ function MessageBubble({
             className={isAudioOnly ? "" : "overflow-hidden"}
             style={isAudioOnly ? undefined : { borderRadius: 12, background: "hsl(240 18% 5%)" }}
           >
-            <MediaBody type={m.type} parsed={parsed} onOpenViewer={onOpenViewer} wsId={wsId} isOut={isOut} transcription={m.transcription} transcriptionStatus={m.transcription_status} />
+            <MediaBody type={m.type} parsed={parsed} onOpenViewer={onOpenViewer} wsId={wsId} isOut={isOut} transcription={m.transcription} transcriptionStatus={m.transcription_status} conversationId={conversationId} messageId={m.id} />
           </div>
 
           {/* Pin / favorite / view-once badges — abs positioned mantém limpo */}
@@ -1883,7 +1885,7 @@ function MessageBubble({
           </div>
         )}
 
-        <MediaBody type={m.type} parsed={parsed} onOpenViewer={onOpenViewer} wsId={wsId} isOut={isOut} transcription={m.transcription} transcriptionStatus={m.transcription_status} />
+        <MediaBody type={m.type} parsed={parsed} onOpenViewer={onOpenViewer} wsId={wsId} isOut={isOut} transcription={m.transcription} transcriptionStatus={m.transcription_status} conversationId={conversationId} messageId={m.id} />
 
         <div
           className="mt-1 flex items-center justify-end gap-1 text-[10px]"
@@ -1926,6 +1928,7 @@ function MessageBubble({
 // de "expandir" que abre o viewer com player maior.
 function MediaBody({
   type, parsed, onOpenViewer, wsId, isOut, transcription, transcriptionStatus,
+  conversationId, messageId,
 }: {
   type: string;
   parsed: ParsedContent;
@@ -1937,6 +1940,8 @@ function MediaBody({
       WhatsApp. */
   transcription?: string;
   transcriptionStatus?: "pending" | "done" | "failed" | "unsupported";
+  conversationId?: string;
+  messageId?: string;
 }) {
   const { text, url, mediaKey, filename, caption, error, latitude, longitude, mimeType } = parsed;
   const body = caption || text;
@@ -2058,7 +2063,7 @@ function MediaBody({
       return (
         <div className="flex flex-col gap-1.5">
           <AudioPlayer url={audioURL} variant={isOut ? "out" : "in"} />
-          <TranscriptionBlock text={transcription} status={transcriptionStatus} isOut={isOut} />
+          <TranscriptionBlock text={transcription} status={transcriptionStatus} isOut={isOut} conversationId={conversationId} messageId={messageId} />
           {error && <ErrorLine text={error} />}
         </div>
       );
@@ -3182,15 +3187,19 @@ function ErrorLine({ text }: { text: string }) {
 // Estados:
 //   - pending: skeleton "Transcrevendo…"
 //   - done: texto cinza-claro itálico, max 8 linhas (collapse depois)
-//   - failed/unsupported: nada (silencia — não polui a bubble)
+//   - failed/unsupported: botão de retry compacto (só admin verá util)
 //   - undefined: nada (legacy ou não-áudio)
 function TranscriptionBlock({
-  text, status, isOut,
+  text, status, isOut, conversationId, messageId,
 }: {
   text?: string;
   status?: "pending" | "done" | "failed" | "unsupported";
   isOut?: boolean;
+  conversationId?: string;
+  messageId?: string;
 }) {
+  const { currentWorkspace } = useWorkspace();
+  const [retrying, setRetrying] = useState(false);
   if (status === "pending") {
     return (
       <div
@@ -3209,6 +3218,48 @@ function TranscriptionBlock({
         />
         Transcrevendo áudio…
       </div>
+    );
+  }
+  if (status === "failed" || status === "unsupported") {
+    if (!conversationId || !messageId || !currentWorkspace?.id) return null;
+    const label = status === "unsupported"
+      ? "Transcrição indisponível — tentar novamente"
+      : "Transcrição falhou — tentar novamente";
+    const onRetry = async () => {
+      setRetrying(true);
+      try {
+        await conversationsApi.retryTranscription(currentWorkspace.id, conversationId, messageId);
+        toast.success("Transcrição reagendada");
+      } catch (e: unknown) {
+        const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
+          || "Não foi possível reagendar — verifique se a Uniq AI está configurada";
+        toast.error(msg);
+      } finally {
+        setRetrying(false);
+      }
+    };
+    return (
+      <button
+        type="button"
+        onClick={onRetry}
+        disabled={retrying}
+        className="text-[10px] flex items-center gap-1.5 px-2 py-1 rounded-md transition-opacity disabled:opacity-50"
+        style={{
+          color: isOut ? "rgba(255,255,255,0.65)" : "var(--text-3)",
+          background: isOut ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,255,255,0.05)",
+          width: "fit-content",
+          maxWidth: "100%",
+        }}
+        title="Re-tenta transcrição via Uniq AI"
+      >
+        {retrying ? (
+          <Loader2 className="w-2.5 h-2.5 animate-spin" />
+        ) : (
+          <RotateCcw className="w-2.5 h-2.5" />
+        )}
+        {label}
+      </button>
     );
   }
   if (status !== "done" || !text) return null;

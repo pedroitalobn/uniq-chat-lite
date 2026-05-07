@@ -69,6 +69,25 @@ func (p *InboundPipeline) SetTriggerService(s *TriggerService) {
 	p.triggers = s
 }
 
+// HasSTT — true se a pipeline tem STTService injetado e disponível.
+// Caller (handler) usa pra responder com erro claro em vez de tentar
+// transcrever em vão.
+func (p *InboundPipeline) HasSTT() bool {
+	return p != nil && p.stt != nil
+}
+
+// RetryTranscribe — chamada manual (handler /transcribe) pra reprocessar
+// uma MessageLog de áudio cuja transcrição falhou ou veio antes do
+// PlatformAI estar configurado. Síncrono pra o caller poder reportar
+// resultado direto na resposta HTTP. Idempotente: marca pending → roda
+// → grava done/failed/unsupported.
+func (p *InboundPipeline) RetryTranscribe(msg *models.MessageLog, conv *models.Conversation) {
+	if p == nil || p.stt == nil || msg == nil {
+		return
+	}
+	p.transcribeAudioAsync(msg, conv)
+}
+
 // Process handles a single inbound message. Safe to call concurrently.
 // Returns the Conversation and MessageLog that were created/updated.
 func (p *InboundPipeline) Process(ctx context.Context, in InboundMessage) (*models.Conversation, *models.MessageLog, error) {
@@ -222,6 +241,13 @@ func (p *InboundPipeline) ProcessSavedInbound(ctx context.Context, ml *models.Me
 	p.appendEvent(ctx, conv, models.ConvEventMessage, models.ActorCustomer, nil, &ml.ID, map[string]any{"type": ml.Type})
 	p.updateDenorm(ctx, conv, in, ml, false)
 	p.broadcastConversation(conv, ml, created, reopened)
+
+	// Transcrição assíncrona — espelha o branch de Process(). Sem isso o
+	// caminho legacy do whatsmeow (Manager.SaveMessage → ProcessSavedInbound)
+	// nunca chamava o Whisper e voice notes ficavam sem texto.
+	if ml.Type == "audio" && p.stt != nil {
+		go p.transcribeAudioAsync(ml, conv)
+	}
 	return nil
 }
 
