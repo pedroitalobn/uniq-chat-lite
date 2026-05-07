@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -114,8 +116,13 @@ func (s *Service) send(to, subject, html, emailType string) error {
 		log.Error().Err(err).Msg("email: failed to build request")
 		return err
 	}
+	// Maileroo aceita tanto X-API-Key (canônico nos docs atuais) quanto
+	// Authorization Bearer (legacy). Mandamos os dois pra evitar
+	// rejeição quando a chave for de uma versão diferente do painel.
+	httpReq.Header.Set("X-API-Key", s.apiKey)
 	httpReq.Header.Set("Authorization", "Bearer "+s.apiKey)
 	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "application/json")
 
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(httpReq)
@@ -125,15 +132,44 @@ func (s *Service) send(to, subject, html, emailType string) error {
 	}
 	defer resp.Body.Close()
 
-	var result mailerooResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		log.Error().Err(err).Str("to", to).Msg("email: failed to decode response")
-		return err
-	}
+	// Lê o body cru primeiro pra poder usar tanto pra decode quanto pra
+	// mensagem de erro caso o Maileroo devolva text/plain (acontece em
+	// alguns 4xx — mensagem como "Invalid API key" sem JSON wrapper).
+	rawBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode >= 400 {
-		log.Error().Int("status", resp.StatusCode).Str("to", to).Str("message", result.Message).Msg("email: maileroo returned error")
-		return fmt.Errorf("maileroo error: %s", result.Message)
+		// Tenta extrair a mensagem do JSON; se falhar, repassa o body cru
+		// truncado pra dar contexto pro caller (admin ver no toast).
+		var result mailerooResponse
+		_ = json.Unmarshal(rawBody, &result)
+		msg := strings.TrimSpace(result.Message)
+		if msg == "" {
+			msg = strings.TrimSpace(string(rawBody))
+			if len(msg) > 200 {
+				msg = msg[:200] + "…"
+			}
+		}
+		hint := ""
+		switch resp.StatusCode {
+		case 401:
+			hint = " (chave inválida — verifique se copiou inteira do painel Maileroo)"
+		case 403:
+			hint = " (sem permissão — domínio do sender pode não estar verificado)"
+		case 422:
+			hint = " (dados inválidos — geralmente sender_email não verificado no Maileroo)"
+		}
+		log.Error().Int("status", resp.StatusCode).Str("to", to).Str("from", s.from).
+			Str("message", msg).Msg("email: maileroo returned error")
+		return fmt.Errorf("maileroo HTTP %d%s — %s", resp.StatusCode, hint, msg)
+	}
+
+	var result mailerooResponse
+	if err := json.Unmarshal(rawBody, &result); err != nil {
+		log.Error().Err(err).Str("to", to).Str("body", string(rawBody)).
+			Msg("email: failed to decode response")
+		// Não retorna erro — Maileroo respondeu 2xx mesmo sem JSON
+		// válido, então deu certo do lado deles.
+		return nil
 	}
 
 	log.Debug().Str("to", to).Str("subject", subject).Str("ref", result.Data.ReferenceID).Msg("email: sent")

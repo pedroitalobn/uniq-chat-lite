@@ -1800,21 +1800,58 @@ func (h *AdminHandler) TestEmail(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "e-mail de destino é obrigatório"})
 	}
 
-	// Get current settings
+	if h.emailSvc == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error":   "email_service_unavailable",
+			"message": "serviço de email não está inicializado — reinicie o backend após salvar a config",
+		})
+	}
+
+	// Garante que o emailSvc está sincronizado com a config persistida.
+	// Em primeira ativação (sem reinício do servidor), o admin acabou
+	// de salvar a chave em /admin/email-settings → emailSvc tem a chave
+	// nova injetada via SetConfig, mas se o save tiver falhado em algum
+	// step intermediário, podemos estar com chave antiga. Refresh aqui
+	// é defensivo.
 	var settings models.EmailSettings
 	if err := h.db.First(&settings).Error; err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "configure o e-mail primeiro"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "email_not_configured",
+			"message": "configure o email em /admin/providers → Email primeiro",
+		})
 	}
 
 	if !settings.IsEnabled {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "e-mail está desabilitado"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "email_disabled",
+			"message": "email está marcado como desativado nas configurações",
+		})
 	}
+
+	if strings.TrimSpace(settings.APIKey) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "email_api_key_missing",
+			"message": "API key do Maileroo não configurada — adicione em /admin/providers → Email",
+		})
+	}
+
+	// Sincroniza o emailSvc com o que está no DB nesse instante (cobre o
+	// caso de Save ter persistido mas o singleton ainda estar com a
+	// chave antiga em memória — race entre dois admins editando).
+	h.emailSvc.SetConfig(settings.APIKey, settings.SenderEmail, settings.SenderName)
 
 	// Send test email
 	htmlContent := email.TestHTML("Uniq.chat")
 	err := h.emailSvc.SyncSend(req.To, "Teste do Uniq.chat", htmlContent, "test")
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao enviar: " + err.Error()})
+		// Erro do Maileroo já vem com hint (HTTP 401/403/422 + razão).
+		// Loga internamente também pra sysadmin.
+		log.Error().Err(err).Str("to", req.To).Str("from", settings.SenderEmail).
+			Msg("test email: falhou no Maileroo")
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+			"error":   "maileroo_send_failed",
+			"message": "falha ao enviar via Maileroo: " + err.Error(),
+		})
 	}
 
 	return c.JSON(fiber.Map{"message": "e-mail de teste enviado com sucesso"})

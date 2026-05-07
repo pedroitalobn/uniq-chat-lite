@@ -615,7 +615,10 @@ function EmailSection() {
   const testMut = useMutation({
     mutationFn: () => adminApi.testEmail(testEmail),
     onSuccess: () => toast.success("Email de teste enviado!"),
-    onError: () => toast.error("Erro ao enviar email de teste"),
+    onError: (e: unknown) => {
+      const r = (e as { response?: { data?: { message?: string; error?: string } } })?.response?.data;
+      toast.error(r?.message || r?.error || "Erro ao enviar email de teste");
+    },
   });
 
   if (isLoading) return <div className="py-4"><Loader2 className="w-4 h-4 animate-spin text-[#00d46a]" /></div>;
