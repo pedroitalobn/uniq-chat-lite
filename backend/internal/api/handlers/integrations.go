@@ -18,6 +18,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/services"
@@ -1604,4 +1605,320 @@ func (h *IntegrationHandler) SetPrimaryInstanceAgent(c *fiber.Ctx) error {
 	}
 	tx.Commit()
 	return c.JSON(fiber.Map{"ok": true})
+}
+
+// ─── Wizard simplificado (item 5 do roadmap) ──────────────────────────────
+
+// QuickSetupQuiz — payload com 7 respostas curtas que o user deu no wizard.
+// Cada campo é opcional: faltas viram placeholders genéricos.
+type QuickSetupQuiz struct {
+	AgentName       string   `json:"agent_name"`
+	BusinessName    string   `json:"business_name"`
+	BusinessSegment string   `json:"business_segment"`
+	BusinessUSP     string   `json:"business_usp"` // diferencial
+	Role            string   `json:"role"`         // atendimento, vendas, suporte, qualificacao, agendamento
+	Tone            string   `json:"tone"`         // formal, casual, próximo, técnico
+	Objective       string   `json:"objective"`    // ex: "agendar consulta", "qualificar lead"
+	Restrictions    []string `json:"restrictions"` // ex: ["nunca prometer prazo", "não falar de concorrentes"]
+	Escalation      string   `json:"escalation"`   // quando passar pra humano
+}
+
+// GenerateAgentFromQuiz — POST /v1/instances/:id/agent/generate-from-quiz?agent_id=
+// Pega 5-7 respostas curtas e usa o LLM da conta pra gerar identity/objective/
+// communication_guidelines/service_instructions/restrictions/agent_name. Antes
+// o user encarava 5 abas com prompts vazios e abandonava o setup.
+func (h *IntegrationHandler) GenerateAgentFromQuiz(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	if user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+	}
+	inst := middleware.GetCurrentInstance(c)
+	if inst == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	var quiz QuickSetupQuiz
+	if err := c.BodyParser(&quiz); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+
+	// LLM resolution: usa a integração ativa do user. Em fluxo Uniq AI a
+	// platform AI é resolvida no agent_runtime; aqui é geração one-shot
+	// barata então caímos pro user_integration mais simples.
+	var integration models.UserIntegration
+	if err := h.db.Where("user_id = ? AND is_active = true", user.ID).
+		Order("created_at ASC").First(&integration).Error; err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "nenhuma integração de IA ativa — configure uma LLM antes de usar o setup rápido",
+		})
+	}
+
+	// Meta-prompt — pede JSON com 5 seções. Em PT-BR pra texto pronto pra
+	// uso no atendimento brasileiro. Tom calibrado por `quiz.Tone`.
+	prompt := buildQuickSetupPrompt(quiz)
+	raw, err := callLLMOneShot(&integration, prompt)
+	if err != nil {
+		log.Error().Err(err).Msg("agent quick-setup: LLM call falhou")
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "falha ao gerar — verifique sua LLM ativa"})
+	}
+
+	parsed := parseQuickSetupResponse(raw, quiz)
+	return c.JSON(parsed)
+}
+
+func buildQuickSetupPrompt(q QuickSetupQuiz) string {
+	defNonEmpty := func(s, fallback string) string {
+		if strings.TrimSpace(s) == "" {
+			return fallback
+		}
+		return s
+	}
+	role := defNonEmpty(q.Role, "atendimento")
+	tone := defNonEmpty(q.Tone, "casual e próximo")
+	business := defNonEmpty(q.BusinessName, "a empresa")
+	segment := defNonEmpty(q.BusinessSegment, "o setor configurado")
+	usp := defNonEmpty(q.BusinessUSP, "atendimento personalizado")
+	objective := defNonEmpty(q.Objective, "ajudar o cliente e direcionar pra próxima etapa")
+	escalation := defNonEmpty(q.Escalation, "questões fora do escopo, reclamações sérias ou pedido explícito")
+	name := defNonEmpty(q.AgentName, "Agente IA")
+	restrictions := strings.Join(q.Restrictions, ", ")
+	if restrictions == "" {
+		restrictions = "nunca inventar informação, nunca prometer o que não pode entregar"
+	}
+
+	return fmt.Sprintf(`Você é um copywriter especializado em prompts de agentes de atendimento conversacional brasileiros (WhatsApp, principalmente).
+
+Gere um prompt SYSTEM completo e enxuto pra um agente IA com base nas informações abaixo. RESPONDA APENAS COM JSON VÁLIDO no formato:
+
+{
+  "agent_name": "...",
+  "identity": "...",
+  "objective": "...",
+  "communication_guidelines": "...",
+  "service_instructions": "...",
+  "restrictions": "..."
+}
+
+Regras de produção do texto:
+- 4–7 linhas curtas por seção (não escreva ensaios).
+- Português brasileiro natural, não-corporativo.
+- Tom: %s. Aplique CONSISTENTEMENTE em communication_guidelines.
+- identity: descreve QUEM o agente é, em 1ª pessoa do agente ("Eu sou...").
+- objective: 1 parágrafo CURTO com a meta principal de cada conversa.
+- communication_guidelines: regras de estilo, formato (frases curtas, sem emojis exceto…), nivelamento.
+- service_instructions: passo-a-passo do que fazer em conversas típicas — incluindo quando passar pra humano (%s).
+- restrictions: bullet/lista do que NÃO fazer.
+- Se faltar info, infira algo razoável; nunca inclua placeholders tipo "[insira aqui]".
+
+Inputs do usuário:
+- Nome do agente: %s
+- Negócio: %s (segmento: %s)
+- Diferencial / USP: %s
+- Função do agente: %s
+- Objetivo principal de cada conversa: %s
+- Restrições: %s
+- Quando passar pra humano: %s
+
+Retorne SOMENTE o JSON, sem markdown, sem explicações.`, tone, escalation, name, business, segment, usp, role, objective, restrictions, escalation)
+}
+
+// callLLMOneShot — wrapper que escolhe o provider e devolve o texto cru.
+// Refator do generateWithLLM pra responder uma string única (não array).
+func callLLMOneShot(i *models.UserIntegration, prompt string) (string, error) {
+	switch i.Provider {
+	case models.ProviderClaude:
+		// Claude já está implementado em callClaude mas devolve []string;
+		// pra one-shot fazemos chamada inline simples.
+		return claudeOneShot(i.APIKey, i.GetFirstModel(), prompt)
+	case models.ProviderOpenAI, models.ProviderDeepSeek, models.ProviderOpenRouter:
+		return openAIOneShot(i, prompt)
+	case models.ProviderGemini:
+		return geminiOneShot(i.APIKey, i.GetFirstModel(), prompt)
+	}
+	return "", fmt.Errorf("provider %s não suporta geração", i.Provider)
+}
+
+func claudeOneShot(apiKey, model, prompt string) (string, error) {
+	if model == "" {
+		model = "claude-3-5-haiku-20241022"
+	}
+	body, _ := json.Marshal(map[string]interface{}{
+		"model":      model,
+		"max_tokens": 2048,
+		"messages":   []map[string]string{{"role": "user", "content": prompt}},
+	})
+	req, _ := http.NewRequest(http.MethodPost, "https://api.anthropic.com/v1/messages", bytes.NewReader(body))
+	req.Header.Set("x-api-key", apiKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+	req.Header.Set("content-type", "application/json")
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		return "", fmt.Errorf("claude %d: %s", resp.StatusCode, string(b))
+	}
+	var out struct {
+		Content []struct {
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if err := json.Unmarshal(b, &out); err != nil {
+		return "", err
+	}
+	if len(out.Content) == 0 {
+		return "", fmt.Errorf("claude: resposta vazia")
+	}
+	return out.Content[0].Text, nil
+}
+
+func openAIOneShot(i *models.UserIntegration, prompt string) (string, error) {
+	endpoint := i.BaseURL
+	if endpoint == "" {
+		endpoint = "https://api.openai.com/v1"
+	}
+	model := i.GetFirstModel()
+	if model == "" {
+		model = "gpt-4o-mini"
+	}
+	body, _ := json.Marshal(map[string]interface{}{
+		"model":       model,
+		"messages":    []map[string]string{{"role": "user", "content": prompt}},
+		"temperature": 0.7,
+		"response_format": map[string]string{"type": "json_object"},
+	})
+	req, _ := http.NewRequest(http.MethodPost, strings.TrimRight(endpoint, "/")+"/chat/completions", bytes.NewReader(body))
+	req.Header.Set("authorization", "Bearer "+i.APIKey)
+	req.Header.Set("content-type", "application/json")
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		return "", fmt.Errorf("openai %d: %s", resp.StatusCode, string(b))
+	}
+	var out struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.Unmarshal(b, &out); err != nil {
+		return "", err
+	}
+	if len(out.Choices) == 0 {
+		return "", fmt.Errorf("openai: resposta vazia")
+	}
+	return out.Choices[0].Message.Content, nil
+}
+
+func geminiOneShot(apiKey, model, prompt string) (string, error) {
+	if model == "" {
+		model = "gemini-1.5-flash"
+	}
+	body, _ := json.Marshal(map[string]interface{}{
+		"contents": []map[string]interface{}{
+			{"parts": []map[string]string{{"text": prompt}}},
+		},
+	})
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, apiKey)
+	req, _ := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	req.Header.Set("content-type", "application/json")
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		return "", fmt.Errorf("gemini %d: %s", resp.StatusCode, string(b))
+	}
+	var out struct {
+		Candidates []struct {
+			Content struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"content"`
+		} `json:"candidates"`
+	}
+	if err := json.Unmarshal(b, &out); err != nil {
+		return "", err
+	}
+	if len(out.Candidates) == 0 || len(out.Candidates[0].Content.Parts) == 0 {
+		return "", fmt.Errorf("gemini: resposta vazia")
+	}
+	return out.Candidates[0].Content.Parts[0].Text, nil
+}
+
+// parseQuickSetupResponse — extrai JSON do texto cru. Tolera markdown
+// envolvendo o JSON (```json...```), texto antes/depois, etc. Em
+// ÚLTIMO caso, devolve fallback fixo pra não trancar o user.
+func parseQuickSetupResponse(raw string, quiz QuickSetupQuiz) fiber.Map {
+	type result struct {
+		AgentName               string `json:"agent_name"`
+		Identity                string `json:"identity"`
+		Objective               string `json:"objective"`
+		CommunicationGuidelines string `json:"communication_guidelines"`
+		ServiceInstructions     string `json:"service_instructions"`
+		Restrictions            string `json:"restrictions"`
+	}
+	clean := strings.TrimSpace(raw)
+	// Tira fences ```json ... ```
+	if strings.HasPrefix(clean, "```") {
+		clean = strings.TrimPrefix(clean, "```json")
+		clean = strings.TrimPrefix(clean, "```")
+		if i := strings.LastIndex(clean, "```"); i >= 0 {
+			clean = clean[:i]
+		}
+	}
+	// Pega o primeiro bloco {...} se ainda houver lixo em volta.
+	if i := strings.Index(clean, "{"); i >= 0 {
+		if j := strings.LastIndex(clean, "}"); j > i {
+			clean = clean[i : j+1]
+		}
+	}
+	var r result
+	if err := json.Unmarshal([]byte(clean), &r); err != nil {
+		log.Warn().Err(err).Str("raw_excerpt", firstNRunes(raw, 200)).
+			Msg("agent quick-setup: parse JSON falhou, usando fallback")
+		r.AgentName = strings.TrimSpace(quiz.AgentName)
+		if r.AgentName == "" {
+			r.AgentName = "Agente IA"
+		}
+		r.Identity = "Sou " + r.AgentName + ", agente de IA do " + quiz.BusinessName
+		r.Objective = quiz.Objective
+		r.CommunicationGuidelines = "Responda de forma " + quiz.Tone + ", direta e útil."
+		r.ServiceInstructions = "Em casos fora do escopo, transferir para humano: " + quiz.Escalation
+		r.Restrictions = strings.Join(quiz.Restrictions, "; ")
+	}
+	if strings.TrimSpace(r.AgentName) == "" {
+		r.AgentName = strings.TrimSpace(quiz.AgentName)
+	}
+	return fiber.Map{
+		"agent_name":               r.AgentName,
+		"identity":                 r.Identity,
+		"objective":                r.Objective,
+		"communication_guidelines": r.CommunicationGuidelines,
+		"service_instructions":     r.ServiceInstructions,
+		"restrictions":             r.Restrictions,
+	}
+}
+
+// firstNRunes — versão local. agent_runtime já tem uma exportada com
+// trailing "…" mas aqui queremos só truncar bruto pra log.
+func firstNRunes(s string, n int) string {
+	if n <= 0 || len(s) == 0 {
+		return ""
+	}
+	rs := []rune(s)
+	if len(rs) <= n {
+		return s
+	}
+	return string(rs[:n])
 }

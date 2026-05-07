@@ -1213,6 +1213,22 @@ export const integrationsApi = {
     api.delete(`/v1/instances/${instanceId}/agents/${agentId}`),
   setPrimaryAgent: (instanceId: string, agentId: string) =>
     api.post(`/v1/instances/${instanceId}/agents/${agentId}/set-primary`),
+  // Wizard simplificado: gera prompt sections via LLM a partir das respostas.
+  generateAgentFromQuiz: (instanceId: string, quiz: {
+    agent_name?: string;
+    business_name?: string;
+    business_segment?: string;
+    business_usp?: string;
+    role?: string;
+    tone?: string;
+    objective?: string;
+    restrictions?: string[];
+    escalation?: string;
+  }, agentId?: string) => api.post(
+    `/v1/instances/${instanceId}/agent/generate-from-quiz`,
+    quiz,
+    agentId ? { params: { agent_id: agentId } } : undefined,
+  ),
   updateAgent: (instanceId: string, data: {
     integration_id?: string | null;
     model?: string;

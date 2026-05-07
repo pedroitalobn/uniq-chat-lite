@@ -1517,6 +1517,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	instance.Post("/agents", integrationH.CreateInstanceAgent)
 	instance.Delete("/agents/:agent_id", integrationH.DeleteInstanceAgent)
 	instance.Post("/agents/:agent_id/set-primary", integrationH.SetPrimaryInstanceAgent)
+	// Wizard simplificado: gera prompts (identity/objective/etc) a partir de
+	// 7 respostas curtas via LLM da conta.
+	instance.Post("/agent/generate-from-quiz", integrationH.GenerateAgentFromQuiz)
 
 	// DEPRECATED legacy inbox routes (WhatsApp-style per-instance chat).
 	// Mantidas para clientes externos via API key — o dashboard já migrou

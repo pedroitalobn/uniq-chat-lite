@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 import { AgentSwitcher } from "@/components/agents/AgentSwitcher";
 import { ActivationTab } from "@/components/agents/ActivationTab";
+import { QuickSetupWizard } from "@/components/agents/QuickSetupWizard";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -261,6 +262,7 @@ export default function AgentsPage() {
   const [selectedInstance, setSelectedInstance] = useState("");
   // Multi-agente: id do agente sendo editado dentro da instância. "" = primário.
   const [selectedAgentId, setSelectedAgentId] = useState("");
+  const [showQuickSetup, setShowQuickSetup] = useState(false);
   const [form, setForm] = useState<AgentForm>(emptyForm());
   const knowledgeUploadRef = useRef<HTMLInputElement | null>(null);
   const skillUploadRef = useRef<HTMLInputElement | null>(null);
@@ -688,6 +690,23 @@ export default function AgentsPage() {
                 />
               </div>
             )}
+            {/* Setup rápido: 7 perguntas que geram identity/objective/etc via LLM.
+                Dispara modal — substitui o passo de "encarar 5 abas vazias". */}
+            {selectedInstance && (
+              <button
+                type="button"
+                onClick={() => setShowQuickSetup(true)}
+                className="mt-3 w-full text-xs font-medium px-3 py-2 rounded-xl inline-flex items-center justify-center gap-1.5"
+                style={{
+                  background: "rgba(99,102,241,0.1)",
+                  color: "#a5b4fc",
+                  border: "1px dashed rgba(99,102,241,0.3)",
+                }}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Setup rápido com IA
+              </button>
+            )}
             <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
               <div className="rounded-2xl p-3" style={cs()}>
                 <p style={{ color: "var(--text-3)" }}>RAG</p>
@@ -1087,6 +1106,26 @@ export default function AgentsPage() {
         </section>
         </AnimatedTabContent>
       </div>
+      )}
+
+      {/* QuickSetup wizard — modal global do editor. Quando aplica,
+          preenche os campos do form sem persistir; user revisa e salva. */}
+      {showQuickSetup && selectedInstance && (
+        <QuickSetupWizard
+          instanceId={selectedInstance}
+          agentId={selectedAgentId || undefined}
+          initialName={form.agent_name}
+          onClose={() => setShowQuickSetup(false)}
+          onApply={(s) => setForm((p) => ({
+            ...p,
+            agent_name: s.agent_name || p.agent_name,
+            identity: s.identity || p.identity,
+            objective: s.objective || p.objective,
+            communication_guidelines: s.communication_guidelines || p.communication_guidelines,
+            service_instructions: s.service_instructions || p.service_instructions,
+            restrictions: s.restrictions || p.restrictions,
+          }))}
+        />
       )}
     </div>
   );
