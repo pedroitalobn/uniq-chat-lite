@@ -87,8 +87,12 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 			c.Set("Access-Control-Allow-Credentials", "true")
 		}
 		// Preflight — responder direto, sem encadear no roteamento
-		// (que pode dar 404 e perder os headers acima).
+		// (que pode dar 404 e perder os headers acima). Cache-Control:
+		// no-store evita que edge proxies (Cloudflare, etc.) sirvam
+		// uma resposta cacheada antiga sem os headers CORS.
 		if c.Method() == fiber.MethodOptions {
+			c.Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+			c.Set("Pragma", "no-cache")
 			if corsAllowed(origin) {
 				if reqHeaders := c.Get("Access-Control-Request-Headers"); reqHeaders != "" {
 					c.Set("Access-Control-Allow-Headers", reqHeaders)
@@ -101,6 +105,22 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 			return c.SendStatus(fiber.StatusNoContent)
 		}
 		return c.Next()
+	})
+
+	// Endpoint de diagnóstico CORS — devolve o que o backend ESTÁ
+	// respondendo pro origin do browser. Útil pra distinguir
+	// "backend não setou header" de "edge proxy/CDN comeu o header".
+	// GET /v1/cors-debug?origin=https://app.uniq.chat
+	app.Get("/v1/cors-debug", func(c *fiber.Ctx) error {
+		origin := c.Query("origin", c.Get("Origin"))
+		return c.JSON(fiber.Map{
+			"origin_received":      c.Get("Origin"),
+			"origin_tested":        origin,
+			"would_allow":          corsAllowed(origin),
+			"cors_allow_list":      corsAllowList,
+			"frontend_url_env":     config.AppConfig.FrontendURL,
+			"response_acao_header": c.GetRespHeader("Access-Control-Allow-Origin"),
+		})
 	})
 
 	// Global middleware
