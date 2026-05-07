@@ -22,6 +22,7 @@ import { showConfirm } from "@/lib/confirm";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useIsMobile } from "@/hooks/useMediaQuery";
+import { CrmHeader, CrmHeaderButton } from "@/components/crm/CrmHeader";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1426,123 +1427,118 @@ export default function CRMPage() {
     setPipelineFilters((prev) => ({ ...prev, [k]: v }));
 
   return (
-    <div className="space-y-4 p-3 sm:p-5 uniq-page">
-      {/* Header — em mobile vira coluna; secondary actions colapsam num kebab */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
-        <div className="min-w-0">
-          <h2 className="text-sm font-medium" style={{ color: "var(--text-2)" }}>Contatos</h2>
-          <p className="text-xs sm:text-sm mt-1" style={{ color: "var(--text-3)" }}>
+    <div className="space-y-3 p-3 sm:p-4 uniq-page">
+      <CrmHeader
+        icon={<User className="w-4 h-4" style={{ color: "var(--green)" }} />}
+        title="Contatos"
+        subtitle={
+          <>
             {contacts.length} contato{contacts.length !== 1 ? "s" : ""}
             {activeFilterCount > 0 && (
               <span style={{ color: "var(--green)" }}> · {activeFilterCount} filtro{activeFilterCount > 1 ? "s" : ""} ativo{activeFilterCount > 1 ? "s" : ""}</span>
             )}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          {/* View toggle — sempre visível */}
-          <div className="flex p-1 rounded-xl items-center" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
-            <button
-              onClick={() => setViewMode("list")}
-              className="p-1.5 rounded-lg transition-colors"
-              style={{ background: viewMode === "list" ? "var(--border-strong)" : "transparent", color: viewMode === "list" ? "white" : "var(--text-2)" }}
-              aria-label="Vista em lista"
-            >
-              <ListIcon className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode("kanban")}
-              className="p-1.5 rounded-lg transition-colors"
-              style={{ background: viewMode === "kanban" ? "var(--border-strong)" : "transparent", color: viewMode === "kanban" ? "white" : "var(--text-2)" }}
-              aria-label="Vista em kanban"
-            >
-              <KanbanSquare className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Pipeline filter — sempre visível (tem badge de count) */}
-          <button
-            onClick={() => setFilterOpen(true)}
-            className="relative flex items-center gap-2 text-sm font-medium px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl transition-all"
-            style={{
-              background: activeFilterCount > 0 ? "rgba(0,212,106,0.08)" : "var(--surface-2)",
-              border: `1px solid ${activeFilterCount > 0 ? "rgba(0,212,106,0.2)" : "var(--border-default)"}`,
-              color: activeFilterCount > 0 ? "var(--green)" : "var(--text-2)",
-            }}
-            aria-label="Filtros do pipeline"
-          >
-            <Filter className="w-4 h-4" />
-            <span className="hidden sm:inline">Pipeline</span>
-            {activeFilterCount > 0 && (
-              <span className="w-4 h-4 rounded-full text-[9px] font-semibold flex items-center justify-center"
-                style={{ background: "var(--green)", color: "#03170a" }}>
-                {activeFilterCount}
-              </span>
+          </>
+        }
+        actions={
+          <>
+            {!isMobile && (
+              <>
+                <CrmHeaderButton onClick={() => setTagsOpen(true)} title="Tags"><TagIcon className="w-3.5 h-3.5" /> Tags</CrmHeaderButton>
+                <CrmHeaderButton onClick={() => setFunnelsOpen(true)} title="Funis"><GitBranch className="w-3.5 h-3.5" /> Funis</CrmHeaderButton>
+                <CrmHeaderButton onClick={() => setJourneysOpen(true)} title="Jornadas"><Route className="w-3.5 h-3.5" /> Jornadas</CrmHeaderButton>
+              </>
             )}
-          </button>
-
-          {/* Desktop: 3 botões inline; Mobile: tudo num kebab pra economizar largura */}
-          {!isMobile ? (
-            <>
-              <SecondaryButton onClick={() => setTagsOpen(true)} icon={<TagIcon className="w-4 h-4" />} label="Tags" />
-              <SecondaryButton onClick={() => setFunnelsOpen(true)} icon={<GitBranch className="w-4 h-4" />} label="Funis" />
-              <SecondaryButton onClick={() => setJourneysOpen(true)} icon={<Route className="w-4 h-4" />} label="Jornadas" />
-            </>
-          ) : (
-            <CRMOverflowMenu
-              onTags={() => setTagsOpen(true)}
-              onFunnels={() => setFunnelsOpen(true)}
-              onJourneys={() => setJourneysOpen(true)}
-            />
-          )}
-
-          <button onClick={() => setCreateOpen(true)} className="btn-primary">
-            <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novo Contato</span>
-            <span className="sm:hidden">Novo</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Tabs + Search + tag filters — todos na mesma linha em desktop;
-          em mobile, tabs ficam acima do search (mas ABAIXO do título) */}
-      <div className="flex gap-3 flex-wrap items-center">
-
-        <div className="flex items-center gap-2 rounded-xl px-3 py-2 flex-1 min-w-48 order-3 sm:order-2"
-          style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
-          <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--text-3)" }} />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nome, telefone, email, ID externo..."
-            className="flex-1 bg-transparent text-sm outline-none"
-            style={{ color: "var(--text-1)" }}
-          />
-          {search && <button onClick={() => setSearch("")}><X className="w-3.5 h-3.5" style={{ color: "var(--text-3)" }} /></button>}
-        </div>
-
-        {tags.length > 0 && (
-          <div className="flex gap-1.5 flex-wrap items-center">
-            <button onClick={() => setActiveTagFilter(null)} className="px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all"
-              style={{
-                background: activeTagFilter === null ? "var(--border-default)" : "var(--surface-2)",
-                color: activeTagFilter === null ? "var(--text-1)" : "var(--text-3)",
-                border: "1px solid var(--border-default)",
-              }}>
-              Todos
-            </button>
-            {tags.map((tag) => (
-              <button key={tag.id} onClick={() => setActiveTagFilter(activeTagFilter === tag.id ? null : tag.id)}
-                className="px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all"
-                style={{
-                  background: activeTagFilter === tag.id ? tag.color + "22" : "var(--surface-2)",
-                  color: activeTagFilter === tag.id ? tag.color : "var(--text-3)",
-                  border: `1px solid ${activeTagFilter === tag.id ? tag.color + "44" : "var(--surface-2)"}`,
-                }}>
-                {tag.name}
+            {isMobile && (
+              <CRMOverflowMenu
+                onTags={() => setTagsOpen(true)}
+                onFunnels={() => setFunnelsOpen(true)}
+                onJourneys={() => setJourneysOpen(true)}
+              />
+            )}
+            <CrmHeaderButton accent onClick={() => setCreateOpen(true)}>
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Novo contato</span>
+              <span className="sm:hidden">Novo</span>
+            </CrmHeaderButton>
+          </>
+        }
+        toolbar={
+          <div className="flex gap-2 flex-wrap items-center">
+            <div
+              className="flex items-center gap-0.5 rounded-xl p-0.5"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}
+            >
+              <button
+                onClick={() => setViewMode("list")}
+                className="p-1.5 rounded-lg transition-colors"
+                style={{ background: viewMode === "list" ? "rgba(255,255,255,0.10)" : "transparent", color: viewMode === "list" ? "var(--text-1)" : "var(--text-2)" }}
+                aria-label="Vista em lista"
+              >
+                <ListIcon className="w-4 h-4" />
               </button>
-            ))}
+              <button
+                onClick={() => setViewMode("kanban")}
+                className="p-1.5 rounded-lg transition-colors"
+                style={{ background: viewMode === "kanban" ? "rgba(255,255,255,0.10)" : "transparent", color: viewMode === "kanban" ? "var(--text-1)" : "var(--text-2)" }}
+                aria-label="Vista em kanban"
+              >
+                <KanbanSquare className="w-4 h-4" />
+              </button>
+            </div>
+            <CrmHeaderButton
+              onClick={() => setFilterOpen(true)}
+              active={activeFilterCount > 0}
+              accent={activeFilterCount > 0}
+              title="Filtros do pipeline"
+            >
+              <Filter className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Pipeline</span>
+              {activeFilterCount > 0 && (
+                <span className="w-4 h-4 rounded-full text-[9px] font-semibold flex items-center justify-center"
+                  style={{ background: "var(--green)", color: "#03170a" }}>
+                  {activeFilterCount}
+                </span>
+              )}
+            </CrmHeaderButton>
+            <div className="flex items-center gap-2 rounded-xl px-3 py-2 flex-1 min-w-[180px]"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--text-3)" }} />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar contato…"
+                className="flex-1 bg-transparent text-xs outline-none"
+                style={{ color: "var(--text-1)" }}
+              />
+              {search && <button onClick={() => setSearch("")}><X className="w-3.5 h-3.5" style={{ color: "var(--text-3)" }} /></button>}
+            </div>
           </div>
-        )}
-      </div>
+        }
+      />
+
+      {tags.length > 0 && (
+        <div className="flex gap-1.5 flex-wrap items-center">
+          <button onClick={() => setActiveTagFilter(null)} className="px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all"
+            style={{
+              background: activeTagFilter === null ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.04)",
+              color: activeTagFilter === null ? "var(--text-1)" : "var(--text-3)",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}>
+            Todos
+          </button>
+          {tags.map((tag) => (
+            <button key={tag.id} onClick={() => setActiveTagFilter(activeTagFilter === tag.id ? null : tag.id)}
+              className="px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all"
+              style={{
+                background: activeTagFilter === tag.id ? tag.color + "22" : "rgba(255,255,255,0.04)",
+                color: activeTagFilter === tag.id ? tag.color : "var(--text-3)",
+                border: `1px solid ${activeTagFilter === tag.id ? tag.color + "44" : "rgba(255,255,255,0.08)"}`,
+              }}>
+              {tag.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Kanban toolbar: seletor de funil (pipeline) + agrupamento */}
       {viewMode === "kanban" && (

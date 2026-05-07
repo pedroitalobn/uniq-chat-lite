@@ -6,6 +6,8 @@ import { Plus, Trash2, Save, Search, Layers, ChevronRight, Loader2, Users, X } f
 import { toast } from "sonner";
 import { segmentsApi } from "@/lib/api";
 import { FunnelOptionPicker, StageOptionPicker, CompanyOptionPicker } from "@/components/crm/FunnelStagePicker";
+import { CrmHeader } from "@/components/crm/CrmHeader";
+import { Filter } from "lucide-react";
 
 type GroupMatch = "all" | "any";
 
@@ -138,15 +140,12 @@ export default function CRMSegmentsPage() {
   const matchLabel = (m: GroupMatch) => (m === "all" ? "TODAS" : "QUALQUER");
 
   return (
-    <div className="px-4 sm:px-6 py-6 lg:py-8 space-y-5">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-medium" style={{ color: "var(--text-1)" }}>Segmentações</h1>
-          <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
-            Recortes de contatos por critérios cruzados — usados em campanhas, jornadas e relatórios.
-          </p>
-        </div>
-      </div>
+    <div className="p-3 sm:p-4 space-y-3">
+      <CrmHeader
+        icon={<Filter className="w-4 h-4" style={{ color: "var(--green)" }} />}
+        title="Segmentações"
+        subtitle="Recortes de contatos por critérios cruzados — usados em campanhas, jornadas e relatórios."
+      />
 
       {/* Builder */}
       <div className="rounded-2xl p-5 space-y-4"

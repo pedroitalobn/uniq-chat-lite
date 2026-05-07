@@ -4,12 +4,9 @@ import { CRMNav } from "@/components/crm/CRMNav";
 
 export default function CRMLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-full flex-col md:flex-row gap-3 md:gap-6">
+    <div className="flex h-full flex-col md:flex-row gap-3 md:gap-4">
       <CRMNav />
-      <div
-        className="flex-1 min-w-0 rounded-2xl overflow-hidden"
-        style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}
-      >
+      <div className="flex-1 min-w-0 min-h-0 overflow-auto">
         {children}
       </div>
     </div>

@@ -10,6 +10,7 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { formatCurrency, uniq, cardStyle } from "@/components/crm/tokens";
 import { CRMFilterBar, type CRMFilters } from "@/components/crm/CRMFilterBar";
+import { CrmHeader, CrmHeaderButton } from "@/components/crm/CrmHeader";
 
 interface Company {
   id: string;
@@ -67,50 +68,47 @@ export default function CompaniesPage() {
   }
 
   return (
-    <div className="flex h-full flex-col uniq-page">
-      <header className="border-b px-4 sm:px-6 py-3 sm:py-4 space-y-3" style={{ borderColor: uniq.borderSoft }}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-medium" style={{ color: "hsl(240 8% 55%)" }}>
-              Empresas
-            </h2>
-            <p className="text-xs" style={{ color: uniq.textFaint }}>
-              {listQ.data?.total ?? 0} empresas cadastradas
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5" style={{ color: uniq.textFaint }} />
+    <div className="flex h-full flex-col gap-3 p-3 sm:p-4 uniq-page">
+      <CrmHeader
+        icon={<Building2 className="w-4 h-4" style={{ color: "var(--green)" }} />}
+        title="Empresas"
+        subtitle={`${listQ.data?.total ?? 0} empresa${(listQ.data?.total ?? 0) === 1 ? "" : "s"} cadastrada${(listQ.data?.total ?? 0) === 1 ? "" : "s"}`}
+        actions={
+          canCreate ? (
+            <CrmHeaderButton accent onClick={() => setNewOpen(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Nova empresa</span>
+              <span className="sm:hidden">Nova</span>
+            </CrmHeaderButton>
+          ) : null
+        }
+        toolbar={
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: "var(--text-3)" }} />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Nome, domínio, CNPJ…"
-                className="w-60 rounded-lg py-1.5 pl-8 pr-3 text-xs outline-none"
-                style={{ ...cardStyle, color: uniq.textPrimary }}
+                className="w-full rounded-xl py-1.5 pl-8 pr-3 text-xs outline-none"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "var(--text-1)",
+                }}
               />
             </div>
-            {canCreate && (
-              <button
-                onClick={() => setNewOpen(true)}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
-                style={{ background: uniq.green, color: "#03170a" }}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Nova empresa
-              </button>
-            )}
           </div>
-        </div>
-        {/* Linha 2: filtros compartilhados com a aba Contatos pra paridade
-            visual. Backend já aceita os 4 filtros; aqui expomos todos. */}
+        }
+      >
         <CRMFilterBar
           workspaceId={wsId}
           value={filters}
           onChange={setFilters}
         />
-      </header>
+      </CrmHeader>
 
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-auto">
         {listQ.isLoading && <div className="text-sm" style={{ color: uniq.textDim }}>Carregando…</div>}
         {!listQ.isLoading && (listQ.data?.items.length ?? 0) === 0 && (
           <EmptyState onCreate={canCreate ? () => setNewOpen(true) : undefined} />

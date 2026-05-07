@@ -9,6 +9,7 @@ import {
   CheckCircle2, Clock, AlertCircle, Trash2, Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
+import { CrmHeader, CrmHeaderButton } from "@/components/crm/CrmHeader";
 
 const TYPE_META: Record<CrmTask["type"], { label: string; icon: React.ElementType }> = {
   call:         { label: "Ligação",     icon: Phone },
@@ -75,37 +76,35 @@ export default function TasksPage() {
   });
 
   return (
-    <div className="p-6 h-full overflow-y-auto">
-      <div className="flex items-start justify-between mb-5 gap-4 flex-wrap">
-        <div>
-          <h2 className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>Tarefas</h2>
-          <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
-            Atividades para a equipe ou agentes IA executarem.
-          </p>
-        </div>
-        <button
-          onClick={() => { setEditing(null); setShowModal(true); }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
-          style={{ background: "#00d46a", color: "#03170a" }}
-        >
-          <Plus className="w-4 h-4" /> Nova tarefa
-        </button>
-      </div>
-
-      <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
-        {STATUS_FILTERS.map((f) => {
-          const active = statusFilter === f.id;
-          return (
-            <button key={f.id} onClick={() => setStatusFilter(f.id)}
-              className="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all"
-              style={active
-                ? { background: f.color + "1a", color: f.color, border: `1px solid ${f.color}55` }
-                : { background: "transparent", color: "var(--text-3)", border: "1px solid var(--surface-border)" }}>
-              {f.label}
-            </button>
-          );
-        })}
-      </div>
+    <div className="p-3 sm:p-4 h-full overflow-y-auto space-y-3">
+      <CrmHeader
+        icon={<ListTodo className="w-4 h-4" style={{ color: "var(--green)" }} />}
+        title="Tarefas"
+        subtitle="Atividades para a equipe ou agentes IA executarem"
+        actions={
+          <CrmHeaderButton accent onClick={() => { setEditing(null); setShowModal(true); }}>
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Nova tarefa</span>
+            <span className="sm:hidden">Nova</span>
+          </CrmHeaderButton>
+        }
+        toolbar={
+          <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
+            {STATUS_FILTERS.map((f) => {
+              const active = statusFilter === f.id;
+              return (
+                <button key={f.id} onClick={() => setStatusFilter(f.id)}
+                  className="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0"
+                  style={active
+                    ? { background: f.color + "1a", color: f.color, border: `1px solid ${f.color}55` }
+                    : { background: "rgba(255,255,255,0.04)", color: "var(--text-3)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  {f.label}
+                </button>
+              );
+            })}
+          </div>
+        }
+      />
 
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--text-3)" }} /></div>

@@ -8,6 +8,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Upload, Loader2, CheckCircle2, AlertCircle, FileText, Building2, Briefcase, Contact as ContactIcon } from "lucide-react";
 import { toast } from "sonner";
 import { crmImportApi } from "@/lib/api";
+import { CrmHeader } from "@/components/crm/CrmHeader";
 
 type Stat = { created: number; updated: number; skipped: number; errors?: string[] };
 
@@ -24,16 +25,12 @@ const HINTS: Record<Entity, { title: string; cols: string[]; icon: typeof Contac
 
 export default function CRMImportPage() {
   return (
-    <div className="px-4 sm:px-6 py-6 lg:py-8 space-y-5">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-medium" style={{ color: "var(--text-1)" }}>Importar CSV</h1>
-          <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
-            Bulk import de Contatos, Empresas e Deals. Idempotente — re-import atualiza ao invés de duplicar.
-          </p>
-        </div>
-
-      </div>
+    <div className="p-3 sm:p-4 space-y-3">
+      <CrmHeader
+        icon={<Upload className="w-4 h-4" style={{ color: "var(--green)" }} />}
+        title="Importar CSV"
+        subtitle="Bulk import de Contatos, Empresas e Deals. Idempotente — re-import atualiza ao invés de duplicar."
+      />
 
       <div className="grid sm:grid-cols-3 gap-4">
         <ImportCard entity="contacts" />

@@ -15,6 +15,7 @@ import type { DealCardData } from "@/components/crm/DealCard";
 import { formatCurrency, uniq, statusColor, statusLabel, relativeTime } from "@/components/crm/tokens";
 import { NewDealDialog } from "@/components/crm/NewDealDialog";
 import { CRMFilterBar, type CRMFilters } from "@/components/crm/CRMFilterBar";
+import { CrmHeader, CrmHeaderButton } from "@/components/crm/CrmHeader";
 
 interface Funnel {
   id: string;
@@ -192,72 +193,68 @@ export default function DealsPage() {
   }
 
   return (
-    <div className="flex h-full flex-col uniq-page">
-      <header
-        className="border-b px-3 sm:px-5 py-3 space-y-3"
-        style={{ borderColor: "var(--surface-border)", background: "var(--surface-1)" }}
-      >
-        {/* Linha 1: funil + ação primária. Search e toggles vão pra linha 2 pra não estourar no mobile. */}
-        <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <FunnelSelector
-              funnels={funnelsQ.data ?? []}
-              activeId={funnelId}
-              onChange={setFunnelId}
-            />
-          </div>
-          {canCreate && (
-            <button
-              onClick={() => setNewOpen(true)}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium flex-shrink-0"
-              style={{
-                background: "var(--green-dim)",
-                border: "1px solid var(--green-border)",
-                color: "var(--green)",
-              }}
-            >
+    <div className="flex h-full flex-col gap-3 p-3 sm:p-4 uniq-page">
+      <CrmHeader
+        icon={<Briefcase className="w-4 h-4" style={{ color: "var(--green)" }} />}
+        title="Deals"
+        subtitle={`${summaryQ.data?.total_open ?? 0} em aberto · ${summaryQ.data?.won_count ?? 0} ganhos · ${summaryQ.data?.lost_count ?? 0} perdidos`}
+        actions={
+          canCreate ? (
+            <CrmHeaderButton accent onClick={() => setNewOpen(true)}>
               <Plus className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Novo deal</span>
               <span className="sm:hidden">Novo</span>
-            </button>
-          )}
-        </div>
-
-        {/* Linha 2: toggles + busca. Wrap em mobile. */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div
-            className="flex items-center gap-1 rounded-lg p-0.5"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
-          >
-            <ViewToggle active={viewMode === "kanban"} onClick={() => setViewMode("kanban")} label="Kanban" icon={<LayoutGrid className="h-3.5 w-3.5" />} />
-            <ViewToggle active={viewMode === "list"} onClick={() => setViewMode("list")} label="Lista" icon={<List className="h-3.5 w-3.5" />} />
+            </CrmHeaderButton>
+          ) : null
+        }
+        toolbar={
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="min-w-[160px]">
+              <FunnelSelector
+                funnels={funnelsQ.data ?? []}
+                activeId={funnelId}
+                onChange={setFunnelId}
+              />
+            </div>
+            <div
+              className="flex items-center gap-0.5 rounded-xl p-0.5"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}
+            >
+              <ViewToggle active={viewMode === "kanban"} onClick={() => setViewMode("kanban")} label="Kanban" icon={<LayoutGrid className="h-3.5 w-3.5" />} />
+              <ViewToggle active={viewMode === "list"} onClick={() => setViewMode("list")} label="Lista" icon={<List className="h-3.5 w-3.5" />} />
+            </div>
+            <div
+              className="flex items-center gap-0.5 rounded-xl p-0.5"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}
+            >
+              <ViewToggle active={ownerFilter === "all"} onClick={() => setOwnerFilter("all")} label="Todos" />
+              <ViewToggle active={ownerFilter === "me"} onClick={() => setOwnerFilter("me")} label="Meus" />
+            </div>
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: "var(--text-3)" }} />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Buscar deal…"
+                className="w-full rounded-xl py-1.5 pl-8 pr-3 text-xs outline-none"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "var(--text-1)",
+                }}
+              />
+            </div>
+            {activeFunnel?.probability_on && (
+              <span
+                className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-[10px] font-medium"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--text-3)" }}
+              >
+                <TrendingUp className="h-3 w-3" /> Probabilidade ativa
+              </span>
+            )}
           </div>
-
-          <div
-            className="flex items-center gap-1 rounded-lg p-0.5"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
-          >
-            <ViewToggle active={ownerFilter === "all"} onClick={() => setOwnerFilter("all")} label="Todos" />
-            <ViewToggle active={ownerFilter === "me"} onClick={() => setOwnerFilter("me")} label="Meus" />
-          </div>
-
-          <div className="relative flex-1 min-w-[160px]">
-            <Search className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5" style={{ color: "var(--text-3)" }} />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar deal…"
-              className="w-full rounded-lg py-1.5 pl-8 pr-3 text-xs outline-none"
-              style={{
-                background: "var(--surface-2)",
-                border: "1px solid var(--surface-border)",
-                color: "var(--text-1)",
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Filtros adicionais — instance/tag */}
+        }
+      >
         <CRMFilterBar
           workspaceId={wsId}
           value={extraFilters}
@@ -265,8 +262,6 @@ export default function DealsPage() {
           showFunnel={false}
           showJourney={false}
         />
-
-        {/* Resumo */}
         <div className="flex flex-wrap items-center gap-2">
           <Metric label="Em aberto" value={String(summaryQ.data?.total_open ?? 0)} accent={uniq.statusOpen} />
           <Metric
@@ -276,16 +271,8 @@ export default function DealsPage() {
             accent={uniq.statusWon}
           />
           <Metric label="Perdidos" value={String(summaryQ.data?.lost_count ?? 0)} accent={uniq.statusLost} />
-          {activeFunnel?.probability_on && (
-            <span
-              className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-medium"
-              style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-3)" }}
-            >
-              <TrendingUp className="h-3 w-3" /> Probabilidade ativa
-            </span>
-          )}
         </div>
-      </header>
+      </CrmHeader>
 
       <div className="flex-1 overflow-hidden" style={{ background: "transparent" }}>
         {viewMode === "kanban" ? (

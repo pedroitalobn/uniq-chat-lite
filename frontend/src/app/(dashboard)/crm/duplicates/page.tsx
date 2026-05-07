@@ -9,6 +9,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, GitMerge, AlertCircle, Users, Phone, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { contactsMergeApi } from "@/lib/api";
+import { CrmHeader } from "@/components/crm/CrmHeader";
 
 interface DupGroup {
   key: string;
@@ -37,17 +38,12 @@ export default function DuplicatesPage() {
   });
 
   return (
-    <div className="px-4 sm:px-6 py-6 lg:py-8 space-y-5">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-medium" style={{ color: "var(--text-1)" }}>Identity Resolution</h1>
-          <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
-            Contatos duplicados (mesmo número WhatsApp + IG + email) viram um único record.
-            Merge re-aponta conversas, deals, orders e tags pro contato sobrevivente.
-          </p>
-        </div>
-
-      </div>
+    <div className="p-3 sm:p-4 space-y-3">
+      <CrmHeader
+        icon={<GitMerge className="w-4 h-4" style={{ color: "var(--green)" }} />}
+        title="Identity Resolution"
+        subtitle="Contatos duplicados viram um único record. Merge re-aponta conversas, deals, orders e tags pro contato sobrevivente."
+      />
 
       <div className="flex items-center gap-2">
         <span className="text-xs" style={{ color: "var(--text-3)" }}>Buscar duplicatas por:</span>
