@@ -370,7 +370,12 @@ function ComposerArea({
     <ComposerPrimitive.Root className="flex-shrink-0">
       <div
         className={cn(
-          "relative mx-3 mb-3 rounded-2xl overflow-hidden",
+          // overflow-visible: o MentionPicker abre `bottom-full` (acima do
+          // input). Antes tinha `overflow-hidden` aqui pra cortar o conteúdo
+          // por causa do `rounded-2xl + backdrop-filter`, mas isso clipava
+          // o dropdown do picker e ele simplesmente sumia. Sem isso o
+          // picker (z-20, absolute) fica visível inteiro.
+          "relative mx-3 mb-3 rounded-2xl overflow-visible",
           isEmpty && "mx-auto w-full max-w-2xl",
         )}
         style={{

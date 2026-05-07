@@ -90,17 +90,29 @@ var AvailableTools = []Tool{
 		},
 	},
 	{
-		Name:        "create_journey",
-		Description: "Cria uma nova jornada de automação. Parâmetros: prompt (descrição em linguagem natural do que a jornada deve fazer), instance_id (opcional).",
+		Name: "create_journey",
+		Description: "Cria uma nova jornada de automação ATIVA com flow real (responde quando a trigger dispara). " +
+			"Use reply_text pra definir EXATAMENTE a mensagem de resposta — sem isso, vai um genérico. " +
+			"Use name pra dar um título legível pra jornada na lista.",
 		Parameters: map[string]Parameter{
 			"prompt": {
 				Type:        "string",
-				Description: "Descrição da jornada em português. Ex: 'Quando alguém mencionar orçamento no grupo Marketing, envie uma mensagem privada de boas-vindas'",
+				Description: "Descrição em linguagem natural do que a jornada deve fazer. Ex: 'Quando alguém disser \"orçamento\" no grupo Marketing, responda no privado'.",
 				Required:    true,
+			},
+			"reply_text": {
+				Type:        "string",
+				Description: "Texto que a jornada deve mandar pro contato no privado quando a trigger disparar. Pode usar Liquid: {{contact.name}}.",
+				Required:    false,
+			},
+			"name": {
+				Type:        "string",
+				Description: "Título curto pra jornada aparecer na lista (ex: 'Resposta orçamento — Marketing').",
+				Required:    false,
 			},
 			"instance_id": {
 				Type:        "string",
-				Description: "ID da instância WhatsApp para associar (UUID, opcional)",
+				Description: "ID da instância WhatsApp para associar (UUID, opcional). Sem isso a jornada serve a qualquer instância do user.",
 				Required:    false,
 			},
 		},

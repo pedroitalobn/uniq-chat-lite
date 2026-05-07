@@ -307,11 +307,19 @@ func (h *ToolsHandler) createJourney(userID uuid.UUID, args map[string]interface
 	}
 
 	instanceID, _ := args["instance_id"].(string)
+	// Mensagem opcional vinda do LLM com a resposta concreta a enviar.
+	// Se vier vazia, derivamos um genérico do prompt.
+	replyText, _ := args["reply_text"].(string)
+	name, _ := args["name"].(string)
 
 	journey := models.Journey{
 		UserID: userID.String(),
 		Prompt: prompt,
 		Status: "active",
+		Name:   name,
+	}
+	if journey.Name == "" {
+		journey.Name = truncateForJourneyName(prompt, 80)
 	}
 
 	if instanceID != "" {
@@ -369,6 +377,17 @@ func (h *ToolsHandler) createJourney(userID uuid.UUID, args map[string]interface
 	parsedRulesJSON, _ := json.Marshal(parsedRules)
 	journey.ParsedRules = string(parsedRulesJSON)
 
+	// Gera o Flow real que o JourneyExecutor vai rodar. Sem isso,
+	// quando a trigger dispara o executor encontra Flow vazio e a
+	// jornada nunca envia nada — sintoma do bug "criou mas não roda".
+	if replyText == "" {
+		replyText = "Olá! Recebemos sua mensagem e em breve te respondemos."
+	}
+	flow := buildSimpleReplyFlow(replyText)
+	if err := journey.SetFlow(flow); err != nil {
+		return map[string]interface{}{"error": fmt.Sprintf("erro ao serializar flow: %v", err)}
+	}
+
 	if err := h.db.Create(&journey).Error; err != nil {
 		return map[string]interface{}{"error": fmt.Sprintf("Erro ao criar jornada: %v", err)}
 	}
@@ -382,8 +401,38 @@ func (h *ToolsHandler) createJourney(userID uuid.UUID, args map[string]interface
 			"trigger_type":   journey.TriggerType,
 			"trigger_filter": triggerFilter,
 			"status":         journey.Status,
+			"reply_text":     replyText,
 		},
 	}
+}
+
+// buildSimpleReplyFlow gera o Flow mínimo que o executor consome:
+// um único step de "message" enviado via DM. É o comportamento default
+// da jornada criada via Uniq AI quando o LLM não especifica algo mais
+// elaborado. Pra fluxos complexos o user edita no /journeys/[id].
+func buildSimpleReplyFlow(text string) *models.JourneyFlow {
+	cfg, _ := json.Marshal(map[string]any{
+		"text": text,
+		"mode": "private",
+	})
+	step := models.FlowStep{
+		ID:          "step-1",
+		Type:        models.StepTypeMessage,
+		Label:       "Resposta automática",
+		Config:      cfg,
+		IsStartStep: true,
+	}
+	return &models.JourneyFlow{
+		Steps:     []models.FlowStep{step},
+		StartStep: step.ID,
+	}
+}
+
+func truncateForJourneyName(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max-1] + "…"
 }
 
 func (h *ToolsHandler) listIntegrations(userID uuid.UUID) interface{} {
