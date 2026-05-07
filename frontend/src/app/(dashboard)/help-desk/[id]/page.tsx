@@ -68,13 +68,22 @@ function slugify(text: string) {
 
 // ─── Page ───────────────────────────────────────────────────────────────────
 
+// Wrapper de remount: chave no articleId faz o React desmontar e
+// remontar o editor inteiro quando o user navega entre artigos
+// (lista → artigo, ou artigo A → artigo B). Resolve o bug onde
+// estado de form/query ficava preso da página anterior, exigindo
+// hard refresh pra ver o conteúdo novo.
 export default function ArticleEditorPage() {
   const params = useParams();
+  const id = (params?.id as string) ?? "";
+  return <ArticleEditor key={id} articleId={id} />;
+}
+
+function ArticleEditor({ articleId }: { articleId: string }) {
   const router = useRouter();
   const qc = useQueryClient();
   const { currentWorkspace } = useWorkspace();
   const wsId = currentWorkspace?.id ?? "";
-  const articleId = params.id as string;
 
   // Form state
   const [title, setTitle] = useState("Novo artigo");

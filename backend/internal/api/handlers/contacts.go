@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/uniq-chat/backend/internal/api/middleware"
@@ -105,7 +107,85 @@ func (h *ContactHandler) ListContacts(c *fiber.Ctx) error {
 	if err := query.Order("name ASC").Limit(limit).Offset(offset).Find(&contacts).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar contatos"})
 	}
+
+	// Enriquecimento: contatos criados via inbound_pipeline ANTES do
+	// push_name chegar ficam com Name = phone (fallback). Quando o
+	// evento de push_name veio depois, ele atualizou Conversation.push_name
+	// mas pode não ter atualizado Contact.name (heurística do upsertPushName
+	// preserva nomes "manuais"). Aqui buscamos o último push_name não-vazio
+	// das conversations do contato e substituímos no response quando o
+	// Contact.name ainda parece um número.
+	enrichContactNames(h.db, contacts)
+
 	return c.JSON(fiber.Map{"data": contacts, "total": total, "limit": limit, "offset": offset})
+}
+
+// enrichContactNames substitui Contact.Name pelo push_name da última
+// conversation quando o Name ainda parece um phone/JID (cenário comum
+// quando contato foi criado pelo pipeline antes do push_name arrivar).
+// Side-effect: persiste o novo nome no DB pra próximas listagens
+// virem certas direto.
+func enrichContactNames(db *gorm.DB, contacts []models.Contact) {
+	if len(contacts) == 0 {
+		return
+	}
+	ids := make([]uuid.UUID, 0, len(contacts))
+	for i := range contacts {
+		c := &contacts[i]
+		if looksLikePhoneOrJID(c.Name, c.Phone) {
+			ids = append(ids, c.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	type row struct {
+		ContactID uuid.UUID
+		PushName  string
+	}
+	var rows []row
+	db.Raw(`
+		SELECT DISTINCT ON (contact_id) contact_id, push_name
+		FROM conversations
+		WHERE contact_id = ANY(?) AND push_name IS NOT NULL AND push_name <> ''
+		ORDER BY contact_id, updated_at DESC
+	`, ids).Scan(&rows)
+	if len(rows) == 0 {
+		return
+	}
+	pushNames := make(map[uuid.UUID]string, len(rows))
+	for _, r := range rows {
+		pushNames[r.ContactID] = r.PushName
+	}
+	for i := range contacts {
+		c := &contacts[i]
+		if name, ok := pushNames[c.ID]; ok && name != "" {
+			c.Name = name
+			// Persist no DB pra reduzir custo das próximas listagens.
+			db.Model(c).Update("name", name)
+		}
+	}
+}
+
+// looksLikePhoneOrJID reconhece nomes "fallback" — phone numérico com
+// ou sem +, ou JIDs do whatsmeow (@s.whatsapp.net / @lid). Esses
+// devem ser substituídos pelo push_name quando disponível.
+func looksLikePhoneOrJID(name, phone string) bool {
+	if name == "" || name == phone || name == "+"+phone {
+		return true
+	}
+	if strings.Contains(name, "@s.whatsapp.net") || strings.Contains(name, "@lid") || strings.Contains(name, "@g.us") {
+		return true
+	}
+	// Apenas dígitos = só telefone
+	allDigits := true
+	for _, ch := range name {
+		if ch < '0' || ch > '9' {
+			allDigits = false
+			break
+		}
+	}
+	return allDigits && len(name) >= 8
 }
 
 // CreateContact godoc
