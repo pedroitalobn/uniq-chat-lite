@@ -61,21 +61,21 @@ function FieldInput({
 }) {
   return (
     <div>
-      <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 48%)" }}>
+      <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>
         {label}{required && " *"}
       </label>
       <div
         className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-        style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)" }}
+        style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
       >
-        <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }} />
+        <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--text-3)" }} />
         <input
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           className="flex-1 bg-transparent text-sm outline-none"
-          style={{ color: "hsl(240 15% 90%)" }}
+          style={{ color: "var(--text-1)" }}
         />
       </div>
     </div>
@@ -93,7 +93,7 @@ function FieldSelect({
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <label className="text-xs font-medium" style={{ color: "hsl(240 8% 48%)" }}>{label}</label>
+        <label className="text-xs font-medium" style={{ color: "var(--text-3)" }}>{label}</label>
         {onManage && (
           <button type="button" onClick={onManage} className="text-[10px] font-medium transition-opacity hover:opacity-80"
             style={{ color: "var(--green)" }}>
@@ -102,16 +102,16 @@ function FieldSelect({
         )}
       </div>
       <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-        style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)", opacity: disabled ? 0.5 : 1 }}>
-        <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }} />
+        style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", opacity: disabled ? 0.5 : 1 }}>
+        <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--text-3)" }} />
         <select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}
-          className="flex-1 bg-transparent text-sm outline-none cursor-pointer" style={{ color: "hsl(240 15% 90%)" }}>
+          className="flex-1 bg-transparent text-sm outline-none cursor-pointer" style={{ color: "var(--text-1)" }}>
           <option value="" style={{ background: "#111" }}>— nenhum —</option>
           {options.map(o => <option key={o.value} value={o.value} style={{ background: "#111" }}>{o.label}</option>)}
         </select>
       </div>
       {options.length === 0 && emptyHint && (
-        <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 38%)" }}>{emptyHint}</p>
+        <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>{emptyHint}</p>
       )}
     </div>
   );
@@ -185,7 +185,7 @@ function ContactModal({
 
   const tabStyle = (active: boolean) => ({
     background: active ? "var(--border-default)" : "transparent",
-    color: active ? "hsl(240 15% 90%)" : "hsl(240 8% 46%)",
+    color: active ? "var(--text-1)" : "var(--text-3)",
     border: active ? "1px solid var(--border-strong)" : "1px solid transparent",
   });
 
@@ -194,14 +194,14 @@ function ContactModal({
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div
         className="relative w-full max-w-lg rounded-2xl shadow-2xl animate-fade-in-up flex flex-col"
-        style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)", maxHeight: "90vh" }}
+        style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", maxHeight: "90vh" }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4">
-          <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>
+          <h2 className="text-base font-medium" style={{ color: "var(--text-1)" }}>
             {contact ? "Editar Contato" : "Novo Contato"}
           </h2>
-          <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }} className="hover:opacity-70 transition-opacity">
+          <button onClick={onClose} style={{ color: "var(--text-3)" }} className="hover:opacity-70 transition-opacity">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -229,22 +229,22 @@ function ContactModal({
               <FieldInput icon={Mail}  label="Email"    value={email} onChange={setEmail} placeholder="joao@email.com" />
 
               <div>
-                <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 48%)" }}>Notas</label>
-                <div className="rounded-xl p-3" style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)" }}>
+                <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>Notas</label>
+                <div className="rounded-xl p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Observações sobre o contato..."
                     rows={3}
                     className="w-full bg-transparent text-sm outline-none resize-none"
-                    style={{ color: "hsl(240 15% 90%)" }}
+                    style={{ color: "var(--text-1)" }}
                   />
                 </div>
               </div>
 
               {tags.length > 0 && (
                 <div>
-                  <label className="text-xs font-medium block mb-2" style={{ color: "hsl(240 8% 48%)" }}>Tags</label>
+                  <label className="text-xs font-medium block mb-2" style={{ color: "var(--text-3)" }}>Tags</label>
                   <div className="flex flex-wrap gap-1.5">
                     {tags.map((tag) => {
                       const selected = selectedTags.includes(tag.id);
@@ -255,7 +255,7 @@ function ContactModal({
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-all"
                           style={{
                             background: selected ? tag.color + "22" : "var(--surface-2)",
-                            color: selected ? tag.color : "hsl(240 8% 46%)",
+                            color: selected ? tag.color : "var(--text-3)",
                             border: `1px solid ${selected ? tag.color + "44" : "var(--border-default)"}`,
                           }}
                         >
@@ -271,7 +271,7 @@ function ContactModal({
           ) : (
             <div className="space-y-3 pb-1">
               <div className="rounded-xl p-3 mb-1" style={{ background: "rgba(0,212,106,0.04)", border: "1px solid rgba(0,212,106,0.1)" }}>
-                <p className="text-[11px]" style={{ color: "hsl(240 8% 52%)" }}>
+                <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
                   Estas variáveis ajudam a segmentar e rastrear o lead dentro do seu processo de vendas.
                 </p>
               </div>
@@ -318,7 +318,7 @@ function ContactModal({
           <button
             onClick={onClose}
             className="flex-1 text-sm py-2.5 rounded-xl transition-all"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 46%)" }}
+            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "var(--text-3)" }}
           >
             Cancelar
           </button>
@@ -362,23 +362,23 @@ function TagManager({ onClose, workspaceId }: { onClose: () => void; workspaceId
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-fade-in-up"
-        style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+        style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>Gerenciar Tags</h2>
-          <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }} className="hover:opacity-70 transition-opacity"><X className="w-5 h-5" /></button>
+          <h2 className="text-base font-medium" style={{ color: "var(--text-1)" }}>Gerenciar Tags</h2>
+          <button onClick={onClose} style={{ color: "var(--text-3)" }} className="hover:opacity-70 transition-opacity"><X className="w-5 h-5" /></button>
         </div>
         <div className="space-y-3 mb-4">
           <div className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-            style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)" }}>
-            <TagIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }} />
+            style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+            <TagIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--text-3)" }} />
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome da tag"
-              className="flex-1 bg-transparent text-sm outline-none" style={{ color: "hsl(240 15% 90%)" }}
+              className="flex-1 bg-transparent text-sm outline-none" style={{ color: "var(--text-1)" }}
               onKeyDown={(e) => e.key === "Enter" && name.trim() && createTag.mutate()} />
           </div>
           <div className="flex gap-1.5 flex-wrap">
             {PRESET_COLORS.map((c) => (
               <button key={c} onClick={() => setColor(c)} className="w-6 h-6 rounded-full transition-all"
-                style={{ background: c, boxShadow: color === c ? `0 0 0 2px hsl(240 18% 6%), 0 0 0 4px ${c}` : "none" }} />
+                style={{ background: c, boxShadow: color === c ? `0 0 0 2px var(--surface-2), 0 0 0 4px ${c}` : "none" }} />
             ))}
           </div>
           <button onClick={() => name.trim() && createTag.mutate()} disabled={!name.trim() || createTag.isPending}
@@ -391,12 +391,12 @@ function TagManager({ onClose, workspaceId }: { onClose: () => void; workspaceId
           {tags.map((tag) => (
             <div key={tag.id} className="flex items-center justify-between p-2 rounded-xl" style={{ background: "var(--surface-2)" }}>
               <TagBadge tag={tag} />
-              <button onClick={() => deleteTag.mutate(tag.id)} className="p-1 rounded-lg transition-colors hover:text-red-400" style={{ color: "hsl(240 8% 38%)" }}>
+              <button onClick={() => deleteTag.mutate(tag.id)} className="p-1 rounded-lg transition-colors hover:text-red-400" style={{ color: "var(--text-3)" }}>
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
           ))}
-          {tags.length === 0 && <p className="text-center text-xs py-4" style={{ color: "hsl(240 8% 38%)" }}>Nenhuma tag ainda</p>}
+          {tags.length === 0 && <p className="text-center text-xs py-4" style={{ color: "var(--text-3)" }}>Nenhuma tag ainda</p>}
         </div>
       </div>
     </div>
@@ -447,16 +447,16 @@ function FunnelManager({ onClose, workspaceId }: { onClose: () => void; workspac
       <div
         className="relative w-full max-w-2xl rounded-2xl shadow-2xl animate-fade-in-up overflow-hidden flex flex-col"
         style={{
-          background: "hsl(240 18% 6%)",
-          border: "1px solid hsl(240 12% 14%)",
+          background: "var(--surface-2)",
+          border: "1px solid var(--surface-border)",
           maxHeight: "min(90vh, 720px)",
         }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid hsl(240 12% 11%)" }}>
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid var(--surface-border)" }}>
           <div className="flex items-center gap-3">
             {mode === "create" && (
-              <button onClick={back} className="p-1 rounded-lg transition-colors hover:bg-white/5" style={{ color: "hsl(240 8% 50%)" }}>
+              <button onClick={back} className="p-1 rounded-lg transition-colors hover:bg-white/5" style={{ color: "var(--text-3)" }}>
                 <ChevronDown className="w-4 h-4 rotate-90" />
               </button>
             )}
@@ -467,17 +467,17 @@ function FunnelManager({ onClose, workspaceId }: { onClose: () => void; workspac
               <GitBranch className="w-4 h-4" style={{ color: "#a78bfa" }} />
             </div>
             <div>
-              <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>
+              <h2 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
                 {mode === "list" ? "Funis e Etapas" : editingFunnel ? `Editar ${editingFunnel.name}` : "Novo funil"}
               </h2>
-              <p className="text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
+              <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
                 {mode === "list"
                   ? "Pipelines de vendas configuráveis por workspace"
                   : "Defina o nome, cor e as etapas do pipeline"}
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-white/5" style={{ color: "hsl(240 8% 38%)" }}>
+          <button onClick={onClose} className="p-1.5 rounded-lg transition-colors hover:bg-white/5" style={{ color: "var(--text-3)" }}>
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -529,11 +529,11 @@ function FunnelList({
       {funnels.length === 0 ? (
         <div
           className="rounded-xl p-8 text-center"
-          style={{ background: "var(--surface-2)", border: "1px dashed hsl(240 12% 16%)" }}
+          style={{ background: "var(--surface-2)", border: "1px dashed var(--surface-border)" }}
         >
-          <GitBranch className="w-8 h-8 mx-auto mb-2" style={{ color: "hsl(240 8% 30%)" }} />
-          <p className="text-sm font-medium" style={{ color: "hsl(240 8% 60%)" }}>Nenhum funil ainda</p>
-          <p className="text-xs mt-1" style={{ color: "hsl(240 8% 42%)" }}>
+          <GitBranch className="w-8 h-8 mx-auto mb-2" style={{ color: "var(--text-3)" }} />
+          <p className="text-sm font-medium" style={{ color: "var(--text-2)" }}>Nenhum funil ainda</p>
+          <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
             Crie seu primeiro pipeline de vendas pra organizar leads
           </p>
         </div>
@@ -564,12 +564,12 @@ function FunnelListItem({
   return (
     <div
       className="rounded-xl p-3 flex items-center gap-3 transition-colors hover:bg-white/[0.02]"
-      style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 13%)" }}
+      style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
     >
       <span className="inline-block w-3 h-3 rounded-full flex-shrink-0" style={{ background: funnel.color || "#a78bfa" }} />
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 90%)" }}>{funnel.name}</div>
-        <div className="text-[11px] mt-0.5" style={{ color: "hsl(240 8% 50%)" }}>
+        <div className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{funnel.name}</div>
+        <div className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
           {stages.length} {stages.length === 1 ? "etapa" : "etapas"}
           {stages.length > 0 && (
             <span className="ml-2 opacity-70">
@@ -582,7 +582,7 @@ function FunnelListItem({
       <button
         onClick={onEdit}
         className="p-1.5 rounded-lg transition-colors hover:bg-white/5"
-        style={{ color: "hsl(240 8% 50%)" }}
+        style={{ color: "var(--text-3)" }}
         title="Editar funil e etapas"
       >
         <Edit2 className="w-3.5 h-3.5" />
@@ -593,7 +593,7 @@ function FunnelListItem({
           onDelete();
         }}
         className="p-1.5 rounded-lg transition-colors hover:bg-red-500/10"
-        style={{ color: "hsl(240 8% 38%)" }}
+        style={{ color: "var(--text-3)" }}
         title="Excluir"
       >
         <Trash2 className="w-3.5 h-3.5" />
@@ -745,7 +745,7 @@ function FunnelForm({
         <SectionHeading icon={GitBranch}>Identidade do funil</SectionHeading>
         <FieldInput icon={GitBranch} label="Nome" value={name} onChange={setName} placeholder="Ex: Vendas B2B" required />
         <div>
-          <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 48%)" }}>
+          <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>
             Descrição (opcional)
           </label>
           <textarea
@@ -756,13 +756,13 @@ function FunnelForm({
             className="w-full bg-transparent rounded-xl px-3 py-2 text-sm outline-none resize-none"
             style={{
               background: "var(--surface-2)",
-              border: "1px solid hsl(240 12% 16%)",
-              color: "hsl(240 15% 90%)",
+              border: "1px solid var(--surface-border)",
+              color: "var(--text-1)",
             }}
           />
         </div>
         <div>
-          <label className="text-xs font-medium block mb-2" style={{ color: "hsl(240 8% 48%)" }}>Cor</label>
+          <label className="text-xs font-medium block mb-2" style={{ color: "var(--text-3)" }}>Cor</label>
           <div className="flex gap-1.5 flex-wrap">
             {PRESET_COLORS.map((c) => (
               <button
@@ -772,7 +772,7 @@ function FunnelForm({
                 className="w-7 h-7 rounded-full transition-all"
                 style={{
                   background: c,
-                  boxShadow: color === c ? `0 0 0 2px hsl(240 18% 6%), 0 0 0 4px ${c}` : "none",
+                  boxShadow: color === c ? `0 0 0 2px var(--surface-2), 0 0 0 4px ${c}` : "none",
                 }}
               />
             ))}
@@ -794,7 +794,7 @@ function FunnelForm({
             Adicionar etapa
           </button>
         </div>
-        <p className="text-[11px]" style={{ color: "hsl(240 8% 48%)" }}>
+        <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
           Os contatos vão se mover por essas etapas no kanban. Ordem importa.
         </p>
         <div className="space-y-1.5">
@@ -802,7 +802,7 @@ function FunnelForm({
             <div
               key={s.id}
               className="flex items-center gap-2 rounded-xl p-2"
-              style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 13%)" }}
+              style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
             >
               <div className="flex flex-col">
                 <button
@@ -810,7 +810,7 @@ function FunnelForm({
                   onClick={() => moveStage(idx, -1)}
                   disabled={idx === 0}
                   className="p-0.5 rounded hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                  style={{ color: "hsl(240 8% 50%)" }}
+                  style={{ color: "var(--text-3)" }}
                 >
                   <ChevronDown className="w-3 h-3 rotate-180" />
                 </button>
@@ -819,18 +819,18 @@ function FunnelForm({
                   onClick={() => moveStage(idx, 1)}
                   disabled={idx === stages.length - 1}
                   className="p-0.5 rounded hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                  style={{ color: "hsl(240 8% 50%)" }}
+                  style={{ color: "var(--text-3)" }}
                 >
                   <ChevronDown className="w-3 h-3" />
                 </button>
               </div>
-              <span className="text-xs tabular-nums w-5 text-center" style={{ color: "hsl(240 8% 38%)" }}>{idx + 1}</span>
+              <span className="text-xs tabular-nums w-5 text-center" style={{ color: "var(--text-3)" }}>{idx + 1}</span>
               <input
                 value={s.name}
                 onChange={(e) => updateStage(idx, { name: e.target.value })}
                 placeholder="Nome da etapa"
                 className="flex-1 bg-transparent text-sm outline-none"
-                style={{ color: "hsl(240 15% 90%)" }}
+                style={{ color: "var(--text-1)" }}
               />
               <select
                 value={s.color}
@@ -852,7 +852,7 @@ function FunnelForm({
                 type="button"
                 onClick={() => removeStage(idx)}
                 className="p-1.5 rounded-lg transition-colors hover:bg-red-500/10"
-                style={{ color: "hsl(240 8% 38%)" }}
+                style={{ color: "var(--text-3)" }}
                 title="Remover"
               >
                 <X className="w-3.5 h-3.5" />
@@ -860,7 +860,7 @@ function FunnelForm({
             </div>
           ))}
           {stages.length === 0 && (
-            <div className="text-center text-xs py-4" style={{ color: "hsl(240 8% 38%)" }}>
+            <div className="text-center text-xs py-4" style={{ color: "var(--text-3)" }}>
               Nenhuma etapa — adicione ao menos uma.
             </div>
           )}
@@ -873,7 +873,7 @@ function FunnelForm({
           type="button"
           onClick={onDone}
           className="text-sm px-4 py-2 rounded-xl transition-colors"
-          style={{ color: "hsl(240 8% 60%)" }}
+          style={{ color: "var(--text-2)" }}
         >
           Cancelar
         </button>
@@ -917,7 +917,7 @@ function FunnelSwitcher({
         style={{
           background: selectedId ? "rgba(167,139,250,0.1)" : "var(--surface-2)",
           border: `1px solid ${selectedId ? "rgba(167,139,250,0.3)" : "var(--border-default)"}`,
-          color: selectedId ? "#c4b5fd" : "hsl(240 15% 90%)",
+          color: selectedId ? "#c4b5fd" : "var(--text-1)",
         }}
       >
         <GitBranch className="w-3.5 h-3.5 flex-shrink-0" />
@@ -936,11 +936,11 @@ function FunnelSwitcher({
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div
             className="absolute left-0 top-full z-40 mt-1 w-72 rounded-xl shadow-2xl overflow-hidden animate-fade-in-up"
-            style={{ background: "hsl(240 18% 7%)", border: "1px solid hsl(240 12% 14%)" }}
+            style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
           >
             <div
               className="px-3 py-2 text-[10px] font-medium uppercase tracking-widest"
-              style={{ color: "hsl(240 8% 42%)", borderBottom: "1px solid hsl(240 12% 11%)" }}
+              style={{ color: "var(--text-3)", borderBottom: "1px solid var(--surface-border)" }}
             >
               Selecionar funil
             </div>
@@ -952,7 +952,7 @@ function FunnelSwitcher({
               }}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-white/[0.03]"
               style={{
-                color: !selectedId ? "#00d46a" : "hsl(240 8% 70%)",
+                color: !selectedId ? "#00d46a" : "var(--text-2)",
                 background: !selectedId ? "rgba(0,212,106,0.05)" : "transparent",
               }}
             >
@@ -971,7 +971,7 @@ function FunnelSwitcher({
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-white/[0.03] text-left"
                   style={{
-                    color: f.id === selectedId ? "#00d46a" : "hsl(240 8% 80%)",
+                    color: f.id === selectedId ? "#00d46a" : "var(--text-1)",
                     background: f.id === selectedId ? "rgba(0,212,106,0.05)" : "transparent",
                   }}
                 >
@@ -979,7 +979,7 @@ function FunnelSwitcher({
                   <div className="flex-1 min-w-0">
                     <div className="truncate font-medium">{f.name}</div>
                     {f.description && (
-                      <div className="truncate text-[10px]" style={{ color: "hsl(240 8% 45%)" }}>
+                      <div className="truncate text-[10px]" style={{ color: "var(--text-3)" }}>
                         {f.description}
                       </div>
                     )}
@@ -988,7 +988,7 @@ function FunnelSwitcher({
                 </button>
               ))}
               {funnels.length === 0 && (
-                <div className="px-3 py-4 text-center text-xs" style={{ color: "hsl(240 8% 42%)" }}>
+                <div className="px-3 py-4 text-center text-xs" style={{ color: "var(--text-3)" }}>
                   Nenhum funil ainda
                 </div>
               )}
@@ -1000,7 +1000,7 @@ function FunnelSwitcher({
                 onManage();
               }}
               className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-medium transition-colors hover:bg-white/[0.03]"
-              style={{ color: "var(--green, #00d46a)", borderTop: "1px solid hsl(240 12% 11%)" }}
+              style={{ color: "var(--green, #00d46a)", borderTop: "1px solid var(--surface-border)" }}
             >
               <Plus className="w-3.5 h-3.5" />
               Gerenciar funis e etapas
@@ -1014,7 +1014,7 @@ function FunnelSwitcher({
 
 function SectionHeading({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
   return (
-    <h3 className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
+    <h3 className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
       <Icon className="w-3 h-3" />
       {children}
     </h3>
@@ -1066,23 +1066,23 @@ function JourneyManager({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-md rounded-2xl p-6 shadow-2xl animate-fade-in-up"
-        style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+        style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>Gerenciar Jornadas</h2>
-          <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }} className="hover:opacity-70 transition-opacity"><X className="w-5 h-5" /></button>
+          <h2 className="text-base font-medium" style={{ color: "var(--text-1)" }}>Gerenciar Jornadas</h2>
+          <button onClick={onClose} style={{ color: "var(--text-3)" }} className="hover:opacity-70 transition-opacity"><X className="w-5 h-5" /></button>
         </div>
         <div className="space-y-3 mb-4">
           <div className="rounded-xl p-3" style={{ background: "rgba(0,212,106,0.04)", border: "1px solid rgba(0,212,106,0.1)" }}>
-            <p className="text-[11px]" style={{ color: "hsl(240 8% 52%)" }}>
+            <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
               Descreva o objetivo da jornada em linguagem natural — a IA gera o fluxo inicial. Você pode refinar depois em <Link href="/journeys" className="underline" style={{ color: "var(--green)" }}>/journeys</Link>.
             </p>
           </div>
           <div className="rounded-xl px-3 py-2.5"
-            style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)" }}>
+            style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
             <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)}
               placeholder="Ex: Qualificar leads B2B, agendar reunião com SDR quando interesse for confirmado..."
               rows={3}
-              className="w-full bg-transparent text-sm outline-none resize-none" style={{ color: "hsl(240 15% 90%)" }} />
+              className="w-full bg-transparent text-sm outline-none resize-none" style={{ color: "var(--text-1)" }} />
           </div>
           <button onClick={() => prompt.trim() && createJourney.mutate()} disabled={!prompt.trim() || createJourney.isPending}
             className="w-full text-sm font-medium py-2 rounded-xl transition-all disabled:opacity-40"
@@ -1095,27 +1095,27 @@ function JourneyManager({ onClose }: { onClose: () => void }) {
             <div key={j.id} className="flex items-center justify-between gap-2 p-2 rounded-xl" style={{ background: "var(--surface-2)" }}>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <Route className="w-3.5 h-3.5 flex-shrink-0" style={{ color: j.status === "active" ? "var(--green)" : "hsl(240 8% 46%)" }} />
-                  <span className="text-sm truncate" style={{ color: "hsl(240 15% 90%)" }}>{j.name}</span>
+                  <Route className="w-3.5 h-3.5 flex-shrink-0" style={{ color: j.status === "active" ? "var(--green)" : "var(--text-3)" }} />
+                  <span className="text-sm truncate" style={{ color: "var(--text-1)" }}>{j.name}</span>
                 </div>
-                <span className="text-[10px] ml-5" style={{ color: j.status === "active" ? "var(--green)" : "hsl(240 8% 46%)" }}>
+                <span className="text-[10px] ml-5" style={{ color: j.status === "active" ? "var(--green)" : "var(--text-3)" }}>
                   {j.status === "active" ? "ativa" : "pausada"}
                 </span>
               </div>
               <button onClick={() => toggleStatus.mutate({ id: j.id, status: j.status === "active" ? "paused" : "active" })}
-                className="p-1 rounded-lg transition-colors" style={{ color: "hsl(240 8% 46%)" }}
+                className="p-1 rounded-lg transition-colors" style={{ color: "var(--text-3)" }}
                 title={j.status === "active" ? "Pausar" : "Ativar"}>
                 {j.status === "active" ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
               </button>
-              <Link href={`/agents/builder/${j.id}`} className="p-1 rounded-lg transition-colors hover:opacity-80" style={{ color: "hsl(240 8% 46%)" }} title="Editar fluxo">
+              <Link href={`/agents/builder/${j.id}`} className="p-1 rounded-lg transition-colors hover:opacity-80" style={{ color: "var(--text-3)" }} title="Editar fluxo">
                 <ExternalLink className="w-3.5 h-3.5" />
               </Link>
-              <button onClick={() => deleteJourney.mutate(j.id)} className="p-1 rounded-lg transition-colors hover:text-red-400" style={{ color: "hsl(240 8% 38%)" }}>
+              <button onClick={() => deleteJourney.mutate(j.id)} className="p-1 rounded-lg transition-colors hover:text-red-400" style={{ color: "var(--text-3)" }}>
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
           ))}
-          {journeys.length === 0 && <p className="text-center text-xs py-4" style={{ color: "hsl(240 8% 38%)" }}>Nenhuma jornada ainda</p>}
+          {journeys.length === 0 && <p className="text-center text-xs py-4" style={{ color: "var(--text-3)" }}>Nenhuma jornada ainda</p>}
         </div>
       </div>
     </div>
@@ -1151,7 +1151,7 @@ function FilterPanel({
     icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   }) => (
     <div>
-      <label className="flex items-center gap-1 text-xs font-medium mb-1.5" style={{ color: "hsl(240 8% 48)" }}>
+      <label className="flex items-center gap-1 text-xs font-medium mb-1.5" style={{ color: "var(--text-3)" }}>
         <Icon className="w-3 h-3" /> {label}
       </label>
       <div className="relative">
@@ -1160,15 +1160,15 @@ function FilterPanel({
           onChange={(e) => onChange(field, e.target.value)}
           className="w-full appearance-none text-sm rounded-xl px-3 py-2.5 pr-8 outline-none cursor-pointer transition-all"
           style={{
-            background: "hsl(240 12% 10%)",
-            border: "1px solid hsl(240 12% 16%)",
-            color: filters[field] ? "hsl(240 15% 93%)" : "hsl(240 8% 46%)",
+            background: "var(--surface-2)",
+            border: "1px solid var(--surface-border)",
+            color: filters[field] ? "var(--text-1)" : "var(--text-3)",
           }}
         >
-          <option value="" style={{ background: "hsl(240 12% 10%)" }}>Todos</option>
-          {options.map((o) => <option key={o} value={o} style={{ background: "hsl(240 12% 10%)" }}>{o}</option>)}
+          <option value="" style={{ background: "var(--surface-2)" }}>Todos</option>
+          {options.map((o) => <option key={o} value={o} style={{ background: "var(--surface-2)" }}>{o}</option>)}
         </select>
-        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "hsl(240 8% 38)" }} />
+        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "var(--text-3)" }} />
       </div>
     </div>
   );
@@ -1178,11 +1178,11 @@ function FilterPanel({
       <div className="absolute inset-0" onClick={onClose} />
       <div
         className="relative w-72 rounded-2xl p-5 shadow-2xl animate-fade-in-up mt-16"
-        style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}
+        style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>Filtros de Pipeline</h3>
-          <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }} className="hover:opacity-70 transition-opacity">
+          <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Filtros de Pipeline</h3>
+          <button onClick={onClose} style={{ color: "var(--text-3)" }} className="hover:opacity-70 transition-opacity">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -1192,7 +1192,7 @@ function FilterPanel({
           <SelectFilter label="Jornada"    field="journey" options={journeys} icon={Route} />
           <SelectFilter label="Responsável" field="owner"  options={owners}   icon={UserCheck} />
           <div>
-            <label className="flex items-center gap-1 text-xs font-medium mb-1" style={{ color: "hsl(240 8% 48%)" }}>
+            <label className="flex items-center gap-1 text-xs font-medium mb-1" style={{ color: "var(--text-3)" }}>
               <Hash className="w-3 h-3" /> ID Externo
             </label>
             <input
@@ -1200,7 +1200,7 @@ function FilterPanel({
               onChange={(e) => onChange("external_id", e.target.value)}
               placeholder="Buscar por ID externo..."
               className="w-full text-sm rounded-xl px-3 py-2 outline-none"
-              style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
+              style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
             />
           </div>
         </div>
@@ -1234,9 +1234,9 @@ function SecondaryButton({
     <button
       onClick={onClick}
       className="flex items-center gap-2 text-sm font-medium px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl transition-all"
-      style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 62%)" }}
-      onMouseEnter={(e) => (e.currentTarget.style.color = "hsl(240 15% 93%)")}
-      onMouseLeave={(e) => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
+      style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "var(--text-2)" }}
+      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-1)")}
+      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-2)")}
     >
       {icon}
       <span className="hidden sm:inline">{label}</span>
@@ -1273,7 +1273,7 @@ function CRMOverflowMenu({
         onClick();
       }}
       className="w-full flex items-center gap-2 px-3 py-2.5 text-sm transition-colors hover:bg-white/[0.04] text-left"
-      style={{ color: "hsl(240 15% 85%)" }}
+      style={{ color: "var(--text-1)" }}
     >
       {icon}
       {label}
@@ -1288,7 +1288,7 @@ function CRMOverflowMenu({
         style={{
           background: open ? "rgba(0,212,106,0.08)" : "var(--surface-2)",
           border: "1px solid " + (open ? "rgba(0,212,106,0.2)" : "var(--border-default)"),
-          color: open ? "#00d46a" : "hsl(240 8% 62%)",
+          color: open ? "#00d46a" : "var(--text-2)",
         }}
         aria-label="Mais opções"
       >
@@ -1297,7 +1297,7 @@ function CRMOverflowMenu({
       {open && (
         <div
           className="absolute right-0 top-full z-40 mt-1 w-48 rounded-xl shadow-2xl overflow-hidden uniq-scale-in"
-          style={{ background: "hsl(240 18% 7%)", border: "1px solid hsl(240 12% 14%)" }}
+          style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
         >
           <Item icon={<TagIcon className="w-3.5 h-3.5" style={{ color: "#a78bfa" }} />} label="Tags" onClick={onTags} />
           <Item icon={<GitBranch className="w-3.5 h-3.5" style={{ color: "#60a5fa" }} />} label="Funis" onClick={onFunnels} />
@@ -1426,12 +1426,12 @@ export default function CRMPage() {
     setPipelineFilters((prev) => ({ ...prev, [k]: v }));
 
   return (
-    <div className="space-y-5 uniq-page">
+    <div className="space-y-4 p-3 sm:p-5 uniq-page">
       {/* Header — em mobile vira coluna; secondary actions colapsam num kebab */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
         <div className="min-w-0">
-          <h2 className="text-sm font-medium" style={{ color: "hsl(240 8% 55%)" }}>Contatos</h2>
-          <p className="text-xs sm:text-sm mt-1" style={{ color: "hsl(240 8% 46%)" }}>
+          <h2 className="text-sm font-medium" style={{ color: "var(--text-2)" }}>Contatos</h2>
+          <p className="text-xs sm:text-sm mt-1" style={{ color: "var(--text-3)" }}>
             {contacts.length} contato{contacts.length !== 1 ? "s" : ""}
             {activeFilterCount > 0 && (
               <span style={{ color: "var(--green)" }}> · {activeFilterCount} filtro{activeFilterCount > 1 ? "s" : ""} ativo{activeFilterCount > 1 ? "s" : ""}</span>
@@ -1440,11 +1440,11 @@ export default function CRMPage() {
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           {/* View toggle — sempre visível */}
-          <div className="flex bg-white/5 p-1 rounded-xl items-center" style={{ border: "1px solid var(--border-default)" }}>
+          <div className="flex p-1 rounded-xl items-center" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
             <button
               onClick={() => setViewMode("list")}
               className="p-1.5 rounded-lg transition-colors"
-              style={{ background: viewMode === "list" ? "var(--border-strong)" : "transparent", color: viewMode === "list" ? "white" : "hsl(240 8% 62%)" }}
+              style={{ background: viewMode === "list" ? "var(--border-strong)" : "transparent", color: viewMode === "list" ? "white" : "var(--text-2)" }}
               aria-label="Vista em lista"
             >
               <ListIcon className="w-4 h-4" />
@@ -1452,7 +1452,7 @@ export default function CRMPage() {
             <button
               onClick={() => setViewMode("kanban")}
               className="p-1.5 rounded-lg transition-colors"
-              style={{ background: viewMode === "kanban" ? "var(--border-strong)" : "transparent", color: viewMode === "kanban" ? "white" : "hsl(240 8% 62%)" }}
+              style={{ background: viewMode === "kanban" ? "var(--border-strong)" : "transparent", color: viewMode === "kanban" ? "white" : "var(--text-2)" }}
               aria-label="Vista em kanban"
             >
               <KanbanSquare className="w-4 h-4" />
@@ -1466,7 +1466,7 @@ export default function CRMPage() {
             style={{
               background: activeFilterCount > 0 ? "rgba(0,212,106,0.08)" : "var(--surface-2)",
               border: `1px solid ${activeFilterCount > 0 ? "rgba(0,212,106,0.2)" : "var(--border-default)"}`,
-              color: activeFilterCount > 0 ? "var(--green)" : "hsl(240 8% 62%)",
+              color: activeFilterCount > 0 ? "var(--green)" : "var(--text-2)",
             }}
             aria-label="Filtros do pipeline"
           >
@@ -1507,16 +1507,16 @@ export default function CRMPage() {
       <div className="flex gap-3 flex-wrap items-center">
 
         <div className="flex items-center gap-2 rounded-xl px-3 py-2 flex-1 min-w-48 order-3 sm:order-2"
-          style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-          <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }} />
+          style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+          <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--text-3)" }} />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nome, telefone, email, ID externo..."
             className="flex-1 bg-transparent text-sm outline-none"
-            style={{ color: "hsl(240 15% 90%)" }}
+            style={{ color: "var(--text-1)" }}
           />
-          {search && <button onClick={() => setSearch("")}><X className="w-3.5 h-3.5" style={{ color: "hsl(240 8% 46%)" }} /></button>}
+          {search && <button onClick={() => setSearch("")}><X className="w-3.5 h-3.5" style={{ color: "var(--text-3)" }} /></button>}
         </div>
 
         {tags.length > 0 && (
@@ -1524,7 +1524,7 @@ export default function CRMPage() {
             <button onClick={() => setActiveTagFilter(null)} className="px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all"
               style={{
                 background: activeTagFilter === null ? "var(--border-default)" : "var(--surface-2)",
-                color: activeTagFilter === null ? "hsl(240 15% 90%)" : "hsl(240 8% 46%)",
+                color: activeTagFilter === null ? "var(--text-1)" : "var(--text-3)",
                 border: "1px solid var(--border-default)",
               }}>
               Todos
@@ -1534,7 +1534,7 @@ export default function CRMPage() {
                 className="px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all"
                 style={{
                   background: activeTagFilter === tag.id ? tag.color + "22" : "var(--surface-2)",
-                  color: activeTagFilter === tag.id ? tag.color : "hsl(240 8% 46%)",
+                  color: activeTagFilter === tag.id ? tag.color : "var(--text-3)",
                   border: `1px solid ${activeTagFilter === tag.id ? tag.color + "44" : "var(--surface-2)"}`,
                 }}>
                 {tag.name}
@@ -1548,7 +1548,7 @@ export default function CRMPage() {
       {viewMode === "kanban" && (
         <div
           className="flex items-center justify-between gap-3 flex-wrap rounded-2xl px-4 py-3"
-          style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}
+          style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
         >
           <div className="flex items-center gap-3 flex-wrap">
             <FunnelSwitcher
@@ -1565,16 +1565,16 @@ export default function CRMPage() {
                 No modo pipeline de funil, as colunas são fixas = stages do funil. */}
             {!pipelineFunnelId && contacts.length > 0 && (
               <>
-                <span className="h-4 w-px" style={{ background: "hsl(240 12% 16%)" }} />
+                <span className="h-4 w-px" style={{ background: "var(--surface-border)" }} />
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium" style={{ color: "hsl(240 8% 46%)" }}>
+                  <span className="text-xs font-medium" style={{ color: "var(--text-3)" }}>
                     Agrupar por
                   </span>
                   <select
                     value={kanbanGroup}
                     onChange={(e) => setKanbanGroup(e.target.value as any)}
                     className="text-xs rounded-lg px-2.5 py-1.5 outline-none font-medium transition-colors cursor-pointer"
-                    style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 15% 90%)" }}
+                    style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "var(--text-1)" }}
                   >
                     <option value="stage" style={{ background: "#111" }}>Etapa</option>
                     <option value="journey" style={{ background: "#111" }}>Jornada</option>
@@ -1586,7 +1586,7 @@ export default function CRMPage() {
           </div>
 
           {selectedPipelineFunnel && (
-            <div className="text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
+            <div className="text-[11px]" style={{ color: "var(--text-3)" }}>
               {pipelineStages.length} {pipelineStages.length === 1 ? "etapa" : "etapas"}
               {pipelineStages.length > 0 && (
                 <> · {pipelineStages.slice(0, 4).map((s) => s.name).join(" → ")}{pipelineStages.length > 4 && " → …"}</>
@@ -1599,7 +1599,7 @@ export default function CRMPage() {
       {/* Active pipeline filter chips */}
       {activeFilterCount > 0 && (
         <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-xs" style={{ color: "hsl(240 8% 42%)" }}>Pipeline:</span>
+          <span className="text-xs" style={{ color: "var(--text-3)" }}>Pipeline:</span>
           {Object.entries(pipelineFilters).filter(([, v]) => v).map(([k, v]) => (
             <span key={k}
               className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg"
@@ -1620,10 +1620,10 @@ export default function CRMPage() {
       ) : contacts.length === 0 ? (
         (activeFilterCount > 0 || search || activeTagFilter) ? (
           <div className="rounded-2xl p-14 text-center animate-fade-in-up"
-            style={{ background: "hsl(240 18% 6%)", border: "1px dashed hsl(240 12% 16%)" }}>
+            style={{ background: "var(--surface-2)", border: "1px dashed var(--surface-border)" }}>
             <Search className="w-10 h-10 mx-auto mb-3 opacity-30" style={{ color: "var(--text-3)" }} />
-            <p className="font-medium text-sm" style={{ color: "hsl(240 8% 70%)" }}>Nenhum contato encontrado</p>
-            <p className="text-sm mt-1.5" style={{ color: "hsl(240 8% 42%)" }}>Tente ajustar os filtros</p>
+            <p className="font-medium text-sm" style={{ color: "var(--text-2)" }}>Nenhum contato encontrado</p>
+            <p className="text-sm mt-1.5" style={{ color: "var(--text-3)" }}>Tente ajustar os filtros</p>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-20 px-4 text-center animate-fade-in-up">
@@ -1661,7 +1661,7 @@ export default function CRMPage() {
           </div>
         )
       ) : viewMode === "list" ? (
-        <div className="rounded-2xl overflow-hidden" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+        <div className="rounded-2xl overflow-hidden" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
           {contacts.map((contact, i) => {
             // Temperature based on days since last update
             const daysSince = contact.updated_at
@@ -1688,7 +1688,7 @@ export default function CRMPage() {
               key={contact.id}
               className="group flex items-start gap-4 px-5 py-3.5 transition-colors hover:bg-white/[0.02]"
               style={{
-                borderTop: i > 0 ? "1px solid hsl(240 12% 11%)" : undefined,
+                borderTop: i > 0 ? "1px solid var(--surface-border)" : undefined,
                 borderLeft: `3px solid ${tempColor}30`,
               }}
             >
@@ -1702,7 +1702,7 @@ export default function CRMPage() {
                 {contact.name[0]?.toUpperCase()}
                 {/* Temperature dot */}
                 <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
-                  style={{ background: tempColor, borderColor: "hsl(240 18% 6%)" }}
+                  style={{ background: tempColor, borderColor: "var(--surface-2)" }}
                   title={tempLabel} />
               </div>
 
@@ -1710,14 +1710,14 @@ export default function CRMPage() {
               <div className="flex-1 min-w-0">
                 {/* Name + tags row */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-sm font-medium" style={{ color: "hsl(240 15% 90%)" }}>{contact.name}</p>
+                  <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{contact.name}</p>
                   {contact.tags?.map((tag) => <TagBadge key={tag.id} tag={tag} />)}
                 </div>
 
                 {/* Phone + email */}
                 <div className="flex items-center gap-3 mt-0.5">
-                  <span className="text-xs font-mono" style={{ color: "hsl(240 8% 46%)" }}>{contact.phone}</span>
-                  {contact.email && <span className="text-xs" style={{ color: "hsl(240 8% 38%)" }}>{contact.email}</span>}
+                  <span className="text-xs font-mono" style={{ color: "var(--text-3)" }}>{contact.phone}</span>
+                  {contact.email && <span className="text-xs" style={{ color: "var(--text-3)" }}>{contact.email}</span>}
                 </div>
 
                 {/* Pipeline badges */}
@@ -1741,24 +1741,24 @@ export default function CRMPage() {
               <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
                 {contact.notes && (
                   <span title={contact.notes}>
-                    <StickyNote className="w-3.5 h-3.5" style={{ color: "hsl(240 8% 38%)" }} />
+                    <StickyNote className="w-3.5 h-3.5" style={{ color: "var(--text-3)" }} />
                   </span>
                 )}
                 <button
                   onClick={() => setEditContact(contact)}
                   className="p-1.5 rounded-lg transition-all"
-                  style={{ color: "hsl(240 8% 42%)" }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "hsl(240 15% 80%)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-2)"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "hsl(240 8% 42%)"; (e.currentTarget as HTMLElement).style.background = ""; }}
+                  style={{ color: "var(--text-3)" }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "var(--text-1)"; (e.currentTarget as HTMLElement).style.background = "var(--surface-2)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "var(--text-3)"; (e.currentTarget as HTMLElement).style.background = ""; }}
                 >
                   <Edit2 className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={async () => { if (!await showConfirm(`Remover o contato "${contact.name}"?`, { title: "Remover contato", confirmLabel: "Remover" })) return; deleteContact.mutate(contact.id); }}
                   className="p-1.5 rounded-lg transition-all"
-                  style={{ color: "hsl(240 8% 42%)" }}
+                  style={{ color: "var(--text-3)" }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#ef4444"; (e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.08)"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "hsl(240 8% 42%)"; (e.currentTarget as HTMLElement).style.background = ""; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "var(--text-3)"; (e.currentTarget as HTMLElement).style.background = ""; }}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -1798,12 +1798,12 @@ export default function CRMPage() {
                       <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "var(--border-default)" }}>
                         <div className="flex items-center gap-2">
                           <span className="inline-block w-2 h-2 rounded-full" style={{ background: col.isNoStage ? "#64748b" : (col.color || "#60a5fa") }} />
-                          <h3 className="text-sm font-medium truncate" style={{ color: col.isNoStage ? "hsl(240 8% 62%)" : "hsl(240 15% 90%)" }}>
+                          <h3 className="text-sm font-medium truncate" style={{ color: col.isNoStage ? "var(--text-2)" : "var(--text-1)" }}>
                             {col.label}
                           </h3>
                         </div>
                         <span className="text-xs font-medium px-2 py-0.5 rounded-full"
-                          style={{ background: "var(--surface-3)", color: "hsl(240 8% 62%)" }}>
+                          style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
                           {colContacts.length}
                         </span>
                       </div>
@@ -1825,8 +1825,8 @@ export default function CRMPage() {
                                     className="group rounded-xl p-3 shadow-xl transition-shadow"
                                     style={{
                                       ...provided.draggableProps.style,
-                                      background: "hsl(240 18% 8%)",
-                                      border: `1px solid ${snapshot.isDragging ? "var(--green)" : "hsl(240 12% 16%)"}`,
+                                      background: "var(--surface-2)",
+                                      border: `1px solid ${snapshot.isDragging ? "var(--green)" : "var(--surface-border)"}`,
                                       boxShadow: snapshot.isDragging ? "0 12px 24px rgba(0,0,0,0.5)" : "0 4px 12px rgba(0,0,0,0.2)",
                                     }}
                                     onClick={(e) => {
@@ -1835,21 +1835,21 @@ export default function CRMPage() {
                                   >
                                     <div className="flex items-start justify-between gap-2 mb-2">
                                       <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 93%)" }}>{contact.name}</p>
-                                        <p className="text-xs font-mono truncate" style={{ color: "hsl(240 8% 46%)" }}>{contact.phone}</p>
+                                        <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{contact.name}</p>
+                                        <p className="text-xs font-mono truncate" style={{ color: "var(--text-3)" }}>{contact.phone}</p>
                                       </div>
-                                      <GripVertical className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 cursor-grab active:cursor-grabbing" style={{ color: "hsl(240 8% 38%)" }} />
+                                      <GripVertical className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 cursor-grab active:cursor-grabbing" style={{ color: "var(--text-3)" }} />
                                     </div>
                                     <div className="flex flex-wrap gap-1 mt-2">
                                       {contact.tags?.map((tag) => <TagBadge key={tag.id} tag={tag} />)}
                                     </div>
                                     <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: "var(--border-default)" }}>
                                       <div className="flex items-center gap-1">
-                                        {contact.owner && <span className="text-[10px]" style={{ color: "hsl(240 8% 42%)" }}>👤 {contact.owner}</span>}
+                                        {contact.owner && <span className="text-[10px]" style={{ color: "var(--text-3)" }}>👤 {contact.owner}</span>}
                                       </div>
                                       <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={(e) => { e.stopPropagation(); setEditContact(contact); }} className="hover:text-white" style={{ color: "hsl(240 8% 42%)" }}><Edit2 className="w-3.5 h-3.5" /></button>
-                                        <button onClick={async (e) => { e.stopPropagation(); if (!await showConfirm(`Remover "${contact.name}"?`)) return; deleteContact.mutate(contact.id); }} className="hover:text-red-400" style={{ color: "hsl(240 8% 42%)" }}><Trash2 className="w-3.5 h-3.5" /></button>
+                                        <button onClick={(e) => { e.stopPropagation(); setEditContact(contact); }} className="hover:text-white" style={{ color: "var(--text-3)" }}><Edit2 className="w-3.5 h-3.5" /></button>
+                                        <button onClick={async (e) => { e.stopPropagation(); if (!await showConfirm(`Remover "${contact.name}"?`)) return; deleteContact.mutate(contact.id); }} className="hover:text-red-400" style={{ color: "var(--text-3)" }}><Trash2 className="w-3.5 h-3.5" /></button>
                                       </div>
                                     </div>
                                   </div>
@@ -1906,13 +1906,13 @@ export default function CRMPage() {
                   >
                     <div className="px-4 py-3 border-b flex items-center justify-between select-none" style={{ borderColor: "var(--border-default)" }}>
                       <div className="flex items-center gap-2">
-                        <GripVertical className="w-4 h-4 opacity-40" style={{ color: "hsl(240 8% 38%)" }} />
-                        <h3 className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 90%)" }}>
+                        <GripVertical className="w-4 h-4 opacity-40" style={{ color: "var(--text-3)" }} />
+                        <h3 className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>
                           {colName}
                         </h3>
                       </div>
                       <span className="text-xs font-medium px-2 py-0.5 rounded-full" 
-                        style={{ background: "var(--surface-3)", color: "hsl(240 8% 62%)" }}>
+                        style={{ background: "var(--surface-3)", color: "var(--text-2)" }}>
                         {colContacts.length}
                       </span>
                     </div>
@@ -1935,8 +1935,8 @@ export default function CRMPage() {
                                   className="group rounded-xl p-3 shadow-xl transition-shadow"
                                   style={{
                                     ...provided.draggableProps.style,
-                                    background: "hsl(240 18% 8%)",
-                                    border: `1px solid ${snapshot.isDragging ? "var(--green)" : "hsl(240 12% 16%)"}`,
+                                    background: "var(--surface-2)",
+                                    border: `1px solid ${snapshot.isDragging ? "var(--green)" : "var(--surface-border)"}`,
                                     boxShadow: snapshot.isDragging ? "0 12px 24px rgba(0,0,0,0.5)" : "0 4px 12px rgba(0,0,0,0.2)",
                                   }}
                                   onClick={(e) => {
@@ -1948,10 +1948,10 @@ export default function CRMPage() {
                                 >
                                   <div className="flex items-start justify-between gap-2 mb-2">
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 93%)" }}>{contact.name}</p>
-                                      <p className="text-xs font-mono truncate" style={{ color: "hsl(240 8% 46%)" }}>{contact.phone}</p>
+                                      <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{contact.name}</p>
+                                      <p className="text-xs font-mono truncate" style={{ color: "var(--text-3)" }}>{contact.phone}</p>
                                     </div>
-                                    <GripVertical className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 cursor-grab active:cursor-grabbing" style={{ color: "hsl(240 8% 38%)" }} />
+                                    <GripVertical className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 cursor-grab active:cursor-grabbing" style={{ color: "var(--text-3)" }} />
                                   </div>
                                   
                                   <div className="flex flex-wrap gap-1 mt-2">
@@ -1960,11 +1960,11 @@ export default function CRMPage() {
                                   
                                   <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: "var(--border-default)" }}>
                                     <div className="flex items-center gap-1">
-                                      {contact.owner && <span className="text-[10px]" style={{ color: "hsl(240 8% 42%)" }}>👤 {contact.owner}</span>}
+                                      {contact.owner && <span className="text-[10px]" style={{ color: "var(--text-3)" }}>👤 {contact.owner}</span>}
                                     </div>
                                     <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <button onClick={(e) => { e.stopPropagation(); setEditContact(contact); }} className="hover:text-white" style={{ color: "hsl(240 8% 42%)" }}><Edit2 className="w-3.5 h-3.5" /></button>
-                                      <button onClick={async (e) => { e.stopPropagation(); if (!await showConfirm(`Remover "${contact.name}"?`)) return; deleteContact.mutate(contact.id); }} className="hover:text-red-400" style={{ color: "hsl(240 8% 42%)" }}><Trash2 className="w-3.5 h-3.5" /></button>
+                                      <button onClick={(e) => { e.stopPropagation(); setEditContact(contact); }} className="hover:text-white" style={{ color: "var(--text-3)" }}><Edit2 className="w-3.5 h-3.5" /></button>
+                                      <button onClick={async (e) => { e.stopPropagation(); if (!await showConfirm(`Remover "${contact.name}"?`)) return; deleteContact.mutate(contact.id); }} className="hover:text-red-400" style={{ color: "var(--text-3)" }}><Trash2 className="w-3.5 h-3.5" /></button>
                                     </div>
                                   </div>
                                 </div>
