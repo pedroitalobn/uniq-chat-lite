@@ -16,9 +16,10 @@ export function UsageBanner() {
   const [warning, setWarning] = useState<{ percent: number; current: number; limit: number; type: string } | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
-  // Subscribe ao WS event usage.threshold (via /v1/ws/events).
+  // Subscribe ao WS event usage.threshold (via /ws/events — caminho
+  // sem /v1/ pra bater com o que o backend registra em router.go).
   useEffect(() => {
-    const wsUrl = (process.env.NEXT_PUBLIC_WS_URL || "wss://api.uniq.chat") + "/v1/ws/events";
+    const wsUrl = (process.env.NEXT_PUBLIC_WS_URL || "wss://api.uniq.chat") + "/ws/events";
     let ws: WebSocket | null = null;
     let mounted = true;
     try {
