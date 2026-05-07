@@ -265,7 +265,7 @@ export function Sidebar() {
               <WsIcon className="w-3.5 h-3.5" style={{ color: wsColor }} />
             </button>
             <div className="flex-1 min-w-0">
-              {workspaces.length > 1 ? (
+              {workspaces.length >= 1 ? (
                 <WorkspaceDropdown
                   workspaces={workspaces}
                   currentId={currentWorkspace?.id || ""}
@@ -276,7 +276,7 @@ export function Sidebar() {
                 />
               ) : (
                 <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>
-                  {currentWorkspace?.name || "Selecione workspace"}
+                  Selecione workspace
                 </p>
               )}
               <p className="text-[9px] mt-0.5 font-medium" style={{

@@ -27,7 +27,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { data: workspaces = [], isLoading } = useQuery<Workspace[]>({
     queryKey: ["workspaces"],
     queryFn: () => workspacesApi.list().then((r) => r.data.workspaces || r.data),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    // Refetch quando a aba volta a ficar visível — cobre o caso "aceitei
+    // convite em outra aba e voltei pro app". Antes ficava 5min cacheado.
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
 
   // Persiste o ID em localStorage assim que muda — interceptor global

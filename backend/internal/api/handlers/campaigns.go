@@ -333,13 +333,50 @@ func (h *CampaignHandler) processCampaign(c models.Campaign, today string) {
 			}
 		}
 
-		// Liquid render no texto + caption (suporta {{contact.name}}, {% if %})
-		liquidVars := map[string]any{"contact": map[string]any{"phone": r.Phone, "name": r.Name}}
-		if c.MessageText != "" {
-			c.MessageText = templatesvc.MustRender(c.MessageText, liquidVars)
+		// Liquid render no texto + caption (suporta {{contact.name}}, {% if %}).
+		// Carrega o contato completo se existir, pra expor email/tags/custom_fields
+		// nas variáveis. NÃO mutamos c.MessageText/c.Caption — antes mutava o struct
+		// em loop, então todos os destinatários após o primeiro recebiam o texto
+		// renderizado com o nome do primeiro.
+		contactVars := map[string]any{
+			"phone":         r.Phone,
+			"name":          r.Name,
+			"email":         "",
+			"first_name":    firstWord(r.Name),
+			"tags":          []string{},
+			"custom_fields": map[string]any{},
 		}
-		if c.Caption != "" {
-			c.Caption = templatesvc.MustRender(c.Caption, liquidVars)
+		if c.WorkspaceID != nil {
+			var fullContact models.Contact
+			if err := h.db.Preload("Tags").
+				Where("(workspace_id = ? OR user_id = ?) AND phone = ?", *c.WorkspaceID, c.UserID, r.Phone).
+				First(&fullContact).Error; err == nil {
+				if r.Name == "" && fullContact.Name != "" {
+					contactVars["name"] = fullContact.Name
+					contactVars["first_name"] = firstWord(fullContact.Name)
+				}
+				contactVars["email"] = fullContact.Email
+				tagNames := make([]string, 0, len(fullContact.Tags))
+				for _, t := range fullContact.Tags {
+					tagNames = append(tagNames, t.Name)
+				}
+				contactVars["tags"] = tagNames
+				if fullContact.CustomFields != "" {
+					var cf map[string]any
+					if err := json.Unmarshal([]byte(fullContact.CustomFields), &cf); err == nil {
+						contactVars["custom_fields"] = cf
+					}
+				}
+			}
+		}
+		liquidVars := map[string]any{"contact": contactVars}
+		messageText := c.MessageText
+		caption := c.Caption
+		if messageText != "" {
+			messageText = templatesvc.MustRender(messageText, liquidVars)
+		}
+		if caption != "" {
+			caption = templatesvc.MustRender(caption, liquidVars)
 		}
 
 		// Build job
@@ -350,17 +387,17 @@ func (h *CampaignHandler) processCampaign(c models.Campaign, today string) {
 			msgType = queue.TypeImage
 			payload.MediaB64 = c.MediaB64
 			payload.MimeType = c.MediaMime
-			payload.Caption = c.Caption
+			payload.Caption = caption
 			if payload.Caption == "" {
-				payload.Caption = c.MessageText
+				payload.Caption = messageText
 			}
 		case "video":
 			msgType = queue.TypeVideo
 			payload.MediaB64 = c.MediaB64
 			payload.MimeType = c.MediaMime
-			payload.Caption = c.Caption
+			payload.Caption = caption
 			if payload.Caption == "" {
-				payload.Caption = c.MessageText
+				payload.Caption = messageText
 			}
 		case "audio":
 			msgType = queue.TypeAudio
@@ -374,7 +411,7 @@ func (h *CampaignHandler) processCampaign(c models.Campaign, today string) {
 			payload.Filename = c.MediaName
 		default:
 			msgType = queue.TypeText
-			payload.Text = c.MessageText
+			payload.Text = messageText
 		}
 
 		job := queue.SendJob{
@@ -1050,7 +1087,12 @@ func (h *CampaignHandler) SegmentOptions(c *fiber.Ctx) error {
 	h.db.Model(&models.Contact{}).Distinct("owner").Where("user_id = ? AND owner != ''", user.ID).Pluck("owner", &owners)
 	h.db.Model(&models.Contact{}).Distinct("external_id").Where("user_id = ? AND external_id != ''", user.ID).Pluck("external_id", &externalIDs)
 	h.db.Where("user_id = ?", user.ID).Find(&tags)
-	h.db.Select("id, name").Where("workspace_id IN (SELECT id FROM workspaces WHERE user_id = ?)", user.ID).Find(&segments)
+	// Segments — incluir tanto workspaces que o user é OWNER quanto aqueles
+	// onde ele é MEMBER (user_workspaces). Antes filtrava só owner, então
+	// um atendente nunca via segmentos criados por colegas no mesmo workspace.
+	h.db.Select("id, name, type, member_count").
+		Where("workspace_id IN (SELECT id FROM workspaces WHERE user_id = ?) OR workspace_id IN (SELECT workspace_id FROM user_workspaces WHERE user_id = ?)", user.ID, user.ID).
+		Find(&segments)
 
 	return c.JSON(fiber.Map{
 		"funnels":      funnels,
@@ -1526,4 +1568,17 @@ func (h *CampaignHandler) RunNow(c *fiber.Ctx) error {
 	go h.processCampaign(camp, now.Format("2006-01-02"))
 
 	return c.JSON(fiber.Map{"ok": true, "message": "tick disparado"})
+}
+
+
+// firstWord — extrai primeiro nome para {{contact.first_name}} no Liquid.
+// Caller usa em saudações: "Olá {{contact.first_name}}, ..." em vez do nome
+// completo, que pode ficar formal demais.
+func firstWord(s string) string {
+	for i := 0; i < len(s); i++ {
+		if s[i] == ' ' || s[i] == '\t' {
+			return s[:i]
+		}
+	}
+	return s
 }

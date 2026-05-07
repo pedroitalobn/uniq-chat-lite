@@ -717,8 +717,10 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                       className="input-field w-full text-xs"
                     >
                       <option value="">— escolha um segmento —</option>
-                      {(segmentOptions?.segments || []).map((s: { id: string; name: string }) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
+                      {(segmentOptions?.segments || []).map((s: { id: string; name: string; member_count?: number }) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}{typeof s.member_count === "number" ? ` · ${s.member_count} contato${s.member_count !== 1 ? "s" : ""}` : ""}
+                        </option>
                       ))}
                     </select>
                     <p className="text-[11px]" style={{ color: "var(--text-3)" }}>

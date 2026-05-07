@@ -5,7 +5,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Save, Search, Layers, ChevronRight, Loader2, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { segmentsApi } from "@/lib/api";
-import { FunnelOptionPicker, StageOptionPicker, CompanyOptionPicker } from "@/components/crm/FunnelStagePicker";
+import {
+  FunnelOptionPicker, StageOptionPicker, CompanyOptionPicker,
+  AgentOptionPicker, MemberOptionPicker,
+  DepartmentOptionPicker, TeamOptionPicker, QueueOptionPicker,
+} from "@/components/crm/FunnelStagePicker";
 import { CrmHeader } from "@/components/crm/CrmHeader";
 import { Filter } from "lucide-react";
 
@@ -39,7 +43,7 @@ const FIELDS: FieldDef[] = [
   { value: "funnel",                    label: "Está no funil (legacy)",       group: "CRM" },
   { value: "stage",                     label: "Está no estágio (legacy)",     group: "CRM" },
   { value: "tag",                       label: "Tem a tag",                    group: "CRM" },
-  { value: "owner",                     label: "Owner é o usuário (ID)",       group: "CRM" },
+  { value: "owner",                     label: "Owner é o usuário",            group: "CRM" },
   { value: "channel",                   label: "Veio pelo canal",              group: "CRM" },
   // CRM v2 — combinam com deals (cross-entity). Backend faz INNER JOIN
   // contacts → deals e aplica esses filtros.
@@ -50,17 +54,17 @@ const FIELDS: FieldDef[] = [
   { value: "min_deal_value",            label: "Deal valor ≥ (cents)",         group: "Deals", type: "number", placeholder: "ex: 100000 = R$1.000" },
   { value: "max_deal_value",            label: "Deal valor ≤ (cents)",         group: "Deals", type: "number" },
   { value: "journey",                   label: "Está/passou na jornada",       group: "Jornada" },
-  { value: "passed_agent",              label: "Atendido pelo agente IA (ID)", group: "Jornada" },
+  { value: "passed_agent",              label: "Atendido pelo agente IA",      group: "Jornada" },
   { value: "purchased_shop",            label: "Comprou na loja (shop ID)",    group: "Compras" },
   { value: "purchased_since_days",      label: "Comprou nos últimos N dias",   group: "Compras", type: "number", placeholder: "ex: 30" },
   { value: "purchased_min_total",       label: "Total de compras ≥ R$",        group: "Compras", type: "number", placeholder: "ex: 100" },
   { value: "never_purchased",           label: "Nunca comprou",                group: "Compras", type: "boolean" },
   { value: "signup_after",              label: "Cadastrou-se após",            group: "Tempo", type: "date" },
   { value: "signup_before",             label: "Cadastrou-se antes de",        group: "Tempo", type: "date" },
-  { value: "inbox_assigned_to",         label: "Atendido pelo atendente (ID)", group: "Inbox" },
-  { value: "inbox_department",          label: "Departamento (ID)",            group: "Inbox" },
-  { value: "inbox_team",                label: "Equipe (ID)",                  group: "Inbox" },
-  { value: "inbox_queue",               label: "Fila (ID)",                    group: "Inbox" },
+  { value: "inbox_assigned_to",         label: "Atendido pelo atendente",      group: "Inbox" },
+  { value: "inbox_department",          label: "Departamento",                 group: "Inbox" },
+  { value: "inbox_team",                label: "Equipe",                       group: "Inbox" },
+  { value: "inbox_queue",               label: "Fila",                         group: "Inbox" },
   { value: "inbox_response_time_max",   label: "Tempo de resp. ≤ N segundos",  group: "Inbox", type: "number", placeholder: "ex: 300" },
   { value: "inbox_conversation_count_min", label: "Nº de conversas ≥",        group: "Inbox", type: "number", placeholder: "ex: 3" },
   { value: "inbox_last_contact_after",  label: "Último contato após",          group: "Inbox", type: "date" },
@@ -247,6 +251,21 @@ export default function CRMSegmentsPage() {
                         onChange={(v) => updateCond(group.id, cond.id, { value: v })} />
                     ) : cond.field === "company_id" ? (
                       <CompanyOptionPicker value={cond.value}
+                        onChange={(v) => updateCond(group.id, cond.id, { value: v })} />
+                    ) : cond.field === "passed_agent" ? (
+                      <AgentOptionPicker value={cond.value}
+                        onChange={(v) => updateCond(group.id, cond.id, { value: v })} />
+                    ) : cond.field === "owner" || cond.field === "inbox_assigned_to" ? (
+                      <MemberOptionPicker value={cond.value}
+                        onChange={(v) => updateCond(group.id, cond.id, { value: v })} />
+                    ) : cond.field === "inbox_department" ? (
+                      <DepartmentOptionPicker value={cond.value}
+                        onChange={(v) => updateCond(group.id, cond.id, { value: v })} />
+                    ) : cond.field === "inbox_team" ? (
+                      <TeamOptionPicker value={cond.value}
+                        onChange={(v) => updateCond(group.id, cond.id, { value: v })} />
+                    ) : cond.field === "inbox_queue" ? (
+                      <QueueOptionPicker value={cond.value}
                         onChange={(v) => updateCond(group.id, cond.id, { value: v })} />
                     ) : cond.field === "deal_status" ? (
                       <select value={cond.value}

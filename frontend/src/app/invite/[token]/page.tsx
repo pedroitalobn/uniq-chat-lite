@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, Mail, X, LogIn, UserPlus, Building2, Crown } from "lucide-react";
 import { workspacesApi } from "@/lib/api";
 import { Logo } from "@/components/Logo";
@@ -39,6 +40,7 @@ export default function InviteAcceptPage({
   const { token } = use(params);
   const router = useRouter();
   const { data: session, status } = useSession();
+  const queryClient = useQueryClient();
 
   const [preview, setPreview] = useState<Preview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(true);
@@ -93,6 +95,9 @@ export default function InviteAcceptPage({
       .acceptInvite(token)
       .then((r) => {
         setWorkspaceId(r.data?.workspace_id || null);
+        // Invalida cache de workspaces — sem isso o seletor da Sidebar fica
+        // mostrando só o workspace antigo (staleTime=5min) até refresh manual.
+        queryClient.invalidateQueries({ queryKey: ["workspaces"] });
         setState("done");
       })
       .catch((err: unknown) => {
