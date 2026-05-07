@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/websocket/v2"
@@ -40,35 +39,73 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 		},
 	})
 
+	// CORS hand-rolled — colocado ANTES de qualquer outro middleware
+	// (até recover/logger) pra garantir que mesmo respostas de erro
+	// (panic, 4xx, redirect HTTPS) carreguem os headers. O middleware
+	// fiber/cors mostrou comportamento inconsistente em prod com
+	// AllowCredentials+AllowOriginsFunc: o preflight chegava no
+	// handler de erro sem nunca passar pelo middleware.
+	corsAllowList := []string{
+		"https://app.uniq.chat",
+		"https://admin.uniq.chat",
+		"https://www.uniq.chat",
+		"https://uniq.chat",
+	}
+	for _, raw := range strings.Split(config.AppConfig.FrontendURL, ",") {
+		trim := strings.TrimSpace(raw)
+		if trim != "" {
+			corsAllowList = append(corsAllowList, trim)
+		}
+	}
+	corsAllowed := func(origin string) bool {
+		if origin == "" {
+			return false
+		}
+		for _, allowed := range corsAllowList {
+			if allowed == origin {
+				return true
+			}
+		}
+		if strings.HasPrefix(origin, "http://localhost:") ||
+			strings.HasPrefix(origin, "http://127.0.0.1:") {
+			return true
+		}
+		if strings.HasPrefix(origin, "https://") && strings.HasSuffix(origin, ".uniq.chat") {
+			return true
+		}
+		return false
+	}
+
+	const corsAllowHeaders = "Origin, Content-Type, Accept, Authorization, apikey, X-API-Key, X-Instance-Token, X-Workspace-ID, Upgrade, Sec-WebSocket-Key, Sec-WebSocket-Version, Sec-WebSocket-Extensions"
+	const corsAllowMethods = "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD"
+
+	app.Use(func(c *fiber.Ctx) error {
+		origin := c.Get("Origin")
+		if corsAllowed(origin) {
+			c.Set("Access-Control-Allow-Origin", origin)
+			c.Set("Vary", "Origin")
+			c.Set("Access-Control-Allow-Credentials", "true")
+		}
+		// Preflight — responder direto, sem encadear no roteamento
+		// (que pode dar 404 e perder os headers acima).
+		if c.Method() == fiber.MethodOptions {
+			if corsAllowed(origin) {
+				if reqHeaders := c.Get("Access-Control-Request-Headers"); reqHeaders != "" {
+					c.Set("Access-Control-Allow-Headers", reqHeaders)
+				} else {
+					c.Set("Access-Control-Allow-Headers", corsAllowHeaders)
+				}
+				c.Set("Access-Control-Allow-Methods", corsAllowMethods)
+				c.Set("Access-Control-Max-Age", "86400")
+			}
+			return c.SendStatus(fiber.StatusNoContent)
+		}
+		return c.Next()
+	})
+
 	// Global middleware
 	app.Use(recover.New())
 	app.Use(logger.New())
-	app.Use(cors.New(cors.Config{
-		AllowOriginsFunc: func(origin string) bool {
-			// 1. Configured frontend URL(s) — supports comma-separated list.
-			for _, allowed := range strings.Split(config.AppConfig.FrontendURL, ",") {
-				if strings.TrimSpace(allowed) == origin {
-					return true
-				}
-			}
-			// 2. Localhost (qualquer porta) pra dev.
-			if strings.HasPrefix(origin, "http://localhost:") ||
-				strings.HasPrefix(origin, "http://127.0.0.1:") {
-				return true
-			}
-			// 3. Subdomínios .uniq.chat — fallback robusto pra prod
-			//    sobreviver mesmo se FRONTEND_URL estiver mal configurado
-			//    (app.uniq.chat, admin.uniq.chat, etc.). Restringe ao
-			//    HTTPS do nosso domínio raiz pra continuar seguro.
-			if strings.HasPrefix(origin, "https://") && strings.HasSuffix(origin, ".uniq.chat") {
-				return true
-			}
-			return false
-		},
-		AllowCredentials: true,
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, apikey, X-API-Key, X-Instance-Token, X-Workspace-ID, Upgrade, Sec-WebSocket-Key, Sec-WebSocket-Version, Sec-WebSocket-Extensions",
-		AllowMethods:     "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD",
-	}))
 
 	// Force HTTPS in production. Trust X-Forwarded-Proto from the
 	// reverse proxy (the TLS terminator forwards us plain HTTP) and
