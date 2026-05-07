@@ -1688,20 +1688,25 @@ func (h *AdminHandler) GetEmailSettings(c *fiber.Ctx) error {
 	if result.Error == gorm.ErrRecordNotFound {
 		// Return default settings
 		return c.JSON(fiber.Map{
-			"api_key":      "",
-			"sender_email": "mail@uniq.chat",
-			"sender_name":  "Uniq.chat",
-			"is_enabled":   true,
+			"api_key":         "",
+			"api_key_preview": "",
+			"sender_email":    "mail@uniq.chat",
+			"sender_name":     "Uniq.chat",
+			"is_enabled":      true,
+			"has_api_key":     false,
 		})
 	}
 	if result.Error != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar configurações"})
 	}
 
-	// Don't return the actual API key for security
+	// Não retorna a chave real (segurança), mas devolve preview mascarado
+	// (primeiros 4 + últimos 4 caracteres) pra admin confirmar qual chave
+	// está configurada no momento sem ter que rotacionar.
 	return c.JSON(fiber.Map{
-		"api_key":      "",
-		"sender_email": settings.SenderEmail,
+		"api_key":         "",
+		"api_key_preview": maskCredential(settings.APIKey),
+		"sender_email":    settings.SenderEmail,
 		"sender_name":  settings.SenderName,
 		"is_enabled":   settings.IsEnabled,
 		"has_api_key":  settings.APIKey != "",
@@ -2251,12 +2256,44 @@ func (h *AdminHandler) TestPlatformAIByID(c *fiber.Ctx) error {
 }
 
 // ListPlatformAIPublic GET /v1/integrations/platform-ai
-// Retorna todas as configs ativas da Uniq AI (sem API key) para o ModelSelector.
+// Lista configs ativas da Uniq AI pra o ModelSelector. Visibilidade
+// difere por papel:
+//   - super_admin: vê tudo (provider, name, models) pra debug e
+//     gestão da plataforma.
+//   - usuário comum: vê APENAS um item genérico "Uniq AI" — sem
+//     provider, sem nome interno, sem lista de modelos. Antes
+//     vazava OpenAI/Claude/etc no badge do ModelSelector e o
+//     cliente final descobria a stack por trás.
 func (h *AdminHandler) ListPlatformAIPublic(c *fiber.Ctx) error {
 	var cfgs []models.PlatformAI
 	if err := h.db.Where("is_active = true").Order("created_at ASC").Find(&cfgs).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "erro"})
 	}
+
+	// Resolve papel do caller. Se não vier user (rota é autenticada
+	// mas pode ter cache), assume não-admin por segurança.
+	user := middleware.GetCurrentUser(c)
+	isAdmin := user != nil && user.Role == models.RoleSuperAdmin
+
+	if !isAdmin {
+		// Colapsa todas as configs ativas num único item "Uniq AI".
+		// Sem essa abstração, ter 2+ configs (ex: GPT-4 + Claude)
+		// faria o ModelSelector listar 2 opções com badges de provider
+		// — vazando a stack interna pro user final.
+		if len(cfgs) == 0 {
+			return c.JSON([]fiber.Map{})
+		}
+		return c.JSON([]fiber.Map{{
+			"id":          cfgs[0].ID,
+			"provider":    "uniq",
+			"name":        "Uniq AI",
+			"is_active":   true,
+			"test_status": "ok",
+			"models":      []string{"uniq-default"},
+		}})
+	}
+
+	// Admin: lista completa com detalhes.
 	out := make([]fiber.Map, 0, len(cfgs))
 	for _, cfg := range cfgs {
 		out = append(out, fiber.Map{

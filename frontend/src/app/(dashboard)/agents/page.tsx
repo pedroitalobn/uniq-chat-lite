@@ -940,13 +940,21 @@ export default function AgentsPage() {
                       Provedor e modelo que geram as respostas. Independente do estado de ativação acima.
                     </p>
                   </div>
-                  <select value={form.integration_id} onChange={(e) => setForm((p) => ({ ...p, integration_id: e.target.value, model: "" }))} style={inp()}>
-                    <option value="">Selecione uma integração de IA</option>
+                  <select value={form.integration_id || "uniq"} onChange={(e) => setForm((p) => ({ ...p, integration_id: e.target.value === "uniq" ? "" : e.target.value, model: "" }))} style={inp()}>
+                    {/* "Uniq AI" é a opção default — quando selecionada,
+                        integration_id fica vazio e o backend cai no
+                        PlatformAI configurado pelo admin (transparente
+                        pro user, sem expor provider/model interno).
+                        Recomendada pra maioria dos casos. */}
+                    <option value="uniq">Uniq AI (recomendado)</option>
+                    {(integrationsQuery.data?.length ?? 0) > 0 && (
+                      <option disabled>──────────</option>
+                    )}
                     {integrationsQuery.data?.map((item: any) => (
                       <option key={item.id} value={item.id}>{item.name} · {item.provider}</option>
                     ))}
                   </select>
-                  <input value={form.model} onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))} placeholder="Modelo (ex: claude-sonnet-4-5)" style={inp()} />
+                  <input value={form.model} onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))} placeholder={form.integration_id ? "Modelo (ex: claude-sonnet-4-5)" : "Auto (Uniq AI escolhe)"} style={inp()} disabled={!form.integration_id} />
                   <textarea value={form.system_prompt} onChange={(e) => setForm((p) => ({ ...p, system_prompt: e.target.value }))} placeholder="Prompt base adicional" style={inp(true)} />
                 </div>
 

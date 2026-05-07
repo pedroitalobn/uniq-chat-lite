@@ -27,6 +27,9 @@ const PROVIDER_COLORS: Record<string, string> = {
   openrouter:  "#7c3aed",
   kilo:        "#06b6d4",
   manus:       "#f43f5e",
+  // "uniq" é o provider abstrato que o backend devolve pra non-admin
+  // — não revela qual LLM/provider está por trás.
+  uniq:        "#00d46a",
   default:     "#6b7280",
 };
 
@@ -42,6 +45,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   qwen:        "Qwen",
   minimax:     "MiniMax",
   manus:       "Manus",
+  uniq:        "Uniq AI",
 };
 
 function providerColor(p: string) {
