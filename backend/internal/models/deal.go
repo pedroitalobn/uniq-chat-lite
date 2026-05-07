@@ -65,7 +65,10 @@ type Deal struct {
 	// CustomFields — valores dos campos personalizados definidos em
 	// CrmCustomField (entity_type=deal). JSON map key→value; tipos
 	// validados na camada de handler antes do write.
-	CustomFields string `gorm:"type:jsonb;default:'{}'" json:"custom_fields,omitempty"`
+	// Sem DEFAULT — NULL é tratado como mapa vazio na leitura. Defaults
+	// JSON literais quebravam AutoMigrate em alguns Postgres ("invalid
+	// input syntax for type json").
+	CustomFields string `gorm:"type:jsonb" json:"custom_fields,omitempty"`
 
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
