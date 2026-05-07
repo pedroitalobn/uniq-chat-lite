@@ -1822,10 +1822,10 @@ func (h *AdminHandler) TestEmail(c *fiber.Ctx) error {
 	}
 
 	if !settings.IsEnabled {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error":   "email_disabled",
-			"message": "email está marcado como desativado nas configurações",
-		})
+		// Test deliberadamente IGNORA is_enabled=false. Admin precisa
+		// poder testar a chave antes de marcar "Habilitado" e expor o
+		// envio pra todos os fluxos (welcome, forgot, etc). Loga apenas.
+		log.Info().Str("to", req.To).Msg("test email: enviando mesmo com is_enabled=false (teste é exceção)")
 	}
 
 	if strings.TrimSpace(settings.APIKey) == "" {
