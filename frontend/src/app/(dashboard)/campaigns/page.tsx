@@ -17,6 +17,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { usePreferences } from "@/lib/preferences";
 import { AudioInput } from "@/components/campaigns/AudioInput";
+import { VariableInsertButton } from "@/components/campaigns/VariableInsertButton";
 import { FunnelOptionPicker, StageOptionPicker } from "@/components/crm/FunnelStagePicker";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 
@@ -217,6 +218,9 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
   const [msgType, setMsgType]   = useState<"text" | "image" | "video" | "audio" | "document">(prefill?.msgType ?? "text");
   const [msgText, setMsgText]   = useState(prefill?.msgText ?? "");
   const [caption, setCaption]   = useState("");
+  // Refs pra inserir variáveis Liquid na posição do cursor.
+  const msgTextRef = useRef<HTMLTextAreaElement>(null);
+  const captionRef = useRef<HTMLTextAreaElement>(null);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   // WABA template
   const [tplKey, setTplKey]         = useState("");
@@ -1180,9 +1184,12 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
 
                   {msgType === "text" && (
                     <div>
-                      <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>Mensagem *</label>
-                      <textarea value={msgText} onChange={(e) => setMsgText(e.target.value)}
-                        placeholder={"Digite a mensagem...\n\nSuporta Liquid: {{contact.name}}"}
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-medium" style={{ color: "hsl(240 8% 50%)" }}>Mensagem *</label>
+                        <VariableInsertButton textareaRef={msgTextRef} value={msgText} onChange={setMsgText} />
+                      </div>
+                      <textarea ref={msgTextRef} value={msgText} onChange={(e) => setMsgText(e.target.value)}
+                        placeholder={"Digite a mensagem...\n\nDica: clique em \"Inserir variável\" pra personalizar com nome, email etc."}
                         rows={5} className="input-field w-full resize-none" />
                     </div>
                   )}
@@ -1241,8 +1248,11 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
 
                   {(msgType === "image" || msgType === "video") && (
                     <div>
-                      <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>Legenda (opcional)</label>
-                      <textarea value={caption} onChange={(e) => setCaption(e.target.value)}
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-medium" style={{ color: "hsl(240 8% 50%)" }}>Legenda (opcional)</label>
+                        <VariableInsertButton textareaRef={captionRef} value={caption} onChange={setCaption} />
+                      </div>
+                      <textarea ref={captionRef} value={caption} onChange={(e) => setCaption(e.target.value)}
                         rows={2} className="input-field w-full resize-none" />
                     </div>
                   )}
