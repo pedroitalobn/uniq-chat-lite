@@ -60,7 +60,7 @@ export function WorkspacePermissionsProvider({ children }: { children: ReactNode
   const workspaceId = currentWorkspace?.id;
 
   const queryEnabled = !!workspaceId && !!session?.user?.id;
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isFetching, isError } = useQuery({
     queryKey: ["workspace-permissions", workspaceId, session?.user?.id],
     queryFn: async () => {
       if (!workspaceId) return null;
@@ -71,6 +71,8 @@ export function WorkspacePermissionsProvider({ children }: { children: ReactNode
     },
     enabled: queryEnabled,
     staleTime: 2 * 60 * 1000,
+    retry: 1, // sem retry agressivo: se /members falhar, melhor liberar
+              // a UI pra mostrar erro do que travar em skeleton infinito.
   });
 
   const value = useMemo<Ctx>(() => {
@@ -83,12 +85,12 @@ export function WorkspacePermissionsProvider({ children }: { children: ReactNode
       if (isOwner) return true;
       return perms.has(key);
     };
-    // TanStack Query reporta isLoading=true enquanto NÃO há data, mesmo
-    // se a query está disabled (enabled=false). Resultado: páginas que
-    // usam permsLoading como gate (ex: /inbox) ficam no <PageSkeleton/>
-    // pra sempre quando workspaceId/session.user.id ainda não chegaram.
-    // Loading "real" = query habilitada E não tem data E está buscando.
-    const realLoading = queryEnabled && isLoading && isFetching;
+    // Loading "real" — só travamos a UI durante fetch ATIVO.
+    // Disabled (enabled=false), error e success liberam o gate.
+    // Sem isso o /inbox ficava em <PageSkeleton/> pra sempre quando:
+    //   - workspaceId/session chegavam tarde (query disabled)
+    //   - /members retornava 4xx/5xx (TanStack mantinha isLoading)
+    const realLoading = queryEnabled && isFetching && !data && !isError;
     return {
       isLoading: realLoading,
       isOwner,
@@ -99,7 +101,7 @@ export function WorkspacePermissionsProvider({ children }: { children: ReactNode
       hasAnyPerm: (keys) => keys.some(hasPerm),
       hasAllPerms: (keys) => keys.every(hasPerm),
     };
-  }, [data, isLoading, isFetching, isSuperAdmin, queryEnabled]);
+  }, [data, isFetching, isError, isSuperAdmin, queryEnabled]);
 
   return (
     <WorkspacePermissionsContext.Provider value={value}>
