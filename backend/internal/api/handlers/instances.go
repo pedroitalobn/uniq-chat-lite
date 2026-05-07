@@ -157,7 +157,23 @@ func (h *InstanceHandler) List(c *fiber.Ctx) error {
 			if err := h.db.Where("user_id = ? AND workspace_id = ?", user.ID, wsUUID).First(&uw).Error; err != nil {
 				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "acesso negado ao workspace"})
 			}
-			q = q.Where("workspace_id = ?", wsUUID)
+			// Inclui também instâncias órfãs (workspace_id IS NULL) que
+			// pertencem ao user. Esses são casos de instâncias criadas
+			// antes do user ter workspace (legacy / onboarding bugado),
+			// e já que o user só tem 1 workspace nesse cenário, faz
+			// sentido elas aparecerem aqui. Quem tem múltiplos workspaces
+			// vê os órfãos em todos — não há ambiguidade porque eles
+			// não estão associados a nenhum.
+			q = q.Where(
+				"workspace_id = ? OR (user_id = ? AND workspace_id IS NULL)",
+				wsUUID, user.ID,
+			)
+			// Auto-link: associa as instâncias órfãs do user a esse
+			// workspace agora. Idempotente — se já tem workspace_id,
+			// não muda nada. Roda em goroutine pra não bloquear a lista.
+			go h.db.Model(&models.Instance{}).
+				Where("user_id = ? AND workspace_id IS NULL", user.ID).
+				Update("workspace_id", wsUUID)
 		}
 	} else {
 		// No workspace filter: show owned instances OR instances in workspaces they belong to
