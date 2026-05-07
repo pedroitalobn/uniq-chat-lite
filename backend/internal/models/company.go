@@ -46,7 +46,7 @@ type Company struct {
 
 	// CustomFields — valores de campos personalizados (CrmCustomField,
 	// entity_type=company). Mapa key→value; tipos validados no handler.
-	CustomFields string `gorm:"type:jsonb;default:'{}'::jsonb" json:"custom_fields,omitempty"`
+	CustomFields string `gorm:"type:jsonb;default:'{}'" json:"custom_fields,omitempty"`
 
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`

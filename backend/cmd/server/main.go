@@ -40,9 +40,14 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to connect to database")
 	}
 
-	// Auto-migrate
+	// Auto-migrate. Em prod uma migration ruim (ex: default JSONB
+	// inválido, FK pendente) derrubava o boot inteiro — o que
+	// disfarçava como "500 generic" do reverse proxy. Logamos como
+	// erro alto pra alertar mas seguimos: rotas estáticas, CORS,
+	// /health continuam respondendo enquanto a migration é
+	// investigada nos logs.
 	if err := autoMigrate(db); err != nil {
-		log.Fatal().Err(err).Msg("failed to run migrations")
+		log.Error().Err(err).Msg("AutoMigrate falhou — servidor segue de pé pra debug, mas tabelas podem estar fora de sync")
 	}
 
 	// Apply raw-SQL ticketing indexes that AutoMigrate cannot express
