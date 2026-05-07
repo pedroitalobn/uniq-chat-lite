@@ -12,6 +12,7 @@ import { instancesApi, integrationsApi, voicesApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { cn } from "@/lib/utils";
 import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
+import { AgentSwitcher } from "@/components/agents/AgentSwitcher";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -232,6 +233,8 @@ export default function AgentsPage() {
   const [view, setView] = useState<"list" | "editor">("list");
   const [tab, setTab] = useState<TabId>("personality");
   const [selectedInstance, setSelectedInstance] = useState("");
+  // Multi-agente: id do agente sendo editado dentro da instância. "" = primário.
+  const [selectedAgentId, setSelectedAgentId] = useState("");
   const [form, setForm] = useState<AgentForm>(emptyForm());
   const knowledgeUploadRef = useRef<HTMLInputElement | null>(null);
   const skillUploadRef = useRef<HTMLInputElement | null>(null);
@@ -253,10 +256,16 @@ export default function AgentsPage() {
   }, [instancesQuery.data, selectedInstance]);
 
   const agentQuery = useQuery({
-    queryKey: ["instance-agent", selectedInstance],
-    queryFn: async () => (await integrationsApi.getAgent(selectedInstance)).data,
+    queryKey: ["instance-agent", selectedInstance, selectedAgentId],
+    queryFn: async () => (await integrationsApi.getAgent(selectedInstance, selectedAgentId || undefined)).data,
     enabled: !!selectedInstance,
   });
+
+  // Reset do selectedAgentId ao trocar de instância — caso contrário o id
+  // seria de outra instância e o GET retornaria 404.
+  useEffect(() => {
+    setSelectedAgentId("");
+  }, [selectedInstance]);
 
   // Batch-fetch para list view — mesmo queryKey do editor, sem double-fetch
   const agentQueries = useQueries({
@@ -291,10 +300,11 @@ export default function AgentsPage() {
         rag_enabled: form.rag_enabled, is_active: form.is_active,
         webhook_url: form.webhook_url, webhook_secret: form.webhook_secret,
         mcp_server_url: form.mcp_server_url,
-      });
+      }, selectedAgentId || undefined);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["instance-agent", selectedInstance] });
+      await queryClient.invalidateQueries({ queryKey: ["instance-agent", selectedInstance, selectedAgentId] });
+      await queryClient.invalidateQueries({ queryKey: ["instance-agents", selectedInstance] });
       toast.success("Agente salvo.");
     },
     onError: (error: any) => toast.error(error?.response?.data?.error || "Não foi possível salvar."),
@@ -307,12 +317,13 @@ export default function AgentsPage() {
   const toggleActiveMutation = useMutation({
     mutationFn: async (active: boolean) => {
       if (!selectedInstance) throw new Error("instância não selecionada");
-      await integrationsApi.updateAgent(selectedInstance, { is_active: active });
+      await integrationsApi.updateAgent(selectedInstance, { is_active: active }, selectedAgentId || undefined);
       return active;
     },
     onSuccess: async (active) => {
       setForm((p) => ({ ...p, is_active: active }));
-      await queryClient.invalidateQueries({ queryKey: ["instance-agent", selectedInstance] });
+      await queryClient.invalidateQueries({ queryKey: ["instance-agent", selectedInstance, selectedAgentId] });
+      await queryClient.invalidateQueries({ queryKey: ["instance-agents", selectedInstance] });
       await queryClient.invalidateQueries({ queryKey: ["agents-instance"] });
       toast.success(active ? "Agente ativado." : "Agente desativado.");
     },
@@ -635,6 +646,17 @@ export default function AgentsPage() {
                 <option key={i.id} value={i.id}>{i.name} · {i.channel}</option>
               ))}
             </select>
+            {/* Multi-agente — chips dos agentes desta instância. Permite
+                criar/promover/remover sem sair do editor. */}
+            {selectedInstance && (
+              <div className="mt-3">
+                <AgentSwitcher
+                  instanceId={selectedInstance}
+                  selectedAgentId={selectedAgentId}
+                  onSelect={setSelectedAgentId}
+                />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
               <div className="rounded-2xl p-3" style={cs()}>
                 <p style={{ color: "var(--text-3)" }}>RAG</p>

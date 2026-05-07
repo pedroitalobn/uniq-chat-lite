@@ -639,6 +639,10 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		WebhookURL              *string                   `json:"webhook_url"`
 		WebhookSecret           *string                   `json:"webhook_secret"`
 		MCPServerURL            *string                   `json:"mcp_server_url"`
+		// Multi-agente: configuráveis pelo UI ao editar agentes secundários.
+		Role               *string   `json:"role"`
+		HandoffSkills      *[]string `json:"handoff_skills"`
+		ActionConfirmation *string   `json:"action_confirmation"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -762,6 +766,18 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 	}
 	if req.MCPServerURL != nil {
 		agent.MCPServerURL = *req.MCPServerURL
+	}
+	if req.Role != nil {
+		agent.Role = strings.ToLower(strings.TrimSpace(*req.Role))
+	}
+	if req.HandoffSkills != nil {
+		agent.HandoffSkills = marshalJSONString(*req.HandoffSkills, "[]")
+	}
+	if req.ActionConfirmation != nil {
+		switch strings.ToLower(strings.TrimSpace(*req.ActionConfirmation)) {
+		case "client", "auto", "human":
+			agent.ActionConfirmation = strings.ToLower(*req.ActionConfirmation)
+		}
 	}
 
 	if err := h.db.Save(&agent).Error; err != nil {

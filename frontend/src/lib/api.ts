@@ -1234,7 +1234,16 @@ export const integrationsApi = {
     webhook_url?: string;
     webhook_secret?: string;
     mcp_server_url?: string;
-  }) => api.put(`/v1/instances/${instanceId}/agent`, data),
+    // Multi-agente: campos novos opcionais — backend aceita e o UI envia
+    // quando edita um agente secundário.
+    role?: string;
+    handoff_skills?: string[];
+    action_confirmation?: "client" | "auto" | "human";
+  }, agentId?: string) => api.put(
+    `/v1/instances/${instanceId}/agent`,
+    data,
+    agentId ? { params: { agent_id: agentId } } : undefined,
+  ),
   uploadAgentAsset: (instanceId: string, file: File, category: "knowledge" | "faq" | "skill", name?: string) => {
     const form = new FormData();
     form.append("file", file);
