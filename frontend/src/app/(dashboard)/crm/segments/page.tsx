@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Save, Search, Layers, ChevronRight, Loader2, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { segmentsApi } from "@/lib/api";
+import { FunnelOptionPicker, StageOptionPicker, CompanyOptionPicker } from "@/components/crm/FunnelStagePicker";
 
 type GroupMatch = "all" | "any";
 
@@ -227,10 +228,36 @@ export default function CRMSegmentsPage() {
                       ))}
                     </select>
 
+                    {/* Pickers especializados pra fields que aceitam UUID
+                        (funnel/stage/company) — em vez de pedir UUID raw,
+                        carrega lista do workspace e mostra nomes. Pra outros
+                        types cai no input genérico. */}
                     {FIELD_BY[cond.field].type === "boolean" ? (
                       <span className="text-xs px-2 py-1 rounded" style={{ background: "var(--green-soft)", color: "var(--green)" }}>
                         ativo
                       </span>
+                    ) : cond.field === "funnel_id" ? (
+                      <FunnelOptionPicker value={cond.value}
+                        onChange={(v) => updateCond(group.id, cond.id, { value: v })} />
+                    ) : cond.field === "stage_id" ? (
+                      <StageOptionPicker
+                        funnelId={
+                          group.conds.find((c) => c.field === "funnel_id")?.value ?? ""
+                        }
+                        value={cond.value}
+                        onChange={(v) => updateCond(group.id, cond.id, { value: v })} />
+                    ) : cond.field === "company_id" ? (
+                      <CompanyOptionPicker value={cond.value}
+                        onChange={(v) => updateCond(group.id, cond.id, { value: v })} />
+                    ) : cond.field === "deal_status" ? (
+                      <select value={cond.value}
+                        onChange={(e) => updateCond(group.id, cond.id, { value: e.target.value })}
+                        className="input-field text-xs flex-1 min-w-0">
+                        <option value="">Qualquer status</option>
+                        <option value="open">Aberto</option>
+                        <option value="won">Ganho</option>
+                        <option value="lost">Perdido</option>
+                      </select>
                     ) : (
                       <input
                         type={FIELD_BY[cond.field].type === "number" ? "number" : FIELD_BY[cond.field].type === "date" ? "date" : "text"}

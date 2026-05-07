@@ -23,11 +23,19 @@ import (
 //   - status     ("won" | "lost" | "open"): só dispara nesse status
 //   - min_value/max_value: só dispara se valor cair no range
 type CrmJourneyDispatcher struct {
-	db *gorm.DB
+	db       *gorm.DB
+	executor *JourneyExecutor // opcional — quando setado, dispatch dispara o flow real
 }
 
 func NewCrmJourneyDispatcher(db *gorm.DB) *CrmJourneyDispatcher {
 	return &CrmJourneyDispatcher{db: db}
+}
+
+// SetExecutor injeta o JourneyExecutor singleton — chamado no boot
+// pra ligar o dispatcher CRM com o motor de execução de flow steps.
+// Sem isso o dispatcher só cria JourneyExecution row (não executa).
+func (d *CrmJourneyDispatcher) SetExecutor(e *JourneyExecutor) {
+	d.executor = e
 }
 
 type dealTriggerFilter struct {
@@ -126,24 +134,37 @@ func (d *CrmJourneyDispatcher) startExecution(j *models.Journey, deal *models.De
 		}
 	}
 
-	exec := models.JourneyExecution{
-		JourneyID:   j.ID,
-		ContactJID:  jid,
-		Status:      models.ExecutionActive,
-		StartedAt:   time.Now(),
+	// Resolve executor: instância injetada > singleton global do
+	// boot. Permite que o dispatcher funcione mesmo se o caller
+	// esqueceu de chamar SetExecutor.
+	exec := d.executor
+	if exec == nil {
+		exec = GlobalJourneyExecutor
 	}
-	// Hidrata os campos opcionais via reflection-friendly path: usar
-	// o map de payload se o model aceitar. Pra compat fazemos só os
-	// campos garantidos.
-	d.db.Create(&exec)
+	if exec != nil {
+		exec.StartFromCrmEvent(j, jid, contact.Name)
+		log.Info().
+			Str("journey", j.ID).
+			Str("deal", deal.ID.String()).
+			Str("contact", jid).
+			Str("trigger", j.TriggerType).
+			Msg("crm_dispatcher: journey iniciada via executor")
+		return
+	}
 
-	// Incrementa o counter da journey pra dashboard.
+	// Fallback (sem executor): cria a row pra audit/dashboard mas
+	// flow não roda. Esse path só ocorre se o boot não chamou
+	// SetExecutor — bug de wiring.
+	row := models.JourneyExecution{
+		JourneyID:  j.ID,
+		ContactJID: jid,
+		Status:     models.ExecutionActive,
+		StartedAt:  time.Now(),
+	}
+	d.db.Create(&row)
 	d.db.Model(j).Update("invocations", gorm.Expr("invocations + 1"))
-
-	log.Info().
+	log.Warn().
 		Str("journey", j.ID).
 		Str("deal", deal.ID.String()).
-		Str("contact", jid).
-		Str("trigger", j.TriggerType).
-		Msg("crm_dispatcher: journey execution criada")
+		Msg("crm_dispatcher: executor não setado — só criou row, flow não rodará")
 }

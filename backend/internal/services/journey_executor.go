@@ -58,8 +58,13 @@ type JourneyExecutor struct {
 	dedupWindow time.Duration
 }
 
+// GlobalJourneyExecutor é a instância singleton populada no boot do
+// servidor — usado por componentes (como o CrmJourneyDispatcher) que
+// não podem injetar a dependência via construtor sem cascatear refactor.
+var GlobalJourneyExecutor *JourneyExecutor
+
 func NewJourneyExecutor(db *gorm.DB, sender MessageSender, llm *LLMService) *JourneyExecutor {
-	return &JourneyExecutor{
+	e := &JourneyExecutor{
 		db:            db,
 		sender:        sender,
 		llm:           llm,
@@ -68,6 +73,11 @@ func NewJourneyExecutor(db *gorm.DB, sender MessageSender, llm *LLMService) *Jou
 		seenMsgs:      make(map[string]time.Time),
 		dedupWindow:   5 * time.Minute,
 	}
+	// Última instanciação ganha — main cria UMA, handlers que precisam
+	// pra debug podem criar uma temporária mas a global fica com a do
+	// boot. Em chamada de teste/handlers efêmeros não há side-effect.
+	GlobalJourneyExecutor = e
+	return e
 }
 
 // seenRecently retorna true se o (instanceID, messageID) foi processado nos
@@ -582,6 +592,26 @@ func (e *JourneyExecutor) upsertContactForJourney(journey *models.Journey, fromJ
 }
 
 // startNew inicia uma nova execução de jornada
+// StartFromCrmEvent é o entry point pra triggers que vêm do CRM
+// (CrmJourneyDispatcher) — eventos como deal_stage_enter / deal_won
+// não nascem de mensagem inbound, então não passam pelo HandleIncoming
+// nem têm groupJID/messageText. Esta função adapta os params pro
+// startNew com defaults seguros: groupJID="", messageText="".
+//
+// Idempotência: respeita re-entry rule do journey (skip se já tem
+// execution active e rule != "always").
+func (e *JourneyExecutor) StartFromCrmEvent(journey *models.Journey, contactJID, contactName string) {
+	if journey == nil || contactJID == "" {
+		return
+	}
+	if !e.canReEnter(journey, contactJID) {
+		log.Debug().Str("journey", journey.ID).Str("contact", contactJID).
+			Msg("journey: skip CRM trigger — re-entry rule violada")
+		return
+	}
+	go e.startNew(journey, contactJID, contactName, "", "")
+}
+
 func (e *JourneyExecutor) startNew(journey *models.Journey, fromJID, fromName, groupJID, messageText string) {
 	// Recover pra evitar que panic num step (config inválida, etc) deixe
 	// o goroutine morrendo sem log. Loga o panic como erro pra

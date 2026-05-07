@@ -31,6 +31,7 @@ import {
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { journeysApi, instancesApi, groupsApi } from "@/lib/api";
+import { FunnelOptionPicker, StageOptionPicker } from "@/components/crm/FunnelStagePicker";
 import { cn } from "@/lib/utils";
 import { MentionPicker, parseMentions, type MentionPickerHandles } from "@/components/MentionPicker";
 
@@ -1065,6 +1066,17 @@ function TriggerPanel({
   // New fields
   const [cronExpr, setCronExpr] = useState((initial as any)?.cron_expr ?? "");
   const [tagName, setTagName] = useState((initial as any)?.tag_name ?? "");
+  // CRM v2 deal-trigger filter — parseado do trigger_filter JSON.
+  const initialDealFilter = (() => {
+    try {
+      const raw = initial?.trigger_filter ?? "";
+      if (!raw) return null;
+      return JSON.parse(raw) as { funnel_id?: string; stage_id?: string; status?: string };
+    } catch { return null; }
+  })();
+  const [dealFunnelId, setDealFunnelId] = useState(initialDealFilter?.funnel_id ?? "");
+  const [dealStageId, setDealStageId] = useState(initialDealFilter?.stage_id ?? "");
+  const [dealStatus, setDealStatus] = useState(initialDealFilter?.status ?? "");
 
   // Re-sync quando a jornada externa recarrega
   useEffect(() => {
@@ -1086,6 +1098,7 @@ function TriggerPanel({
 
   const needsKeywords = triggerType === "group_keyword" || triggerType === "private_keyword" || triggerType === "user_command";
   const needsGroup = triggerType.startsWith("group_");
+  const isDealTrigger = triggerType.startsWith("deal_");
 
   const inputClass = "w-full rounded-lg px-2.5 py-1.5 text-sm outline-none";
   const inputStyle: React.CSSProperties = { background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-1)" };
@@ -1096,9 +1109,21 @@ function TriggerPanel({
       const keywords = needsKeywords
         ? keywordsStr.split(",").map((s) => s.trim()).filter(Boolean)
         : [];
+      // CRM v2 deal triggers serializam dealFunnel/Stage/Status num
+      // JSON pra trigger_filter — backend usa pra filtrar journey
+      // dispatch via CrmJourneyDispatcher.matchesFilter.
+      let triggerFilter = "";
+      if (isDealTrigger) {
+        const f: Record<string, unknown> = {};
+        if (dealFunnelId) f.funnel_id = dealFunnelId;
+        if (dealStageId) f.stage_id = dealStageId;
+        if (dealStatus) f.status = dealStatus;
+        triggerFilter = Object.keys(f).length > 0 ? JSON.stringify(f) : "";
+      }
       const res = await journeysApi.updateTrigger(journeyId, {
         name: name.trim() || undefined,
         trigger_type: triggerType,
+        trigger_filter: triggerFilter,
         keywords,
         group_jid: needsGroup ? groupJID : "",
         instance_id: instanceId,
@@ -1263,6 +1288,44 @@ function TriggerPanel({
             className={inputClass}
             style={inputStyle}
           />
+        </div>
+      )}
+
+      {/* CRM v2 — filtros de deal lifecycle. Vazios = dispara pra
+          todos deals; preenche pra escopar (ex: só funil X stage Y). */}
+      {isDealTrigger && (
+        <div className="space-y-2 rounded-lg p-3"
+          style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+          <p className="text-[10px] uppercase tracking-wider font-medium opacity-60">
+            Filtrar deals
+          </p>
+          <div>
+            <label className="text-[10px] block mb-1 opacity-60">Funil (opcional)</label>
+            <FunnelOptionPicker value={dealFunnelId}
+              onChange={(v) => { setDealFunnelId(v); setDealStageId(""); }} />
+          </div>
+          {dealFunnelId && (triggerType === "deal_stage_enter" || triggerType === "deal_stage_exit") && (
+            <div>
+              <label className="text-[10px] block mb-1 opacity-60">Estágio (opcional)</label>
+              <StageOptionPicker funnelId={dealFunnelId} value={dealStageId}
+                onChange={setDealStageId} />
+            </div>
+          )}
+          {(triggerType === "deal_created" || triggerType === "deal_stage_enter") && (
+            <div>
+              <label className="text-[10px] block mb-1 opacity-60">Status (opcional)</label>
+              <select value={dealStatus} onChange={(e) => setDealStatus(e.target.value)}
+                className={inputClass} style={inputStyle}>
+                <option value="">Qualquer status</option>
+                <option value="open">Aberto</option>
+                <option value="won">Ganho</option>
+                <option value="lost">Perdido</option>
+              </select>
+            </div>
+          )}
+          <p className="text-[10px] opacity-50">
+            Sem filtros = dispara em qualquer deal.
+          </p>
         </div>
       )}
 

@@ -1065,6 +1065,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	meetings.Patch("/:id", middleware.RequireWorkspacePermission(db, models.PermCRMEdit), crmMeetingH.Update)
 	meetings.Delete("/:id", middleware.RequireWorkspacePermission(db, models.PermCRMEdit), crmMeetingH.Delete)
 
+	// CRM Timeline — feed unificado de eventos cross-entity (Contact + Deal).
+	// Filtros opcionais: contact_id, deal_id, company_id.
+	crmTimelineH := handlers.NewCrmTimelineHandler(db)
+	crm.Get("/timeline", middleware.RequireWorkspacePermission(db, models.PermCRMView), crmTimelineH.List)
+
 	// ─── Ticketing / Atendimento ──────────────────────────────────────────────
 	// All routes require an active workspace passed via X-Workspace-ID header
 	// (or ?workspace_id=). RequireWorkspacePermission enforces the RBAC key.

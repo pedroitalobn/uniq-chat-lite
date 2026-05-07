@@ -307,8 +307,13 @@ func (h *ContactHandler) UpdateContact(c *fiber.Ctx) error {
 		Email      *string `json:"email"`
 		Notes      *string `json:"notes"`
 		AvatarURL  *string `json:"avatar_url"`
+		// LEGACY: aceitos só pra retrocompat — UI moderna usa FK.
 		Funnel     *string `json:"funnel"`
 		Stage      *string `json:"stage"`
+		// CRM v2: FK preferido
+		FunnelID   *string `json:"funnel_id"`
+		StageID    *string `json:"stage_id"`
+		CompanyID  *string `json:"company_id"`
 		Journey    *string `json:"journey"`
 		ExternalID *string `json:"external_id"`
 		OwnerID    *string `json:"owner_id"`
@@ -332,10 +337,33 @@ func (h *ContactHandler) UpdateContact(c *fiber.Ctx) error {
 	if req.AvatarURL != nil {
 		updates["avatar_url"] = *req.AvatarURL
 	}
-	if req.Funnel != nil {
+	// FK preferida (CRM v2). Vazio ou "" = clear.
+	if req.FunnelID != nil {
+		if *req.FunnelID == "" {
+			updates["funnel_id"] = nil
+		} else if fid, err := uuid.Parse(*req.FunnelID); err == nil {
+			updates["funnel_id"] = fid
+		}
+	}
+	if req.StageID != nil {
+		if *req.StageID == "" {
+			updates["stage_id"] = nil
+		} else if sid, err := uuid.Parse(*req.StageID); err == nil {
+			updates["stage_id"] = sid
+		}
+	}
+	if req.CompanyID != nil {
+		if *req.CompanyID == "" {
+			updates["company_id"] = nil
+		} else if cid, err := uuid.Parse(*req.CompanyID); err == nil {
+			updates["company_id"] = cid
+		}
+	}
+	// Legacy strings — só atualiza se FK não veio (retrocompat).
+	if req.Funnel != nil && req.FunnelID == nil {
 		updates["funnel"] = *req.Funnel
 	}
-	if req.Stage != nil {
+	if req.Stage != nil && req.StageID == nil {
 		updates["stage"] = *req.Stage
 	}
 	if req.Journey != nil {

@@ -25,6 +25,13 @@ func NewDealHandler(db *gorm.DB) *DealHandler {
 	}
 }
 
+// SetJourneyExecutor injeta o executor singleton — chamado no boot
+// pra que o dispatcher consiga executar journeys de verdade quando
+// um deal lifecycle event dispara (vs apenas registrar a row).
+func (h *DealHandler) SetJourneyExecutor(e *services.JourneyExecutor) {
+	h.dispatcher.SetExecutor(e)
+}
+
 // List GET /v1/crm/deals?funnel_id=&stage_id=&status=&owner_id=&contact_id=&company_id=&q=&limit=&offset=
 //
 // Default behavior: returns open deals only, sorted by stage_change_at desc.

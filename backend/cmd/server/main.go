@@ -52,6 +52,9 @@ func main() {
 	// Ensure all extended plan columns exist (idempotent, Postgres-only).
 	applyPlansMigration(db)
 
+	// CRM v2 constraints (NOT NULL, cascade DELETE, hot-path indexes).
+	applyCrmConstraints(db)
+
 	// Seed default plans
 	seedPlans(db)
 
@@ -557,6 +560,68 @@ func applyTicketingIndexes(db *gorm.DB) {
 		}
 	}
 	log.Info().Msg("ticketing indexes applied")
+}
+
+// applyCrmConstraints aplica constraints físicas que reforçam a v2
+// do CRM. Idempotente — todos com guard de existência.
+//
+// Inclui:
+//   - deals.contact_id NOT NULL (já era no struct, garantia em prod)
+//   - cascade ON DELETE em funnel_stages → funnels (drop do funil
+//     remove os stages órfãos automaticamente)
+//   - cascade ON DELETE em deal_activities → deals
+//   - índice composto pra hot-path de busca por contact+status nos deals
+func applyCrmConstraints(db *gorm.DB) {
+	if db.Dialector.Name() != "postgres" {
+		return
+	}
+	statements := []string{
+		// 1. deals.contact_id NOT NULL — pré-condição: rows com contact_id
+		//    nulo já não devem existir (struct GORM já era not null). Caso
+		//    existam órfãos legados, fazemos UPDATE pra NULL→delete antes.
+		`DELETE FROM deals WHERE contact_id IS NULL`,
+		`ALTER TABLE deals ALTER COLUMN contact_id SET NOT NULL`,
+
+		// 2. ON DELETE CASCADE: funnel_stages quando o funnel é apagado.
+		//    Drop + recreate da FK pra adicionar a cláusula CASCADE.
+		`ALTER TABLE funnel_stages DROP CONSTRAINT IF EXISTS fk_funnel_stages_funnel`,
+		`ALTER TABLE funnel_stages
+		   ADD CONSTRAINT fk_funnel_stages_funnel
+		   FOREIGN KEY (funnel_id) REFERENCES funnels(id) ON DELETE CASCADE`,
+
+		// 3. ON DELETE CASCADE: deal_activities quando o deal é apagado.
+		`ALTER TABLE deal_activities DROP CONSTRAINT IF EXISTS fk_deal_activities_deal`,
+		`ALTER TABLE deal_activities
+		   ADD CONSTRAINT fk_deal_activities_deal
+		   FOREIGN KEY (deal_id) REFERENCES deals(id) ON DELETE CASCADE`,
+
+		// 4. Hot-path index — listar deals por contato + status (UI deal list).
+		`CREATE INDEX IF NOT EXISTS idx_deals_contact_status
+		   ON deals (contact_id, status)
+		   WHERE deleted_at IS NULL`,
+		// Hot-path: deals abertos por funnel/stage (kanban).
+		`CREATE INDEX IF NOT EXISTS idx_deals_funnel_stage_open
+		   ON deals (funnel_id, stage_id)
+		   WHERE status = 'open' AND deleted_at IS NULL`,
+		// Hot-path: tasks pendentes por workspace+due_at (TaskRunner agent).
+		`CREATE INDEX IF NOT EXISTS idx_crm_tasks_pending_due
+		   ON crm_tasks (workspace_id, due_at)
+		   WHERE status = 'pending' AND deleted_at IS NULL`,
+	}
+	for _, stmt := range statements {
+		if err := db.Exec(stmt).Error; err != nil {
+			log.Warn().Err(err).Str("stmt", stmt[:min(80, len(stmt))]).
+				Msg("crm constraint: failed to apply (non-fatal)")
+		}
+	}
+	log.Info().Msg("crm constraints applied")
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // applyPlansMigration garante que as colunas estendidas da tabela plans existam.
