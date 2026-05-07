@@ -302,15 +302,19 @@ export function SidebarDock() {
   }
 
   const navItems = [
-    { href: "/uniq-ai",      label: "Uniq AI",              icon: Sparkles,       show: canSeeUniqAi && planAllows("allow_ai") },
+    // Mesma política do Sidebar: só Campaigns/Journeys/Help Desk
+    // ganham gate de plano (eram bloqueados por isBeta antes). Os
+    // demais ficam perm-only pra não esconder de plano pago cujo
+    // session.user.plan não traz allow_* preenchido.
+    { href: "/uniq-ai",      label: "Uniq AI",              icon: Sparkles,       show: canSeeUniqAi },
     { href: "/dashboard",    label: t("nav_dashboard"),     icon: LayoutDashboard, show: canSeeDashboard },
-    { href: "/inbox",        label: t("nav_inbox"),         icon: Headset,         show: canSeeInbox && planAllows("allow_inbox"), badge: unreadCount > 0 ? unreadCount : undefined },
-    { href: "/crm",          label: t("nav_crm"),           icon: Contact,         show: canSeeCRM && planAllows("allow_crm") },
+    { href: "/inbox",        label: t("nav_inbox"),         icon: Headset,         show: canSeeInbox, badge: unreadCount > 0 ? unreadCount : undefined },
+    { href: "/crm",          label: t("nav_crm"),           icon: Contact,         show: canSeeCRM },
     { href: "/campaigns",    label: t("nav_campaigns"),     icon: Megaphone,       show: canSeeCampaigns && planAllows("allow_campaigns") },
     { href: "/journeys",     label: "Jornadas",             icon: Wand2,           show: canSeeJourneys && planAllows("allow_journeys") },
-    { href: "/agents",       label: "Agentes",              icon: Bot,             show: canSeeAgents && planAllows("allow_ai") },
+    { href: "/agents",       label: "Agentes",              icon: Bot,             show: canSeeAgents },
     { href: "/help-desk",    label: "Help Desk",            icon: BookOpen,        show: planAllows("allow_helpdesk") },
-    { href: "/shops",        label: "Shops",                icon: ShoppingBag,     show: planAllows("allow_shop") },
+    { href: "/shops",        label: "Shops",                icon: ShoppingBag,     show: true },
     { href: "/servers",      label: t("nav_servers"),       icon: Server,          show: canSeeServers },
     { href: "/instances",    label: t("nav_instances"),     icon: Smartphone,      show: canSeeInstances },
     { href: "/integrations", label: t("nav_integrations"),  icon: Plug,            show: canSeeIntegrations },

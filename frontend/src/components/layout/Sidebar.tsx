@@ -160,15 +160,20 @@ export function Sidebar() {
   // executa o trabalho), depois Agentes (configuração de personalidade), e
   // por último a infra (Servers/Instances/Integrations) e Conta.
   const navItems: NavItem[] = [
-    { href: "/uniq-ai",      label: "Uniq AI",             icon: Sparkles,        exact: false, show: canSeeUniqAi && planAllows("allow_ai") },
+    // Política de gate: módulos historicamente perm-only continuam só
+    // por permissão (canSeeX). Os 3 abaixo (Campaigns/Journeys/Help Desk)
+    // estavam atrás de `isBeta` antes — agora respeitam plan.allow_*.
+    // Adicionar planAllows nos demais sobre-bloqueia clientes pagantes
+    // cujo session.user.plan não traz a flag explicitamente.
+    { href: "/uniq-ai",      label: "Uniq AI",             icon: Sparkles,        exact: false, show: canSeeUniqAi },
     { href: "/dashboard",    label: t("nav_dashboard"),    icon: LayoutDashboard, exact: true,  show: canSeeDashboard },
-    { href: "/inbox",        label: t("nav_inbox"),        icon: Headset,         exact: false, show: canSeeInbox && planAllows("allow_inbox") },
-    { href: "/crm",          label: t("nav_crm"),          icon: Contact,         exact: false, show: canSeeCRM && planAllows("allow_crm") },
+    { href: "/inbox",        label: t("nav_inbox"),        icon: Headset,         exact: false, show: canSeeInbox },
+    { href: "/crm",          label: t("nav_crm"),          icon: Contact,         exact: false, show: canSeeCRM },
     { href: "/campaigns",    label: t("nav_campaigns"),    icon: Megaphone,       exact: false, show: canSeeCampaigns && planAllows("allow_campaigns") },
     { href: "/journeys",     label: "Jornadas",            icon: Wand2,           exact: false, show: canSeeJourneys && planAllows("allow_journeys") },
-    { href: "/agents",       label: "Agentes",             icon: Bot,             exact: false, show: canSeeAgents && planAllows("allow_ai") },
+    { href: "/agents",       label: "Agentes",             icon: Bot,             exact: false, show: canSeeAgents },
     { href: "/help-desk",    label: "Help Desk",           icon: BookOpen,        exact: false, show: planAllows("allow_helpdesk") },
-    { href: "/shops",        label: "Shops",               icon: ShoppingBag,     exact: false, show: planAllows("allow_shop") },
+    { href: "/shops",        label: "Shops",               icon: ShoppingBag,     exact: false, show: true },
     { href: "/servers",      label: t("nav_servers"),      icon: Server,          exact: false, show: canSeeServers },
     { href: "/instances",    label: t("nav_instances"),    icon: Smartphone,      exact: false, show: canSeeInstances },
     { href: "/integrations", label: t("nav_integrations"), icon: Plug,            exact: false, show: canSeeIntegrations },
