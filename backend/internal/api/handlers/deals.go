@@ -13,9 +13,17 @@ import (
 	"gorm.io/gorm"
 )
 
-type DealHandler struct{ db *gorm.DB }
+type DealHandler struct {
+	db         *gorm.DB
+	dispatcher *services.CrmJourneyDispatcher
+}
 
-func NewDealHandler(db *gorm.DB) *DealHandler { return &DealHandler{db: db} }
+func NewDealHandler(db *gorm.DB) *DealHandler {
+	return &DealHandler{
+		db:         db,
+		dispatcher: services.NewCrmJourneyDispatcher(db),
+	}
+}
 
 // List GET /v1/crm/deals?funnel_id=&stage_id=&status=&owner_id=&contact_id=&company_id=&q=&limit=&offset=
 //
@@ -181,6 +189,9 @@ func (h *DealHandler) Create(c *fiber.Ctx) error {
 	if body.CompanyID != nil {
 		h.bumpCompanyDealCounters(*body.CompanyID)
 	}
+	// CRM v2: dispara journey trigger "deal_created" pra qualquer journey
+	// configurada com esse trigger + filtro (funnel_id/stage_id).
+	h.dispatcher.FireDealEvent(models.TriggerDealCreated, &body)
 	return c.Status(fiber.StatusCreated).JSON(body)
 }
 
@@ -303,6 +314,15 @@ func (h *DealHandler) Move(c *fiber.Ctx) error {
 		h.activity(&d, models.DealActivityLost, "Deal perdido", nil, middleware.GetCurrentUserID(c))
 	}
 	h.db.Preload("Contact").Preload("Company").Preload("Owner").Preload("Tags").First(&d, "id = ?", id)
+
+	// CRM v2: dispara journeys vinculadas a eventos de deal — async,
+	// não atrasa a response.
+	h.dispatcher.FireDealEvent(models.TriggerDealStageEnter, &d)
+	if stage.IsWon {
+		h.dispatcher.FireDealEvent(models.TriggerDealWon, &d)
+	} else if stage.IsLost {
+		h.dispatcher.FireDealEvent(models.TriggerDealLost, &d)
+	}
 	return c.JSON(d)
 }
 
@@ -364,6 +384,13 @@ func (h *DealHandler) finalize(c *fiber.Ctx, status models.DealStatus, activity 
 			"currency":  d.Currency,
 			"reason":    body.Reason,
 		})
+	}
+	// CRM v2: dispara journey trigger correspondente (deal_won/deal_lost).
+	switch status {
+	case models.DealStatusWon:
+		h.dispatcher.FireDealEvent(models.TriggerDealWon, &d)
+	case models.DealStatusLost:
+		h.dispatcher.FireDealEvent(models.TriggerDealLost, &d)
 	}
 	return c.JSON(d)
 }

@@ -325,6 +325,16 @@ const (
 	TriggerUserCommand     TriggerType = "user_command" // /menu, /stop, /help...
 	TriggerButtonClick     TriggerType = "button_click" // id de quick-reply
 	TriggerListSelect      TriggerType = "list_select"  // row id de lista
+
+	// CRM lifecycle triggers — disparam quando deals mudam de
+	// estágio/status. Permite jornadas como "Quando deal entra em
+	// 'Negociação', envia proposta no WhatsApp em 1 dia". O config
+	// JSON do journey deve conter funnel_id + stage_id (ou status).
+	TriggerDealStageEnter  TriggerType = "deal_stage_enter"  // deal entrou em determinado stage
+	TriggerDealStageExit   TriggerType = "deal_stage_exit"   // deal saiu de determinado stage
+	TriggerDealCreated     TriggerType = "deal_created"      // deal novo num funil/stage
+	TriggerDealWon         TriggerType = "deal_won"          // status virou won
+	TriggerDealLost        TriggerType = "deal_lost"         // status virou lost
 )
 
 // Reserved commands (always intercepted before flow evaluation)
