@@ -171,7 +171,11 @@ func codeBlock(value string) string {
 
 // ── Welcome ───────────────────────────────────────────────────────────────────
 
-func welcomeHTML(appName, name, appURL string) string {
+// Convenção: TODAS as funções *HTML seguem (appName, appURL, name, ...).
+// Inconsistências antes (ex: welcomeHTML(appName, name, appURL)) versus
+// callers que sempre passavam (s.appName, s.appURL, name, ...) faziam
+// emails sair com appURL no lugar do nome do user. Padronizado.
+func welcomeHTML(appName, appURL, name string) string {
 	content := iconEmoji("🎉") +
 		h1("Bem-vindo ao "+appName) +
 		p("Olá, <strong>"+name+"</strong>. Estamos felizes em ter você por aqui.") +
@@ -189,7 +193,7 @@ func welcomeHTML(appName, name, appURL string) string {
 
 // ── Password Changed ──────────────────────────────────────────────────────────
 
-func passwordChangedHTML(appName, name, appURL string) string {
+func passwordChangedHTML(appName, appURL, name string) string {
 	content := iconEmoji("🔐") +
 		h1("Senha alterada") +
 		p("Olá, <strong>"+name+"</strong>.") +
@@ -221,7 +225,7 @@ func emailVerificationHTML(appName, appURL, name, verifyLink string) string {
 
 // ── Forgot Password ───────────────────────────────────────────────────────────
 
-func forgotPasswordHTML(appName, name, appURL, resetLink string) string {
+func forgotPasswordHTML(appName, appURL, name, resetLink string) string {
 	content := iconEmoji("🔑") +
 		h1("Redefinir sua senha") +
 		p("Olá, <strong>"+name+"</strong>.") +
@@ -238,7 +242,7 @@ func forgotPasswordHTML(appName, name, appURL, resetLink string) string {
 
 // ── Payment Confirmed ─────────────────────────────────────────────────────────
 
-func paymentConfirmedHTML(appName, name, appURL, planName string, amount float64) string {
+func paymentConfirmedHTML(appName, appURL, name, planName string, amount float64) string {
 	amountStr := fmt.Sprintf("R$ %.2f", amount)
 	content := iconEmoji("🎊") +
 		h1("Pagamento confirmado") +
@@ -256,7 +260,7 @@ func paymentConfirmedHTML(appName, name, appURL, planName string, amount float64
 
 // ── Plan Changed ──────────────────────────────────────────────────────────────
 
-func planChangedHTML(appName, name, appURL, oldPlan, newPlan string) string {
+func planChangedHTML(appName, appURL, name, oldPlan, newPlan string) string {
 	content := iconEmoji("⬆️") +
 		h1("Plano atualizado") +
 		p("Olá, <strong>"+name+"</strong>.") +
@@ -272,7 +276,7 @@ func planChangedHTML(appName, name, appURL, oldPlan, newPlan string) string {
 
 // ── Payment Failed ────────────────────────────────────────────────────────────
 
-func paymentFailedHTML(appName, name, appURL, billingURL string) string {
+func paymentFailedHTML(appName, appURL, name, billingURL string) string {
 	content := iconEmoji("⚠️") +
 		h1("Pagamento não processado") +
 		p("Olá, <strong>"+name+"</strong>.") +
@@ -292,7 +296,7 @@ func paymentFailedHTML(appName, name, appURL, billingURL string) string {
 
 // ── Subscription Canceled ─────────────────────────────────────────────────────
 
-func subscriptionCanceledHTML(appName, name, appURL, plansURL string) string {
+func subscriptionCanceledHTML(appName, appURL, name, plansURL string) string {
 	content := iconEmoji("👋") +
 		h1("Assinatura cancelada") +
 		p("Olá, <strong>"+name+"</strong>.") +
@@ -310,7 +314,7 @@ func subscriptionCanceledHTML(appName, name, appURL, plansURL string) string {
 
 // ── Instance Banned ───────────────────────────────────────────────────────────
 
-func instanceBannedHTML(appName, name, appURL, instanceName, phone string) string {
+func instanceBannedHTML(appName, appURL, name, instanceName, phone string) string {
 	content := iconEmoji("🚫") +
 		h1("Instância banida") +
 		p("Olá, <strong>"+name+"</strong>.") +
@@ -329,7 +333,7 @@ func instanceBannedHTML(appName, name, appURL, instanceName, phone string) strin
 
 // ── Admin Created Account ─────────────────────────────────────────────────────
 
-func adminCreatedAccountHTML(appName, name, appURL, email, tempPassword string) string {
+func adminCreatedAccountHTML(appName, appURL, name, email, tempPassword string) string {
 	content := iconEmoji("👋") +
 		h1("Sua conta foi criada") +
 		p("Olá, <strong>"+name+"</strong>. Um administrador criou uma conta pra você no "+appName+".") +
@@ -348,7 +352,10 @@ func adminCreatedAccountHTML(appName, name, appURL, email, tempPassword string) 
 
 // ── Admin Reset Password ──────────────────────────────────────────────────────
 
-func adminResetPasswordHTML(appName, name, appURL, newPassword string) string {
+// Assinatura segue o padrão dos outros templates (appName, appURL, ...)
+// pra evitar bugs como "olá <strong>https://app.uniq.chat</strong>" que
+// rolaram quando o caller passava parâmetros na ordem errada.
+func adminResetPasswordHTML(appName, appURL, name, newPassword string) string {
 	content := iconEmoji("🔐") +
 		h1("Senha redefinida") +
 		p("Olá, <strong>"+name+"</strong>.") +

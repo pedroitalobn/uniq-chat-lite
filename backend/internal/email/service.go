@@ -189,7 +189,7 @@ func (s *Service) SendEmailVerification(to, name, verifyLink string) {
 }
 
 func (s *Service) SendWelcome(to, name string) {
-	if err := s.send(to, "Bem-vindo ao "+s.appName+"!", welcomeHTML(s.appName, name, s.appURL), "welcome"); err != nil {
+	if err := s.send(to, "Bem-vindo ao "+s.appName+"!", welcomeHTML(s.appName, s.appURL, name), "welcome"); err != nil {
 		log.Error().Err(err).Str("to", to).Msg("email: failed to send welcome")
 	}
 }
@@ -252,7 +252,7 @@ type AdminCreatedAccountInput struct {
 // passa as credenciais. Aceita struct nomeada pra impedir trocas
 // posicionais — bug histórico.
 func (s *Service) SendAdminCreatedAccount(in AdminCreatedAccountInput) {
-	html := adminCreatedAccountHTML(s.appName, in.Name, s.appURL, in.UserEmail, in.TempPassword)
+	html := adminCreatedAccountHTML(s.appName, s.appURL, in.Name, in.UserEmail, in.TempPassword)
 	log.Debug().
 		Str("to", in.To).
 		Str("user_email", in.UserEmail).
