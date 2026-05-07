@@ -372,17 +372,29 @@ func adminResetPasswordHTML(appName, appURL, name, newPassword string) string {
 
 // ── Workspace Invite ──────────────────────────────────────────────────────────
 
-func workspaceInviteHTML(appName, appURL, workspaceName, inviterName, roleName, acceptURL string) string {
+func workspaceInviteHTML(appName, appURL, workspaceName, inviterName, roleName, acceptURL string, userExists bool) string {
+	intro := p("<strong>" + inviterName + "</strong> convidou você pra colaborar no workspace <strong>" + workspaceName + "</strong> no " + appName + ".")
+	cta := p("Clique no botão abaixo pra aceitar o convite e começar a colaborar:")
+	if userExists {
+		// User já tem conta: deixa explícito que basta logar e que o convite
+		// também aparece in-app, evitando o "preciso me cadastrar de novo?"
+		intro = p("<strong>"+inviterName+"</strong> convidou você pra colaborar no workspace <strong>"+workspaceName+"</strong> no "+appName+".") +
+			highlightBox(
+				inlineP("✅ Você já tem conta no "+appName+" com este email — basta <strong>fazer login</strong> pra aceitar o convite. Ele também já aparece no banner do seu painel."),
+				BrandPrimary,
+			)
+		cta = p("Faça login com seu email já cadastrado e clique em aceitar:")
+	}
 	content := iconEmoji("🎉") +
 		h1("Você foi convidado") +
-		p("<strong>"+inviterName+"</strong> convidou você pra colaborar no workspace <strong>"+workspaceName+"</strong> no "+appName+".") +
+		intro +
 		card(
 			h3("Detalhes do convite")+
 				infoItem("Workspace", workspaceName)+
 				infoItem("Função", roleName)+
 				infoItem("Convidado por", inviterName),
 		) +
-		p("Clique no botão abaixo pra aceitar o convite e começar a colaborar:") +
+		cta +
 		btn("Aceitar convite", acceptURL, BrandPrimary) +
 		highlightBox(
 			inlineP("⏰ Este convite expira em <strong>7 dias</strong>."),

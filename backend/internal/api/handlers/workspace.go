@@ -520,22 +520,89 @@ func (h *WorkspaceHandler) CreateInvite(c *fiber.Ctx) error {
 		roleName = "Membro"
 	}
 
+	// Detecta se o convidado já tem conta — muda a copy do email pra
+	// "faça login pra aceitar" em vez de "crie sua conta".
+	var userExists bool
+	{
+		var existing models.User
+		if err := h.db.Select("id").Where("LOWER(email) = LOWER(?)", req.Email).First(&existing).Error; err == nil {
+			userExists = true
+		}
+	}
+
 	// Envio assíncrono — se Maileroo cair, o convite ainda é válido pelo link.
-	go func(to, ws, inv, rl, url string) {
+	go func(to, ws, inv, rl, url string, exists bool) {
 		if h.emailSvc == nil {
 			return
 		}
-		if err := h.emailSvc.SendWorkspaceInvite(to, ws, inv, rl, url); err != nil {
+		if err := h.emailSvc.SendWorkspaceInvite(to, ws, inv, rl, url, exists); err != nil {
 			log.Error().Err(err).Str("to", to).Str("workspace", ws).
 				Msg("workspace: failed to send invite email")
 		}
-	}(invite.Email, workspaceName, inviterName, roleName, acceptURL)
+	}(invite.Email, workspaceName, inviterName, roleName, acceptURL, userExists)
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"invite":     invite,
 		"link":       "/invite/" + invite.Token,
 		"accept_url": acceptURL,
 	})
+}
+
+// MyPendingInvites — convites pendentes endereçados ao email do user atual.
+// Usado pela Sidebar/banner pra alertar in-app que ele foi convidado pra
+// um workspace, sem depender só do email transacional.
+func (h *WorkspaceHandler) MyPendingInvites(c *fiber.Ctx) error {
+	user := middleware.GetCurrentUser(c)
+	if user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "não autenticado"})
+	}
+
+	// Marca expirados antes de listar — evita banner zumbi.
+	h.db.Model(&models.Invite{}).
+		Where("email = ? AND status = 'pending' AND expires_at < ?", user.Email, time.Now()).
+		Update("status", "expired")
+
+	var invites []models.Invite
+	h.db.Preload("Role").Preload("Inviter").Preload("Workspace").
+		Where("email = ? AND status = 'pending'", user.Email).
+		Order("created_at DESC").
+		Find(&invites)
+
+	out := make([]fiber.Map, 0, len(invites))
+	for _, inv := range invites {
+		// Dedup: se o user já é membro do workspace, marca o convite como
+		// aceito e pula (cobre o caso aceitou em outra aba/sessão).
+		var existing models.UserWorkspace
+		if err := h.db.Where("user_id = ? AND workspace_id = ?", user.ID, inv.WorkspaceID).First(&existing).Error; err == nil {
+			h.db.Model(&inv).Update("status", "accepted")
+			continue
+		}
+		wsName := ""
+		if inv.Workspace != nil {
+			wsName = inv.Workspace.Name
+		}
+		roleName := ""
+		if inv.Role != nil {
+			roleName = inv.Role.Name
+		}
+		inviterName, inviterEmail := "", ""
+		if inv.Inviter != nil {
+			inviterName = inv.Inviter.Name
+			inviterEmail = inv.Inviter.Email
+		}
+		out = append(out, fiber.Map{
+			"token":          inv.Token,
+			"workspace_id":   inv.WorkspaceID,
+			"workspace_name": wsName,
+			"role_name":      roleName,
+			"inviter_name":   inviterName,
+			"inviter_email":  inviterEmail,
+			"expires_at":     inv.ExpiresAt,
+			"created_at":     inv.CreatedAt,
+		})
+	}
+
+	return c.JSON(fiber.Map{"invites": out})
 }
 
 // ListInvites returns pending invites for a workspace
@@ -648,8 +715,15 @@ func (h *WorkspaceHandler) ResendInvite(c *fiber.Ctx) error {
 
 	// Envio síncrono aqui — usuário clicou "Reenviar" e quer feedback
 	// (sucesso/erro) antes de fechar. 15s timeout no HTTP client.
+	var userExists bool
+	{
+		var existing models.User
+		if err := h.db.Select("id").Where("LOWER(email) = LOWER(?)", invite.Email).First(&existing).Error; err == nil {
+			userExists = true
+		}
+	}
 	if h.emailSvc != nil {
-		if err := h.emailSvc.SendWorkspaceInvite(invite.Email, workspaceName, inviterName, roleName, acceptURL); err != nil {
+		if err := h.emailSvc.SendWorkspaceInvite(invite.Email, workspaceName, inviterName, roleName, acceptURL, userExists); err != nil {
 			log.Error().Err(err).Str("to", invite.Email).Msg("workspace: failed to resend invite email")
 			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
 				"error":      "email não pôde ser enviado — compartilhe o link manualmente",

@@ -272,9 +272,11 @@ func (s *Service) SendAdminResetPassword(to, name, newPassword string) {
 
 // SendWorkspaceInvite envia o convite para entrar num workspace. `acceptURL`
 // já inclui o token — o backend gera via FrontendAppURL + "/invite/" + token.
-func (s *Service) SendWorkspaceInvite(to, workspaceName, inviterName, roleName, acceptURL string) error {
+// userExists muda a copy: usuários que já têm conta veem "faça login pra
+// aceitar" + lembrete que o convite também aparece in-app no banner.
+func (s *Service) SendWorkspaceInvite(to, workspaceName, inviterName, roleName, acceptURL string, userExists bool) error {
 	subject := inviterName + " convidou você para " + workspaceName + " no " + s.appName
-	html := workspaceInviteHTML(s.appName, s.appURL, workspaceName, inviterName, roleName, acceptURL)
+	html := workspaceInviteHTML(s.appName, s.appURL, workspaceName, inviterName, roleName, acceptURL, userExists)
 	return s.send(to, subject, html, "workspace_invite")
 }
 

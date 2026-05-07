@@ -758,6 +758,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	workspaces.Get("/", workspaceH.List)
 	workspaces.Post("/", workspaceH.Create)
 	workspaces.Post("/accept-invite/:token", workspaceH.AcceptInvite)
+	// Convites pendentes endereçados ao user atual — alimenta o banner in-app
+	// que avisa "você foi convidado pra um workspace" sem depender só do email.
+	workspaces.Get("/my-invites", workspaceH.MyPendingInvites)
 
 	// Workspace-specific routes
 	workspace := workspaces.Group("/:id")
