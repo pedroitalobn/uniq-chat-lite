@@ -1070,6 +1070,16 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	crmTimelineH := handlers.NewCrmTimelineHandler(db)
 	crm.Get("/timeline", middleware.RequireWorkspacePermission(db, models.PermCRMView), crmTimelineH.List)
 
+	// CRM Custom Fields — definições de atributos personalizados por
+	// entidade (deal/contact/company). Os VALORES vivem na coluna
+	// custom_fields jsonb das entidades; aqui só CRUD do schema.
+	crmCustomFieldH := handlers.NewCrmCustomFieldHandler(db)
+	customFields := crm.Group("/custom-fields")
+	customFields.Get("/", middleware.RequireWorkspacePermission(db, models.PermCRMView), crmCustomFieldH.List)
+	customFields.Post("/", middleware.RequireWorkspacePermission(db, models.PermCRMEdit), crmCustomFieldH.Create)
+	customFields.Put("/:id", middleware.RequireWorkspacePermission(db, models.PermCRMEdit), crmCustomFieldH.Update)
+	customFields.Delete("/:id", middleware.RequireWorkspacePermission(db, models.PermCRMEdit), crmCustomFieldH.Delete)
+
 	// ─── Ticketing / Atendimento ──────────────────────────────────────────────
 	// All routes require an active workspace passed via X-Workspace-ID header
 	// (or ?workspace_id=). RequireWorkspacePermission enforces the RBAC key.

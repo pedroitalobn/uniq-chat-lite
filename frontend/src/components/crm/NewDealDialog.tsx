@@ -65,12 +65,22 @@ export function NewDealDialog({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // Pool local de contatos/empresas recém-criados — pra o picker não
+  // perder a referência depois de criar inline (a query principal pode
+  // demorar 1 frame pra refetchar).
+  const [extraContacts, setExtraContacts] = useState<Array<{ id: string; name: string; phone?: string }>>([]);
+  const [extraCompanies, setExtraCompanies] = useState<Array<{ id: string; name: string }>>([]);
+
   const contactsQ = useQuery({
     queryKey: ["crm-contacts-search", wsId, contactQuery],
     queryFn: () =>
-      crmApi.listContacts({ search: contactQuery || undefined, limit: 12, workspace_id: wsId }).then((r) =>
-        ((r.data as { items?: Array<{ id: string; name: string; phone?: string }> }).items ?? [])
-      ),
+      crmApi.listContacts({ search: contactQuery || undefined, limit: 20, workspace_id: wsId }).then((r) => {
+        // Backend retorna {data: [...]} — alguns endpoints usam {items}, então
+        // aceitamos os dois pra robustez.
+        const raw = r.data as { items?: any[]; data?: any[] };
+        const arr = (raw.items ?? raw.data ?? []) as Array<{ id: string; name: string; phone?: string }>;
+        return arr;
+      }),
     enabled: !!wsId,
     staleTime: 5_000,
   });
@@ -78,12 +88,33 @@ export function NewDealDialog({
   const companiesQ = useQuery({
     queryKey: ["crm-companies-search", wsId, companyQuery],
     queryFn: () =>
-      companiesApi.list(wsId, { q: companyQuery || undefined, limit: 12 }).then((r) =>
-        ((r.data as { items?: Array<{ id: string; name: string }> }).items ?? [])
-      ),
+      companiesApi.list(wsId, { q: companyQuery || undefined, limit: 20 }).then((r) => {
+        const raw = r.data as { items?: any[]; data?: any[] };
+        const arr = (raw.items ?? raw.data ?? []) as Array<{ id: string; name: string }>;
+        return arr;
+      }),
     enabled: !!wsId,
     staleTime: 5_000,
   });
+
+  // Combina resultado da busca + criados-na-sessão, dedup por id.
+  const contactItems = useMemo(() => {
+    const seen = new Set<string>();
+    const out: Array<{ id: string; name: string; phone?: string }> = [];
+    for (const c of [...extraContacts, ...(contactsQ.data ?? [])]) {
+      if (!seen.has(c.id)) { seen.add(c.id); out.push(c); }
+    }
+    return out;
+  }, [extraContacts, contactsQ.data]);
+
+  const companyItems = useMemo(() => {
+    const seen = new Set<string>();
+    const out: Array<{ id: string; name: string }> = [];
+    for (const c of [...extraCompanies, ...(companiesQ.data ?? [])]) {
+      if (!seen.has(c.id)) { seen.add(c.id); out.push(c); }
+    }
+    return out;
+  }, [extraCompanies, companiesQ.data]);
 
   const create = useMutation({
     mutationFn: () => {
@@ -91,6 +122,9 @@ export function NewDealDialog({
       if (!funnel) throw new Error("Selecione um funil antes de criar o deal");
       if (!contactId) throw new Error("Selecione ou crie um contato");
       if (!stageId) throw new Error("Selecione um estágio");
+      // Backend espera time.Time (RFC3339). O <input type="date"> devolve
+      // YYYY-MM-DD, então normalizamos pra ISO 00:00 UTC antes de mandar.
+      const closeISO = expectedCloseDate ? `${expectedCloseDate}T00:00:00Z` : undefined;
       return dealsApi.create(wsId, {
         title: title.trim(),
         contact_id: contactId,
@@ -99,7 +133,7 @@ export function NewDealDialog({
         company_id: companyId || undefined,
         value: valueMinor,
         currency,
-        expected_close_date: expectedCloseDate || undefined,
+        expected_close_date: closeISO,
         description: description || undefined,
       });
     },
@@ -174,9 +208,13 @@ export function NewDealDialog({
                 wsId={wsId}
                 query={contactQuery}
                 onQueryChange={setContactQuery}
-                items={contactsQ.data ?? []}
+                items={contactItems}
                 selectedId={contactId}
                 onSelect={setContactId}
+                onCreated={(c) => {
+                  setExtraContacts((prev) => [c, ...prev]);
+                  setContactId(c.id);
+                }}
               />
             </Field>
             <Field label="Empresa (opcional)">
@@ -184,9 +222,13 @@ export function NewDealDialog({
                 wsId={wsId}
                 query={companyQuery}
                 onQueryChange={setCompanyQuery}
-                items={companiesQ.data ?? []}
+                items={companyItems}
                 selectedId={companyId}
                 onSelect={setCompanyId}
+                onCreated={(c) => {
+                  setExtraCompanies((prev) => [c, ...prev]);
+                  setCompanyId(c.id);
+                }}
               />
             </Field>
           </div>
@@ -294,13 +336,14 @@ function useClickOutside<T extends HTMLElement>(onOutside: () => void) {
 }
 
 // ─── ContactPicker — busca + criar inline com modal expansível ────────────────
-function ContactPicker({ wsId, query, onQueryChange, items, selectedId, onSelect }: {
+function ContactPicker({ wsId, query, onQueryChange, items, selectedId, onSelect, onCreated }: {
   wsId: string;
   query: string;
   onQueryChange: (v: string) => void;
   items: Array<{ id: string; name: string; phone?: string }>;
   selectedId: string;
   onSelect: (id: string) => void;
+  onCreated?: (c: { id: string; name: string; phone?: string }) => void;
 }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -317,12 +360,18 @@ function ContactPicker({ wsId, query, onQueryChange, items, selectedId, onSelect
       workspace_id: wsId,
     } as any),
     onSuccess: (res) => {
-      const id = (res.data as any)?.id || (res.data as any)?.data?.id;
+      const data = (res.data as any) ?? {};
+      const id = data.id || data.data?.id;
+      const name = data.name || data.data?.name || newName.trim();
+      const phone = data.phone || data.data?.phone || newPhone.trim();
       if (id) {
+        onCreated?.({ id, name, phone });
         onSelect(id);
         onQueryChange("");
-        toast.success("Contato criado");
+        toast.success("Contato criado e selecionado");
         qc.invalidateQueries({ queryKey: ["crm-contacts-search"] });
+      } else {
+        toast.error("Contato criado mas não foi possível ler o ID — tente buscar manualmente");
       }
       setShowCreate(false);
       setNewName("");
@@ -457,13 +506,14 @@ function ContactPicker({ wsId, query, onQueryChange, items, selectedId, onSelect
 }
 
 // ─── CompanyPicker — análogo, sem phone obrigatório ──────────────────────────
-function CompanyPicker({ wsId, query, onQueryChange, items, selectedId, onSelect }: {
+function CompanyPicker({ wsId, query, onQueryChange, items, selectedId, onSelect, onCreated }: {
   wsId: string;
   query: string;
   onQueryChange: (v: string) => void;
   items: Array<{ id: string; name: string }>;
   selectedId: string;
   onSelect: (id: string) => void;
+  onCreated?: (c: { id: string; name: string }) => void;
 }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -473,14 +523,19 @@ function CompanyPicker({ wsId, query, onQueryChange, items, selectedId, onSelect
 
   const createMut = useMutation({
     mutationFn: (name: string) => companiesApi.create(wsId, { name } as any),
-    onSuccess: (res) => {
-      const id = (res.data as any)?.id || (res.data as any)?.data?.id;
+    onSuccess: (res, name) => {
+      const data = (res.data as any) ?? {};
+      const id = data.id || data.data?.id;
+      const finalName = data.name || data.data?.name || name;
       if (id) {
+        onCreated?.({ id, name: finalName });
         onSelect(id);
         onQueryChange("");
         setOpen(false);
-        toast.success("Empresa criada");
+        toast.success("Empresa criada e selecionada");
         qc.invalidateQueries({ queryKey: ["crm-companies-search"] });
+      } else {
+        toast.error("Empresa criada mas não foi possível ler o ID");
       }
     },
     onError: (e: unknown) => {

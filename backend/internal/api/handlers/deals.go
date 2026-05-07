@@ -163,8 +163,29 @@ func (h *DealHandler) Get(c *fiber.Ctx) error {
 // Create POST /v1/crm/deals
 func (h *DealHandler) Create(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
+	// custom_fields chega como objeto JSON mas é armazenado como string
+	// no model — extrai antes pra não quebrar o BodyParser.
+	rawBytes := c.Body()
+	var rawMap map[string]any
+	_ = json.Unmarshal(rawBytes, &rawMap)
+	customFieldsJSON := ""
+	if cf, ok := rawMap["custom_fields"].(map[string]any); ok {
+		validated, err := ValidateCustomFields(h.db, ws, "deal", cf)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "custom_fields inválido: " + err.Error()})
+		}
+		customFieldsJSON = validated
+		delete(rawMap, "custom_fields")
+	}
 	var body models.Deal
-	if err := c.BodyParser(&body); err != nil {
+	if customFieldsJSON != "" {
+		// Re-serializa sem custom_fields pra o BodyParser não dar tilt.
+		clean, _ := json.Marshal(rawMap)
+		if err := json.Unmarshal(clean, &body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
+		}
+		body.CustomFields = customFieldsJSON
+	} else if err := c.BodyParser(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
 	}
 	if body.Title == "" || body.ContactID == uuid.Nil || body.FunnelID == uuid.Nil || body.StageID == uuid.Nil {
@@ -226,6 +247,14 @@ func (h *DealHandler) Patch(c *fiber.Ctx) error {
 		"probability": true, "expected_close_date": true, "stage_id": true,
 		"funnel_id": true, "company_id": true, "owner_id": true,
 		"priority": true, "source": true, "is_archived": true,
+	}
+	// custom_fields é tratado fora do allowed map: vem como objeto JSON,
+	// passa pelo validator e vira jsonb na coluna.
+	if cf, ok := body["custom_fields"].(map[string]any); ok {
+		if validated, err := ValidateCustomFields(h.db, ws, "deal", cf); err == nil {
+			h.db.Model(&d).UpdateColumn("custom_fields", validated)
+		}
+		delete(body, "custom_fields")
 	}
 	update := map[string]any{}
 	var newStageID *uuid.UUID

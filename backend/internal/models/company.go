@@ -44,6 +44,10 @@ type Company struct {
 	DealCount    int `gorm:"default:0" json:"deal_count"`
 	OpenDealSum  int64 `gorm:"default:0" json:"open_deal_sum"` // minor units
 
+	// CustomFields — valores de campos personalizados (CrmCustomField,
+	// entity_type=company). Mapa key→value; tipos validados no handler.
+	CustomFields string `gorm:"type:jsonb;default:'{}'::jsonb" json:"custom_fields,omitempty"`
+
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`

@@ -62,6 +62,11 @@ type Deal struct {
 	// Tags via the same join table as Contact for reuse (deal_tags separate)
 	Tags []Tag `gorm:"many2many:deal_tags;joinForeignKey:DealID;joinReferences:TagID" json:"tags,omitempty"`
 
+	// CustomFields — valores dos campos personalizados definidos em
+	// CrmCustomField (entity_type=deal). JSON map key→value; tipos
+	// validados na camada de handler antes do write.
+	CustomFields string `gorm:"type:jsonb;default:'{}'::jsonb" json:"custom_fields,omitempty"`
+
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`

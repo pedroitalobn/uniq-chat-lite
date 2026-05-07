@@ -85,9 +85,14 @@ type Contact struct {
 	LastContactAt *time.Time `json:"last_contact_at,omitempty"`
 
 	// Custom attributes — free-form JSON for per-workspace enrichment
-	// (favorite_language, preferred_contact_time, ...). Schema is defined
-	// via CustomField rows; here we just store key→value pairs.
+	// (favorite_language, preferred_contact_time, ...). Schema é definido
+	// via CrmCustomField rows; aqui só armazenamos pares key→value.
 	AttributesJSON string `gorm:"type:text" json:"attributes,omitempty"`
+
+	// CustomFields — valores de campos personalizados (CrmCustomField,
+	// entity_type=contact). Substitui AttributesJSON em novos fluxos;
+	// AttributesJSON fica pra compatibilidade.
+	CustomFields string `gorm:"type:jsonb;default:'{}'::jsonb" json:"custom_fields,omitempty"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
