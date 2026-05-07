@@ -9,8 +9,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, Plus, X } from "lucide-react";
-import { crmApi, companiesApi, dealsApi } from "@/lib/api";
+import { crmApi, companiesApi, dealsApi, customFieldsApi } from "@/lib/api";
 import type { KanbanStage } from "./KanbanBoard";
+import { CustomFieldsRenderer, type CustomFieldsValue } from "./CustomFieldsRenderer";
 
 // Estilos compartilhados pra inputs/selects/textarea — usados via spread.
 // Antes era styled-jsx, mas o scoping causava confusão dentro dos pickers.
@@ -48,6 +49,16 @@ export function NewDealDialog({
   const [description, setDescription] = useState("");
   const [contactQuery, setContactQuery] = useState("");
   const [companyQuery, setCompanyQuery] = useState("");
+  const [customFieldsValue, setCustomFieldsValue] = useState<CustomFieldsValue>({});
+
+  // Definições de campos personalizados pra deals — carrega 1x e renderiza
+  // dinâmico no fim do form. Vazio se o workspace não criou nenhum em Propriedades.
+  const customFieldsQ = useQuery({
+    queryKey: ["custom-fields", wsId, "deal"],
+    queryFn: () => customFieldsApi.list(wsId, "deal").then((r) => r.data.items ?? []),
+    enabled: !!wsId,
+    staleTime: 60_000,
+  });
 
   // Pre-seleciona o primeiro estágio quando os stages chegam.
   useEffect(() => {
@@ -135,7 +146,11 @@ export function NewDealDialog({
         currency,
         expected_close_date: closeISO,
         description: description || undefined,
-      });
+        // custom_fields é tratado pelo handler como objeto JSON.
+        // Não está no tipo do client (Record<string, unknown>), então
+        // forçamos via assertion.
+        ...(Object.keys(customFieldsValue).length > 0 ? { custom_fields: customFieldsValue } : {}),
+      } as any);
     },
     onSuccess: () => {
       toast.success("Deal criado");
@@ -280,6 +295,20 @@ export function NewDealDialog({
               style={{ ...inputStyle, resize: "none" }}
             />
           </Field>
+
+          {(customFieldsQ.data?.length ?? 0) > 0 && (
+            <div className="pt-3 border-t" style={{ borderColor: "var(--surface-border)" }}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider mb-2.5"
+                style={{ color: "var(--text-3)" }}>
+                Campos personalizados
+              </p>
+              <CustomFieldsRenderer
+                defs={customFieldsQ.data ?? []}
+                value={customFieldsValue}
+                onChange={setCustomFieldsValue}
+              />
+            </div>
+          )}
         </div>
 
         {/* Footer */}

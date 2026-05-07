@@ -18,6 +18,7 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { crmApi } from "@/lib/api";
 import { FunnelManagerPanel } from "@/components/crm/FunnelManager";
 import { CrmHeader } from "@/components/crm/CrmHeader";
+import { CustomFieldsManager } from "@/components/crm/CustomFieldsManager";
 import type { Tag } from "@/types";
 
 type TabId = "funnels" | "tags" | "fields";
@@ -79,7 +80,7 @@ export default function PropertiesPage() {
       >
         {tab === "funnels" && <FunnelManagerPanel workspaceId={wsId} />}
         {tab === "tags" && <TagsPanel wsId={wsId} />}
-        {tab === "fields" && <CustomFieldsPanel />}
+        {tab === "fields" && <CustomFieldsManager workspaceId={wsId} />}
       </div>
     </div>
   );
@@ -202,91 +203,3 @@ function TagsPanel({ wsId }: { wsId?: string }) {
   );
 }
 
-// ─── Custom Fields panel — placeholder por enquanto ──────────────────────────
-// Backend ainda não tem schema pra custom_fields. Esse painel mostra o que
-// vai existir e o tipo de UI que vai ter, pra alinhar expectativa.
-function CustomFieldsPanel() {
-  const ENTITIES = [
-    { id: "deal",    label: "Deals",    description: "Atributos próprios pra cada deal (ex: linkedin do lead)" },
-    { id: "contact", label: "Contatos", description: "Campos extras no contato (ex: cargo, aniversário)" },
-    { id: "company", label: "Empresas", description: "Dados extras de empresa (ex: faturamento, ticket médio)" },
-  ];
-  const TYPES = [
-    { id: "text",     label: "Texto curto" },
-    { id: "textarea", label: "Texto longo" },
-    { id: "number",   label: "Número" },
-    { id: "date",     label: "Data" },
-    { id: "url",      label: "URL" },
-    { id: "select",   label: "Seleção única" },
-    { id: "multi",    label: "Seleção múltipla" },
-    { id: "boolean",  label: "Sim/Não" },
-  ];
-
-  return (
-    <div className="space-y-5">
-      <div
-        className="rounded-xl px-4 py-3 flex items-start gap-2 text-xs"
-        style={{
-          background: "rgba(245,158,11,0.08)",
-          border: "1px solid rgba(245,158,11,0.20)",
-          color: "var(--text-2)",
-        }}
-      >
-        <Layers className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "#f59e0b" }} />
-        <div>
-          <p className="font-medium" style={{ color: "var(--text-1)" }}>Campos personalizados — em desenvolvimento</p>
-          <p className="mt-0.5">
-            Em breve você poderá criar atributos próprios (ex: linkedin, score, NPS) por entidade
-            e tipo de valor. Abaixo é a prévia da UI.
-          </p>
-        </div>
-      </div>
-
-      {ENTITIES.map((ent) => (
-        <div
-          key={ent.id}
-          className="rounded-xl p-4 space-y-3"
-          style={{
-            background: "rgba(255,255,255,0.02)",
-            border: "1px solid rgba(255,255,255,0.06)",
-          }}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>{ent.label}</h3>
-              <p className="text-xs" style={{ color: "var(--text-3)" }}>{ent.description}</p>
-            </div>
-            <button
-              disabled
-              className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium opacity-50 cursor-not-allowed"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                color: "var(--text-2)",
-              }}
-              title="Em breve"
-            >
-              <Plus className="w-3.5 h-3.5" /> Novo campo
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {TYPES.map((t) => (
-              <span
-                key={t.id}
-                className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px]"
-                style={{
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                  color: "var(--text-3)",
-                }}
-              >
-                <X className="w-2.5 h-2.5 opacity-40" />
-                {t.label}
-              </span>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}

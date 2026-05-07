@@ -212,6 +212,7 @@ func (h *ContactHandler) CreateContact(c *fiber.Ctx) error {
 		Journey     string `json:"journey"`
 		ExternalID  string `json:"external_id"`
 		OwnerID     string `json:"owner_id"`
+		CustomFields map[string]any `json:"custom_fields,omitempty"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.Name == "" || req.Phone == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campos 'name' e 'phone' são obrigatórios"})
@@ -254,6 +255,11 @@ func (h *ContactHandler) CreateContact(c *fiber.Ctx) error {
 	if req.OwnerID != "" {
 		if oid, err := uuid.Parse(req.OwnerID); err == nil {
 			contact.OwnerID = &oid
+		}
+	}
+	if len(req.CustomFields) > 0 && contact.WorkspaceID != nil {
+		if validated, err := ValidateCustomFields(h.db, *contact.WorkspaceID, "contact", req.CustomFields); err == nil {
+			contact.CustomFields = validated
 		}
 	}
 	if err := h.db.Create(&contact).Error; err != nil {
@@ -317,9 +323,15 @@ func (h *ContactHandler) UpdateContact(c *fiber.Ctx) error {
 		Journey    *string `json:"journey"`
 		ExternalID *string `json:"external_id"`
 		OwnerID    *string `json:"owner_id"`
+		CustomFields map[string]any `json:"custom_fields,omitempty"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
+	}
+	if req.CustomFields != nil && contact.WorkspaceID != nil {
+		if validated, err := ValidateCustomFields(h.db, *contact.WorkspaceID, "contact", req.CustomFields); err == nil {
+			h.db.Model(&contact).UpdateColumn("custom_fields", validated)
+		}
 	}
 	updates := map[string]interface{}{}
 	if req.Name != nil && *req.Name != "" {

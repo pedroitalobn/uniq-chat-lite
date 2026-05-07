@@ -1076,6 +1076,50 @@ export const suppressionsApi = {
   delete: (id: string) => api.delete(`/v1/suppressions/${id}`),
 };
 
+// Custom Fields — definição de atributos dinâmicos por entidade (deal/contact/company).
+// Os VALORES vivem na coluna custom_fields da entidade; aqui só CRUD do schema.
+export type CustomFieldType = "text" | "textarea" | "number" | "date" | "url" | "select" | "multi" | "boolean";
+export type CustomFieldEntity = "deal" | "contact" | "company";
+
+export interface CustomFieldDef {
+  id: string;
+  workspace_id: string;
+  entity_type: CustomFieldEntity;
+  key: string;
+  name: string;
+  type: CustomFieldType;
+  options?: string; // JSON array stringified for select/multi
+  required: boolean;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export const customFieldsApi = {
+  list: (workspaceId: string, entityType?: CustomFieldEntity) =>
+    api.get<{ items: CustomFieldDef[] }>("/v1/crm/custom-fields", {
+      headers: wsHeaders(workspaceId),
+      params: entityType ? { entity_type: entityType } : undefined,
+    }),
+  create: (workspaceId: string, data: {
+    entity_type: CustomFieldEntity;
+    name: string;
+    type: CustomFieldType;
+    options?: string[];
+    required?: boolean;
+    position?: number;
+  }) => api.post<CustomFieldDef>("/v1/crm/custom-fields", data, { headers: wsHeaders(workspaceId) }),
+  update: (workspaceId: string, id: string, data: Partial<{
+    name: string;
+    type: CustomFieldType;
+    options: string[];
+    required: boolean;
+    position: number;
+  }>) => api.put<CustomFieldDef>(`/v1/crm/custom-fields/${id}`, data, { headers: wsHeaders(workspaceId) }),
+  delete: (workspaceId: string, id: string) =>
+    api.delete(`/v1/crm/custom-fields/${id}`, { headers: wsHeaders(workspaceId) }),
+};
+
 export const subscriptionTopicsApi = {
   list: () => api.get("/v1/subscription-topics"),
   create: (data: { slug: string; name: string; description?: string; is_required?: boolean; default_opt_in?: boolean }) =>

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -77,8 +78,26 @@ func (h *CompanyHandler) Get(c *fiber.Ctx) error {
 // Create POST /v1/crm/companies
 func (h *CompanyHandler) Create(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
+	// custom_fields chega como objeto JSON; remove do body antes de parsear
+	// pra não bater na coluna string do model.
+	rawBytes := c.Body()
+	var rawMap map[string]any
+	_ = json.Unmarshal(rawBytes, &rawMap)
+	customFieldsJSON := ""
+	if cf, ok := rawMap["custom_fields"].(map[string]any); ok {
+		if validated, err := ValidateCustomFields(h.db, ws, "company", cf); err == nil {
+			customFieldsJSON = validated
+		}
+		delete(rawMap, "custom_fields")
+	}
 	var body models.Company
-	if err := c.BodyParser(&body); err != nil {
+	if customFieldsJSON != "" {
+		clean, _ := json.Marshal(rawMap)
+		if err := json.Unmarshal(clean, &body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
+		}
+		body.CustomFields = customFieldsJSON
+	} else if err := c.BodyParser(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
 	}
 	if strings.TrimSpace(body.Name) == "" {
@@ -108,6 +127,12 @@ func (h *CompanyHandler) Patch(c *fiber.Ctx) error {
 	}
 	var body map[string]any
 	c.BodyParser(&body)
+	if cf, ok := body["custom_fields"].(map[string]any); ok {
+		if validated, err := ValidateCustomFields(h.db, ws, "company", cf); err == nil {
+			h.db.Model(&co).UpdateColumn("custom_fields", validated)
+		}
+		delete(body, "custom_fields")
+	}
 	allowed := []string{
 		"name", "legal_name", "domain", "website", "industry", "size", "description",
 		"phone", "email", "address_line", "city", "state", "country", "postal_code", "tax_id",
