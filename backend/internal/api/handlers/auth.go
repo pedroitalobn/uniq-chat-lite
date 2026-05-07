@@ -30,6 +30,26 @@ var (
 	stripeCheckoutType string
 )
 
+// resolveFrontendURL — devolve a primeira URL absoluta (com http/https)
+// disponível no config: FrontendURL → AppURL → APIURL. Se nenhuma estiver
+// setada, retorna "" (caller deve falhar com mensagem clara). Existe pra
+// blindar criação de Stripe Checkout Session, que rejeita success_url sem
+// scheme com erro críptico ("URL is invalid"). Sem isso, deploy novo com
+// FRONTEND_URL ainda vazia quebra cadastro pago em silêncio.
+func resolveFrontendURL() string {
+	candidates := []string{
+		strings.TrimRight(config.AppConfig.FrontendURL, "/"),
+		strings.TrimRight(config.AppConfig.AppURL, "/"),
+		strings.TrimRight(config.AppConfig.APIURL, "/"),
+	}
+	for _, u := range candidates {
+		if u != "" && (strings.HasPrefix(u, "http://") || strings.HasPrefix(u, "https://")) {
+			return u
+		}
+	}
+	return ""
+}
+
 func loadStripeConfigFromDB(db *gorm.DB) {
 	var settings models.PaymentSettings
 	if db.Where("id = ?", "default").First(&settings).Error == nil {
@@ -328,7 +348,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		}
 		h.db.Model(&user).Update("stripe_customer_id", sc.ID)
 
-		frontendURL := config.AppConfig.FrontendURL
+		frontendURL := resolveFrontendURL()
 		checkoutType := getStripeCheckoutType(h.db)
 
 		if checkoutType == "transparent" {
@@ -1401,7 +1421,12 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		}
 		h.db.Model(&pending).Updates(patch)
 
-		frontendURL := config.AppConfig.FrontendURL
+		frontendURL := resolveFrontendURL()
+		if frontendURL == "" {
+			log.Error().Msg("stripe checkout: FRONTEND_URL e APP_URL ausentes/inválidas — defina em prod")
+			return SafeErr(c, fiber.StatusServiceUnavailable, "frontend_url_missing",
+				"configuração do servidor incompleta — FRONTEND_URL precisa estar setada", nil)
+		}
 		checkoutType := getStripeCheckoutType(h.db)
 
 		if checkoutType == "transparent" {
@@ -1420,8 +1445,18 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 			}
 			pi, err := paymentintent.New(params)
 			if err != nil {
-				return SafeErr(c, fiber.StatusBadGateway, "stripe_payment_intent_failed",
-					"não foi possível criar o pagamento — tente novamente em alguns instantes", err)
+				msg := "não foi possível criar o pagamento — tente novamente em alguns instantes"
+				if se, ok := err.(*stripe.Error); ok {
+					switch se.Code {
+					case stripe.ErrorCodeResourceMissing:
+						msg = "recurso Stripe não encontrado — verifique se a chave/price está no modo certo (test/live)"
+					case stripe.ErrorCode("api_key_expired"):
+						msg = "chave Stripe expirada — admin precisa rotacionar em /admin/providers"
+					case stripe.ErrorCode("amount_too_small"):
+						msg = "valor do plano abaixo do mínimo aceito pela Stripe"
+					}
+				}
+				return SafeErr(c, fiber.StatusBadGateway, "stripe_payment_intent_failed", msg, err)
 			}
 			h.db.Model(&pending).Update("stripe_pi_id", pi.ID)
 			return c.JSON(fiber.Map{
@@ -1457,8 +1492,22 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		}
 		sess, err := session.New(params)
 		if err != nil {
-			return SafeErr(c, fiber.StatusBadGateway, "stripe_session_failed",
-				"não foi possível criar a sessão de pagamento — tente novamente", err)
+			// Stripe devolve *stripe.Error com Code útil (resource_missing,
+			// authentication_required, api_key_expired). Surfaceia o code +
+			// price_id no log/response pra admin diagnosticar sem ter que
+			// olhar logs do container.
+			msg := "não foi possível criar a sessão de pagamento — tente novamente"
+			if se, ok := err.(*stripe.Error); ok {
+				switch se.Code {
+				case stripe.ErrorCodeResourceMissing:
+					msg = "Price ID '" + plan.StripePriceID + "' não existe na conta Stripe configurada (verifique modo test/live)"
+				case "url_invalid":
+					msg = "URL de retorno inválida — FRONTEND_URL precisa começar com https://"
+				case stripe.ErrorCode("api_key_expired"):
+					msg = "chave Stripe expirada — admin precisa rotacionar em /admin/providers"
+				}
+			}
+			return SafeErr(c, fiber.StatusBadGateway, "stripe_session_failed", msg, err)
 		}
 		h.db.Model(&pending).Update("stripe_session_id", sess.ID)
 		return c.JSON(fiber.Map{
