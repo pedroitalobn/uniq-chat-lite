@@ -11,34 +11,42 @@ import { cn } from "@/lib/utils";
 type NavItem = {
   href: string;
   label: string;
+  description: string;
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   match: (p: string) => boolean;
 };
 
 const MAIN_ITEMS: NavItem[] = [
-  { href: "/crm/deals",     label: "Deals",     icon: Briefcase,     match: (p) => p === "/crm" || p.startsWith("/crm/deals") },
-  { href: "/crm/contacts",  label: "Contatos",  icon: Contact,       match: (p) => p.startsWith("/crm/contacts") },
-  { href: "/crm/companies", label: "Empresas",  icon: Building2,     match: (p) => p.startsWith("/crm/companies") },
-  { href: "/crm/funnels",   label: "Funis",     icon: GitBranch,     match: (p) => p.startsWith("/crm/funnels") },
-  { href: "/crm/tasks",     label: "Tarefas",   icon: ListTodo,      match: (p) => p.startsWith("/crm/tasks") },
-  { href: "/crm/meetings",  label: "Reuniões",  icon: CalendarClock, match: (p) => p.startsWith("/crm/meetings") },
-  { href: "/crm/segments",  label: "Segmentos", icon: Filter,        match: (p) => p.startsWith("/crm/segments") },
+  { href: "/crm/deals",     label: "Deals",     description: "Pipeline de vendas",  icon: Briefcase,     match: (p) => p === "/crm" || p.startsWith("/crm/deals") },
+  { href: "/crm/contacts",  label: "Contatos",  description: "Pessoas e leads",     icon: Contact,       match: (p) => p.startsWith("/crm/contacts") },
+  { href: "/crm/companies", label: "Empresas",  description: "Organizações",        icon: Building2,     match: (p) => p.startsWith("/crm/companies") },
+  { href: "/crm/funnels",   label: "Funis",     description: "Pipelines + etapas",  icon: GitBranch,     match: (p) => p.startsWith("/crm/funnels") },
+  { href: "/crm/tasks",     label: "Tarefas",   description: "Follow-ups",          icon: ListTodo,      match: (p) => p.startsWith("/crm/tasks") },
+  { href: "/crm/meetings",  label: "Reuniões",  description: "Agendamentos",        icon: CalendarClock, match: (p) => p.startsWith("/crm/meetings") },
+  { href: "/crm/segments",  label: "Segmentos", description: "Grupos e filtros",    icon: Filter,        match: (p) => p.startsWith("/crm/segments") },
 ];
 
 const TOOL_ITEMS: NavItem[] = [
-  { href: "/crm/import",     label: "Importar",   icon: Upload,   match: (p) => p.startsWith("/crm/import") },
-  { href: "/crm/duplicates", label: "Duplicatas", icon: GitMerge, match: (p) => p.startsWith("/crm/duplicates") },
+  { href: "/crm/import",     label: "Importar",   description: "CSV e planilhas",   icon: Upload,   match: (p) => p.startsWith("/crm/import") },
+  { href: "/crm/duplicates", label: "Duplicatas", description: "Mesclar registros", icon: GitMerge, match: (p) => p.startsWith("/crm/duplicates") },
 ];
+
+const glassPanel: React.CSSProperties = {
+  background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+  backdropFilter: "blur(16px) saturate(180%)",
+  WebkitBackdropFilter: "blur(16px) saturate(180%)",
+  border: "1px solid rgba(255,255,255,0.08)",
+};
 
 export function CRMNav() {
   const pathname = usePathname();
 
   return (
     <>
-      {/* Mobile: barra horizontal com scroll */}
+      {/* Mobile: barra horizontal scroll com glassmorphism */}
       <nav
-        className="md:hidden flex gap-1 overflow-x-auto px-1 py-1 rounded-xl scrollbar-none"
-        style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
+        className="md:hidden flex gap-1 overflow-x-auto p-1.5 rounded-2xl scrollbar-none"
+        style={glassPanel}
       >
         {[...MAIN_ITEMS, ...TOOL_ITEMS].map((item) => {
           const active = item.match(pathname);
@@ -48,10 +56,13 @@ export function CRMNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-1.5 flex-shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
+                "flex items-center gap-1.5 flex-shrink-0 rounded-xl px-3 py-2 text-xs font-medium transition-all",
               )}
               style={{
-                background: active ? "var(--green-dim)" : "transparent",
+                background: active
+                  ? "linear-gradient(135deg, rgba(0,212,106,0.18), rgba(0,212,106,0.06))"
+                  : "transparent",
+                border: active ? "1px solid rgba(0,212,106,0.25)" : "1px solid transparent",
                 color: active ? "var(--green)" : "var(--text-2)",
               }}
             >
@@ -62,69 +73,79 @@ export function CRMNav() {
         })}
       </nav>
 
-      {/* Desktop: sidebar */}
-      <aside className="hidden md:block w-44 lg:w-52 flex-shrink-0 sticky top-0 self-start">
-        <nav
-          className="rounded-2xl overflow-hidden w-full"
-          style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
-        >
-          {MAIN_ITEMS.map((item, i) => {
+      {/* Desktop: sidebar com glassmorphism + descrições */}
+      <aside className="hidden md:block w-48 lg:w-56 flex-shrink-0 sticky top-0 self-start">
+        <nav className="rounded-2xl overflow-hidden p-1.5 space-y-0.5" style={glassPanel}>
+          {MAIN_ITEMS.map((item) => {
             const active = item.match(pathname);
             const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={cn(
-                  "w-full flex items-center gap-2.5 px-3 lg:px-4 py-2.5 text-left transition-colors relative",
-                  i < MAIN_ITEMS.length - 1 ? "border-b" : ""
-                )}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all relative"
                 style={{
-                  borderColor: "var(--surface-border)",
-                  background: active ? "var(--green-dim)" : "transparent",
+                  background: active
+                    ? "linear-gradient(135deg, rgba(0,212,106,0.16), rgba(0,212,106,0.04))"
+                    : "transparent",
+                  border: active ? "1px solid rgba(0,212,106,0.22)" : "1px solid transparent",
                 }}
               >
-                {active && (
-                  <div
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r"
-                    style={{ background: "var(--green)" }}
-                  />
-                )}
-                <Icon className="w-4 h-4 flex-shrink-0" style={{ color: active ? "var(--green)" : "var(--text-3)" }} />
-                <span className="text-xs font-medium truncate" style={{ color: active ? "var(--green)" : "var(--text-1)" }}>
-                  {item.label}
-                </span>
+                <div
+                  className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{
+                    background: active ? "rgba(0,212,106,0.18)" : "rgba(255,255,255,0.04)",
+                    border: `1px solid ${active ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.06)"}`,
+                  }}
+                >
+                  <Icon className="w-3.5 h-3.5" style={{ color: active ? "var(--green)" : "var(--text-3)" }} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium truncate" style={{ color: active ? "var(--green)" : "var(--text-1)" }}>
+                    {item.label}
+                  </p>
+                  <p className="text-[10px] truncate hidden lg:block" style={{ color: "var(--text-3)" }}>
+                    {item.description}
+                  </p>
+                </div>
               </Link>
             );
           })}
 
           <div
-            className="px-3 lg:px-4 pt-2.5 pb-1 text-[9px] font-semibold uppercase tracking-widest border-t"
-            style={{ color: "var(--text-3)", borderColor: "var(--surface-border)" }}
+            className="px-3 pt-3 pb-1 text-[9px] font-semibold uppercase tracking-widest"
+            style={{ color: "var(--text-3)" }}
           >
             Ferramentas
           </div>
 
-          {TOOL_ITEMS.map((item, i) => {
+          {TOOL_ITEMS.map((item) => {
             const active = item.match(pathname);
             const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={cn(
-                  "w-full flex items-center gap-2.5 px-3 lg:px-4 py-2 text-left transition-colors relative",
-                  i < TOOL_ITEMS.length - 1 ? "border-b" : ""
-                )}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl transition-all"
                 style={{
-                  borderColor: "var(--surface-border)",
-                  background: active ? "var(--green-dim)" : "transparent",
+                  background: active
+                    ? "linear-gradient(135deg, rgba(0,212,106,0.16), rgba(0,212,106,0.04))"
+                    : "transparent",
+                  border: active ? "1px solid rgba(0,212,106,0.22)" : "1px solid transparent",
                 }}
               >
-                <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: active ? "var(--green)" : "var(--text-3)" }} />
-                <span className="text-xs truncate" style={{ color: active ? "var(--green)" : "var(--text-2)" }}>
+                <div
+                  className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
+                  style={{
+                    background: active ? "rgba(0,212,106,0.18)" : "rgba(255,255,255,0.04)",
+                    border: `1px solid ${active ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.06)"}`,
+                  }}
+                >
+                  <Icon className="w-3 h-3" style={{ color: active ? "var(--green)" : "var(--text-3)" }} />
+                </div>
+                <p className="text-xs truncate" style={{ color: active ? "var(--green)" : "var(--text-2)" }}>
                   {item.label}
-                </span>
+                </p>
               </Link>
             );
           })}
