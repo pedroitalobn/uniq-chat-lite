@@ -4,8 +4,10 @@ import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import QRCode from "qrcode";
-import { authApi, plansApi } from "@/lib/api";
+import { authApi, plansApi, workspacesApi } from "@/lib/api";
 import { usePreferences, TIMEZONES, type Language, type ThemeMode } from "@/lib/preferences";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import {
   User, Lock, Check, Loader2, Eye, EyeOff, Globe, Sun, Moon, Monitor,
   Clock, CreditCard, Zap, ArrowRight, Star, Info, ChevronRight, Ticket, Copy, Link2,
@@ -616,6 +618,32 @@ function TwoFactorCard() {
 // ─── Preferences Section ──────────────────────────────────────────────────────
 function PreferencesSection({ t }: { t: (k: string) => string }) {
   const { language, theme, timezone, setLanguage, setTheme, setTimezone } = usePreferences();
+  const { currentWorkspace } = useWorkspace();
+  const { isOwner, isSuperAdmin, hasPerm } = useWorkspacePermissions();
+  const canEditWorkspace = isOwner || isSuperAdmin || hasPerm("workspaces:manage");
+  // Espelho do timezone do workspace pra exibir/alterar daqui (em vez de
+  // forçar o user a achar /workspace/[id]/messaging). É o valor que o
+  // scheduler de campanhas, freqcap e quiet hours usam.
+  const wsTimezone = (currentWorkspace as unknown as { timezone?: string } | null)?.timezone ?? "America/Sao_Paulo";
+  const [pendingWsTz, setPendingWsTz] = useState<string>(wsTimezone);
+
+  // Sincroniza quando o workspace ativo muda.
+  useEffect(() => {
+    setPendingWsTz(wsTimezone);
+  }, [wsTimezone]);
+
+  const saveWsTz = useMutation({
+    mutationFn: () => {
+      if (!currentWorkspace?.id) throw new Error("Sem workspace ativo");
+      return workspacesApi.update(currentWorkspace.id, { timezone: pendingWsTz });
+    },
+    onSuccess: () => toast.success("Timezone do workspace atualizado"),
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
+        || "Erro ao salvar timezone do workspace";
+      toast.error(msg);
+    },
+  });
 
   return (
     <SectionWrap title={t("settings_preferences")} description={t("settings_preferences_desc")}>
@@ -646,7 +674,7 @@ function PreferencesSection({ t }: { t: (k: string) => string }) {
               </div>
             </Field>
 
-            <Field label={t("settings_timezone")}>
+            <Field label={`${t("settings_timezone")} (exibição)`}>
               <div className="relative">
                 <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "var(--text-3)" }} />
                 <select value={timezone} onChange={(e) => setTimezone(e.target.value)} className="input-field w-full pl-9">
@@ -656,19 +684,50 @@ function PreferencesSection({ t }: { t: (k: string) => string }) {
                 </select>
               </div>
               <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
-                {t("timezone_label")}: <span className="font-mono">{timezone}</span>
+                Aplicado só na sua interface (datas, horários listados). Não afeta agendamento de campanhas.
               </p>
             </Field>
+
+            {currentWorkspace && (
+              <Field label="Timezone do workspace (agendamentos)">
+                <div className="relative">
+                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "var(--text-3)" }} />
+                  <select
+                    value={pendingWsTz}
+                    onChange={(e) => setPendingWsTz(e.target.value)}
+                    disabled={!canEditWorkspace}
+                    className="input-field w-full pl-9 disabled:opacity-60"
+                  >
+                    {TIMEZONES.map((tz) => (
+                      <option key={tz.value} value={tz.value}>{tz.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
+                  Usado por <strong>campanhas</strong> (janelas <span className="font-mono">schedule_hours</span>),
+                  <strong> frequency caps</strong> e <strong>quiet hours</strong>. Cliente em Orlando? Selecione
+                  <span className="font-mono"> America/New_York</span>.
+                </p>
+                {canEditWorkspace && pendingWsTz !== wsTimezone && (
+                  <button
+                    type="button"
+                    onClick={() => saveWsTz.mutate()}
+                    disabled={saveWsTz.isPending}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                    style={{ background: "var(--green)", color: "#03170a" }}
+                  >
+                    {saveWsTz.isPending ? "Salvando…" : `Salvar como timezone do workspace`}
+                  </button>
+                )}
+                {!canEditWorkspace && (
+                  <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
+                    Só dono ou admin do workspace pode alterar.
+                  </p>
+                )}
+              </Field>
+            )}
           </div>
         </Card>
-
-        <div className="flex justify-end">
-          <button onClick={() => toast.success(t("settings_saved"))}
-            className="btn-primary">
-            <Globe className="w-4 h-4" />
-            {t("settings_save")}
-          </button>
-        </div>
       </div>
     </SectionWrap>
   );

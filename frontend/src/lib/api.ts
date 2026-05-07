@@ -907,7 +907,16 @@ export const workspacesApi = {
   list: () => api.get("/v1/workspaces"),
   create: (data: { name: string }) => api.post("/v1/workspaces", data),
   get: (id: string) => api.get(`/v1/workspaces/${id}`),
-  update: (id: string, data: { name?: string; color?: string; icon?: string }) =>
+  update: (id: string, data: {
+    name?: string;
+    color?: string;
+    icon?: string;
+    timezone?: string;
+    quiet_hours?: string;
+    freq_cap_per_hour?: number;
+    freq_cap_per_day?: number;
+    freq_cap_per_week?: number;
+  }) =>
     api.put(`/v1/workspaces/${id}`, data),
   delete: (id: string) => api.delete(`/v1/workspaces/${id}`),
   // Members
