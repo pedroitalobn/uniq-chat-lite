@@ -11,6 +11,7 @@ import (
 	"github.com/stripe/stripe-go/v76/checkout/session"
 	stripecustomer "github.com/stripe/stripe-go/v76/customer"
 	"github.com/stripe/stripe-go/v76/paymentintent"
+	stripeprice "github.com/stripe/stripe-go/v76/price"
 	"github.com/stripe/stripe-go/v76/webhook"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/config"
@@ -48,6 +49,29 @@ func (h *StripeHandler) getWebhookSecret() string {
 	var settings models.PaymentSettings
 	if err := h.db.Where("id = ?", "default").First(&settings).Error; err == nil {
 		return settings.StripeWebhookSecret
+	}
+	return ""
+}
+
+// stripeKeyMode lê o prefixo da chave configurada (sk_test_ ou sk_live_)
+// pra dizer em que modo a Stripe está respondendo. Útil pra dar mensagens
+// de erro claras quando o admin mistura test/live.
+func stripeKeyMode() string {
+	k := strings.TrimSpace(stripe.Key)
+	if strings.HasPrefix(k, "sk_test_") || strings.HasPrefix(k, "rk_test_") {
+		return "test"
+	}
+	if strings.HasPrefix(k, "sk_live_") || strings.HasPrefix(k, "rk_live_") {
+		return "live"
+	}
+	return "unknown"
+}
+
+// priceModePath devolve o segmento de URL apropriado pra montar links
+// pro dashboard. Test fica em /test/, live na raiz.
+func priceModePath(mode string) string {
+	if mode == "test" {
+		return "test"
 	}
 	return ""
 }
@@ -215,6 +239,30 @@ func (h *StripeHandler) CreateCheckout(c *fiber.Ctx) error {
 	}
 	if plan.Price == 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "use este endpoint apenas para planos pagos"})
+	}
+
+	// Preflight: verifica que o Price existe na conta + modo da chave
+	// configurada. Sem isso, o erro vinha como "resource_missing" cru
+	// e o admin não sabia se era mismatch test/live, conta errada ou
+	// price arquivado. Agora damos diagnóstico preciso.
+	priceMode := stripeKeyMode()
+	if _, err := stripeprice.Get(plan.StripePriceID, nil); err != nil {
+		stripeErr, _ := err.(*stripe.Error)
+		if stripeErr != nil && stripeErr.Code == stripe.ErrorCodeResourceMissing {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "stripe_price_not_found",
+				"message": "Price '" + plan.StripePriceID + "' não existe na conta Stripe configurada (modo " + priceMode + "). " +
+					"Causas comuns: o Price foi criado no modo oposto (test↔live), em outra conta, ou foi arquivado. " +
+					"Verifique em https://dashboard.stripe.com/" + priceModePath(priceMode) + "/prices/" + plan.StripePriceID,
+				"price_id": plan.StripePriceID,
+				"key_mode": priceMode,
+			})
+		}
+		// Outros erros (rede, auth) — repassa o detalhe.
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+			"error":   "stripe_price_lookup_failed",
+			"message": "não foi possível validar o Price na Stripe: " + err.Error(),
+		})
 	}
 
 	// Create or reuse Stripe customer
