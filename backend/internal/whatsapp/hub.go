@@ -80,6 +80,30 @@ func (h *Hub) run() {
 				if h.users[client.userID] == nil {
 					h.users[client.userID] = make(map[*Client]bool)
 				}
+				// Limite por user pra mitigar memory leak — antes
+				// usuário com bug no frontend (reconnect loop) ou
+				// atacante abrindo abas em paralelo acumulava conexões
+				// até OOM. 20 é generoso (multi-tab + multi-device);
+				// quando estoura, dropa o cliente MAIS ANTIGO pra abrir
+				// espaço — comportamento previsível, sem rejeitar o
+				// pedido novo.
+				const maxConnsPerUser = 20
+				if len(h.users[client.userID]) >= maxConnsPerUser {
+					var oldest *Client
+					for c := range h.users[client.userID] {
+						oldest = c
+						break // ordem de map é random; "primeiro" é suficiente
+					}
+					if oldest != nil {
+						delete(h.users[client.userID], oldest)
+						for room := range oldest.rooms {
+							if rc, ok := h.rooms[room]; ok {
+								delete(rc, oldest)
+							}
+						}
+						close(oldest.Conn)
+					}
+				}
 				h.users[client.userID][client] = true
 			}
 			for room := range client.rooms {

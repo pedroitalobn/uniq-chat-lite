@@ -737,9 +737,8 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 
 	// Validate against Anthropic API
 	if _, err := validateAnthropicKey(key); err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "API key inválida: " + err.Error(),
-		})
+		return SafeErr(c, fiber.StatusUnauthorized, "anthropic_key_invalid",
+			"API key da Anthropic inválida — verifique e tente novamente", err)
 	}
 
 	// Derive a stable identity from the key
@@ -1421,7 +1420,8 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 			}
 			pi, err := paymentintent.New(params)
 			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar pagamento: " + err.Error()})
+				return SafeErr(c, fiber.StatusBadGateway, "stripe_payment_intent_failed",
+					"não foi possível criar o pagamento — tente novamente em alguns instantes", err)
 			}
 			h.db.Model(&pending).Update("stripe_pi_id", pi.ID)
 			return c.JSON(fiber.Map{
@@ -1457,7 +1457,8 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		}
 		sess, err := session.New(params)
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar sessão de pagamento: " + err.Error()})
+			return SafeErr(c, fiber.StatusBadGateway, "stripe_session_failed",
+				"não foi possível criar a sessão de pagamento — tente novamente", err)
 		}
 		h.db.Model(&pending).Update("stripe_session_id", sess.ID)
 		return c.JSON(fiber.Map{

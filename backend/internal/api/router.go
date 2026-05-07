@@ -152,6 +152,38 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 		return c.JSON(fiber.Map{"status": "ok", "service": "uniq-chat"})
 	})
 
+	// /ready — readiness check robusto pra load balancer / orchestrator
+	// (Dokploy, K8s, ECS). Diferente do /health (liveness, "processo
+	// está vivo"), /ready confirma que dependências críticas respondem
+	// (DB, MinIO se configurado). Retorna 503 se algo essencial está
+	// fora — load balancer remove o pod do roteamento até voltar.
+	app.Get("/ready", func(c *fiber.Ctx) error {
+		checks := map[string]string{}
+		ready := true
+		// DB ping com timeout curto pra não segurar o orchestrator.
+		if sqlDB, err := db.DB(); err == nil {
+			ctx, cancel := context.WithTimeout(c.Context(), 2*time.Second)
+			defer cancel()
+			if err := sqlDB.PingContext(ctx); err != nil {
+				checks["db"] = "down: " + err.Error()
+				ready = false
+			} else {
+				checks["db"] = "ok"
+			}
+		} else {
+			checks["db"] = "down: " + err.Error()
+			ready = false
+		}
+		status := fiber.StatusOK
+		if !ready {
+			status = fiber.StatusServiceUnavailable
+		}
+		return c.Status(status).JSON(fiber.Map{
+			"ready":  ready,
+			"checks": checks,
+		})
+	})
+
 	// Channels metadata (public — used by UI to list available channels)
 	channelsHandler := func(c *fiber.Ctx) error {
 		type channelInfo struct {
@@ -351,8 +383,12 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	app.Post("/v1/stripe/webhook", stripeH.Webhook)
 	app.Post("/v1/payments/webhook/stripe", stripeH.Webhook)
 
-	// Activate lead after payment (public)
-	app.Post("/stripe/activate-lead", stripeH.ActivateLead)
+	// Activate lead after payment (public). Rate limit anti-abuse:
+	// é endpoint público que confere session_id da Stripe contra
+	// pending — sem limite, atacante pode iterar IDs em busca de
+	// pendings expostos. 10/min é suficiente pro flow legítimo
+	// (1 chamada por user pós-checkout).
+	app.Post("/stripe/activate-lead", middleware.RateLimit(10), stripeH.ActivateLead)
 
 	// Endpoint genérico (provider-agnóstico) — webhook é o caminho
 	// preferido (Stripe já materializou o user) e a consulta à API do

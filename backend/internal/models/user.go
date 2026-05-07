@@ -44,13 +44,18 @@ type User struct {
 	TOTPEnabledAt            *time.Time `json:"totp_enabled_at,omitempty"`
 	TOTPBackupCodesHash      string     `gorm:"type:text" json:"-"` // JSON array de bcrypt hashes
 	Timezone                 string     `gorm:"type:varchar(50);default:'America/Sao_Paulo'" json:"timezone,omitempty"`
-	StripeCustomerID         string     `gorm:"type:varchar(255)" json:"stripe_customer_id,omitempty"`
-	StripeSubscriptionID     string     `gorm:"type:varchar(255)" json:"stripe_subscription_id,omitempty"`
+	// Customer/Subscription IDs ficam fora do JSON exposto pra cliente
+	// (`json:"-"`). Esses identificadores valem ouro pra atacante
+	// (consultar Stripe/Asaas direto, fazer phishing direcionado, etc).
+	// Status (active/past_due/canceled) continua público pra UI mostrar
+	// estado da assinatura sem expor o ID.
+	StripeCustomerID         string     `gorm:"type:varchar(255)" json:"-"`
+	StripeSubscriptionID     string     `gorm:"type:varchar(255)" json:"-"`
 	StripeSubscriptionStatus string     `gorm:"type:varchar(50)" json:"stripe_subscription_status,omitempty"`
 
-	// Asaas
-	AsaasCustomerID         string `gorm:"type:varchar(255)" json:"asaas_customer_id,omitempty"`
-	AsaasSubscriptionID     string `gorm:"type:varchar(255)" json:"asaas_subscription_id,omitempty"`
+	// Asaas — mesmo tratamento: IDs internos ocultos, status público.
+	AsaasCustomerID         string `gorm:"type:varchar(255)" json:"-"`
+	AsaasSubscriptionID     string `gorm:"type:varchar(255)" json:"-"`
 	AsaasSubscriptionStatus string `gorm:"type:varchar(50)" json:"asaas_subscription_status,omitempty"`
 	// Asaas não suporta cancel-at-period-end nativo. Quando user pede pra
 	// cancelar mas manter acesso até o fim do ciclo, gravamos o timestamp

@@ -11,6 +11,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+	stripe "github.com/stripe/stripe-go/v76"
+	stripeprice "github.com/stripe/stripe-go/v76/price"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/email"
@@ -573,6 +575,26 @@ func (h *AdminHandler) UpdateUser(c *fiber.Ctx) error {
 			h.db.First(&oldPlan, "id = ?", *user.PlanID)
 		}
 		h.db.First(&newPlan, "id = ?", pidNew)
+
+		// Downgrade: detecta violação dos novos limites e loga aviso.
+		// Não auto-pausa instâncias/campanhas (decisão UX delicada —
+		// pode quebrar fluxo crítico do user); o banner de usage no
+		// frontend pega `usage > limit` e mostra alerta.
+		var instCount, campaignCount int64
+		h.db.Model(&models.Instance{}).Where("user_id = ?", user.ID).Count(&instCount)
+		h.db.Model(&models.Campaign{}).Where("user_id = ? AND status NOT IN ?", user.ID,
+			[]string{"completed", "cancelled", "failed"}).Count(&campaignCount)
+		if newPlan.MaxInstances > 0 && int(instCount) > newPlan.MaxInstances {
+			log.Warn().Str("user_id", user.ID.String()).
+				Int("instances_atual", int(instCount)).Int("limite_novo", newPlan.MaxInstances).
+				Msg("plan downgrade: usuário excede limite de instâncias — banner de upgrade no frontend cobre")
+		}
+		if newPlan.MaxCampaigns > 0 && int(campaignCount) > newPlan.MaxCampaigns {
+			log.Warn().Str("user_id", user.ID.String()).
+				Int("campanhas_atual", int(campaignCount)).Int("limite_novo", newPlan.MaxCampaigns).
+				Msg("plan downgrade: usuário excede limite de campanhas")
+		}
+
 		entry := models.PlanChangeLog{
 			UserID:       user.ID,
 			FromPlanID:   user.PlanID,
@@ -1172,6 +1194,39 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 		updates["is_active"] = *req.IsActive
 	}
 	if req.StripePriceID != "" {
+		// Guard contra Plan.Price divergir do unit_amount real do
+		// Stripe Price. Sem isso, admin pode setar Price=99 no DB
+		// mas o checkout cobra 199 (porque o Stripe Price é 199).
+		// Valida via API: stripeprice.Get e compara em centavos.
+		// Se Stripe não está configurado (key vazia), pula a checagem
+		// — admin assume responsabilidade.
+		loadStripeConfigFromDB(h.db)
+		if stripeKey != "" {
+			stripe.Key = stripeKey
+			sp, err := stripeprice.Get(req.StripePriceID, nil)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error":   "stripe_price_invalid",
+					"message": "Price ID '" + req.StripePriceID + "' não existe na conta Stripe configurada (verifique modo test/live)",
+				})
+			}
+			expectedCents := req.Price
+			actualCents := float64(sp.UnitAmount) // unit_amount is in minor units
+			expected := 0.0
+			if expectedCents != nil {
+				expected = *expectedCents * 100
+			} else {
+				expected = plan.Price * 100
+			}
+			if actualCents != expected {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error":   "stripe_price_mismatch",
+					"message": fmt.Sprintf("Price '%s' está como %.2f no Stripe mas o plano está como %.2f no DB. Atualize um dos lados antes de salvar.", req.StripePriceID, actualCents/100, expected/100),
+					"stripe":  actualCents / 100,
+					"db":      expected / 100,
+				})
+			}
+		}
 		updates["stripe_price_id"] = req.StripePriceID
 	}
 	if req.AsaasProductID != "" {

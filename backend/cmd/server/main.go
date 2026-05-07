@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -280,6 +282,29 @@ func main() {
 
 	addr := ":" + cfg.Port
 	log.Info().Str("addr", addr).Msg("Uniq.chat API starting")
+
+	// Graceful shutdown — ouve SIGTERM/SIGINT e drena conexões antes de
+	// matar o processo. Sem isso o Dokploy/K8s mata 30s depois e
+	// requests em flight perdem (transações abortadas, webhooks
+	// re-entregues como falhados, WS clients caem sem aviso). Janela de
+	// 25s pra finalizar (LB tem 30s de drain default).
+	go func() {
+		quit := make(chan os.Signal, 1)
+		signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
+		<-quit
+		log.Info().Msg("graceful shutdown: drenando conexões (até 25s)")
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+		defer cancel()
+		if err := app.ShutdownWithContext(ctx); err != nil {
+			log.Error().Err(err).Msg("graceful shutdown: erro durante drain")
+		} else {
+			log.Info().Msg("graceful shutdown: drain concluído")
+		}
+		// Fecha pool de DB pra liberar conexões antes do exit.
+		if sqlDB, err := db.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+	}()
 
 	if err := app.Listen(addr); err != nil {
 		log.Fatal().Err(err).Msg("server error")
