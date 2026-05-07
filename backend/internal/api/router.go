@@ -415,10 +415,15 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// enumeração de emails e DoS via cadastro em massa. Antes eram
 	// generosos demais (30/min em register permitia 1800 tentativas/h
 	// vindo de 1 IP — basta usar proxy pool pra escalar).
-	authRegister := middleware.RateLimit(5)   // 5/min — cadastros legítimos são raros por IP
-	authSensitive := middleware.RateLimit(3)  // 3/min — forgot/reset/verify (anti-enum)
-	authLogin := middleware.RateLimit(10)     // 10/min — typo + múltiplos devices toleráveis; brute force inviável
-	authValidate := middleware.RateLimit(60)  // 60/min — UI faz polling, mantém alto
+	// /register tem 3 endpoints sequenciais (/start, /verify, /complete)
+	// + retries por OTP errado, então 10/min é o mínimo razoável sem
+	// bloquear flow legítimo. RateLimit usa IP real (CF-Connecting-IP)
+	// agora; antes todos compartilhavam o IP do proxy e 5/min estourava
+	// com 1-2 users simultâneos no onboarding.
+	authRegister := middleware.RateLimit(10)
+	authSensitive := middleware.RateLimit(5)  // forgot/reset/verify (anti-enum, mas não tão agressivo a ponto de bloquear sequência completa)
+	authLogin := middleware.RateLimit(15)     // typo + multi-device + multi-aba toleráveis; brute force inviável (precisa senha correta)
+	authValidate := middleware.RateLimit(60)  // UI faz polling, mantém alto
 	auth := app.Group("/auth")
 	auth.Post("/login", authLogin, authH.Login)
 	auth.Post("/register", authRegister, authH.Register)

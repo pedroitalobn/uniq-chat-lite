@@ -158,12 +158,26 @@ func (h *AdminHandler) testPaymentProvider(provider string, settings *models.Pay
 		if key == "" {
 			return false, "api_key vazia"
 		}
-		baseURL := "https://api.asaas.com"
+		// Antes usávamos https://api.asaas.com com path /api/v3/... que
+		// resultava em https://api.asaas.com/api/v3/customers (404).
+		// Asaas tem dois hosts canônicos:
+		//   prod    → https://www.asaas.com/api/v3/...
+		//   sandbox → https://sandbox.asaas.com/api/v3/...
+		// (resto do código já usa www.asaas.com em asaas_client.go +
+		//  asaas.go handler — alinhamos aqui pra evitar mismatch de
+		//  ambiente entre teste de conexão e webhook real.)
+		baseURL := "https://www.asaas.com"
 		if settings.AsaasEnvironment == "sandbox" {
 			baseURL = "https://sandbox.asaas.com"
 		}
 		req, _ := http.NewRequest("GET", baseURL+"/api/v3/customers?limit=1", nil)
+		// Asaas aceita o token em access_token (legacy) E Authorization
+		// Bearer (mais novo). Mandamos os dois pra cobrir tokens
+		// gerados em qualquer época do painel.
 		req.Header.Set("access_token", key)
+		req.Header.Set("Authorization", "Bearer "+key)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("User-Agent", "uniq-chat/1.0")
 		resp, err := client.Do(req)
 		if err != nil {
 			return false, "erro de rede: " + err.Error()
@@ -173,7 +187,15 @@ func (h *AdminHandler) testPaymentProvider(provider string, settings *models.Pay
 			return true, ""
 		}
 		body, _ := io.ReadAll(resp.Body)
-		return false, fmt.Sprintf("HTTP %d — %s", resp.StatusCode, truncErr(string(body), 200))
+		hint := ""
+		if resp.StatusCode == 401 {
+			hint = " (chave inválida — confira se copiou inteira do painel)"
+		} else if resp.StatusCode == 403 {
+			hint = " (chave válida mas sem permissão — verifique escopo no painel Asaas)"
+		} else if resp.StatusCode == 404 {
+			hint = " (endpoint não encontrado — provavelmente ambiente errado: prod vs sandbox)"
+		}
+		return false, fmt.Sprintf("HTTP %d%s — %s", resp.StatusCode, hint, truncErr(string(body), 200))
 	}
 	return false, "provider não suportado"
 }

@@ -56,7 +56,13 @@ func (c *AsaasClient) Request(method, endpoint string, body []byte) (statusCode 
 		return 0, nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("access_token", c.apiKey())
+	// Asaas aceita o token nos dois formatos (legacy access_token +
+	// Bearer mais novo). Mandar os dois é seguro e cobre contas que
+	// só aceitam um deles.
+	apiKey := c.apiKey()
+	req.Header.Set("access_token", apiKey)
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("User-Agent", "uniq-chat/1.0")
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)

@@ -39,7 +39,7 @@ func RateLimit(limit int) fiber.Handler {
 			return c.Next()
 		}
 
-		key := c.IP()
+		key := clientIP(c)
 		if user := GetCurrentUser(c); user != nil {
 			key = "user:" + user.ID.String()
 		}
@@ -79,6 +79,34 @@ func RateLimit(limit int) fiber.Handler {
 
 		return c.Next()
 	}
+}
+
+// clientIP — IP real do cliente respeitando proxy chain. Quando o
+// backend roda atrás de Cloudflare + Dokploy/Caddy, c.IP() retorna o
+// IP do proxy interno (sempre o mesmo), fazendo TODOS os users
+// compartilharem 1 bucket de rate limit — limites apertados (5/min)
+// ficavam impossíveis de respeitar.
+//
+// Ordem de preferência:
+//  1. CF-Connecting-IP — Cloudflare (header confiável quando proxy ativo)
+//  2. X-Real-IP — alguns reverse proxies setam isso
+//  3. X-Forwarded-For — pega o PRIMEIRO da lista (cliente original)
+//  4. c.IP() — fallback pra dev local sem proxy
+func clientIP(c *fiber.Ctx) string {
+	if v := strings.TrimSpace(c.Get("CF-Connecting-IP")); v != "" {
+		return v
+	}
+	if v := strings.TrimSpace(c.Get("X-Real-IP")); v != "" {
+		return v
+	}
+	if v := strings.TrimSpace(c.Get("X-Forwarded-For")); v != "" {
+		// X-Forwarded-For = "client, proxy1, proxy2"; primeiro é o cliente.
+		if i := strings.IndexByte(v, ','); i > 0 {
+			v = v[:i]
+		}
+		return strings.TrimSpace(v)
+	}
+	return c.IP()
 }
 
 func itoa(n int) string {
