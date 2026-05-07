@@ -17,6 +17,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { usePreferences } from "@/lib/preferences";
 import { AudioInput } from "@/components/campaigns/AudioInput";
+import { FunnelOptionPicker, StageOptionPicker } from "@/components/crm/FunnelStagePicker";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 function fmtDate(s: string) {
@@ -1383,22 +1384,19 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                         className="input-field w-full text-xs"
                       />
                     ) : (
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          placeholder="funnel_id (opcional)"
+                      <div className="space-y-2">
+                        <FunnelOptionPicker
                           value={a.funnel_id || ""}
-                          onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, funnel_id: e.target.value } : x))}
-                          className="input-field w-full text-xs font-mono"
+                          onChange={(v) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, funnel_id: v, stage_id: "" } : x))}
+                          placeholder="Funil"
                         />
-                        <input
-                          type="text"
-                          placeholder="stage_id"
+                        <StageOptionPicker
+                          funnelId={a.funnel_id || ""}
                           value={a.stage_id || ""}
-                          onChange={(e) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, stage_id: e.target.value } : x))}
-                          className="input-field w-full text-xs font-mono"
+                          onChange={(v) => setPostActions((p) => p.map((x, i) => i === idx ? { ...x, stage_id: v } : x))}
+                          placeholder="Estágio"
                         />
-                        <label className="col-span-2 flex items-center gap-2 text-[11px]" style={{ color: "var(--text-2)" }}>
+                        <label className="flex items-center gap-2 text-[11px]" style={{ color: "var(--text-2)" }}>
                           <input
                             type="checkbox"
                             checked={!!a.create_if_missing}

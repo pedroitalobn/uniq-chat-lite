@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Search, Building2, Users, Briefcase, X } from "lucide-react";
-import { companiesApi } from "@/lib/api";
+import { companiesApi, customFieldsApi } from "@/lib/api";
+import { CustomFieldsRenderer } from "@/components/crm/CustomFieldsRenderer";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { formatCurrency, uniq, cardStyle } from "@/components/crm/tokens";
@@ -216,6 +217,14 @@ function NewCompanyDialog({
   const [industry, setIndustry] = useState("");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("BR");
+  const [customFieldsValue, setCustomFieldsValue] = useState<Record<string, unknown>>({});
+
+  const customFieldsQ = useQuery({
+    queryKey: ["custom-fields", wsId, "company"],
+    queryFn: () => customFieldsApi.list(wsId, "company").then((r) => r.data.items ?? []),
+    enabled: !!wsId,
+    staleTime: 60_000,
+  });
 
   const create = useMutation({
     mutationFn: () =>
@@ -225,7 +234,8 @@ function NewCompanyDialog({
         industry: industry.trim() || undefined,
         city: city.trim() || undefined,
         country,
-      }),
+        ...(Object.keys(customFieldsValue).length > 0 ? { custom_fields: customFieldsValue } : {}),
+      } as any),
     onSuccess: () => {
       toast.success("Empresa criada");
       onCreated();
@@ -299,6 +309,20 @@ function NewCompanyDialog({
               />
             </Labeled>
           </div>
+
+          {(customFieldsQ.data?.length ?? 0) > 0 && (
+            <div className="pt-2 border-t" style={{ borderColor: uniq.borderSoft }}>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: uniq.textFaint }}>
+                Campos personalizados
+              </p>
+              <CustomFieldsRenderer
+                defs={customFieldsQ.data ?? []}
+                value={customFieldsValue}
+                onChange={setCustomFieldsValue}
+                compact
+              />
+            </div>
+          )}
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <button

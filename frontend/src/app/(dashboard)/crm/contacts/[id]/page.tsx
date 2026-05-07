@@ -11,6 +11,7 @@ import { crmApi, dealsApi, contactGroupsApi, conversationsApi } from "@/lib/api"
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { EntityTasksMeetings } from "@/components/crm/DealTasksMeetings";
 import { ContactTagPicker } from "@/components/crm/ContactTagPicker";
+import { EntityCustomFieldsSection } from "@/components/crm/EntityCustomFieldsSection";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import {
   formatCurrency, relativeTime, uniq, cardStyle, statusColor, statusLabel,
@@ -43,6 +44,7 @@ interface Contact {
   deals_won?: number;
   last_contact_at?: string;
   created_at: string;
+  custom_fields?: string | Record<string, unknown> | null;
 }
 
 interface Deal {
@@ -289,6 +291,17 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
         >
           {/* Tarefas e reuniões deste contato (cross-entity) */}
           <EntityTasksMeetings workspaceId={(wsId as string) || ""} scope={{ contactId: id }} />
+
+          {wsId && (
+            <EntityCustomFieldsSection
+              workspaceId={wsId}
+              entityType="contact"
+              entityId={id}
+              initialValue={c.custom_fields ?? null}
+              onPatch={(cf) => crmApi.updateContact(id, { custom_fields: cf } as Record<string, unknown>)}
+              invalidateKeys={[["contact", id], ["contacts"]]}
+            />
+          )}
 
           <SidebarLabel>Pipeline</SidebarLabel>
           <div className="mt-2 rounded-xl p-3 text-xs" style={cardStyle}>

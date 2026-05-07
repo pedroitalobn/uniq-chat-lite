@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { DealTasksMeetings } from "@/components/crm/DealTasksMeetings";
+import { EntityCustomFieldsSection } from "@/components/crm/EntityCustomFieldsSection";
 import {
   ArrowLeft, Check, X, RotateCcw, Briefcase, Building2, User as UserIcon,
   Calendar, DollarSign, Tag as TagIcon, StickyNote, Send, ChevronDown,
@@ -39,6 +40,7 @@ interface Deal {
   expected_close_date?: string | null;
   created_at: string;
   priority: string;
+  custom_fields?: string | Record<string, unknown> | null;
 }
 
 interface Stage {
@@ -317,6 +319,19 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
             <p className="mt-1 text-xs" style={{ color: uniq.textFaint }}>Nenhuma empresa vinculada.</p>
           )}
         </div>
+
+        {wsId && (
+          <div className="border-b p-5" style={{ borderColor: uniq.borderSoft }}>
+            <EntityCustomFieldsSection
+              workspaceId={wsId}
+              entityType="deal"
+              entityId={id}
+              initialValue={deal.custom_fields ?? null}
+              onPatch={(cf) => dealsApi.patch(wsId, id, { custom_fields: cf })}
+              invalidateKeys={[["deal", wsId, id], ["deals", wsId]]}
+            />
+          </div>
+        )}
 
         {deal.conversation_id && (
           <div className="border-b p-5" style={{ borderColor: uniq.borderSoft }}>

@@ -11,6 +11,7 @@ import {
 import { companiesApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { EntityTasksMeetings } from "@/components/crm/DealTasksMeetings";
+import { EntityCustomFieldsSection } from "@/components/crm/EntityCustomFieldsSection";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { formatCurrency, relativeTime, uniq, cardStyle, statusColor, statusLabel } from "@/components/crm/tokens";
 
@@ -38,6 +39,7 @@ interface Company {
   currency?: string;
   owner?: { id: string; name: string; email: string } | null;
   created_at: string;
+  custom_fields?: string | Record<string, unknown> | null;
 }
 
 interface Contact {
@@ -249,6 +251,17 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
           style={{ borderColor: uniq.borderSoft, background: uniq.bgElevated }}
         >
           <EntityTasksMeetings workspaceId={(wsId as string) || ""} scope={{ companyId: id }} />
+
+          {wsId && (
+            <EntityCustomFieldsSection
+              workspaceId={wsId}
+              entityType="company"
+              entityId={id}
+              initialValue={c.custom_fields ?? null}
+              onPatch={(cf) => companiesApi.patch(wsId, id, { custom_fields: cf } as Record<string, unknown>)}
+              invalidateKeys={[["company", wsId, id], ["companies", wsId]]}
+            />
+          )}
 
           <h2 className="mb-3 text-xs font-medium uppercase tracking-widest" style={{ color: uniq.textFaint }}>
             Contatos ({contactsQ.data?.length ?? 0})

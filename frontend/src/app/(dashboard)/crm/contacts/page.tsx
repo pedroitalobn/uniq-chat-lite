@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { crmApi, journeysApi } from "@/lib/api";
+import { crmApi, customFieldsApi, journeysApi } from "@/lib/api";
+import { CustomFieldsRenderer } from "@/components/crm/CustomFieldsRenderer";
 import { Contact, Tag } from "@/types";
 import {
   Plus, Search, Tag as TagIcon, Trash2, Phone, Mail, Edit2,
@@ -140,6 +141,19 @@ function ContactModal({
   );
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<"basic" | "pipeline">("basic");
+  const [customFieldsValue, setCustomFieldsValue] = useState<Record<string, unknown>>(() => {
+    const cf = (contact as unknown as { custom_fields?: string | Record<string, unknown> })?.custom_fields;
+    if (!cf) return {};
+    if (typeof cf === "string") { try { return JSON.parse(cf) || {}; } catch { return {}; } }
+    return cf;
+  });
+
+  const customFieldsQ = useQuery({
+    queryKey: ["custom-fields", workspaceId, "contact"],
+    queryFn: () => customFieldsApi.list(workspaceId as string, "contact").then((r) => r.data.items ?? []),
+    enabled: !!workspaceId,
+    staleTime: 60_000,
+  });
 
   const { data: funnels = [] } = useQuery<Funnel[]>({
     queryKey: ["funnels", workspaceId],
@@ -165,13 +179,16 @@ function ContactModal({
       return;
     }
     setSaving(true);
-    const payload = { name, phone, email, notes, funnel, stage, journey, external_id: externalId, owner, workspace_id: workspaceId };
+    const payload: Record<string, unknown> = { name, phone, email, notes, funnel, stage, journey, external_id: externalId, owner, workspace_id: workspaceId };
+    if (Object.keys(customFieldsValue).length > 0) {
+      payload.custom_fields = customFieldsValue;
+    }
     try {
       if (contact) {
-        await crmApi.updateContact(contact.id, payload);
+        await crmApi.updateContact(contact.id, payload as Parameters<typeof crmApi.updateContact>[1]);
         await crmApi.assignTags(contact.id, selectedTags);
       } else {
-        const res = await crmApi.createContact(payload);
+        const res = await crmApi.createContact(payload as Parameters<typeof crmApi.createContact>[0]);
         if (selectedTags.length > 0) await crmApi.assignTags(res.data.id, selectedTags);
       }
       toast.success(contact ? "Contato atualizado" : "Contato criado");
@@ -266,6 +283,20 @@ function ContactModal({
                       );
                     })}
                   </div>
+                </div>
+              )}
+
+              {(customFieldsQ.data?.length ?? 0) > 0 && (
+                <div className="pt-2 border-t" style={{ borderColor: "var(--surface-border)" }}>
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
+                    Campos personalizados
+                  </p>
+                  <CustomFieldsRenderer
+                    defs={customFieldsQ.data ?? []}
+                    value={customFieldsValue}
+                    onChange={setCustomFieldsValue}
+                    compact
+                  />
                 </div>
               )}
             </div>
