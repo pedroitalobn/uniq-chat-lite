@@ -36,28 +36,57 @@ func (h *WorkspaceHandler) List(c *fiber.Ctx) error {
 		Find(&userWorkspaces)
 
 	// Auto-heal: user autenticado mas sem workspace = onboarding falhou
-	// na hora de criar o default (slug collision silenciosa, webhook
-	// Stripe que não rodou createDefaultWorkspace, etc). Em vez de
-	// devolver lista vazia (que trava o frontend inteiro — inbox/CRM/
-	// campanhas filtram por workspace_id), criamos um na hora.
-	// Idempotente: só dispara se realmente não tem nenhum.
+	// (slug collision silenciosa, webhook Stripe que rodou pela metade,
+	// UserWorkspace.Create falhou após Workspace.Create, etc). Em vez
+	// de devolver lista vazia (que trava o frontend inteiro — inbox/
+	// CRM/campanhas filtram por workspace_id), reconstruímos a relação.
+	// Idempotente: só dispara se realmente não tem nenhum user_workspace.
 	if len(userWorkspaces) == 0 {
 		var user models.User
 		if err := h.db.First(&user, "id = ?", userID).Error; err == nil {
-			name := strings.TrimSpace(user.Name)
-			if name == "" {
-				name = "Meu Workspace"
-			} else {
-				first := strings.Fields(name)
-				if len(first) > 0 {
-					name = first[0] + "'s Workspace"
+			// Primeira tentativa: já existe um workspace órfão owned
+			// por esse user (a row criou mas UserWorkspace falhou)?
+			// Recria só a membership pra reaproveitar o workspace.
+			var orphan models.Workspace
+			if err := h.db.Where("owner_id = ?", user.ID).Order("created_at ASC").First(&orphan).Error; err == nil {
+				// Garante role admin existe pra esse workspace
+				var role models.Role
+				if err := h.db.Where("workspace_id = ?", orphan.ID).Order("is_default DESC, created_at ASC").First(&role).Error; err != nil {
+					role = models.Role{
+						WorkspaceID: orphan.ID,
+						Name:        "Admin",
+						Description: "Acesso total ao workspace",
+						IsDefault:   true,
+					}
+					h.db.Create(&role)
+					var perms []models.Permission
+					h.db.Find(&perms)
+					for _, p := range perms {
+						h.db.Create(&models.RolePermission{RoleID: role.ID, PermissionID: p.ID})
+					}
 				}
+				h.db.Create(&models.UserWorkspace{
+					UserID:      user.ID,
+					WorkspaceID: orphan.ID,
+					RoleID:      &role.ID,
+					IsOwner:     true,
+				})
+			} else {
+				// Nenhum workspace órfão — cria um do zero.
+				name := strings.TrimSpace(user.Name)
+				if name == "" {
+					name = "Meu Workspace"
+				} else {
+					first := strings.Fields(name)
+					if len(first) > 0 {
+						name = first[0] + "'s Workspace"
+					}
+				}
+				createDefaultWorkspace(h.db, &user, name)
 			}
-			if ws := createDefaultWorkspace(h.db, &user, name); ws != nil {
-				h.db.Preload("Workspace").Preload("Role").
-					Where("user_id = ?", userID).
-					Find(&userWorkspaces)
-			}
+			h.db.Preload("Workspace").Preload("Role").
+				Where("user_id = ?", userID).
+				Find(&userWorkspaces)
 		}
 	}
 

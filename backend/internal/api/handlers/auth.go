@@ -259,7 +259,17 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 				RoleID:      &workspaceInvite.RoleID,
 				IsOwner:     false,
 			}
-			h.db.Create(&uw)
+			if err := h.db.Create(&uw).Error; err != nil {
+				// Não dá pra associar o user ao workspace que ele foi
+				// convidado pra entrar — pior que silenciar é deixar o
+				// onboarding "completar" sem acesso real. Aborta com
+				// erro pra o frontend mostrar e o user retentar.
+				log.Error().Err(err).Str("user_id", user.ID.String()).Str("workspace_id", ws.ID.String()).
+					Msg("aceitar invite: falha ao criar UserWorkspace")
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": "falha ao adicionar você ao workspace — entre em contato com quem te convidou",
+				})
+			}
 			h.db.Model(workspaceInvite).Update("status", "accepted")
 			workspace = &ws
 		}
@@ -276,6 +286,10 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 			}
 		}
 		workspace = createDefaultWorkspace(h.db, &user, workspaceName)
+		if workspace == nil {
+			log.Error().Str("user_id", user.ID.String()).Str("workspace_name", workspaceName).
+				Msg("createDefaultWorkspace failed during register — user has no workspace; auto-heal in /v1/workspaces will retry on first list call")
+		}
 	}
 
 	// cleanupLead deletes the just-created lead user so retrying with the same
@@ -491,18 +505,34 @@ func createDefaultWorkspace(db *gorm.DB, user *models.User, name string) *models
 		Description: "Acesso total ao workspace",
 		IsDefault:   true,
 	}
-	db.Create(&adminRole)
+	if err := db.Create(&adminRole).Error; err != nil {
+		// Workspace existe mas sem role. UserWorkspace abaixo precisa
+		// do role; sem ele user fica sem permissions. Loga e segue —
+		// melhor ter workspace vazio (auto-heal pode ser re-rodado)
+		// do que travar o cadastro inteiro.
+		log.Error().Err(err).Str("workspace_id", ws.ID.String()).Msg("createDefaultWorkspace: criar adminRole falhou")
+	}
 	var permissions []models.Permission
 	db.Find(&permissions)
 	for _, p := range permissions {
-		db.Create(&models.RolePermission{RoleID: adminRole.ID, PermissionID: p.ID})
+		// Erros aqui são raros (apenas se a permission table tem inconsistência).
+		// Falhas individuais não derrubam o setup; perm faltando é só uma feature
+		// a menos liberada — admin pode reatribuir manualmente.
+		_ = db.Create(&models.RolePermission{RoleID: adminRole.ID, PermissionID: p.ID}).Error
 	}
-	db.Create(&models.UserWorkspace{
+	if err := db.Create(&models.UserWorkspace{
 		UserID:      user.ID,
 		WorkspaceID: ws.ID,
 		RoleID:      &adminRole.ID,
 		IsOwner:     true,
-	})
+	}).Error; err != nil {
+		// Sem UserWorkspace o user é DONO mas não tem membership —
+		// /v1/workspaces retorna vazio e o user não vê nada. Pior caso
+		// dos três. Loga e o auto-heal de /v1/workspaces vai detectar
+		// "0 workspaces" e tentar recriar.
+		log.Error().Err(err).Str("user_id", user.ID.String()).Str("workspace_id", ws.ID.String()).
+			Msg("createDefaultWorkspace: criar UserWorkspace falhou")
+	}
 	db.Preload("Role").First(ws, ws.ID)
 	return ws
 }
@@ -1465,6 +1495,10 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		MarkInviteCodeUsed(h.db, pending.InviteCode, user.ID)
 	}
 	workspace := createDefaultWorkspace(h.db, &user, req.WorkspaceName)
+	if workspace == nil {
+		log.Error().Str("user_id", user.ID.String()).Str("workspace_name", req.WorkspaceName).
+			Msg("createDefaultWorkspace failed during free signup — user materializado sem workspace; /v1/workspaces auto-heal vai recriar")
+	}
 	now := time.Now()
 	h.db.Model(&pending).Update("completed_at", now)
 

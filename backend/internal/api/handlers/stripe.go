@@ -7,6 +7,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	stripe "github.com/stripe/stripe-go/v76"
 	"github.com/stripe/stripe-go/v76/checkout/session"
 	stripecustomer "github.com/stripe/stripe-go/v76/customer"
@@ -718,7 +719,14 @@ func (h *StripeHandler) materializePending(pendingIDStr, planIDStr, subscription
 			wsName = "Meu Workspace"
 		}
 	}
-	createDefaultWorkspace(h.db, &user, wsName)
+	if ws := createDefaultWorkspace(h.db, &user, wsName); ws == nil {
+		// Não abortamos o materialize — User+plano JÁ foram criados e o
+		// pagamento já passou. /v1/workspaces auto-heal recria na primeira
+		// listagem. Logamos pra alertar a equipe (slug colision raro,
+		// mas pode ser DB indisponível também).
+		log.Error().Str("user_id", user.ID.String()).Str("workspace_name", wsName).Str("session", sessionOrPIID).
+			Msg("materializePending: createDefaultWorkspace falhou — user materializado pago sem workspace; auto-heal vai recriar")
+	}
 
 	now := time.Now()
 	h.db.Model(&pending).Update("completed_at", now)
