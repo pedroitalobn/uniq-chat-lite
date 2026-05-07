@@ -554,9 +554,17 @@ func (h *IntegrationHandler) GetAgent(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instância não encontrada"})
 	}
 	var agent models.InstanceAgent
-	if err := h.db.Preload("Integration").Preload("Assets", func(tx *gorm.DB) *gorm.DB {
+	// Multi-agente: retorna o primário por padrão; UI nova passa ?agent_id=
+	// pra editar agentes específicos.
+	q := h.db.Preload("Integration").Preload("Assets", func(tx *gorm.DB) *gorm.DB {
 		return tx.Order("created_at DESC")
-	}).Where("instance_id = ?", inst.ID).First(&agent).Error; err != nil {
+	})
+	if aid := c.Query("agent_id"); aid != "" {
+		q = q.Where("id = ? AND instance_id = ?", aid, inst.ID)
+	} else {
+		q = q.Where("instance_id = ?", inst.ID).Order("is_primary DESC, created_at ASC")
+	}
+	if err := q.First(&agent).Error; err != nil {
 		return c.JSON(fiber.Map{
 			"instance_id":     inst.ID,
 			"rag_enabled":     true,
@@ -637,15 +645,28 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 	}
 
 	var agent models.InstanceAgent
-	if err := h.db.Where("instance_id = ?", inst.ID).First(&agent).Error; err != nil {
+	// Multi-agente: ?agent_id= seleciona o agente específico; sem param,
+	// edita o primário (preserva fluxo single-agent).
+	q := h.db.Where("instance_id = ?", inst.ID)
+	if aid := c.Query("agent_id"); aid != "" {
+		q = q.Where("id = ?", aid)
+	} else {
+		q = q.Order("is_primary DESC, created_at ASC")
+	}
+	if err := q.First(&agent).Error; err != nil {
 		agent = models.InstanceAgent{
-			InstanceID: inst.ID,
-			FAQ:        "[]",
-			Variables:  "[]",
-			Voice:      "{}",
-			Skills:     "[]",
-			AppAccess:  "[]",
-			RAGEnabled: true,
+			InstanceID:         inst.ID,
+			FAQ:                "[]",
+			Variables:          "[]",
+			Voice:              "{}",
+			Skills:             "[]",
+			AppAccess:          "[]",
+			HandoffSkills:      "[]",
+			RAGEnabled:         true,
+			IsPrimary:          true,
+			Role:               "primary",
+			Priority:           100,
+			ActionConfirmation: "client",
 		}
 	}
 
@@ -787,15 +808,28 @@ func (h *IntegrationHandler) UploadAgentAsset(c *fiber.Ctx) error {
 	}
 
 	var agent models.InstanceAgent
-	if err := h.db.Where("instance_id = ?", inst.ID).First(&agent).Error; err != nil {
+	// Multi-agente: ?agent_id= seleciona o agente específico; sem param,
+	// edita o primário (preserva fluxo single-agent).
+	q := h.db.Where("instance_id = ?", inst.ID)
+	if aid := c.Query("agent_id"); aid != "" {
+		q = q.Where("id = ?", aid)
+	} else {
+		q = q.Order("is_primary DESC, created_at ASC")
+	}
+	if err := q.First(&agent).Error; err != nil {
 		agent = models.InstanceAgent{
-			InstanceID: inst.ID,
-			FAQ:        "[]",
-			Variables:  "[]",
-			Voice:      "{}",
-			Skills:     "[]",
-			AppAccess:  "[]",
-			RAGEnabled: true,
+			InstanceID:         inst.ID,
+			FAQ:                "[]",
+			Variables:          "[]",
+			Voice:              "{}",
+			Skills:             "[]",
+			AppAccess:          "[]",
+			HandoffSkills:      "[]",
+			RAGEnabled:         true,
+			IsPrimary:          true,
+			Role:               "primary",
+			Priority:           100,
+			ActionConfirmation: "client",
 		}
 		if err := h.db.Create(&agent).Error; err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao inicializar agente"})
@@ -946,22 +980,35 @@ func (h *IntegrationHandler) IngestAgentText(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(asset)
 }
 
-// ensureInstanceAgent retorna o agent da instância, criando-o se ausente.
-// Usado pelos endpoints de ingestão pra permitir alimentar antes mesmo
-// do agent ser configurado pela UI.
+// ensureInstanceAgent retorna o agent PRIMÁRIO da instância, criando-o
+// se ausente. Multi-agente: prioriza is_primary=true; cai pro primeiro
+// criado (por created_at) se nenhum estiver marcado como primário (legado).
 func (h *IntegrationHandler) ensureInstanceAgent(instanceID uuid.UUID) (*models.InstanceAgent, error) {
 	var agent models.InstanceAgent
-	if err := h.db.Where("instance_id = ?", instanceID).First(&agent).Error; err == nil {
+	if err := h.db.Where("instance_id = ? AND is_primary = ?", instanceID, true).First(&agent).Error; err == nil {
+		return &agent, nil
+	}
+	if err := h.db.Where("instance_id = ?", instanceID).Order("created_at ASC").First(&agent).Error; err == nil {
+		// Marca como primary on-the-fly se ainda não está. Idempotente.
+		if !agent.IsPrimary {
+			h.db.Model(&agent).Update("is_primary", true)
+			agent.IsPrimary = true
+		}
 		return &agent, nil
 	}
 	agent = models.InstanceAgent{
-		InstanceID: instanceID,
-		FAQ:        "[]",
-		Variables:  "[]",
-		Voice:      "{}",
-		Skills:     "[]",
-		AppAccess:  "[]",
-		RAGEnabled: true,
+		InstanceID:         instanceID,
+		FAQ:                "[]",
+		Variables:          "[]",
+		Voice:              "{}",
+		Skills:             "[]",
+		AppAccess:          "[]",
+		HandoffSkills:      "[]",
+		RAGEnabled:         true,
+		IsPrimary:          true,
+		Role:               "primary",
+		Priority:           100,
+		ActionConfirmation: "client",
 	}
 	if err := h.db.Create(&agent).Error; err != nil {
 		return nil, fmt.Errorf("falha ao inicializar agente: %w", err)
@@ -1385,4 +1432,144 @@ func parseVariations(text string) ([]string, error) {
 	}
 	// Fallback: return as single variation
 	return []string{text}, nil
+}
+
+// ─── Multi-agente: gerenciamento dos agentes de uma instância ─────────────
+
+// ListInstanceAgents — todos os agentes da instância. Usado pela UI
+// pra mostrar a lista e oferecer "+ adicionar agente".
+func (h *IntegrationHandler) ListInstanceAgents(c *fiber.Ctx) error {
+	inst := middleware.GetCurrentInstance(c)
+	if inst == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	var agents []models.InstanceAgent
+	h.db.Select("id, agent_name, role, is_primary, is_active, priority, handoff_skills, action_confirmation, model, created_at, updated_at").
+		Where("instance_id = ?", inst.ID).
+		Order("is_primary DESC, priority ASC, created_at ASC").
+		Find(&agents)
+	return c.JSON(fiber.Map{"agents": agents})
+}
+
+// CreateInstanceAgent — cria um agente adicional (não-primário) na
+// instância. Body: { agent_name, role, handoff_skills?, action_confirmation? }.
+// Não promove a primary — pra isso usar set-primary explicitamente.
+func (h *IntegrationHandler) CreateInstanceAgent(c *fiber.Ctx) error {
+	inst := middleware.GetCurrentInstance(c)
+	if inst == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	var req struct {
+		AgentName          string   `json:"agent_name"`
+		Role               string   `json:"role"`
+		HandoffSkills      []string `json:"handoff_skills"`
+		ActionConfirmation string   `json:"action_confirmation"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+	req.AgentName = strings.TrimSpace(req.AgentName)
+	req.Role = strings.TrimSpace(strings.ToLower(req.Role))
+	if req.AgentName == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "agent_name é obrigatório"})
+	}
+	if req.Role == "" {
+		req.Role = "support"
+	}
+	if req.ActionConfirmation == "" {
+		req.ActionConfirmation = "client"
+	}
+	skillsJSON := "[]"
+	if len(req.HandoffSkills) > 0 {
+		if b, err := json.Marshal(req.HandoffSkills); err == nil {
+			skillsJSON = string(b)
+		}
+	}
+	// Garante existência de um primário antes de criar secundários — sem
+	// isso, ensureInstanceAgent disparado em paralelo poderia criar OUTRO
+	// primário e ficar com 2.
+	if _, err := h.ensureInstanceAgent(inst.ID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	agent := models.InstanceAgent{
+		InstanceID:         inst.ID,
+		AgentName:          req.AgentName,
+		Role:               req.Role,
+		HandoffSkills:      skillsJSON,
+		ActionConfirmation: req.ActionConfirmation,
+		FAQ:                "[]",
+		Variables:          "[]",
+		Voice:              "{}",
+		Skills:             "[]",
+		AppAccess:          "[]",
+		RAGEnabled:         true,
+		IsPrimary:          false,
+		Priority:           200,
+	}
+	if err := h.db.Create(&agent).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar agente: " + err.Error()})
+	}
+	return c.Status(fiber.StatusCreated).JSON(agent)
+}
+
+// DeleteInstanceAgent — remove agente. Bloqueia exclusão do primário
+// quando há outros agentes (precisa promover outro antes); permite quando
+// é o único da instância (limpeza total).
+func (h *IntegrationHandler) DeleteInstanceAgent(c *fiber.Ctx) error {
+	inst := middleware.GetCurrentInstance(c)
+	if inst == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	agentID, err := uuid.Parse(c.Params("agent_id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "agent_id inválido"})
+	}
+	var agent models.InstanceAgent
+	if err := h.db.Where("id = ? AND instance_id = ?", agentID, inst.ID).First(&agent).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "agente não encontrado"})
+	}
+	if agent.IsPrimary {
+		var others int64
+		h.db.Model(&models.InstanceAgent{}).Where("instance_id = ? AND id <> ?", inst.ID, agent.ID).Count(&others)
+		if others > 0 {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error": "não é possível remover o agente primário com outros agentes ativos. Promova outro primeiro.",
+			})
+		}
+	}
+	// Limpa assets associados antes de deletar o agente.
+	h.db.Where("instance_agent_id = ?", agent.ID).Delete(&models.AgentAsset{})
+	h.db.Delete(&agent)
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// SetPrimaryInstanceAgent — promove um agente a primário. Atomic: o
+// antigo primário perde a flag. Usado pela UI quando user troca o
+// "agente padrão" da instância.
+func (h *IntegrationHandler) SetPrimaryInstanceAgent(c *fiber.Ctx) error {
+	inst := middleware.GetCurrentInstance(c)
+	if inst == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	agentID, err := uuid.Parse(c.Params("agent_id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "agent_id inválido"})
+	}
+	var target models.InstanceAgent
+	if err := h.db.Where("id = ? AND instance_id = ?", agentID, inst.ID).First(&target).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "agente não encontrado"})
+	}
+	tx := h.db.Begin()
+	if err := tx.Model(&models.InstanceAgent{}).
+		Where("instance_id = ? AND id <> ?", inst.ID, target.ID).
+		Update("is_primary", false).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	if err := tx.Model(&target).Update("is_primary", true).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	tx.Commit()
+	return c.JSON(fiber.Map{"ok": true})
 }
