@@ -313,21 +313,26 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 		}
 	}
 
-	// Generate unique slug within the server scope
+	// Generate unique slug within the server scope. Antes tinha off-by-one
+	// no fim do loop (saía com slug `-50` sem checar) e podia bater unique
+	// constraint. Agora caímos pra suffix uuid como fallback duro.
 	baseSlug := models.SlugFrom(req.Name)
 	slug := baseSlug
-	for i := 2; i <= 50; i++ {
-		q := h.db.Where("slug = ?", slug)
+	taken := func(s string) bool {
+		q := h.db.Where("slug = ?", s)
 		if instance.ServerID != nil {
 			q = q.Where("server_id = ?", *instance.ServerID)
 		} else {
 			q = q.Where("server_id IS NULL")
 		}
 		var existing models.Instance
-		if q.First(&existing).Error != nil {
-			break // available
-		}
+		return q.First(&existing).Error == nil
+	}
+	for i := 2; i <= 50 && taken(slug); i++ {
 		slug = fmt.Sprintf("%s-%d", baseSlug, i)
+	}
+	if taken(slug) {
+		slug = baseSlug + "-" + uuid.New().String()[:6]
 	}
 	instance.Slug = slug
 	if req.Token != "" {

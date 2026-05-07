@@ -4,8 +4,10 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/google/uuid"
+	"golang.org/x/text/unicode/norm"
 	"gorm.io/gorm"
 )
 
@@ -46,20 +48,65 @@ func (s *Server) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-var slugRe = regexp.MustCompile(`[^a-z0-9-]`)
+var (
+	slugRe        = regexp.MustCompile(`[^a-z0-9-]`)
+	slugWhitespRe = regexp.MustCompile(`\s+`)
+	// Transliteração explícita pra chars que NFKD não decompõe (ç → c não
+	// vem de graça via NFD; ñ idem em alguns casos). Cobrimos também caps
+	// pra ToLower já tratar antes, mas mantemos defensivo.
+	slugTranslit = strings.NewReplacer(
+		"ç", "c", "Ç", "c",
+		"ñ", "n", "Ñ", "n",
+		"ß", "ss",
+		"æ", "ae", "Æ", "ae",
+		"œ", "oe", "Œ", "oe",
+		"ø", "o", "Ø", "o",
+		"å", "a", "Å", "a",
+		"ł", "l", "Ł", "l",
+		"đ", "d", "Đ", "d",
+		"&", "e", "@", "at", "+", "mais",
+	)
+)
 
 // SlugFrom converts an arbitrary name to a URL/subdomain-safe slug.
+//
+// Aguenta nomes compostos com acentos ("João da Silva" → "joao-da-silva"),
+// caracteres especiais Português/Espanhol/Alemão/Nórdicos, e normaliza
+// whitespace (tabs, newlines, múltiplos espaços) pra um único hífen.
+//
+// Antes a regex `[^a-z0-9-]` simplesmente APAGAVA acentos — "José Silva"
+// virava "jos-silva", o que era feio e causava colisões frequentes (vários
+// nomes diferentes produziam o mesmo slug). Agora decompõe via NFKD e
+// remove só os marks combinantes, preservando a letra base.
 func SlugFrom(name string) string {
-	s := strings.ToLower(name)
-	s = strings.ReplaceAll(s, " ", "-")
+	s := strings.TrimSpace(name)
+	// 1. Transliteração explícita de chars não-decomponíveis.
+	s = slugTranslit.Replace(s)
+	// 2. NFKD decompõe acentos: "á" → "a" + combining acute. Em seguida
+	//    removemos os combining marks (categoria Unicode Mn).
+	s = norm.NFKD.String(s)
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if unicode.Is(unicode.Mn, r) {
+			continue // diacrítico combinante — descarta
+		}
+		b.WriteRune(r)
+	}
+	s = b.String()
+	// 3. Lowercase + colapsa qualquer whitespace (tab/newline/múltiplos espaços)
+	//    em um único hífen.
+	s = strings.ToLower(s)
+	s = slugWhitespRe.ReplaceAllString(s, "-")
+	// 4. Remove qualquer char restante fora de [a-z0-9-].
 	s = slugRe.ReplaceAllString(s, "")
-	// collapse multiple dashes
+	// 5. Colapsa hífens duplicados e trim das pontas.
 	for strings.Contains(s, "--") {
 		s = strings.ReplaceAll(s, "--", "-")
 	}
 	s = strings.Trim(s, "-")
 	if len(s) > 63 {
-		s = s[:63]
+		s = strings.Trim(s[:63], "-")
 	}
 	if s == "" {
 		s = uuid.New().String()[:8]

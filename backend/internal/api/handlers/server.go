@@ -142,13 +142,15 @@ func (h *ServerHandler) Create(c *fiber.Ctx) error {
 		slug = models.SlugFrom(slug) // normalize
 	}
 
-	// Ensure slug uniqueness — append short uuid suffix if taken
+	// Ensure slug uniqueness — append short uuid suffix if taken. Antes
+	// o loop podia sair com a última tentativa AINDA colidindo (não
+	// rechecava após gerar). Agora cheque + retry até achar livre.
 	base := slug
-	for i := 2; i <= 10; i++ {
+	taken := func(s string) bool {
 		var existing models.Server
-		if h.db.Where("slug = ?", slug).First(&existing).Error != nil {
-			break // not found → available
-		}
+		return h.db.Where("slug = ?", s).First(&existing).Error == nil
+	}
+	for i := 0; i < 10 && taken(slug); i++ {
 		slug = base + "-" + uuid.New().String()[:4]
 	}
 
