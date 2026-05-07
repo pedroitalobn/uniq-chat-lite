@@ -40,6 +40,20 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to connect to database")
 	}
 
+	// Recuperação de coluna custom_fields corrompida — em alguns
+	// deploys parciais o GORM criou a coluna com valores inválidos
+	// (ex: literal "'{}'::jsonb" como string), o que faz qualquer
+	// SELECT na tabela falhar com "invalid input syntax for type
+	// json". Drop seguro com IF EXISTS antes da AutoMigrate; ela
+	// recria limpa logo depois sem default. Idempotente.
+	if db.Dialector.Name() == "postgres" {
+		for _, table := range []string{"contacts", "deals", "companies"} {
+			if err := db.Exec("ALTER TABLE " + table + " DROP COLUMN IF EXISTS custom_fields").Error; err != nil {
+				log.Warn().Err(err).Str("table", table).Msg("repair: drop custom_fields falhou — seguindo")
+			}
+		}
+	}
+
 	// Auto-migrate. Em prod uma migration ruim (ex: default JSONB
 	// inválido, FK pendente) derrubava o boot inteiro — o que
 	// disfarçava como "500 generic" do reverse proxy. Logamos como
