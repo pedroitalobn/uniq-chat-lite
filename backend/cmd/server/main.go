@@ -58,11 +58,14 @@ func main() {
 				log.Warn().Err(err).Str("table", table).Msg("repair: drop custom_fields falhou — seguindo")
 			}
 		}
-		// Backfill contatos cujo `name` é igual ao `phone` (entrada antiga
-		// que usava telefone como fallback do nome). Limpa pra "" pra que
-		// a UI mostre placeholder e o user possa editar. Não-destrutivo:
-		// só toca rows onde name == phone literal.
-		_ = db.Exec(`UPDATE contacts SET name = '' WHERE name = phone OR name = external_id`).Error
+		// LEGACY: backfill que limpava `name` quando igual ao phone/external_id.
+		// Removido — rodava em todo restart e tinha risco de apagar nomes reais
+		// em corner cases (e.g. user com nome puramente numérico igual ao
+		// telefone). O ProfileSyncCron agora preenche corretamente a partir
+		// do push_name das conversations e do MessageLog. Quem precisar dessa
+		// limpeza pontual pode rodar manualmente:
+		//
+		//   UPDATE contacts SET name = '' WHERE name = phone OR name = external_id;
 
 		// Multi-agente: remove o uniqueIndex legado em instance_agents.instance_id
 		// pra permitir N agentes por instância. Idempotente — só roda se o

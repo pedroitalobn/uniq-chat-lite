@@ -91,6 +91,8 @@ func (c *ProfileSyncCron) RunOnce(ctx context.Context, missingLimit, staleLimit 
 	updated := 0
 	updated += c.fillMissing(ctx, missingLimit)
 	updated += c.refreshStale(ctx, staleLimit)
+	updated += c.propagateNamesFromHistory(ctx, missingLimit)
+	updated += c.propagateConversationNamesToContacts(ctx, missingLimit)
 	return updated
 }
 
@@ -232,6 +234,106 @@ func (c *ProfileSyncCron) refreshStale(ctx context.Context, limit int) int {
 			Model(&models.Conversation{}).
 			Where("id = ?", r.ID).
 			Update("avatar_url", permPic).Error; err == nil {
+			updated++
+		}
+	}
+	return updated
+}
+
+// propagateNamesFromHistory — pra conversations que ainda têm push_name
+// vazio e o whatsmeow Store também não devolveu nada (GetContactInfo
+// retorna ""), procuramos no histórico de MessageLog. Toda inbound
+// passada gravou contact_name no momento — esse valor é a melhor fonte
+// "fria" que sobrevive a qualquer perda de Store local.
+//
+// Sem isso, contatos antigos que pararam de mandar mensagem ficam pra
+// sempre sem nome, mesmo tendo aparecido em algum momento no inbox.
+func (c *ProfileSyncCron) propagateNamesFromHistory(ctx context.Context, limit int) int {
+	type row struct {
+		ID         uuid.UUID
+		InstanceID uuid.UUID
+		ChannelKey string
+	}
+	var rows []row
+	if err := c.db.WithContext(ctx).
+		Table("conversations").
+		Select("id, instance_id, channel_key").
+		Where("channel_type = ?", "whatsapp").
+		Where("channel_key IS NOT NULL AND channel_key <> ''").
+		Where("(push_name IS NULL OR push_name = '')").
+		Where("channel_key NOT LIKE ?", "%@g.us").
+		Order("updated_at DESC").
+		Limit(limit).
+		Scan(&rows).Error; err != nil {
+		return 0
+	}
+	updated := 0
+	for _, r := range rows {
+		var name string
+		// Pega o último contact_name não-vazio e que não pareça telefone/JID
+		// pra essa instância+JID. Filtra na query pra não trazer milhares de
+		// rows pra memória.
+		err := c.db.WithContext(ctx).
+			Raw(`
+				SELECT contact_name FROM message_logs
+				WHERE instance_id = ? AND from_jid = ?
+				  AND contact_name <> '' AND contact_name NOT LIKE '%%@%%'
+				  AND contact_name <> ?
+				ORDER BY created_at DESC
+				LIMIT 1
+			`, r.InstanceID, r.ChannelKey, extractPhoneFromKey(r.ChannelKey)).
+			Scan(&name).Error
+		if err != nil || name == "" {
+			continue
+		}
+		if err := c.db.WithContext(ctx).
+			Model(&models.Conversation{}).
+			Where("id = ? AND (push_name IS NULL OR push_name = '')", r.ID).
+			Update("push_name", name).Error; err == nil {
+			updated++
+		}
+	}
+	return updated
+}
+
+// propagateConversationNamesToContacts — quando a Conversation tem um
+// push_name bom mas o Contact vinculado ainda está com nome vazio ou
+// igual ao telefone/JID, copia pro Contact. É a versão proativa do que
+// o handler enrichContactNames faz lazy quando o user lista contatos —
+// rodando aqui, qualquer cliente (mobile, integração, agente) pega o
+// nome certo já no primeiro fetch.
+func (c *ProfileSyncCron) propagateConversationNamesToContacts(ctx context.Context, limit int) int {
+	type row struct {
+		ContactID uuid.UUID
+		PushName  string
+		Phone     string
+	}
+	var rows []row
+	if err := c.db.WithContext(ctx).
+		Raw(`
+			SELECT DISTINCT ON (c.id) c.id AS contact_id, conv.push_name, c.phone
+			FROM contacts c
+			JOIN conversations conv ON conv.contact_id = c.id
+			WHERE conv.push_name IS NOT NULL AND conv.push_name <> ''
+			  AND (
+			    c.name IS NULL OR c.name = ''
+			    OR c.name = c.phone OR c.name = '+' || c.phone
+			    OR c.name LIKE '%%@s.whatsapp.net' OR c.name LIKE '%%@lid'
+			  )
+			ORDER BY c.id, conv.updated_at DESC
+			LIMIT ?
+		`, limit).Scan(&rows).Error; err != nil {
+		return 0
+	}
+	updated := 0
+	for _, r := range rows {
+		if r.PushName == "" || r.PushName == r.Phone || r.PushName == "+"+r.Phone {
+			continue
+		}
+		if err := c.db.WithContext(ctx).
+			Model(&models.Contact{}).
+			Where("id = ?", r.ContactID).
+			Update("name", r.PushName).Error; err == nil {
 			updated++
 		}
 	}
