@@ -10,7 +10,7 @@ import {
   Plus, Search, Tag as TagIcon, Trash2, Phone, Mail, Edit2,
   X, Check, User, StickyNote, GitBranch, Layers, Route,
   Hash, UserCheck, ChevronDown, Filter, List as ListIcon, KanbanSquare, GripVertical,
-  Pause, Play, ExternalLink, MoreVertical,
+  Pause, Play, ExternalLink, MoreVertical, Briefcase,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -24,6 +24,11 @@ import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { CrmHeader, CrmHeaderButton } from "@/components/crm/CrmHeader";
+import { ContactInboxCTA } from "@/components/crm/ContactInboxCTA";
+import {
+  FunnelOptionPicker, StageOptionPicker, CompanyOptionPicker,
+  MemberOptionPicker, JourneyOptionPicker,
+} from "@/components/crm/FunnelStagePicker";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1157,80 +1162,119 @@ function JourneyManager({ onClose }: { onClose: () => void }) {
 // ─── Filter Panel ─────────────────────────────────────────────────────────────
 
 function FilterPanel({
-  contacts,
   filters,
   onChange,
   onClose,
 }: {
-  contacts: Contact[];
+  contacts: Contact[]; // mantido pra compat com o caller; não usado mais
   filters: Record<string, string>;
   onChange: (k: string, v: string) => void;
   onClose: () => void;
 }) {
-  // Build unique value lists from loaded contacts
-  const uniq = (key: keyof Contact) =>
-    [...new Set(contacts.map((c) => c[key] as string).filter(Boolean))].sort();
-
-  const funnels  = uniq("funnel");
-  const stages   = uniq("stage");
-  const journeys = uniq("journey");
-  const owners   = uniq("owner");
-
-  const SelectFilter = ({
-    label, field, options, icon: Icon,
-  }: {
-    label: string; field: string; options: string[];
-    icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
-  }) => (
-    <div>
-      <label className="flex items-center gap-1 text-xs font-medium mb-1.5" style={{ color: "var(--text-3)" }}>
-        <Icon className="w-3 h-3" /> {label}
-      </label>
-      <div className="relative">
-        <select
-          value={filters[field] ?? ""}
-          onChange={(e) => onChange(field, e.target.value)}
-          className="w-full appearance-none text-sm rounded-xl px-3 py-2.5 pr-8 outline-none cursor-pointer transition-all"
-          style={{
-            background: "var(--surface-2)",
-            border: "1px solid var(--surface-border)",
-            color: filters[field] ? "var(--text-1)" : "var(--text-3)",
-          }}
-        >
-          <option value="" style={{ background: "var(--surface-2)" }}>Todos</option>
-          {options.map((o) => <option key={o} value={o} style={{ background: "var(--surface-2)" }}>{o}</option>)}
-        </select>
-        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "var(--text-3)" }} />
-      </div>
-    </div>
-  );
-
+  // CRM 2.0: filtra contatos por relação (funnel_id/stage_id/journey_id/
+  // company_id/has_deal/deal_status). O filtro antigo lia campos string
+  // legados (funnel/stage/journey) que estavam mortos — UI mostrava nada
+  // ou tudo. Agora carrega listas reais do workspace e filtra via JOIN no
+  // backend.
   return (
     <div className="fixed inset-0 z-[110] flex items-start justify-end p-4">
       <div className="absolute inset-0" onClick={onClose} />
       <div
-        className="relative w-72 rounded-2xl p-5 shadow-2xl animate-fade-in-up mt-16"
+        className="relative w-80 rounded-2xl p-5 shadow-2xl animate-fade-in-up mt-16 max-h-[80vh] overflow-y-auto"
         style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Filtros de Pipeline</h3>
+          <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Filtrar contatos</h3>
           <button onClick={onClose} style={{ color: "var(--text-3)" }} className="hover:opacity-70 transition-opacity">
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="space-y-3">
-          <SelectFilter label="Funil"      field="funnel"  options={funnels}  icon={GitBranch} />
-          <SelectFilter label="Etapa"      field="stage"   options={stages}   icon={Layers} />
-          <SelectFilter label="Jornada"    field="journey" options={journeys} icon={Route} />
-          <SelectFilter label="Responsável" field="owner"  options={owners}   icon={UserCheck} />
           <div>
-            <label className="flex items-center gap-1 text-xs font-medium mb-1" style={{ color: "var(--text-3)" }}>
+            <label className="flex items-center gap-1 text-xs font-medium mb-1.5" style={{ color: "var(--text-3)" }}>
+              <GitBranch className="w-3 h-3" /> Funil (deal)
+            </label>
+            <FunnelOptionPicker
+              value={filters.funnel_id ?? ""}
+              onChange={(v) => { onChange("funnel_id", v); if (!v) onChange("stage_id", ""); }}
+            />
+          </div>
+          <div>
+            <label className="flex items-center gap-1 text-xs font-medium mb-1.5" style={{ color: "var(--text-3)" }}>
+              <Layers className="w-3 h-3" /> Estágio
+            </label>
+            <StageOptionPicker
+              funnelId={filters.funnel_id ?? ""}
+              value={filters.stage_id ?? ""}
+              onChange={(v) => onChange("stage_id", v)}
+            />
+          </div>
+          <div>
+            <label className="flex items-center gap-1 text-xs font-medium mb-1.5" style={{ color: "var(--text-3)" }}>
+              <Route className="w-3 h-3" /> Jornada
+            </label>
+            <JourneyOptionPicker
+              value={filters.journey_id ?? ""}
+              onChange={(v) => onChange("journey_id", v)}
+            />
+          </div>
+          <div>
+            <label className="flex items-center gap-1 text-xs font-medium mb-1.5" style={{ color: "var(--text-3)" }}>
+              <UserCheck className="w-3 h-3" /> Responsável
+            </label>
+            <MemberOptionPicker
+              value={filters.owner_id ?? ""}
+              onChange={(v) => onChange("owner_id", v)}
+            />
+          </div>
+          <div>
+            <label className="flex items-center gap-1 text-xs font-medium mb-1.5" style={{ color: "var(--text-3)" }}>
+              <Hash className="w-3 h-3" /> Empresa
+            </label>
+            <CompanyOptionPicker
+              value={filters.company_id ?? ""}
+              onChange={(v) => onChange("company_id", v)}
+            />
+          </div>
+          <div>
+            <label className="flex items-center gap-1 text-xs font-medium mb-1.5" style={{ color: "var(--text-3)" }}>
+              <Briefcase className="w-3 h-3" /> Tem deal?
+            </label>
+            <select
+              value={filters.has_deal ?? ""}
+              onChange={(e) => onChange("has_deal", e.target.value)}
+              className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
+              style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+            >
+              <option value="">Tanto faz</option>
+              <option value="true">Só com deal</option>
+              <option value="false">Só sem deal</option>
+            </select>
+          </div>
+          <div>
+            <label className="flex items-center gap-1 text-xs font-medium mb-1.5" style={{ color: "var(--text-3)" }}>
+              <Hash className="w-3 h-3" /> Status do deal
+            </label>
+            <select
+              value={filters.deal_status ?? ""}
+              onChange={(e) => onChange("deal_status", e.target.value)}
+              className="w-full text-sm rounded-xl px-3 py-2.5 outline-none"
+              style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
+            >
+              <option value="">Qualquer</option>
+              <option value="open">Aberto</option>
+              <option value="won">Ganho</option>
+              <option value="lost">Perdido</option>
+            </select>
+          </div>
+          <div>
+            <label className="flex items-center gap-1 text-xs font-medium mb-1.5" style={{ color: "var(--text-3)" }}>
               <Hash className="w-3 h-3" /> ID Externo
             </label>
             <input
               value={filters.external_id ?? ""}
               onChange={(e) => onChange("external_id", e.target.value)}
-              placeholder="Buscar por ID externo..."
+              placeholder="Buscar por ID externo…"
               className="w-full text-sm rounded-xl px-3 py-2 outline-none"
               style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-1)" }}
             />
@@ -1238,7 +1282,7 @@ function FilterPanel({
         </div>
         {Object.values(filters).some(Boolean) && (
           <button
-            onClick={() => { ["funnel","stage","journey","owner","external_id"].forEach((k) => onChange(k, "")); }}
+            onClick={() => { ["funnel_id","stage_id","journey_id","owner_id","company_id","has_deal","deal_status","external_id","funnel","stage","journey","owner"].forEach((k) => onChange(k, "")); }}
             className="w-full mt-4 text-xs py-2 rounded-xl transition-all"
             style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.15)" }}
           >
@@ -1708,14 +1752,26 @@ export default function CRMPage() {
                 borderLeft: `3px solid ${tempColor}30`,
               }}
             >
-              {/* Avatar */}
-              <div className="relative w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-semibold mt-0.5"
+              {/* Avatar — usa foto do WhatsApp/Instagram quando disponível
+                  (avatar_url do contato), cai pra inicial colorida quando
+                  vazio. Antes só mostrava inicial. */}
+              <div className="relative w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-semibold mt-0.5 overflow-hidden"
                 style={{
-                  background: `linear-gradient(135deg, ${avBg}, transparent)`,
+                  background: contact.avatar_url ? "var(--surface-3)" : `linear-gradient(135deg, ${avBg}, transparent)`,
                   border: `1px solid ${avBorder}`,
                   color: avText,
                 }}>
-                {contact.name[0]?.toUpperCase()}
+                {contact.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={contact.avatar_url}
+                    alt={contact.name || "?"}
+                    className="w-full h-full object-cover"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                  />
+                ) : (
+                  (contact.name || "?")[0]?.toUpperCase()
+                )}
                 {/* Temperature dot */}
                 <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
                   style={{ background: tempColor, borderColor: "var(--surface-2)" }}
@@ -1724,16 +1780,33 @@ export default function CRMPage() {
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                {/* Name + tags row */}
+                {/* Name + tags row — placeholder italic quando ainda não
+                    tem nome (push_name vazio do WA). Antes mostrava o
+                    telefone como nome, poluía a lista. */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{contact.name}</p>
+                  {contact.name?.trim() ? (
+                    <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{contact.name}</p>
+                  ) : (
+                    <p className="text-sm italic" style={{ color: "var(--text-3)" }}>Sem nome</p>
+                  )}
                   {contact.tags?.map((tag) => <TagBadge key={tag.id} tag={tag} />)}
                 </div>
 
-                {/* Phone + email */}
-                <div className="flex items-center gap-3 mt-0.5">
+                {/* Phone + email + origem */}
+                <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                   <span className="text-xs font-mono" style={{ color: "var(--text-3)" }}>{contact.phone}</span>
                   {contact.email && <span className="text-xs" style={{ color: "var(--text-3)" }}>{contact.email}</span>}
+                  {/* Indicação de origem — qual instância criou esse contato.
+                      Útil pra atendente saber por onde falar de volta. */}
+                  {contact.source && (
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wider"
+                      style={{ background: "rgba(99,102,241,0.08)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,0.2)" }}
+                      title="Origem do contato"
+                    >
+                      {contact.source}
+                    </span>
+                  )}
                 </div>
 
                 {/* Pipeline badges */}
@@ -1760,6 +1833,13 @@ export default function CRMPage() {
                     <StickyNote className="w-3.5 h-3.5" style={{ color: "var(--text-3)" }} />
                   </span>
                 )}
+                {/* Inbox CTA — abre conversa direto. Quando o contato tem
+                    instance_id de origem, vai pra ela; senão abre seletor. */}
+                <ContactInboxCTA
+                  contactId={contact.id}
+                  contactPhone={contact.phone}
+                  preferredInstanceId={contact.instance_id}
+                />
                 <button
                   onClick={() => setEditContact(contact)}
                   className="p-1.5 rounded-lg transition-all"

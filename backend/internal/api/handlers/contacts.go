@@ -100,6 +100,50 @@ func (h *ContactHandler) ListContacts(c *fiber.Ctx) error {
 		}
 	}
 
+	// CRM v2 filters — relação via deals e journey_executions, em vez dos
+	// campos string legados. UI nova usa esses; o filtro velho de
+	// "funnel"/"stage" string fica até deprecation completa.
+	if v := c.Query("funnel_id"); v != "" {
+		if id, err := uuid.Parse(v); err == nil {
+			query = query.Where(
+				"contacts.id IN (SELECT contact_id FROM deals WHERE funnel_id = ? AND deleted_at IS NULL)",
+				id,
+			)
+		}
+	}
+	if v := c.Query("stage_id"); v != "" {
+		if id, err := uuid.Parse(v); err == nil {
+			query = query.Where(
+				"contacts.id IN (SELECT contact_id FROM deals WHERE stage_id = ? AND deleted_at IS NULL)",
+				id,
+			)
+		}
+	}
+	if v := c.Query("journey_id"); v != "" {
+		if id, err := uuid.Parse(v); err == nil {
+			query = query.Where(
+				"contacts.id IN (SELECT contact_id FROM journey_executions WHERE journey_id = ? AND status IN ('active','running','pending'))",
+				id,
+			)
+		}
+	}
+	if v := c.Query("company_id"); v != "" {
+		if id, err := uuid.Parse(v); err == nil {
+			query = query.Where("contacts.company_id = ?", id)
+		}
+	}
+	if v := c.Query("has_deal"); v == "true" {
+		query = query.Where("contacts.id IN (SELECT contact_id FROM deals WHERE deleted_at IS NULL)")
+	} else if v == "false" {
+		query = query.Where("contacts.id NOT IN (SELECT contact_id FROM deals WHERE deleted_at IS NULL)")
+	}
+	if v := c.Query("deal_status"); v != "" {
+		query = query.Where(
+			"contacts.id IN (SELECT contact_id FROM deals WHERE status = ? AND deleted_at IS NULL)",
+			v,
+		)
+	}
+
 	var total int64
 	query.Count(&total)
 

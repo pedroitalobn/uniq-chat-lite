@@ -58,6 +58,12 @@ func main() {
 				log.Warn().Err(err).Str("table", table).Msg("repair: drop custom_fields falhou — seguindo")
 			}
 		}
+		// Backfill contatos cujo `name` é igual ao `phone` (entrada antiga
+		// que usava telefone como fallback do nome). Limpa pra "" pra que
+		// a UI mostre placeholder e o user possa editar. Não-destrutivo:
+		// só toca rows onde name == phone literal.
+		_ = db.Exec(`UPDATE contacts SET name = '' WHERE name = phone OR name = external_id`).Error
+
 		// Multi-agente: remove o uniqueIndex legado em instance_agents.instance_id
 		// pra permitir N agentes por instância. Idempotente — só roda se o
 		// índice ainda existir. AutoMigrate logo abaixo recria como índice

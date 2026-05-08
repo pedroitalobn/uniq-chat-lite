@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  LayoutGrid, List, Plus, Search, ChevronDown, TrendingUp, Briefcase,
+  LayoutGrid, List, Plus, Search, ChevronDown, TrendingUp, Briefcase, Filter as FilterIcon,
 } from "lucide-react";
 import { dealsApi, crmApi, funnelViewsApi } from "@/lib/api";
+import { readLastFunnelId, useLastFunnelPersistor } from "@/lib/last-funnel";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { KanbanBoard, type KanbanStage, type KanbanStageStats } from "@/components/crm/KanbanBoard";
@@ -75,13 +76,20 @@ export default function DealsPage() {
     enabled: !!wsId && canView,
   });
 
-  // Pick the first funnel the moment it arrives
+  // Pick funnel ao chegar a lista: prefere o ÚLTIMO usado (localStorage),
+  // depois o is_default, depois o primeiro. Sem isso o user que trabalha
+  // sempre num funil específico era jogado de volta no default cada visita.
   useEffect(() => {
     if (!funnelId && funnelsQ.data && funnelsQ.data.length > 0) {
-      const def = funnelsQ.data.find((f) => (f as unknown as { is_default?: boolean }).is_default) ?? funnelsQ.data[0];
+      const lastId = readLastFunnelId(wsId);
+      const last = lastId ? funnelsQ.data.find((f) => f.id === lastId) : undefined;
+      const def = last
+        ?? funnelsQ.data.find((f) => (f as unknown as { is_default?: boolean }).is_default)
+        ?? funnelsQ.data[0];
       setFunnelId(def.id);
     }
-  }, [funnelId, funnelsQ.data]);
+  }, [funnelId, funnelsQ.data, wsId]);
+  useLastFunnelPersistor(wsId, funnelId);
 
   const activeFunnel = useMemo(
     () => funnelsQ.data?.find((f) => f.id === funnelId) ?? null,
@@ -394,6 +402,7 @@ function FunnelSelector({ funnels, activeId, onChange }: {
         onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.11)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)"; }}
         onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
       >
+        <FilterIcon className="h-3.5 w-3.5" style={{ color: uniq.green }} aria-hidden />
         {active?.name ?? "Selecionar funil"}
         <ChevronDown className="h-3 w-3" style={{ color: uniq.textFaint }} />
       </button>

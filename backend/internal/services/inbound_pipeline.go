@@ -356,12 +356,16 @@ func (p *InboundPipeline) resolveContact(ctx context.Context, in InboundMessage)
 	var inst models.Instance
 	p.db.WithContext(ctx).First(&inst, "id = ?", in.InstanceID)
 
-	name := in.FromName
-	if name == "" {
-		name = phone
-	}
-	if name == "" {
-		name = in.ChannelKey
+	// Nome do contato: NUNCA usar phone como nome — antes contatos
+	// novos entravam com phone no campo `name`, poluindo a UI ("Olá +55…")
+	// e quebrando segmentos por nome. Se WhatsApp não devolveu push_name,
+	// deixa o campo VAZIO — UI exibe placeholder ("Sem nome") e CRM pode
+	// ser editado depois manualmente.
+	name := strings.TrimSpace(in.FromName)
+	// Se push_name acabou sendo igual ao phone (whatsmeow às vezes faz isso
+	// quando contato não tem nome no celular do remetente), descarta também.
+	if name == phone || name == in.ChannelKey {
+		name = ""
 	}
 
 	src := models.ContactSource(in.ChannelType)

@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, Plus, X } from "lucide-react";
 import { crmApi, companiesApi, dealsApi, customFieldsApi } from "@/lib/api";
+import { MemberOptionPicker } from "@/components/crm/FunnelStagePicker";
 import type { KanbanStage } from "./KanbanBoard";
 import { CustomFieldsRenderer, type CustomFieldsValue } from "./CustomFieldsRenderer";
 
@@ -50,6 +51,9 @@ export function NewDealDialog({
   const [contactQuery, setContactQuery] = useState("");
   const [companyQuery, setCompanyQuery] = useState("");
   const [customFieldsValue, setCustomFieldsValue] = useState<CustomFieldsValue>({});
+  // Owner — membro do workspace dono do deal. Era ausente da UI; sem ele
+  // não dava pra dizer "esse deal é da Maria". Default vazio = sem owner.
+  const [ownerId, setOwnerId] = useState("");
 
   // Definições de campos personalizados pra deals — carrega 1x e renderiza
   // dinâmico no fim do form. Vazio se o workspace não criou nenhum em Propriedades.
@@ -142,6 +146,7 @@ export function NewDealDialog({
         funnel_id: funnel.id,
         stage_id: stageId,
         company_id: companyId || undefined,
+        owner_id: ownerId || undefined,
         value: valueMinor,
         currency,
         expected_close_date: closeISO,
@@ -266,6 +271,14 @@ export function NewDealDialog({
               />
             </Field>
           </div>
+
+          <Field label="Responsável (owner)">
+            <MemberOptionPicker
+              value={ownerId}
+              onChange={setOwnerId}
+              placeholder="Atribuir a um membro do workspace"
+            />
+          </Field>
 
           <div className="grid grid-cols-[1fr_96px] gap-3">
             <Field label="Valor">

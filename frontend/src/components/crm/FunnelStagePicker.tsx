@@ -8,7 +8,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   crmApi, companiesApi, instancesApi, departmentsApi,
-  teamsApi, queuesApi, workspacesApi,
+  teamsApi, queuesApi, workspacesApi, journeysApi,
 } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 
@@ -189,4 +189,26 @@ export function QueueOptionPicker({ value, onChange, placeholder }: {
   const options = (data ?? []).map((q) => ({ value: q.id, label: q.name }));
   return <Select value={value} onChange={onChange} options={options}
     placeholder={placeholder ?? "Selecionar fila"} isLoading={isLoading} />;
+}
+
+// JourneyOptionPicker — jornadas ativas do workspace. Lista vem do
+// /v1/journeys filtrado por workspace. Usado nos filtros do CRM v2.
+export function JourneyOptionPicker({ value, onChange, placeholder }: {
+  value: string; onChange: (v: string) => void; placeholder?: string;
+}) {
+  const { currentWorkspace } = useWorkspace();
+  const wsId = currentWorkspace?.id;
+  const { data, isLoading } = useQuery<Array<{ id: string; name: string }>>({
+    queryKey: ["journeys-picker", wsId],
+    queryFn: async () => {
+      const r = await journeysApi.list(wsId);
+      const d = r.data as { items?: Array<{ id: string; name: string }> } | Array<{ id: string; name: string }>;
+      return Array.isArray(d) ? d : (d.items || []);
+    },
+    enabled: !!wsId,
+    staleTime: 60_000,
+  });
+  const options = (data ?? []).map((j) => ({ value: j.id, label: j.name }));
+  return <Select value={value} onChange={onChange} options={options}
+    placeholder={placeholder ?? "Selecionar jornada"} isLoading={isLoading} />;
 }
