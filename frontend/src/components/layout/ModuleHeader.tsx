@@ -1,10 +1,10 @@
 "use client";
 
 // ModuleHeader — header padronizado pra cada módulo principal (CRM,
-// Campanhas, Jornadas, Agentes, Help Desk, Shops, etc). Visualmente
-// alinhado: ícone colorido em badge + título + subtítulo curto.
-// Mover pra um componente único pra ficar fácil bater consistência
-// em todas as páginas e ajustar o estilo num lugar só.
+// Campanhas, Jornadas, Agentes, Help Desk, Shops, etc). É o ÚNICO título
+// da página — antes coexistia com CrmHeader/headers locais que criavam
+// duplicidade visual. Tipografia maior (text-lg sm:text-xl) pra ser
+// percebido como o título principal sem competir com seções internas.
 
 import type { LucideIcon } from "lucide-react";
 
@@ -24,21 +24,23 @@ export function ModuleHeader({
   border?: string;
 }) {
   return (
-    <div className="flex items-center gap-2 px-3 sm:px-4 pt-2">
+    <div className="flex items-center gap-2.5 px-3 sm:px-4 pt-3 sm:pt-4 flex-wrap">
       <span
-        className="w-7 h-7 rounded-lg flex items-center justify-center"
+        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
         style={{ background: bg, border: `1px solid ${border}` }}
       >
-        <Icon className="w-3.5 h-3.5" style={{ color }} />
+        <Icon className="w-4 h-4" style={{ color }} />
       </span>
-      <h1 className="text-base font-semibold tracking-tight" style={{ color: "var(--text-1)" }}>
-        {title}
-      </h1>
-      {subtitle && (
-        <span className="text-[11px] truncate" style={{ color: "var(--text-3)" }}>
-          {subtitle}
-        </span>
-      )}
+      <div className="min-w-0">
+        <h1 className="text-lg sm:text-xl font-semibold tracking-tight leading-none" style={{ color: "var(--text-1)" }}>
+          {title}
+        </h1>
+        {subtitle && (
+          <p className="text-[11px] sm:text-xs mt-1 truncate" style={{ color: "var(--text-3)" }}>
+            {subtitle}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

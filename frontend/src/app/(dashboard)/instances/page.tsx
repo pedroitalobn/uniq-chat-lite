@@ -705,10 +705,8 @@ function InstancesContent() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>
-            Instâncias
-          </h1>
-          <p className="text-sm mt-1.5" style={{ color: "hsl(240 8% 46%)" }}>
+          {/* Título "Instâncias" agora no ModuleHeader (layout). */}
+          <p className="text-sm" style={{ color: "hsl(240 8% 46%)" }}>
             Gerencie suas conexões de canal
           </p>
         </div>

@@ -1,60 +1,55 @@
 "use client";
 
-// CrmHeader — header glass-morphism unificado pra todas as páginas do CRM.
-// Estrutura padronizada: (linha 1) título + ações; (linha 2) toolbar.
-// Mantém a estética consistente com o resto do app (gradient + backdrop-blur).
+// CrmHeader — barra de AÇÕES + TOOLBAR no topo das páginas do CRM. Antes
+// renderizava título + subtítulo + ícone (h1 grande), o que duplicava
+// o título já mostrado pelo ModuleHeader do layout. Agora o título
+// único vive no ModuleHeader; este componente fica responsável só pela
+// linha de ações (botões "Novo deal", filtros, etc) e a toolbar abaixo.
+// Props title/subtitle/icon mantidas pra compat com call-sites mas
+// renderizadas como linha discreta opcional.
 
 import type { ReactNode } from "react";
 
 export function CrmHeader({
-  title,
   subtitle,
-  icon,
   actions,
   toolbar,
   children,
 }: {
-  title: ReactNode;
+  /** @deprecated mantido pra compat — ignorado no render. ModuleHeader provê o título. */
+  title?: ReactNode;
+  /** Linha discreta opcional acima das ações (ex: "Funil: Vendas SP"). */
   subtitle?: ReactNode;
+  /** @deprecated mantido pra compat — ignorado. */
   icon?: ReactNode;
   actions?: ReactNode;
   toolbar?: ReactNode;
   children?: ReactNode;
 }) {
+  // Sem actions, toolbar nem subtitle, não renderiza nada — alguns
+  // pages chamam só pra título e agora o ModuleHeader cobre.
+  if (!actions && !toolbar && !subtitle && !children) return null;
+
   return (
     <header
-      className="rounded-2xl px-4 sm:px-5 py-3 sm:py-4 space-y-3"
+      className="rounded-2xl px-4 sm:px-5 py-3 space-y-3"
       style={{
-        background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+        background: "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)",
         backdropFilter: "blur(16px) saturate(180%)",
         WebkitBackdropFilter: "blur(16px) saturate(180%)",
         border: "1px solid rgba(255,255,255,0.08)",
       }}
     >
-      <div className="flex items-center gap-3 flex-wrap">
-        {icon && (
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{
-              background: "rgba(0,212,106,0.10)",
-              border: "1px solid rgba(0,212,106,0.20)",
-            }}
-          >
-            {icon}
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <h1 className="text-base sm:text-lg font-semibold tracking-tight truncate" style={{ color: "var(--text-1)" }}>
-            {title}
-          </h1>
+      {(subtitle || actions) && (
+        <div className="flex items-center gap-3 flex-wrap">
           {subtitle && (
-            <p className="text-xs mt-0.5 truncate" style={{ color: "var(--text-3)" }}>
+            <p className="text-xs truncate min-w-0 flex-1" style={{ color: "var(--text-3)" }}>
               {subtitle}
             </p>
           )}
+          {actions && <div className="flex items-center gap-2 flex-wrap flex-shrink-0">{actions}</div>}
         </div>
-        {actions && <div className="flex items-center gap-2 flex-wrap flex-shrink-0">{actions}</div>}
-      </div>
+      )}
       {toolbar}
       {children}
     </header>

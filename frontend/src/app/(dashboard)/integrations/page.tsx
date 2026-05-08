@@ -136,18 +136,7 @@ export default function IntegrationsPage() {
           {/* Section header glass line */}
           <div className="absolute -bottom-3 left-0 right-0 h-px pointer-events-none"
             style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)" }} />
-          <div className="flex items-center gap-2.5 mb-1">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{
-                background: "linear-gradient(135deg, rgba(0,212,106,0.15), rgba(0,212,106,0.05))",
-                backdropFilter: "blur(8px)",
-                WebkitBackdropFilter: "blur(8px)",
-                border: "1px solid rgba(0,212,106,0.25)",
-              }}>
-              <Plug className="w-4 h-4" style={{ color: "var(--green)" }} />
-            </div>
-            <h1 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>Integrações</h1>
-          </div>
+          {/* Título "Integrações" + ícone agora no ModuleHeader (layout). */}
           <p className="text-xs hidden sm:block" style={{ color: "var(--text-3)" }}>
             LLMs, agentes, webhooks, shop e mais
           </p>

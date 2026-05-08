@@ -506,11 +506,8 @@ export default function AgentsPage() {
             )}
             {view === "list" && (
               <>
-                <h1 className="text-xl sm:text-2xl font-semibold flex items-center gap-2" style={{ color: "var(--text-1)" }}>
-                  <Bot className="w-5 h-5" style={{ color: "#a78bfa" }} />
-                  Agentes IA
-                </h1>
-                <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
+                {/* Título "Agentes IA" agora no ModuleHeader (layout). */}
+                <p className="text-xs" style={{ color: "var(--text-3)" }}>
                   Configure, treine e ative seus agentes de IA por instância.
                 </p>
               </>

@@ -415,13 +415,7 @@ function KnowledgeHero({
       {/* Title + actions */}
       <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <div className="flex items-center gap-2.5 mb-1">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.20)" }}>
-              <BookOpen className="w-4 h-4" style={{ color: "#00d46a" }} />
-            </div>
-            <h1 className="text-xl font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Base de conhecimento</h1>
-          </div>
+          {/* Título "Base de conhecimento" + ícone agora no ModuleHeader. */}
           <p className="text-sm" style={{ color: "hsl(240 8% 50%)" }}>
             Artigos, tutoriais e FAQs para sua equipe e clientes
           </p>

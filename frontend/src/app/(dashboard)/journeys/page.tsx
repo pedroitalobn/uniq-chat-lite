@@ -96,11 +96,8 @@ export default function JourneysPage() {
       <div className="mb-3 sm:mb-4 flex-shrink-0">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight flex items-center gap-2 sm:gap-3" style={{ color: "var(--text-1)" }}>
-              <Wand2 className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: "#8b5cf6" }} />
-              Jornadas
-            </h1>
-            <p className="text-xs sm:text-sm mt-1" style={{ color: "var(--text-3)" }}>
+            {/* Título "Jornadas" agora no ModuleHeader (layout). */}
+            <p className="text-xs sm:text-sm" style={{ color: "var(--text-3)" }}>
               Cadências e regras de relacionamento — crie via canvas, template ou linguagem natural pelo Uniq AI.
             </p>
           </div>

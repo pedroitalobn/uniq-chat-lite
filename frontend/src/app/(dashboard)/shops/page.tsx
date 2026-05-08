@@ -73,12 +73,7 @@ export default function ShopsPage() {
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
       <div className="flex items-start justify-between mb-6 gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <ShoppingBag className="w-5 h-5" style={{ color: "var(--green)" }} />
-            <h1 className="text-xl font-semibold" style={{ color: "var(--text-1)" }}>
-              Shops
-            </h1>
-          </div>
+          {/* Título "Lojas" + ícone agora no ModuleHeader (layout). */}
           <p className="text-sm" style={{ color: "var(--text-3)" }}>
             Lojas atreladas às suas instâncias. Conecte e-commerces externos pra sincronizar produtos
             e usar em journeys, agentes e campanhas.

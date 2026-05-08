@@ -2015,8 +2015,9 @@ export default function CampaignsPage() {
     <div className="space-y-7">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 93%)" }}>Campanhas</h1>
-          <p className="text-sm mt-1.5" style={{ color: "hsl(240 8% 46%)" }}>
+          {/* Título "Campanhas" agora vive no ModuleHeader (layout). Aqui
+              fica só o subtítulo informativo com contagem. */}
+          <p className="text-sm" style={{ color: "hsl(240 8% 46%)" }}>
             {campaigns.length} campanha{campaigns.length !== 1 ? "s" : ""}
             {running > 0 && <span> · <span style={{ color: "var(--green)" }}>{running} em execução</span></span>}
             {completed > 0 && <span> · {completed} concluída{completed !== 1 ? "s" : ""}</span>}
