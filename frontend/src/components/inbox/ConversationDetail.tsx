@@ -13,6 +13,7 @@ import {
   Maximize2 as Maximize2Icon, Phone, Video as VideoIcon, PhoneMissed,
   UserPlus, MessageSquare, ListChecks, CornerUpLeft, CornerUpRight,
   Pencil, Trash2, Search, Info, Bell, BellOff, Eye, Briefcase, Loader2,
+  MoreVertical,
 } from "lucide-react";
 import { AudioPlayer } from "@/components/inbox/AudioPlayer";
 import { ContactCRMPanel } from "@/components/inbox/ContactCRMPanel";
@@ -198,6 +199,9 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
 
   const [transferOpen, setTransferOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
+  // Menu "..." mobile do header: agrupa briefcase/call/refresh quando o
+  // header não cabe horizontalmente em telas pequenas.
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
 
   // Mode selector: human / ai / observing
   type ConvMode = "human" | "ai" | "observing";
@@ -663,7 +667,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     <div className="flex h-full min-h-0">
       {/* Main pane: header + timeline + composer */}
       <section className="flex flex-1 min-w-0 flex-col">
-        <header className="flex items-center gap-2 px-4 py-2.5 border-b flex-shrink-0"
+        <header className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-2.5 border-b flex-shrink-0"
           style={{ borderColor: "rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
           {/* Back button */}
           {onClose ? (
@@ -744,8 +748,10 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                   {status.label}
                 </span>
               )}
+              {/* Badges secundárias somem em mobile pra liberar espaço pro
+                  nome do contato. SLA fica visível em qualquer tela. */}
               {conv?.reopen_count ? (
-                <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-400">
+                <span className="hidden sm:inline-flex rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-400">
                   reaberto {conv.reopen_count}×
                 </span>
               ) : null}
@@ -757,8 +763,10 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             </div>
             <div className="flex items-center gap-1.5 text-[11px] flex-wrap" style={{ color: "hsl(240 8% 50%)" }}>
               <PresenceLabel presence={presence} />
+              {/* Chip do canal só em sm+ — em mobile o ícone ao lado do nome
+                  já indica a origem; ganha-se uma linha de espaço. */}
               <span
-                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                className="hidden sm:inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
                 style={{
                   background: channelChipStyle(conv?.channel_type).bg,
                   color: channelChipStyle(conv?.channel_type).color,
@@ -820,69 +828,113 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                     // mas outros code paths antigos ainda olham is_bot_active.
                     bot.mutate(id === "ai");
                   }}
-                  className="px-2.5 py-1.5 text-[10px] font-medium flex items-center gap-1 transition-all"
+                  className="px-2 sm:px-2.5 py-1.5 text-[10px] font-medium flex items-center gap-1 transition-all"
+                  title={label}
+                  aria-label={label}
                   style={{
                     background: convMode === id ? (id === "ai" ? "rgba(167,139,250,0.2)" : id === "human" ? "rgba(0,212,106,0.15)" : "rgba(255,255,255,0.08)") : "transparent",
                     color: convMode === id ? (id === "ai" ? "#c4b5fd" : id === "human" ? "#00d46a" : "hsl(240 15% 80%)") : "hsl(240 8% 50%)",
                   }}>
                   <Icon className="h-3 w-3" />
-                  {label}
+                  {/* Em mobile o ícone fala por si — esconde label pra
+                      caber back+nome+badges+pills+ações na largura. */}
+                  <span className="hidden sm:inline">{label}</span>
                 </button>
               ))}
             </div>
           )}
 
-          {/* Botão Criar negociação */}
-          {conv?.contact_id && (
-            <button onClick={() => setDealModalOpen(true)}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium flex-shrink-0"
-              style={{ background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.2)", color: "#fbbf24" }}>
-              <Briefcase className="h-3 w-3" />
-              <span className="hidden sm:inline">Negociação</span>
+          {/* Ações secundárias — em sm+ ficam visíveis lado a lado;
+              em mobile colapsam em um menu "..." pra evitar overflow do
+              header (era o sintoma principal: badges/buttons sobrepostos
+              no iPhone). */}
+          <div className="hidden sm:flex items-center gap-2">
+            {conv?.contact_id && (
+              <button onClick={() => setDealModalOpen(true)}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium flex-shrink-0"
+                style={{ background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.2)", color: "#fbbf24" }}>
+                <Briefcase className="h-3 w-3" />
+                <span>Negociação</span>
+              </button>
+            )}
+            {(conv?.channel_type === "whatsapp") && conv?.instance_id && conv?.channel_key && (
+              <CallButton instanceId={conv.instance_id} jid={conv.channel_key} />
+            )}
+            <button
+              onClick={() => {
+                convQ.refetch();
+                timelineQ.refetch();
+                qc.invalidateQueries({ queryKey: ["conversations", wsId] });
+              }}
+              disabled={timelineQ.isFetching || convQ.isFetching}
+              className="flex items-center justify-center rounded-lg flex-shrink-0 transition-colors disabled:opacity-50"
+              style={{ width: 30, height: 30, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 8% 60%)" }}
+              title="Atualizar mensagens"
+              aria-label="Atualizar mensagens"
+            >
+              <RotateCcw className={`h-3.5 w-3.5 ${timelineQ.isFetching || convQ.isFetching ? "animate-spin" : ""}`} />
             </button>
-          )}
+          </div>
 
-          {/* Botão Ligar — só para WhatsApp (não WABA) */}
-          {(conv?.channel_type === "whatsapp") && conv?.instance_id && conv?.channel_key && (
-            <CallButton instanceId={conv.instance_id} jid={conv.channel_key} />
-          )}
-
-          {/* Refresh manual — fallback caso o WS caia ou o polling de 30s
-              não traga a última mensagem rápido o suficiente. Roda
-              convQ + timelineQ + invalida lista de conversas pra atualizar
-              o badge de unread no painel esquerdo na mesma ação. */}
-          <button
-            onClick={() => {
-              convQ.refetch();
-              timelineQ.refetch();
-              qc.invalidateQueries({ queryKey: ["conversations", wsId] });
-            }}
-            disabled={timelineQ.isFetching || convQ.isFetching}
-            className="flex items-center justify-center rounded-lg flex-shrink-0 transition-colors disabled:opacity-50"
-            style={{
-              width: 30,
-              height: 30,
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              color: "hsl(240 8% 60%)",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(0,212,106,0.10)";
-              e.currentTarget.style.borderColor = "rgba(0,212,106,0.22)";
-              e.currentTarget.style.color = "#00d46a";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(255,255,255,0.04)";
-              e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
-              e.currentTarget.style.color = "hsl(240 8% 60%)";
-            }}
-            title="Atualizar mensagens"
-            aria-label="Atualizar mensagens"
-          >
-            <RotateCcw
-              className={`h-3.5 w-3.5 ${timelineQ.isFetching || convQ.isFetching ? "animate-spin" : ""}`}
-            />
-          </button>
+          {/* Mobile: botão "..." que abre menu com as 3 ações secundárias. */}
+          <div className="sm:hidden flex-shrink-0 relative">
+            <button
+              onClick={() => setMobileActionsOpen((v) => !v)}
+              className="flex items-center justify-center rounded-lg"
+              style={{ width: 30, height: 30, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 8% 60%)" }}
+              title="Mais ações"
+              aria-label="Mais ações"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </button>
+            {mobileActionsOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setMobileActionsOpen(false)}
+                />
+                <div
+                  className="absolute right-0 top-full mt-1 z-50 rounded-lg overflow-hidden min-w-[180px]"
+                  style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}
+                >
+                  {conv?.contact_id && (
+                    <button
+                      onClick={() => { setDealModalOpen(true); setMobileActionsOpen(false); }}
+                      className="w-full text-left flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-white/5"
+                      style={{ color: "#fbbf24" }}
+                    >
+                      <Briefcase className="h-3.5 w-3.5" />
+                      Criar negociação
+                    </button>
+                  )}
+                  {(conv?.channel_type === "whatsapp") && conv?.instance_id && conv?.channel_key && (
+                    <button
+                      onClick={() => setMobileActionsOpen(false)}
+                      className="w-full text-left flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-white/5"
+                      style={{ color: "#00d46a" }}
+                    >
+                      <Phone className="h-3.5 w-3.5" />
+                      <span>Ligar</span>
+                      <span className="ml-auto"><CallButton instanceId={conv.instance_id} jid={conv.channel_key} /></span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      convQ.refetch();
+                      timelineQ.refetch();
+                      qc.invalidateQueries({ queryKey: ["conversations", wsId] });
+                      setMobileActionsOpen(false);
+                    }}
+                    className="w-full text-left flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-white/5"
+                    style={{ color: "hsl(240 8% 75%)" }}
+                  >
+                    <RotateCcw className={`h-3.5 w-3.5 ${timelineQ.isFetching || convQ.isFetching ? "animate-spin" : ""}`} />
+                    Atualizar mensagens
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </header>
 
         <div

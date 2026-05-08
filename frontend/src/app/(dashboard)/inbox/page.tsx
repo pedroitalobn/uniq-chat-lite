@@ -1061,7 +1061,8 @@ function AgentDropdown({
         <button
           onClick={() => setOpen((o) => !o)}
           disabled={!canViewAll}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
+          className="flex items-center gap-1.5 rounded-lg px-2 sm:px-3 py-1.5 text-xs font-medium"
+          title={currentLabel}
           style={{
             background: bg,
             backdropFilter: "blur(8px)",
@@ -1075,7 +1076,7 @@ function AgentDropdown({
           onMouseLeave={e => { e.currentTarget.style.background = bg; e.currentTarget.style.borderColor = border; }}
         >
           <UserIcon className="h-3.5 w-3.5" style={{ color: isActive ? "#00d46a" : "hsl(240 8% 48%)" }} />
-          {currentLabel}
+          <span className={isActive ? "" : "hidden sm:inline"}>{currentLabel}</span>
           <ChevronDown className="h-3 w-3" />
         </button>
       }
@@ -1149,7 +1150,8 @@ function SingleSelectDropdown({
       trigger={
         <button
           onClick={() => setOpen((o) => !o)}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
+          className="flex items-center gap-1.5 rounded-lg px-2 sm:px-3 py-1.5 text-xs font-medium"
+          title={label}
           style={{
             background: triggerBg,
             backdropFilter: "blur(8px)",
@@ -1162,7 +1164,10 @@ function SingleSelectDropdown({
           onMouseLeave={e => { e.currentTarget.style.background = triggerBg; e.currentTarget.style.borderColor = triggerBorder; }}
         >
           <span style={{ color: iconColor, display: "inline-flex" }}>{icon}</span>
-          {label}
+          {/* Label esconde em mobile QUANDO o filtro está no default — fica
+              só o ícone, libera espaço pra caber tudo numa linha. Quando
+              ativo (não-default) o label aparece pra dar feedback claro. */}
+          <span className={active ? "" : "hidden sm:inline"}>{label}</span>
           <ChevronDown className="h-3 w-3" />
         </button>
       }
@@ -1207,7 +1212,8 @@ function MultiSelectDropdown({
       trigger={
         <button
           onClick={() => setOpen((o) => !o)}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
+          className="flex items-center gap-1.5 rounded-lg px-2 sm:px-3 py-1.5 text-xs font-medium"
+          title={label}
           style={{
             background: selected.length > 0 ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.06)",
             backdropFilter: "blur(8px)",
@@ -1228,7 +1234,9 @@ function MultiSelectDropdown({
           }}
         >
           <span style={{ color: selected.length > 0 ? "#00d46a" : "hsl(240 8% 48%)", display: "inline-flex" }}>{icon}</span>
-          {label}
+          {/* Em mobile: só label se houver seleção (= filtro ativo). Sem
+              seleção, fica ícone-only pra economizar largura. */}
+          <span className={selected.length > 0 ? "" : "hidden sm:inline"}>{label}</span>
           <ChevronDown className="h-3 w-3" />
         </button>
       }
