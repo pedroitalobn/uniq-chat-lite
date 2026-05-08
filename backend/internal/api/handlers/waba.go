@@ -1216,6 +1216,12 @@ func (h *WABAHandler) RegisterPhone(c *fiber.Ctx) error {
 	if resp.StatusCode >= 400 {
 		return c.Status(resp.StatusCode).JSON(fiber.Map{"error": "Meta: " + string(respBody)})
 	}
+	// Persiste o PIN no DB pra UI exibir como lembrete (com copy fácil).
+	// Esse PIN é exigido pela Meta toda vez que o user re-registra o
+	// número (troca de provedor, restore, deactivate/reactivate). Antes
+	// ficava só na cabeça do user — esquecia e tinha que zerar 2FA no
+	// painel da Meta. Não é segredo crítico (separado do AccessToken).
+	h.db.Model(&waba).Update("registration_pin", body.PIN)
 	return c.JSON(fiber.Map{"success": true})
 }
 

@@ -808,6 +808,16 @@ export const wabaApi = {
     api.post(`/v1/instances/${instanceId}/waba/register`, { pin }),
   subscribe: (instanceId: string) =>
     api.post(`/v1/instances/${instanceId}/waba/subscribe`),
+  diagnostics: (instanceId: string) =>
+    api.get(`/v1/instances/${instanceId}/waba/diagnostics`),
+  messagesLog: (instanceId: string, params?: {
+    status?: string;
+    q?: string;
+    type?: string;
+    limit?: number;
+    offset?: number;
+  }) =>
+    api.get(`/v1/instances/${instanceId}/waba/messages-log`, { params }),
   sendMessage: (
     instanceId: string,
     data: {

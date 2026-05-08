@@ -32,6 +32,9 @@ interface WABAData {
   verified_name: string;
   status: string;
   code_verification: string;
+  /** PIN do 2FA salvo após /register — exibido como chip no header pra
+   *  o user lembrar ao reconectar/reativar o número. */
+  pin?: string;
 }
 
 interface TemplateComponent {
@@ -171,7 +174,18 @@ export default function WABAManagePage({ params }: { params: Promise<{ id: strin
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {/* Lembrete do PIN 2FA ao lado do header — copy-to-clipboard
+              fácil. Quando vazio mostra hint "registre 2FA" pra o user
+              entender que precisa rodar o passo 2 abaixo. */}
+          {waba.pin ? (
+            <PinChip pin={waba.pin} />
+          ) : (
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+              style={{ background: "rgba(245,158,11,0.10)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.25)" }}>
+              PIN não registrado
+            </span>
+          )}
           <ReconnectButton instanceId={id} />
         </div>
       </div>
@@ -258,6 +272,9 @@ export default function WABAManagePage({ params }: { params: Promise<{ id: strin
 
       {/* Test send */}
       <TestSendSection instanceId={id} wabaStatus={waba.status} templates={templates} />
+
+      {/* Logs de envio — painel com status de cada mensagem outbound. */}
+      <MessagesLogSection instanceId={id} />
 
       {/* Diagnóstico Meta */}
       <div className="rounded-xl p-3 flex items-start gap-2"
@@ -1392,4 +1409,309 @@ function ReconnectButton({ instanceId }: { instanceId: string }) {
       <WABAConnectButton instanceId={instanceId} className="[&>button]:!py-2 [&>button]:!px-3 [&>button]:!text-xs [&>button>span]:!text-xs" />
     </div>
   );
+}
+
+// PinChip — chip clicável no header da WABA mostrando o PIN 2FA salvo.
+// Click copia pra clipboard com feedback visual (Check verde por 1.5s).
+// Mascara o PIN por padrão (••••••) — clica no olho pra revelar antes de
+// copiar, evita expor em screenshot acidental sem comprometer praticidade.
+function PinChip({ pin }: { pin: string }) {
+  const [revealed, setRevealed] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(pin);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+      toast.success("PIN copiado");
+    } catch {
+      toast.error("Não consegui copiar");
+    }
+  };
+  return (
+    <div
+      className="inline-flex items-center gap-1.5 rounded-full pl-2.5 pr-1 py-1"
+      style={{
+        background: "rgba(0,212,106,0.10)",
+        border: "1px solid rgba(0,212,106,0.30)",
+        color: "var(--green)",
+      }}
+      title="PIN 2FA do registro WABA — necessário pra reconectar este número no futuro"
+    >
+      <span className="text-[10px] font-medium uppercase tracking-wider">PIN</span>
+      <span className="text-xs font-mono tabular-nums" style={{ color: "var(--text-1)" }}>
+        {revealed ? pin : "••••••"}
+      </span>
+      <button
+        type="button"
+        onClick={() => setRevealed((v) => !v)}
+        className="w-6 h-6 rounded-full flex items-center justify-center hover:bg-white/5"
+        title={revealed ? "Ocultar" : "Mostrar"}
+      >
+        {revealed ? <X className="w-3 h-3" /> : <Pencil className="w-3 h-3" />}
+      </button>
+      <button
+        type="button"
+        onClick={copy}
+        className="w-6 h-6 rounded-full flex items-center justify-center hover:bg-white/5"
+        title="Copiar PIN"
+      >
+        {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+      </button>
+    </div>
+  );
+}
+
+// MessagesLogSection — painel de logs de envio. Mostra cada mensagem
+// outbound desta instância WABA com status (sent/delivered/read/failed),
+// destinatário, timestamp e erro quando aplicável. Filtro por status,
+// busca por número/nome, paginação. Stats no header pra ver de relance
+// taxa de entrega das últimas 24h.
+type LogItem = {
+  id: string;
+  conversation_id?: string;
+  type: string;
+  to_jid: string;
+  contact_name: string;
+  status: "pending" | "sent" | "delivered" | "read" | "failed";
+  external_message_id?: string;
+  delivery_error?: string;
+  content?: string;
+  delivered_at?: string;
+  read_at?: string;
+  created_at: string;
+};
+type LogStats = {
+  pending: number;
+  sent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+  total_24h: number;
+};
+
+function MessagesLogSection({ instanceId }: { instanceId: string }) {
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [offset, setOffset] = useState(0);
+  const limit = 25;
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q), 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const { data, isLoading, refetch } = useQuery<{
+    items: LogItem[];
+    total: number;
+    stats: LogStats;
+  }>({
+    queryKey: ["waba-messages-log", instanceId, statusFilter, debouncedQ, offset],
+    queryFn: () => wabaApi.messagesLog(instanceId, {
+      status: statusFilter,
+      q: debouncedQ || undefined,
+      limit,
+      offset,
+    }).then((r) => r.data),
+    refetchInterval: 30_000, // poll leve a cada 30s pra status evoluir sozinho
+  });
+
+  const items = data?.items ?? [];
+  const stats = data?.stats ?? { pending: 0, sent: 0, delivered: 0, read: 0, failed: 0, total_24h: 0 };
+  const total = data?.total ?? 0;
+
+  const deliveryRate = stats.total_24h > 0
+    ? Math.round(((stats.delivered + stats.read) / stats.total_24h) * 100)
+    : 0;
+
+  return (
+    <div className="rounded-2xl p-4"
+      style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Send className="w-4 h-4" style={{ color: "var(--green)" }} />
+          <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
+            Logs de envio
+          </h3>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <StatChip label="Últ. 24h" value={String(stats.total_24h)} />
+          <StatChip label="Entregues" value={`${stats.delivered + stats.read}`} color="var(--green)" />
+          <StatChip label="Falhas" value={String(stats.failed)} color="#ef4444" />
+          <StatChip label="Taxa" value={`${deliveryRate}%`} color={deliveryRate >= 90 ? "var(--green)" : deliveryRate >= 70 ? "#f59e0b" : "#ef4444"} />
+          <button
+            onClick={() => refetch()}
+            className="text-[10px] px-2 py-1 rounded-md inline-flex items-center gap-1"
+            style={{ background: "var(--surface-3)", color: "var(--text-2)" }}
+            title="Atualizar"
+          >
+            <Loader2 className={`w-3 h-3 ${isLoading ? "animate-spin" : ""}`} />
+            {isLoading ? "" : "Atualizar"}
+          </button>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        {(["all", "sent", "delivered", "read", "failed", "pending"] as const).map((s) => {
+          const count = s === "all" ? total : stats[s as keyof LogStats] ?? 0;
+          return (
+            <button
+              key={s}
+              onClick={() => { setStatusFilter(s); setOffset(0); }}
+              className="text-[11px] px-2.5 py-1 rounded-full font-medium transition-colors"
+              style={statusFilter === s ? {
+                background: "rgba(0,212,106,0.18)",
+                color: "var(--green)",
+                border: "1px solid rgba(0,212,106,0.35)",
+              } : {
+                background: "var(--surface-3)",
+                color: "var(--text-2)",
+                border: "1px solid var(--surface-border)",
+              }}
+            >
+              {STATUS_LABELS[s]} {count > 0 && <span className="opacity-60">· {count}</span>}
+            </button>
+          );
+        })}
+        <input
+          value={q}
+          onChange={(e) => { setQ(e.target.value); setOffset(0); }}
+          placeholder="Buscar telefone ou nome…"
+          className="text-xs px-3 py-1.5 rounded-lg outline-none ml-auto"
+          style={{
+            background: "var(--surface-3)",
+            border: "1px solid var(--surface-border)",
+            color: "var(--text-1)",
+            width: 200,
+          }}
+        />
+      </div>
+
+      {/* Lista */}
+      {items.length === 0 ? (
+        <div className="text-xs text-center py-8" style={{ color: "var(--text-3)" }}>
+          {isLoading ? "Carregando…" : "Nenhum envio registrado neste filtro."}
+        </div>
+      ) : (
+        <div className="rounded-lg overflow-hidden"
+          style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>
+          {items.map((it, i) => (
+            <LogRow key={it.id} item={it} divider={i > 0} />
+          ))}
+        </div>
+      )}
+
+      {/* Paginação */}
+      {total > limit && (
+        <div className="flex items-center justify-between gap-2 mt-3 text-xs" style={{ color: "var(--text-3)" }}>
+          <span>{offset + 1}–{Math.min(offset + limit, total)} de {total}</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setOffset(Math.max(0, offset - limit))}
+              disabled={offset === 0}
+              className="px-2.5 py-1 rounded-md disabled:opacity-40"
+              style={{ background: "var(--surface-3)" }}
+            >Anterior</button>
+            <button
+              onClick={() => setOffset(offset + limit)}
+              disabled={offset + limit >= total}
+              className="px-2.5 py-1 rounded-md disabled:opacity-40"
+              style={{ background: "var(--surface-3)" }}
+            >Próxima</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  all: "Todos",
+  pending: "Pendentes",
+  sent: "Enviadas",
+  delivered: "Entregues",
+  read: "Lidas",
+  failed: "Falhas",
+};
+
+const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }> = {
+  pending:   { bg: "rgba(245,158,11,0.10)", color: "#f59e0b", label: "Pendente" },
+  sent:      { bg: "rgba(96,165,250,0.10)", color: "#60a5fa", label: "Enviada" },
+  delivered: { bg: "rgba(0,212,106,0.10)",  color: "var(--green)", label: "Entregue" },
+  read:      { bg: "rgba(0,212,106,0.18)",  color: "var(--green)", label: "Lida" },
+  failed:    { bg: "rgba(239,68,68,0.10)",  color: "#ef4444", label: "Falhou" },
+};
+
+function StatChip({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px]"
+      style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+      <span style={{ color: "var(--text-3)" }}>{label}</span>
+      <span className="font-semibold tabular-nums" style={{ color: color || "var(--text-1)" }}>{value}</span>
+    </span>
+  );
+}
+
+function LogRow({ item, divider }: { item: LogItem; divider: boolean }) {
+  const st = STATUS_STYLES[item.status] || STATUS_STYLES.sent;
+  const phone = (item.to_jid || "").split("@")[0] || item.to_jid;
+  const time = new Date(item.created_at);
+  const timeStr = time.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const previewBody = previewFromContent(item.content);
+
+  return (
+    <div
+      className="flex items-start gap-3 px-3 py-2.5"
+      style={divider ? { borderTop: "1px solid var(--surface-border)" } : undefined}
+    >
+      <div className="flex-shrink-0">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+          style={{ background: st.bg, color: st.color, border: `1px solid ${st.color}33` }}>
+          {st.label}
+        </span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <span className="font-medium" style={{ color: "var(--text-1)" }}>
+            {item.contact_name || phone}
+          </span>
+          {item.contact_name && (
+            <span className="font-mono text-[11px]" style={{ color: "var(--text-3)" }}>{phone}</span>
+          )}
+          <span className="ml-auto text-[10px] tabular-nums" style={{ color: "var(--text-3)" }}>
+            {timeStr}
+          </span>
+        </div>
+        <div className="text-[11px] truncate mt-0.5" style={{ color: "var(--text-3)" }}>
+          <span className="uppercase tracking-wider mr-1.5">[{item.type}]</span>
+          {previewBody}
+        </div>
+        {item.delivery_error && (
+          <div className="text-[10px] mt-0.5 truncate" style={{ color: "#ef4444" }} title={item.delivery_error}>
+            ⚠ {item.delivery_error}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// previewFromContent — extrai um preview legível do MessageLog.Content
+// (que é um JSON string serializado). Pra texto retorna "body"; pra mídia
+// retorna caption ou label do tipo. Falha graciosa se não for JSON.
+function previewFromContent(content?: string): string {
+  if (!content) return "—";
+  try {
+    const parsed = JSON.parse(content);
+    if (typeof parsed === "string") return parsed.slice(0, 80);
+    if (parsed?.body) return String(parsed.body).slice(0, 80);
+    if (parsed?.text?.body) return String(parsed.text.body).slice(0, 80);
+    if (parsed?.caption) return String(parsed.caption).slice(0, 80);
+    if (parsed?.template_name) return `Template: ${parsed.template_name}`;
+    return "—";
+  } catch {
+    return content.slice(0, 80);
+  }
 }

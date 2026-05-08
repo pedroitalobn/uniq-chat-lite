@@ -887,6 +887,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	// nunca avançam pra delivered (sintoma típico de webhook não
 	// configurado no Meta App Settings).
 	instanceWaba.Get("/diagnostics", wabaH.GetDiagnostics)
+	// Painel de logs de envio: lista mensagens outbound com filtro por
+	// status (sent/delivered/read/failed), busca por número/nome,
+	// paginação. Permite ao usuário ver "esse número recebeu? falhou?
+	// por quê?" sem entrar em cada conversa.
+	instanceWaba.Get("/messages-log", wabaH.GetMessagesLog)
 	// Business Profile
 	instanceWaba.Get("/business-profile", wabaH.GetBusinessProfile)
 	instanceWaba.Patch("/business-profile", wabaH.UpdateBusinessProfile)
