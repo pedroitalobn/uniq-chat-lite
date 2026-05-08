@@ -15,6 +15,7 @@ import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 import { AgentSwitcher } from "@/components/agents/AgentSwitcher";
 import { ActivationTab } from "@/components/agents/ActivationTab";
 import { QuickSetupWizard } from "@/components/agents/QuickSetupWizard";
+import { AgentActionsConfig } from "@/components/agents/AgentActionsConfig";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -932,6 +933,18 @@ export default function AgentsPage() {
           {/* ── Access tab ── */}
           {tab === "access" && (
             <>
+              {/* Ações nativas do agente dentro da Uniq — toggles + política
+                  de confirmação. Usa app_access (type=action) pra reaproveitar
+                  estrutura existente; backend lê via parseEnabledTools. */}
+              <div className="rounded-3xl p-5" style={cs()}>
+                <AgentActionsConfig
+                  appAccess={form.app_access as any}
+                  confirmation={form.action_confirmation}
+                  onChangeAppAccess={(next) => setForm((p) => ({ ...p, app_access: next as any }))}
+                  onChangeConfirmation={(v) => setForm((p) => ({ ...p, action_confirmation: v }))}
+                />
+              </div>
+
               {/* Card de Estado — DEDICADO. Antes ativação ficava
                   amarrada ao card de LLM ("LLM e ativação"), o que
                   fazia parecer que "ligar agente" e "ligar LLM" eram

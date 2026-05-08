@@ -90,6 +90,9 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 	if siblings := r.loadSiblingsForPrompt(agent); siblings != "" {
 		systemPrompt += "\n\n" + siblings
 	}
+	if tools := BuildToolsPromptSection(agent); tools != "" {
+		systemPrompt += "\n\n" + tools
+	}
 	userPrompt := r.buildUserPrompt(instUUID, fromJID, fromName, text, messageType)
 	if strings.TrimSpace(systemPrompt) == "" {
 		systemPrompt = "Você é um assistente de atendimento útil, profissional e objetivo."
@@ -111,19 +114,63 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 
 	// Multi-agente: detecta marcador [[handoff:role]], pina sibling em
 	// ConversationAgentState e remove o token da resposta visível.
+	var convForActions models.Conversation
+	convForActionsLoaded := false
 	{
-		var conv models.Conversation
 		if err := r.db.Where("instance_id = ? AND channel_key = ?", instUUID, fromJID).
 			Where("status IN ?", []models.ConversationStatus{
 				models.ConversationStatusOpen,
 				models.ConversationStatusPending,
 				models.ConversationStatusSnoozed,
 			}).
-			Order("updated_at DESC").First(&conv).Error; err == nil {
-			reply = r.detectAndApplyHandoff(agent, &conv, reply)
+			Order("updated_at DESC").First(&convForActions).Error; err == nil {
+			reply = r.detectAndApplyHandoff(agent, &convForActions, reply)
+			convForActionsLoaded = true
 		} else {
 			reply = handoffMarkerRe.ReplaceAllString(reply, "")
 			reply = strings.TrimSpace(reply)
+		}
+		if reply == "" {
+			return false
+		}
+	}
+
+	// Ações nativas: marker [[action:NAME({...})]]. ParseAndExecuteActions
+	// despacha tools (add_tag, note, create_task, schedule_meeting,
+	// transfer_to_human) respeitando ActionConfirmation e devolve a reply
+	// já sem markers.
+	{
+		toolCtx := AgentToolContext{
+			DB:           r.db,
+			Agent:        agent,
+			Conversation: &convForActions,
+		}
+		if convForActionsLoaded {
+			toolCtx.WorkspaceID = convForActions.WorkspaceID
+		}
+		if convForActionsLoaded && convForActions.ContactID != nil {
+			var contact models.Contact
+			if err := r.db.First(&contact, "id = ?", *convForActions.ContactID).Error; err == nil {
+				toolCtx.Contact = &contact
+			}
+		}
+		// Resolve user dono da instância pra rastreabilidade.
+		var inst models.Instance
+		if err := r.db.Select("id, user_id, workspace_id").First(&inst, "id = ?", instUUID).Error; err == nil {
+			toolCtx.CreatedByID = inst.UserID
+			if toolCtx.WorkspaceID == uuid.Nil && inst.WorkspaceID != nil {
+				toolCtx.WorkspaceID = *inst.WorkspaceID
+			}
+		}
+		var results []AgentToolResult
+		reply, results = ParseAndExecuteActions(toolCtx, reply)
+		for _, res := range results {
+			log.Info().
+				Str("tool", res.Tool).
+				Bool("ok", res.OK).
+				Str("detail", res.Detail).
+				Str("agent", agent.AgentName).
+				Msg("agent-runtime: tool executada")
 		}
 		if reply == "" {
 			return false
@@ -828,4 +875,13 @@ func atoiSafe(s string) (int, error) {
 		n = n*10 + int(c-'0')
 	}
 	return n, nil
+}
+
+// derefUUID — devolve uuid.Nil quando ptr é nil. Usado pra evitar panic
+// em conversation.WorkspaceID e similares.
+func derefUUID(p *uuid.UUID) uuid.UUID {
+	if p == nil {
+		return uuid.Nil
+	}
+	return *p
 }
