@@ -17,7 +17,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Sparkles, Mic2, MessageSquare, AlertTriangle, Plus, Loader2,
-  CheckCircle2, ArrowUpRight, Info,
+  CheckCircle2, ArrowUpRight, Info, RefreshCw,
 } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 import { toast } from "sonner";
@@ -58,10 +58,14 @@ export default function UsagePage() {
     }
   }, [searchParams, qc, router]);
 
-  const { data: view, isLoading } = useQuery<UsageView>({
+  const { data: view, isLoading, error, refetch } = useQuery<UsageView>({
     queryKey: ["usage", "me"],
     queryFn: () => usageApi.me().then(r => r.data),
     refetchInterval: 30_000,
+    // Sem retry agressivo: se o endpoint falhar (401/500), mostramos
+    // o erro logo. Antes a página ficava infinitamente em "Carregando…"
+    // porque `isLoading || !view` é true mesmo após 3 retries falhados.
+    retry: 1,
   });
 
   const { data: timeseries } = useQuery<{ items: UsageTimeseriesPoint[] }>({
@@ -86,12 +90,51 @@ export default function UsagePage() {
     onError: () => toast.error("Falha ao atualizar"),
   });
 
-  if (isLoading || !view) {
+  if (isLoading) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6">
         <ModuleHeader title="Consumo" subtitle="Carregando…" icon={Sparkles} />
         <div className="flex justify-center py-20">
           <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--text-3)" }} />
+        </div>
+      </div>
+    );
+  }
+
+  // Estado de erro — antes a página ficava em loading infinito quando
+  // o endpoint falhava. Agora mostra erro + botão de retentar.
+  if (error || !view) {
+    const msg = (error as any)?.response?.data?.error
+      || (error as any)?.message
+      || "Não foi possível carregar seu consumo agora.";
+    return (
+      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-3xl mx-auto">
+        <ModuleHeader title="Consumo" subtitle="Erro ao carregar" icon={Sparkles} />
+        <div
+          className="rounded-2xl p-6 mt-4 flex items-start gap-4"
+          style={{
+            background: "rgba(239,68,68,0.06)",
+            border: "1px solid rgba(239,68,68,0.25)",
+          }}
+        >
+          <div className="p-2 rounded-lg flex-shrink-0"
+            style={{ background: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.25)" }}>
+            <AlertTriangle className="w-5 h-5" style={{ color: "#ef4444" }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
+              Não foi possível carregar seu consumo
+            </p>
+            <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>{msg}</p>
+            <button
+              onClick={() => refetch()}
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-opacity hover:opacity-90"
+              style={{ background: "var(--green)", color: "var(--green-fg)" }}
+            >
+              <RefreshCw className="w-3 h-3" />
+              Tentar de novo
+            </button>
+          </div>
         </div>
       </div>
     );

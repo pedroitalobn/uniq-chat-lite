@@ -1073,7 +1073,16 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 		MaxContacts       *int     `json:"max_contacts"`
 		MaxDeals          *int     `json:"max_deals"`
 		Features          string   `json:"features"`
+		// Sistema de créditos (Fase 1+) — sem isso o admin não consegue
+		// editar limit/topup/overage do plano: o handler ignorava o
+		// payload e o front via os campos zerarem após save.
+		AICreditsIncludedPerCycle      *int64 `json:"ai_credits_included_per_cycle"`
+		VoiceCreditsIncludedPerCycle   *int64 `json:"voice_credits_included_per_cycle"`
+		MessageCreditsIncludedPerCycle *int64 `json:"message_credits_included_per_cycle"`
+		OverageAllowedDefault          *bool  `json:"overage_allowed_default"`
+		OverageMillicentsPerCredit     *int64 `json:"overage_millicents_per_credit"`
 		AllowAI           *bool    `json:"allow_ai"`
+		AllowVoice        *bool    `json:"allow_voice"`
 		AllowJourneys     *bool    `json:"allow_journeys"`
 		AllowCRM          *bool    `json:"allow_crm"`
 		AllowInbox        *bool    `json:"allow_inbox"`
@@ -1082,10 +1091,14 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 		AllowWarmup       *bool    `json:"allow_warmup"`
 		AllowNewsletters  *bool    `json:"allow_newsletters"`
 		AllowCommunities  *bool    `json:"allow_communities"`
+		AllowWhatsAppQR   *bool    `json:"allow_whatsapp_qr"`
+		AllowWABA         *bool    `json:"allow_waba"`
 		AllowInstagram    *bool    `json:"allow_instagram"`
 		AllowTikTok       *bool    `json:"allow_tiktok"`
 		AllowAPIAccess    *bool    `json:"allow_api_access"`
 		AllowGlobalWebhook *bool   `json:"allow_global_webhook"`
+		AllowHelpDesk     *bool    `json:"allow_helpdesk"`
+		AllowWebChat      *bool    `json:"allow_webchat"`
 		AllowProxy        *bool    `json:"allow_proxy"`
 		AllowProxyResidencial *bool `json:"allow_proxy_residencial"`
 		AllowShop         *bool    `json:"allow_shop"`
@@ -1148,9 +1161,28 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 	if req.MaxDeals != nil {
 		updates["max_deals"] = *req.MaxDeals
 	}
+	// Sistema de créditos — limites + overage por ciclo
+	if req.AICreditsIncludedPerCycle != nil {
+		updates["ai_credits_included_per_cycle"] = *req.AICreditsIncludedPerCycle
+	}
+	if req.VoiceCreditsIncludedPerCycle != nil {
+		updates["voice_credits_included_per_cycle"] = *req.VoiceCreditsIncludedPerCycle
+	}
+	if req.MessageCreditsIncludedPerCycle != nil {
+		updates["message_credits_included_per_cycle"] = *req.MessageCreditsIncludedPerCycle
+	}
+	if req.OverageAllowedDefault != nil {
+		updates["overage_allowed_default"] = *req.OverageAllowedDefault
+	}
+	if req.OverageMillicentsPerCredit != nil {
+		updates["overage_millicents_per_credit"] = *req.OverageMillicentsPerCredit
+	}
 	// Feature flags (pointer pra distinguir false explícito de não-enviado)
 	if req.AllowAI != nil {
 		updates["allow_ai"] = *req.AllowAI
+	}
+	if req.AllowVoice != nil {
+		updates["allow_voice"] = *req.AllowVoice
 	}
 	if req.AllowJourneys != nil {
 		updates["allow_journeys"] = *req.AllowJourneys
@@ -1176,6 +1208,12 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 	if req.AllowCommunities != nil {
 		updates["allow_communities"] = *req.AllowCommunities
 	}
+	if req.AllowWhatsAppQR != nil {
+		updates["allow_whatsapp_qr"] = *req.AllowWhatsAppQR
+	}
+	if req.AllowWABA != nil {
+		updates["allow_waba"] = *req.AllowWABA
+	}
 	if req.AllowInstagram != nil {
 		updates["allow_instagram"] = *req.AllowInstagram
 	}
@@ -1187,6 +1225,12 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 	}
 	if req.AllowGlobalWebhook != nil {
 		updates["allow_global_webhook"] = *req.AllowGlobalWebhook
+	}
+	if req.AllowHelpDesk != nil {
+		updates["allow_helpdesk"] = *req.AllowHelpDesk
+	}
+	if req.AllowWebChat != nil {
+		updates["allow_webchat"] = *req.AllowWebChat
 	}
 	if req.AllowProxy != nil {
 		updates["allow_proxy"] = *req.AllowProxy
