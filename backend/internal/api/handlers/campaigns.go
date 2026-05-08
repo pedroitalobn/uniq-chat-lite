@@ -490,13 +490,23 @@ func (h *CampaignHandler) List(c *fiber.Ctx) error {
 func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 
-	// Plan limit enforcement — antes Free user (MaxCampaigns=0) criava
-	// ilimitadas campanhas e elas rodavam normalmente no scheduler.
-	// MaxCampaigns: -1 = ilimitado, 0 = bloqueado, N = limite.
+	// Plan limit enforcement — checa AllowCampaigns (feature flag) +
+	// MaxCampaigns (cap quantitativo). Combinação esperada:
+	//   AllowCampaigns=false                 → bloqueado (route já barra
+	//                                          via RequireFeature, mas
+	//                                          defesa em profundidade).
+	//   AllowCampaigns=true, MaxCampaigns=-1 → ilimitado.
+	//   AllowCampaigns=true, MaxCampaigns=N>0→ até N ativas.
+	//   AllowCampaigns=true, MaxCampaigns=0  → ilimitado (feature ligada
+	//                                          sem cap específico = não
+	//                                          faz sentido ser zero).
+	// Antes: MaxCampaigns=0 retornava plan_does_not_allow_campaigns
+	// MESMO com AllowCampaigns=true — confuso pra plano Business onde
+	// admin liga a feature mas esquece de setar o cap, e bloqueia tudo.
 	if user != nil && user.PlanID != nil {
 		var plan models.Plan
 		if err := h.db.First(&plan, "id = ?", *user.PlanID).Error; err == nil {
-			if plan.MaxCampaigns == 0 {
+			if !plan.AllowCampaigns {
 				return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
 					"error":   "plan_does_not_allow_campaigns",
 					"message": "seu plano não permite criar campanhas — faça upgrade",
