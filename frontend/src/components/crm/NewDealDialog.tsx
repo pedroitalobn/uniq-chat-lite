@@ -13,6 +13,8 @@ import { crmApi, companiesApi, dealsApi, customFieldsApi } from "@/lib/api";
 import { MemberOptionPicker } from "@/components/crm/FunnelStagePicker";
 import type { KanbanStage } from "./KanbanBoard";
 import { CustomFieldsRenderer, type CustomFieldsValue } from "./CustomFieldsRenderer";
+import { useIsMobile } from "@/hooks/useMediaQuery";
+import { BottomSheet } from "@/components/mobile/BottomSheet";
 
 // Estilos compartilhados pra inputs/selects/textarea — usados via spread.
 // Antes era styled-jsx, mas o scoping causava confusão dentro dos pickers.
@@ -173,45 +175,11 @@ export function NewDealDialog({
 
   const sortedStages = useMemo(() => [...stages].sort((a, b) => a.order - b.order), [stages]);
   const canSave = !!title.trim() && !!contactId && !!stageId && !!funnel;
+  const isMobile = useIsMobile();
 
-  return (
-    <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center p-0 md:p-4">
-      {/* Backdrop — clicar fecha. */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-
-      <div
-        className="relative w-full md:max-w-xl rounded-t-2xl md:rounded-2xl flex flex-col"
-        style={{
-          background: "var(--surface-solid)",
-          border: "1px solid var(--surface-border)",
-          maxHeight: "90dvh",
-          boxShadow: "0 24px 48px rgba(0,0,0,0.55)",
-        }}
-      >
-        {/* Header */}
-        <div
-          className="flex items-start justify-between px-5 py-4 border-b flex-shrink-0"
-          style={{ borderColor: "var(--surface-border)" }}
-        >
-          <div>
-            <h2 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>Novo deal</h2>
-            <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
-              Funil: <span style={{ color: "var(--text-2)" }}>{funnel?.name ?? "—"}</span>
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Fechar"
-            className="p-2 rounded-lg hover:bg-white/5"
-            style={{ color: "var(--text-3)" }}
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+  const formBody = (
+    <>
+        <div className="px-5 py-4 space-y-4">
           <Field label="Título do deal *">
             <input
               value={title}
@@ -347,6 +315,53 @@ export function NewDealDialog({
             {create.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             Criar deal
           </button>
+        </div>
+    </>
+  );
+
+  // Mobile: BottomSheet (drag-to-dismiss, animação spring, safe-area).
+  if (isMobile) {
+    return (
+      <BottomSheet open onClose={onClose} title={`Novo deal — ${funnel?.name ?? ""}`} maxHeight="92vh">
+        {formBody}
+      </BottomSheet>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="relative w-full max-w-xl rounded-2xl flex flex-col overflow-hidden"
+        style={{
+          background: "var(--surface-solid)",
+          border: "1px solid var(--surface-border)",
+          maxHeight: "90dvh",
+          boxShadow: "0 24px 48px rgba(0,0,0,0.55)",
+        }}
+      >
+        <div
+          className="flex items-start justify-between px-5 py-4 border-b flex-shrink-0"
+          style={{ borderColor: "var(--surface-border)" }}
+        >
+          <div>
+            <h2 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>Novo deal</h2>
+            <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
+              Funil: <span style={{ color: "var(--text-2)" }}>{funnel?.name ?? "—"}</span>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar"
+            className="p-2 rounded-lg hover:bg-white/5"
+            style={{ color: "var(--text-3)" }}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {formBody}
         </div>
       </div>
     </div>

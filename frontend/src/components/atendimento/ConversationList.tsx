@@ -2,8 +2,16 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
+import { Virtuoso } from "react-virtuoso";
 import { MessageCircle, Pencil, Users as UsersIcon, UserCheck, Archive as ArchiveIcon, CheckCheck as CheckCheckIcon } from "lucide-react";
 import { SwipeRow } from "@/components/mobile/SwipeRow";
+import { useLongPress } from "@/hooks/useLongPress";
+import { QuickActionMenu, type QuickAction } from "@/components/mobile/QuickActionMenu";
+
+// Acima desse total a lista vira virtualizada (Virtuoso). Para listas
+// pequenas o overhead do Virtuoso (medição + measure cells) custa mais
+// que renderizar tudo direto.
+const VIRTUALIZE_THRESHOLD = 60;
 
 export interface ConversationRow {
   id: string;
@@ -257,6 +265,8 @@ export function ConversationList({
   onRenameContact,
   onArchive,
   onMarkRead,
+  scrollParent,
+  onLongPressActions,
 }: {
   items: ConversationRow[];
   isLoading?: boolean;
@@ -281,6 +291,15 @@ export function ConversationList({
   onArchive?: (conv: ConversationRow) => void;
   /** Swipe-to-mark-read em mobile (direita revela "Lida"). */
   onMarkRead?: (conv: ConversationRow) => void;
+  /** Quando virtualiza (>= VIRTUALIZE_THRESHOLD) e a lista está embutida em
+   *  outro container scrollável (ex: PullToRefresh), passar aqui o elemento
+   *  que rola — Virtuoso usa como customScrollParent ao invés de criar o
+   *  próprio scroller (evita conflito de nested scroll). */
+  scrollParent?: HTMLElement | null;
+  /** Long-press numa row abre menu de ações rápidas (estilo iOS context menu).
+   *  Caller decide quais ações expor por linha — comum: marcar lida, arquivar,
+   *  abrir contato, atribuir, mudar prioridade. Não passar = sem menu. */
+  onLongPressActions?: (conv: ConversationRow) => QuickAction[];
 }) {
   if (isLoading) {
     return (
@@ -329,9 +348,15 @@ export function ConversationList({
     setEditingId(null);
   };
 
-  return (
-    <ul>
-      {items.map((conv) => {
+  // Long-press menu — estado compartilhado entre todas as rows. Só uma row
+  // pode estar com menu aberto por vez. anchor.x/y é a posição do dedo.
+  const [pressMenu, setPressMenu] = useState<{
+    conv: ConversationRow;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const renderRow = (conv: ConversationRow) => {
         const status = STATUS_STYLES[conv.status] ?? STATUS_STYLES.open;
         const isSelected = selectedId === conv.id;
         const isGroup = isGroupChannelKey(conv.channel_key);
@@ -528,44 +553,127 @@ export function ConversationList({
             )}
           </div>
         );
-        return (
-          <li
-            key={conv.id}
-            style={{
-              borderBottom: "1px solid var(--border-default)",
-            }}
-            className="hover:bg-white/5"
-          >
-            {(onArchive || onMarkRead) ? (
-              <SwipeRow
-                rightActions={onArchive ? [{
-                  id: "archive",
-                  label: "Arquivar",
-                  icon: ArchiveIcon,
-                  color: "#475569",
-                  onAction: () => onArchive(conv),
-                }] : []}
-                leftActions={onMarkRead && conv.agent_unread_count > 0 ? [{
-                  id: "read",
-                  label: "Lida",
-                  icon: CheckCheckIcon,
-                  color: "#00d46a",
-                  textColor: "#0a0a14",
-                  onAction: () => onMarkRead(conv),
-                }] : []}
-              >
-                <Link href={href} className="block" scroll={false}>
-                  {rowInner}
-                </Link>
-              </SwipeRow>
-            ) : (
-              <Link href={href} className="block" scroll={false}>
-                {rowInner}
-              </Link>
-            )}
-          </li>
+        const linkEl = (
+          <Link href={href} className="block" scroll={false}>
+            {rowInner}
+          </Link>
         );
-      })}
-    </ul>
+        const swipeOrLink = (onArchive || onMarkRead) ? (
+          <SwipeRow
+            rightActions={onArchive ? [{
+              id: "archive",
+              label: "Arquivar",
+              icon: ArchiveIcon,
+              color: "#475569",
+              onAction: () => onArchive(conv),
+            }] : []}
+            leftActions={onMarkRead && conv.agent_unread_count > 0 ? [{
+              id: "read",
+              label: "Lida",
+              icon: CheckCheckIcon,
+              color: "#00d46a",
+              textColor: "#0a0a14",
+              onAction: () => onMarkRead(conv),
+            }] : []}
+          >
+            {linkEl}
+          </SwipeRow>
+        ) : linkEl;
+        return (
+          <LongPressRow
+            key={conv.id}
+            enabled={!!onLongPressActions}
+            onTrigger={(x, y) => setPressMenu({ conv, x, y })}
+          >
+            {swipeOrLink}
+          </LongPressRow>
+        );
+  };
+
+  // Virtualiza apenas quando a lista é grande — evita custo de medição
+  // pra listas pequenas que cabem no viewport.
+  const menu = onLongPressActions ? (
+    <QuickActionMenu
+      anchor={pressMenu ? { x: pressMenu.x, y: pressMenu.y } : null}
+      onClose={() => setPressMenu(null)}
+      items={pressMenu ? onLongPressActions(pressMenu.conv) : []}
+    />
+  ) : null;
+
+  if (items.length >= VIRTUALIZE_THRESHOLD) {
+    return (
+      <>
+        <Virtuoso
+          data={items}
+          style={scrollParent ? undefined : { height: "100%" }}
+          customScrollParent={scrollParent ?? undefined}
+          itemContent={(_idx, conv) => renderRow(conv)}
+          computeItemKey={(_idx, conv) => conv.id}
+          increaseViewportBy={{ top: 400, bottom: 600 }}
+        />
+        {menu}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div>{items.map((conv) => renderRow(conv))}</div>
+      {menu}
+    </>
+  );
+}
+
+// LongPressRow — wrapper que aplica useLongPress numa row. Extraído pra
+// componente próprio porque hooks não podem ser chamados em loop. Quando
+// disabled passa pelos children direto sem overhead. O `style: borderBottom`
+// e o hover ficam aqui pra a row inteira ter o look correto.
+function LongPressRow({
+  enabled,
+  onTrigger,
+  children,
+}: {
+  enabled: boolean;
+  onTrigger: (x: number, y: number) => void;
+  children: React.ReactNode;
+}) {
+  const longPress = useLongPress((x, y) => onTrigger(x, y), 480);
+  // Quando enabled=false, evita o overhead de attachar 8 listeners por row.
+  if (!enabled) {
+    return (
+      <div
+        style={{ borderBottom: "1px solid var(--border-default)" }}
+        className="hover:bg-white/5"
+      >
+        {children}
+      </div>
+    );
+  }
+  return (
+    <div
+      style={{ borderBottom: "1px solid var(--border-default)" }}
+      className="hover:bg-white/5"
+      onTouchStart={longPress.onTouchStart}
+      onTouchMove={longPress.onTouchMove}
+      onTouchEnd={(e) => {
+        longPress.onTouchEnd();
+        // Se o long-press disparou, previne o click default (que abriria a
+        // conversa via Link) — usuário só queria o menu.
+        if (longPress.wasTriggered()) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
+      onTouchCancel={longPress.onTouchCancel}
+      onClickCapture={(e) => {
+        // Mesmo no desktop (mouseup), previne click se o press foi longo.
+        if (longPress.wasTriggered()) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
+    >
+      {children}
+    </div>
   );
 }

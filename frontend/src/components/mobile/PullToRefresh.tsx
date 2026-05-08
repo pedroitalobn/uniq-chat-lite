@@ -17,13 +17,23 @@ export function PullToRefresh({
   children,
   threshold = 80,
   className,
+  onScrollerReady,
 }: {
   onRefresh: () => Promise<void> | void;
   children: React.ReactNode;
   threshold?: number;
   className?: string;
+  /** Callback chamado uma vez assim que o div interno scrollável é montado.
+   *  Usado por listas virtualizadas (Virtuoso) que precisam apontar pro
+   *  elemento real de scroll quando estão embutidas no PullToRefresh —
+   *  passar ao caller via setState força re-render com a referência. */
+  onScrollerReady?: (el: HTMLDivElement | null) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (onScrollerReady) onScrollerReady(ref.current);
+    return () => { if (onScrollerReady) onScrollerReady(null); };
+  }, [onScrollerReady]);
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const startY = useRef<number | null>(null);

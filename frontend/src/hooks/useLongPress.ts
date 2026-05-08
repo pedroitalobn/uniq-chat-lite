@@ -12,7 +12,7 @@ import { useCallback, useRef } from "react";
 import { haptic } from "@/lib/haptics";
 
 export function useLongPress(
-  onLongPress: () => void,
+  onLongPress: (x: number, y: number) => void,
   ms = 500,
 ) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -33,7 +33,7 @@ export function useLongPress(
     timer.current = setTimeout(() => {
       triggered.current = true;
       haptic.warning(); // pulso forte indica "menu disponível"
-      onLongPress();
+      onLongPress(x, y);
     }, ms);
   }, [onLongPress, ms]);
 

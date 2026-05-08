@@ -211,6 +211,11 @@ function InboxPage() {
   };
 
   const seenConvsRef = useRef<Set<string>>(new Set());
+  // Scroller real da lista de conversas (PullToRefresh interno) — usado pelo
+  // Virtuoso como customScrollParent quando a lista é grande o bastante pra
+  // virar virtualizada (>= 60 itens). useState pra forçar re-render quando o
+  // PullToRefresh expõe seu div, senão o Virtuoso renderiza sem scroller.
+  const [listScroller, setListScroller] = useState<HTMLDivElement | null>(null);
   // Guarda o last_message_at por conversa para detectar nova mensagem em conversa existente.
   const convLastMsgRef = useRef<Map<string, string>>(new Map());
   const seenInitializedRef = useRef(false);
@@ -941,6 +946,7 @@ function InboxPage() {
               comporta-se como um div normal de scroll. */}
           <PullToRefresh
             className="flex-1 uniq-no-bounce"
+            onScrollerReady={setListScroller}
             onRefresh={async () => {
               await Promise.all([listQ.refetch(), statsQ.refetch()]);
             }}
@@ -983,6 +989,50 @@ function InboxPage() {
                 }}
                 onArchive={isMobile ? (conv) => archiveMut.mutate(conv.id) : undefined}
                 onMarkRead={isMobile ? (conv) => markReadMut.mutate(conv.id) : undefined}
+                scrollParent={listScroller}
+                onLongPressActions={isMobile ? (conv) => {
+                  // Menu rápido estilo iOS — mesmas ações do swipe + abrir
+                  // contato e copiar telefone. Atalho pra quem prefere
+                  // pressionar e segurar ao invés de arrastar.
+                  const actions = [];
+                  if (conv.agent_unread_count > 0) {
+                    actions.push({
+                      id: "read",
+                      label: "Marcar como lida",
+                      icon: Check,
+                      onSelect: () => markReadMut.mutate(conv.id),
+                    });
+                  }
+                  if (conv.contact?.id) {
+                    actions.push({
+                      id: "open-contact",
+                      label: "Abrir contato no CRM",
+                      icon: UserCircle2,
+                      onSelect: () => router.push(`/crm/contacts/${conv.contact!.id}`),
+                    });
+                  }
+                  const phone = conv.contact?.phone;
+                  if (phone) {
+                    actions.push({
+                      id: "copy-phone",
+                      label: "Copiar telefone",
+                      hint: phone,
+                      icon: Phone,
+                      onSelect: () => {
+                        navigator.clipboard.writeText(phone).catch(() => {});
+                        toast.success("Telefone copiado");
+                      },
+                    });
+                  }
+                  actions.push({
+                    id: "archive",
+                    label: "Arquivar conversa",
+                    icon: X,
+                    destructive: true,
+                    onSelect: () => archiveMut.mutate(conv.id),
+                  });
+                  return actions;
+                } : undefined}
               />
             )}
           </PullToRefresh>

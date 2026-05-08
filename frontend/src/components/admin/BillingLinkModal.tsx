@@ -16,6 +16,8 @@ import { adminApi } from "@/lib/api";
 import { CreditCard, Copy, Check, ExternalLink, Loader2, Mail, X } from "lucide-react";
 import { toast } from "sonner";
 import type { Plan, User } from "@/types";
+import { useIsMobile } from "@/hooks/useMediaQuery";
+import { BottomSheet } from "@/components/mobile/BottomSheet";
 
 type Result = {
   action: "checkout_link" | "subscription_updated";
@@ -72,29 +74,10 @@ export function BillingLinkModal({ user, onClose }: { user: User; onClose: () =>
     }
   };
 
-  return (
-    <div
-      className="fixed inset-0 z-[120] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.6)" }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-2xl p-5 space-y-4"
-        style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CreditCard className="w-4 h-4" style={{ color: "var(--green)" }} />
-            <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
-              Cobrar / trocar plano
-            </h3>
-          </div>
-          <button onClick={onClose} style={{ color: "var(--text-3)" }}>
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+  const isMobile = useIsMobile();
 
+  const body = (
+    <div className="space-y-4">
         <div className="rounded-lg p-3 text-xs" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
           <p style={{ color: "var(--text-2)" }}>
             Para <strong>{user.name}</strong>
@@ -179,7 +162,7 @@ export function BillingLinkModal({ user, onClose }: { user: User; onClose: () =>
           </div>
         )}
 
-        {result && result.action === "checkout_link" && result.url && (
+      {result && result.action === "checkout_link" && result.url && (
           <div className="space-y-3">
             <div className="rounded-xl p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
               <p className="text-[11px] uppercase tracking-wider mb-1" style={{ color: "var(--text-3)" }}>
@@ -227,6 +210,42 @@ export function BillingLinkModal({ user, onClose }: { user: User; onClose: () =>
             </div>
           </div>
         )}
+    </div>
+  );
+
+  // Em mobile vira bottom sheet (slide up + drag-to-dismiss + safe-area).
+  // Em desktop mantém o overlay centralizado tradicional.
+  if (isMobile) {
+    return (
+      <BottomSheet open onClose={onClose} title="Cobrar / trocar plano">
+        <div className="px-5 pt-3 pb-2">{body}</div>
+      </BottomSheet>
+    );
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[120] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.6)" }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md rounded-2xl p-5"
+        style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <CreditCard className="w-4 h-4" style={{ color: "var(--green)" }} />
+            <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
+              Cobrar / trocar plano
+            </h3>
+          </div>
+          <button onClick={onClose} style={{ color: "var(--text-3)" }}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        {body}
       </div>
     </div>
   );
