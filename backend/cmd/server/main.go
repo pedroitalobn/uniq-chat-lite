@@ -564,11 +564,14 @@ func seedPlans(db *gorm.DB) {
 			MaxMessagesPerDay:     100,
 			MaxUsers:              3,
 			MaxWorkspaces:         1,
-			Features:              `{"whatsapp":true,"instagram":false,"crm":true,"campaigns":false,"integrations":false,"api":false,"webhooks":false,"mcp":false,"description":"Para pequenos negócios","stripe_price_id":"price_1TFmWyGKxdRCOZrXWqqZU28y"}`,
+			Features:              `{"whatsapp":true,"instagram":false,"crm":true,"campaigns":false,"integrations":false,"api":false,"webhooks":false,"mcp":false,"description":"Para pequenos negócios"}`,
 			AllowProxy:            false,
 			AllowProxyResidencial: false,
 			IsActive:              true,
-			StripePriceID:         "price_1TFmWyGKxdRCOZrXWqqZU28y",
+			// StripePriceID lido de STRIPE_PRICE_STARTER abaixo via setPriceID.
+			// Antes ficava hardcoded num price antigo (price_1TFmWy...) que
+			// sobreviveu pra rows existentes mesmo após o admin trocar o env.
+			StripePriceID:         os.Getenv("STRIPE_PRICE_STARTER"),
 		},
 		{
 			Name:                  "Pro",
@@ -619,14 +622,30 @@ func seedPlans(db *gorm.DB) {
 		db.Where("name = 'Enterprise'").Delete(&models.Plan{})
 	}
 
-	// Inject Stripe Price IDs from environment if set
-	setPriceID := func(planName, envKey string) {
-		if priceID := os.Getenv(envKey); priceID != "" {
-			db.Model(&models.Plan{}).Where("name = ?", planName).Update("stripe_price_id", priceID)
+	// Self-heal: se Starter ainda tem o price antigo hardcoded de quando
+	// estava no seed, limpa pra que o env/UI possam preencher na sequência.
+	// Idempotente — só roda se a row ainda tem o price legado.
+	db.Model(&models.Plan{}).
+		Where("name = 'Starter' AND stripe_price_id = 'price_1TFmWyGKxdRCOZrXWqqZU28y'").
+		Update("stripe_price_id", "")
+
+	// Inject Stripe Price IDs from environment SOMENTE quando a row DB
+	// estiver vazia. UI do admin é fonte da verdade — antes esse loop
+	// sobrescrevia toda boot, o que apagava o que o admin tinha salvo
+	// (e travava o checkout pra quem usava UI em vez de env).
+	// Prioridade efetiva agora: UI/DB > env > vazio.
+	setPriceIDIfEmpty := func(planName, envKey string) {
+		priceID := os.Getenv(envKey)
+		if priceID == "" {
+			return
 		}
+		db.Model(&models.Plan{}).
+			Where("name = ? AND (stripe_price_id IS NULL OR stripe_price_id = '')", planName).
+			Update("stripe_price_id", priceID)
 	}
-	setPriceID("Pro", "STRIPE_PRICE_PRO")
-	setPriceID("Business", "STRIPE_PRICE_BUSINESS")
+	setPriceIDIfEmpty("Starter", "STRIPE_PRICE_STARTER")
+	setPriceIDIfEmpty("Pro", "STRIPE_PRICE_PRO")
+	setPriceIDIfEmpty("Business", "STRIPE_PRICE_BUSINESS")
 }
 
 // applyTicketingIndexes installs the partial unique index and hot-path
