@@ -1197,6 +1197,30 @@ func (h *CampaignHandler) processCampaignWABA(c models.Campaign, today string) {
 		return
 	}
 
+	// Busca a definição do template na Meta uma única vez no início do
+	// envio. Sem isso a gente chuta o tipo de header pela extensão da URL,
+	// e Meta retorna 132012 ("expected IMAGE, received UNKNOWN") quando o
+	// chute não bate. Fetch falhar não bloqueia o envio — segue com a
+	// heurística antiga, mas loga warn pra ajudar debug.
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	tplDef, tplErr := FetchWABATemplate(ctx, &waba, c.TemplateName, c.TemplateLanguage)
+	cancel()
+	if tplErr != nil {
+		log.Warn().Err(tplErr).Str("campaign", c.ID.String()).Str("template", c.TemplateName).
+			Msg("campaign WABA: não consegui buscar template — seguindo com heurística")
+	} else if tplDef.IsMediaHeader() && c.TemplateHeaderURL == "" {
+		// Falha cedo: template requer mídia mas a campanha não tem URL
+		// configurada. Sem isso Meta retorna o erro críptico 132012 e cada
+		// recipient vira "failed" — vamos parar tudo logo no início.
+		errMsg := fmt.Sprintf("Template %q requer header %s, mas a campanha não tem URL de mídia configurada. Edite a campanha e adicione a URL.",
+			c.TemplateName, tplDef.HeaderFormat)
+		log.Warn().Str("campaign", c.ID.String()).Msg(errMsg)
+		h.db.Model(&c).Updates(map[string]any{
+			"status": models.CampaignStatusFailed,
+		})
+		return
+	}
+
 	// Parse template_variables: { "1": "{{contact.name}}", "2": "PROMO20", ... }
 	var varMap map[string]string
 	_ = json.Unmarshal([]byte(c.TemplateVariables), &varMap)
@@ -1262,14 +1286,21 @@ func (h *CampaignHandler) processCampaignWABA(c models.Campaign, today string) {
 		components := []map[string]any{}
 		if c.TemplateHeaderURL != "" {
 			headerURL := templatesvc.MustRender(c.TemplateHeaderURL, liquidVars)
-			// Detecta tipo de header pela extensão da URL (heurística simples)
+			// Tipo de header: prefere a definição vinda do Meta (fonte da
+			// verdade — o template foi APROVADO com aquele formato).
+			// Cair pra heurística da extensão é fallback pra quando
+			// FetchWABATemplate falha por timeout/credenciais.
 			headerType := "image"
-			low := strings.ToLower(headerURL)
-			switch {
-			case strings.HasSuffix(low, ".mp4"), strings.HasSuffix(low, ".3gp"):
-				headerType = "video"
-			case strings.HasSuffix(low, ".pdf"):
-				headerType = "document"
+			if tplDef != nil && tplDef.IsMediaHeader() {
+				headerType = tplDef.HeaderParameterType()
+			} else {
+				low := strings.ToLower(headerURL)
+				switch {
+				case strings.HasSuffix(low, ".mp4"), strings.HasSuffix(low, ".3gp"):
+					headerType = "video"
+				case strings.HasSuffix(low, ".pdf"):
+					headerType = "document"
+				}
 			}
 			components = append(components, map[string]any{
 				"type": "header",
