@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner";
 import type { Plan } from "@/types";
 import { cn } from "@/lib/utils";
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 
 interface EditState {
   name: string;
@@ -151,6 +152,18 @@ function HighlightsEditor({ highlights, onChange }: { highlights: string[]; onCh
   };
   const remove = (i: number) => onChange(highlights.filter((_, idx) => idx !== i));
   const add = () => onChange([...highlights, ""]);
+  // Drag-to-reorder: o GripVertical era só decorativo antes — não dava
+  // pra reordenar. Agora usa @hello-pangea/dnd (já no bundle pra
+  // contatos/deals) com chave instável (idx + valor) pra evitar
+  // colisão quando dois itens têm texto vazio recém-adicionado.
+  const onDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    if (result.destination.index === result.source.index) return;
+    const next = [...highlights];
+    const [moved] = next.splice(result.source.index, 1);
+    next.splice(result.destination.index, 0, moved);
+    onChange(next);
+  };
 
   return (
     <div>
@@ -167,35 +180,66 @@ function HighlightsEditor({ highlights, onChange }: { highlights: string[]; onCh
           <Plus className="w-3 h-3" /> Adicionar
         </button>
       </div>
-      <div className="space-y-1.5">
-        {highlights.map((item, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <GripVertical className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 28%)" }} />
-            <input
-              type="text"
-              value={item}
-              onChange={(e) => update(i, e.target.value)}
-              placeholder="Ex: 5 instâncias WhatsApp"
-              className="input-field flex-1 text-xs py-1.5"
-            />
-            <button
-              type="button"
-              onClick={() => remove(i)}
-              className="p-1 rounded-lg flex-shrink-0 transition-colors"
-              style={{ color: "hsl(240 8% 35%)" }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#f87171"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "hsl(240 8% 35%)"; }}
+      <DragDropContext onDragEnd={onDragEnd}>
+        <Droppable droppableId="highlights-list">
+          {(dropProvided) => (
+            <div
+              ref={dropProvided.innerRef}
+              {...dropProvided.droppableProps}
+              className="space-y-1.5"
             >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        ))}
-        {highlights.length === 0 && (
-          <p className="text-[11px] text-center py-2" style={{ color: "hsl(240 8% 28%)" }}>
-            Nenhum texto personalizado
-          </p>
-        )}
-      </div>
+              {highlights.map((item, i) => (
+                <Draggable key={`hl-${i}`} draggableId={`hl-${i}`} index={i}>
+                  {(dragProvided, snapshot) => (
+                    <div
+                      ref={dragProvided.innerRef}
+                      {...dragProvided.draggableProps}
+                      className="flex items-center gap-2"
+                      style={{
+                        ...dragProvided.draggableProps.style,
+                        background: snapshot.isDragging ? "rgba(0,212,106,0.05)" : undefined,
+                        borderRadius: snapshot.isDragging ? 8 : 0,
+                      }}
+                    >
+                      <span
+                        {...dragProvided.dragHandleProps}
+                        className="cursor-grab active:cursor-grabbing p-0.5"
+                        style={{ color: "hsl(240 8% 28%)" }}
+                        title="Arraste pra reordenar"
+                      >
+                        <GripVertical className="w-3.5 h-3.5" />
+                      </span>
+                      <input
+                        type="text"
+                        value={item}
+                        onChange={(e) => update(i, e.target.value)}
+                        placeholder="Ex: 5 instâncias WhatsApp"
+                        className="input-field flex-1 text-xs py-1.5"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => remove(i)}
+                        className="p-1 rounded-lg flex-shrink-0 transition-colors"
+                        style={{ color: "hsl(240 8% 35%)" }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#f87171"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "hsl(240 8% 35%)"; }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </Draggable>
+              ))}
+              {dropProvided.placeholder}
+              {highlights.length === 0 && (
+                <p className="text-[11px] text-center py-2" style={{ color: "hsl(240 8% 28%)" }}>
+                  Nenhum texto personalizado
+                </p>
+              )}
+            </div>
+          )}
+        </Droppable>
+      </DragDropContext>
     </div>
   );
 }
