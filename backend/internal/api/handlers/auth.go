@@ -1192,6 +1192,16 @@ func (h *AuthHandler) RegisterStart(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": reason})
 	}
 
+	// Antes de invalidar pendings antigos, busca o último válido pra
+	// HERDAR plan_id/invite quando o request atual veio "vazio" (ex:
+	// click em "Reenviar" sem o frontend mandar de novo). Sem isso o
+	// usuário acabava no /register/verify sendo perguntado de novo qual
+	// plano queria — pergunta redundante.
+	var prior models.PendingRegistration
+	hasPrior := h.db.
+		Where("email = ? AND completed_at IS NULL AND expires_at > ?", req.Email, time.Now().Add(-24*time.Hour)).
+		Order("created_at DESC").First(&prior).Error == nil
+
 	// Invalidate any previous pending registrations for this email
 	h.db.Where("email = ? AND completed_at IS NULL", req.Email).
 		Updates(map[string]interface{}{"expires_at": time.Now().Add(-time.Second)})
@@ -1205,6 +1215,18 @@ func (h *AuthHandler) RegisterStart(c *fiber.Ctx) error {
 	if req.PlanID != "" {
 		if pid, err := uuid.Parse(req.PlanID); err == nil {
 			pending.PlanID = &pid
+		}
+	}
+	// Inherit plan/invite do pending anterior se request atual está vazio.
+	if hasPrior {
+		if pending.PlanID == nil && prior.PlanID != nil {
+			pending.PlanID = prior.PlanID
+		}
+		if pending.InviteCode == "" && prior.InviteCode != "" {
+			pending.InviteCode = prior.InviteCode
+		}
+		if pending.WorkspaceInviteToken == "" && prior.WorkspaceInviteToken != "" {
+			pending.WorkspaceInviteToken = prior.WorkspaceInviteToken
 		}
 	}
 	if err := h.db.Create(&pending).Error; err != nil {

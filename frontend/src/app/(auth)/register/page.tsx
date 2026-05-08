@@ -182,7 +182,7 @@ function StepEmail({
 }
 
 // ── Step 2: Check email ───────────────────────────────────────────────────────
-function StepCheckEmail({ email, onBack }: { email: string; onBack: () => void }) {
+function StepCheckEmail({ email, onBack, planID }: { email: string; onBack: () => void; planID?: string }) {
   const [cooldown, setCooldown] = useState(60);
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
@@ -209,7 +209,11 @@ function StepCheckEmail({ email, onBack }: { email: string; onBack: () => void }
       await fetch(`${API}/v1/auth/register/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        // CRÍTICO: reenviar PRESERVANDO o plano escolhido. Sem isso o
+        // backend criava um novo PendingRegistration vazio (invalidando
+        // o anterior) e o user via "selecione o plano" novamente após
+        // verificar o email — pergunta redundante.
+        body: JSON.stringify({ email, plan_id: planID || undefined }),
       });
       setResent(true);
       startTimer();
@@ -397,7 +401,7 @@ function RegisterContent() {
               <motion.div key="check" custom={dir} variants={slide}
                 initial="enter" animate="center" exit="exit"
                 transition={{ duration: 0.2, ease: "easeInOut" }}>
-                <StepCheckEmail email={email} onBack={goBack} />
+                <StepCheckEmail email={email} onBack={goBack} planID={planID} />
               </motion.div>
             )}
           </AnimatePresence>
