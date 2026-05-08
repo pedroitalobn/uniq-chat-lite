@@ -863,8 +863,10 @@ function InboxPage() {
               </button>
             )}
 
-            {/* Search */}
-            <div className="relative ml-auto">
+            {/* Search — em desktop fica no header com os filtros; em mobile
+                escondemos aqui e renderizamos como barra de busca dedicada
+                no topo da coluna de conversas (logo abaixo do heat strip). */}
+            <div className="relative ml-auto hidden md:block">
               <Search
                 className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5"
                 style={{ color: "hsl(240 8% 38%)" }}
@@ -904,6 +906,49 @@ function InboxPage() {
             borderRight: isMobile ? "none" : "1px solid rgba(255,255,255,0.06)",
           }}
         >
+          {/* Search bar dedicada (mobile) — fica no topo da coluna de chats,
+              full-width, sempre visível mesmo enquanto o user rola a lista.
+              Em desktop a busca já vive no header com os filtros, então aqui
+              renderizamos só em <md. Botão "X" pra limpar quando há texto. */}
+          {isMobile && (
+            <div
+              className="flex items-center gap-2 px-3 py-2.5 flex-shrink-0"
+              style={{
+                background: "rgba(0,0,0,0.20)",
+                borderBottom: "1px solid rgba(255,255,255,0.06)",
+              }}
+            >
+              <div className="relative flex-1">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4"
+                  style={{ color: "hsl(240 8% 50%)" }}
+                />
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Buscar conversas, contatos…"
+                  enterKeyHint="search"
+                  className="w-full rounded-full py-2 pl-10 pr-9 text-[15px] outline-none"
+                  style={{
+                    background: "var(--surface-2)",
+                    border: "1px solid var(--border-default)",
+                    color: "hsl(240 15% 92%)",
+                  }}
+                />
+                {q && (
+                  <button
+                    type="button"
+                    onClick={() => setQ("")}
+                    aria-label="Limpar busca"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full"
+                    style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 8% 65%)" }}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           {/* Urgency heat strip — only when we have conversations */}
           {!listQ.isLoading && list.length > 0 && (() => {
             const now = Date.now();
