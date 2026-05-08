@@ -128,11 +128,18 @@ func (h *CampaignHandler) evaluateCampaign(c *models.Campaign, now time.Time, _ 
 	return ""
 }
 
-// workspaceLocation devolve o time.Location do workspace dono da
-// campanha. Fallback America/Sao_Paulo, depois UTC.
+// workspaceLocation devolve o time.Location pra avaliar agendamento da
+// campanha. Cascade:
+//   1. Campaign.TimeZone (escolha explícita do user no setup) — permite
+//      disparar pra contatos em fuso diferente da conta. Ex: agência em
+//      São Paulo agendando campanha pra clientes em Orlando, escolhe
+//      "America/New_York" e o "10:00" do schedule é horário de Orlando.
+//   2. Workspace.Timezone (default da conta).
+//   3. America/Sao_Paulo.
+//   4. UTC.
 func (h *CampaignHandler) workspaceLocation(c *models.Campaign) *time.Location {
-	tzName := ""
-	if c.WorkspaceID != nil {
+	tzName := strings.TrimSpace(c.TimeZone)
+	if tzName == "" && c.WorkspaceID != nil {
 		var ws models.Workspace
 		if err := h.db.Select("timezone").First(&ws, "id = ?", c.WorkspaceID).Error; err == nil && ws.Timezone != "" {
 			tzName = ws.Timezone
@@ -552,6 +559,7 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		TimesTotal    int        `json:"times_total"`
 		TimesPerDay   int        `json:"times_per_day"`
 		ScheduleHours string     `json:"schedule_hours"`
+		TimeZone      string     `json:"time_zone"`
 		// Safety / rate limiting
 		DelaySeconds         int `json:"delay_seconds"`
 		DelayMinSeconds      int `json:"delay_min_seconds"`
@@ -700,6 +708,7 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		TimesTotal:           timesTotal,
 		TimesPerDay:          timesPerDay,
 		ScheduleHours:        schedHours,
+		TimeZone:             strings.TrimSpace(req.TimeZone),
 		DelaySeconds:         delay,
 		DelayMinSeconds:      delayMin,
 		DelayMaxSeconds:      delayMax,

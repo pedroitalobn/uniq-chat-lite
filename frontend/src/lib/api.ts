@@ -1037,6 +1037,7 @@ export const campaignsApi = {
     times_total?: number;
     times_per_day?: number;
     schedule_hours?: string;
+    time_zone?: string;
     delay_seconds?: number;
     delay_min_seconds?: number;
     delay_max_seconds?: number;

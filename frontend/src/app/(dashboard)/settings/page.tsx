@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import QRCode from "qrcode";
 import { authApi, plansApi, workspacesApi } from "@/lib/api";
-import { usePreferences, TIMEZONES, type Language, type ThemeMode } from "@/lib/preferences";
+import { usePreferences, type Language, type ThemeMode } from "@/lib/preferences";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import {
@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Plan } from "@/types";
 import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
+import { TimezonePicker } from "@/components/ui/TimezonePicker";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Section = "billing" | "profile" | "security" | "preferences" | "account" | "invites";
@@ -675,14 +676,7 @@ function PreferencesSection({ t }: { t: (k: string) => string }) {
             </Field>
 
             <Field label={`${t("settings_timezone")} (exibição)`}>
-              <div className="relative">
-                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "var(--text-3)" }} />
-                <select value={timezone} onChange={(e) => setTimezone(e.target.value)} className="input-field w-full pl-9">
-                  {TIMEZONES.map((tz) => (
-                    <option key={tz.value} value={tz.value}>{tz.label}</option>
-                  ))}
-                </select>
-              </div>
+              <TimezonePicker value={timezone} onChange={setTimezone} />
               <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
                 Aplicado só na sua interface (datas, horários listados). Não afeta agendamento de campanhas.
               </p>
@@ -690,23 +684,16 @@ function PreferencesSection({ t }: { t: (k: string) => string }) {
 
             {currentWorkspace && (
               <Field label="Timezone do workspace (agendamentos)">
-                <div className="relative">
-                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: "var(--text-3)" }} />
-                  <select
-                    value={pendingWsTz}
-                    onChange={(e) => setPendingWsTz(e.target.value)}
-                    disabled={!canEditWorkspace}
-                    className="input-field w-full pl-9 disabled:opacity-60"
-                  >
-                    {TIMEZONES.map((tz) => (
-                      <option key={tz.value} value={tz.value}>{tz.label}</option>
-                    ))}
-                  </select>
-                </div>
+                {canEditWorkspace ? (
+                  <TimezonePicker value={pendingWsTz} onChange={setPendingWsTz} />
+                ) : (
+                  <div className="relative opacity-60">
+                    <TimezonePicker value={pendingWsTz} onChange={() => {}} />
+                  </div>
+                )}
                 <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
                   Usado por <strong>campanhas</strong> (janelas <span className="font-mono">schedule_hours</span>),
-                  <strong> frequency caps</strong> e <strong>quiet hours</strong>. Cliente em Orlando? Selecione
-                  <span className="font-mono"> America/New_York</span>.
+                  <strong> frequency caps</strong> e <strong>quiet hours</strong>. Busque pela cidade — ex: Orlando vira <span className="font-mono">America/New_York</span>.
                 </p>
                 {canEditWorkspace && pendingWsTz !== wsTimezone && (
                   <button

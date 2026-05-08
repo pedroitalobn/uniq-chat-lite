@@ -81,6 +81,11 @@ type Campaign struct {
 	// Scheduling window
 	StartDate *time.Time `json:"start_date,omitempty"`
 	EndDate   *time.Time `json:"end_date,omitempty"`
+	// TimeZone — IANA tz pra avaliar schedule_hours e quiet_hours.
+	// Ex: "America/New_York" pra disparar campanha pra contatos de
+	// Orlando mesmo com a conta no horário de Brasília. Vazio = usa
+	// o timezone do workspace (fallback Brasília → UTC).
+	TimeZone string `gorm:"type:varchar(64)" json:"time_zone,omitempty"`
 
 	// Frequency
 	TimesTotal    int    `gorm:"default:1" json:"times_total"`
