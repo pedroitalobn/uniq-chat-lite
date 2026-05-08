@@ -134,8 +134,10 @@ export function SwipeRow({
 
   return (
     <div ref={ref} className={className} style={{ position: "relative", overflow: "hidden" }}>
-      {/* Right actions revelados quando swipe pra esquerda */}
-      {rightActions.length > 0 && (
+      {/* Right actions revelados quando swipe pra esquerda. Só monta enquanto
+          o gesto está em curso ou snapped — antes ficava sempre visível porque
+          var(--surface-1) tem alpha 0.72 e deixava o "Arquivar" vazar atrás. */}
+      {rightActions.length > 0 && (drag < 0 || snapped === "right") && (
         <div
           className="absolute top-0 right-0 bottom-0 flex"
           style={{ pointerEvents: snapped === "right" ? "auto" : "none" }}
@@ -154,7 +156,7 @@ export function SwipeRow({
         </div>
       )}
       {/* Left actions revelados quando swipe pra direita */}
-      {leftActions.length > 0 && (
+      {leftActions.length > 0 && (drag > 0 || snapped === "left") && (
         <div
           className="absolute top-0 left-0 bottom-0 flex"
           style={{ pointerEvents: snapped === "left" ? "auto" : "none" }}
@@ -183,7 +185,10 @@ export function SwipeRow({
           transition: startX.current === null
             ? "transform 0.22s cubic-bezier(0.16,1,0.3,1)"
             : "none",
-          background: "var(--surface-1)",
+          // Background sólido (não usa var(--surface-1) porque tem alpha 0.72
+          // e deixa as actions atrás vazarem visualmente). Casa com o tom do
+          // app shell (--surface-solid), funciona em dark mode.
+          background: "hsl(240 18% 6.5%)",
           position: "relative",
           zIndex: 1,
         }}

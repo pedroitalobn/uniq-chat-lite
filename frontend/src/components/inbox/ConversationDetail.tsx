@@ -13,12 +13,15 @@ import {
   Maximize2 as Maximize2Icon, Phone, Video as VideoIcon, PhoneMissed,
   UserPlus, MessageSquare, ListChecks, CornerUpLeft, CornerUpRight,
   Pencil, Trash2, Search, Info, Bell, BellOff, Eye, Briefcase, Loader2,
-  MoreVertical,
+  MoreVertical, Plus,
 } from "lucide-react";
+import { BottomSheet } from "@/components/mobile/BottomSheet";
 import { AudioPlayer } from "@/components/inbox/AudioPlayer";
 import { ContactCRMPanel } from "@/components/inbox/ContactCRMPanel";
 import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 import { AudioRecorderButton } from "@/components/inbox/AudioRecorderButton";
+import { AudioHoldButton } from "@/components/inbox/AudioHoldButton";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 import { MediaViewer, type MediaViewerSource } from "@/components/inbox/MediaViewer";
 import { AgentPanel } from "@/components/inbox/AgentPanel";
 import { WindowKeeperToggle } from "@/components/inbox/WindowKeeperToggle";
@@ -3548,8 +3551,10 @@ function Composer({
   const [mode, setMode] = useState<"message" | "note">("message");
   const [text, setText] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const draftKey = `inbox:draft:${conversationId}:${mode}`;
+  const isMobile = useIsMobile();
 
   // Send constraints — endpoint informa o que o canal aceita.
   // window_open=false + allows_template=true → fora da janela 24h, só template.
@@ -3886,8 +3891,9 @@ function Composer({
         onChange={onFileSelected}
       />
 
-      {/* Mode tabs */}
-      <div className="mb-2 flex items-center gap-1.5 text-xs">
+      {/* Mode tabs — em mobile escondemos. O toggle "Nota interna" fica
+          acessível via botão "+" do composer (BottomSheet de anexos). */}
+      <div className="mb-2 hidden md:flex items-center gap-1.5 text-xs">
         <button
           onClick={() => setMode("message")}
           className="rounded-md px-2 py-1 font-medium transition-colors"
@@ -4125,7 +4131,145 @@ function Composer({
           </div>
         )}
 
-        <div className="flex items-end gap-2">
+        {/* ───── Composer mobile (estilo WhatsApp) ─────
+             Single-row: [+ attach] [textarea round] [mic-or-send round].
+             Hold-to-record no mic, slide-up cancela.
+             O "+" abre BottomSheet com Foto, Documento, Emoji, Nota interna.
+             Em modo nota, borda âmbar no input + chip de modo. */}
+        {isMobile && mode === "note" && (
+          <div className="mb-2 flex items-center gap-2">
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
+              style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.30)" }}
+            >
+              <StickyNote className="h-3 w-3" />
+              Nota interna
+            </span>
+            <button
+              type="button"
+              onClick={() => setMode("message")}
+              className="text-[11px]"
+              style={{ color: "hsl(240 8% 60%)" }}
+            >
+              voltar pra mensagem
+            </button>
+          </div>
+        )}
+        <div className="md:hidden flex items-end gap-2">
+          <button
+            type="button"
+            onClick={() => setAttachOpen(true)}
+            disabled={!canSend}
+            aria-label="Anexar"
+            className="flex items-center justify-center rounded-full transition-colors disabled:opacity-40 flex-shrink-0"
+            style={{
+              width: 44,
+              height: 44,
+              background: "var(--surface-2)",
+              border: "1px solid var(--border-default)",
+              color: "hsl(240 8% 70%)",
+            }}
+          >
+            <Plus className="h-5 w-5" />
+          </button>
+          <div className="relative flex-1 min-w-0">
+            <textarea
+              ref={isMobile ? textareaRef : undefined}
+              className="w-full resize-none rounded-3xl pl-4 pr-11 py-2.5 text-[15px] outline-none"
+              style={{
+                background: "var(--surface-2)",
+                border: `1px solid ${mode === "note" ? "rgba(245,158,11,0.45)" : "hsl(240 12% 16%)"}`,
+                color: "hsl(240 15% 92%)",
+                minHeight: 44,
+                maxHeight: 140,
+                lineHeight: 1.35,
+              }}
+              rows={1}
+              placeholder={mode === "message"
+                ? (hasAttachment ? "Legenda do anexo (opcional)…" : "Mensagem")
+                : "Nota interna…"}
+              value={text}
+              onChange={(e) => {
+                setText(e.target.value);
+                // Auto-grow: ajusta a altura ao conteúdo até maxHeight (CSS limita).
+                const ta = e.currentTarget;
+                ta.style.height = "44px";
+                ta.style.height = Math.min(ta.scrollHeight, 140) + "px";
+              }}
+              onKeyDown={(e) => {
+                // Em mobile, Enter quebra linha (não envia) — padrão WhatsApp.
+                // Send é só pelo botão. Shift+Enter idem.
+                if (pickerOpen && e.key === "Escape") {
+                  e.preventDefault();
+                  setText("");
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setEmojiOpen((v) => !v)}
+              disabled={!canSend || mode !== "message"}
+              aria-label="Emoji"
+              className="absolute right-2 bottom-1.5 flex h-9 w-9 items-center justify-center rounded-full disabled:opacity-40"
+              style={{ color: emojiOpen ? "var(--green)" : "hsl(240 8% 60%)" }}
+            >
+              <Smile className="h-5 w-5" />
+            </button>
+            {emojiOpen && (
+              <EmojiPickerPanel
+                onPick={(e) => {
+                  const ta = textareaRef.current;
+                  if (!ta) {
+                    setText((t) => t + e);
+                    return;
+                  }
+                  const start = ta.selectionStart ?? text.length;
+                  const end = ta.selectionEnd ?? text.length;
+                  const next = text.slice(0, start) + e + text.slice(end);
+                  setText(next);
+                  requestAnimationFrame(() => {
+                    ta.focus();
+                    const pos = start + e.length;
+                    ta.setSelectionRange(pos, pos);
+                  });
+                }}
+                onClose={() => setEmojiOpen(false)}
+              />
+            )}
+          </div>
+          {/* Quando há texto OU anexo: botão Send.
+              Quando vazio: hold-to-record (estilo WhatsApp). */}
+          {text.trim() || hasAttachment ? (
+            <button
+              type="button"
+              onClick={hasAttachment ? sendAttachment : submit}
+              disabled={
+                hasAttachment
+                  ? uploading
+                  : disabled || isSending || isNoting
+              }
+              aria-label={mode === "note" ? "Adicionar nota" : "Enviar"}
+              className="flex items-center justify-center rounded-full disabled:opacity-50 flex-shrink-0"
+              style={{
+                width: 44,
+                height: 44,
+                background: accentBg,
+                color: accentFg,
+                boxShadow: "0 2px 8px rgba(0,212,106,0.25)",
+              }}
+            >
+              {mode === "note" ? <StickyNote className="h-5 w-5" /> : <Send className="h-5 w-5" />}
+            </button>
+          ) : (
+            <AudioHoldButton
+              disabled={!canSend || mode !== "message" || !instanceId || !allowsType("audio")}
+              onRecorded={(file) => acceptFiles([file])}
+            />
+          )}
+        </div>
+
+        {/* ───── Composer desktop (mantém layout original) ───── */}
+        <div className="hidden md:flex items-end gap-2">
           <button
             type="button"
             onClick={onPickFile}
@@ -4271,7 +4415,84 @@ function Composer({
           </div>
         )}
       </div>
+
+      {/* BottomSheet de anexos — aberto pelo "+" do composer mobile.
+          Concentra ações que antes ficavam espalhadas na barra: Foto/galeria,
+          Documento, Localização (futuro), Toggle Nota interna. */}
+      <BottomSheet open={attachOpen} onClose={() => setAttachOpen(false)} title="Anexar">
+        <div className="px-4 pt-2 pb-4 grid grid-cols-3 gap-3">
+          <AttachAction
+            icon={<ImageIcon className="h-6 w-6" />}
+            label="Foto / Vídeo"
+            color="#60a5fa"
+            disabled={!canSend || mode !== "message" || uploading || !allowsType("image")}
+            onClick={() => { setAttachOpen(false); onPickFile(); }}
+          />
+          <AttachAction
+            icon={<FileText className="h-6 w-6" />}
+            label="Documento"
+            color="#a78bfa"
+            disabled={!canSend || mode !== "message" || uploading || !allowsType("document")}
+            onClick={() => { setAttachOpen(false); onPickFile(); }}
+          />
+          <AttachAction
+            icon={<Mic className="h-6 w-6" />}
+            label="Áudio"
+            color="#f59e0b"
+            disabled={!canSend || mode !== "message" || uploading || !allowsType("audio")}
+            onClick={() => {
+              setAttachOpen(false);
+              toast.info("Segure o botão do microfone na barra para gravar");
+            }}
+          />
+          <AttachAction
+            icon={<StickyNote className="h-6 w-6" />}
+            label={mode === "note" ? "Voltar p/ msg" : "Nota interna"}
+            color="#f59e0b"
+            disabled={!canNote && mode !== "note"}
+            onClick={() => {
+              setAttachOpen(false);
+              setMode((m) => (m === "note" ? "message" : "note"));
+            }}
+          />
+        </div>
+      </BottomSheet>
     </div>
+  );
+}
+
+// AttachAction — botão grid usado dentro do BottomSheet de anexos do mobile.
+// Visual estilo iOS Messages: ícone circular colorido + label embaixo.
+function AttachAction({
+  icon, label, color, disabled, onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  color: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex flex-col items-center gap-1.5 disabled:opacity-40"
+    >
+      <span
+        className="flex h-14 w-14 items-center justify-center rounded-2xl"
+        style={{
+          background: `${color}20`,
+          color,
+          border: `1px solid ${color}40`,
+        }}
+      >
+        {icon}
+      </span>
+      <span className="text-[11px] text-center" style={{ color: "var(--text-2)" }}>
+        {label}
+      </span>
+    </button>
   );
 }
 
