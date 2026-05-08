@@ -236,7 +236,20 @@ func (h *StripeHandler) CreateCheckout(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "plano não encontrado"})
 	}
 	if plan.StripePriceID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "plano sem preço Stripe configurado"})
+		// Diagnóstico: retorna o plan_id e nome pra admin saber EXATAMENTE
+		// qual row está sem price. Antes era um erro genérico que sumia a
+		// pista quando o frontend mandava um plan_id de plano antigo/teste.
+		log.Warn().
+			Str("plan_id", plan.ID.String()).
+			Str("plan_name", plan.Name).
+			Float64("plan_price", plan.Price).
+			Msg("stripe checkout: plano sem stripe_price_id")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":     "plano sem preço Stripe configurado",
+			"plan_id":   plan.ID.String(),
+			"plan_name": plan.Name,
+			"hint":      "Em /admin/plans, edite este plano e cole o Price ID (price_xxx). Confira que está no MESMO modo (test/live) que sua chave Stripe.",
+		})
 	}
 	if plan.Price == 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "use este endpoint apenas para planos pagos"})
