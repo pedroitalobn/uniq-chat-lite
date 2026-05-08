@@ -793,6 +793,17 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	billing.Post("/cancel", billingH.Cancel)
 	billing.Post("/resume", billingH.Resume)
 
+	// Usage / Credits — painel de consumo do user (estilo Claude Code).
+	// Recorder vem do singleton seedado no main.go; se ainda não tiver
+	// (boot order) cai pra um vazio inocente.
+	usageH := handlers.NewUsageHandler(db, services.GetGlobalUsageRecorder())
+	usage := api.Group("/usage")
+	usage.Get("/me", usageH.GetMyUsage)
+	usage.Get("/me/events", usageH.ListMyEvents)
+	usage.Get("/me/timeseries", usageH.GetMyTimeseries)
+	usage.Get("/me/topups", usageH.ListMyTopups)
+	usage.Post("/me/overage", usageH.SetOverage)
+
 	systemWebhooks := api.Group("/webhooks/system")
 	systemWebhooks.Get("/events", globalWebhookH.ListEvents)
 	systemWebhooks.Get("/events/:eventID/preview", webhookLogsH.PreviewEvent)

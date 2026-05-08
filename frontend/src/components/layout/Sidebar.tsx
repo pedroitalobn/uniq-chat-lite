@@ -182,6 +182,7 @@ export function Sidebar() {
     // dentro do card de workspace (escondia em sidebar collapsed). Agora
     // entrada primária pra qualquer membro do workspace.
     { href: "/workspace",    label: "Workspace",           icon: Building2,       exact: false, show: !!currentWorkspace },
+    { href: "/usage",        label: "Consumo",             icon: Zap,             exact: false, show: true },
     { href: "/settings",     label: t("nav_settings"),     icon: Settings,        exact: false, show: true },
   ];
   const visibleNavItems = navItems.filter((n) => n.show);

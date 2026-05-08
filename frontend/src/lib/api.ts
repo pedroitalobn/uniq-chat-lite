@@ -2217,6 +2217,68 @@ export interface PlatformVoiceConfig {
   last_tested_at?: string;
 }
 
+// ─── Usage / Credits ─────────────────────────────────────────────────
+//
+// Painel de consumo do user (estilo Claude Code). Devolve estado da
+// quota do ciclo atual: limites do plano, used, topups, overage,
+// percentage, hard_stopped flags por categoria.
+
+export interface UsageCategoryView {
+  limit: number;
+  used: number;
+  topup: number;
+  overage: number;
+  available: number;
+  percent: number;
+  hard_stopped: boolean;
+}
+
+export interface UsageView {
+  period_start: string;
+  period_end: string;
+  plan: { name: string; is_payg: boolean };
+  overage_allowed: boolean;
+  overage_cents_accumulated: number;
+  ai: UsageCategoryView;
+  voice: UsageCategoryView;
+  message: UsageCategoryView;
+  notifications: { at_50: boolean; at_80: boolean; at_95: boolean };
+}
+
+export interface UsageEvent {
+  id: string;
+  user_id: string;
+  workspace_id?: string;
+  event_type: string;
+  category: "ai" | "voice" | "message" | "proxy" | "other";
+  resource: string;
+  quantity: number;
+  cost_usd_micro: number;
+  credits: number;
+  is_overage: boolean;
+  occurred_at: string;
+  metadata?: string;
+}
+
+export interface UsageTimeseriesPoint {
+  date: string;
+  ai: number;
+  voice: number;
+  message: number;
+  proxy: number;
+}
+
+export const usageApi = {
+  me: () => api.get<UsageView>("/v1/usage/me"),
+  events: (params?: { category?: string; limit?: number }) =>
+    api.get<{ items: UsageEvent[] }>("/v1/usage/me/events", { params }),
+  timeseries: (days = 30) =>
+    api.get<{ items: UsageTimeseriesPoint[] }>("/v1/usage/me/timeseries", { params: { days } }),
+  topups: () => api.get<{ items: any[] }>("/v1/usage/me/topups"),
+  setOverage: (allowed: boolean) =>
+    api.post<{ ok: boolean; allowed: boolean }>("/v1/usage/me/overage", { allowed }),
+};
+
 export const platformVoiceApi = {
   list: () => api.get<PlatformVoiceConfig[]>("/v1/admin/platform-voice"),
   create: (data: Partial<PlatformVoiceConfig> & { api_key?: string }) =>
