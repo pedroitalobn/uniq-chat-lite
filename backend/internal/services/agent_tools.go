@@ -167,6 +167,15 @@ func executeAction(ctx AgentToolContext, name string, args map[string]any) Agent
 		return toolSearchHelpArticles(ctx, args)
 	case "send_help_article":
 		return toolSendHelpArticle(ctx, args)
+	// Sprint E — RAG do agente + Instagram extra + utility
+	case "query_kb":
+		return toolQueryKB(ctx, args)
+	case "instagram_dm":
+		return toolInstagramDM(ctx, args)
+	case "instagram_comment":
+		return toolInstagramComment(ctx, args)
+	case "get_current_time":
+		return toolGetCurrentTime(ctx, args)
 	}
 	return AgentToolResult{OK: false, Detail: "tool desconhecida: " + name}
 }
@@ -449,6 +458,11 @@ var toolCatalog = map[string]string{
 	// Sprint D — Help Desk
 	"search_help_articles": `search_help_articles({"query":"como cancelar plano"}) — busca artigos publicados no help desk; até 5 hits.`,
 	"send_help_article":    `send_help_article({"slug":"como-cancelar-plano"}) — envia link/preview do artigo pra o cliente.`,
+	// Sprint E — RAG do agente + IG + utility
+	"query_kb":          `query_kb({"query":"política de reembolso"}) — busca trechos relevantes nos documentos do agente. Use ANTES de inventar resposta sobre processo interno.`,
+	"instagram_dm":      `instagram_dm({"to":"username","message":"..."}) — envia DM Instagram (proativo; não responde inbound).`,
+	"instagram_comment": `instagram_comment({"media_id":"abc","text":"..."}) — comenta num post (instâncias IG).`,
+	"get_current_time":  `get_current_time({}) — devolve data/hora atual (BRT). Use SEMPRE antes de mencionar "hoje", "amanhã", dias da semana ou prazos.`,
 }
 
 func parseEnabledTools(agent *models.InstanceAgent) []string {
@@ -1205,4 +1219,139 @@ func agentToolsFrontendURL() string {
 		return config.AppConfig.FrontendURL
 	}
 	return "https://app.uniq.chat"
+}
+
+// ─── Sprint E: RAG do agente + Instagram extra + utility ─────────────────
+
+// toolQueryKB — busca semântica light nos AgentAssets do agente. Hoje
+// é keyword-based (substring case-insensitive em ExtractedText), com
+// snippet de 280 chars centrado no match. Versão futura troca pra
+// embeddings/pgvector sem mudar o contrato da tool.
+func toolQueryKB(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	q := strings.TrimSpace(asString(args["query"]))
+	if q == "" {
+		return AgentToolResult{OK: false, Detail: "query obrigatório"}
+	}
+	if ctx.Agent == nil {
+		return AgentToolResult{OK: false, Detail: "agent não resolvido"}
+	}
+	like := "%" + strings.ToLower(q) + "%"
+	var assets []models.AgentAsset
+	ctx.DB.Where("instance_agent_id = ? AND is_active = ?", ctx.Agent.ID, true).
+		Where("LOWER(extracted_text) LIKE ? OR LOWER(file_name) LIKE ?", like, like).
+		Limit(5).
+		Find(&assets)
+	if len(assets) == 0 {
+		return AgentToolResult{OK: true, Detail: "nenhum trecho encontrado na base"}
+	}
+
+	// Pra cada asset, extrai snippet centrado no primeiro match.
+	var blocks []string
+	for _, a := range assets {
+		text := a.ExtractedText
+		lower := strings.ToLower(text)
+		idx := strings.Index(lower, strings.ToLower(q))
+		if idx < 0 {
+			// Match foi no file_name — devolve só primeiros 280 chars.
+			blocks = append(blocks, "["+a.FileName+"] "+firstNRunesStr(text, 280))
+			continue
+		}
+		// Snippet ±140 chars antes/depois do match.
+		start := idx - 140
+		if start < 0 {
+			start = 0
+		}
+		end := idx + len(q) + 140
+		if end > len(text) {
+			end = len(text)
+		}
+		snippet := text[start:end]
+		if start > 0 {
+			snippet = "…" + snippet
+		}
+		if end < len(text) {
+			snippet = snippet + "…"
+		}
+		blocks = append(blocks, "["+a.FileName+"] "+snippet)
+	}
+	return AgentToolResult{OK: true, Detail: strings.Join(blocks, "\n\n---\n\n")}
+}
+
+// toolInstagramDM — envia DM proativa (instâncias Instagram). Não é
+// usada pra responder inbound — fluxo normal já trata. Útil pra agente
+// disparar mensagem em respostas a webhooks ou jornadas.
+func toolInstagramDM(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	to := strings.TrimSpace(asString(args["to"]))
+	if to == "" && ctx.Contact != nil {
+		to = ctx.Contact.ExternalID
+	}
+	if to == "" {
+		return AgentToolResult{OK: false, Detail: "to (username) obrigatório"}
+	}
+	msg := strings.TrimSpace(asString(args["message"]))
+	if msg == "" {
+		return AgentToolResult{OK: false, Detail: "message obrigatório"}
+	}
+	svc := NewInstagramService(ctx.DB)
+	if svc == nil {
+		return AgentToolResult{OK: false, Detail: "Instagram service indisponível"}
+	}
+	resp, err := svc.SendDM(context.Background(), ctx.Agent.InstanceID.String(), to, msg)
+	if err != nil {
+		return AgentToolResult{OK: false, Detail: err.Error()}
+	}
+	_ = resp // SendDMResponse fields variam por provider; sucesso = sem erro
+	return AgentToolResult{OK: true, Detail: "DM enviada pra @" + to}
+}
+
+// toolInstagramComment — posta comentário num media (post/reel) do
+// próprio perfil ou de outro pelo media_id.
+func toolInstagramComment(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	mediaID := strings.TrimSpace(asString(args["media_id"]))
+	if mediaID == "" {
+		return AgentToolResult{OK: false, Detail: "media_id obrigatório"}
+	}
+	text := strings.TrimSpace(asString(args["text"]))
+	if text == "" {
+		return AgentToolResult{OK: false, Detail: "text obrigatório"}
+	}
+	svc := NewInstagramService(ctx.DB)
+	if svc == nil {
+		return AgentToolResult{OK: false, Detail: "Instagram service indisponível"}
+	}
+	resp, err := svc.Comment(context.Background(), ctx.Agent.InstanceID.String(), mediaID, text)
+	if err != nil {
+		return AgentToolResult{OK: false, Detail: err.Error()}
+	}
+	id := ""
+	if resp != nil {
+		id = resp.CommentID
+	}
+	return AgentToolResult{OK: true, ID: id, Detail: "comentário publicado"}
+}
+
+// toolGetCurrentTime — utility crítica. LLMs frequentemente erram
+// quando perguntam sobre "hoje", "amanhã", "que dia da semana é". Tool
+// expõe data/hora atual em PT-BR / America/Sao_Paulo (default) ou TZ
+// custom via args.timezone.
+func toolGetCurrentTime(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	tz := strings.TrimSpace(asString(args["timezone"]))
+	if tz == "" {
+		tz = "America/Sao_Paulo"
+	}
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		loc = time.Local
+	}
+	now := time.Now().In(loc)
+	weekdayPT := []string{"domingo", "segunda-feira", "terça-feira", "quarta-feira",
+		"quinta-feira", "sexta-feira", "sábado"}[now.Weekday()]
+	monthPT := []string{"janeiro", "fevereiro", "março", "abril", "maio", "junho",
+		"julho", "agosto", "setembro", "outubro", "novembro", "dezembro"}[now.Month()-1]
+	human := fmt.Sprintf("%s, %d de %s de %d, %02d:%02d (%s)",
+		weekdayPT, now.Day(), monthPT, now.Year(), now.Hour(), now.Minute(), tz)
+	return AgentToolResult{
+		OK:     true,
+		Detail: human + " · ISO: " + now.Format(time.RFC3339),
+	}
 }

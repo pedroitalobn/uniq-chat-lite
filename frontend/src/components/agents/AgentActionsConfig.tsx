@@ -36,7 +36,11 @@ type ActionId =
   | "instagram_follow"
   | "instagram_unfollow"
   | "search_help_articles"
-  | "send_help_article";
+  | "send_help_article"
+  | "query_kb"
+  | "instagram_dm"
+  | "instagram_comment"
+  | "get_current_time";
 
 type AppAccessEntry = {
   id: string;
@@ -82,6 +86,11 @@ const ACTIONS: Array<{
   // Sprint D — Help Desk
   { id: "search_help_articles", label: "Buscar artigo Help Desk", description: "Procura tutoriais publicados que podem responder a dúvida do cliente.", icon: BookOpen },
   { id: "send_help_article",    label: "Enviar artigo Help Desk",  description: "Envia link/preview do artigo direto pra conversa.",                    icon: Send },
+  // Sprint E — RAG + Instagram extra + utility
+  { id: "query_kb",          label: "Consultar base do agente", description: "Busca trechos relevantes nos documentos carregados na knowledge base do agente.", icon: BookOpen },
+  { id: "instagram_dm",      label: "Enviar DM Instagram",      description: "DM proativo via Instagram (não é resposta — começa conversa nova).",            icon: Instagram },
+  { id: "instagram_comment", label: "Comentar no Instagram",    description: "Posta comentário num media (post/reel) via media_id.",                          icon: Instagram },
+  { id: "get_current_time",  label: "Saber data/hora atual",    description: "Devolve data/hora em PT-BR. Habilite quando o agente discute prazos/datas.",     icon: ListChecks },
 ];
 
 const CONFIRMATION_OPTIONS = [

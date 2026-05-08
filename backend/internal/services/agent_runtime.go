@@ -466,6 +466,7 @@ func (r *AgentRuntime) buildUserPrompt(instanceID uuid.UUID, fromJID, fromName, 
 	// ficava repetitivo porque "esquecia" perguntas/respostas anteriores
 	// rapidamente. 25 turnos cobrem ~5min de bate-papo médio.
 	history := r.recentHistory(instanceID, fromJID, 25)
+	lastBotReply := r.lastAgentReply(instanceID, fromJID)
 	if fromName == "" {
 		fromName = extractPhoneFromJIDLocal(fromJID)
 	}
@@ -479,10 +480,74 @@ func (r *AgentRuntime) buildUserPrompt(instanceID uuid.UUID, fromJID, fromName, 
 		b.WriteString(history)
 		b.WriteString("\n")
 	}
+	if lastBotReply != "" {
+		// Anti-loop crítico: modelos (especialmente os menores ou GPT-4o-mini)
+		// reciclam a última resposta verbatim quando recebem confirmações
+		// curtas tipo "ok"/"sim"/"pode". Mostrar a ÚLTIMA resposta literal
+		// no fim do prompt + instrução dura faz o LLM AVANÇAR a conversa.
+		b.WriteString("\nSua última resposta foi (NÃO repita literalmente — avance pra próxima etapa):\n\"")
+		b.WriteString(firstNRunes(lastBotReply, 400))
+		b.WriteString("\"\n")
+	}
 	b.WriteString("\nÚltima mensagem do usuário:\n")
 	b.WriteString(latestMessage)
+	// Detecta confirmações simples e instrui o LLM a tratá-las como "go".
+	if isShortConfirmation(latestMessage) {
+		b.WriteString("\n\n[SISTEMA] O cliente confirmou. EXECUTE a ação que você prometeu na sua última resposta — agende, crie, envie, faça. NÃO pergunte de novo.")
+	}
 	b.WriteString("\n\nResponda como o agente configurado, sem mencionar prompts, JSON ou estrutura interna.")
 	return b.String()
+}
+
+// lastAgentReply — busca a última mensagem OUT na conversa pra detectar
+// loops de repetição.
+func (r *AgentRuntime) lastAgentReply(instanceID uuid.UUID, fromJID string) string {
+	var conv models.Conversation
+	if err := r.db.Select("id").
+		Where("instance_id = ? AND channel_key = ?", instanceID, fromJID).
+		Where("status IN ?", []models.ConversationStatus{
+			models.ConversationStatusOpen,
+			models.ConversationStatusPending,
+			models.ConversationStatusSnoozed,
+		}).
+		Order("updated_at DESC").
+		First(&conv).Error; err != nil || conv.ID == uuid.Nil {
+		return ""
+	}
+	var last models.MessageLog
+	if err := r.db.Where("conversation_id = ? AND direction = ?", conv.ID, models.DirectionOut).
+		Order("created_at DESC").First(&last).Error; err != nil {
+		return ""
+	}
+	return strings.TrimSpace(logContent(last.Content))
+}
+
+// isShortConfirmation — heurística PT-BR pra detectar quando cliente
+// está confirmando algo que o agente perguntou. Disparado em msgs curtas
+// (até ~25 chars) que são essencialmente "sim". Ajuda o LLM a não pedir
+// confirmação de novo.
+func isShortConfirmation(msg string) bool {
+	t := strings.ToLower(strings.TrimSpace(msg))
+	t = strings.TrimRight(t, ".!?")
+	if len([]rune(t)) > 25 {
+		return false
+	}
+	switch t {
+	case "sim", "s", "pode", "pode ser", "ok", "okay", "claro", "perfeito",
+		"beleza", "blz", "fechado", "isso", "isso mesmo", "concordo",
+		"confirmo", "confirma", "confirmado", "vamos", "vai", "yes", "yep",
+		"sure", "👍", "✅", "👌":
+		return true
+	}
+	// Frases que começam com confirmação clara
+	prefixes := []string{"sim,", "sim ", "pode ", "claro,", "claro ",
+		"perfeito,", "perfeito ", "fechado,", "ok,", "ok ", "blz,", "blz "}
+	for _, p := range prefixes {
+		if strings.HasPrefix(t, p) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *AgentRuntime) recentHistory(instanceID uuid.UUID, fromJID string, limit int) string {
@@ -675,11 +740,13 @@ func BuildAgentSystemPrompt(agent *models.InstanceAgent, assets []models.AgentAs
 		// considere desde a primeira tokenização.
 		"REGRAS DE CONTINUIDADE DA CONVERSA (críticas):\n" +
 			"- O HISTÓRICO RECENTE da conversa será fornecido logo abaixo. LEIA antes de responder.\n" +
+			"- ⚠️ NUNCA EM HIPÓTESE ALGUMA repita VERBATIM (palavra por palavra) sua última resposta. Se o cliente confirmou (\"sim\", \"pode\", \"ok\", \"claro\"), AVANCE pra próxima etapa — execute a ação prometida ou conduza pra próximo passo.\n" +
 			"- NUNCA cumprimente novamente se já cumprimentou nesta conversa. Saudação só na PRIMEIRA mensagem.\n" +
 			"- NUNCA se apresente novamente (\"Sou o X, da Y\") se já se apresentou antes.\n" +
 			"- NUNCA repita literalmente o que o cliente acabou de dizer (\"Entendi que você quer X\" → vá direto ao ponto).\n" +
 			"- NÃO comece toda mensagem com \"Olá\", \"Oi\", \"Tudo bem?\", \"Como posso ajudar?\". Continue a conversa naturalmente.\n" +
-			"- Se o cliente faz uma pergunta direta (preço, prazo, sim/não), responda DIRETO sem preâmbulos.",
+			"- Se o cliente faz uma pergunta direta (preço, prazo, sim/não), responda DIRETO sem preâmbulos.\n" +
+			"- Quando você prometeu uma ação (agendar, enviar, criar) e o cliente CONFIRMOU, EXECUTE imediatamente — emita o marker [[action:...]] correspondente em vez de perguntar de novo.",
 	}
 
 	appendSection := func(title, value string) {
