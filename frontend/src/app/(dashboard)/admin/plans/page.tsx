@@ -617,28 +617,45 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                   Permitir overage por padrão (user pode mudar depois)
                 </label>
 
+                {/* Avisos de inconsistência: quando feature flag (Allow*) está ON
+                    mas o cap (Max*) está em 0, fica ambíguo — backend trata como
+                    ilimitado pra não quebrar o plano (ver fix em campaigns.go),
+                    mas é melhor o admin escolher explícito (-1 ilimitado, N>0
+                    cap, ou desligar a feature). hint passa pra NumField que
+                    realça em âmbar e mostra texto guia. */}
                 <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "hsl(240 8% 50%)" }}>Por módulo</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <NumField label="Max. Agentes IA" value={form.max_agents} onChange={(v) => setForm({ ...form, max_agents: v })} />
-                  <NumField label="Max. Jornadas" value={form.max_journeys} onChange={(v) => setForm({ ...form, max_journeys: v })} />
-                  <NumField label="Max. Campanhas" value={form.max_campaigns} onChange={(v) => setForm({ ...form, max_campaigns: v })} />
-                  <NumField label="Max. Triggers" value={form.max_triggers} onChange={(v) => setForm({ ...form, max_triggers: v })} />
+                  <NumField label="Max. Agentes IA" value={form.max_agents} onChange={(v) => setForm({ ...form, max_agents: v })}
+                    mismatchHint={maxMismatchHint("Uniq AI / Agentes", form.allow_ai, form.max_agents)} />
+                  <NumField label="Max. Jornadas" value={form.max_journeys} onChange={(v) => setForm({ ...form, max_journeys: v })}
+                    mismatchHint={maxMismatchHint("Jornadas", form.allow_journeys, form.max_journeys)} />
+                  <NumField label="Max. Campanhas" value={form.max_campaigns} onChange={(v) => setForm({ ...form, max_campaigns: v })}
+                    mismatchHint={maxMismatchHint("Campanhas", form.allow_campaigns, form.max_campaigns)} />
+                  <NumField label="Max. Triggers" value={form.max_triggers} onChange={(v) => setForm({ ...form, max_triggers: v })}
+                    mismatchHint={maxMismatchHint("Triggers", form.allow_triggers, form.max_triggers)} />
                   <NumField label="Max. Webhooks" value={form.max_webhooks} onChange={(v) => setForm({ ...form, max_webhooks: v })} />
-                  <NumField label="Max. Contatos (CRM)" value={form.max_contacts} onChange={(v) => setForm({ ...form, max_contacts: v })} />
-                  <NumField label="Max. Deals" value={form.max_deals} onChange={(v) => setForm({ ...form, max_deals: v })} />
+                  <NumField label="Max. Contatos (CRM)" value={form.max_contacts} onChange={(v) => setForm({ ...form, max_contacts: v })}
+                    mismatchHint={maxMismatchHint("CRM", form.allow_crm, form.max_contacts)} />
+                  <NumField label="Max. Deals" value={form.max_deals} onChange={(v) => setForm({ ...form, max_deals: v })}
+                    mismatchHint={maxMismatchHint("CRM", form.allow_crm, form.max_deals)} />
                 </div>
 
                 <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "hsl(240 8% 50%)" }}>Shop</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <NumField label="Max. Lojas" value={form.max_shops} onChange={(v) => setForm({ ...form, max_shops: v })} />
-                  <NumField label="Max. Produtos" value={form.max_products} onChange={(v) => setForm({ ...form, max_products: v })} />
-                  <NumField label="Max. Integrações Shop" value={form.max_shop_integrations} onChange={(v) => setForm({ ...form, max_shop_integrations: v })} />
+                  <NumField label="Max. Lojas" value={form.max_shops} onChange={(v) => setForm({ ...form, max_shops: v })}
+                    mismatchHint={maxMismatchHint("Shop", form.allow_shop, form.max_shops)} />
+                  <NumField label="Max. Produtos" value={form.max_products} onChange={(v) => setForm({ ...form, max_products: v })}
+                    mismatchHint={maxMismatchHint("Shop", form.allow_shop, form.max_products)} />
+                  <NumField label="Max. Integrações Shop" value={form.max_shop_integrations} onChange={(v) => setForm({ ...form, max_shop_integrations: v })}
+                    mismatchHint={maxMismatchHint("Shop", form.allow_shop, form.max_shop_integrations)} />
                 </div>
 
                 <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "hsl(240 8% 50%)" }}>Proxy</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <NumField label="Instâncias por proxy" value={form.max_instances_per_proxy} onChange={(v) => setForm({ ...form, max_instances_per_proxy: v })} />
-                  <NumField label="Pool máximo" value={form.max_proxy_pool} onChange={(v) => setForm({ ...form, max_proxy_pool: v })} />
+                  <NumField label="Instâncias por proxy" value={form.max_instances_per_proxy} onChange={(v) => setForm({ ...form, max_instances_per_proxy: v })}
+                    mismatchHint={maxMismatchHint("Proxy", form.allow_proxy, form.max_instances_per_proxy)} />
+                  <NumField label="Pool máximo" value={form.max_proxy_pool} onChange={(v) => setForm({ ...form, max_proxy_pool: v })}
+                    mismatchHint={maxMismatchHint("Proxy", form.allow_proxy, form.max_proxy_pool)} />
                 </div>
               </div>
             )}
@@ -1082,7 +1099,28 @@ function PlanCardPreview({ name, price, description, highlights }: {
   );
 }
 
-function NumField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+// maxMismatchHint — devolve mensagem de aviso quando a feature flag (Allow*)
+// está ligada mas o cap (Max*) está em 0. Combinação ambígua: backend trata
+// como ilimitado (defesa anti-bug, ver campaigns.go), mas é melhor o admin
+// escolher explícito. Vazio = sem aviso.
+function maxMismatchHint(featureName: string, allow: boolean, max: number): string | undefined {
+  if (allow && max === 0) {
+    return `${featureName} está ON mas o limite é 0 — backend trata como ilimitado. Use -1 pra explicitar ilimitado, ou desligue a feature.`;
+  }
+  return undefined;
+}
+
+function NumField({
+  label, value, onChange, mismatchHint,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  /** Quando passado, exibe aviso âmbar abaixo do input. Usado pra
+   *  detectar plan editor inconsistente (ex: allow_campaigns=true +
+   *  max_campaigns=0 → ambíguo). */
+  mismatchHint?: string;
+}) {
   return (
     <div>
       <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>{label}</label>
@@ -1091,7 +1129,16 @@ function NumField({ label, value, onChange }: { label: string; value: number; on
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         className="input-field w-full font-mono text-sm"
+        style={mismatchHint
+          ? { borderColor: "rgba(245,158,11,0.55)", boxShadow: "0 0 0 1px rgba(245,158,11,0.20)" }
+          : undefined}
       />
+      {mismatchHint && (
+        <p className="text-[10px] mt-1 flex items-start gap-1" style={{ color: "#f59e0b" }}>
+          <span aria-hidden>⚠</span>
+          <span>{mismatchHint}</span>
+        </p>
+      )}
     </div>
   );
 }
