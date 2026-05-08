@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"os"
 	"strings"
 	"time"
 
@@ -235,20 +236,46 @@ func (h *StripeHandler) CreateCheckout(c *fiber.Ctx) error {
 	if err := h.db.First(&plan, "id = ?", req.PlanID).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "plano não encontrado"})
 	}
-	if plan.StripePriceID == "" {
-		// Diagnóstico: retorna o plan_id e nome pra admin saber EXATAMENTE
-		// qual row está sem price. Antes era um erro genérico que sumia a
-		// pista quando o frontend mandava um plan_id de plano antigo/teste.
+	// Resolução do Price ID com prioridade: DB > env > vazio.
+	// Self-heal: se o admin acabou de configurar o env mas a row do DB
+	// ainda não foi atualizada (boot anterior, cache do orquestrador, etc),
+	// usa o env aqui mesmo e atualiza a row no caminho. Antes a request
+	// falhava 400 mesmo com env correto e admin já tinha "salvado" via UI.
+	priceID := strings.TrimSpace(plan.StripePriceID)
+	if priceID == "" {
+		envKey := ""
+		switch strings.ToLower(strings.TrimSpace(plan.Name)) {
+		case "starter":
+			envKey = "STRIPE_PRICE_STARTER"
+		case "pro":
+			envKey = "STRIPE_PRICE_PRO"
+		case "business":
+			envKey = "STRIPE_PRICE_BUSINESS"
+		}
+		if envKey != "" {
+			priceID = strings.TrimSpace(os.Getenv(envKey))
+		}
+		if priceID != "" {
+			// Persiste pra próxima request não passar por aqui de novo.
+			h.db.Model(&plan).Update("stripe_price_id", priceID)
+			plan.StripePriceID = priceID
+			log.Info().
+				Str("plan", plan.Name).
+				Str("source", envKey).
+				Msg("stripe checkout: heal — preenchi stripe_price_id via env")
+		}
+	}
+	if priceID == "" {
 		log.Warn().
 			Str("plan_id", plan.ID.String()).
 			Str("plan_name", plan.Name).
 			Float64("plan_price", plan.Price).
-			Msg("stripe checkout: plano sem stripe_price_id")
+			Msg("stripe checkout: plano sem stripe_price_id (DB vazio e env não bateu)")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":     "plano sem preço Stripe configurado",
 			"plan_id":   plan.ID.String(),
 			"plan_name": plan.Name,
-			"hint":      "Em /admin/plans, edite este plano e cole o Price ID (price_xxx). Confira que está no MESMO modo (test/live) que sua chave Stripe.",
+			"hint":      "Configure o Price ID em /admin/plans ou seta STRIPE_PRICE_" + strings.ToUpper(plan.Name) + " no env.",
 		})
 	}
 	if plan.Price == 0 {
