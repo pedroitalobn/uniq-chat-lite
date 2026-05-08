@@ -70,6 +70,11 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 
 	agent, agentMode, found := r.resolveAgent(instUUID, fromJID)
 	if !found {
+		// Diagnóstico — quando resolveAgent não retorna agente, ainda
+		// queremos logar pra que o admin veja na aba "Logs" que a
+		// mensagem chegou mas foi bloqueada. Procura o primário pra
+		// usar agent_id no log + identifica a razão provável.
+		r.logSkippedNoAgent(instUUID, text, started, fromJID)
 		return false
 	}
 
@@ -416,10 +421,12 @@ func (r *AgentRuntime) resolveAgent(instanceID uuid.UUID, fromJID string) (*mode
 		}
 	}
 
-	// Legacy: check is_bot_active
-	if convErr == nil && !conv.IsBotActive {
-		return nil, models.AgentModeDisabled, false
-	}
+	// Removido check legado de is_bot_active. Source of truth é
+	// ConversationAgentState (acima). is_bot_active tem default false no
+	// model — conversas antigas/migradas vinham bloqueadas erroneamente,
+	// agente não respondia mesmo estando ativo. Quando humano desliga o
+	// bot pela UI do inbox, ConversationAgentState.Mode=disabled é setado
+	// e o branch acima já trata.
 
 	if a, ok := r.resolveQueueOrInstance(conv, instanceID, preloadAgent); ok {
 		if gate(a) {
@@ -1167,4 +1174,53 @@ func truncateRunes(s string, max int) string {
 		return s
 	}
 	return string(rs[:max]) + "…"
+}
+
+// logSkippedNoAgent — chamado quando resolveAgent retorna não-found.
+// Tenta achar o primário da instância pra logar com contexto. Diagnóstico
+// inclui razão provável (sem agente, agente inativo, conv com bot
+// desligado, fora da janela).
+func (r *AgentRuntime) logSkippedNoAgent(instanceID uuid.UUID, text string, started time.Time, fromJID string) {
+	var primary models.InstanceAgent
+	err := r.db.Where("instance_id = ?", instanceID).
+		Order("is_primary DESC, created_at ASC").First(&primary).Error
+	if err != nil {
+		log.Warn().
+			Str("instance", instanceID.String()).
+			Str("from", fromJID).
+			Msg("agent-runtime: inbound chegou mas instância não tem agente cadastrado")
+		return
+	}
+
+	reason := "no_active_agent"
+	if !primary.IsActive {
+		reason = "agent_inactive"
+	} else {
+		var conv models.Conversation
+		if err := r.db.Where("instance_id = ? AND channel_key = ?", instanceID, fromJID).
+			Where("status IN ?", []models.ConversationStatus{
+				models.ConversationStatusOpen,
+				models.ConversationStatusPending,
+				models.ConversationStatusSnoozed,
+			}).Order("updated_at DESC").First(&conv).Error; err == nil {
+			var state models.ConversationAgentState
+			if r.db.Where("conversation_id = ?", conv.ID).First(&state).Error == nil {
+				if state.Mode == models.AgentModeDisabled {
+					reason = "human_took_over"
+				}
+			}
+			if !conv.IsBotActive {
+				reason = "bot_disabled_in_conversation"
+			}
+		}
+		if !isAgentActiveNow(&primary, time.Now(), 0) {
+			reason = "outside_activation_window"
+		}
+	}
+
+	r.logExecution(models.AgentExecution{
+		AgentID: primary.ID, InstanceID: instanceID,
+		Trigger: "inbound", Status: "skipped", SkipReason: reason,
+		InputPreview: text, DurationMs: int(time.Since(started).Milliseconds()),
+	})
 }
