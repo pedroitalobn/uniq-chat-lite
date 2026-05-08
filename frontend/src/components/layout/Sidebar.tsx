@@ -21,6 +21,7 @@ import { Logo } from "@/components/Logo";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { WorkspaceCustomizeDialog, resolveWorkspaceIcon } from "@/components/layout/WorkspaceCustomizeDialog";
+import { UsageBanner } from "@/components/layout/UsageBanner";
 import { conversationsApi } from "@/lib/api";
 
 export function Sidebar() {
@@ -182,7 +183,6 @@ export function Sidebar() {
     // dentro do card de workspace (escondia em sidebar collapsed). Agora
     // entrada primária pra qualquer membro do workspace.
     { href: "/workspace",    label: "Workspace",           icon: Building2,       exact: false, show: !!currentWorkspace },
-    { href: "/usage",        label: "Consumo",             icon: Zap,             exact: false, show: true },
     { href: "/settings",     label: t("nav_settings"),     icon: Settings,        exact: false, show: true },
   ];
   const visibleNavItems = navItems.filter((n) => n.show);
@@ -515,6 +515,11 @@ export function Sidebar() {
           </div>
         )}
       </nav>
+
+      {/* Usage banner — clicável, leva pra /usage. Mostra a categoria
+         mais crítica + mini-barras por categoria. Substitui o item de
+         menu "Consumo" — agora vive como widget visual no rodapé. */}
+      <UsageBanner collapsed={collapsed} />
 
       {/* Upgrade prompt — só pro dono, plano free */}
       {!collapsed && canSeeBilling && planName?.toLowerCase() === "free" && (
