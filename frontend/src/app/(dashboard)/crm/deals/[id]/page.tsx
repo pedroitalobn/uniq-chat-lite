@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { DealTasksMeetings } from "@/components/crm/DealTasksMeetings";
 import { EntityCustomFieldsSection } from "@/components/crm/EntityCustomFieldsSection";
+import { MemberOptionPicker } from "@/components/crm/FunnelStagePicker";
 import {
   ArrowLeft, Check, X, RotateCcw, Briefcase, Building2, User as UserIcon,
   Calendar, DollarSign, Tag as TagIcon, StickyNote, Send, ChevronDown,
@@ -125,6 +126,14 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
     onSuccess: () => { toast.success("Deal reaberto"); refresh(); },
   });
 
+  // Atribui/troca o owner do deal. Usa dealsApi.patch direto pra evitar
+  // criar endpoint dedicado — backend já aceita owner_id em PATCH.
+  const setOwner = useMutation({
+    mutationFn: (ownerId: string) => dealsApi.patch(wsId as string, id, { owner_id: ownerId || null }),
+    onSuccess: () => { toast.success("Responsável atualizado"); refresh(); },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Falha ao atualizar dono"),
+  });
+
   const [noteBody, setNoteBody] = useState("");
   const addNote = useMutation({
     mutationFn: () => dealsApi.addNote(wsId as string, id, noteBody.trim()),
@@ -216,10 +225,22 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
                 : "—"
             }
           />
-          <SummaryTile
-            label="Dono"
-            value={deal.owner?.name ?? "Sem dono"}
-          />
+          {/* Dono editável: clique troca/define o responsável. Antes era
+              read-only, então não dava pra ajustar quando criasse o deal
+              sem owner ou pra repassar pra outro atendente. */}
+          <div
+            className="rounded-xl p-3 flex flex-col gap-1"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <span className="text-[10px] uppercase tracking-wider" style={{ color: uniq.textFaint }}>
+              Responsável
+            </span>
+            <MemberOptionPicker
+              value={deal.owner?.id ?? ""}
+              onChange={(v) => setOwner.mutate(v)}
+              placeholder={setOwner.isPending ? "Atualizando…" : "Sem responsável"}
+            />
+          </div>
         </div>
 
         {/* Timeline + note composer */}
