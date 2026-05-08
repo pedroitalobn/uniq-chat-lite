@@ -4,7 +4,9 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -648,6 +650,10 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		ActivationMode *string                 `json:"activation_mode"`
 		Schedule       *map[string]interface{} `json:"schedule"`
 		ContextRules   *map[string]interface{} `json:"context_rules"`
+		// Trigger — em qual condição o agente inicia/responde.
+		TriggerMode          *string   `json:"trigger_mode"`
+		TriggerKeywords      *[]string `json:"trigger_keywords"`
+		TriggerWebhookSecret *string   `json:"trigger_webhook_secret"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -806,6 +812,25 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 	}
 	if req.ContextRules != nil {
 		agent.ContextRules = marshalJSONString(*req.ContextRules, "{}")
+	}
+	if req.TriggerMode != nil {
+		switch strings.ToLower(strings.TrimSpace(*req.TriggerMode)) {
+		case "any", "keyword", "webhook":
+			agent.TriggerMode = strings.ToLower(*req.TriggerMode)
+		}
+	}
+	if req.TriggerKeywords != nil {
+		agent.TriggerKeywords = marshalJSONString(*req.TriggerKeywords, "[]")
+	}
+	if req.TriggerWebhookSecret != nil {
+		// Vazio = remove (sem auth obrigatória); preenchido = setado.
+		agent.TriggerWebhookSecret = strings.TrimSpace(*req.TriggerWebhookSecret)
+	}
+	// Auto-gera slug do webhook quando o modo virar "webhook" e ainda
+	// não houver slug salvo. Idempotente: slug existente é preservado pra
+	// não invalidar URLs já distribuídas.
+	if agent.TriggerMode == "webhook" && strings.TrimSpace(agent.TriggerWebhookSlug) == "" {
+		agent.TriggerWebhookSlug = generateWebhookSlug()
 	}
 
 	if err := h.db.Save(&agent).Error; err != nil {
@@ -1938,4 +1963,16 @@ func firstNRunes(s string, n int) string {
 		return s
 	}
 	return string(rs[:n])
+}
+
+// generateWebhookSlug — 32 chars hex (16 bytes random) por agente.
+// Usado como path param de /v1/webhooks/agent-trigger/:slug. Gera entropy
+// suficiente pra ser tratado como segredo quando não há HMAC configurado.
+func generateWebhookSlug() string {
+	b := make([]byte, 16)
+	if _, err := cryptorand.Read(b); err != nil {
+		// Fallback timestamp-based — extremamente raro, mas evita string vazia.
+		return fmt.Sprintf("agw_%d", time.Now().UnixNano())
+	}
+	return "agw_" + hex.EncodeToString(b)
 }

@@ -7,8 +7,9 @@
 // devolve mode=disabled quando o "agora" cai fora da janela — caindo
 // limpo pra atendimento humano sem precisar tocar nada mais.
 
-import { useMemo } from "react";
-import { Calendar, Clock, Plus, Trash2, UserPlus, Zap } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Calendar, Clock, Copy, Hash, Plus, Trash2, UserPlus, Webhook, Zap } from "lucide-react";
+import { toast } from "sonner";
 
 type ScheduleRange = { from: string; to: string };
 type Schedule = {
@@ -17,6 +18,14 @@ type Schedule = {
 };
 
 type ActivationMode = "always" | "business_hours" | "off_hours" | "new_contact_only" | "custom";
+type TriggerMode = "any" | "keyword" | "webhook";
+
+type TriggerConfig = {
+  mode: TriggerMode;
+  keywords: string[];
+  webhook_slug: string;        // read-only, gerado pelo backend ao ativar webhook mode
+  webhook_secret: string;
+};
 
 const DAYS: Array<{ key: string; label: string }> = [
   { key: "mon", label: "Segunda" },
@@ -40,11 +49,18 @@ export function ActivationTab({
   schedule,
   onChangeMode,
   onChangeSchedule,
+  trigger,
+  onChangeTrigger,
+  apiBase,
 }: {
   mode: ActivationMode;
   schedule: Schedule;
   onChangeMode: (m: ActivationMode) => void;
   onChangeSchedule: (s: Schedule) => void;
+  trigger: TriggerConfig;
+  onChangeTrigger: (t: TriggerConfig) => void;
+  /** URL base do backend pra montar a URL completa do webhook (ex: https://api.uniq.chat) */
+  apiBase?: string;
 }) {
   const showSchedule = mode === "business_hours" || mode === "off_hours" || mode === "custom";
 
@@ -215,6 +231,205 @@ export function ActivationTab({
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Trigger: em qual condição o agente INICIA/RESPONDE ── */}
+      <TriggerSection trigger={trigger} onChange={onChangeTrigger} apiBase={apiBase} />
+    </div>
+  );
+}
+
+// ─── Trigger config ──────────────────────────────────────────────────────
+
+const TRIGGER_PRESETS: Array<{ id: TriggerMode; title: string; desc: string; icon: any }> = [
+  { id: "any",     title: "Toda mensagem inbound",        desc: "Default — responde qualquer mensagem que cair na instância (respeitando a janela acima).", icon: Zap },
+  { id: "keyword", title: "Por palavra-chave",            desc: "Só responde se a mensagem do cliente CONTIVER alguma das palavras configuradas.",          icon: Hash },
+  { id: "webhook", title: "Por webhook (integração)",     desc: "Não responde mensagens normais. Inicia conversa ao receber POST no endpoint dedicado.",     icon: Webhook },
+];
+
+function TriggerSection({
+  trigger, onChange, apiBase,
+}: {
+  trigger: TriggerConfig;
+  onChange: (t: TriggerConfig) => void;
+  apiBase?: string;
+}) {
+  const [keywordInput, setKeywordInput] = useState("");
+  const fullWebhookURL = trigger.webhook_slug
+    ? `${(apiBase || "https://api.uniq.chat").replace(/\/$/, "")}/v1/webhooks/agent-trigger/${trigger.webhook_slug}`
+    : "";
+
+  const addKeyword = () => {
+    const k = keywordInput.trim().toLowerCase();
+    if (!k) return;
+    if (trigger.keywords.some((x) => x.toLowerCase() === k)) {
+      setKeywordInput("");
+      return;
+    }
+    onChange({ ...trigger, keywords: [...trigger.keywords, k] });
+    setKeywordInput("");
+  };
+  const removeKeyword = (i: number) =>
+    onChange({ ...trigger, keywords: trigger.keywords.filter((_, idx) => idx !== i) });
+
+  const copyURL = async () => {
+    if (!fullWebhookURL) return;
+    try {
+      await navigator.clipboard.writeText(fullWebhookURL);
+      toast.success("URL copiada");
+    } catch {
+      toast.error("Não consegui copiar — selecione manualmente");
+    }
+  };
+
+  return (
+    <div className="space-y-4 pt-2 border-t" style={{ borderColor: "var(--surface-border)" }}>
+      <div>
+        <h2 className="text-base font-semibold mb-1" style={{ color: "var(--text-1)" }}>O que dispara o agente</h2>
+        <p className="text-xs" style={{ color: "var(--text-3)" }}>
+          Define em qual <em>evento</em> o agente entra em ação. Combina com a janela acima — o agente só responde se ambos passarem.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {TRIGGER_PRESETS.map((p) => {
+          const active = trigger.mode === p.id;
+          const Icon = p.icon;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onChange({ ...trigger, mode: p.id })}
+              className="text-left rounded-2xl p-4 transition"
+              style={{
+                background: active ? "rgba(0,212,106,0.08)" : "var(--surface-2)",
+                border: `1px solid ${active ? "rgba(0,212,106,0.3)" : "var(--surface-border)"}`,
+              }}
+            >
+              <div className="flex items-center gap-2 mb-1.5">
+                <Icon className="w-4 h-4" style={{ color: active ? "var(--green)" : "var(--text-3)" }} />
+                <span className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{p.title}</span>
+              </div>
+              <p className="text-[11px]" style={{ color: "var(--text-3)" }}>{p.desc}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Keyword config ── */}
+      {trigger.mode === "keyword" && (
+        <div className="rounded-2xl p-4 space-y-3" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Palavras-chave</h3>
+            <span className="text-[11px]" style={{ color: "var(--text-3)" }}>
+              {trigger.keywords.length} cadastrada{trigger.keywords.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={keywordInput}
+              onChange={(e) => setKeywordInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addKeyword(); } }}
+              placeholder="ex: preço, comprar, orçamento"
+              className="input-field text-xs flex-1"
+            />
+            <button
+              type="button"
+              onClick={addKeyword}
+              className="text-[11px] px-2 py-1.5 rounded-md inline-flex items-center gap-1"
+              style={{ background: "rgba(0,212,106,0.1)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.25)" }}
+            >
+              <Plus className="w-3 h-3" />
+              Adicionar
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {trigger.keywords.length === 0 && (
+              <span className="text-[11px]" style={{ color: "var(--text-3)" }}>
+                Nenhuma palavra cadastrada — adicione pelo menos uma pra o agente disparar.
+              </span>
+            )}
+            {trigger.keywords.map((k, i) => (
+              <span
+                key={`${i}-${k}`}
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md"
+                style={{ background: "var(--surface-3)", color: "var(--text-1)", border: "1px solid var(--surface-border)" }}
+              >
+                {k}
+                <button
+                  type="button"
+                  onClick={() => removeKeyword(i)}
+                  className="hover:opacity-60"
+                  style={{ color: "#f87171" }}
+                  title="Remover"
+                >
+                  <Trash2 className="w-2.5 h-2.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+          <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
+            Match por substring case-insensitive. Ex: <code>preço</code> casa &quot;qual o preço?&quot; e &quot;preço amanhã&quot;.
+          </p>
+        </div>
+      )}
+
+      {/* ── Webhook config ── */}
+      {trigger.mode === "webhook" && (
+        <div className="rounded-2xl p-4 space-y-3" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+          <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Endpoint do webhook</h3>
+          {fullWebhookURL ? (
+            <>
+              <div className="rounded-lg p-2.5 flex items-center gap-2"
+                style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+                <code className="text-[11px] font-mono flex-1 truncate" style={{ color: "var(--text-1)" }}>
+                  POST {fullWebhookURL}
+                </code>
+                <button
+                  type="button"
+                  onClick={copyURL}
+                  className="p-1 rounded hover:bg-white/5"
+                  style={{ color: "var(--text-3)" }}
+                  title="Copiar URL"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <pre className="text-[10px] p-2 rounded overflow-x-auto"
+                style={{ background: "var(--surface-3)", color: "var(--text-2)", border: "1px solid var(--surface-border)" }}>
+{`Body JSON:
+{
+  "to": "5511999999999",
+  "message": "Lead novo do site — interessado em automação",
+  "from_name": "João da Silva",
+  "variables": { "campanha": "black-friday" }
+}`}
+              </pre>
+            </>
+          ) : (
+            <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+              Salve o agente pra gerar a URL do webhook automaticamente.
+            </p>
+          )}
+
+          <div>
+            <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-2)" }}>
+              Secret (opcional, recomendado em produção)
+            </label>
+            <input
+              type="text"
+              value={trigger.webhook_secret}
+              onChange={(e) => onChange({ ...trigger, webhook_secret: e.target.value })}
+              placeholder="Cole/gere um secret de 32+ caracteres"
+              className="input-field text-xs w-full"
+            />
+            <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
+              Quando preenchido, o webhook exige header <code>X-Uniq-Signature: hex(HMAC-SHA256(body, secret))</code>.
+              Sem secret, a URL por si só é o token (slug de 32 chars random).
+            </p>
           </div>
         </div>
       )}

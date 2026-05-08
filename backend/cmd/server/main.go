@@ -317,7 +317,7 @@ func main() {
 	}()
 
 	// Router
-	app := api.SetupRouter(db, manager)
+	app := api.SetupRouter(db, manager, agentRuntime)
 
 	addr := ":" + cfg.Port
 	log.Info().Str("addr", addr).Msg("Uniq.chat API starting")

@@ -1259,6 +1259,10 @@ export const integrationsApi = {
     activation_mode?: "always" | "business_hours" | "off_hours" | "new_contact_only" | "custom";
     schedule?: { timezone: string; days: Record<string, Array<{ from: string; to: string }>> };
     context_rules?: Record<string, unknown>;
+    // Trigger
+    trigger_mode?: "any" | "keyword" | "webhook";
+    trigger_keywords?: string[];
+    trigger_webhook_secret?: string;
   }, agentId?: string) => api.put(
     `/v1/instances/${instanceId}/agent`,
     data,

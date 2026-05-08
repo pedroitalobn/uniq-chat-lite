@@ -67,12 +67,34 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 	if !found {
 		return false
 	}
-	if agent.Integration == nil || agent.IntegrationID == nil {
-		log.Debug().Str("instance", instanceID).Msg("agent-runtime: agente ativo sem integração vinculada")
+
+	// Resolve LLM integration. Prioridade:
+	//   1. Agent.Integration (custom escolhida pelo user em /agents)
+	//   2. PlatformAI default (Uniq AI configurada pelo admin) — quando
+	//      o agent não tem integration_id.
+	//   3. Sem fallback → não responde (e loga pra debug).
+	//
+	// Antes a função BAILAVA OUT em (1), o que fazia agentes em Uniq AI
+	// (que é o default da UI!) nunca responderem. UI marcava como pronto,
+	// runtime silenciava — confusão clássica.
+	var integration *models.UserIntegration
+	if agent.Integration != nil && agent.IntegrationID != nil {
+		integration = agent.Integration
+	} else {
+		// Fallback Uniq AI / PlatformAI.
+		var pai models.PlatformAI
+		if err := r.db.Where("is_active = true AND api_key <> ''").
+			Order("created_at ASC").First(&pai).Error; err == nil {
+			integration = PlatformAIToIntegration(&pai)
+		}
+	}
+	if integration == nil {
+		log.Warn().
+			Str("instance", instanceID).
+			Str("agent", agent.AgentName).
+			Msg("agent-runtime: nenhuma LLM disponível (sem integração custom e sem PlatformAI configurada)")
 		return false
 	}
-
-	integration := agent.Integration
 	if model := strings.TrimSpace(agent.Model); model != "" {
 		if b, err := json.Marshal([]string{model}); err == nil {
 			copy := *integration
@@ -83,6 +105,18 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 
 	client := r.manager.GetInstance(instanceID)
 	if client == nil || !client.IsConnected() {
+		return false
+	}
+
+	// Trigger gate — em qual condição o agente DECIDE responder.
+	// "any" passa direto. "keyword" exige match na mensagem inbound.
+	// "webhook" não responde inbound NUNCA — só é disparado via
+	// /v1/webhooks/agent-trigger/:slug.
+	if !shouldTriggerAgent(agent, text) {
+		log.Debug().
+			Str("agent", agent.AgentName).
+			Str("trigger_mode", agent.TriggerMode).
+			Msg("agent-runtime: trigger não satisfeito — pulando")
 		return false
 	}
 
@@ -884,4 +918,172 @@ func derefUUID(p *uuid.UUID) uuid.UUID {
 		return uuid.Nil
 	}
 	return *p
+}
+
+// shouldTriggerAgent — gate de TriggerMode. Decide se o agente deve
+// processar este inbound. Webhook-mode NÃO responde mensagens normais
+// (só via endpoint dedicado).
+func shouldTriggerAgent(agent *models.InstanceAgent, inboundText string) bool {
+	if agent == nil {
+		return false
+	}
+	mode := strings.ToLower(strings.TrimSpace(agent.TriggerMode))
+	switch mode {
+	case "", "any":
+		return true
+	case "webhook":
+		// Inbound não dispara webhook-only; só /v1/webhooks/agent-trigger.
+		return false
+	case "keyword":
+		var kws []string
+		_ = json.Unmarshal([]byte(agent.TriggerKeywords), &kws)
+		if len(kws) == 0 {
+			return false // sem keywords cadastradas → não responde nada
+		}
+		lower := strings.ToLower(inboundText)
+		for _, kw := range kws {
+			kw = strings.ToLower(strings.TrimSpace(kw))
+			if kw != "" && strings.Contains(lower, kw) {
+				return true
+			}
+		}
+		return false
+	}
+	return true // modos desconhecidos → fail-open pra não trancar atendimento
+}
+
+// ─── Webhook trigger ──────────────────────────────────────────────────────
+
+// AgentWebhookPayload — corpo aceito pelo webhook de trigger do agente.
+// O contexto mínimo é só "to" (JID/phone do destinatário) + "message"
+// (texto que vira input do LLM). Variables é livre — o agente pode
+// referenciar via {{variables.X}} no system prompt se quiser.
+type AgentWebhookPayload struct {
+	To        string                 `json:"to"`        // JID, e.164, ou phone bruto
+	Message   string                 `json:"message"`   // texto do "evento" pra alimentar o LLM
+	FromName  string                 `json:"from_name"` // opcional — nome do contato pra contexto
+	Variables map[string]any         `json:"variables"` // opcional — ficam disponíveis pro prompt
+	Metadata  map[string]any         `json:"metadata"`  // opcional — só pra log/audit
+}
+
+// TriggerByWebhook — dispara o agente fora do fluxo inbound regular.
+// Usado pelo endpoint /v1/webhooks/agent-trigger/:slug. Carrega o agente,
+// roda o LLM e envia a resposta via WhatsApp pra `payload.To`.
+//
+// Retorna a reply enviada (sanitizada, sem markers) ou erro descritivo.
+func (r *AgentRuntime) TriggerByWebhook(agent *models.InstanceAgent, payload AgentWebhookPayload) (string, error) {
+	if r == nil || agent == nil {
+		return "", fmt.Errorf("runtime ou agente inválido")
+	}
+	if !agent.IsActive {
+		return "", fmt.Errorf("agente inativo")
+	}
+	to := strings.TrimSpace(payload.To)
+	msg := strings.TrimSpace(payload.Message)
+	if to == "" {
+		return "", fmt.Errorf("campo 'to' obrigatório")
+	}
+	if msg == "" {
+		return "", fmt.Errorf("campo 'message' obrigatório")
+	}
+
+	// Normaliza JID — aceita "5511...", "+55 11 ...", "5511...@s.whatsapp.net".
+	jid := to
+	if !strings.Contains(jid, "@") {
+		// Tira tudo que não é dígito
+		var b strings.Builder
+		for _, c := range jid {
+			if c >= '0' && c <= '9' {
+				b.WriteRune(c)
+			}
+		}
+		jid = b.String() + "@s.whatsapp.net"
+	}
+
+	// Resolve LLM (mesma cascata do inbound regular):
+	//   custom Integration > PlatformAI default (Uniq AI) > erro.
+	var integration *models.UserIntegration
+	if agent.IntegrationID != nil {
+		if agent.Integration != nil {
+			integration = agent.Integration
+		} else {
+			var integ models.UserIntegration
+			if err := r.db.First(&integ, "id = ?", *agent.IntegrationID).Error; err == nil {
+				integration = &integ
+			}
+		}
+	}
+	if integration == nil {
+		var pai models.PlatformAI
+		if err := r.db.Where("is_active = true AND api_key <> ''").
+			Order("created_at ASC").First(&pai).Error; err == nil {
+			integration = PlatformAIToIntegration(&pai)
+		}
+	}
+	if integration == nil {
+		return "", fmt.Errorf("nenhuma LLM disponível (sem integration_id e sem PlatformAI ativa)")
+	}
+	if model := strings.TrimSpace(agent.Model); model != "" {
+		if b, err := json.Marshal([]string{model}); err == nil {
+			copy := *integration
+			copy.Models = string(b)
+			integration = &copy
+		}
+	}
+
+	// Cliente WhatsApp da instância do agente.
+	client := r.manager.GetInstance(agent.InstanceID.String())
+	if client == nil || !client.IsConnected() {
+		return "", fmt.Errorf("instância do agente desconectada")
+	}
+
+	// System prompt + ferramentas + handoff (mesmo que inbound regular).
+	systemPrompt := BuildAgentSystemPrompt(agent, agent.Assets)
+	if siblings := r.loadSiblingsForPrompt(agent); siblings != "" {
+		systemPrompt += "\n\n" + siblings
+	}
+	if tools := BuildToolsPromptSection(agent); tools != "" {
+		systemPrompt += "\n\n" + tools
+	}
+	if strings.TrimSpace(systemPrompt) == "" {
+		systemPrompt = "Você é um assistente de atendimento útil, profissional e objetivo."
+	}
+
+	// User prompt: contexto do evento + variáveis.
+	var userPrompt strings.Builder
+	userPrompt.WriteString("Você foi disparado por um webhook externo. Use o evento abaixo como gancho pra iniciar/continuar a conversa de forma natural com o cliente.\n\n")
+	if payload.FromName != "" {
+		userPrompt.WriteString(fmt.Sprintf("Cliente: %s\n", payload.FromName))
+	}
+	userPrompt.WriteString("Canal: WhatsApp\n\nEvento recebido:\n")
+	userPrompt.WriteString(msg)
+	if len(payload.Variables) > 0 {
+		if vb, err := json.MarshalIndent(payload.Variables, "", "  "); err == nil {
+			userPrompt.WriteString("\n\nDados adicionais:\n")
+			userPrompt.Write(vb)
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	reply, err := r.llm.CallChatWithSystem(ctx, integration, systemPrompt, userPrompt.String(), false)
+	if err != nil {
+		return "", fmt.Errorf("LLM falhou: %w", err)
+	}
+	reply = sanitizeAssistantReply(reply)
+	reply = handoffMarkerRe.ReplaceAllString(reply, "")
+	reply = actionMarkerRe.ReplaceAllString(reply, "")
+	reply = strings.TrimSpace(reply)
+	if reply == "" {
+		return "", fmt.Errorf("LLM retornou resposta vazia")
+	}
+
+	if _, sendErr := client.SendTextMessage(jid, reply); sendErr != nil {
+		return reply, fmt.Errorf("falha ao enviar WhatsApp: %w", sendErr)
+	}
+	log.Info().
+		Str("agent", agent.AgentName).
+		Str("to", jid).
+		Msg("agent-runtime: trigger webhook executado")
+	return reply, nil
 }

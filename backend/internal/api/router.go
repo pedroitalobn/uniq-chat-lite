@@ -23,7 +23,7 @@ import (
 )
 
 // SetupRouter configures all routes and returns the Fiber app.
-func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
+func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.AgentRuntime) *fiber.App {
 	app := fiber.New(fiber.Config{
 		// CF-Connecting-IP é injetado pela Cloudflare com o IP real do cliente.
 		// Sem isso, c.IP() retorna o IP do proxy (172.67.x.x) e TODOS os
@@ -1520,6 +1520,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Wizard simplificado: gera prompts (identity/objective/etc) a partir de
 	// 7 respostas curtas via LLM da conta.
 	instance.Post("/agent/generate-from-quiz", integrationH.GenerateAgentFromQuiz)
+
+	// Webhook trigger pra agentes — endpoint público (autenticado por slug
+	// + opcional HMAC). Permite integrações externas dispararem o agente.
+	agentWebhookH := handlers.NewAgentWebhookHandler(db, agentRuntime)
+	app.Post("/v1/webhooks/agent-trigger/:slug", agentWebhookH.Trigger)
 
 	// DEPRECATED legacy inbox routes (WhatsApp-style per-instance chat).
 	// Mantidas para clientes externos via API key — o dashboard já migrou

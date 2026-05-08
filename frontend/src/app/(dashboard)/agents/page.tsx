@@ -65,6 +65,11 @@ type AgentForm = {
     timezone: string;
     days: Record<string, Array<{ from: string; to: string }>>;
   };
+  // Trigger
+  trigger_mode: "any" | "keyword" | "webhook";
+  trigger_keywords: string[];
+  trigger_webhook_slug: string;
+  trigger_webhook_secret: string;
 };
 
 // ─── Skills catalog ─────────────────────────────────────────────────────────
@@ -149,6 +154,10 @@ function emptyForm(): AgentForm {
     role: "primary", handoff_skills: [], action_confirmation: "client",
     activation_mode: "always",
     schedule: { timezone: "America/Sao_Paulo", days: {} },
+    trigger_mode: "any",
+    trigger_keywords: [],
+    trigger_webhook_slug: "",
+    trigger_webhook_secret: "",
   };
 }
 
@@ -194,6 +203,10 @@ function mapAgent(data: any): AgentForm {
         days: raw.days || {},
       };
     })(),
+    trigger_mode: ["any", "keyword", "webhook"].includes(data?.trigger_mode) ? data.trigger_mode : "any",
+    trigger_keywords: parseJSONArray<string[]>(data?.trigger_keywords, []),
+    trigger_webhook_slug: data?.trigger_webhook_slug || "",
+    trigger_webhook_secret: data?.trigger_webhook_secret || "",
   };
 }
 
@@ -334,6 +347,9 @@ export default function AgentsPage() {
         action_confirmation: form.action_confirmation,
         activation_mode: form.activation_mode,
         schedule: form.schedule,
+        trigger_mode: form.trigger_mode,
+        trigger_keywords: form.trigger_keywords,
+        trigger_webhook_secret: form.trigger_webhook_secret,
       } as any, selectedAgentId || undefined);
     },
     onSuccess: async () => {
@@ -942,6 +958,20 @@ export default function AgentsPage() {
               schedule={form.schedule}
               onChangeMode={(m) => setForm((p) => ({ ...p, activation_mode: m }))}
               onChangeSchedule={(s) => setForm((p) => ({ ...p, schedule: s }))}
+              trigger={{
+                mode: form.trigger_mode,
+                keywords: form.trigger_keywords,
+                webhook_slug: form.trigger_webhook_slug,
+                webhook_secret: form.trigger_webhook_secret,
+              }}
+              onChangeTrigger={(t) => setForm((p) => ({
+                ...p,
+                trigger_mode: t.mode,
+                trigger_keywords: t.keywords,
+                trigger_webhook_secret: t.webhook_secret,
+                // webhook_slug é gerado pelo backend; só atualiza local se backend devolveu (no save).
+              }))}
+              apiBase={process.env.NEXT_PUBLIC_API_URL}
             />
           )}
 

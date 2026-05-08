@@ -177,6 +177,28 @@ type InstanceAgent struct {
 	//     "skip_if_human_replied_within_min": 30 }
 	// Por enquanto só serializa pra evolução incremental sem migration.
 	ContextRules string `gorm:"type:text;default:'{}'" json:"context_rules,omitempty"`
+	// Trigger — em QUE CONDIÇÕES o agente abre/responde a conversa.
+	// Complementa ActivationMode (que é o gate de horário/contexto):
+	//   "any"     → responde qualquer mensagem inbound (default).
+	//   "keyword" → só responde quando a mensagem casa com TriggerKeywords
+	//                (substring case-insensitive contra a última msg do
+	//                cliente). Útil pra agente especialista em pré-venda
+	//                ativado por "preço", "comprar", etc.
+	//   "webhook" → NÃO responde mensagens inbound; só dispara via
+	//                POST /v1/webhooks/agent-trigger/:slug com payload.
+	//                Útil pra integrações (form site → agent inicia
+	//                conversa no WhatsApp).
+	TriggerMode string `gorm:"type:varchar(20);default:'any'" json:"trigger_mode,omitempty"`
+	// TriggerKeywords — JSON array de strings minúsculas. Match por
+	// substring (case-insensitive) na última mensagem inbound.
+	TriggerKeywords string `gorm:"type:text;default:'[]'" json:"trigger_keywords,omitempty"`
+	// TriggerWebhookSlug — identificador único do webhook deste agente.
+	// Path final: POST /v1/webhooks/agent-trigger/<slug>. Auto-gerado
+	// quando agent.TriggerMode = "webhook" e ainda vazio.
+	TriggerWebhookSlug string `gorm:"type:varchar(64);uniqueIndex" json:"trigger_webhook_slug,omitempty"`
+	// TriggerWebhookSecret — opcional. Se preenchido, requests precisam
+	// trazer header X-Uniq-Signature = HMAC-SHA256(body, secret) hex.
+	TriggerWebhookSecret string `gorm:"type:varchar(128)" json:"trigger_webhook_secret,omitempty"`
 	// n8n / webhook passthrough
 	WebhookURL    string `gorm:"type:varchar(255)" json:"webhook_url,omitempty"`
 	WebhookSecret string `gorm:"type:varchar(255)" json:"webhook_secret,omitempty"`
