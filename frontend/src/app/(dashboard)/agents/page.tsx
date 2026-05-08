@@ -1472,7 +1472,7 @@ function AgentListView({
             </div>
 
             {/* CTA footer */}
-            <div className="px-4 pb-4">
+            <div className="px-4 pb-4 space-y-2">
               <button
                 onClick={() => onEdit(inst.id)}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-sm font-medium transition-all"
@@ -1484,6 +1484,19 @@ function AgentListView({
                 <Settings2 className="w-4 h-4" />
                 {configured ? "Editar agente" : "Configurar agente"}
               </button>
+              {/* Beta — link pro novo editor (Fase 1: esqueleto). Some
+                  quando o port das fases 2-6 estiver completo. */}
+              <a
+                href={`/agents/${inst.id}/primary`}
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-[11px] font-medium transition-all"
+                style={{
+                  background: "rgba(99,102,241,0.06)",
+                  color: "#a5b4fc",
+                  border: "1px dashed rgba(99,102,241,0.30)",
+                }}
+              >
+                Novo editor (beta) →
+              </a>
             </div>
           </div>
         );
