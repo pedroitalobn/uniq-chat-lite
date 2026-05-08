@@ -9,13 +9,14 @@ import { toast } from "sonner";
 import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 import {
   CreditCard, Mail, MessageSquare, Server, Globe, Shield, Key, Save, Check, X,
-  Loader2, RefreshCw, Edit2, ExternalLink, Smartphone, Settings2, Sparkles, Mic2,
+  Loader2, RefreshCw, Edit2, ExternalLink, Smartphone, Settings2, Sparkles, Mic2, DollarSign,
 } from "lucide-react";
 import { PlatformAIPanel } from "@/app/(dashboard)/admin/platform-ai/page";
 import { PlatformVoicePanel } from "@/components/admin/PlatformVoicePanel";
+import { PricingConfigPanel } from "@/components/admin/PricingConfigPanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Tab = "payment" | "communication" | "server" | "proxies" | "ai" | "voice";
+type Tab = "payment" | "communication" | "server" | "proxies" | "ai" | "voice" | "pricing";
 type CommSection = "email" | "templates" | "otp";
 
 interface PaymentSettings {
@@ -220,6 +221,10 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] 
   // globais (OpenAI TTS, ElevenLabs, etc.) que viram a "Uniq Voice"
   // pra workspaces com allow_voice no plano.
   { id: "voice",         label: "Uniq Voice",   icon: Mic2,          desc: "Provedores TTS globais (OpenAI TTS, ElevenLabs)" },
+  // Pricing: margem dinâmica por categoria + custo bruto dos providers
+  // + top-up packs publicados pra venda. Mudança aqui afeta todos os
+  // events futuros em <5s (cache do recorder invalidado no PUT).
+  { id: "pricing",       label: "Pricing",      icon: DollarSign,    desc: "Margem, custo bruto, top-up packs" },
   { id: "server",        label: "Servidor",     icon: Server,        desc: "Servidores e instâncias" },
   { id: "proxies",       label: "Proxies",      icon: Globe,         desc: "Gerenciamento de proxies" },
 ];
@@ -1010,7 +1015,7 @@ function ProvidersPageInner() {
   // Aba inicial vem do query (?tab=ai por exemplo) — usado pelo
   // redirect de /admin/platform-ai e bookmarks que linkam direto.
   const initialTab = (searchParams.get("tab") as Tab) || "payment";
-  const validTabs: Tab[] = ["payment", "communication", "ai", "voice", "server", "proxies"];
+  const validTabs: Tab[] = ["payment", "communication", "ai", "voice", "pricing", "server", "proxies"];
   const router = useRouter();
   const [active, setActive] = useState<Tab>(validTabs.includes(initialTab) ? initialTab : "payment");
   const isSuperAdmin = (session?.user as { role?: string })?.role === "super_admin";
@@ -1089,6 +1094,7 @@ function ProvidersPageInner() {
             {active === "communication" && <CommunicationTab />}
             {active === "ai"            && <PlatformAIPanel />}
             {active === "voice"         && <PlatformVoicePanel />}
+            {active === "pricing"       && <PricingConfigPanel />}
             {active === "server"        && <ServerTab />}
             {active === "proxies"       && <ProxiesTab />}
           </AnimatedTabContent>

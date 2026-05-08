@@ -118,6 +118,12 @@ export interface Plan {
   max_proxy_pool: number;
   allow_ai: boolean;
   allow_voice: boolean;
+  // Uniq Credits — allowance + overage policy
+  ai_credits_included_per_cycle?: number;
+  voice_credits_included_per_cycle?: number;
+  message_credits_included_per_cycle?: number;
+  overage_allowed_default?: boolean;
+  overage_millicents_per_credit?: number | null;
   allow_journeys: boolean;
   allow_crm: boolean;
   allow_inbox: boolean;

@@ -2279,6 +2279,61 @@ export const usageApi = {
     api.post<{ ok: boolean; allowed: boolean }>("/v1/usage/me/overage", { allowed }),
 };
 
+// ─── Admin usage ───────────────────────────────────────────────────────
+
+export interface PricingConfig {
+  id?: string;
+  credit_unit_micros: number;
+  margin_pct_ai: number;
+  margin_pct_voice: number;
+  margin_pct_message: number;
+  margin_pct_proxy: number;
+  llm_cost_matrix: string;
+  llm_default_input_cost_per_1k: number;
+  llm_default_output_cost_per_1k: number;
+  tts_default_cost_per_100_chars: number;
+  stt_default_cost_per_second: number;
+  message_outbound_qr_cost: number;
+  message_outbound_waba_util: number;
+  message_outbound_waba_mkt: number;
+  message_inbound_cost: number;
+  proxy_default_cost_per_100_mb: number;
+  topup_packs: string;
+}
+
+export interface GlobalUsageData {
+  days: number;
+  totals: {
+    total_credits: number;
+    total_cost_usd_micro: number;
+    event_count: number;
+    overage_credits: number;
+  };
+  by_category: { category: string; credits: number; cost_usd_micro: number; event_count: number }[];
+  by_provider: { provider: string; category: string; cost_usd_micro: number; credits: number; event_count: number }[];
+  top_users: {
+    user_id: string;
+    user_email: string;
+    user_name: string;
+    credits: number;
+    cost_usd_micro: number;
+    event_count: number;
+  }[];
+  timeseries: { day: string; credits: number; cost_usd_micro: number }[];
+}
+
+export const adminUsageApi = {
+  pricing: () => api.get<PricingConfig>("/v1/admin/pricing-config"),
+  updatePricing: (data: Partial<PricingConfig>) =>
+    api.put<PricingConfig>("/v1/admin/pricing-config", data),
+  userUsage: (userId: string) => api.get<UsageView>(`/v1/admin/users/${userId}/usage`),
+  grantTopup: (userId: string, data: { category: string; credits: number; note?: string }) =>
+    api.post<{ ok: boolean; topup_id: string }>(`/v1/admin/users/${userId}/topup-grant`, data),
+  resetCycle: (userId: string) =>
+    api.post<{ ok: boolean }>(`/v1/admin/users/${userId}/usage-reset`),
+  global: (days = 30) => api.get<GlobalUsageData>("/v1/admin/usage/global", { params: { days } }),
+};
+
 export const platformVoiceApi = {
   list: () => api.get<PlatformVoiceConfig[]>("/v1/admin/platform-voice"),
   create: (data: Partial<PlatformVoiceConfig> & { api_key?: string }) =>

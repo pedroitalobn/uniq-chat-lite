@@ -1679,6 +1679,19 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	admin.Delete("/platform-voice/:id", adminH.DeletePlatformVoice)
 	admin.Post("/platform-voice/:id/test", adminH.TestPlatformVoice)
 
+	// Pricing config (singleton — margens dinâmicas, custo bruto por
+	// provider, top-up packs publicados). UpdatePricingConfig invalida
+	// o cache do UsageRecorder pra refletir mudança em <5s.
+	admin.Get("/pricing-config", adminH.GetPricingConfig)
+	admin.Put("/pricing-config", adminH.UpdatePricingConfig)
+
+	// Usage admin — inspeção de quota por user, grant manual de créditos,
+	// reset de ciclo, dashboard global de consumo.
+	admin.Get("/users/:id/usage", adminH.GetUserUsage)
+	admin.Post("/users/:id/topup-grant", adminH.GrantTopup)
+	admin.Post("/users/:id/usage-reset", adminH.ResetUserCycle)
+	admin.Get("/usage/global", adminH.GetGlobalUsage)
+
 	// ─── Customer.io / Close-inspired modules ──────────────────────────
 	segH := handlers.NewSegmentHandler(db)
 	supH := handlers.NewSuppressionHandler(db)

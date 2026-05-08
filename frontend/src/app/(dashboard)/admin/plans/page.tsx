@@ -18,6 +18,12 @@ interface EditState {
   // Limites globais
   max_instances: number;
   max_messages_per_day: number;
+  // Credits (Uniq Credits — Phase 1+ usage system)
+  ai_credits_included_per_cycle: number;
+  voice_credits_included_per_cycle: number;
+  message_credits_included_per_cycle: number;
+  overage_allowed_default: boolean;
+  overage_millicents_per_credit?: number | null;
   max_users: number;
   max_workspaces: number;
   // Sub-limites por módulo (-1=ilimitado, 0=bloqueado)
@@ -299,6 +305,11 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
     price: p?.price ?? 0,
     max_instances: p?.max_instances ?? 1,
     max_messages_per_day: p?.max_messages_per_day ?? 100,
+    ai_credits_included_per_cycle: p?.ai_credits_included_per_cycle ?? 0,
+    voice_credits_included_per_cycle: p?.voice_credits_included_per_cycle ?? 0,
+    message_credits_included_per_cycle: p?.message_credits_included_per_cycle ?? 0,
+    overage_allowed_default: p?.overage_allowed_default ?? false,
+    overage_millicents_per_credit: p?.overage_millicents_per_credit ?? null,
     max_users: p?.max_users ?? 1,
     max_workspaces: p?.max_workspaces ?? 1,
     max_agents: p?.max_agents ?? 0,
@@ -360,6 +371,11 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
         price: form.price,
         max_instances: form.max_instances,
         max_messages_per_day: form.max_messages_per_day,
+        ai_credits_included_per_cycle: form.ai_credits_included_per_cycle,
+        voice_credits_included_per_cycle: form.voice_credits_included_per_cycle,
+        message_credits_included_per_cycle: form.message_credits_included_per_cycle,
+        overage_allowed_default: form.overage_allowed_default,
+        overage_millicents_per_credit: form.overage_millicents_per_credit,
         max_users: form.max_users,
         max_workspaces: form.max_workspaces,
         max_agents: form.max_agents,
@@ -578,6 +594,28 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                   <NumField label="Max. Instâncias WPP" value={form.max_instances} onChange={(v) => setForm({ ...form, max_instances: v })} />
                   <NumField label="Envios diários" value={form.max_messages_per_day} onChange={(v) => setForm({ ...form, max_messages_per_day: v })} />
                 </div>
+
+                {/* Uniq Credits — allowance mensal por categoria. Free
+                    plan zero em tudo = PAYG puro (user só usa AI/Voice
+                    se comprar topup). overage_allowed_default vira o
+                    default da quota; user pode mudar pelo painel /usage. */}
+                <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "hsl(240 8% 50%)" }}>
+                  Uniq Credits (allowance mensal — 0 = PAYG)
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <NumField label="Créditos AI / mês" value={form.ai_credits_included_per_cycle} onChange={(v) => setForm({ ...form, ai_credits_included_per_cycle: v })} />
+                  <NumField label="Créditos Voice / mês" value={form.voice_credits_included_per_cycle} onChange={(v) => setForm({ ...form, voice_credits_included_per_cycle: v })} />
+                  <NumField label="Créditos Mensagens / mês" value={form.message_credits_included_per_cycle} onChange={(v) => setForm({ ...form, message_credits_included_per_cycle: v })} />
+                  <NumField label="Overage R$ / 1k créditos extras (millicents)" value={form.overage_millicents_per_credit ?? 0} onChange={(v) => setForm({ ...form, overage_millicents_per_credit: v || null })} />
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer text-xs mt-2" style={{ color: "var(--text-2)" }}>
+                  <input
+                    type="checkbox"
+                    checked={form.overage_allowed_default}
+                    onChange={(e) => setForm({ ...form, overage_allowed_default: e.target.checked })}
+                  />
+                  Permitir overage por padrão (user pode mudar depois)
+                </label>
 
                 <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "hsl(240 8% 50%)" }}>Por módulo</p>
                 <div className="grid grid-cols-2 gap-3">
