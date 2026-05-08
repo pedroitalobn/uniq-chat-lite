@@ -461,6 +461,22 @@ function InboxPage() {
       qc.invalidateQueries({ queryKey: ["conversations", wsId, "unified"] });
     },
   });
+  // Swipe-to-archive (esquerda) e swipe-to-read (direita) — gestos
+  // mobile aplicados em cada row da ConversationList. Resolve = arquiva
+  // pra UX mobile (segue padrão Telegram/iOS Mail "swipe to delete/archive").
+  const archiveMut = useMutation({
+    mutationFn: (id: string) => conversationsApi.resolve(wsId as string, id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["conversations", wsId, "unified"] });
+    },
+    onError: () => toast.error("Falha ao arquivar"),
+  });
+  const markReadMut = useMutation({
+    mutationFn: (id: string) => conversationsApi.markRead(wsId as string, id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["conversations", wsId, "unified"] });
+    },
+  });
 
   const backfill = useMutation({
     mutationFn: () => conversationsApi.backfill(wsId as string, { limit: 500, max_batches: 20 }),
@@ -965,6 +981,8 @@ function InboxPage() {
                   await crmApi.updateContact(contactId, { name: newName });
                   qc.invalidateQueries({ queryKey: ["conversations", wsId] });
                 }}
+                onArchive={isMobile ? (conv) => archiveMut.mutate(conv.id) : undefined}
+                onMarkRead={isMobile ? (conv) => markReadMut.mutate(conv.id) : undefined}
               />
             )}
           </PullToRefresh>

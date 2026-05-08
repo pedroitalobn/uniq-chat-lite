@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { MessageCircle, Pencil, Users as UsersIcon, UserCheck } from "lucide-react";
+import { MessageCircle, Pencil, Users as UsersIcon, UserCheck, Archive as ArchiveIcon, CheckCheck as CheckCheckIcon } from "lucide-react";
+import { SwipeRow } from "@/components/mobile/SwipeRow";
 
 export interface ConversationRow {
   id: string;
@@ -254,6 +255,8 @@ export function ConversationList({
   instanceLabel,
   showInstanceChip,
   onRenameContact,
+  onArchive,
+  onMarkRead,
 }: {
   items: ConversationRow[];
   isLoading?: boolean;
@@ -274,6 +277,10 @@ export function ConversationList({
   showInstanceChip?: boolean;
   /** Callback para salvar novo nome do contato ao editar inline. */
   onRenameContact?: (contactId: string, newName: string) => Promise<void>;
+  /** Swipe-to-archive em mobile (esquerda revela "Arquivar"). */
+  onArchive?: (conv: ConversationRow) => void;
+  /** Swipe-to-mark-read em mobile (direita revela "Lida"). */
+  onMarkRead?: (conv: ConversationRow) => void;
 }) {
   if (isLoading) {
     return (
@@ -529,9 +536,33 @@ export function ConversationList({
             }}
             className="hover:bg-white/5"
           >
-            <Link href={href} className="block" scroll={false}>
-              {rowInner}
-            </Link>
+            {(onArchive || onMarkRead) ? (
+              <SwipeRow
+                rightActions={onArchive ? [{
+                  id: "archive",
+                  label: "Arquivar",
+                  icon: ArchiveIcon,
+                  color: "#475569",
+                  onAction: () => onArchive(conv),
+                }] : []}
+                leftActions={onMarkRead && conv.agent_unread_count > 0 ? [{
+                  id: "read",
+                  label: "Lida",
+                  icon: CheckCheckIcon,
+                  color: "#00d46a",
+                  textColor: "#0a0a14",
+                  onAction: () => onMarkRead(conv),
+                }] : []}
+              >
+                <Link href={href} className="block" scroll={false}>
+                  {rowInner}
+                </Link>
+              </SwipeRow>
+            ) : (
+              <Link href={href} className="block" scroll={false}>
+                {rowInner}
+              </Link>
+            )}
           </li>
         );
       })}
