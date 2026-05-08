@@ -1,16 +1,17 @@
 "use client";
 
-import { Loader2, AlertTriangle, Construction } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 import { useAgentFormContext } from "../../_shared/AgentFormContext";
 import { PersonalityCard } from "./_components/PersonalityCard";
 import { VoiceCard } from "./_components/VoiceCard";
 import { KnowledgeCard } from "./_components/KnowledgeCard";
+import { SkillsCard } from "./_components/SkillsCard";
+import { StatusCard } from "./_components/StatusCard";
 
-// Studio — página principal de configuração do agente. Cards
-// colapsáveis: Personalidade, Voz, Conhecimento.
-//
-// Fase 3 vai trazer: card de Habilidades + status lateral.
-// Fase 5 vai trazer: split-view com preview de chat ao vivo.
+// Studio — página principal de configuração do agente.
+// Layout: cards à esquerda (scroll vertical), status card sticky
+// à direita em telas grandes; em mobile o status some até a Fase 5
+// (vai virar bottom sheet com preview de chat ao vivo).
 export default function AgentStudioPage() {
   const { form, updateForm, isLoading, error, instanceId } = useAgentFormContext();
 
@@ -49,24 +50,20 @@ export default function AgentStudioPage() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-3xl mx-auto space-y-3">
-      {/* Cards do Studio */}
-      <PersonalityCard form={form} update={updateForm} />
-      <VoiceCard form={form} update={updateForm} />
-      <KnowledgeCard form={form} update={updateForm} instanceId={instanceId} />
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl mx-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-4">
+        <div className="space-y-3 min-w-0">
+          <PersonalityCard form={form} update={updateForm} />
+          <VoiceCard form={form} update={updateForm} />
+          <KnowledgeCard form={form} update={updateForm} instanceId={instanceId} />
+          <SkillsCard form={form} update={updateForm} />
+        </div>
 
-      {/* Placeholder das próximas fases */}
-      <div
-        className="rounded-2xl p-4 flex items-center gap-3"
-        style={{
-          background: "var(--surface-2)",
-          border: "1px dashed var(--surface-border)",
-        }}
-      >
-        <Construction className="w-4 h-4 flex-shrink-0" style={{ color: "var(--text-3)" }} />
-        <p className="text-xs" style={{ color: "var(--text-3)" }}>
-          Habilidades, status lateral e preview de chat ao vivo chegam nas próximas fases (3 e 5).
-        </p>
+        {/* Status card lateral — em mobile aparece em cima dos cards
+            também, mas com layout simplificado. Em lg fica sticky. */}
+        <div className="hidden lg:block">
+          <StatusCard form={form} />
+        </div>
       </div>
     </div>
   );
