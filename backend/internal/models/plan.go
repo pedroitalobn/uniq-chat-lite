@@ -35,6 +35,7 @@ type Plan struct {
 
 	// ── Feature flags (módulos liga/desliga) ──────────────────────────
 	AllowAI            bool `gorm:"default:false" json:"allow_ai"`             // /agents, RAG, OpenRouter, MCP
+	AllowVoice         bool `gorm:"default:false" json:"allow_voice"`          // Uniq Voice (TTS) + integrações de voz
 	AllowJourneys      bool `gorm:"default:false" json:"allow_journeys"`       // /journeys
 	AllowCRM           bool `gorm:"default:false" json:"allow_crm"`            // /crm/contacts/companies/deals/tasks/meetings
 	AllowInbox         bool `gorm:"default:true"  json:"allow_inbox"`          // /inbox + queues + departments + SLA
@@ -84,6 +85,7 @@ type FeatureKey string
 
 const (
 	FeatureAI            FeatureKey = "ai"
+	FeatureVoice         FeatureKey = "voice"
 	FeatureJourneys      FeatureKey = "journeys"
 	FeatureCRM           FeatureKey = "crm"
 	FeatureInbox         FeatureKey = "inbox"
@@ -116,6 +118,8 @@ func (p *Plan) HasFeature(key FeatureKey) bool {
 	switch key {
 	case FeatureAI:
 		return p.AllowAI
+	case FeatureVoice:
+		return p.AllowVoice
 	case FeatureJourneys:
 		return p.AllowJourneys
 	case FeatureCRM:

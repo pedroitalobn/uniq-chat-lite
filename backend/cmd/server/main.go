@@ -507,6 +507,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.Cart{},
 		// Platform AI (Uniq AI) — singleton config
 		&models.PlatformAI{},
+		&models.PlatformVoice{},
 		// Help Desk (knowledge base)
 		&models.HelpDeskCategory{},
 		&models.HelpDeskArticle{},

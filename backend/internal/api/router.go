@@ -1470,6 +1470,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	integrations.Post("/:id/test", integrationH.Test)
 	integrations.Post("/:id/oauth/refresh", integrationH.RefreshClaudeOAuth)
 	integrations.Get("/platform-ai", adminH.ListPlatformAIPublic)
+	integrations.Get("/platform-voice", adminH.ListPlatformVoicePublic)
 
 	// AI generation (uses user integrations)
 	api.Post("/ai/generate", integrationH.GenerateVariations)
@@ -1657,6 +1658,15 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	admin.Put("/platform-ai/:id", adminH.UpdatePlatformAIByID)
 	admin.Delete("/platform-ai/:id", adminH.DeletePlatformAI)
 	admin.Post("/platform-ai/:id/test", adminH.TestPlatformAIByID)
+	// Uniq Voice — TTS gerenciado pela plataforma. Espelha o pattern do
+	// platform-ai: super admin configura providers globais (OpenAI TTS,
+	// ElevenLabs, etc) que viram a "Uniq Voice" pros workspaces que têm
+	// allow_voice no plano e não configuraram VoiceProvider próprio.
+	admin.Get("/platform-voice", adminH.ListPlatformVoice)
+	admin.Post("/platform-voice", adminH.CreatePlatformVoice)
+	admin.Put("/platform-voice/:id", adminH.UpdatePlatformVoiceByID)
+	admin.Delete("/platform-voice/:id", adminH.DeletePlatformVoice)
+	admin.Post("/platform-voice/:id/test", adminH.TestPlatformVoice)
 
 	// ─── Customer.io / Close-inspired modules ──────────────────────────
 	segH := handlers.NewSegmentHandler(db)

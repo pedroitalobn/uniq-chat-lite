@@ -117,6 +117,7 @@ export interface Plan {
   max_instances_per_proxy: number;
   max_proxy_pool: number;
   allow_ai: boolean;
+  allow_voice: boolean;
   allow_journeys: boolean;
   allow_crm: boolean;
   allow_inbox: boolean;

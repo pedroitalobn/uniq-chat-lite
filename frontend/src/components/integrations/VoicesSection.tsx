@@ -6,7 +6,7 @@ import {
   Mic, Plus, Trash2, RefreshCw, Volume2, Eye, EyeOff,
   ChevronDown, ChevronRight, Loader2, Play, X,
 } from "lucide-react";
-import { voicesApi } from "@/lib/api";
+import { voicesApi, platformVoiceApi, PlatformVoiceConfig } from "@/lib/api";
 import { toast } from "sonner";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { cn } from "@/lib/utils";
@@ -57,6 +57,17 @@ export function VoicesSection() {
     queryFn: () => voicesApi.listProviders(workspaceId).then(r => r.data),
     enabled: !!workspaceId,
   });
+
+  // Uniq Voice: TTS gerenciado pela plataforma. Se o super admin
+  // configurou + o plano do user libera, mostramos um card destaque
+  // permitindo usar sem precisar configurar provider próprio.
+  // Backend faz o gating real (plan.allow_voice + active config); aqui
+  // só consultamos o endpoint público que já filtra ativos.
+  const { data: platformVoices = [] } = useQuery<PlatformVoiceConfig[]>({
+    queryKey: ["platform-voice-public"],
+    queryFn: () => platformVoiceApi.listPublic().then(r => r.data),
+  });
+  const uniqVoice = platformVoices[0];
 
   const { data: allVoices = [] } = useQuery<WorkspaceVoice[]>({
     queryKey: ["voices", workspaceId],
@@ -128,6 +139,41 @@ export function VoicesSection() {
           Adicionar provider
         </button>
       </div>
+
+      {/* Uniq Voice — card destaque quando platform tem voice configurado.
+          Aparece antes da lista de providers próprios. Não requer setup —
+          se o plano libera + super admin configurou, agentes já podem usar. */}
+      {uniqVoice && (
+        <div
+          className="rounded-2xl p-4 flex items-start gap-3"
+          style={{
+            background: "linear-gradient(135deg, rgba(245,158,11,0.10), rgba(0,212,106,0.06))",
+            border: "1px solid rgba(245,158,11,0.30)",
+          }}
+        >
+          <div className="p-2.5 rounded-xl flex-shrink-0"
+            style={{ background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.30)" }}>
+            <Volume2 className="w-4 h-4" style={{ color: "#f59e0b" }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
+                Uniq Voice
+              </h3>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                style={{ background: "rgba(0,212,106,0.12)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.25)" }}>
+                Disponível
+              </span>
+            </div>
+            <p className="text-xs mt-1" style={{ color: "var(--text-2)" }}>
+              TTS gerenciado pela plataforma — sem precisar configurar provider próprio. Já pode ser usado direto pelos seus agentes.
+            </p>
+            <p className="text-[11px] mt-1.5" style={{ color: "var(--text-3)" }}>
+              Quer usar API key própria? Adicione um provider abaixo (ElevenLabs, OpenAI TTS, etc.) — ele tem prioridade sobre o Uniq Voice.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Providers list */}
       {loadingProviders ? (

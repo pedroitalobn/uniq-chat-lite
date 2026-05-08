@@ -2199,3 +2199,32 @@ export const platformAIApi = {
   // Public endpoint (active configs for ModelSelector)
   listPublic: () => api.get<PlatformAIConfig[]>("/v1/integrations/platform-ai"),
 };
+
+// PlatformVoice — espelha a API de PlatformAI mas pra TTS (Uniq Voice).
+// Super admin gerencia providers globais (OpenAI TTS, ElevenLabs, etc.)
+// que viram a "Uniq Voice" pros workspaces que têm allow_voice no plano.
+export interface PlatformVoiceConfig {
+  id?: string;
+  provider: string;     // openai_tts | elevenlabs | qwen_tts | azure_tts
+  name: string;
+  base_url?: string;
+  /** JSON array com vozes disponíveis: [{id,name,language,gender}, ...] */
+  voices?: string;
+  config?: string;
+  is_active: boolean;
+  has_api_key?: boolean;
+  test_status?: string;
+  last_tested_at?: string;
+}
+
+export const platformVoiceApi = {
+  list: () => api.get<PlatformVoiceConfig[]>("/v1/admin/platform-voice"),
+  create: (data: Partial<PlatformVoiceConfig> & { api_key?: string }) =>
+    api.post<{ ok: boolean; id: string }>("/v1/admin/platform-voice", data),
+  update: (id: string, data: Partial<PlatformVoiceConfig> & { api_key?: string }) =>
+    api.put<{ ok: boolean; id: string }>(`/v1/admin/platform-voice/${id}`, data),
+  delete: (id: string) => api.delete(`/v1/admin/platform-voice/${id}`),
+  test: (id: string) =>
+    api.post<{ ok: boolean; message: string }>(`/v1/admin/platform-voice/${id}/test`),
+  listPublic: () => api.get<PlatformVoiceConfig[]>("/v1/integrations/platform-voice"),
+};

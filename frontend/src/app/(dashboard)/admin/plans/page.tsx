@@ -35,6 +35,7 @@ interface EditState {
   max_proxy_pool: number;
   // Feature flags
   allow_ai: boolean;
+  allow_voice: boolean;
   allow_journeys: boolean;
   allow_crm: boolean;
   allow_inbox: boolean;
@@ -313,6 +314,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
     max_instances_per_proxy: p?.max_instances_per_proxy ?? 0,
     max_proxy_pool: p?.max_proxy_pool ?? 0,
     allow_ai: p?.allow_ai ?? false,
+    allow_voice: p?.allow_voice ?? false,
     allow_journeys: p?.allow_journeys ?? false,
     allow_crm: p?.allow_crm ?? false,
     allow_inbox: p?.allow_inbox ?? true,
@@ -373,6 +375,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
         max_instances_per_proxy: form.max_instances_per_proxy,
         max_proxy_pool: form.max_proxy_pool,
         allow_ai: form.allow_ai,
+        allow_voice: form.allow_voice,
         allow_journeys: form.allow_journeys,
         allow_crm: form.allow_crm,
         allow_inbox: form.allow_inbox,
@@ -644,6 +647,8 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                 <FeatureGroup title="Automação & IA">
                   <FeatureToggle label="Uniq AI / Agentes" desc="/agents — RAG + tools + voz (TTS) + IVC"
                     checked={form.allow_ai} onChange={(v) => setForm({ ...form, allow_ai: v })} color="#a78bfa" />
+                  <FeatureToggle label="Uniq Voice" desc="TTS gerenciado pela plataforma + provider próprio"
+                    checked={form.allow_voice} onChange={(v) => setForm({ ...form, allow_voice: v })} color="#f59e0b" />
                   <FeatureToggle label="Jornadas" desc="/journeys — flow builder de automações"
                     checked={form.allow_journeys} onChange={(v) => setForm({ ...form, allow_journeys: v })} color="#60a5fa" />
                   <FeatureToggle label="Triggers" desc="Autoresponders por keyword/regex"

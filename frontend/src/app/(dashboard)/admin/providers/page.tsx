@@ -9,12 +9,13 @@ import { toast } from "sonner";
 import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 import {
   CreditCard, Mail, MessageSquare, Server, Globe, Shield, Key, Save, Check, X,
-  Loader2, RefreshCw, Edit2, ExternalLink, Smartphone, Settings2, Sparkles,
+  Loader2, RefreshCw, Edit2, ExternalLink, Smartphone, Settings2, Sparkles, Mic2,
 } from "lucide-react";
 import { PlatformAIPanel } from "@/app/(dashboard)/admin/platform-ai/page";
+import { PlatformVoicePanel } from "@/components/admin/PlatformVoicePanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Tab = "payment" | "communication" | "server" | "proxies" | "ai";
+type Tab = "payment" | "communication" | "server" | "proxies" | "ai" | "voice";
 type CommSection = "email" | "templates" | "otp";
 
 interface PaymentSettings {
@@ -215,6 +216,10 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] 
   // por todos os módulos da plataforma — Uniq AI chat, transcrição
   // Whisper de áudios do inbox, agente de instâncias.
   { id: "ai",            label: "Uniq AI",      icon: Sparkles,      desc: "Provedores LLM globais (OpenAI, Anthropic, etc.)" },
+  // Voice: TTS gerenciado pela plataforma. Espelha Uniq AI — providers
+  // globais (OpenAI TTS, ElevenLabs, etc.) que viram a "Uniq Voice"
+  // pra workspaces com allow_voice no plano.
+  { id: "voice",         label: "Uniq Voice",   icon: Mic2,          desc: "Provedores TTS globais (OpenAI TTS, ElevenLabs)" },
   { id: "server",        label: "Servidor",     icon: Server,        desc: "Servidores e instâncias" },
   { id: "proxies",       label: "Proxies",      icon: Globe,         desc: "Gerenciamento de proxies" },
 ];
@@ -1005,7 +1010,7 @@ function ProvidersPageInner() {
   // Aba inicial vem do query (?tab=ai por exemplo) — usado pelo
   // redirect de /admin/platform-ai e bookmarks que linkam direto.
   const initialTab = (searchParams.get("tab") as Tab) || "payment";
-  const validTabs: Tab[] = ["payment", "communication", "ai", "server", "proxies"];
+  const validTabs: Tab[] = ["payment", "communication", "ai", "voice", "server", "proxies"];
   const router = useRouter();
   const [active, setActive] = useState<Tab>(validTabs.includes(initialTab) ? initialTab : "payment");
   const isSuperAdmin = (session?.user as { role?: string })?.role === "super_admin";
@@ -1083,6 +1088,7 @@ function ProvidersPageInner() {
             {active === "payment"       && <PaymentTab />}
             {active === "communication" && <CommunicationTab />}
             {active === "ai"            && <PlatformAIPanel />}
+            {active === "voice"         && <PlatformVoicePanel />}
             {active === "server"        && <ServerTab />}
             {active === "proxies"       && <ProxiesTab />}
           </AnimatedTabContent>
