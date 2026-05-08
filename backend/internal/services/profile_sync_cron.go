@@ -131,7 +131,9 @@ func (c *ProfileSyncCron) fillMissing(ctx context.Context, limit int) int {
 		newAvatar := r.AvatarURL
 		if newAvatar == "" {
 			if pic := client.GetContactProfilePicture(r.ChannelKey); pic != "" {
-				newAvatar = pic
+				// Baixa do CDN da Meta e sobe pro nosso storage — sem isso
+				// a URL signed expira em horas e o avatar some.
+				newAvatar = whatsapp.PersistAvatar(ctx, r.ChannelKey, pic)
 			}
 		}
 		newPushName := r.PushName
@@ -182,25 +184,31 @@ func (c *ProfileSyncCron) fillMissing(ctx context.Context, limit int) int {
 	return updated
 }
 
-// refreshStale — pra conversas que JÁ têm avatar mas não foram tocadas em
-// 6+ horas, tenta refrescar (URL signed pode ter expirado). Mantém o valor
-// antigo se a refetch retornar vazio.
+// refreshStale — migra avatar_urls antigas (signed URLs do CDN da Meta
+// que expiram) pra nosso storage permanente. Filtra por URLs que NÃO são
+// do nosso domínio — uma vez migrado pro MinIO/S3, a URL é estável e a
+// gente nunca refaz fetch (se o user trocar a foto, evento Picture do
+// whatsmeow pode invalidar — TODO).
 func (c *ProfileSyncCron) refreshStale(ctx context.Context, limit int) int {
 	type row struct {
 		ID         uuid.UUID
 		InstanceID uuid.UUID
 		ChannelKey string
+		AvatarURL  string
 	}
 	var rows []row
-	cutoff := time.Now().Add(-6 * time.Hour)
-	if err := c.db.WithContext(ctx).
+	q := c.db.WithContext(ctx).
 		Table("conversations").
-		Select("id, instance_id, channel_key").
+		Select("id, instance_id, channel_key, avatar_url").
 		Where("channel_type = ?", "whatsapp").
 		Where("channel_key IS NOT NULL AND channel_key <> ''").
 		Where("avatar_url IS NOT NULL AND avatar_url <> ''").
-		Where("channel_key NOT LIKE ?", "%@g.us").
-		Where("updated_at < ?", cutoff).
+		Where("channel_key NOT LIKE ?", "%@g.us")
+	// Só URLs externas (signed do CDN da Meta) — as nossas (que já estão
+	// no MinIO) ficam de fora porque são permanentes.
+	q = q.Where("(avatar_url LIKE ? OR avatar_url LIKE ? OR avatar_url LIKE ?)",
+		"%whatsapp.net%", "%fbcdn.net%", "%whatsapp.com%")
+	if err := q.
 		Order("updated_at ASC").
 		Limit(limit).
 		Scan(&rows).Error; err != nil {
@@ -216,10 +224,14 @@ func (c *ProfileSyncCron) refreshStale(ctx context.Context, limit int) int {
 		if pic == "" {
 			continue
 		}
+		permPic := whatsapp.PersistAvatar(ctx, r.ChannelKey, pic)
+		if permPic == "" {
+			continue
+		}
 		if err := c.db.WithContext(ctx).
 			Model(&models.Conversation{}).
 			Where("id = ?", r.ID).
-			Update("avatar_url", pic).Error; err == nil {
+			Update("avatar_url", permPic).Error; err == nil {
 			updated++
 		}
 	}

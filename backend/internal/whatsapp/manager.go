@@ -373,8 +373,12 @@ func (m *Manager) SaveMessageEx(in SaveMessageInput) error {
 		contactAvatar = cached
 	} else if client := m.GetInstance(instanceID); client != nil && client.IsConnected() {
 		if picURL := client.GetContactProfilePicture(toJID); picURL != "" {
-			contactAvatar = picURL
-			storeAvatarCache(toJID, picURL)
+			// Baixa os bytes e sobe pro nosso MinIO — a signed URL da Meta
+			// expira em horas e antes a gente guardava ela direto, perdendo
+			// o avatar. Cache armazena a URL permanente pra reuso instantâneo.
+			permURL := PersistAvatar(context.Background(), toJID, picURL)
+			contactAvatar = permURL
+			storeAvatarCache(toJID, permURL)
 		}
 	}
 
@@ -843,15 +847,16 @@ func upsertPushName(m *Manager, instanceID, jid, name string) {
 			Update("avatar_url", avatar)
 	} else if client := m.GetInstance(instanceID); client != nil && client.IsConnected() {
 		if pic := client.GetContactProfilePicture(jid); pic != "" {
-			storeAvatarCache(jid, pic)
+			permPic := PersistAvatar(context.Background(), jid, pic)
+			storeAvatarCache(jid, permPic)
 			m.db.Model(&models.Conversation{}).
 				Where("instance_id = ? AND channel_key = ? AND (avatar_url = '' OR avatar_url IS NULL)",
 					instUUID, jid).
-				Update("avatar_url", pic)
+				Update("avatar_url", permPic)
 			// Também escreve em Contact se ainda vazio
 			m.db.Model(&models.Contact{}).
 				Where("phone LIKE ? AND (avatar_url = '' OR avatar_url IS NULL)", "%"+phone+"%").
-				Update("avatar_url", pic)
+				Update("avatar_url", permPic)
 		}
 	}
 	log.Debug().
