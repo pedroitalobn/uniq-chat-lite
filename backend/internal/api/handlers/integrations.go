@@ -1976,3 +1976,55 @@ func generateWebhookSlug() string {
 	}
 	return "agw_" + hex.EncodeToString(b)
 }
+
+// ─── Logs de execução do agente (aba Logs no editor) ─────────────────────
+
+// ListAgentLogs — GET /v1/instances/:id/agent/logs?agent_id=&limit=&status=
+//
+// Lista as últimas execuções do agente da instância. Sem agent_id, traz
+// do primário. Filtros: status (success|skipped|failed), limit (1..200,
+// default 50). Ordem: mais recentes primeiro.
+func (h *IntegrationHandler) ListAgentLogs(c *fiber.Ctx) error {
+	inst := middleware.GetCurrentInstance(c)
+	if inst == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	// Resolve agente alvo: ?agent_id= ou primário.
+	var agent models.InstanceAgent
+	q := h.db.Where("instance_id = ?", inst.ID)
+	if aid := c.Query("agent_id"); aid != "" {
+		q = q.Where("id = ?", aid)
+	} else {
+		q = q.Order("is_primary DESC, created_at ASC")
+	}
+	if err := q.First(&agent).Error; err != nil {
+		// Sem agente cadastrado ainda → lista vazia (não 404, evita
+		// flicker na UI quando agente acabou de ser criado).
+		return c.JSON(fiber.Map{"items": []any{}})
+	}
+
+	limit := c.QueryInt("limit", 50)
+	if limit < 1 || limit > 200 {
+		limit = 50
+	}
+
+	logsQ := h.db.Model(&models.AgentExecution{}).Where("agent_id = ?", agent.ID)
+	if status := strings.TrimSpace(c.Query("status")); status != "" {
+		switch status {
+		case "success", "skipped", "failed":
+			logsQ = logsQ.Where("status = ?", status)
+		}
+	}
+
+	var logs []models.AgentExecution
+	if err := logsQ.Order("created_at DESC").Limit(limit).Find(&logs).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{
+		"items":     logs,
+		"agent_id":  agent.ID,
+		"agent_name": agent.AgentName,
+	})
+}

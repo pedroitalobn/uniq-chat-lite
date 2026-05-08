@@ -1213,6 +1213,9 @@ export const integrationsApi = {
     api.delete(`/v1/instances/${instanceId}/agents/${agentId}`),
   setPrimaryAgent: (instanceId: string, agentId: string) =>
     api.post(`/v1/instances/${instanceId}/agents/${agentId}/set-primary`),
+  // Logs de execução pra aba "Logs" no editor de agente.
+  agentLogs: (instanceId: string, params?: { agent_id?: string; status?: "success" | "skipped" | "failed"; limit?: number }) =>
+    api.get(`/v1/instances/${instanceId}/agent/logs`, { params }),
   // Wizard simplificado: gera prompt sections via LLM a partir das respostas.
   generateAgentFromQuiz: (instanceId: string, quiz: {
     agent_name?: string;

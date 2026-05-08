@@ -60,6 +60,9 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		return false
 	}
 
+	// Logging de execução: começamos um struct mutável aqui que cada
+	// branch pode preencher e chamar logExecution antes de retornar.
+	started := time.Now()
 	instUUID, err := uuid.Parse(instanceID)
 	if err != nil {
 		return false
@@ -95,6 +98,11 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 			Str("instance", instanceID).
 			Str("agent", agent.AgentName).
 			Msg("agent-runtime: nenhuma LLM disponível (sem integração custom e sem PlatformAI configurada)")
+		r.logExecution(models.AgentExecution{
+			AgentID: agent.ID, InstanceID: instUUID,
+			Trigger: "inbound", Status: "skipped", SkipReason: "no_llm",
+			InputPreview: text, DurationMs: int(time.Since(started).Milliseconds()),
+		})
 		return false
 	}
 	if model := strings.TrimSpace(agent.Model); model != "" {
@@ -107,6 +115,11 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 
 	client := r.manager.GetInstance(instanceID)
 	if client == nil || !client.IsConnected() {
+		r.logExecution(models.AgentExecution{
+			AgentID: agent.ID, InstanceID: instUUID,
+			Trigger: "inbound", Status: "skipped", SkipReason: "instance_disconnected",
+			InputPreview: text, DurationMs: int(time.Since(started).Milliseconds()),
+		})
 		return false
 	}
 
@@ -119,6 +132,15 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 			Str("agent", agent.AgentName).
 			Str("trigger_mode", agent.TriggerMode).
 			Msg("agent-runtime: trigger não satisfeito — pulando")
+		reason := "trigger_no_match"
+		if strings.ToLower(agent.TriggerMode) == "webhook" {
+			reason = "trigger_webhook_only"
+		}
+		r.logExecution(models.AgentExecution{
+			AgentID: agent.ID, InstanceID: instUUID,
+			Trigger: "inbound", Status: "skipped", SkipReason: reason,
+			InputPreview: text, DurationMs: int(time.Since(started).Milliseconds()),
+		})
 		return false
 	}
 
@@ -140,11 +162,21 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 	reply, err := r.llm.CallChatWithSystem(ctx, integration, systemPrompt, userPrompt, false)
 	if err != nil {
 		log.Error().Err(err).Str("instance", instanceID).Str("chat", fromJID).Msg("agent-runtime: falha ao gerar resposta")
+		r.logExecution(models.AgentExecution{
+			AgentID: agent.ID, InstanceID: instUUID,
+			Trigger: "inbound", Status: "failed", ErrorMessage: err.Error(),
+			InputPreview: text, DurationMs: int(time.Since(started).Milliseconds()),
+		})
 		return false
 	}
 
 	reply = sanitizeAssistantReply(reply)
 	if reply == "" {
+		r.logExecution(models.AgentExecution{
+			AgentID: agent.ID, InstanceID: instUUID,
+			Trigger: "inbound", Status: "failed", ErrorMessage: "LLM retornou resposta vazia",
+			InputPreview: text, DurationMs: int(time.Since(started).Milliseconds()),
+		})
 		return false
 	}
 
@@ -253,6 +285,12 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		Str("agent", agent.AgentName).
 		Msg("agent-runtime: resposta enviada")
 
+	r.logExecution(models.AgentExecution{
+		AgentID: agent.ID, InstanceID: instUUID,
+		Trigger: "inbound", Status: "success",
+		InputPreview: text, ReplyPreview: reply,
+		DurationMs: int(time.Since(started).Milliseconds()),
+	})
 	return true
 }
 
@@ -1095,5 +1133,38 @@ func (r *AgentRuntime) TriggerByWebhook(agent *models.InstanceAgent, payload Age
 		Str("agent", agent.AgentName).
 		Str("to", jid).
 		Msg("agent-runtime: trigger webhook executado")
+	r.logExecution(models.AgentExecution{
+		AgentID: agent.ID, InstanceID: agent.InstanceID,
+		Trigger: "webhook", Status: "success",
+		InputPreview: msg, ReplyPreview: reply,
+	})
 	return reply, nil
+}
+
+// ─── Logging de execução (aba Logs do agente) ─────────────────────────────
+
+// logExecution persiste um AgentExecution. Async (goroutine) pra não
+// adicionar latência no path de resposta. Erros do save só viram log
+// debug — perder uma row de log nunca pode quebrar o atendimento.
+func (r *AgentRuntime) logExecution(rec models.AgentExecution) {
+	if r == nil || r.db == nil {
+		return
+	}
+	go func() {
+		// Trunca previews defensivamente (DB já tem varchar(500), mas
+		// reduz risco de erro silencioso por overflow).
+		rec.InputPreview = truncateRunes(rec.InputPreview, 480)
+		rec.ReplyPreview = truncateRunes(rec.ReplyPreview, 480)
+		if err := r.db.Create(&rec).Error; err != nil {
+			log.Debug().Err(err).Msg("agent-runtime: falha ao persistir log de execução")
+		}
+	}()
+}
+
+func truncateRunes(s string, max int) string {
+	rs := []rune(s)
+	if len(rs) <= max {
+		return s
+	}
+	return string(rs[:max]) + "…"
 }

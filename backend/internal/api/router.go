@@ -1520,6 +1520,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	// Wizard simplificado: gera prompts (identity/objective/etc) a partir de
 	// 7 respostas curtas via LLM da conta.
 	instance.Post("/agent/generate-from-quiz", integrationH.GenerateAgentFromQuiz)
+	// Logs de execução do agente — alimenta a aba "Logs" no editor.
+	instance.Get("/agent/logs", integrationH.ListAgentLogs)
 
 	// Webhook trigger pra agentes — endpoint público (autenticado por slug
 	// + opcional HMAC). Permite integrações externas dispararem o agente.

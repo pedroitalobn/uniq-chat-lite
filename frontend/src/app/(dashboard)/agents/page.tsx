@@ -16,10 +16,11 @@ import { AgentSwitcher } from "@/components/agents/AgentSwitcher";
 import { ActivationTab } from "@/components/agents/ActivationTab";
 import { QuickSetupWizard } from "@/components/agents/QuickSetupWizard";
 import { AgentActionsConfig } from "@/components/agents/AgentActionsConfig";
+import { AgentLogsTab } from "@/components/agents/AgentLogsTab";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type TabId = "personality" | "knowledge" | "skills" | "access" | "voice_studio" | "activation";
+type TabId = "personality" | "knowledge" | "skills" | "access" | "voice_studio" | "activation" | "logs";
 
 type AgentAsset = {
   id: string;
@@ -263,6 +264,7 @@ const TABS: Array<{ id: TabId; label: string; icon: React.ElementType; descripti
   { id: "access",        label: "Access",        icon: Globe,   description: "LLM, MCP, apps e integrações" },
   { id: "voice_studio",  label: "Voice Studio",  icon: Volume2, description: "Vozes, clones e providers" },
   { id: "activation",    label: "Ativação",      icon: Zap,     description: "Quando o agente responde" },
+  { id: "logs",          label: "Logs",          icon: RefreshCw, description: "Histórico de execuções" },
 ];
 
 // ─── Page ────────────────────────────────────────────────────────────────────
@@ -973,6 +975,10 @@ export default function AgentsPage() {
               }))}
               apiBase={process.env.NEXT_PUBLIC_API_URL}
             />
+          )}
+
+          {tab === "logs" && selectedInstance && (
+            <AgentLogsTab instanceId={selectedInstance} agentId={selectedAgentId} />
           )}
 
           {/* ── Access tab ── */}
