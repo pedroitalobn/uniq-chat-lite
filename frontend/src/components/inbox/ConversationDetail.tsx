@@ -3914,7 +3914,9 @@ function Composer({
         >
           Nota interna
         </button>
-        <span className="ml-auto text-[11px]" style={{ color: "hsl(240 8% 38%)" }}>
+        {/* Hint só em desktop — em mobile não tem teclado físico, "Enter
+            envia · Shift+Enter" é confuso e ocupa linha grande do composer. */}
+        <span className="hidden sm:inline ml-auto text-[11px]" style={{ color: "hsl(240 8% 38%)" }}>
           {mode === "message"
             ? "Enter envia · Shift+Enter quebra linha · / resposta rápida"
             : "Nota visível só para a equipe"}

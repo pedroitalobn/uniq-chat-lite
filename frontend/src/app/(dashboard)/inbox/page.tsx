@@ -670,6 +670,11 @@ function InboxPage() {
           background: "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)",
           backdropFilter: "blur(16px) saturate(180%)",
           WebkitBackdropFilter: "blur(16px) saturate(180%)",
+          // Em mobile, quando uma conversa está aberta, escondemos o
+          // header inteiro (título + filtros + busca) — a conversa ocupa
+          // a tela toda, padrão UX dos apps de mensageria. O header da
+          // própria ConversationDetail tem o back arrow pra voltar.
+          display: (isMobile && selectedId) ? "none" : undefined,
         }}
       >
         {/* Linha 1: título + sinalizadores ativos + ações globais (notif, menu).

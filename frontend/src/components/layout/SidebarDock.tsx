@@ -515,20 +515,10 @@ export function SidebarDock() {
 
   return (
     <>
-      {/* Mobile hamburger */}
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-3.5 left-4 z-40 p-2 rounded-xl"
-        style={{
-          background: C.bg,
-          border: `1px solid ${C.border}`,
-          color: C.text2,
-          backdropFilter: "blur(12px)",
-        }}
-        aria-label="Abrir menu"
-      >
-        <Menu style={{ width: 16, height: 16 }} />
-      </button>
+      {/* Mobile hamburger removido — toda navegação mobile vive no
+          MobileDock + sheet "Mais". Hamburger flutuante criava conflito
+          visual com o ModuleHeader e era confuso ("não tenho noção de
+          como usar"). Em md+ a sidebar dock continua visível. */}
 
       {/* Desktop floating dock */}
       <div
