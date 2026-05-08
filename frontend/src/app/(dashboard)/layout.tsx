@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { SidebarDock } from "@/components/layout/SidebarDock";
-import { BottomNav } from "@/components/layout/BottomNav";
+import { MobileDock } from "@/components/layout/MobileDock";
 import { CommandPalette } from "@/components/ui/CommandPalette";
 import { LayoutClient } from "./LayoutClient";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
@@ -30,9 +30,13 @@ export default async function DashboardLayout({
               <SidebarDock />
               <LayoutClient>{children}</LayoutClient>
             </div>
-            <UniqAIIsland />
+            {/* UniqAIIsland (FAB flutuante) só aparece em md+. No mobile,
+                a entrada Uniq AI vive no centro do MobileDock. */}
+            <div className="hidden md:contents">
+              <UniqAIIsland />
+            </div>
             <AmbientAIPanel />
-            <BottomNav />
+            <MobileDock />
             <CommandPalette />
           </UniqAIIslandProvider>
         </PresenceProvider>

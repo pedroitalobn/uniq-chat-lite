@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter_Tight, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -27,6 +27,27 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Uniq.chat — WhatsApp API Platform",
   description: "Gerencie instâncias WhatsApp com facilidade e escala.",
+  // Hints pra o navegador tratar como app instalável (PWA-lite). Ícone
+  // virá do /icon.png. Sem service worker offline ainda — só o "look".
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Uniq.chat",
+    statusBarStyle: "black-translucent",
+  },
+  applicationName: "Uniq.chat",
+  formatDetection: { telephone: false },
+};
+
+// Viewport separado pra suportar safe-area-inset (notch iOS, home indicator).
+// viewport-fit=cover habilita as env(safe-area-inset-*) no CSS, que o
+// MobileDock e bottom sheets já consomem.
+export const viewport: Viewport = {
+  themeColor: "#0a0a14",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

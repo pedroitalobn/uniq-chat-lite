@@ -199,7 +199,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
         <PageContextRegistrar pathname={pathname || ""} />
         <UsageBanner />
         <PendingInvitesBanner />
-        <div className="flex-1 px-4 sm:px-6 py-6 lg:py-8 pt-16 lg:pt-8 pb-14 md:pb-8 overflow-y-auto">
+        <div className="flex-1 px-4 sm:px-6 py-6 lg:py-8 pt-16 lg:pt-8 pb-28 md:pb-8 overflow-y-auto">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={pathname}
@@ -225,7 +225,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
         <PageContextRegistrar pathname={pathname || ""} />
         <UsageBanner />
         <PendingInvitesBanner />
-        <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pt-16 lg:pt-8 pb-14 md:pb-8 overflow-y-auto">
+        <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pt-16 lg:pt-8 pb-28 md:pb-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
@@ -252,7 +252,7 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
     <main className="flex-1 overflow-hidden flex flex-col">
       <PageContextRegistrar pathname={pathname || ""} />
       <UsageBanner />
-      <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pt-16 lg:pt-8 pb-14 md:pb-8 overflow-y-auto">
+      <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pt-16 lg:pt-8 pb-28 md:pb-8 overflow-y-auto">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={pathname}
