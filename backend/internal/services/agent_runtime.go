@@ -156,6 +156,14 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 	if tools := BuildToolsPromptSection(agent); tools != "" {
 		systemPrompt += "\n\n" + tools
 	}
+	// Memória de longo prazo do contato (se houver). Acumulada por
+	// SummarizeContactConversation a cada conversa fechada. Sem isso o
+	// agente "esquece" tudo que aprendeu além dos últimos 25 turnos.
+	if contactID := r.resolveContactID(instUUID, fromJID); contactID != uuid.Nil {
+		if mem := LoadContactMemoryPrompt(r.db, contactID); mem != "" {
+			systemPrompt += "\n\n" + mem
+		}
+	}
 	userPrompt := r.buildUserPrompt(instUUID, fromJID, fromName, text, messageType)
 	if strings.TrimSpace(systemPrompt) == "" {
 		systemPrompt = "Você é um assistente de atendimento útil, profissional e objetivo."
@@ -1283,4 +1291,25 @@ func (r *AgentRuntime) logSkippedNoAgent(instanceID uuid.UUID, text string, star
 		Trigger: "inbound", Status: "skipped", SkipReason: reason,
 		InputPreview: text, DurationMs: int(time.Since(started).Milliseconds()),
 	})
+}
+
+// resolveContactID — quick lookup do contact_id pra uma instance+jid.
+// Retorna uuid.Nil quando não existe (contato ainda não foi criado pelo
+// inbound_pipeline). Usado pra carregar ContactMemory no system prompt.
+func (r *AgentRuntime) resolveContactID(instanceID uuid.UUID, fromJID string) uuid.UUID {
+	var conv models.Conversation
+	if err := r.db.
+		Select("contact_id").
+		Where("instance_id = ? AND channel_key = ?", instanceID, fromJID).
+		Where("status IN ?", []models.ConversationStatus{
+			models.ConversationStatusOpen,
+			models.ConversationStatusPending,
+			models.ConversationStatusSnoozed,
+			models.ConversationStatusResolved,
+		}).
+		Order("updated_at DESC").
+		First(&conv).Error; err == nil && conv.ContactID != nil {
+		return *conv.ContactID
+	}
+	return uuid.Nil
 }

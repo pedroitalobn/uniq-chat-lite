@@ -120,6 +120,18 @@ func executeAction(ctx AgentToolContext, name string, args map[string]any) Agent
 		return toolScheduleMeeting(ctx, args)
 	case "transfer_to_human":
 		return toolTransferToHuman(ctx, args)
+	// Sprint A — CRM
+	case "update_contact":
+		return toolUpdateContact(ctx, args)
+	case "create_deal":
+		return toolCreateDeal(ctx, args)
+	case "update_deal_stage":
+		return toolUpdateDealStage(ctx, args)
+	case "search_contact":
+		return toolSearchContact(ctx, args)
+	// Sprint B — jornada
+	case "enroll_in_journey":
+		return toolEnrollInJourney(ctx, args)
 	}
 	return AgentToolResult{OK: false, Detail: "tool desconhecida: " + name}
 }
@@ -379,6 +391,13 @@ var toolCatalog = map[string]string{
 	"create_task":       `create_task({"title":"...","due_at":"2026-05-10T15:00:00Z","description":"..."}) — cria tarefa pra time humano.`,
 	"schedule_meeting":  `schedule_meeting({"title":"...","when":"2026-05-10T15:00:00Z","duration_min":60,"description":"..."}) — agenda reunião com o contato.`,
 	"transfer_to_human": `transfer_to_human({"reason":"cliente pediu cancelamento"}) — transfere a conversa pra humano e desliga o bot.`,
+	// Sprint A — CRM
+	"update_contact":    `update_contact({"email":"x@y.com","name":"Novo nome","custom_fields":{"cargo":"Diretor"}}) — atualiza dados do contato.`,
+	"create_deal":       `create_deal({"title":"Plano Pro - empresa X","value":99,"funnel":"Vendas","stage":"Proposta"}) — cria deal no funil/estágio (por nome).`,
+	"update_deal_stage": `update_deal_stage({"stage":"Fechado-Ganho"}) — move o deal mais recente do contato pra esta etapa (por nome).`,
+	"search_contact":    `search_contact({"query":"João Silva"}) — busca contato por nome/telefone/email; retorna até 5 matches.`,
+	// Sprint B — jornadas
+	"enroll_in_journey": `enroll_in_journey({"journey":"Onboarding"}) — inscreve o contato na jornada (por nome).`,
 }
 
 func parseEnabledTools(agent *models.InstanceAgent) []string {
@@ -448,4 +467,218 @@ func ifErr(err error, ok string) string {
 		return err.Error()
 	}
 	return ok
+}
+
+// ─── Sprint A: CRM tools ──────────────────────────────────────────────────
+
+// toolUpdateContact — atualiza name/email e merge custom_fields.
+// Não toca telefone (segurança: phone é identidade, evita spoof por LLM).
+func toolUpdateContact(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	if ctx.Contact == nil {
+		return AgentToolResult{OK: false, Detail: "contato não resolvido"}
+	}
+	updates := map[string]any{}
+	if v := strings.TrimSpace(asString(args["name"])); v != "" && v != ctx.Contact.Name {
+		updates["name"] = v
+	}
+	if v := strings.TrimSpace(asString(args["email"])); v != "" && v != ctx.Contact.Email {
+		updates["email"] = v
+	}
+	// Merge custom_fields (não substitui — preserva o que existe).
+	if cf, ok := args["custom_fields"].(map[string]any); ok && len(cf) > 0 {
+		var existing map[string]any
+		if ctx.Contact.CustomFields != "" {
+			_ = json.Unmarshal([]byte(ctx.Contact.CustomFields), &existing)
+		}
+		if existing == nil {
+			existing = map[string]any{}
+		}
+		for k, v := range cf {
+			existing[k] = v
+		}
+		if b, err := json.Marshal(existing); err == nil {
+			updates["custom_fields"] = string(b)
+		}
+	}
+	if len(updates) == 0 {
+		return AgentToolResult{OK: true, Detail: "nada a atualizar"}
+	}
+	if err := ctx.DB.Model(ctx.Contact).Updates(updates).Error; err != nil {
+		return AgentToolResult{OK: false, Detail: err.Error()}
+	}
+	return AgentToolResult{OK: true, ID: ctx.Contact.ID.String(), Detail: "contato atualizado"}
+}
+
+// toolCreateDeal — cria um deal no funil/estágio especificado (por nome,
+// case-insensitive). Default value=0, currency=BRL.
+func toolCreateDeal(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	if ctx.Contact == nil {
+		return AgentToolResult{OK: false, Detail: "contato não resolvido"}
+	}
+	title := strings.TrimSpace(asString(args["title"]))
+	if title == "" {
+		return AgentToolResult{OK: false, Detail: "title obrigatório"}
+	}
+	funnelName := strings.TrimSpace(asString(args["funnel"]))
+	stageName := strings.TrimSpace(asString(args["stage"]))
+
+	// Resolve funil.
+	var funnel models.Funnel
+	q := ctx.DB.Where("workspace_id = ?", ctx.WorkspaceID)
+	if funnelName != "" {
+		q = q.Where("LOWER(name) = LOWER(?)", funnelName)
+	} else {
+		q = q.Where("is_default = ?", true)
+	}
+	if err := q.First(&funnel).Error; err != nil {
+		// Fallback: pega o primeiro do workspace.
+		if err2 := ctx.DB.Where("workspace_id = ?", ctx.WorkspaceID).Order("created_at ASC").First(&funnel).Error; err2 != nil {
+			return AgentToolResult{OK: false, Detail: "nenhum funil encontrado pra criar deal"}
+		}
+	}
+
+	// Resolve stage do funil.
+	var stage models.FunnelStage
+	sq := ctx.DB.Where("funnel_id = ?", funnel.ID)
+	if stageName != "" {
+		sq = sq.Where("LOWER(name) = LOWER(?)", stageName)
+	} else {
+		sq = sq.Order(`"order" ASC`)
+	}
+	if err := sq.First(&stage).Error; err != nil {
+		return AgentToolResult{OK: false, Detail: "estágio não encontrado no funil " + funnel.Name}
+	}
+
+	// Value em centavos (mesma convenção dos outros endpoints).
+	var valueCents int
+	switch v := args["value"].(type) {
+	case float64:
+		valueCents = int(v * 100)
+	case int:
+		valueCents = v * 100
+	case string:
+		if n, err := atoiSafe(v); err == nil {
+			valueCents = n * 100
+		}
+	}
+	currency := strings.ToUpper(strings.TrimSpace(asString(args["currency"])))
+	if currency == "" {
+		currency = "BRL"
+	}
+
+	deal := models.Deal{
+		WorkspaceID: ctx.WorkspaceID,
+		FunnelID:    funnel.ID,
+		StageID:     stage.ID,
+		ContactID:   ctx.Contact.ID,
+		Title:       firstNRunesStr(title, 200),
+		Value:       int64(valueCents),
+		Currency:    currency,
+		Status:      models.DealStatusOpen,
+		OwnerID:     &ctx.CreatedByID,
+	}
+	if ctx.Contact.CompanyID != nil {
+		deal.CompanyID = ctx.Contact.CompanyID
+	}
+	if err := ctx.DB.Create(&deal).Error; err != nil {
+		return AgentToolResult{OK: false, Detail: err.Error()}
+	}
+	return AgentToolResult{OK: true, ID: deal.ID.String(),
+		Detail: "deal criado em " + funnel.Name + " · " + stage.Name}
+}
+
+// toolUpdateDealStage — move o deal aberto mais recente do contato pra
+// novo estágio (por nome). Se cliente tem vários deals abertos, atualiza
+// o mais recente — caller mais ambicioso fica pra futuro.
+func toolUpdateDealStage(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	if ctx.Contact == nil {
+		return AgentToolResult{OK: false, Detail: "contato não resolvido"}
+	}
+	stageName := strings.TrimSpace(asString(args["stage"]))
+	if stageName == "" {
+		return AgentToolResult{OK: false, Detail: "stage obrigatório"}
+	}
+	var deal models.Deal
+	if err := ctx.DB.Where("contact_id = ? AND status = ?", ctx.Contact.ID, models.DealStatusOpen).
+		Order("created_at DESC").First(&deal).Error; err != nil {
+		return AgentToolResult{OK: false, Detail: "nenhum deal aberto pra esse contato"}
+	}
+	var newStage models.FunnelStage
+	if err := ctx.DB.Where("funnel_id = ? AND LOWER(name) = LOWER(?)", deal.FunnelID, stageName).
+		First(&newStage).Error; err != nil {
+		return AgentToolResult{OK: false, Detail: "estágio '" + stageName + "' não existe no funil"}
+	}
+	now := time.Now()
+	if err := ctx.DB.Model(&deal).Updates(map[string]any{
+		"stage_id":        newStage.ID,
+		"stage_change_at": &now,
+	}).Error; err != nil {
+		return AgentToolResult{OK: false, Detail: err.Error()}
+	}
+	return AgentToolResult{OK: true, ID: deal.ID.String(),
+		Detail: "deal movido pra " + newStage.Name}
+}
+
+// toolSearchContact — busca contatos do workspace por nome/phone/email
+// (substring case-insensitive). Devolve até 5 matches no Detail
+// (formato "Nome · phone · id").
+func toolSearchContact(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	q := strings.TrimSpace(asString(args["query"]))
+	if q == "" {
+		return AgentToolResult{OK: false, Detail: "query obrigatório"}
+	}
+	like := "%" + strings.ToLower(q) + "%"
+	var contacts []models.Contact
+	ctx.DB.Where("workspace_id = ?", ctx.WorkspaceID).
+		Where("LOWER(name) LIKE ? OR phone LIKE ? OR LOWER(email) LIKE ?", like, "%"+q+"%", like).
+		Limit(5).
+		Find(&contacts)
+	if len(contacts) == 0 {
+		return AgentToolResult{OK: true, Detail: "nenhum contato encontrado"}
+	}
+	var lines []string
+	for _, c := range contacts {
+		name := c.Name
+		if name == "" {
+			name = "(sem nome)"
+		}
+		lines = append(lines, name+" · "+c.Phone+" · "+c.ID.String())
+	}
+	return AgentToolResult{OK: true, Detail: strings.Join(lines, " | ")}
+}
+
+// ─── Sprint B: jornadas ──────────────────────────────────────────────────
+
+// toolEnrollInJourney — inicia execução de jornada pra esse contato.
+// Resolve por nome (case-insensitive). Não bloqueia se contato já tinha
+// execução anterior — JourneyExecution.canReEnter trata isso.
+func toolEnrollInJourney(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	if ctx.Contact == nil {
+		return AgentToolResult{OK: false, Detail: "contato não resolvido"}
+	}
+	name := strings.TrimSpace(asString(args["journey"]))
+	if name == "" {
+		name = strings.TrimSpace(asString(args["name"]))
+	}
+	if name == "" {
+		return AgentToolResult{OK: false, Detail: "journey (nome) obrigatório"}
+	}
+	var journey models.Journey
+	if err := ctx.DB.Where("workspace_id = ? AND LOWER(name) = LOWER(?)", ctx.WorkspaceID, name).
+		First(&journey).Error; err != nil {
+		return AgentToolResult{OK: false, Detail: "jornada '" + name + "' não encontrada"}
+	}
+	exec := models.JourneyExecution{
+		ID:         uuid.New().String(),
+		JourneyID:  journey.ID,
+		InstanceID: ctx.Agent.InstanceID.String(),
+		ContactJID: ctx.Contact.Phone + "@s.whatsapp.net",
+		Status:     models.ExecutionActive,
+		StartedAt:  time.Now(),
+	}
+	if err := ctx.DB.Create(&exec).Error; err != nil {
+		return AgentToolResult{OK: false, Detail: err.Error()}
+	}
+	return AgentToolResult{OK: true, ID: exec.ID,
+		Detail: "contato inscrito na jornada " + journey.Name}
 }

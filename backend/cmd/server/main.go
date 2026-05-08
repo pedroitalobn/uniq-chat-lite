@@ -405,6 +405,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.InstanceAgent{},
 		&models.AgentAsset{},
 		&models.AgentExecution{},
+		&models.ContactMemory{},
 		&models.PasswordResetToken{},
 		&models.Proxy{},
 		&models.InstagramAccount{},

@@ -2502,6 +2502,22 @@ func (h *ConversationHandler) setStatus(c *fiber.Ctx, status models.Conversation
 	actor := middleware.GetCurrentUserID(c)
 	h.appendEvent(&conv, models.ConvEventStatusChanged, actor, map[string]any{"from": prev, "to": status})
 	h.broadcast(&conv, "conversation.status_changed", map[string]any{"from": prev, "to": status})
+
+	// Auto-resume da memória do contato quando a conversa fecha. Async pra
+	// não atrasar a resposta do handler. Passa contexto novo (não o do
+	// request, que é cancelado quando a resposta sai).
+	if (status == models.ConversationStatusResolved || status == models.ConversationStatusClosed) &&
+		conv.ContactID != nil && h.llm != nil {
+		contactID := *conv.ContactID
+		convID := conv.ID
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if err := services.SummarizeContactConversation(ctx, h.db, h.llm, contactID, convID); err != nil {
+				log.Debug().Err(err).Str("contact", contactID.String()).Msg("contact-memory: summarize falhou (non-fatal)")
+			}
+		}()
+	}
 	return c.JSON(conv)
 }
 

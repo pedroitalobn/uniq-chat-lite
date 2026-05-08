@@ -14,7 +14,12 @@ type ActionId =
   | "note"
   | "create_task"
   | "schedule_meeting"
-  | "transfer_to_human";
+  | "transfer_to_human"
+  | "update_contact"
+  | "create_deal"
+  | "update_deal_stage"
+  | "search_contact"
+  | "enroll_in_journey";
 
 type AppAccessEntry = {
   id: string;
@@ -37,6 +42,13 @@ const ACTIONS: Array<{
   { id: "create_task",       label: "Criar tarefa",        description: "Abre tarefa pra time humano (ex: ligar amanhã, enviar proposta).", icon: ClipboardList },
   { id: "schedule_meeting",  label: "Agendar reunião",     description: "Cria reunião na agenda do CRM com horário sugerido.",             icon: FileText },
   { id: "transfer_to_human", label: "Transferir pra humano", description: "Desliga o bot e passa a conversa pro atendimento humano.",       icon: UserMinus },
+  // Sprint A — CRM completo
+  { id: "update_contact",    label: "Atualizar contato",   description: "Atualiza nome, email e custom_fields. Telefone fica imutável (segurança).", icon: NotebookPen },
+  { id: "create_deal",       label: "Criar negócio",       description: "Abre um deal novo no funil/estágio escolhido pelo nome.",           icon: ClipboardList },
+  { id: "update_deal_stage", label: "Mover deal de etapa", description: "Move o deal aberto mais recente do contato pra outra etapa.",        icon: FileText },
+  { id: "search_contact",    label: "Buscar contato",      description: "Procura contatos por nome/telefone/email no workspace.",            icon: BookmarkPlus },
+  // Sprint B — jornadas
+  { id: "enroll_in_journey", label: "Inscrever em jornada", description: "Coloca o contato numa jornada de mensagens automáticas existente.", icon: FileText },
 ];
 
 const CONFIRMATION_OPTIONS = [
