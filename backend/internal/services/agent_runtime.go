@@ -18,10 +18,11 @@ import (
 )
 
 type AgentRuntime struct {
-	db      *gorm.DB
-	manager *whatsapp.Manager
-	llm     *LLMService
-	tts     *TTSService
+	db         *gorm.DB
+	manager    *whatsapp.Manager
+	llm        *LLMService
+	tts        *TTSService
+	replyQueue *AgentReplyQueue // jitter + serialização por instância (anti-ban)
 
 	seenMu   sync.Mutex
 	seenMsgs map[string]time.Time
@@ -29,11 +30,12 @@ type AgentRuntime struct {
 
 func NewAgentRuntime(db *gorm.DB, manager *whatsapp.Manager, llm *LLMService, tts *TTSService) *AgentRuntime {
 	return &AgentRuntime{
-		db:       db,
-		manager:  manager,
-		llm:      llm,
-		tts:      tts,
-		seenMsgs: make(map[string]time.Time),
+		db:         db,
+		manager:    manager,
+		llm:        llm,
+		tts:        tts,
+		replyQueue: NewAgentReplyQueue(manager),
+		seenMsgs:   make(map[string]time.Time),
 	}
 }
 
@@ -222,10 +224,8 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		return true
 	}
 
-	_ = client.SendTyping(fromJID, true)
-	time.Sleep(900 * time.Millisecond)
-
-	// Tentar responder em áudio se voz estiver configurada
+	// Tentar responder em áudio se voz estiver configurada — áudio segue
+	// path direto (TTS já tem latência natural + presence "gravando").
 	if r.tts != nil && r.trySendAudio(ctx, client, agent, fromJID, reply) {
 		_ = client.SendTyping(fromJID, false)
 		log.Info().
@@ -236,12 +236,16 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		return true
 	}
 
-	_, sendErr := client.SendTextMessage(fromJID, reply)
-	_ = client.SendTyping(fromJID, false)
-	if sendErr != nil {
-		log.Error().Err(sendErr).Str("instance", instanceID).Str("chat", fromJID).Msg("agent-runtime: falha ao enviar resposta")
-		return false
-	}
+	// Texto: enfileira via AgentReplyQueue. Worker per-instance aplica
+	// "digitando…" + sleep proporcional ao tamanho da resposta + jitter
+	// + cooldown final. Mimetiza humano único atendendo, reduz risco de
+	// banimento por padrão robótico.
+	r.replyQueue.Enqueue(AgentReplyJob{
+		InstanceID: instanceID,
+		ToJID:      fromJID,
+		Reply:      reply,
+		AgentName:  agent.AgentName,
+	})
 
 	log.Info().
 		Str("instance", instanceID).
@@ -1078,9 +1082,15 @@ func (r *AgentRuntime) TriggerByWebhook(agent *models.InstanceAgent, payload Age
 		return "", fmt.Errorf("LLM retornou resposta vazia")
 	}
 
-	if _, sendErr := client.SendTextMessage(jid, reply); sendErr != nil {
-		return reply, fmt.Errorf("falha ao enviar WhatsApp: %w", sendErr)
-	}
+	// Webhook trigger também passa pela fila — mesmo benefício anti-ban
+	// (digitando + jitter + cooldown). Async: o caller recebe 200 enquanto
+	// o envio acontece em background.
+	r.replyQueue.Enqueue(AgentReplyJob{
+		InstanceID: agent.InstanceID.String(),
+		ToJID:      jid,
+		Reply:      reply,
+		AgentName:  agent.AgentName,
+	})
 	log.Info().
 		Str("agent", agent.AgentName).
 		Str("to", jid).
