@@ -701,7 +701,18 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		agent.SystemPrompt = *req.SystemPrompt
 	}
 	if req.AgentName != nil {
-		agent.AgentName = *req.AgentName
+		// agent_name é varchar(120) — usuários colando o prompt inteiro
+		// aqui (acidentalmente) faziam o save bater no constraint do
+		// Postgres e devolver 500 genérico. Validamos antes pra explicar.
+		name := strings.TrimSpace(*req.AgentName)
+		if len([]rune(name)) > 120 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "nome do agente excede 120 caracteres",
+				"hint":  "Use só o nome curto (ex: 'Gabriel'). Personalidade longa vai em Identidade ou Prompt do sistema.",
+				"length": len([]rune(name)),
+			})
+		}
+		agent.AgentName = name
 	}
 	if req.Identity != nil {
 		agent.Identity = *req.Identity
@@ -798,7 +809,13 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 	}
 
 	if err := h.db.Save(&agent).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao salvar agente"})
+		// Erro do Postgres ajuda muito o admin/user (ex: "value too long for
+		// type character varying" indica field overflow). Antes era genérico.
+		log.Error().Err(err).Str("instance", inst.ID.String()).Msg("agent: save failed")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "falha ao salvar agente",
+			"detail":  err.Error(),
+		})
 	}
 
 	return h.GetAgent(c)

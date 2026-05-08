@@ -341,7 +341,15 @@ export default function AgentsPage() {
       await queryClient.invalidateQueries({ queryKey: ["instance-agents", selectedInstance] });
       toast.success("Agente salvo.");
     },
-    onError: (error: any) => toast.error(error?.response?.data?.error || "Não foi possível salvar."),
+    onError: (error: any) => {
+      // Concatena error + hint quando o backend manda os dois (ex: nome
+      // muito longo). Sem isso o user só via "falha ao salvar" sem saber
+      // que campo tava ruim.
+      const data = error?.response?.data;
+      const msg = data?.error || "Não foi possível salvar.";
+      const hint = data?.hint || data?.detail;
+      toast.error(hint ? `${msg} — ${hint}` : msg);
+    },
   });
 
   // Toggle de ativação independente do save geral. Antes ativação
@@ -497,13 +505,14 @@ export default function AgentsPage() {
                     <input
                       value={form.agent_name}
                       onChange={(e) => setForm((p) => ({ ...p, agent_name: e.target.value }))}
-                      placeholder="Nome do agente"
+                      placeholder="Nome do agente (ex: Gabriel)"
+                      maxLength={120}
+                      title="Nome curto (até 120 chars). Personalidade vai em Identidade/Prompt do sistema."
                       className="w-full bg-transparent border-0 outline-none text-xl sm:text-2xl font-semibold tracking-tight"
                       style={{
                         color: form.agent_name?.trim() ? "var(--text-1)" : "var(--text-3)",
                         minWidth: 200,
                       }}
-                      title="Clique para editar o nome do agente"
                     />
                     {/* Subtítulo: instância vinculada + canal + status */}
                     <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
