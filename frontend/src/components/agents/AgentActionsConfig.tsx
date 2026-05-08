@@ -6,7 +6,10 @@
 // persistidos como entradas do array app_access (type="action") pra
 // reusar a infra existente; o backend lê via parseEnabledTools.
 
-import { Bot, BookmarkPlus, ClipboardList, FileText, MessageSquareWarning, NotebookPen, Tag, UserMinus, UsersRound } from "lucide-react";
+import {
+  Bot, BookmarkPlus, ClipboardList, FileText, MessageSquareWarning, NotebookPen, Tag, UserMinus, UsersRound,
+  Image as ImageIcon, Video, Mic, Paperclip, MapPin, Contact, QrCode, ListChecks, BarChart3, Smile, Instagram, BookOpen, Send,
+} from "lucide-react";
 
 type ActionId =
   | "add_tag"
@@ -19,7 +22,21 @@ type ActionId =
   | "create_deal"
   | "update_deal_stage"
   | "search_contact"
-  | "enroll_in_journey";
+  | "enroll_in_journey"
+  | "send_image"
+  | "send_video"
+  | "send_audio"
+  | "send_document"
+  | "send_location"
+  | "send_contact"
+  | "send_pix"
+  | "send_buttons"
+  | "send_poll"
+  | "react_to_last"
+  | "instagram_follow"
+  | "instagram_unfollow"
+  | "search_help_articles"
+  | "send_help_article";
 
 type AppAccessEntry = {
   id: string;
@@ -49,6 +66,22 @@ const ACTIONS: Array<{
   { id: "search_contact",    label: "Buscar contato",      description: "Procura contatos por nome/telefone/email no workspace.",            icon: BookmarkPlus },
   // Sprint B — jornadas
   { id: "enroll_in_journey", label: "Inscrever em jornada", description: "Coloca o contato numa jornada de mensagens automáticas existente.", icon: FileText },
+  // Sprint C — instância (WhatsApp + Instagram)
+  { id: "send_image",         label: "Enviar imagem",     description: "Manda foto/imagem via URL com legenda opcional.",                       icon: ImageIcon },
+  { id: "send_video",         label: "Enviar vídeo",      description: "Manda vídeo via URL com legenda opcional.",                              icon: Video },
+  { id: "send_audio",         label: "Enviar áudio",      description: "Manda áudio (com ptt=true vira voice note do WhatsApp).",                icon: Mic },
+  { id: "send_document",      label: "Enviar documento",  description: "Manda PDF/arquivo via URL com nome customizado.",                        icon: Paperclip },
+  { id: "send_location",      label: "Enviar localização", description: "Manda coordenadas GPS com nome do local.",                              icon: MapPin },
+  { id: "send_contact",       label: "Enviar contato",    description: "Compartilha vCard de outro contato (nome + telefone + email).",          icon: Contact },
+  { id: "send_pix",           label: "Enviar cobrança PIX", description: "Card interativo de pagamento com chave PIX (CPF/CNPJ/EMAIL/PHONE/EVP).", icon: QrCode },
+  { id: "send_buttons",       label: "Enviar botões",     description: "Mensagem com até 3 botões clicáveis (resposta rápida).",                 icon: ListChecks },
+  { id: "send_poll",          label: "Enviar enquete",    description: "Pergunta com 2-12 opções; suporta múltipla escolha.",                    icon: BarChart3 },
+  { id: "react_to_last",      label: "Reagir à última msg", description: "Coloca emoji-reação na última mensagem do cliente (👍, ❤️, etc).",    icon: Smile },
+  { id: "instagram_follow",   label: "Seguir no Instagram", description: "Segue o usuário do Instagram (instâncias IG via Taktik).",              icon: Instagram },
+  { id: "instagram_unfollow", label: "Deixar de seguir IG", description: "Unfollow no Instagram.",                                                 icon: Instagram },
+  // Sprint D — Help Desk
+  { id: "search_help_articles", label: "Buscar artigo Help Desk", description: "Procura tutoriais publicados que podem responder a dúvida do cliente.", icon: BookOpen },
+  { id: "send_help_article",    label: "Enviar artigo Help Desk",  description: "Envia link/preview do artigo direto pra conversa.",                    icon: Send },
 ];
 
 const CONFIRMATION_OPTIONS = [

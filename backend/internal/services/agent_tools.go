@@ -12,15 +12,20 @@ package services
 // que vai pro cliente.
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/models"
+	"github.com/uniq-chat/backend/internal/whatsapp"
 	"gorm.io/gorm"
 )
 
@@ -132,6 +137,36 @@ func executeAction(ctx AgentToolContext, name string, args map[string]any) Agent
 	// Sprint B — jornada
 	case "enroll_in_journey":
 		return toolEnrollInJourney(ctx, args)
+	// Sprint C — capacidades nativas da instância (WhatsApp + Instagram)
+	case "send_image":
+		return toolSendMedia(ctx, args, "image")
+	case "send_video":
+		return toolSendMedia(ctx, args, "video")
+	case "send_audio":
+		return toolSendMedia(ctx, args, "audio")
+	case "send_document":
+		return toolSendMedia(ctx, args, "document")
+	case "send_location":
+		return toolSendLocation(ctx, args)
+	case "send_contact":
+		return toolSendContact(ctx, args)
+	case "send_pix":
+		return toolSendPix(ctx, args)
+	case "send_buttons":
+		return toolSendButtons(ctx, args)
+	case "send_poll":
+		return toolSendPoll(ctx, args)
+	case "react_to_last":
+		return toolReactToLast(ctx, args)
+	case "instagram_follow":
+		return toolInstagramFollow(ctx, args)
+	case "instagram_unfollow":
+		return toolInstagramUnfollow(ctx, args)
+	// Sprint D — Help Desk
+	case "search_help_articles":
+		return toolSearchHelpArticles(ctx, args)
+	case "send_help_article":
+		return toolSendHelpArticle(ctx, args)
 	}
 	return AgentToolResult{OK: false, Detail: "tool desconhecida: " + name}
 }
@@ -398,6 +433,22 @@ var toolCatalog = map[string]string{
 	"search_contact":    `search_contact({"query":"João Silva"}) — busca contato por nome/telefone/email; retorna até 5 matches.`,
 	// Sprint B — jornadas
 	"enroll_in_journey": `enroll_in_journey({"journey":"Onboarding"}) — inscreve o contato na jornada (por nome).`,
+	// Sprint C — capacidades nativas da instância
+	"send_image":        `send_image({"url":"https://...","caption":"opcional"}) — envia imagem por URL.`,
+	"send_video":        `send_video({"url":"https://...","caption":"opcional"}) — envia vídeo por URL.`,
+	"send_audio":        `send_audio({"url":"https://...","ptt":true}) — envia áudio (ptt=true vira "voice note").`,
+	"send_document":     `send_document({"url":"https://...","filename":"proposta.pdf"}) — envia PDF/doc.`,
+	"send_location":     `send_location({"lat":-23.55,"lon":-46.63,"name":"Av Paulista 1000"}) — envia localização GPS.`,
+	"send_contact":      `send_contact({"name":"Maria Vendas","phone":"5511999998888","email":"opcional"}) — envia vCard.`,
+	"send_pix":          `send_pix({"merchant":"Empresa X","key":"55119...","key_type":"PHONE","title":"Pagamento","body":"Plano Pro mensal"}) — envia cobrança PIX interativa.`,
+	"send_buttons":      `send_buttons({"body":"Como prefere?","buttons":["WhatsApp","Email","Ligação"]}) — envia mensagem com botões interativos.`,
+	"send_poll":         `send_poll({"question":"Qual horário?","options":["Manhã","Tarde","Noite"],"multi":false}) — envia enquete.`,
+	"react_to_last":     `react_to_last({"emoji":"👍"}) — reage à última mensagem inbound do cliente.`,
+	"instagram_follow":  `instagram_follow({"username":"cliente_handle"}) — segue o usuário (instâncias Instagram).`,
+	"instagram_unfollow": `instagram_unfollow({"username":"cliente_handle"}) — deixa de seguir.`,
+	// Sprint D — Help Desk
+	"search_help_articles": `search_help_articles({"query":"como cancelar plano"}) — busca artigos publicados no help desk; até 5 hits.`,
+	"send_help_article":    `send_help_article({"slug":"como-cancelar-plano"}) — envia link/preview do artigo pra o cliente.`,
 }
 
 func parseEnabledTools(agent *models.InstanceAgent) []string {
@@ -681,4 +732,477 @@ func toolEnrollInJourney(ctx AgentToolContext, args map[string]any) AgentToolRes
 	}
 	return AgentToolResult{OK: true, ID: exec.ID,
 		Detail: "contato inscrito na jornada " + journey.Name}
+}
+
+// ─── Sprint C: capacidades nativas da instância ──────────────────────────
+
+// fetchURLAsBytes — baixa o asset apontado pela URL com timeout curto.
+// Limita 25MB pra não estourar memória do server. Retorna bytes + content-type
+// (útil pra send_*Message que pede mime).
+func fetchURLAsBytes(rawURL string) ([]byte, string, error) {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return nil, "", fmt.Errorf("url vazia")
+	}
+	httpC := &http.Client{Timeout: 25 * time.Second}
+	resp, err := httpC.Get(rawURL)
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return nil, "", fmt.Errorf("download falhou: HTTP %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 25*1024*1024))
+	if err != nil {
+		return nil, "", err
+	}
+	mime := resp.Header.Get("Content-Type")
+	return body, mime, nil
+}
+
+// resolveTargetJID — determina pra qual JID enviar. Default = contato
+// atual da conversa. Permite override via args["to"].
+func resolveTargetJID(ctx AgentToolContext, args map[string]any) string {
+	if to := strings.TrimSpace(asString(args["to"])); to != "" {
+		if !strings.Contains(to, "@") {
+			return to + "@s.whatsapp.net"
+		}
+		return to
+	}
+	if ctx.Conversation != nil && ctx.Conversation.ChannelKey != "" {
+		return ctx.Conversation.ChannelKey
+	}
+	if ctx.Contact != nil && ctx.Contact.Phone != "" {
+		return ctx.Contact.Phone + "@s.whatsapp.net"
+	}
+	return ""
+}
+
+// toolSendMedia — handler unificado pra image/video/audio/document. Aceita
+// `url` (obrigatório) + `caption`/`filename` conforme o tipo.
+func toolSendMedia(ctx AgentToolContext, args map[string]any, kind string) AgentToolResult {
+	if ctx.Agent == nil {
+		return AgentToolResult{OK: false, Detail: "agent não resolvido"}
+	}
+	to := resolveTargetJID(ctx, args)
+	if to == "" {
+		return AgentToolResult{OK: false, Detail: "destinatário não resolvido"}
+	}
+	url := strings.TrimSpace(asString(args["url"]))
+	if url == "" {
+		return AgentToolResult{OK: false, Detail: "url obrigatória"}
+	}
+
+	mgr := agentToolsGlobalManager()
+	if mgr == nil {
+		return AgentToolResult{OK: false, Detail: "manager indisponível"}
+	}
+	client := mgr.GetInstance(ctx.Agent.InstanceID.String())
+	if client == nil || !client.IsConnected() {
+		return AgentToolResult{OK: false, Detail: "instância desconectada"}
+	}
+
+	data, mime, err := fetchURLAsBytes(url)
+	if err != nil {
+		return AgentToolResult{OK: false, Detail: "download: " + err.Error()}
+	}
+
+	caption := asString(args["caption"])
+	switch kind {
+	case "image":
+		if mime == "" {
+			mime = "image/jpeg"
+		}
+		id, err := client.SendImageMessage(to, data, mime, caption)
+		if err != nil {
+			return AgentToolResult{OK: false, Detail: err.Error()}
+		}
+		return AgentToolResult{OK: true, ID: id, Detail: "imagem enviada"}
+	case "video":
+		if mime == "" {
+			mime = "video/mp4"
+		}
+		id, err := client.SendVideoMessage(to, data, mime, caption)
+		if err != nil {
+			return AgentToolResult{OK: false, Detail: err.Error()}
+		}
+		return AgentToolResult{OK: true, ID: id, Detail: "vídeo enviado"}
+	case "audio":
+		if mime == "" {
+			mime = "audio/ogg"
+		}
+		ptt := false
+		if v, ok := args["ptt"].(bool); ok {
+			ptt = v
+		}
+		id, err := client.SendAudioMessage(to, data, mime, ptt, 0)
+		if err != nil {
+			return AgentToolResult{OK: false, Detail: err.Error()}
+		}
+		return AgentToolResult{OK: true, ID: id, Detail: "áudio enviado"}
+	case "document":
+		if mime == "" {
+			mime = "application/octet-stream"
+		}
+		filename := strings.TrimSpace(asString(args["filename"]))
+		if filename == "" {
+			filename = "documento"
+		}
+		id, err := client.SendDocumentMessage(to, data, mime, filename)
+		if err != nil {
+			return AgentToolResult{OK: false, Detail: err.Error()}
+		}
+		return AgentToolResult{OK: true, ID: id, Detail: "documento enviado: " + filename}
+	}
+	return AgentToolResult{OK: false, Detail: "kind inválido"}
+}
+
+func toolSendLocation(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	to := resolveTargetJID(ctx, args)
+	if to == "" {
+		return AgentToolResult{OK: false, Detail: "destinatário não resolvido"}
+	}
+	lat, latOK := asFloat(args["lat"])
+	lon, lonOK := asFloat(args["lon"])
+	if !latOK || !lonOK {
+		return AgentToolResult{OK: false, Detail: "lat e lon obrigatórios"}
+	}
+	mgr := agentToolsGlobalManager()
+	if mgr == nil {
+		return AgentToolResult{OK: false, Detail: "manager indisponível"}
+	}
+	client := mgr.GetInstance(ctx.Agent.InstanceID.String())
+	if client == nil || !client.IsConnected() {
+		return AgentToolResult{OK: false, Detail: "instância desconectada"}
+	}
+	id, err := client.SendLocationMessage(to, lat, lon, asString(args["name"]))
+	if err != nil {
+		return AgentToolResult{OK: false, Detail: err.Error()}
+	}
+	return AgentToolResult{OK: true, ID: id, Detail: "localização enviada"}
+}
+
+func toolSendContact(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	to := resolveTargetJID(ctx, args)
+	if to == "" {
+		return AgentToolResult{OK: false, Detail: "destinatário não resolvido"}
+	}
+	name := strings.TrimSpace(asString(args["name"]))
+	phone := strings.TrimSpace(asString(args["phone"]))
+	if name == "" || phone == "" {
+		return AgentToolResult{OK: false, Detail: "name e phone obrigatórios"}
+	}
+	email := strings.TrimSpace(asString(args["email"]))
+	// vCard 3.0 mínimo (whatsmeow aceita o blob completo).
+	vcard := "BEGIN:VCARD\nVERSION:3.0\nFN:" + name + "\nTEL;type=CELL;waid=" + phone + ":" + phone + "\n"
+	if email != "" {
+		vcard += "EMAIL:" + email + "\n"
+	}
+	vcard += "END:VCARD"
+	mgr := agentToolsGlobalManager()
+	client := mgr.GetInstance(ctx.Agent.InstanceID.String())
+	if client == nil || !client.IsConnected() {
+		return AgentToolResult{OK: false, Detail: "instância desconectada"}
+	}
+	id, err := client.SendContactMessage(to, name, vcard)
+	if err != nil {
+		return AgentToolResult{OK: false, Detail: err.Error()}
+	}
+	return AgentToolResult{OK: true, ID: id, Detail: "contato enviado: " + name}
+}
+
+func toolSendPix(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	to := resolveTargetJID(ctx, args)
+	if to == "" {
+		return AgentToolResult{OK: false, Detail: "destinatário não resolvido"}
+	}
+	mgr := agentToolsGlobalManager()
+	client := mgr.GetInstance(ctx.Agent.InstanceID.String())
+	if client == nil || !client.IsConnected() {
+		return AgentToolResult{OK: false, Detail: "instância desconectada"}
+	}
+	data := whatsappPixDataFromArgs(args)
+	if data.MerchantName == "" || data.PixKey == "" {
+		return AgentToolResult{OK: false, Detail: "merchant e key obrigatórios"}
+	}
+	id, err := client.SendPixMessage(to, data)
+	if err != nil {
+		return AgentToolResult{OK: false, Detail: err.Error()}
+	}
+	return AgentToolResult{OK: true, ID: id, Detail: "PIX enviado pra " + data.MerchantName}
+}
+
+func toolSendButtons(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	to := resolveTargetJID(ctx, args)
+	if to == "" {
+		return AgentToolResult{OK: false, Detail: "destinatário não resolvido"}
+	}
+	body := strings.TrimSpace(asString(args["body"]))
+	if body == "" {
+		return AgentToolResult{OK: false, Detail: "body obrigatório"}
+	}
+	rawButtons, ok := args["buttons"].([]any)
+	if !ok || len(rawButtons) == 0 {
+		return AgentToolResult{OK: false, Detail: "buttons (lista) obrigatório"}
+	}
+	if len(rawButtons) > 3 {
+		return AgentToolResult{OK: false, Detail: "máximo 3 botões"}
+	}
+	var buttons []whatsappButtonItem
+	for i, b := range rawButtons {
+		text := strings.TrimSpace(asString(b))
+		if text == "" {
+			continue
+		}
+		buttons = append(buttons, whatsappButtonItem{
+			ID:   fmt.Sprintf("btn_%d", i+1),
+			Text: text,
+		})
+	}
+	if len(buttons) == 0 {
+		return AgentToolResult{OK: false, Detail: "nenhum botão válido"}
+	}
+	mgr := agentToolsGlobalManager()
+	client := mgr.GetInstance(ctx.Agent.InstanceID.String())
+	if client == nil || !client.IsConnected() {
+		return AgentToolResult{OK: false, Detail: "instância desconectada"}
+	}
+	id, err := whatsappCallSendButtons(client, to, body, asString(args["footer"]), buttons)
+	if err != nil {
+		return AgentToolResult{OK: false, Detail: err.Error()}
+	}
+	return AgentToolResult{OK: true, ID: id, Detail: "botões enviados"}
+}
+
+func toolSendPoll(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	to := resolveTargetJID(ctx, args)
+	if to == "" {
+		return AgentToolResult{OK: false, Detail: "destinatário não resolvido"}
+	}
+	question := strings.TrimSpace(asString(args["question"]))
+	if question == "" {
+		return AgentToolResult{OK: false, Detail: "question obrigatório"}
+	}
+	rawOpts, ok := args["options"].([]any)
+	if !ok || len(rawOpts) < 2 {
+		return AgentToolResult{OK: false, Detail: "options (mín 2) obrigatório"}
+	}
+	options := make([]string, 0, len(rawOpts))
+	for _, o := range rawOpts {
+		s := strings.TrimSpace(asString(o))
+		if s != "" {
+			options = append(options, s)
+		}
+	}
+	if len(options) < 2 {
+		return AgentToolResult{OK: false, Detail: "opções válidas insuficientes"}
+	}
+	selectable := 1
+	if v, ok := args["multi"].(bool); ok && v {
+		selectable = 0 // 0 = múltiplas escolhas no whatsmeow
+	}
+	mgr := agentToolsGlobalManager()
+	client := mgr.GetInstance(ctx.Agent.InstanceID.String())
+	if client == nil || !client.IsConnected() {
+		return AgentToolResult{OK: false, Detail: "instância desconectada"}
+	}
+	id, err := client.SendPollMessage(to, question, options, selectable)
+	if err != nil {
+		return AgentToolResult{OK: false, Detail: err.Error()}
+	}
+	return AgentToolResult{OK: true, ID: id, Detail: "enquete enviada"}
+}
+
+// toolReactToLast — reage à última mensagem inbound do contato com o
+// emoji passado. Sem msg_id explícito, busca a última do MessageLog.
+func toolReactToLast(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	emoji := strings.TrimSpace(asString(args["emoji"]))
+	if emoji == "" {
+		return AgentToolResult{OK: false, Detail: "emoji obrigatório"}
+	}
+	if ctx.Conversation == nil {
+		return AgentToolResult{OK: false, Detail: "conversa não resolvida"}
+	}
+	var lastMsg models.MessageLog
+	if err := ctx.DB.Where("conversation_id = ? AND direction = ?", ctx.Conversation.ID, models.DirectionIn).
+		Order("created_at DESC").First(&lastMsg).Error; err != nil {
+		return AgentToolResult{OK: false, Detail: "nenhuma msg inbound encontrada"}
+	}
+	to := resolveTargetJID(ctx, args)
+	mgr := agentToolsGlobalManager()
+	client := mgr.GetInstance(ctx.Agent.InstanceID.String())
+	if client == nil || !client.IsConnected() {
+		return AgentToolResult{OK: false, Detail: "instância desconectada"}
+	}
+	id, err := client.SendReaction(to, lastMsg.ExternalMessageID, lastMsg.SenderJID, emoji)
+	if err != nil {
+		return AgentToolResult{OK: false, Detail: err.Error()}
+	}
+	return AgentToolResult{OK: true, ID: id, Detail: "reação " + emoji + " enviada"}
+}
+
+func toolInstagramFollow(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	username := strings.TrimSpace(asString(args["username"]))
+	if username == "" && ctx.Contact != nil {
+		username = ctx.Contact.ExternalID
+	}
+	if username == "" {
+		return AgentToolResult{OK: false, Detail: "username obrigatório"}
+	}
+	if err := agentToolsInstagramFollow(ctx.DB, ctx.Agent.InstanceID.String(), username); err != nil {
+		return AgentToolResult{OK: false, Detail: err.Error()}
+	}
+	return AgentToolResult{OK: true, Detail: "agora seguindo @" + username}
+}
+
+func toolInstagramUnfollow(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	username := strings.TrimSpace(asString(args["username"]))
+	if username == "" && ctx.Contact != nil {
+		username = ctx.Contact.ExternalID
+	}
+	if username == "" {
+		return AgentToolResult{OK: false, Detail: "username obrigatório"}
+	}
+	if err := agentToolsInstagramUnfollow(ctx.DB, ctx.Agent.InstanceID.String(), username); err != nil {
+		return AgentToolResult{OK: false, Detail: err.Error()}
+	}
+	return AgentToolResult{OK: true, Detail: "deixou de seguir @" + username}
+}
+
+// ─── Sprint D: Help Desk ─────────────────────────────────────────────────
+
+// toolSearchHelpArticles — busca artigos publicados do workspace por
+// title/summary/content (substring case-insensitive). Devolve até 5
+// matches em formato "Título · /help/<slug>" pra o LLM mencionar.
+func toolSearchHelpArticles(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	q := strings.TrimSpace(asString(args["query"]))
+	if q == "" {
+		return AgentToolResult{OK: false, Detail: "query obrigatório"}
+	}
+	like := "%" + strings.ToLower(q) + "%"
+	var articles []models.HelpDeskArticle
+	ctx.DB.Where("workspace_id = ? AND status = ?", ctx.WorkspaceID, models.ArticlePublished).
+		Where("LOWER(title) LIKE ? OR LOWER(summary) LIKE ? OR LOWER(content) LIKE ?", like, like, like).
+		Order("view_count DESC").
+		Limit(5).
+		Find(&articles)
+	if len(articles) == 0 {
+		return AgentToolResult{OK: true, Detail: "nenhum artigo encontrado"}
+	}
+	var lines []string
+	for _, a := range articles {
+		lines = append(lines, a.Title+" · slug="+a.Slug)
+	}
+	return AgentToolResult{OK: true, Detail: strings.Join(lines, " | ")}
+}
+
+// toolSendHelpArticle — envia uma mensagem com link/preview do artigo.
+// Resolve por slug. URL final usa frontend_url/help/<slug>.
+func toolSendHelpArticle(ctx AgentToolContext, args map[string]any) AgentToolResult {
+	slug := strings.TrimSpace(asString(args["slug"]))
+	if slug == "" {
+		return AgentToolResult{OK: false, Detail: "slug obrigatório"}
+	}
+	var article models.HelpDeskArticle
+	if err := ctx.DB.Where("workspace_id = ? AND slug = ? AND status = ?",
+		ctx.WorkspaceID, slug, models.ArticlePublished).First(&article).Error; err != nil {
+		return AgentToolResult{OK: false, Detail: "artigo não encontrado: " + slug}
+	}
+	to := resolveTargetJID(ctx, args)
+	if to == "" {
+		return AgentToolResult{OK: false, Detail: "destinatário não resolvido"}
+	}
+	mgr := agentToolsGlobalManager()
+	client := mgr.GetInstance(ctx.Agent.InstanceID.String())
+	if client == nil || !client.IsConnected() {
+		return AgentToolResult{OK: false, Detail: "instância desconectada"}
+	}
+	frontendURL := strings.TrimRight(agentToolsFrontendURL(), "/")
+	link := frontendURL + "/help/" + slug
+	body := article.Title
+	if article.Summary != "" {
+		body += "\n\n" + article.Summary
+	}
+	body += "\n\n👉 " + link
+	id, err := client.SendTextMessage(to, body)
+	if err != nil {
+		return AgentToolResult{OK: false, Detail: err.Error()}
+	}
+	return AgentToolResult{OK: true, ID: id, Detail: "artigo enviado: " + article.Title}
+}
+
+// ─── Helpers compartilhados das tools de instância ──────────────────────
+
+// asFloat — extrai float64 de json (json decodifica numbers como float64).
+func asFloat(v any) (float64, bool) {
+	switch x := v.(type) {
+	case float64:
+		return x, true
+	case int:
+		return float64(x), true
+	case string:
+		var f float64
+		if _, err := fmt.Sscanf(x, "%f", &f); err == nil {
+			return f, true
+		}
+	}
+	return 0, false
+}
+
+// agentToolsGlobalManager — accessor pro singleton do whatsapp.Manager
+// usado nas tools de instância. Isolado em função pra facilitar mock em
+// testes futuros.
+func agentToolsGlobalManager() *whatsapp.Manager {
+	return whatsapp.GlobalManager
+}
+
+// whatsappButtonItem — alias local pro whatsapp.ButtonItem pra evitar
+// import circular do agent_tools (que já importa whatsapp). Usado só
+// no toolSendButtons.
+type whatsappButtonItem = whatsapp.ButtonItem
+
+// whatsappCallSendButtons — wrapper pra SendButtonsMessage com a
+// assinatura simplificada que as tools consomem.
+func whatsappCallSendButtons(client *whatsapp.InstanceClient, to, body, footer string, buttons []whatsappButtonItem) (string, error) {
+	return client.SendButtonsMessage(to, body, footer, buttons)
+}
+
+// whatsappPixDataFromArgs — converte map[string]any pro PixData esperado
+// por SendPixMessage. KeyType é case-insensitive; default vazio cai no
+// validador interno do whatsmeow.
+func whatsappPixDataFromArgs(args map[string]any) whatsapp.PixData {
+	return whatsapp.PixData{
+		HeaderTitle:  asString(args["title"]),
+		BodyText:     asString(args["body"]),
+		FooterText:   asString(args["footer"]),
+		MerchantName: strings.TrimSpace(asString(args["merchant"])),
+		PixKey:       strings.TrimSpace(asString(args["key"])),
+		KeyType:      strings.ToUpper(strings.TrimSpace(asString(args["key_type"]))),
+	}
+}
+
+// agentToolsInstagramFollow — chama Taktik via InstagramService.
+// O DB vem do AgentToolContext (passado pelo runtime).
+func agentToolsInstagramFollow(db *gorm.DB, instanceID, username string) error {
+	svc := NewInstagramService(db)
+	if svc == nil {
+		return fmt.Errorf("integração Instagram não configurada (set TAKTIK_BASE_URL)")
+	}
+	return svc.Follow(context.Background(), instanceID, username)
+}
+
+func agentToolsInstagramUnfollow(db *gorm.DB, instanceID, username string) error {
+	svc := NewInstagramService(db)
+	if svc == nil {
+		return fmt.Errorf("integração Instagram não configurada (set TAKTIK_BASE_URL)")
+	}
+	return svc.Unfollow(context.Background(), instanceID, username)
+}
+
+func agentToolsFrontendURL() string {
+	if config.AppConfig != nil && strings.TrimSpace(config.AppConfig.FrontendURL) != "" {
+		return config.AppConfig.FrontendURL
+	}
+	return "https://app.uniq.chat"
 }
