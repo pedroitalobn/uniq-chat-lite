@@ -306,6 +306,13 @@ func main() {
 	proxyMonitor := services.NewProxyMonitor(db, manager)
 	proxyMonitor.Start()
 
+	// Profile sync cron — preenche avatar_url e push_name retroativamente em
+	// conversas que ficaram sem (porque a captura era 100% reativa antes).
+	// Também refresca avatares stale (>6h) pra contornar URLs assinadas
+	// expiradas pela Meta. Roda a cada 20min, max ~200 lookups por tick.
+	profileSyncCron := services.NewProfileSyncCron(db, manager)
+	profileSyncCron.Start()
+
 	// Scheduled recovery snapshots (check every hour)
 	recoveryH := handlers.NewRecoveryHandler(db, manager)
 	go func() {
