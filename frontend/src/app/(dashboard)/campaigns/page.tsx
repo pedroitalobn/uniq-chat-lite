@@ -1857,53 +1857,127 @@ const CH_LABEL: Record<string, string> = {
 
 function CampaignTemplateCards({ onSelect }: { onSelect: (t: typeof CAMPAIGN_TEMPLATES[number]) => void }) {
   const [showAll, setShowAll] = React.useState(false);
+  const [mobileSheetOpen, setMobileSheetOpen] = React.useState(false);
   const visible = showAll ? CAMPAIGN_TEMPLATES : CAMPAIGN_TEMPLATES.slice(0, 4);
+
+  // Em mobile, a seção de templates ocupava a tela inteira (8 cards
+  // empilhados em col-1) e empurrava as campanhas existentes pra
+  // baixo da fold. Trocamos por um botão "Ver templates" que abre uma
+  // bottom sheet — mesmo padrão do "Mais" do dock. Em sm+, o grid
+  // tradicional segue.
+  const handlePick = (tpl: typeof CAMPAIGN_TEMPLATES[number]) => {
+    setMobileSheetOpen(false);
+    onSelect(tpl);
+  };
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-sm font-semibold" style={{ color: "hsl(240 15% 80%)" }}>Templates pré-montados</h2>
-          <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 44%)" }}>Comece com uma campanha pronta e personalize</p>
+          <p className="text-xs mt-0.5 truncate" style={{ color: "hsl(240 8% 44%)" }}>Comece com uma campanha pronta e personalize</p>
         </div>
+        {/* Mobile: botão único que abre sheet com todos. */}
+        <button
+          onClick={() => setMobileSheetOpen(true)}
+          className="sm:hidden flex-shrink-0 text-xs font-medium px-3 py-2 rounded-xl inline-flex items-center gap-1.5"
+          style={{ background: "rgba(0,212,106,0.10)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.25)" }}
+        >
+          Ver templates ({CAMPAIGN_TEMPLATES.length})
+        </button>
+        {/* Desktop: toggle ver todos. */}
         <button onClick={() => setShowAll(v => !v)}
-          className="text-xs px-2.5 py-1.5 rounded-lg transition"
+          className="hidden sm:inline-flex text-xs px-2.5 py-1.5 rounded-lg transition"
           style={{ color: "hsl(240 8% 50%)", background: "var(--surface-2)", border: "1px solid hsl(240 12% 13%)" }}>
           {showAll ? "Ver menos" : `Ver todos (${CAMPAIGN_TEMPLATES.length})`}
         </button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Grid só em sm+ — mobile usa a sheet abaixo. */}
+      <div className="hidden sm:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {visible.map((tpl) => (
-          <div key={tpl.id}
-            className="rounded-2xl p-4 flex flex-col gap-2.5 group transition-all duration-200 cursor-pointer"
-            style={{
-              background: tpl.bg,
-              border: `1px solid ${tpl.color}20`,
-              boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
-            }}
-            onClick={() => onSelect(tpl)}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 16px ${tpl.color}18, 0 0 0 1px ${tpl.color}25`}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.18)"}>
-            <div className="flex items-start justify-between">
-              <span className="text-2xl leading-none">{tpl.emoji}</span>
-              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                style={{ background: `${tpl.color}18`, color: tpl.color, border: `1px solid ${tpl.color}30` }}>
-                {CH_LABEL[tpl.channel] ?? tpl.channel}
-              </span>
-            </div>
-            <div>
-              <p className="text-sm font-semibold leading-tight" style={{ color: "hsl(240 15% 90%)" }}>{tpl.name}</p>
-              <p className="text-xs mt-0.5 leading-snug" style={{ color: "hsl(240 8% 48%)" }}>{tpl.description}</p>
-            </div>
-            <button
-              onClick={e => { e.stopPropagation(); onSelect(tpl); }}
-              className="mt-auto text-xs font-medium py-1.5 px-3 rounded-xl w-full text-center transition-all"
-              style={{ background: `${tpl.color}15`, color: tpl.color, border: `1px solid ${tpl.color}25` }}>
-              Usar template →
-            </button>
-          </div>
+          <TemplateCard key={tpl.id} tpl={tpl} onSelect={onSelect} />
         ))}
       </div>
+
+      {/* Mobile sheet — cards full-width, scroll. Backdrop + slide up. */}
+      {mobileSheetOpen && (
+        <>
+          <div
+            className="sm:hidden fixed inset-0 z-[80]"
+            style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
+            onClick={() => setMobileSheetOpen(false)}
+          />
+          <div
+            className="sm:hidden fixed bottom-0 left-0 right-0 z-[81] rounded-t-3xl flex flex-col"
+            style={{
+              background: "rgba(10,10,20,0.94)",
+              backdropFilter: "blur(28px) saturate(200%)",
+              WebkitBackdropFilter: "blur(28px) saturate(200%)",
+              borderTop: "1px solid rgba(255,255,255,0.10)",
+              maxHeight: "85vh",
+              paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
+            }}
+          >
+            <div className="flex justify-center pt-2 pb-1">
+              <div className="w-10 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }} />
+            </div>
+            <div className="flex items-center justify-between px-5 pb-3"
+              style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+              <p className="text-base font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+                Templates ({CAMPAIGN_TEMPLATES.length})
+              </p>
+              <button
+                onClick={() => setMobileSheetOpen(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center"
+                style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 8% 60%)" }}
+                aria-label="Fechar"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5">
+              {CAMPAIGN_TEMPLATES.map((tpl) => (
+                <TemplateCard key={tpl.id} tpl={tpl} onSelect={handlePick} />
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function TemplateCard({ tpl, onSelect }: {
+  tpl: typeof CAMPAIGN_TEMPLATES[number];
+  onSelect: (t: typeof CAMPAIGN_TEMPLATES[number]) => void;
+}) {
+  return (
+    <div
+      className="rounded-2xl p-4 flex flex-col gap-2.5 group transition-all duration-200 cursor-pointer"
+      style={{
+        background: tpl.bg,
+        border: `1px solid ${tpl.color}20`,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+      }}
+      onClick={() => onSelect(tpl)}
+    >
+      <div className="flex items-start justify-between">
+        <span className="text-2xl leading-none">{tpl.emoji}</span>
+        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+          style={{ background: `${tpl.color}18`, color: tpl.color, border: `1px solid ${tpl.color}30` }}>
+          {CH_LABEL[tpl.channel] ?? tpl.channel}
+        </span>
+      </div>
+      <div>
+        <p className="text-sm font-semibold leading-tight" style={{ color: "hsl(240 15% 90%)" }}>{tpl.name}</p>
+        <p className="text-xs mt-0.5 leading-snug" style={{ color: "hsl(240 8% 48%)" }}>{tpl.description}</p>
+      </div>
+      <button
+        onClick={e => { e.stopPropagation(); onSelect(tpl); }}
+        className="mt-auto text-xs font-medium py-1.5 px-3 rounded-xl w-full text-center transition-all"
+        style={{ background: `${tpl.color}15`, color: tpl.color, border: `1px solid ${tpl.color}25` }}>
+        Usar template →
+      </button>
     </div>
   );
 }
