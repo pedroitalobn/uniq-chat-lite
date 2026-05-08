@@ -654,6 +654,9 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		TriggerMode          *string   `json:"trigger_mode"`
 		TriggerKeywords      *[]string `json:"trigger_keywords"`
 		TriggerWebhookSecret *string   `json:"trigger_webhook_secret"`
+		// Ritmo e tamanho das respostas.
+		ResponsePace   *string `json:"response_pace"`
+		ResponseLength *string `json:"response_length"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -831,6 +834,18 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 	// não invalidar URLs já distribuídas.
 	if agent.TriggerMode == "webhook" && strings.TrimSpace(agent.TriggerWebhookSlug) == "" {
 		agent.TriggerWebhookSlug = generateWebhookSlug()
+	}
+	if req.ResponsePace != nil {
+		switch strings.ToLower(strings.TrimSpace(*req.ResponsePace)) {
+		case "instant", "natural", "thoughtful", "very_human":
+			agent.ResponsePace = strings.ToLower(*req.ResponsePace)
+		}
+	}
+	if req.ResponseLength != nil {
+		switch strings.ToLower(strings.TrimSpace(*req.ResponseLength)) {
+		case "concise", "balanced", "detailed":
+			agent.ResponseLength = strings.ToLower(*req.ResponseLength)
+		}
 	}
 
 	if err := h.db.Save(&agent).Error; err != nil {

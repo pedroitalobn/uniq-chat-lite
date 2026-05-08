@@ -199,6 +199,19 @@ type InstanceAgent struct {
 	// TriggerWebhookSecret — opcional. Se preenchido, requests precisam
 	// trazer header X-Uniq-Signature = HMAC-SHA256(body, secret) hex.
 	TriggerWebhookSecret string `gorm:"type:varchar(128)" json:"trigger_webhook_secret,omitempty"`
+	// ResponsePace — ritmo das respostas (delay de "digitação" + cooldowns).
+	//   "instant"     → mínimo de delay (~600ms base, anti-ban floor)
+	//   "natural"     → padrão humano (~220ms/char, default)
+	//   "thoughtful"  → pausa pra pensar (~400ms/char + cooldowns maiores)
+	//   "very_human"  → bem devagar, parece atendente humano (~600ms/char)
+	ResponsePace string `gorm:"type:varchar(20);default:'natural'" json:"response_pace,omitempty"`
+	// ResponseLength — orienta o LLM sobre o tamanho da resposta. Injetado
+	// no system prompt como diretriz dura. Não trunca a saída do LLM —
+	// só guia o estilo.
+	//   "concise"   → 1-2 frases curtas
+	//   "balanced"  → mistura — detalha quando precisa (default)
+	//   "detailed"  → respostas completas e didáticas
+	ResponseLength string `gorm:"type:varchar(20);default:'balanced'" json:"response_length,omitempty"`
 	// n8n / webhook passthrough
 	WebhookURL    string `gorm:"type:varchar(255)" json:"webhook_url,omitempty"`
 	WebhookSecret string `gorm:"type:varchar(255)" json:"webhook_secret,omitempty"`

@@ -1266,6 +1266,9 @@ export const integrationsApi = {
     trigger_mode?: "any" | "keyword" | "webhook";
     trigger_keywords?: string[];
     trigger_webhook_secret?: string;
+    // Ritmo + tamanho
+    response_pace?: "instant" | "natural" | "thoughtful" | "very_human";
+    response_length?: "concise" | "balanced" | "detailed";
   }, agentId?: string) => api.put(
     `/v1/instances/${instanceId}/agent`,
     data,

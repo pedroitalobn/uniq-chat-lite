@@ -71,6 +71,9 @@ type AgentForm = {
   trigger_keywords: string[];
   trigger_webhook_slug: string;
   trigger_webhook_secret: string;
+  // Ritmo + tamanho da resposta
+  response_pace: "instant" | "natural" | "thoughtful" | "very_human";
+  response_length: "concise" | "balanced" | "detailed";
 };
 
 // ─── Skills catalog ─────────────────────────────────────────────────────────
@@ -159,6 +162,8 @@ function emptyForm(): AgentForm {
     trigger_keywords: [],
     trigger_webhook_slug: "",
     trigger_webhook_secret: "",
+    response_pace: "natural",
+    response_length: "balanced",
   };
 }
 
@@ -208,6 +213,8 @@ function mapAgent(data: any): AgentForm {
     trigger_keywords: parseJSONArray<string[]>(data?.trigger_keywords, []),
     trigger_webhook_slug: data?.trigger_webhook_slug || "",
     trigger_webhook_secret: data?.trigger_webhook_secret || "",
+    response_pace: ["instant", "natural", "thoughtful", "very_human"].includes(data?.response_pace) ? data.response_pace : "natural",
+    response_length: ["concise", "balanced", "detailed"].includes(data?.response_length) ? data.response_length : "balanced",
   };
 }
 
@@ -352,6 +359,8 @@ export default function AgentsPage() {
         trigger_mode: form.trigger_mode,
         trigger_keywords: form.trigger_keywords,
         trigger_webhook_secret: form.trigger_webhook_secret,
+        response_pace: form.response_pace,
+        response_length: form.response_length,
       } as any, selectedAgentId || undefined);
     },
     onSuccess: async () => {
@@ -972,6 +981,15 @@ export default function AgentsPage() {
                 trigger_keywords: t.keywords,
                 trigger_webhook_secret: t.webhook_secret,
                 // webhook_slug é gerado pelo backend; só atualiza local se backend devolveu (no save).
+              }))}
+              responseStyle={{
+                pace: form.response_pace,
+                length: form.response_length,
+              }}
+              onChangeResponseStyle={(s) => setForm((p) => ({
+                ...p,
+                response_pace: s.pace,
+                response_length: s.length,
               }))}
               apiBase={process.env.NEXT_PUBLIC_API_URL}
             />

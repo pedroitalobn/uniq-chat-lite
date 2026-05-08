@@ -282,6 +282,7 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		ToJID:      fromJID,
 		Reply:      reply,
 		AgentName:  agent.AgentName,
+		Pace:       agent.ResponsePace,
 	})
 
 	log.Info().
@@ -453,7 +454,10 @@ func (r *AgentRuntime) resolveQueueOrInstance(conv models.Conversation, instance
 }
 
 func (r *AgentRuntime) buildUserPrompt(instanceID uuid.UUID, fromJID, fromName, latestMessage, messageType string) string {
-	history := r.recentHistory(instanceID, fromJID, 10)
+	// Aumenta janela de histórico de 10→25 turnos. Antes o agente
+	// ficava repetitivo porque "esquecia" perguntas/respostas anteriores
+	// rapidamente. 25 turnos cobrem ~5min de bate-papo médio.
+	history := r.recentHistory(instanceID, fromJID, 25)
 	if fromName == "" {
 		fromName = extractPhoneFromJIDLocal(fromJID)
 	}
@@ -474,12 +478,37 @@ func (r *AgentRuntime) buildUserPrompt(instanceID uuid.UUID, fromJID, fromName, 
 }
 
 func (r *AgentRuntime) recentHistory(instanceID uuid.UUID, fromJID string, limit int) string {
-	phone := extractPhoneFromJIDLocal(fromJID)
+	// Prefere filtrar por conversation_id (mais confiável). Fallback ao
+	// filtro por jid quando a conversa não foi resolvida ainda.
 	var logs []models.MessageLog
-	q := r.db.Where("instance_id = ? AND (to_jid = ? OR to_jid LIKE ? OR sender_jid = ?)", instanceID, fromJID, phone+"%@", fromJID).
-		Order("created_at DESC").
-		Limit(limit)
-	if err := q.Find(&logs).Error; err != nil || len(logs) == 0 {
+	var conv models.Conversation
+	if err := r.db.
+		Select("id").
+		Where("instance_id = ? AND channel_key = ?", instanceID, fromJID).
+		Where("status IN ?", []models.ConversationStatus{
+			models.ConversationStatusOpen,
+			models.ConversationStatusPending,
+			models.ConversationStatusSnoozed,
+			models.ConversationStatusResolved,
+		}).
+		Order("updated_at DESC").
+		First(&conv).Error; err == nil && conv.ID != uuid.Nil {
+		r.db.Where("conversation_id = ?", conv.ID).
+			Order("created_at DESC").
+			Limit(limit).
+			Find(&logs)
+	} else {
+		// Fallback antigo — filtro por JID com OR. Pode pegar msgs de
+		// outras conversas com mesmo número, mas é melhor que nada.
+		phone := extractPhoneFromJIDLocal(fromJID)
+		r.db.Where("instance_id = ? AND (to_jid = ? OR to_jid LIKE ? OR sender_jid = ?)",
+			instanceID, fromJID, phone+"%@", fromJID).
+			Order("created_at DESC").
+			Limit(limit).
+			Find(&logs)
+	}
+
+	if len(logs) == 0 {
 		return ""
 	}
 
@@ -633,6 +662,16 @@ func BuildAgentSystemPrompt(agent *models.InstanceAgent, assets []models.AgentAs
 		"Você é um agente operacional de atendimento dentro da plataforma Uniq.chat.",
 		"Responda sempre no idioma do usuário, de forma natural, curta e útil.",
 		"Se a base não trouxer informação suficiente, diga isso com transparência e proponha encaminhamento humano em vez de inventar detalhes.",
+		// Anti-repetição — alça o problema "agente cumprimenta a cada msg".
+		// Vai como diretriz no início do system prompt pra que o modelo já
+		// considere desde a primeira tokenização.
+		"REGRAS DE CONTINUIDADE DA CONVERSA (críticas):\n" +
+			"- O HISTÓRICO RECENTE da conversa será fornecido logo abaixo. LEIA antes de responder.\n" +
+			"- NUNCA cumprimente novamente se já cumprimentou nesta conversa. Saudação só na PRIMEIRA mensagem.\n" +
+			"- NUNCA se apresente novamente (\"Sou o X, da Y\") se já se apresentou antes.\n" +
+			"- NUNCA repita literalmente o que o cliente acabou de dizer (\"Entendi que você quer X\" → vá direto ao ponto).\n" +
+			"- NÃO comece toda mensagem com \"Olá\", \"Oi\", \"Tudo bem?\", \"Como posso ajudar?\". Continue a conversa naturalmente.\n" +
+			"- Se o cliente faz uma pergunta direta (preço, prazo, sim/não), responda DIRETO sem preâmbulos.",
 	}
 
 	appendSection := func(title, value string) {
@@ -688,7 +727,27 @@ func BuildAgentSystemPrompt(agent *models.InstanceAgent, assets []models.AgentAs
 		sections = append(sections, "PROMPT BASE ADICIONAL\n"+strings.TrimSpace(agent.SystemPrompt))
 	}
 
+	// ResponseLength — diretriz dura sobre o tamanho da resposta. Sem
+	// isso o LLM tendia a ser excessivamente verboso (especialmente
+	// modelos da família Claude/GPT-4) e o cliente percebia como
+	// "robô explicando demais".
+	if guide := responseLengthGuide(agent.ResponseLength); guide != "" {
+		sections = append(sections, "TAMANHO E RITMO DAS RESPOSTAS\n"+guide)
+	}
+
 	return strings.Join(sections, "\n\n")
+}
+
+func responseLengthGuide(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "concise":
+		return "Responda em NO MÁXIMO 1-2 frases curtas (até ~25 palavras). Sem listas, sem títulos, sem saudações longas. Direto ao ponto. Quando a info for complexa, divida em mensagens separadas curtas em vez de um parágrafão."
+	case "detailed":
+		return "Pode ser mais didático e explicar com profundidade. Use parágrafos curtos quando precisar elaborar. Evite muros de texto: máx ~6 linhas por mensagem; se precisar de mais, diga 'posso te explicar com mais detalhes — quer continuar?' antes."
+	case "balanced", "":
+		return "Responda no tamanho NECESSÁRIO — geralmente 1-3 frases. Detalhe só quando o cliente pedir mais ou a info exigir. Evite repetir o que o cliente acabou de dizer. Mensagens curtas e diretas funcionam melhor em WhatsApp."
+	}
+	return ""
 }
 
 func formatJSONBlock(raw string, title string) string {
@@ -1135,6 +1194,7 @@ func (r *AgentRuntime) TriggerByWebhook(agent *models.InstanceAgent, payload Age
 		ToJID:      jid,
 		Reply:      reply,
 		AgentName:  agent.AgentName,
+		Pace:       agent.ResponsePace,
 	})
 	log.Info().
 		Str("agent", agent.AgentName).

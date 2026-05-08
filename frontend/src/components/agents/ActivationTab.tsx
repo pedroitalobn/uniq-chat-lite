@@ -19,12 +19,19 @@ type Schedule = {
 
 type ActivationMode = "always" | "business_hours" | "off_hours" | "new_contact_only" | "custom";
 type TriggerMode = "any" | "keyword" | "webhook";
+type ResponsePace = "instant" | "natural" | "thoughtful" | "very_human";
+type ResponseLength = "concise" | "balanced" | "detailed";
 
 type TriggerConfig = {
   mode: TriggerMode;
   keywords: string[];
   webhook_slug: string;        // read-only, gerado pelo backend ao ativar webhook mode
   webhook_secret: string;
+};
+
+type ResponseStyleConfig = {
+  pace: ResponsePace;
+  length: ResponseLength;
 };
 
 const DAYS: Array<{ key: string; label: string }> = [
@@ -51,6 +58,8 @@ export function ActivationTab({
   onChangeSchedule,
   trigger,
   onChangeTrigger,
+  responseStyle,
+  onChangeResponseStyle,
   apiBase,
 }: {
   mode: ActivationMode;
@@ -59,6 +68,8 @@ export function ActivationTab({
   onChangeSchedule: (s: Schedule) => void;
   trigger: TriggerConfig;
   onChangeTrigger: (t: TriggerConfig) => void;
+  responseStyle: ResponseStyleConfig;
+  onChangeResponseStyle: (s: ResponseStyleConfig) => void;
   /** URL base do backend pra montar a URL completa do webhook (ex: https://api.uniq.chat) */
   apiBase?: string;
 }) {
@@ -237,6 +248,92 @@ export function ActivationTab({
 
       {/* ── Trigger: em qual condição o agente INICIA/RESPONDE ── */}
       <TriggerSection trigger={trigger} onChange={onChangeTrigger} apiBase={apiBase} />
+
+      {/* ── Ritmo + tamanho da resposta ── */}
+      <ResponseStyleSection style={responseStyle} onChange={onChangeResponseStyle} />
+    </div>
+  );
+}
+
+// ─── Response style config ───────────────────────────────────────────────
+
+const PACE_OPTIONS: Array<{ id: ResponsePace; title: string; desc: string }> = [
+  { id: "instant",    title: "Instantâneo",  desc: "Mais rápido possível (mín ~600ms). Pode soar robótico — use só em FAQ/automação." },
+  { id: "natural",    title: "Natural",      desc: "Padrão humano: digita ~300 chars/min com variação. Default recomendado." },
+  { id: "thoughtful", title: "Pensativo",    desc: "Pausa pra pensar antes (~400ms/char). Bom pra vendas consultivas." },
+  { id: "very_human", title: "Bem humano",   desc: "Devagar, longas pausas. Quase indistinguível de humano. Mais lento (até 25s)." },
+];
+
+const LENGTH_OPTIONS: Array<{ id: ResponseLength; title: string; desc: string }> = [
+  { id: "concise",  title: "Curto e direto",   desc: "1-2 frases por mensagem. Sem explicações longas. Bom pra suporte rápido / FAQ." },
+  { id: "balanced", title: "Equilibrado",      desc: "1-3 frases. Detalha quando precisa. Default — melhor pra maioria." },
+  { id: "detailed", title: "Detalhado",        desc: "Pode explicar com profundidade. Bom pra suporte técnico ou onboarding educativo." },
+];
+
+function ResponseStyleSection({
+  style, onChange,
+}: {
+  style: ResponseStyleConfig;
+  onChange: (s: ResponseStyleConfig) => void;
+}) {
+  return (
+    <div className="space-y-4 pt-2 border-t" style={{ borderColor: "var(--surface-border)" }}>
+      <div>
+        <h2 className="text-base font-semibold mb-1" style={{ color: "var(--text-1)" }}>Como o agente responde</h2>
+        <p className="text-xs" style={{ color: "var(--text-3)" }}>
+          Ritmo do envio e tamanho da resposta. Ajuste pra parecer mais humano e evitar banimento por &quot;robô óbvio&quot;.
+        </p>
+      </div>
+
+      {/* Pace */}
+      <div>
+        <p className="text-xs font-medium mb-2" style={{ color: "var(--text-2)" }}>Ritmo (delay de digitação)</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {PACE_OPTIONS.map((p) => {
+            const active = style.pace === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => onChange({ ...style, pace: p.id })}
+                className="text-left rounded-xl p-3 transition"
+                style={{
+                  background: active ? "rgba(0,212,106,0.06)" : "var(--surface-2)",
+                  border: `1px solid ${active ? "rgba(0,212,106,0.25)" : "var(--surface-border)"}`,
+                }}
+              >
+                <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{p.title}</p>
+                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>{p.desc}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Length */}
+      <div>
+        <p className="text-xs font-medium mb-2" style={{ color: "var(--text-2)" }}>Tamanho da resposta</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          {LENGTH_OPTIONS.map((l) => {
+            const active = style.length === l.id;
+            return (
+              <button
+                key={l.id}
+                type="button"
+                onClick={() => onChange({ ...style, length: l.id })}
+                className="text-left rounded-xl p-3 transition"
+                style={{
+                  background: active ? "rgba(99,102,241,0.06)" : "var(--surface-2)",
+                  border: `1px solid ${active ? "rgba(99,102,241,0.25)" : "var(--surface-border)"}`,
+                }}
+              >
+                <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{l.title}</p>
+                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>{l.desc}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

@@ -15,6 +15,7 @@ package services
 
 import (
 	mathrand "math/rand"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,6 +30,10 @@ type AgentReplyJob struct {
 	ToJID      string
 	Reply      string
 	AgentName  string // só pra log
+	// Pace do agente — controla a magnitude do delay de "digitação" e
+	// dos cooldowns. Valores: "instant" | "natural" | "thoughtful" |
+	// "very_human". Vazio cai pra "natural".
+	Pace string
 }
 
 // AgentReplyQueue — gerencia uma fila por instância. Singleton no boot;
@@ -91,7 +96,7 @@ func (q *AgentReplyQueue) worker(instanceID string, ch chan AgentReplyJob) {
 			continue
 		}
 
-		typingDelay := computeTypingDelay(job.Reply)
+		typingDelay := computeTypingDelay(job.Reply, job.Pace)
 		_ = client.SendTyping(job.ToJID, true)
 		time.Sleep(typingDelay)
 
@@ -105,34 +110,89 @@ func (q *AgentReplyQueue) worker(instanceID string, ch chan AgentReplyJob) {
 				Str("instance", instanceID).
 				Str("to", job.ToJID).
 				Str("agent", job.AgentName).
+				Str("pace", job.Pace).
 				Dur("typing_delay", typingDelay).
 				Msg("agent-reply-queue: enviado")
 		}
 		_ = client.SendTyping(job.ToJID, false)
 
-		// Cooldown entre mensagens consecutivas no mesmo número/instância.
-		time.Sleep(jitterMS(1500, 3000))
+		// Cooldown entre mensagens consecutivas, escalado pelo pace.
+		minCD, maxCD := cooldownRange(job.Pace)
+		time.Sleep(jitterMS(minCD, maxCD))
 	}
+}
+
+// paceProfile — multipliers + floors por modo. Mantido em uma função
+// só pra facilitar tunar tudo no mesmo lugar.
+type paceProfile struct {
+	msPerChar   int           // base
+	jitterPct   int           // ±N%
+	minDelay    time.Duration
+	maxDelay    time.Duration
+	cooldownMin int // ms
+	cooldownMax int // ms
+}
+
+func paceProfileFor(mode string) paceProfile {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "instant":
+		return paceProfile{
+			msPerChar: 40, jitterPct: 30,
+			minDelay: 600 * time.Millisecond, maxDelay: 4 * time.Second,
+			cooldownMin: 400, cooldownMax: 900,
+		}
+	case "thoughtful":
+		return paceProfile{
+			msPerChar: 400, jitterPct: 25,
+			minDelay: 2200 * time.Millisecond, maxDelay: 18 * time.Second,
+			cooldownMin: 2500, cooldownMax: 4500,
+		}
+	case "very_human":
+		return paceProfile{
+			msPerChar: 600, jitterPct: 30,
+			minDelay: 3500 * time.Millisecond, maxDelay: 25 * time.Second,
+			cooldownMin: 3500, cooldownMax: 7000,
+		}
+	}
+	// "natural" / vazio / desconhecido → default humano padrão.
+	return paceProfile{
+		msPerChar: 220, jitterPct: 25,
+		minDelay: 1200 * time.Millisecond, maxDelay: 12 * time.Second,
+		cooldownMin: 1500, cooldownMax: 3000,
+	}
+}
+
+func cooldownRange(pace string) (int, int) {
+	p := paceProfileFor(pace)
+	return p.cooldownMin, p.cooldownMax
 }
 
 // computeTypingDelay — calcula tempo de "digitação" baseado em:
 //   - tamanho da resposta (caracteres)
-//   - velocidade humana média (~250 chars/min em mobile = 4.16 chars/seg)
-//   - jitter ±25% pra não ser determinístico
-//   - pisos: mínimo 1.2s, máximo 12s (respostas longas continuam respondendo
-//     em tempo razoável; cliente espera mas não desiste)
-func computeTypingDelay(reply string) time.Duration {
+//   - velocidade humana ajustada pelo Pace do agente
+//   - jitter random pra não ser determinístico
+//   - pisos/tetos por pace pra cliente não esperar eternamente nem
+//     receber resposta instantânea (gatilho de banimento)
+func computeTypingDelay(reply, pace string) time.Duration {
+	prof := paceProfileFor(pace)
 	chars := len([]rune(reply))
-	// 4 chars/seg = 250ms por char.
-	baseMS := chars * 220
-	// Jitter ±25%.
-	jitter := mathrand.Intn(baseMS/2 + 1) - (baseMS / 4)
-	totalMS := baseMS + jitter
-	if totalMS < 1200 {
-		totalMS = 1200 + mathrand.Intn(800)
+	baseMS := chars * prof.msPerChar
+	jitterRange := baseMS * prof.jitterPct / 100
+	if jitterRange < 1 {
+		jitterRange = 1
 	}
-	if totalMS > 12000 {
-		totalMS = 10000 + mathrand.Intn(2500)
+	jitter := mathrand.Intn(jitterRange*2) - jitterRange
+	totalMS := baseMS + jitter
+	minMS := int(prof.minDelay / time.Millisecond)
+	maxMS := int(prof.maxDelay / time.Millisecond)
+	if totalMS < minMS {
+		totalMS = minMS + mathrand.Intn(800)
+	}
+	if totalMS > maxMS {
+		totalMS = maxMS - 2000 + mathrand.Intn(2500)
+	}
+	if totalMS < minMS {
+		totalMS = minMS
 	}
 	return time.Duration(totalMS) * time.Millisecond
 }
