@@ -803,6 +803,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	usage.Get("/me/timeseries", usageH.GetMyTimeseries)
 	usage.Get("/me/topups", usageH.ListMyTopups)
 	usage.Post("/me/overage", usageH.SetOverage)
+	// Top-up checkout — gera Stripe Checkout Session em mode=payment
+	// pra comprar créditos avulsos. Webhook handleCheckoutCompleted
+	// detecta type=topup e aplica via ApplyTopupFromCheckout.
+	usage.Post("/me/topup-checkout", usageH.CreateTopupCheckout)
+	usage.Get("/topup-packs", usageH.ListTopupPacks)
 
 	systemWebhooks := api.Group("/webhooks/system")
 	systemWebhooks.Get("/events", globalWebhookH.ListEvents)

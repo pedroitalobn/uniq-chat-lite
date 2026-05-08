@@ -12,7 +12,8 @@
 //
 // Pendente: botão "Comprar mais créditos" (Phase 4 com Stripe checkout).
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Sparkles, Mic2, MessageSquare, AlertTriangle, Plus, Loader2,
@@ -22,6 +23,7 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianG
 import { toast } from "sonner";
 import {
   usageApi, type UsageView, type UsageCategoryView, type UsageEvent, type UsageTimeseriesPoint,
+  type TopupPack,
 } from "@/lib/api";
 import { ModuleHeader } from "@/components/layout/ModuleHeader";
 
@@ -33,7 +35,28 @@ const CATEGORY_META: Record<string, { label: string; icon: any; color: string; b
 
 export default function UsagePage() {
   const qc = useQueryClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [eventCategory, setEventCategory] = useState<string>("");
+  const [topupOpen, setTopupOpen] = useState(false);
+
+  // Volta do Stripe checkout — mostra toast e invalida quota pra puxar
+  // o saldo novo. Webhook applies o topup async, então damos 2s de
+  // grace antes do refetch agressivo.
+  useEffect(() => {
+    const t = searchParams.get("topup");
+    if (t === "success") {
+      toast.success("Pagamento aprovado — créditos chegando…");
+      const i1 = setTimeout(() => qc.invalidateQueries({ queryKey: ["usage"] }), 2_000);
+      const i2 = setTimeout(() => qc.invalidateQueries({ queryKey: ["usage"] }), 6_000);
+      router.replace("/usage");
+      return () => { clearTimeout(i1); clearTimeout(i2); };
+    }
+    if (t === "cancel") {
+      toast.info("Compra cancelada");
+      router.replace("/usage");
+    }
+  }, [searchParams, qc, router]);
 
   const { data: view, isLoading } = useQuery<UsageView>({
     queryKey: ["usage", "me"],
@@ -142,8 +165,9 @@ export default function UsagePage() {
         onCategoryChange={setEventCategory}
       />
 
-      {/* Comprar (placeholder Phase 4) */}
-      <BuyTopupCTA />
+      {/* Comprar — abre modal com packs do PricingConfig */}
+      <BuyTopupCTA onClick={() => setTopupOpen(true)} />
+      {topupOpen && <TopupModal onClose={() => setTopupOpen(false)} />}
     </div>
   );
 }
@@ -490,7 +514,7 @@ function EventRow({ ev, divider }: { ev: UsageEvent; divider: boolean }) {
 
 // ─── CTA topup ───────────────────────────────────────────────────────────
 
-function BuyTopupCTA() {
+function BuyTopupCTA({ onClick }: { onClick: () => void }) {
   return (
     <div
       className="rounded-2xl p-4 flex items-center gap-3"
@@ -508,17 +532,138 @@ function BuyTopupCTA() {
           Comprar mais créditos
         </p>
         <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
-          Top-ups isolados não vencem com o ciclo. Disponível em breve via checkout Stripe.
+          Top-ups são permanentes — não vencem com o ciclo. Aparecem como saldo extra no painel.
         </p>
       </div>
       <button
-        disabled
-        className="text-xs font-medium px-3 py-2 rounded-lg flex items-center gap-1.5 opacity-60 cursor-not-allowed"
+        onClick={onClick}
+        className="text-xs font-medium px-3 py-2 rounded-lg flex items-center gap-1.5 transition-opacity hover:opacity-90"
         style={{ background: "var(--green)", color: "var(--green-fg)" }}
       >
-        Em breve
+        Comprar
         <ArrowUpRight className="w-3 h-3" />
       </button>
+    </div>
+  );
+}
+
+// ─── Topup modal ─────────────────────────────────────────────────────────
+
+function TopupModal({ onClose }: { onClose: () => void }) {
+  const [selected, setSelected] = useState<number | null>(null);
+  const { data, isLoading } = useQuery<{ items: TopupPack[] }>({
+    queryKey: ["topup-packs"],
+    queryFn: () => usageApi.topupPacks().then(r => r.data),
+  });
+  const checkout = useMutation({
+    mutationFn: (idx: number) => usageApi.topupCheckout({ pack_index: idx, scope: "account" }),
+    onSuccess: (r) => {
+      // Redireciona pra Stripe checkout. Volta automático pro /usage
+      // depois com ?topup=success ou ?topup=cancel.
+      window.location.href = r.data.checkout_url;
+    },
+    onError: (e: any) => {
+      toast.error(e?.response?.data?.error || "Erro ao iniciar pagamento");
+    },
+  });
+
+  const packs = data?.items ?? [];
+
+  return (
+    <div
+      className="fixed inset-0 z-[150] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl p-5 space-y-4"
+        style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>
+              Comprar créditos
+            </h2>
+            <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
+              Pagamento via Stripe. Créditos somam no seu saldo na hora.
+            </p>
+          </div>
+          <button onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-white/5"
+            style={{ color: "var(--text-3)" }}>
+            ✕
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--text-3)" }} />
+          </div>
+        ) : packs.length === 0 ? (
+          <div className="rounded-xl py-8 text-center"
+            style={{ background: "var(--surface-2)", border: "1px dashed var(--surface-border)" }}>
+            <p className="text-sm" style={{ color: "var(--text-2)" }}>Nenhum pack disponível ainda.</p>
+            <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
+              Admin precisa configurar packs em /admin/providers → Pricing.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {packs.map((pack, idx) => {
+              const meta = CATEGORY_META[pack.category] ?? CATEGORY_META.ai;
+              const Icon = meta.icon;
+              const isSel = selected === idx;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => setSelected(idx)}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left"
+                  style={{
+                    background: isSel ? meta.bg : "var(--surface-2)",
+                    border: `1px solid ${isSel ? meta.color : "var(--surface-border)"}`,
+                  }}
+                >
+                  <div className="p-2 rounded-lg"
+                    style={{ background: meta.bg, border: `1px solid ${meta.border}` }}>
+                    <Icon className="w-4 h-4" style={{ color: meta.color }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
+                      {pack.label}
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
+                      {pack.credits.toLocaleString("pt-BR")} créditos {meta.label}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-base font-semibold tabular-nums" style={{ color: "var(--text-1)" }}>
+                      R$ {(pack.price_cents / 100).toFixed(2)}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <button
+            onClick={onClose}
+            className="text-xs px-3 py-2 rounded-lg"
+            style={{ background: "var(--surface-2)", color: "var(--text-2)" }}
+          >Cancelar</button>
+          <button
+            onClick={() => selected !== null && checkout.mutate(selected)}
+            disabled={selected === null || checkout.isPending}
+            className="text-xs font-medium px-4 py-2 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-40"
+            style={{ background: "var(--green)", color: "var(--green-fg)" }}
+          >
+            {checkout.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+            Ir para o pagamento
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

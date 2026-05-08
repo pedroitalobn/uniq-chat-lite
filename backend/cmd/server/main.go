@@ -324,6 +324,13 @@ func main() {
 	profileSyncCron := services.NewProfileSyncCron(db, manager)
 	profileSyncCron.Start()
 
+	// Overage invoice cron — roda 1x por dia. Pra cada UsageQuota com
+	// period_end vencido E overage_cents_accumulated > 0 cria invoice
+	// avulsa na Stripe + zera o acumulador. Free PAYG sem stripe_customer
+	// é skipado (overage virou perda; user precisava de topup).
+	overageCron := handlers.NewOverageInvoiceCron(db)
+	overageCron.Start()
+
 	// Scheduled recovery snapshots (check every hour)
 	recoveryH := handlers.NewRecoveryHandler(db, manager)
 	go func() {

@@ -2268,6 +2268,13 @@ export interface UsageTimeseriesPoint {
   proxy: number;
 }
 
+export interface TopupPack {
+  category: "ai" | "voice" | "message";
+  credits: number;
+  price_cents: number;
+  label: string;
+}
+
 export const usageApi = {
   me: () => api.get<UsageView>("/v1/usage/me"),
   events: (params?: { category?: string; limit?: number }) =>
@@ -2277,6 +2284,10 @@ export const usageApi = {
   topups: () => api.get<{ items: any[] }>("/v1/usage/me/topups"),
   setOverage: (allowed: boolean) =>
     api.post<{ ok: boolean; allowed: boolean }>("/v1/usage/me/overage", { allowed }),
+  // Top-up checkout (Stripe). Pack vem do PricingConfig.TopupPacks.
+  topupPacks: () => api.get<{ items: TopupPack[] }>("/v1/usage/topup-packs"),
+  topupCheckout: (data: { pack_index: number; scope: "account" | "workspace"; workspace_id?: string }) =>
+    api.post<{ checkout_url: string; topup_id: string }>("/v1/usage/me/topup-checkout", data),
 };
 
 // ─── Admin usage ───────────────────────────────────────────────────────

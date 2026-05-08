@@ -491,6 +491,16 @@ func (h *StripeHandler) Webhook(c *fiber.Ctx) error {
 }
 
 func (h *StripeHandler) handleCheckoutCompleted(sess *stripe.CheckoutSession) {
+	// Top-up de Uniq Credits — checkout em mode=payment com type=topup
+	// no metadata. Aplica créditos via UsageRecorder em vez do fluxo de
+	// subscription. Idempotente — se já marcou paid antes, é no-op.
+	if sess.Metadata != nil && sess.Metadata["type"] == "topup" {
+		if err := ApplyTopupFromCheckout(h.db, sess); err != nil {
+			log.Warn().Err(err).Str("session", sess.ID).Msg("topup webhook: falha ao aplicar")
+		}
+		return
+	}
+
 	// Novo fluxo: pending_id na metadata significa que ainda não
 	// existe User no DB — precisamos materializar agora a partir do
 	// PendingRegistration.
