@@ -136,6 +136,17 @@ func (h *MessageHandler) logMessage(instanceID, direction, msgType, jid, msgID s
 						plan = u.Plan
 					}
 					usage.Increment(context.Background(), inst.UserID, models.UsageTypeMessagesSent, plan)
+					// Sistema novo de créditos — grava evento detalhado pro
+					// painel de consumo. Coexiste com UsageCounter legado
+					// (que segue cuidando do rate-limit anti-spam diário).
+					// channelKind diferencia QR de WABA pra precificação
+					// (WABA marketing custa mais, conversation utility menos).
+					services.RecordUsage(context.Background(), services.RecordRequest{
+						UserID:    inst.UserID,
+						EventType: models.EventMessageOutbound,
+						Quantity:  1,
+						Resource:  "whatsapp_qr",
+					})
 				}
 			}
 		}

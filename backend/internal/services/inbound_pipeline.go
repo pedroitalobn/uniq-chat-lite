@@ -736,6 +736,16 @@ func (p *InboundPipeline) transcribeAudioAsync(msg *models.MessageLog, conv *mod
 		return
 	}
 
+	// Grava consumo de Voice (categoria voice, segundos de áudio).
+	// Estimativa de duração via tamanho do blob — Whisper não devolve a
+	// duração e detectar exato exige libav (overkill aqui). 16kbps é o
+	// mínimo razoável pra opus voice note: bytes / 2000 ≈ segundos.
+	audioSeconds := int64(len(audio)) / 2000
+	if audioSeconds < 1 {
+		audioSeconds = 1
+	}
+	recordSTTUsage(context.Background(), p.db, msg.InstanceID, "uniq_voice_stt", audioSeconds)
+
 	// Emite WS event pro front atualizar a bubble. Mesmo canal das demais
 	// notificações de mensagem; UI escuta `conversation.message_updated`
 	// (reutiliza o invalidador de conversation.* já existente).

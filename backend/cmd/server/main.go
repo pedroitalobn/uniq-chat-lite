@@ -277,6 +277,14 @@ func main() {
 	})
 	services.SetGlobalUsageService(usageSvc)
 
+	// Sistema de créditos (Uniq Credits) — UsageRecorder grava
+	// usage_events e atualiza usage_quotas/workspace_quotas atomic.
+	// Coexiste com o UsageService legado (rate-limit anti-spam diário
+	// continua usando UsageCounter). PricingConfig é seedado no primeiro
+	// uso (lazy via pricing0).
+	usageRecorder := services.NewUsageRecorder(db)
+	services.SetGlobalUsageRecorder(usageRecorder)
+
 	// Asaas cron — emula cancel_at_period_end via flag asaas_cancel_at.
 	asaasCron := services.NewAsaasCron(db)
 	asaasCron.Start()
@@ -508,6 +516,11 @@ func autoMigrate(db *gorm.DB) error {
 		// Platform AI (Uniq AI) — singleton config
 		&models.PlatformAI{},
 		&models.PlatformVoice{},
+		&models.PricingConfig{},
+		&models.UsageEvent{},
+		&models.UsageQuota{},
+		&models.WorkspaceQuota{},
+		&models.UsageTopup{},
 		// Help Desk (knowledge base)
 		&models.HelpDeskCategory{},
 		&models.HelpDeskArticle{},

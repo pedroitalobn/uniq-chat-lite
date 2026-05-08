@@ -20,6 +20,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/config"
 	"github.com/uniq-chat/backend/internal/models"
+	"github.com/uniq-chat/backend/internal/services"
 	"github.com/uniq-chat/backend/internal/storage"
 	"gorm.io/gorm"
 )
@@ -1042,6 +1043,31 @@ func (h *WABAHandler) SendMessage(c *fiber.Ctx) error {
 		ExternalMessageID: wamid,
 	}
 	h.db.Create(&ml)
+
+	// Grava consumo no sistema de créditos. Resource diferencia tipo
+	// pra cobrar valor certo: WABA marketing > utility > QR. Se a
+	// caller não passou hint, default vai pra "waba_utility" (mais
+	// comum em respostas dentro da janela 24h).
+	{
+		var inst models.Instance
+		if err := h.db.Select("user_id, workspace_id").First(&inst, "id = ?", waba.InstanceID).Error; err == nil {
+			kind := "waba_utility"
+			if req.Template != nil {
+				// Template marketing custa mais. Utility fica como
+				// default — em fase 2 a gente lê tpl.Category da Meta
+				// (que já temos em ListTemplates) pra acertar.
+				kind = "waba_marketing"
+			}
+			services.RecordUsage(context.Background(), services.RecordRequest{
+				UserID:      inst.UserID,
+				WorkspaceID: inst.WorkspaceID,
+				EventType:   models.EventMessageOutbound,
+				Quantity:    1,
+				Resource:    kind,
+				Metadata:    map[string]any{"wamid": wamid},
+			})
+		}
+	}
 
 	if h.pipeline != nil {
 		go func(m models.MessageLog) {

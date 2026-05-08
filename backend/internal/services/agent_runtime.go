@@ -182,6 +182,11 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		})
 		return false
 	}
+	// Grava consumo (estimado por chars/4 ≈ tokens — temos ~erro de 10-20%
+	// pra português, aceitável até refatorarmos LLMService pra retornar
+	// usage real). Resource = "<provider>:<model>" pra resolver custo na
+	// PricingConfig.LLMCostMatrix.
+	recordLLMUsageEstimate(ctx, r.db, instUUID, integration, userPrompt+systemPrompt, reply)
 
 	reply = sanitizeAssistantReply(reply)
 	if reply == "" {
@@ -686,6 +691,8 @@ func (r *AgentRuntime) trySendAudio(ctx context.Context, client interface {
 		log.Warn().Err(err).Str("voice", voiceExternal).Msg("agent-runtime: TTS falhou, usando texto")
 		return false
 	}
+	// Grava consumo de Voice (categoria voice, chars sintetizados).
+	recordTTSUsage(ctx, r.db, agent.InstanceID, string(voiceProvider.Provider), voiceExternal, text)
 
 	// PTT só é válido com containers Opus (ogg/webm). Forçar PTT=true em
 	// MP3/AAC faz o destinatário receber o áudio como "indisponível" porque
@@ -1369,6 +1376,9 @@ func (r *AgentRuntime) TriggerByWebhook(agent *models.InstanceAgent, payload Age
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 	reply, err := r.llm.CallChatWithSystem(ctx, integration, systemPrompt, userPrompt.String(), false)
+	if reply != "" {
+		recordLLMUsageEstimate(ctx, r.db, agent.InstanceID, integration, userPrompt.String()+systemPrompt, reply)
+	}
 	if err != nil {
 		return "", fmt.Errorf("LLM falhou: %w", err)
 	}

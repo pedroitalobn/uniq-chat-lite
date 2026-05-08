@@ -73,6 +73,20 @@ type Plan struct {
 	// Não é usado pra autorização — só metadata UI.
 	Features string `gorm:"type:text;default:'{}'" json:"features"`
 
+	// ── Sistema de Créditos (consumo metered) ─────────────────────────
+	// Allowance mensal (zerado a cada ciclo da subscription). 0 = PAYG
+	// puro pra esse recurso (free plan ou pacote sem AI/Voice incluso).
+	AICreditsIncludedPerCycle      int64 `gorm:"not null;default:0" json:"ai_credits_included_per_cycle"`
+	VoiceCreditsIncludedPerCycle   int64 `gorm:"not null;default:0" json:"voice_credits_included_per_cycle"`
+	MessageCreditsIncludedPerCycle int64 `gorm:"not null;default:0" json:"message_credits_included_per_cycle"`
+	// Política default de overage. User pode sobrescrever em UsageQuota,
+	// mas o default vem daqui no início do ciclo.
+	OverageAllowedDefault    bool  `gorm:"not null;default:false" json:"overage_allowed_default"`
+	// Preço cobrado por crédito extra (em centavos × 1000 = "milicentavos"
+	// pra suportar valores < 1 centavo). Ex: 50 = R$ 0,00050 / crédito =
+	// R$ 5 / 10k créditos extras. NULL = usa pricing global.
+	OverageMillicentsPerCredit *int64 `gorm:"" json:"overage_millicents_per_credit,omitempty"`
+
 	IsActive  bool      `gorm:"default:true" json:"is_active"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
