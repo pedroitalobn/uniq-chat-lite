@@ -1528,27 +1528,11 @@ export default function CRMPage() {
         }
         toolbar={
           <div className="flex gap-2 flex-wrap items-center">
-            <div
-              className="flex items-center gap-0.5 rounded-xl p-0.5"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}
-            >
-              <button
-                onClick={() => setViewMode("list")}
-                className="p-1.5 rounded-lg transition-colors"
-                style={{ background: viewMode === "list" ? "rgba(255,255,255,0.10)" : "transparent", color: viewMode === "list" ? "var(--text-1)" : "var(--text-2)" }}
-                aria-label="Vista em lista"
-              >
-                <ListIcon className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode("kanban")}
-                className="p-1.5 rounded-lg transition-colors"
-                style={{ background: viewMode === "kanban" ? "rgba(255,255,255,0.10)" : "transparent", color: viewMode === "kanban" ? "var(--text-1)" : "var(--text-2)" }}
-                aria-label="Vista em kanban"
-              >
-                <KanbanSquare className="w-4 h-4" />
-              </button>
-            </div>
+            {/* Toggle list/kanban removido — kanban genérico de contatos
+                (agrupado por funnel/stage/journey strings legados) perdeu
+                propósito após o filtro CRM v2. Pipeline visual de fato
+                vive em /crm/deals, que é onde a noção de "mover entre
+                estágios" tem semântica. */}
             <CrmHeaderButton
               onClick={() => setFilterOpen(true)}
               active={activeFilterCount > 0}
@@ -1604,57 +1588,9 @@ export default function CRMPage() {
         </div>
       )}
 
-      {/* Kanban toolbar: seletor de funil (pipeline) + agrupamento */}
-      {viewMode === "kanban" && (
-        <div
-          className="flex items-center justify-between gap-3 flex-wrap rounded-2xl px-4 py-3"
-          style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
-        >
-          <div className="flex items-center gap-3 flex-wrap">
-            <FunnelSwitcher
-              funnels={pipelineFunnels}
-              selectedId={pipelineFunnelId}
-              onSelect={(id) => {
-                setPipelineFunnelId(id);
-                if (id) setKanbanGroup("stage");
-              }}
-              onManage={() => setFunnelsOpen(true)}
-            />
-
-            {/* Agrupamento só faz sentido quando NÃO estamos num funil específico.
-                No modo pipeline de funil, as colunas são fixas = stages do funil. */}
-            {!pipelineFunnelId && contacts.length > 0 && (
-              <>
-                <span className="h-4 w-px" style={{ background: "var(--surface-border)" }} />
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium" style={{ color: "var(--text-3)" }}>
-                    Agrupar por
-                  </span>
-                  <select
-                    value={kanbanGroup}
-                    onChange={(e) => setKanbanGroup(e.target.value as any)}
-                    className="text-xs rounded-lg px-2.5 py-1.5 outline-none font-medium transition-colors cursor-pointer"
-                    style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "var(--text-1)" }}
-                  >
-                    <option value="stage" style={{ background: "#111" }}>Etapa</option>
-                    <option value="journey" style={{ background: "#111" }}>Jornada</option>
-                    <option value="funnel" style={{ background: "#111" }}>Funil</option>
-                  </select>
-                </div>
-              </>
-            )}
-          </div>
-
-          {selectedPipelineFunnel && (
-            <div className="text-[11px]" style={{ color: "var(--text-3)" }}>
-              {pipelineStages.length} {pipelineStages.length === 1 ? "etapa" : "etapas"}
-              {pipelineStages.length > 0 && (
-                <> · {pipelineStages.slice(0, 4).map((s) => s.name).join(" → ")}{pipelineStages.length > 4 && " → …"}</>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Kanban toolbar removida — vista kanban de contatos foi descontinuada
+          (agrupamento por strings legados de funnel/stage/journey perdeu sentido
+          após filtros CRM v2). Pipeline visual vive em /crm/deals. */}
 
       {/* Active pipeline filter chips */}
       {activeFilterCount > 0 && (
@@ -1720,7 +1656,7 @@ export default function CRMPage() {
             </Link>
           </div>
         )
-      ) : viewMode === "list" ? (
+      ) : (
         <div className="rounded-2xl overflow-hidden" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
           {contacts.map((contact, i) => {
             // Temperature based on days since last update
@@ -1863,7 +1799,10 @@ export default function CRMPage() {
             );
           })}
         </div>
-      ) : (
+      )}
+      {/* Kanban removido — restou stub abaixo só pra documentar a decisão.
+          Lógica de pipeline visual vive em /crm/deals (DealCard + KanbanBoard). */}
+      {false && (
         <DragDropContext onDragEnd={onDragEnd}>
           <div className="flex gap-4 overflow-x-auto pb-4 snap-x">
             {(() => {
