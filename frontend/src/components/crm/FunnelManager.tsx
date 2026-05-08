@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronDown, GitBranch, Layers, List as ListIcon, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { crmApi } from "@/lib/api";
+import { showConfirm } from "@/lib/confirm";
 
 export type FunnelStage = { id: string; funnel_id: string; name: string; color?: string; order?: number };
 export type Funnel = { id: string; name: string; description?: string; color?: string; stages?: FunnelStage[] };
@@ -66,7 +67,7 @@ function FunnelListItem({ funnel, onEdit, onDelete }: { funnel: Funnel; onEdit: 
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button onClick={onEdit} className="text-[11px] px-2 py-1 rounded-lg" style={{ color: "var(--text-2)" }}>Editar</button>
-        <button onClick={() => { if (confirm("Remover este funil? Etapas e referências em deals serão perdidas.")) onDelete(); }}
+        <button onClick={async () => { if (await showConfirm("Remover este funil? Etapas e referências em deals serão perdidas.", { title: "Remover funil", confirmLabel: "Remover" })) onDelete(); }}
           className="p-1.5 rounded-lg" style={{ color: "#f87171", background: "rgba(248,113,113,0.10)" }}>
           <X className="w-3.5 h-3.5" />
         </button>

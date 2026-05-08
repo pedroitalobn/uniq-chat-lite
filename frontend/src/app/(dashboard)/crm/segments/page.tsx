@@ -12,6 +12,7 @@ import {
 } from "@/components/crm/FunnelStagePicker";
 import { CrmHeader } from "@/components/crm/CrmHeader";
 import { Filter } from "lucide-react";
+import { showConfirm } from "@/lib/confirm";
 
 type GroupMatch = "all" | "any";
 
@@ -447,7 +448,7 @@ function SegmentList() {
               </p>
             </div>
             <button
-              onClick={() => { if (confirm(`Remover "${s.name}"?`)) deleteMut.mutate(s.id); }}
+              onClick={async () => { if (await showConfirm(`Remover "${s.name}"?`, { title: "Remover segmento", confirmLabel: "Remover" })) deleteMut.mutate(s.id); }}
               className="p-1.5 rounded-md" style={{ color: "#f87171" }}>
               <Trash2 className="w-3.5 h-3.5" />
             </button>

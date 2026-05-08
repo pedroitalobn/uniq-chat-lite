@@ -8,6 +8,7 @@ import { quickRepliesApi } from "@/lib/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { InboxSettingsHeader } from "@/components/inbox/InboxSettingsHeader";
+import { showConfirm } from "@/lib/confirm";
 
 interface QuickReply {
   id: string;
@@ -170,8 +171,8 @@ export default function QuickRepliesPage() {
               <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-600 dark:text-zinc-300">{qr.body}</p>
             </div>
             <button
-              onClick={() => {
-                if (confirm("Excluir resposta rápida?")) remove.mutate(qr.id);
+              onClick={async () => {
+                if (await showConfirm("Excluir resposta rápida?", { title: "Excluir resposta", confirmLabel: "Excluir" })) remove.mutate(qr.id);
               }}
               className="rounded-md p-1.5 text-zinc-500 hover:bg-red-500/10 hover:text-red-500"
             >

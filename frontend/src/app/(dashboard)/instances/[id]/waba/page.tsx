@@ -21,6 +21,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { wabaApi, instancesApi, mediaUploadApi } from "@/lib/api";
 import { WABAConnectButton } from "@/components/instances/WABAConnectButton";
+import { showConfirm } from "@/lib/confirm";
 
 interface WABAData {
   id: string;
@@ -341,7 +342,7 @@ function TemplateCard({ t, instanceId, qc }: { t: Template; instanceId: string; 
                 <Pencil className="w-3.5 h-3.5" />
               </button>
             )}
-            <button onClick={() => { if (confirm(`Remover template ${t.name}?`)) deleteMut.mutate(); }}
+            <button onClick={async () => { if (await showConfirm(`Remover template ${t.name}?`, { title: "Remover template", confirmLabel: "Remover" })) deleteMut.mutate(); }}
               className="p-1.5 rounded-md hover:opacity-80" style={{ color: "#f87171" }}>
               <Trash2 className="w-3.5 h-3.5" />
             </button>

@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { AnimatedTabContent } from "@/components/ui/AnimatedTabContent";
 import api from "@/lib/api";
+import { showConfirm } from "@/lib/confirm";
 
 interface Shop {
   id: string;
@@ -235,8 +236,8 @@ export default function ShopDetailPage({ params }: { params: Promise<{ id: strin
                   key={p.id}
                   product={p}
                   onEdit={() => setEditingProduct(p)}
-                  onDelete={() => {
-                    if (confirm(`Remover "${p.name}"?`)) deleteProductMut.mutate(p.id);
+                  onDelete={async () => {
+                    if (await showConfirm(`Remover "${p.name}"?`, { title: "Remover produto", confirmLabel: "Remover" })) deleteProductMut.mutate(p.id);
                   }}
                 />
               ))}

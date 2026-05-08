@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Crown, Plus, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { integrationsApi } from "@/lib/api";
+import { showConfirm } from "@/lib/confirm";
 
 type AgentRow = {
   id: string;
@@ -112,8 +113,8 @@ export function AgentSwitcher({
               {isActive && !a.is_primary && agents.length > 1 && (
                 <button
                   type="button"
-                  onClick={() => {
-                    if (confirm(`Remover agente "${a.agent_name || "sem nome"}"?`)) deleteMut.mutate(a.id);
+                  onClick={async () => {
+                    if (await showConfirm(`Remover agente "${a.agent_name || "sem nome"}"?`, { title: "Remover agente", confirmLabel: "Remover" })) deleteMut.mutate(a.id);
                   }}
                   disabled={deleteMut.isPending}
                   className="p-1 rounded-md"

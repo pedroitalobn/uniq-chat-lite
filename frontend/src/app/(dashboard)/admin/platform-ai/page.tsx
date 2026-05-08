@@ -520,8 +520,8 @@ export function PlatformAIPanel() {
                   Editar
                 </button>
                 <button
-                  onClick={() => {
-                    if (confirm(`Remover "${c.name}"?`)) c.id && deleteMut.mutate(c.id);
+                  onClick={async () => {
+                    if (await showConfirm(`Remover "${c.name}"?`, { title: "Remover credencial", confirmLabel: "Remover" })) c.id && deleteMut.mutate(c.id);
                   }}
                   disabled={deleteMut.isPending}
                   style={{
@@ -583,6 +583,7 @@ export function PlatformAIPanel() {
 // dos submenus de "Provedores".
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { showConfirm } from "@/lib/confirm";
 
 export default function PlatformAIPage() {
   const router = useRouter();

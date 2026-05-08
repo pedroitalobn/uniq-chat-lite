@@ -10,6 +10,7 @@ import { voicesApi } from "@/lib/api";
 import { toast } from "sonner";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { cn } from "@/lib/utils";
+import { showConfirm } from "@/lib/confirm";
 
 interface VoiceProvider {
   id: string;
@@ -176,7 +177,7 @@ export function VoicesSection() {
                       {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                     </button>
                     <button
-                      onClick={() => { if (confirm(`Remover "${p.name}"?`)) deleteProvider.mutate(p.id); }}
+                      onClick={async () => { if (await showConfirm(`Remover "${p.name}"?`, { title: "Remover provider", confirmLabel: "Remover" })) deleteProvider.mutate(p.id); }}
                       className="p-1.5 rounded-lg transition-all hover:opacity-70"
                       style={{ color: "#ef4444" }}
                       title="Remover provider">

@@ -9,6 +9,7 @@ import { Loader2, Plus, Trash2, ShieldOff, Search } from "lucide-react";
 import { toast } from "sonner";
 import { suppressionsApi } from "@/lib/api";
 import { WorkspaceTabs } from "@/components/workspace/WorkspaceTabs";
+import { showConfirm } from "@/lib/confirm";
 
 interface Suppression {
   id: string;
@@ -127,7 +128,7 @@ export default function SuppressionsPage({ params }: { params: Promise<{ workspa
                       {new Date(s.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
                     </td>
                     <td className="px-4 py-2 text-right">
-                      <button onClick={() => { if (confirm(`Remover bloqueio de ${s.key}?`)) deleteMut.mutate(s.id); }}
+                      <button onClick={async () => { if (await showConfirm(`Remover bloqueio de ${s.key}?`, { title: "Remover bloqueio", confirmLabel: "Remover" })) deleteMut.mutate(s.id); }}
                         className="p-1.5 rounded-md" style={{ color: "#f87171" }}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>

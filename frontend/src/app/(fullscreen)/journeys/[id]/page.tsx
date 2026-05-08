@@ -34,6 +34,7 @@ import { journeysApi, instancesApi, groupsApi } from "@/lib/api";
 import { FunnelOptionPicker, StageOptionPicker } from "@/components/crm/FunnelStagePicker";
 import { cn } from "@/lib/utils";
 import { MentionPicker, parseMentions, type MentionPickerHandles } from "@/components/MentionPicker";
+import { showConfirm } from "@/lib/confirm";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type StepType =
@@ -1722,7 +1723,7 @@ function BuilderCanvas() {
         style={{ background: "var(--surface-2)", borderColor: "var(--surface-border)" }}>
         <button
           onClick={async () => {
-            if (dirty && !window.confirm("Você tem alterações não salvas. Sair mesmo assim?")) return;
+            if (dirty && !(await showConfirm("Você tem alterações não salvas. Sair mesmo assim?", { title: "Sair sem salvar", confirmLabel: "Sair" }))) return;
             router.push("/journeys");
           }}
           className="p-1.5 rounded-lg hover:bg-[var(--surface-3)]"

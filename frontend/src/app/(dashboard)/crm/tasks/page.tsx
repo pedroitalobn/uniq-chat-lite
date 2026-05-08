@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { CrmHeader, CrmHeaderButton } from "@/components/crm/CrmHeader";
+import { showConfirm } from "@/lib/confirm";
 
 const TYPE_META: Record<CrmTask["type"], { label: string; icon: React.ElementType }> = {
   call:         { label: "Ligação",     icon: Phone },
@@ -233,7 +234,7 @@ function TaskRow({ task, onEdit, onDelete, onComplete }: {
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button onClick={() => onEdit(task)} className="text-[11px] px-2 py-1 rounded" style={{ color: "var(--text-2)" }}>Editar</button>
-        <button onClick={() => { if (confirm("Remover esta tarefa?")) onDelete(task); }}
+        <button onClick={async () => { if (await showConfirm("Remover esta tarefa?", { title: "Remover tarefa", confirmLabel: "Remover" })) onDelete(task); }}
           className="p-1.5 rounded" style={{ color: "#f87171" }}>
           <Trash2 className="w-3.5 h-3.5" />
         </button>

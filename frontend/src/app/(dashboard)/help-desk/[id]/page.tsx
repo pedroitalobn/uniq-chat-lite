@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { helpDeskApi, type HelpDeskArticle } from "@/lib/helpdesk-api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { RichTextEditor } from "@/components/helpdesk/RichTextEditor";
+import { showConfirm } from "@/lib/confirm";
 
 // escapeHTML — usado quando o content legado vem em Markdown puro e
 // queremos exibir no Tiptap como texto, sem interpretar caracteres especiais
@@ -588,11 +589,15 @@ function PreviewButton({ workspaceId, articleSlug, status }: {
       href={previewURL || "#"}
       target={previewURL ? "_blank" : undefined}
       rel="noopener noreferrer"
-      onClick={(e) => {
+      onClick={async (e) => {
         if (disabled) { e.preventDefault(); return; }
         if (status !== "published") {
-          if (!confirm("Este artigo ainda não está publicado. O preview pode mostrar 404. Continuar?")) {
-            e.preventDefault();
+          // Sempre previne primeiro pra esperar a confirmação async — sem
+          // isso o browser abriria a aba antes da resposta. Se confirmado,
+          // navegamos manualmente via window.open na nova aba.
+          e.preventDefault();
+          if (await showConfirm("Este artigo ainda não está publicado. O preview pode mostrar 404. Continuar?", { title: "Preview de rascunho", confirmLabel: "Continuar", danger: false })) {
+            if (previewURL) window.open(previewURL, "_blank", "noopener,noreferrer");
           }
         }
       }}

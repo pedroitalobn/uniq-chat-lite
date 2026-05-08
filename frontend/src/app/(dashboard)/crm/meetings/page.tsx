@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { CrmHeader, CrmHeaderButton } from "@/components/crm/CrmHeader";
+import { showConfirm } from "@/lib/confirm";
 
 const STATUS_FILTERS: { id: "all" | CrmMeeting["status"]; label: string; color: string }[] = [
   { id: "all",       label: "Todas",       color: "hsl(240 8% 60%)" },
@@ -95,7 +96,7 @@ export default function MeetingsPage() {
                 {items.map((m) => (
                   <MeetingRow key={m.id} meeting={m}
                     onEdit={() => { setEditing(m); setShowModal(true); }}
-                    onDelete={() => { if (confirm("Remover esta reunião?")) deleteMut.mutate(m.id); }} />
+                    onDelete={async () => { if (await showConfirm("Remover esta reunião?", { title: "Remover reunião", confirmLabel: "Remover" })) deleteMut.mutate(m.id); }} />
                 ))}
               </div>
             </div>

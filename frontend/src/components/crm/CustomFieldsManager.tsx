@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Trash2, Save, X, Layers, Briefcase, User, Building2 } from "lucide-react";
 import { customFieldsApi, type CustomFieldDef, type CustomFieldEntity, type CustomFieldType } from "@/lib/api";
+import { showConfirm } from "@/lib/confirm";
 
 const TYPE_LABELS: Record<CustomFieldType, string> = {
   text: "Texto curto",
@@ -160,8 +161,8 @@ function EntitySection({
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm(`Remover o campo "${f.name}"? Os valores existentes ficam órfãos e somem da UI.`)) {
+                  onClick={async () => {
+                    if (await showConfirm(`Remover o campo "${f.name}"? Os valores existentes ficam órfãos e somem da UI.`, { title: "Remover campo", confirmLabel: "Remover" })) {
                       deleteMut.mutate(f.id);
                     }
                   }}

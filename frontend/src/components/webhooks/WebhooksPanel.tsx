@@ -10,6 +10,7 @@ import { globalWebhooksApi } from "@/lib/api";
 import { toast } from "sonner";
 import { WebhookDeliveriesDialog } from "./WebhookDeliveriesDialog";
 import { EventTestMenu } from "./EventTestMenu";
+import { showConfirm } from "@/lib/confirm";
 
 interface SystemEvent {
   id: string;
@@ -262,8 +263,8 @@ export function WebhooksPanel({ showHeader = true }: { showHeader?: boolean }) {
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => {
-                      if (confirm(`Deletar "${wh.name}"?`)) deleteMut.mutate(wh.id);
+                    onClick={async () => {
+                      if (await showConfirm(`Deletar "${wh.name}"?`, { title: "Deletar webhook", confirmLabel: "Deletar" })) deleteMut.mutate(wh.id);
                     }}
                     className="p-2 rounded-lg transition-colors hover:bg-white/5"
                     style={{ color: "#ef4444" }}

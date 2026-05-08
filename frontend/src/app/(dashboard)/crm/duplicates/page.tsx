@@ -10,6 +10,7 @@ import { Loader2, GitMerge, AlertCircle, Users, Phone, Mail } from "lucide-react
 import { toast } from "sonner";
 import { contactsMergeApi } from "@/lib/api";
 import { CrmHeader } from "@/components/crm/CrmHeader";
+import { showConfirm } from "@/lib/confirm";
 
 interface DupGroup {
   key: string;
@@ -91,8 +92,8 @@ export default function DuplicatesPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => {
-                      if (confirm(`Fundir ${g.count} contatos com ${by} ${g.key}?`)) {
+                    onClick={async () => {
+                      if (await showConfirm(`Fundir ${g.count} contatos com ${by} ${g.key}?`, { title: "Fundir contatos", confirmLabel: "Fundir", danger: false })) {
                         mergeMut.mutate({ survivor, loosers });
                       }
                     }}

@@ -88,7 +88,7 @@ export function DockIcon({ icon: Icon, label, badge, pulse, active, onClick, dan
             height: 16,
             borderRadius: 99,
             background: "#00d46a",
-            color: "#000",
+            color: "#03170a",
             fontSize: 9,
             fontWeight: 700,
             display: "flex",

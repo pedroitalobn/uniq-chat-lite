@@ -9,6 +9,7 @@ import { Loader2, Plus, Trash2, Mail, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { subscriptionTopicsApi } from "@/lib/api";
 import { WorkspaceTabs } from "@/components/workspace/WorkspaceTabs";
+import { showConfirm } from "@/lib/confirm";
 
 interface Topic {
   id: string;
@@ -87,7 +88,7 @@ export default function SubscriptionsPage({ params }: { params: Promise<{ worksp
                     className="p-1.5 rounded-md" style={{ color: "var(--text-3)" }}>
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={() => { if (confirm(`Remover "${t.name}"?`)) deleteMut.mutate(t.id); }}
+                  <button onClick={async () => { if (await showConfirm(`Remover "${t.name}"?`, { title: "Remover assinatura", confirmLabel: "Remover" })) deleteMut.mutate(t.id); }}
                     className="p-1.5 rounded-md" style={{ color: "#f87171" }}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

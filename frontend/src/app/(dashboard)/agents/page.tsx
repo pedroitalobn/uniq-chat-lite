@@ -17,6 +17,7 @@ import { ActivationTab } from "@/components/agents/ActivationTab";
 import { QuickSetupWizard } from "@/components/agents/QuickSetupWizard";
 import { AgentActionsConfig } from "@/components/agents/AgentActionsConfig";
 import { AgentLogsTab } from "@/components/agents/AgentLogsTab";
+import { showConfirm } from "@/lib/confirm";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -609,9 +610,9 @@ export default function AgentsPage() {
                   sem LLM configurada (agente sobe mas não responde). */}
               <button
                 disabled={!selectedInstance || toggleActiveMutation.isPending}
-                onClick={() => {
+                onClick={async () => {
                   if (!form.is_active && !readiness.hasLLM) {
-                    if (!confirm("Você está ativando o agente sem uma LLM configurada. Sem isso ele não responde. Ativar mesmo assim?")) return;
+                    if (!await showConfirm("Você está ativando o agente sem uma LLM configurada. Sem isso ele não responde. Ativar mesmo assim?", { title: "Ativar sem LLM", confirmLabel: "Ativar", danger: false })) return;
                   }
                   toggleActiveMutation.mutate(!form.is_active);
                 }}
@@ -1037,9 +1038,9 @@ export default function AgentsPage() {
                   </div>
                   <button
                     disabled={toggleActiveMutation.isPending}
-                    onClick={() => {
+                    onClick={async () => {
                       if (!form.is_active && !readiness.hasLLM) {
-                        if (!confirm("Você está ativando o agente sem uma LLM configurada. Sem isso ele não responde. Ativar mesmo assim?")) return;
+                        if (!await showConfirm("Você está ativando o agente sem uma LLM configurada. Sem isso ele não responde. Ativar mesmo assim?", { title: "Ativar sem LLM", confirmLabel: "Ativar", danger: false })) return;
                       }
                       toggleActiveMutation.mutate(!form.is_active);
                     }}
@@ -1407,10 +1408,10 @@ function AgentListView({
                     rodando. Exige LLM configurada pra ativar (UX warn). */}
                 {configured && (
                   <button
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
                       if (!isActive && !hasLLM) {
-                        if (!confirm("Sem LLM configurada o agente não responde. Ativar mesmo assim?")) return;
+                        if (!await showConfirm("Sem LLM configurada o agente não responde. Ativar mesmo assim?", { title: "Ativar sem LLM", confirmLabel: "Ativar", danger: false })) return;
                       }
                       onToggleActive(inst.id, !isActive);
                     }}
@@ -1668,7 +1669,7 @@ function VoiceStudioTab({ wsId, selectedVoiceId, onSelect }: {
                         <Sparkles className="w-3 h-3" /> Clonar voz
                       </button>
                     )}
-                    <button onClick={() => { if (confirm("Remover este provider e todas as vozes vinculadas?")) deleteProviderMutation.mutate(prov.id); }}
+                    <button onClick={async () => { if (await showConfirm("Remover este provider e todas as vozes vinculadas?", { title: "Remover provider", confirmLabel: "Remover" })) deleteProviderMutation.mutate(prov.id); }}
                       title="Remover" className="ml-auto p-1.5 rounded-lg"
                       style={{ background: "rgba(239,68,68,0.10)", color: "#f87171", border: "1px solid rgba(239,68,68,0.20)" }}>
                       <Trash2 className="w-3 h-3" />
@@ -1783,7 +1784,7 @@ function VoiceStudioTab({ wsId, selectedVoiceId, onSelect }: {
                         sem cluttering a UI). */}
                     {voice.category === "clone" && (
                       <button
-                        onClick={() => { if (confirm(`Remover a voz "${voice.name}"? Isso também a apaga no provider.`)) deleteVoiceMutation.mutate(voice.id); }}
+                        onClick={async () => { if (await showConfirm(`Remover a voz "${voice.name}"? Isso também a apaga no provider.`, { title: "Remover voz", confirmLabel: "Remover" })) deleteVoiceMutation.mutate(voice.id); }}
                         className="p-2 rounded-xl"
                         title="Remover voz"
                         style={{ background: "rgba(239,68,68,0.10)", color: "#f87171", border: "1px solid rgba(239,68,68,0.20)" }}>
