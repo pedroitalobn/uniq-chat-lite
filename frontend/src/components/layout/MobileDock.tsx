@@ -22,8 +22,8 @@ import {
   Megaphone, Wand2, Bot, Smartphone, Plug, Settings, Building2,
   LifeBuoy, ShoppingBag, X, Database, Server,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useUniqAIIsland } from "@/components/uniq-ai/island-context";
+import { haptic } from "@/lib/haptics";
 
 type NavEntry = {
   href: string;
@@ -123,7 +123,7 @@ export function MobileDock() {
 
           {/* Mais (sheet trigger) */}
           <button
-            onClick={() => setSheetOpen(true)}
+            onClick={() => { haptic.tap(); setSheetOpen(true); }}
             className="flex flex-col items-center justify-center gap-0.5 flex-1 h-full rounded-2xl"
             style={{
               transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
@@ -240,6 +240,7 @@ function DockItem({ item, active, index }: { item: NavEntry; active: boolean; in
     >
       <Link
         href={item.href}
+        onClick={() => haptic.tap()}
         className="flex flex-col items-center justify-center gap-0.5 flex-1 h-full rounded-2xl"
         style={{
           transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
@@ -261,7 +262,7 @@ function UniqAICenterButton({ open }: { open: () => void }) {
       style={{ width: 64, flex: "0 0 auto" }}
     >
       <motion.button
-        onClick={open}
+        onClick={() => { haptic.select(); open(); }}
         whileTap={{ scale: 0.92 }}
         className="absolute flex items-center justify-center rounded-full"
         style={{

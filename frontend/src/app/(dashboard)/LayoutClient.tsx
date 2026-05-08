@@ -8,6 +8,7 @@ import { UsageBanner } from "@/components/billing/UsageBanner";
 import { PendingInvitesBanner } from "@/components/layout/PendingInvitesBanner";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUniqAIPageContext, type IslandPageContext } from "@/components/uniq-ai/island-context";
+import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 
 // Detecta o escopo da página atual a partir do pathname — registra
 // automaticamente no contexto do Uniq AI sem precisar tocar cada página.
@@ -45,6 +46,9 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
   // useEffect dispara, setMounted(true) vira a UI real.
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
+  // Keyboard inset — atualiza --kb-h CSS var quando teclado virtual abre.
+  // Composer da inbox / footers fixos usam .uniq-keyboard-aware-bottom.
+  useKeyboardInset();
   // Full-width SEM box: viewport inteiro (sem padding, sem card).
   // Inbox messenger e canvas de Journey precisam disso.
   const isFullWidth =

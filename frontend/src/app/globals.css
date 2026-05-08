@@ -1225,3 +1225,17 @@ html { scroll-behavior: smooth; }
     overscroll-behavior-y: none;
   }
 }
+
+/* Skeleton shimmer — usado nos placeholders de loading */
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* keyboard-aware bottom padding — composer da inbox usa essa custom prop
+   quando o teclado abre no iOS. JS atualiza --kb-h via visualViewport.
+   Default 0 pra não interferir quando teclado fechado. */
+:root { --kb-h: 0px; }
+.uniq-keyboard-aware-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--kb-h));
+}

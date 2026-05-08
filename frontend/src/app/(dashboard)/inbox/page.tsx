@@ -20,6 +20,7 @@ import {
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { ConversationList, type ConversationRow } from "@/components/atendimento/ConversationList";
+import { PullToRefresh } from "@/components/mobile/PullToRefresh";
 import { ConversationDetail } from "@/components/inbox/ConversationDetail";
 import { InboxReports } from "@/components/inbox/InboxReports";
 import { useConversationWS } from "@/hooks/useConversationWS";
@@ -919,7 +920,15 @@ function InboxPage() {
               </div>
             );
           })()}
-          <div className="flex-1 overflow-y-auto uniq-no-bounce">
+          {/* Pull-to-refresh em mobile — gesto nativo iOS/Android.
+              No desktop o overflow:auto + touch events não disparam,
+              comporta-se como um div normal de scroll. */}
+          <PullToRefresh
+            className="flex-1 uniq-no-bounce"
+            onRefresh={async () => {
+              await Promise.all([listQ.refetch(), statsQ.refetch()]);
+            }}
+          >
             {listQ.isError ? (
               <ErrorStateWithProbe
                 error={listQ.error}
@@ -958,7 +967,7 @@ function InboxPage() {
                 }}
               />
             )}
-          </div>
+          </PullToRefresh>
         </aside>
 
         {/* Drag handle: só desktop. Em mobile o painel principal não

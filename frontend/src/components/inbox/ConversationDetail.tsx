@@ -3856,7 +3856,7 @@ function Composer({
 
   return (
     <div
-      className="p-3 relative"
+      className="p-3 relative uniq-keyboard-aware-bottom"
       style={{
         background: composerBg,
         borderTop: "1px solid hsl(240 12% 16%)",
