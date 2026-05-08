@@ -883,6 +883,10 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	instanceWaba.Delete("/templates/:name", wabaH.DeleteTemplate)
 	instanceWaba.Post("/messages", wabaH.SendMessage)
 	instanceWaba.Post("/messages/:messageId/read", wabaH.MarkAsRead)
+	// Diagnóstico: ajuda a entender por que mensagens ficam em "sent" e
+	// nunca avançam pra delivered (sintoma típico de webhook não
+	// configurado no Meta App Settings).
+	instanceWaba.Get("/diagnostics", wabaH.GetDiagnostics)
 	// Business Profile
 	instanceWaba.Get("/business-profile", wabaH.GetBusinessProfile)
 	instanceWaba.Patch("/business-profile", wabaH.UpdateBusinessProfile)
