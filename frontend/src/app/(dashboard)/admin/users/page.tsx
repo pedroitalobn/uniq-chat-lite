@@ -6,13 +6,14 @@ import { adminApi } from "@/lib/api";
 import {
   Users, Shield, User as UserIcon, Trash2, Ban, CheckCircle2,
   Loader2, Plus, X, Eye, EyeOff, Clock, Search, RotateCcw,
-  ChevronDown, Lock, Ticket,
+  ChevronDown, Lock, Ticket, CreditCard, Copy, Mail, ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { showConfirm } from "@/lib/confirm";
 import { cn } from "@/lib/utils";
 import type { User, Plan } from "@/types";
 import { useState, useEffect } from "react";
+import { BillingLinkModal } from "@/components/admin/BillingLinkModal";
 
 // ─── Create User Modal ────────────────────────────────────────────────────────
 function CreateUserModal({ plans, onClose, onCreated }: {
@@ -364,6 +365,7 @@ export default function AdminUsersPage() {
   const [search, setSearch]       = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [resetUser, setResetUser]   = useState<User | null>(null);
+  const [billingUser, setBillingUser] = useState<User | null>(null);
   const [blockUser, setBlockUser]   = useState<User | null>(null);
   const [actionId, setActionId]     = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -670,6 +672,15 @@ export default function AdminUsersPage() {
                         onClick={(e) => { e.stopPropagation(); setResetUser(user); }}
                       />
 
+                      {/* Cobrar / trocar plano — gera link Stripe ou faz
+                          upgrade/downgrade in-place se já há sub ativa */}
+                      <ActionBtn
+                        icon={<CreditCard className="w-3.5 h-3.5" />}
+                        label="Cobrar / trocar plano"
+                        color="var(--green)"
+                        onClick={(e) => { e.stopPropagation(); setBillingUser(user); }}
+                      />
+
                       {/* Block / Unblock */}
                       {blocked ? (
                         <ActionBtn
@@ -715,6 +726,7 @@ export default function AdminUsersPage() {
         />
       )}
       {resetUser && <ResetPasswordModal user={resetUser} onClose={() => setResetUser(null)} />}
+      {billingUser && <BillingLinkModal user={billingUser} onClose={() => setBillingUser(null)} />}
       {blockUser && <BlockModal user={blockUser} onClose={() => setBlockUser(null)} onConfirm={handleBlock} />}
     </div>
   );

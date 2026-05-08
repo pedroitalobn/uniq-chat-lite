@@ -14,6 +14,7 @@ import (
 	stripecustomer "github.com/stripe/stripe-go/v76/customer"
 	"github.com/stripe/stripe-go/v76/paymentintent"
 	stripeprice "github.com/stripe/stripe-go/v76/price"
+	stripesub "github.com/stripe/stripe-go/v76/subscription"
 	"github.com/stripe/stripe-go/v76/webhook"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/config"
@@ -807,4 +808,241 @@ func (h *StripeHandler) materializePending(pendingIDStr, planIDStr, subscription
 		go h.emailSvc.SendPaymentConfirmed(user.Email, user.Name, plan.Name, plan.Price)
 	}
 	go h.emailSvc.SendWelcome(user.Email, user.Name)
+}
+
+// ─── Admin billing-link (cobrança de user existente) ──────────────────────
+
+// AdminCreateBillingLink — gera URL de Stripe Checkout pra um user que
+// o admin upgrade'ou pra plano pago sem ter cobrado ainda. Idempotente:
+// cada chamada gera nova session (Stripe permite múltiplas vivas).
+//
+// POST /v1/admin/users/:id/billing-link
+// Body: { "plan_id"?: "uuid", "send_email"?: bool }
+//
+// - plan_id default = user.PlanID atual (cobra o plano que ele já está usando)
+// - send_email=true dispara email com o link pro user
+//
+// Retorna { url, expires_at, plan_name, plan_price, sent_email }.
+func (h *StripeHandler) AdminCreateBillingLink(c *fiber.Ctx) error {
+	h.loadConfig()
+	if strings.TrimSpace(stripe.Key) == "" {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error":   "stripe_not_configured",
+			"message": "Configure a Stripe secret key em /admin/providers → Pagamento.",
+		})
+	}
+
+	targetID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	var target models.User
+	if err := h.db.Preload("Plan").First(&target, "id = ?", targetID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "usuário não encontrado"})
+	}
+
+	var req struct {
+		PlanID    string `json:"plan_id"`
+		SendEmail bool   `json:"send_email"`
+	}
+	_ = c.BodyParser(&req) // body opcional
+
+	// Resolve o plano: default = atual do user.
+	var plan models.Plan
+	if req.PlanID != "" {
+		pid, err := uuid.Parse(req.PlanID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "plan_id inválido"})
+		}
+		if err := h.db.First(&plan, "id = ?", pid).Error; err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "plano não encontrado"})
+		}
+	} else {
+		if target.PlanID == nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "user sem plano associado — passe plan_id no body",
+			})
+		}
+		if err := h.db.First(&plan, "id = ?", *target.PlanID).Error; err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "plano do user não encontrado"})
+		}
+	}
+
+	if plan.Price == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "billing-link só faz sentido em plano pago. Plano atual = R$ 0",
+		})
+	}
+
+	// Resolve Price ID com o mesmo fallback do CreateCheckout (DB > env).
+	priceID := strings.TrimSpace(plan.StripePriceID)
+	if priceID == "" {
+		envKey := ""
+		switch strings.ToLower(strings.TrimSpace(plan.Name)) {
+		case "starter":
+			envKey = "STRIPE_PRICE_STARTER"
+		case "pro":
+			envKey = "STRIPE_PRICE_PRO"
+		case "business":
+			envKey = "STRIPE_PRICE_BUSINESS"
+		}
+		if envKey != "" {
+			priceID = strings.TrimSpace(os.Getenv(envKey))
+		}
+		if priceID != "" {
+			h.db.Model(&plan).Update("stripe_price_id", priceID)
+		}
+	}
+	if priceID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "plano " + plan.Name + " sem Stripe Price ID",
+			"hint":  "Configure em /admin/plans ou STRIPE_PRICE_" + strings.ToUpper(plan.Name),
+		})
+	}
+
+	// ── Caminho 1: user JÁ tem subscription ativa → upgrade/downgrade
+	// in-place via subscription.Update. Evita criar 2 subs em paralelo.
+	if strings.TrimSpace(target.StripeSubscriptionID) != "" {
+		// Carrega a subscription pra pegar o item_id atual (pra trocar o price).
+		curSub, err := stripesub.Get(target.StripeSubscriptionID, nil)
+		if err == nil && curSub != nil && len(curSub.Items.Data) > 0 {
+			currentPriceID := curSub.Items.Data[0].Price.ID
+			if currentPriceID == priceID {
+				return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+					"error": "user já está assinando este plano",
+					"plan":  plan.Name,
+				})
+			}
+			// Update: troca o Price, mantém a sub. Proration default
+			// (Stripe credita/cobra pro-rata na próxima fatura).
+			updateParams := &stripe.SubscriptionParams{
+				Items: []*stripe.SubscriptionItemsParams{
+					{
+						ID:    stripe.String(curSub.Items.Data[0].ID),
+						Price: stripe.String(priceID),
+					},
+				},
+				ProrationBehavior: stripe.String("create_prorations"),
+				Metadata: map[string]string{
+					"user_id": target.ID.String(),
+					"plan_id": plan.ID.String(),
+					"source":  "admin_billing_link",
+				},
+			}
+			updated, err := stripesub.Update(target.StripeSubscriptionID, updateParams)
+			if err != nil {
+				return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+					"error":   "stripe_sub_update_failed",
+					"message": err.Error(),
+				})
+			}
+			// Persistência local: webhook subscription.updated vai cair também,
+			// mas atualiza aqui pra UI ficar consistente sem esperar webhook.
+			h.db.Model(&target).Updates(map[string]interface{}{
+				"plan_id": plan.ID,
+			})
+			log.Info().
+				Str("admin_target", target.ID.String()).
+				Str("from_price", currentPriceID).
+				Str("to_price", priceID).
+				Str("sub_status", string(updated.Status)).
+				Msg("admin billing-link: subscription trocada (in-place)")
+			return c.JSON(fiber.Map{
+				"action":     "subscription_updated",
+				"plan_name":  plan.Name,
+				"plan_price": plan.Price,
+				"user_email": target.Email,
+				"sub_id":     updated.ID,
+				"sub_status": string(updated.Status),
+				"hint":       "Troca de plano aplicada — Stripe vai pro-ratear na próxima fatura. Nenhum link enviado.",
+			})
+		}
+	}
+
+	// ── Caminho 2: user SEM subscription ativa → Stripe Checkout link
+	// (será uma NOVA subscription quando ele pagar).
+	customerID := target.StripeCustomerID
+	if customerID == "" {
+		cp := &stripe.CustomerParams{
+			Email: stripe.String(target.Email),
+			Name:  stripe.String(target.Name),
+			Metadata: map[string]string{
+				"user_id": target.ID.String(),
+			},
+		}
+		sc, err := stripecustomer.New(cp)
+		if err != nil {
+			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+				"error":   "stripe_customer_failed",
+				"message": err.Error(),
+			})
+		}
+		customerID = sc.ID
+		h.db.Model(&target).Update("stripe_customer_id", customerID)
+	}
+
+	frontendURL := strings.TrimRight(config.AppConfig.FrontendURL, "/")
+	if frontendURL == "" {
+		frontendURL = "https://app.uniq.chat"
+	}
+
+	params := &stripe.CheckoutSessionParams{
+		Customer: stripe.String(customerID),
+		Mode:     stripe.String(string(stripe.CheckoutSessionModeSubscription)),
+		LineItems: []*stripe.CheckoutSessionLineItemParams{
+			{Price: stripe.String(priceID), Quantity: stripe.Int64(1)},
+		},
+		SuccessURL:        stripe.String(frontendURL + "/payment/success?session_id={CHECKOUT_SESSION_ID}"),
+		CancelURL:         stripe.String(frontendURL + "/billing"),
+		ClientReferenceID: stripe.String(target.ID.String()),
+		SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
+			Metadata: map[string]string{
+				"user_id": target.ID.String(),
+				"plan_id": plan.ID.String(),
+				"source":  "admin_billing_link",
+			},
+		},
+		Metadata: map[string]string{
+			"user_id": target.ID.String(),
+			"plan_id": plan.ID.String(),
+			"source":  "admin_billing_link",
+		},
+	}
+	sess, err := session.New(params)
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+			"error":   "stripe_session_failed",
+			"message": err.Error(),
+		})
+	}
+
+	out := fiber.Map{
+		"action":     "checkout_link",
+		"url":        sess.URL,
+		"session_id": sess.ID,
+		"plan_name":  plan.Name,
+		"plan_price": plan.Price,
+		"user_email": target.Email,
+		"sent_email": false,
+	}
+	if sess.ExpiresAt > 0 {
+		out["expires_at"] = time.Unix(sess.ExpiresAt, 0)
+	}
+
+	if req.SendEmail && h.emailSvc != nil {
+		go func(to, name, planName string, price float64, link string) {
+			if err := h.emailSvc.SendBillingLink(to, name, planName, price, link); err != nil {
+				log.Error().Err(err).Str("to", to).Msg("admin billing-link: falha ao enviar email")
+			}
+		}(target.Email, target.Name, plan.Name, plan.Price, sess.URL)
+		out["sent_email"] = true
+	}
+
+	log.Info().
+		Str("admin_target", target.ID.String()).
+		Str("plan", plan.Name).
+		Bool("emailed", req.SendEmail).
+		Msg("admin billing-link: link gerado (sem subscription ativa)")
+
+	return c.JSON(out)
 }

@@ -1626,6 +1626,10 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager) *fiber.App {
 	// Rotas com parâmetros por último
 	admin.Put("/users/:id", adminH.UpdateUser)
 	admin.Post("/users/:id/reset-password", adminH.ResetPassword)
+	// Billing link — gera URL Stripe pra cobrar/atualizar assinatura de
+	// user existente. Faz upgrade/downgrade in-place quando já há sub
+	// ativa (subscription.Update + proration); senão, devolve checkout.
+	admin.Post("/users/:id/billing-link", stripeH.AdminCreateBillingLink)
 	admin.Delete("/users/:id", adminH.DeleteUser)
 	admin.Get("/users/:id/delete-diagnose", adminH.UserDeleteDiagnose)
 	admin.Put("/plans/:id", adminH.UpdatePlan)

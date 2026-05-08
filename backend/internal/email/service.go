@@ -218,6 +218,15 @@ func (s *Service) SendPlanChanged(to, name, oldPlan, newPlan string) {
 	}
 }
 
+// SendBillingLink — usado quando admin gera um link de cobrança pra user
+// existente (upgrade pago após admin ter atribuído plano sem cobrar).
+// Síncrono pra que o admin saiba se o envio falhou.
+func (s *Service) SendBillingLink(to, name, planName string, planPrice float64, billingURL string) error {
+	subject := "Ative sua assinatura — " + s.appName
+	html := billingLinkHTML(s.appName, s.appURL, name, planName, planPrice, billingURL)
+	return s.send(to, subject, html, "billing_link")
+}
+
 func (s *Service) SendPaymentFailed(to, name string) {
 	billingURL := s.appURL + "/billing"
 	if err := s.send(to, "Falha no pagamento", paymentFailedHTML(s.appName, s.appURL, name, billingURL), "payment_failed"); err != nil {

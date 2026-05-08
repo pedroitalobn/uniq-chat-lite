@@ -430,3 +430,31 @@ func TestHTML(appName string) string {
 		p("Pra personalizar os templates, vá em Configurações → Email no painel de administração.")
 	return baseTemplate(appName, "https://uniq.chat", BrandPrimary, content)
 }
+
+// ── Admin billing link ────────────────────────────────────────────────────
+
+// billingLinkHTML — email enviado quando admin gera link de cobrança pra
+// user que estava num plano pago sem ter assinatura ativa, ou pra trocar
+// de plano. CTA principal é o link de checkout pré-configurado pelo admin.
+func billingLinkHTML(appName, appURL, name, planName string, planPrice float64, billingURL string) string {
+	priceStr := fmt.Sprintf("R$ %.2f / mês", planPrice)
+	content := iconEmoji("💳") +
+		h1("Hora de ativar sua assinatura") +
+		p("Olá, <strong>"+name+"</strong>. Sua conta no "+appName+" está usando o plano <strong>"+planName+"</strong> e precisa de uma forma de pagamento ativa pra continuar com todos os recursos.") +
+		card(
+			h3("Resumo")+
+				infoItem("Plano", planName)+
+				infoItem("Valor", priceStr)+
+				infoItem("Pagamento", "Cartão de crédito via Stripe (seguro)"),
+		) +
+		p("Clique no botão abaixo pra concluir o pagamento em poucos segundos:") +
+		btn("Ativar assinatura", billingURL, BrandPrimary) +
+		highlightBox(
+			inlineP("⏰ O link expira em 24 horas. Se precisar de outro, peça pro admin gerar novamente."),
+			BrandWarning,
+		) +
+		divider() +
+		pSmall("Dúvidas sobre o pagamento? Responda este email — nosso time vai te ajudar.") +
+		fmt.Sprintf(`<p style="margin:12px 0 0;color:%s;font-size:12px;line-height:1.5;">Se o botão não funcionar, copie este link no navegador:<br><span style="color:%s;word-break:break-all;">%s</span></p>`, BrandMuted, BrandPrimary, billingURL)
+	return baseTemplate(appName, appURL, BrandPrimary, content)
+}

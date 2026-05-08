@@ -1427,6 +1427,12 @@ export const adminApi = {
     api.put(`/v1/admin/users/${id}`, data),
   resetPassword: (id: string, password: string) =>
     api.post(`/v1/admin/users/${id}/reset-password`, { password }),
+  // billingLink — gera URL Stripe pra cobrar/atualizar assinatura do user.
+  // Se user já tem subscription ativa e plan_id é diferente, faz upgrade/
+  // downgrade in-place via subscription.Update (proration). Senão retorna
+  // checkout URL pra ele assinar pela primeira vez.
+  billingLink: (id: string, data: { plan_id?: string; send_email?: boolean }) =>
+    api.post(`/v1/admin/users/${id}/billing-link`, data),
   deleteUser: (id: string) => api.delete(`/v1/admin/users/${id}?cascade=true`),
   listPlans: () => api.get("/v1/admin/plans"),
   createPlan: (data: Record<string, unknown>) => api.post("/v1/admin/plans", data),
