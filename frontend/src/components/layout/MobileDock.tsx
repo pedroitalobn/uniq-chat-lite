@@ -77,6 +77,19 @@ export function MobileDock() {
 
   return (
     <>
+      {/* Fade scrim atrás do dock — gradient transparente → opaco do
+          fundo da app. Esconde conteúdo "vazando" pelas laterais e fundo
+          do dock flutuante. Pointer-events-none pra não bloquear scroll. */}
+      <div
+        aria-hidden
+        className="md:hidden fixed left-0 right-0 z-30 pointer-events-none"
+        style={{
+          bottom: 0,
+          height: "calc(env(safe-area-inset-bottom, 0px) + 96px)",
+          background: "linear-gradient(to bottom, transparent 0%, rgba(10,10,20,0.35) 35%, rgba(10,10,20,0.85) 70%, rgba(10,10,20,0.96) 100%)",
+        }}
+      />
+
       {/* Floating dock — só aparece em mobile/tablet pequeno */}
       <nav
         className="md:hidden fixed left-1/2 -translate-x-1/2 z-40 px-2"

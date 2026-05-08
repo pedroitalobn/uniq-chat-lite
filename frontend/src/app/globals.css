@@ -1191,3 +1191,37 @@ html { scroll-behavior: smooth; }
 .uniq-list-dark > * + * {
   border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
+
+/* ─── Mobile polish: momentum scroll + tap feedback nativo ─────────────── */
+/* Ativado só em <md pra não impactar desktop. Os ajustes simulam o feel
+   de app nativo iOS/Android: scroll com inércia, overscroll contido,
+   tap highlight customizado, transições mais responsivas. */
+@media (max-width: 767px) {
+  /* Scroll containers principais ganham momentum + overscroll contain */
+  main, aside, .uniq-mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* Tap highlight discreto verde — substitui o azul/cinza padrão */
+  * {
+    -webkit-tap-highlight-color: rgba(0, 212, 106, 0.18);
+  }
+
+  /* Botões ganham pressed-state mais perceptível */
+  button:active, [role="button"]:active, a:active {
+    transform: scale(0.97);
+    transition: transform 0.08s ease-out;
+  }
+
+  /* Inputs/textareas: prevenem zoom automático no iOS quando focam (font-size < 16px dispara zoom) */
+  input, textarea, select {
+    font-size: max(16px, 1em);
+  }
+
+  /* Body: travamos overscroll global pra eliminar o "bounce" no rubber-band
+     do iOS quando user puxa pra baixo no topo da página. */
+  body {
+    overscroll-behavior-y: none;
+  }
+}
