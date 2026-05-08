@@ -372,12 +372,18 @@ export default function AgentsPage() {
     onError: (error: any) => toast.error(error?.response?.data?.error || "Não foi possível alterar o status."),
   });
 
-  // Checklist do que está pronto pra ativar com sucesso. Inclui LLM
-  // (integração + modelo), prompt base, e identidade. Sem isso o
-  // agente "ativo" não tem o que responder.
+  // Checklist do que está pronto pra ativar com sucesso.
+  // Convenção: integration_id vazio = Uniq AI (default da plataforma) —
+  // o backend cai automaticamente nela em agent_runtime via
+  // resolveIntegration. Antes hasLLM/hasModel checavam só integration_id
+  // raw, então a UI dizia "sem LLM" mesmo com Uniq AI selecionada (que é
+  // o estado default mais comum). Agora:
+  //   - usingUniqAI = sem integration custom → LLM/modelo auto-resolvidos
+  //   - integração custom sem modelo definido → flagged como pendente
+  const usingUniqAI = !form.integration_id;
   const readiness = {
-    hasLLM: !!form.integration_id,
-    hasModel: !!form.model.trim(),
+    hasLLM: usingUniqAI || !!form.integration_id,
+    hasModel: usingUniqAI || !!form.model.trim(),
     hasIdentity: !!form.identity.trim() || !!form.agent_name.trim(),
     hasInstructions: !!form.system_prompt.trim() || !!form.service_instructions.trim(),
   };
@@ -1269,7 +1275,10 @@ function AgentListView({
           try { return agentData?.skills ? JSON.parse(agentData.skills).filter((s: any) => s.enabled).length : 0; }
           catch { return 0; }
         })();
-        const hasLLM = !!agentData?.integration_id;
+        // Sem integration_id custom = Uniq AI default (sempre disponível
+        // via platform_ai). Card mostrava "sem LLM" pra agente bem
+        // configurado que usa Uniq AI.
+        const hasLLM = configured;
         const hasRAG = !!agentData?.rag_enabled;
 
         // Compute a score 0-100 based on configuration completeness
