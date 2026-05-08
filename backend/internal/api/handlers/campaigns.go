@@ -128,11 +128,18 @@ func (h *CampaignHandler) evaluateCampaign(c *models.Campaign, now time.Time, _ 
 	return ""
 }
 
-// workspaceLocation devolve o time.Location do workspace dono da
-// campanha. Fallback America/Sao_Paulo, depois UTC.
+// workspaceLocation devolve o time.Location pra avaliar agendamento da
+// campanha. Cascade:
+//   1. Campaign.TimeZone (escolha explícita do user no setup) — permite
+//      disparar pra contatos em fuso diferente da conta. Ex: agência em
+//      São Paulo agendando campanha pra clientes em Orlando, escolhe
+//      "America/New_York" e o "10:00" do schedule é horário de Orlando.
+//   2. Workspace.Timezone (default da conta).
+//   3. America/Sao_Paulo.
+//   4. UTC.
 func (h *CampaignHandler) workspaceLocation(c *models.Campaign) *time.Location {
-	tzName := ""
-	if c.WorkspaceID != nil {
+	tzName := strings.TrimSpace(c.TimeZone)
+	if tzName == "" && c.WorkspaceID != nil {
 		var ws models.Workspace
 		if err := h.db.Select("timezone").First(&ws, "id = ?", c.WorkspaceID).Error; err == nil && ws.Timezone != "" {
 			tzName = ws.Timezone
@@ -490,13 +497,23 @@ func (h *CampaignHandler) List(c *fiber.Ctx) error {
 func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 
-	// Plan limit enforcement — antes Free user (MaxCampaigns=0) criava
-	// ilimitadas campanhas e elas rodavam normalmente no scheduler.
-	// MaxCampaigns: -1 = ilimitado, 0 = bloqueado, N = limite.
+	// Plan limit enforcement — checa AllowCampaigns (feature flag) +
+	// MaxCampaigns (cap quantitativo). Combinação esperada:
+	//   AllowCampaigns=false                 → bloqueado (route já barra
+	//                                          via RequireFeature, mas
+	//                                          defesa em profundidade).
+	//   AllowCampaigns=true, MaxCampaigns=-1 → ilimitado.
+	//   AllowCampaigns=true, MaxCampaigns=N>0→ até N ativas.
+	//   AllowCampaigns=true, MaxCampaigns=0  → ilimitado (feature ligada
+	//                                          sem cap específico = não
+	//                                          faz sentido ser zero).
+	// Antes: MaxCampaigns=0 retornava plan_does_not_allow_campaigns
+	// MESMO com AllowCampaigns=true — confuso pra plano Business onde
+	// admin liga a feature mas esquece de setar o cap, e bloqueia tudo.
 	if user != nil && user.PlanID != nil {
 		var plan models.Plan
 		if err := h.db.First(&plan, "id = ?", *user.PlanID).Error; err == nil {
-			if plan.MaxCampaigns == 0 {
+			if !plan.AllowCampaigns {
 				return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
 					"error":   "plan_does_not_allow_campaigns",
 					"message": "seu plano não permite criar campanhas — faça upgrade",
@@ -542,6 +559,7 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		TimesTotal    int        `json:"times_total"`
 		TimesPerDay   int        `json:"times_per_day"`
 		ScheduleHours string     `json:"schedule_hours"`
+		TimeZone      string     `json:"time_zone"`
 		// Safety / rate limiting
 		DelaySeconds         int `json:"delay_seconds"`
 		DelayMinSeconds      int `json:"delay_min_seconds"`
@@ -690,6 +708,7 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		TimesTotal:           timesTotal,
 		TimesPerDay:          timesPerDay,
 		ScheduleHours:        schedHours,
+		TimeZone:             strings.TrimSpace(req.TimeZone),
 		DelaySeconds:         delay,
 		DelayMinSeconds:      delayMin,
 		DelayMaxSeconds:      delayMax,

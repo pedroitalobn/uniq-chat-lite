@@ -391,6 +391,10 @@ export interface Campaign {
   times_total: number;
   times_per_day: number;
   schedule_hours: string;
+  /** IANA tz override pra avaliar schedule_hours/quiet_hours. Vazio = usa
+   *  workspace TZ. Permite agência BR disparar pra Orlando ("America/
+   *  New_York") ou pra qualquer fuso sem mudar o setting da conta. */
+  time_zone?: string;
   delay_seconds: number;
   delay_min_seconds?: number;
   delay_max_seconds?: number;
