@@ -602,6 +602,14 @@ func (r *AgentRuntime) recentHistory(instanceID uuid.UUID, fromJID string, limit
 
 // trySendAudio converts reply text to audio via TTS and sends it as a PTT message.
 // Returns true if audio was sent successfully.
+//
+// Resolução do provider de voz:
+//   1. cfg.WorkspaceVoiceID = "uniq:<voice_id>" → usa Uniq Voice (platform)
+//      com a voz <voice_id>. Gated por plano (AllowVoice).
+//   2. cfg.WorkspaceVoiceID = UUID → carrega WorkspaceVoice + Provider
+//      próprio do workspace.
+//   3. cfg.WorkspaceVoiceID vazio + plano libera + Uniq Voice ativo →
+//      usa Uniq Voice com a primeira voz da config global.
 func (r *AgentRuntime) trySendAudio(ctx context.Context, client interface {
 	SendAudioMessage(string, []byte, string, bool, uint32) (string, error)
 }, agent *models.InstanceAgent, toJID, text string) bool {
@@ -610,22 +618,46 @@ func (r *AgentRuntime) trySendAudio(ctx context.Context, client interface {
 		return false
 	}
 
-	// Resolve the WorkspaceVoice to get provider credentials
-	var voice models.WorkspaceVoice
-	if cfg.WorkspaceVoiceID != "" {
+	// Resolve provider e voice_id externo. Pode vir do WorkspaceVoice
+	// próprio, OU do PlatformVoice (Uniq Voice) quando o user não tem
+	// VoiceProvider configurado e o plano libera.
+	var (
+		voiceProvider  *models.VoiceProvider
+		voiceExternal  string
+	)
+
+	if strings.HasPrefix(cfg.WorkspaceVoiceID, "uniq:") {
+		// Modo explícito Uniq Voice — extrai voice_id e resolve platform.
+		voiceExternal = strings.TrimPrefix(cfg.WorkspaceVoiceID, "uniq:")
+		vp, _ := r.resolvePlatformVoiceProvider(ctx, agent.InstanceID)
+		if vp == nil {
+			return false
+		}
+		voiceProvider = vp
+	} else if cfg.WorkspaceVoiceID != "" {
+		// Path original: workspace voice por UUID.
 		voiceID, err := uuid.Parse(cfg.WorkspaceVoiceID)
 		if err != nil {
 			return false
 		}
+		var voice models.WorkspaceVoice
 		if r.db.Preload("Provider").First(&voice, "id = ?", voiceID).Error != nil {
 			return false
 		}
+		if voice.Provider == nil || !voice.Provider.IsActive {
+			return false
+		}
+		voiceProvider = voice.Provider
+		voiceExternal = voice.ExternalID
 	} else {
-		return false
-	}
-
-	if voice.Provider == nil || !voice.Provider.IsActive {
-		return false
+		// audio_enabled=true mas sem voice_id setado — tenta Uniq Voice
+		// como último recurso. Pega a primeira voz da config global.
+		vp, voiceID := r.resolvePlatformVoiceProvider(ctx, agent.InstanceID)
+		if vp == nil {
+			return false
+		}
+		voiceProvider = vp
+		voiceExternal = voiceID
 	}
 
 	stability := cfg.Stability
@@ -642,16 +674,16 @@ func (r *AgentRuntime) trySendAudio(ctx context.Context, client interface {
 		speed = 1.0
 	}
 
-	audioData, mime, err := r.tts.Synthesize(ctx, voice.Provider, TTSRequest{
+	audioData, mime, err := r.tts.Synthesize(ctx, voiceProvider, TTSRequest{
 		Text:       text,
-		VoiceID:    voice.ExternalID,
+		VoiceID:    voiceExternal,
 		Stability:  stability,
 		Similarity: similarity,
 		Style:      style,
 		Speed:      speed,
 	})
 	if err != nil {
-		log.Warn().Err(err).Str("voice", voice.ExternalID).Msg("agent-runtime: TTS falhou, usando texto")
+		log.Warn().Err(err).Str("voice", voiceExternal).Msg("agent-runtime: TTS falhou, usando texto")
 		return false
 	}
 
@@ -692,7 +724,94 @@ func parseAgentVoiceConfig(raw string) (*agentVoiceConfig, bool) {
 	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
 		return nil, false
 	}
-	return &cfg, cfg.AudioEnabled && cfg.WorkspaceVoiceID != ""
+	// Aceita: voice_id explícito (UUID OR "uniq:<id>") OR vazio (vai cair
+	// no fallback de Uniq Voice se o plano permitir + platform tiver voz).
+	return &cfg, cfg.AudioEnabled
+}
+
+// resolvePlatformVoiceProvider — carrega o PlatformVoice ativo e devolve
+// um *models.VoiceProvider sintético (in-memory) compatível com os
+// adapters do TTSService. O voice_id externo default vem da primeira
+// entrada do array de Voices da config (JSON), ou de defaults conhecidos
+// por provider quando vazio. Retorna nil se:
+//   • plano do user não libera FeatureVoice
+//   • Não há PlatformVoice ativo configurado pelo super admin
+//   • PlatformVoice tem provider name fora do conjunto suportado pelo TTSService
+func (r *AgentRuntime) resolvePlatformVoiceProvider(ctx context.Context, instanceID uuid.UUID) (*models.VoiceProvider, string) {
+	// Acha o user dono da instância e seu plano.
+	var inst models.Instance
+	if err := r.db.WithContext(ctx).Preload("User.Plan").First(&inst, "id = ?", instanceID).Error; err != nil {
+		return nil, ""
+	}
+	if inst.User == nil {
+		return nil, ""
+	}
+	plan := inst.User.Plan
+	// Super admin / planos sem feature locked = bloqueia. UI já indica que
+	// Uniq Voice não está disponível, mas defesa em profundidade aqui.
+	if plan == nil || !plan.HasFeature(models.FeatureVoice) {
+		return nil, ""
+	}
+	var pv models.PlatformVoice
+	if err := r.db.WithContext(ctx).
+		Where("is_active = ?", true).
+		Order("created_at ASC").
+		First(&pv).Error; err != nil {
+		return nil, ""
+	}
+	// Mapeia o name do provider pro enum interno do VoiceProvider. Se o
+	// super admin colocou um provider que ainda não temos adapter, o TTS
+	// vai falhar com "provider não suportado" — log warn no caller.
+	pname := models.VoiceProviderType("")
+	switch strings.ToLower(pv.Provider) {
+	case "elevenlabs":
+		pname = models.VoiceProviderElevenLabs
+	case "qwen_tts", "qwen":
+		pname = models.VoiceProviderQwenTTS
+	case "openai_tts", "openai":
+		pname = models.VoiceProviderOpenAITTS
+	default:
+		log.Warn().Str("provider", pv.Provider).Msg("uniq voice: provider sem adapter no TTSService")
+		return nil, ""
+	}
+	virt := &models.VoiceProvider{
+		ID:       pv.ID,
+		Provider: pname,
+		APIKey:   pv.APIKey,
+		IsActive: true,
+		Name:     pv.Name,
+	}
+	// Voice id default: primeira da config global, ou fallback por provider.
+	voiceID := firstPlatformVoiceID(pv.Voices)
+	if voiceID == "" {
+		switch pname {
+		case models.VoiceProviderElevenLabs:
+			voiceID = "21m00Tcm4TlvDq8ikWAM" // Rachel
+		case models.VoiceProviderQwenTTS:
+			voiceID = "longxiaoxia"
+		case models.VoiceProviderOpenAITTS:
+			voiceID = "nova"
+		}
+	}
+	return virt, voiceID
+}
+
+// firstPlatformVoiceID — extrai o "id" do primeiro item do array de
+// vozes salvo como JSON em PlatformVoice.Voices. Robusto contra JSON
+// inválido (retorna "" e cai no default por provider no caller).
+func firstPlatformVoiceID(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	var arr []map[string]any
+	if err := json.Unmarshal([]byte(raw), &arr); err != nil || len(arr) == 0 {
+		return ""
+	}
+	if id, ok := arr[0]["id"].(string); ok {
+		return id
+	}
+	return ""
 }
 
 type agentVoiceConfig struct {
