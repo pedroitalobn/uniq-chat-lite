@@ -1158,17 +1158,32 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                           <code className="text-[11px] font-mono shrink-0" style={{ color: "hsl(240 8% 70%)", minWidth: "5rem" }}>{`{{${v}}}`}</code>
                           <input value={tplVars[v] || ""}
                             onChange={(e) => setTplVars((p) => ({ ...p, [v]: e.target.value }))}
-                            placeholder={v === "1" || v === "name" ? "{{contact.name}}" : "valor ou {{contact.xxx}}"}
+                            placeholder={v === "1" || v === "name" ? "{{contact.name}}" : "valor fixo ou {{contact.xxx}}"}
                             className="input-field flex-1 text-xs font-mono" />
+                          <VariableMenu
+                            onPick={(expr) =>
+                              setTplVars((p) => ({ ...p, [v]: ((p[v] || "") + expr).trim() }))
+                            }
+                          />
                         </div>
                       ))}
+                      <p className="text-[10px]" style={{ color: "hsl(240 8% 45%)" }}>
+                        Dica: clique no <b>+</b> ao lado pra inserir uma variável (CRM, CSV, data).
+                        Você pode misturar texto fixo com {`{{ ... }}`}.
+                      </p>
                     </div>
                   )}
                   {tplHasMediaHeader && (
                     <div>
                       <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>URL da mídia do header *</label>
-                      <input value={tplHeaderURL} onChange={(e) => setTplHeaderURL(e.target.value)}
-                        placeholder="https://..." className="input-field w-full text-xs font-mono" />
+                      <div className="flex items-center gap-2">
+                        <input value={tplHeaderURL} onChange={(e) => setTplHeaderURL(e.target.value)}
+                          placeholder="https://... ou {{ csv.image_url }}" className="input-field flex-1 text-xs font-mono" />
+                        <VariableMenu onPick={(expr) => setTplHeaderURL((p) => (p + expr).trim())} />
+                      </div>
+                      <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 45%)" }}>
+                        URL fixa pra todos OU dinâmica por contato (ex: <code>{`{{ csv.image_url }}`}</code>).
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1574,6 +1589,128 @@ const glassBtn: React.CSSProperties = {
   border: "1px solid rgba(0,212,106,0.30)",
   boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)",
 };
+
+// ─── Variable Menu ──────────────────────────────────────────────────────────
+//
+// Picker de variáveis Liquid pra inserir nos inputs de variáveis do
+// template WABA. Cobre as principais fontes:
+//
+//   • CRM contact (name/email/city/job/owner/funnel/stage/tag)
+//   • Custom fields do CRM (contact.custom.*)
+//   • CSV / paste (csv.*) — colunas extras vindas do upload
+//   • Data/hora atual (now/date/time)
+//
+// Não tem como sabermos no front quais custom_fields/csv columns existem
+// em runtime (depende do workspace e do upload), então mostramos placeholders
+// genéricos que o user preenche.
+
+const VARIABLE_GROUPS: Array<{ label: string; vars: Array<{ expr: string; hint: string }> }> = [
+  {
+    label: "Contato (CRM)",
+    vars: [
+      { expr: "{{ contact.name }}",       hint: "Nome do contato" },
+      { expr: "{{ contact.phone }}",      hint: "Telefone" },
+      { expr: "{{ contact.email }}",      hint: "Email" },
+      { expr: "{{ contact.city }}",       hint: "Cidade" },
+      { expr: "{{ contact.state }}",      hint: "Estado" },
+      { expr: "{{ contact.country }}",    hint: "País" },
+      { expr: "{{ contact.job_title }}",  hint: "Cargo" },
+      { expr: "{{ contact.company }}",    hint: "Empresa" },
+      { expr: "{{ contact.funnel }}",     hint: "Funil" },
+      { expr: "{{ contact.stage }}",      hint: "Etapa" },
+      { expr: "{{ contact.owner_name }}", hint: "Responsável" },
+    ],
+  },
+  {
+    label: "Custom fields (CRM)",
+    vars: [
+      { expr: "{{ contact.custom.NOME_DO_CAMPO }}", hint: "Substitua NOME_DO_CAMPO" },
+    ],
+  },
+  {
+    label: "CSV / Lista colada",
+    vars: [
+      { expr: "{{ csv.COLUNA }}", hint: "Substitua COLUNA pelo cabeçalho do CSV" },
+    ],
+  },
+  {
+    label: "Data e hora",
+    vars: [
+      { expr: "{{ date }}", hint: "Data atual (DD/MM/YYYY)" },
+      { expr: "{{ time }}", hint: "Hora atual (HH:MM)" },
+      { expr: "{{ now }}",  hint: "Timestamp ISO 8601" },
+    ],
+  },
+];
+
+function VariableMenu({ onPick }: { onPick: (expr: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        title="Inserir variável"
+        className="px-2 py-1.5 rounded-md text-xs font-bold transition-colors"
+        style={{
+          background: open ? "rgba(0,212,106,0.15)" : "var(--surface-2)",
+          border: `1px solid ${open ? "rgba(0,212,106,0.30)" : "hsl(240 12% 16%)"}`,
+          color: open ? "var(--green)" : "hsl(240 8% 70%)",
+        }}
+      >
+        +
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-[100]" onClick={() => setOpen(false)} />
+          <div
+            className="absolute right-0 top-full mt-1 z-[101] w-72 max-h-80 overflow-y-auto rounded-lg shadow-2xl"
+            style={{
+              background: "hsl(240 18% 7%)",
+              border: "1px solid hsl(240 12% 16%)",
+            }}
+          >
+            {VARIABLE_GROUPS.map((g) => (
+              <div key={g.label}>
+                <div
+                  className="px-3 py-1.5 text-[9px] uppercase tracking-widest"
+                  style={{
+                    color: "hsl(240 8% 45%)",
+                    background: "hsl(240 14% 10%)",
+                    borderBottom: "1px solid hsl(240 12% 14%)",
+                  }}
+                >
+                  {g.label}
+                </div>
+                {g.vars.map((v) => (
+                  <button
+                    key={v.expr}
+                    type="button"
+                    onClick={() => {
+                      onPick(v.expr);
+                      setOpen(false);
+                    }}
+                    className="block w-full px-3 py-2 text-left transition-colors hover:bg-white/5"
+                  >
+                    <code
+                      className="block text-[10px] font-mono"
+                      style={{ color: "var(--green)" }}
+                    >
+                      {v.expr}
+                    </code>
+                    <span className="text-[10px]" style={{ color: "hsl(240 8% 50%)" }}>
+                      {v.hint}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 // ─── Campaign Card ─────────────────────────────────────────────────────────────
 

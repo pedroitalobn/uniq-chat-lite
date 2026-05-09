@@ -1,11 +1,9 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -568,6 +566,10 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		Recipients []struct {
 			Phone string `json:"phone"`
 			Name  string `json:"name"`
+			// Extra — colunas adicionais do CSV/paste pra render Liquid via
+			// `{{ csv.<col> }}` no template. Sem schema fixo. Ex:
+			//   { "codigo_promo": "BLACK20", "cidade": "São Paulo" }
+			Extra map[string]any `json:"extra,omitempty"`
 		} `json:"recipients"`
 		SegmentFilter struct {
 			Funnel     string   `json:"funnel,omitempty"`
@@ -738,12 +740,20 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		}
 		h.db.Model(&campaign).Update("total_count", len(resolved))
 	default:
-		// Manual recipients list
+		// Manual recipients list (CSV / paste). Extra columns ficam
+		// serializadas em ExtraFields pra render via {{ csv.<col> }}.
 		for _, r := range req.Recipients {
+			extra := ""
+			if len(r.Extra) > 0 {
+				if b, err := json.Marshal(r.Extra); err == nil {
+					extra = string(b)
+				}
+			}
 			h.db.Create(&models.CampaignRecipient{
-				CampaignID: campaign.ID,
-				Phone:      r.Phone,
-				Name:       r.Name,
+				CampaignID:  campaign.ID,
+				Phone:       r.Phone,
+				Name:        r.Name,
+				ExtraFields: extra,
 			})
 		}
 		h.db.Model(&campaign).Update("total_count", len(req.Recipients))
@@ -1244,11 +1254,14 @@ func (h *CampaignHandler) processCampaignWABA(c models.Campaign, today string) {
 	var varMap map[string]string
 	_ = json.Unmarshal([]byte(c.TemplateVariables), &varMap)
 
-	// Delay entre envios (rate limit Meta — começa baixo, sobe com quality)
-	delay := time.Duration(c.DelaySeconds) * time.Second
-	if delay < 1*time.Second {
-		delay = 1 * time.Second
-	}
+	// Delay entre envios — combina o pacing humano que o user pediu com
+	// o ceiling físico de 80 msg/s da Cloud API. Quando user pede 5s
+	// entre envios, respeita; quando pede 0s ou negativo, cai pro
+	// floor de 12.5ms (= 1/80) pra não estourar.
+	delay := computeMetaDelay(time.Duration(c.DelaySeconds) * time.Second)
+
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	sendCtx := context.Background()
 
 	for i := range recipients {
 		r := &recipients[i]
@@ -1293,13 +1306,11 @@ func (h *CampaignHandler) processCampaignWABA(c models.Campaign, today string) {
 			}
 		}
 
-		// Renderiza variáveis com Liquid pra esse destinatário
-		liquidVars := map[string]any{
-			"contact": map[string]any{
-				"phone": r.Phone,
-				"name":  r.Name,
-			},
-		}
+		// Renderiza variáveis com Liquid pra esse destinatário. Builder
+		// expõe contact.* (CRM enriched), csv.* (extra fields do upload),
+		// extra.* (alias) e now/date/time. Quando o contato não existe
+		// no CRM, contact.* tem só phone+name do recipient.
+		liquidVars := BuildCampaignLiquidVars(h.db, r, c.WorkspaceID, c.UserID)
 
 		// Monta components do template
 		components := []map[string]any{}
@@ -1370,11 +1381,13 @@ func (h *CampaignHandler) processCampaignWABA(c models.Campaign, today string) {
 		}
 		body, _ := json.Marshal(payload)
 
+		// Helper SendWABATemplateWithRetry encapsula:
+		//   • Backoff exponencial 2/4/8/16/32s em 429 e 5xx
+		//   • Honra header Retry-After da Meta quando presente
+		//   • Detecta codes 80007 / 130429 / 131056 e retenta
+		//   • Erros permanentes (132xxx, 400, 401) saem direto sem retry
 		url := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/messages", waba.PhoneNumberID)
-		req, _ := http.NewRequest("POST", url, bytes.NewReader(body))
-		req.Header.Set("Authorization", "Bearer "+waba.AccessToken)
-		req.Header.Set("Content-Type", "application/json")
-		resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+		statusCode, respBody, err := SendWABATemplateWithRetry(sendCtx, httpClient, url, waba.AccessToken, body)
 
 		if err != nil {
 			log.Warn().Err(err).Str("phone", r.Phone).Msg("campaign WABA: HTTP failed")
@@ -1385,15 +1398,13 @@ func (h *CampaignHandler) processCampaignWABA(c models.Campaign, today string) {
 			h.db.Model(&c).Update("failed_count", gorm.Expr("failed_count + 1"))
 			continue
 		}
-		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
 
-		if resp.StatusCode >= 400 {
+		if statusCode >= 400 {
 			errMsg := string(respBody)
 			if len(errMsg) > 300 {
 				errMsg = errMsg[:300]
 			}
-			log.Warn().Int("status", resp.StatusCode).Str("phone", r.Phone).
+			log.Warn().Int("status", statusCode).Str("phone", r.Phone).
 				Str("body", errMsg).Msg("campaign WABA: Meta retornou erro")
 			h.db.Model(r).Updates(map[string]any{
 				"status": models.RecipientStatusFailed,
