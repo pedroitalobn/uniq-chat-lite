@@ -1127,23 +1127,94 @@ function extractTemplateVars(tpl: Template | undefined): string[] {
   const set = new Set<string>();
   for (const comp of tpl.components) {
     if (!comp.text) continue;
+    // Header de mídia (IMAGE/VIDEO/DOC) tem `text` vazio, mas se vier
+    // populado por engano não devemos tratar como variável textual.
+    if (comp.type === "HEADER" && comp.format && comp.format.toUpperCase() !== "TEXT") continue;
     let m;
     while ((m = rx.exec(comp.text)) !== null) set.add(m[1]);
   }
   return Array.from(set).sort((a, b) => Number(a) - Number(b));
 }
 
-function buildTemplateComponents(tpl: Template | undefined, vars: Record<string, string>): Array<Record<string, unknown>> {
+type TemplateMedia = {
+  url: string;
+  filename: string;
+  latitude: string;
+  longitude: string;
+  name: string;
+  address: string;
+};
+
+const emptyTemplateMedia: TemplateMedia = {
+  url: "",
+  filename: "",
+  latitude: "",
+  longitude: "",
+  name: "",
+  address: "",
+};
+
+function getHeaderFormat(tpl: Template | undefined): string {
+  const h = tpl?.components?.find((c) => c.type === "HEADER");
+  return (h?.format || "TEXT").toUpperCase();
+}
+
+// buildTemplateComponents — gera o payload do "components" no formato
+// que a Meta espera. Suporta TODOS os formatos de header (TEXT, IMAGE,
+// VIDEO, DOCUMENT, LOCATION) + body com variáveis. Sem isso, templates
+// com header de mídia voltavam erro 132012 ("expected IMAGE, received
+// UNKNOWN").
+function buildTemplateComponents(
+  tpl: Template | undefined,
+  vars: Record<string, string>,
+  media: TemplateMedia,
+): Array<Record<string, unknown>> {
   if (!tpl?.components) return [];
   const out: Array<Record<string, unknown>> = [];
-  for (const comp of tpl.components) {
-    if (!comp.text) continue;
-    const compVars = (comp.text.match(/\{\{\s*(\d+)\s*\}\}/g) ?? []).map((m) => m.replace(/[{}\s]/g, ""));
-    if (compVars.length === 0) continue;
-    out.push({
-      type: comp.type.toLowerCase(),
-      parameters: compVars.map((k) => ({ type: "text", text: vars[k] ?? "" })),
-    });
+
+  const headerComp = tpl.components.find((c) => c.type === "HEADER");
+  if (headerComp) {
+    const fmt = (headerComp.format || "TEXT").toUpperCase();
+    if (fmt === "TEXT" && headerComp.text) {
+      const headerVars = (headerComp.text.match(/\{\{\s*(\d+)\s*\}\}/g) ?? []).map((m) =>
+        m.replace(/[{}\s]/g, ""),
+      );
+      if (headerVars.length > 0) {
+        out.push({
+          type: "header",
+          parameters: headerVars.map((k) => ({ type: "text", text: vars[k] ?? "" })),
+        });
+      }
+    } else if (fmt === "IMAGE" && media.url.trim()) {
+      out.push({ type: "header", parameters: [{ type: "image", image: { link: media.url.trim() } }] });
+    } else if (fmt === "VIDEO" && media.url.trim()) {
+      out.push({ type: "header", parameters: [{ type: "video", video: { link: media.url.trim() } }] });
+    } else if (fmt === "DOCUMENT" && media.url.trim()) {
+      const doc: Record<string, string> = { link: media.url.trim() };
+      if (media.filename.trim()) doc.filename = media.filename.trim();
+      out.push({ type: "header", parameters: [{ type: "document", document: doc }] });
+    } else if (fmt === "LOCATION" && media.latitude.trim() && media.longitude.trim()) {
+      const loc: Record<string, unknown> = {
+        latitude: parseFloat(media.latitude),
+        longitude: parseFloat(media.longitude),
+      };
+      if (media.name.trim()) loc.name = media.name.trim();
+      if (media.address.trim()) loc.address = media.address.trim();
+      out.push({ type: "header", parameters: [{ type: "location", location: loc }] });
+    }
+  }
+
+  const bodyComp = tpl.components.find((c) => c.type === "BODY");
+  if (bodyComp?.text) {
+    const bodyVars = (bodyComp.text.match(/\{\{\s*(\d+)\s*\}\}/g) ?? []).map((m) =>
+      m.replace(/[{}\s]/g, ""),
+    );
+    if (bodyVars.length > 0) {
+      out.push({
+        type: "body",
+        parameters: bodyVars.map((k) => ({ type: "text", text: vars[k] ?? "" })),
+      });
+    }
   }
   return out;
 }
@@ -1163,27 +1234,37 @@ function TestSendSection({ instanceId, templates = [] }: {
     approved[0] ? `${approved[0].name}|${approved[0].language}` : "",
   );
   const [templateVars, setTemplateVars] = useState<Record<string, string>>({});
+  const [templateMedia, setTemplateMedia] = useState<TemplateMedia>(emptyTemplateMedia);
   const [templateName, templateLang] = templateKey.split("|");
 
   const selectedTpl = approved.find((t) => t.name === templateName && t.language === templateLang);
   const tplVarKeys = extractTemplateVars(selectedTpl);
+  const headerFormat = getHeaderFormat(selectedTpl);
+  const needsMedia = headerFormat === "IMAGE" || headerFormat === "VIDEO" || headerFormat === "DOCUMENT";
+  const needsLocation = headerFormat === "LOCATION";
 
   // Reset variables when template changes
   const handleTemplateChange = (key: string) => {
     setTemplateKey(key);
     setTemplateVars({});
+    setTemplateMedia(emptyTemplateMedia);
   };
 
   const canSend = mode === "text"
     ? !!to && !!text
-    : !!to && !!templateName && !!templateLang && tplVarKeys.every((k) => (templateVars[k] ?? "").trim().length > 0);
+    : !!to &&
+      !!templateName &&
+      !!templateLang &&
+      tplVarKeys.every((k) => (templateVars[k] ?? "").trim().length > 0) &&
+      (!needsMedia || templateMedia.url.trim().length > 0) &&
+      (!needsLocation || (templateMedia.latitude.trim() !== "" && templateMedia.longitude.trim() !== ""));
 
   const send = useMutation({
     mutationFn: () => {
       if (mode === "text") {
         return wabaApi.sendMessage(instanceId, { to, type: "text", text: { body: text } });
       }
-      const components = buildTemplateComponents(selectedTpl, templateVars);
+      const components = buildTemplateComponents(selectedTpl, templateVars, templateMedia);
       return wabaApi.sendMessage(instanceId, {
         to,
         type: "template",
@@ -1288,6 +1369,71 @@ function TestSendSection({ instanceId, templates = [] }: {
           </select>
         )}
       </div>
+      {/* Inputs de header mídia (IMAGE/VIDEO/DOCUMENT) — sem isso a Meta
+         devolve 132012 "expected IMAGE, received UNKNOWN" porque o
+         template foi aprovado com mídia mas o request omite o param. */}
+      {mode === "template" && needsMedia && (
+        <div className="mt-2 rounded-lg p-3 space-y-2"
+          style={{ background: "rgba(96,165,250,0.06)", border: "1px solid rgba(96,165,250,0.20)" }}>
+          <p className="text-[10px] uppercase tracking-wider" style={{ color: "#60a5fa" }}>
+            Header · {headerFormat.toLowerCase()} (URL pública)
+          </p>
+          <input
+            value={templateMedia.url}
+            onChange={(e) => setTemplateMedia((p) => ({ ...p, url: e.target.value }))}
+            placeholder={
+              headerFormat === "IMAGE"
+                ? "https://exemplo.com/imagem.jpg"
+                : headerFormat === "VIDEO"
+                ? "https://exemplo.com/video.mp4"
+                : "https://exemplo.com/arquivo.pdf"
+            }
+            className="input-field w-full"
+          />
+          {headerFormat === "DOCUMENT" && (
+            <input
+              value={templateMedia.filename}
+              onChange={(e) => setTemplateMedia((p) => ({ ...p, filename: e.target.value }))}
+              placeholder="Nome do arquivo (opcional, ex: Contrato.pdf)"
+              className="input-field w-full"
+            />
+          )}
+        </div>
+      )}
+      {mode === "template" && needsLocation && (
+        <div className="mt-2 rounded-lg p-3 space-y-2"
+          style={{ background: "rgba(0,212,106,0.06)", border: "1px solid rgba(0,212,106,0.20)" }}>
+          <p className="text-[10px] uppercase tracking-wider" style={{ color: "var(--green)" }}>
+            Header · localização
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              value={templateMedia.latitude}
+              onChange={(e) => setTemplateMedia((p) => ({ ...p, latitude: e.target.value }))}
+              placeholder="Latitude"
+              className="input-field w-full"
+            />
+            <input
+              value={templateMedia.longitude}
+              onChange={(e) => setTemplateMedia((p) => ({ ...p, longitude: e.target.value }))}
+              placeholder="Longitude"
+              className="input-field w-full"
+            />
+          </div>
+          <input
+            value={templateMedia.name}
+            onChange={(e) => setTemplateMedia((p) => ({ ...p, name: e.target.value }))}
+            placeholder="Nome do local (opcional)"
+            className="input-field w-full"
+          />
+          <input
+            value={templateMedia.address}
+            onChange={(e) => setTemplateMedia((p) => ({ ...p, address: e.target.value }))}
+            placeholder="Endereço (opcional)"
+            className="input-field w-full"
+          />
+        </div>
+      )}
       {/* Variable inputs for templates with {{N}} params */}
       {mode === "template" && tplVarKeys.length > 0 && (
         <div className="mt-2 grid sm:grid-cols-2 gap-2">
