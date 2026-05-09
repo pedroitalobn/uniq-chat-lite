@@ -1227,6 +1227,20 @@ export const integrationsApi = {
   // Logs de execução pra aba "Logs" no editor de agente.
   agentLogs: (instanceId: string, params?: { agent_id?: string; status?: "success" | "skipped" | "failed"; limit?: number }) =>
     api.get(`/v1/instances/${instanceId}/agent/logs`, { params }),
+  // Preview / dry-run — chama o LLM com a config salva, sem persistir
+  // nada (não cria conversa, não dispara ações, não consome quota).
+  previewAgent: (
+    instanceId: string,
+    data: {
+      message: string;
+      history?: Array<{ role: "user" | "agent"; text: string }>;
+      agent_id?: string;
+    },
+  ) =>
+    api.post<{ reply: string; duration_ms: number; error?: string }>(
+      `/v1/instances/${instanceId}/agent/preview`,
+      data,
+    ),
   // Wizard simplificado: gera prompt sections via LLM a partir das respostas.
   generateAgentFromQuiz: (instanceId: string, quiz: {
     agent_name?: string;

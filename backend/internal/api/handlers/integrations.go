@@ -31,6 +31,7 @@ type IntegrationHandler struct {
 	db              *gorm.DB
 	claudeOAuth     *services.ClaudeOAuth
 	openRouterOAuth *services.OpenRouterOAuth
+	llm             *services.LLMService
 }
 
 func NewIntegrationHandler(db *gorm.DB) *IntegrationHandler {
@@ -39,6 +40,13 @@ func NewIntegrationHandler(db *gorm.DB) *IntegrationHandler {
 		claudeOAuth:     services.NewClaudeOAuth(),
 		openRouterOAuth: services.NewOpenRouterOAuth(),
 	}
+}
+
+// SetLLM injeta a instância compartilhada do LLMService — usado pelo
+// endpoint de preview de agente. Setter pra evitar mudar a assinatura
+// do construtor histórico (chamado de vários lugares).
+func (h *IntegrationHandler) SetLLM(llm *services.LLMService) {
+	h.llm = llm
 }
 
 // ClaudeOAuthClientMetadata serve o JSON de metadata pública do cliente OAuth.
@@ -612,6 +620,101 @@ func (h *IntegrationHandler) GetAgent(c *fiber.Ctx) error {
 		"compiled_prompt":          services.BuildAgentSystemPrompt(&agent, agent.Assets),
 		"created_at":               agent.CreatedAt,
 		"updated_at":               agent.UpdatedAt,
+	})
+}
+
+// POST /instances/:id/agent/preview
+//
+// Dry-run do agente — chama a LLM com o system prompt construído da
+// config salva e o histórico passado pelo cliente. Não escreve no DB,
+// não dispara ações nativas, não consome quota de overage.
+//
+// Body: { message: string, history?: [{role: "user"|"agent", text: string}], agent_id?: string }
+// Resposta: { reply, duration_ms, error? }
+func (h *IntegrationHandler) PreviewAgent(c *fiber.Ctx) error {
+	inst := middleware.GetCurrentInstance(c)
+	if inst == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+	if h.llm == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error": "preview indisponível — LLM service não inicializado",
+		})
+	}
+
+	var req struct {
+		Message string `json:"message"`
+		History []struct {
+			Role string `json:"role"`
+			Text string `json:"text"`
+		} `json:"history"`
+		AgentID string `json:"agent_id"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
+	}
+	req.Message = strings.TrimSpace(req.Message)
+	if req.Message == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "mensagem vazia"})
+	}
+	if len(req.Message) > 4000 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "mensagem muito longa (máx 4000)"})
+	}
+	if len(req.History) > 25 {
+		req.History = req.History[len(req.History)-25:]
+	}
+
+	// Carrega o agente alvo (primário por default; secundário se vier ?agent_id).
+	var agent models.InstanceAgent
+	q := h.db.Preload("Integration").Preload("Assets")
+	if req.AgentID != "" {
+		q = q.Where("id = ? AND instance_id = ?", req.AgentID, inst.ID)
+	} else {
+		q = q.Where("instance_id = ?", inst.ID).Order("is_primary DESC, created_at ASC")
+	}
+	if err := q.First(&agent).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "agente não encontrado"})
+	}
+
+	// System prompt vem do mesmo builder do runtime real, garantindo
+	// que o preview reflete fielmente como o agente vai se comportar
+	// em produção (mesma identidade, KB, restrições).
+	systemPrompt := services.BuildAgentSystemPrompt(&agent, agent.Assets)
+
+	// User prompt: simplificado em relação ao runtime real — sem
+	// detector de loop nem instruções de WhatsApp, mas com histórico
+	// pra LLM ter contexto multi-turno.
+	var b strings.Builder
+	b.WriteString("Contexto: preview de agente (sem cliente real, sem persistência).\n")
+	if len(req.History) > 0 {
+		b.WriteString("\nHistórico recente:\n")
+		for _, h := range req.History {
+			role := "Cliente"
+			if h.Role == "agent" || h.Role == "assistant" {
+				role = "Agente"
+			}
+			b.WriteString(fmt.Sprintf("%s: %s\n", role, strings.TrimSpace(h.Text)))
+		}
+	}
+	b.WriteString("\nÚltima mensagem do cliente:\n")
+	b.WriteString(req.Message)
+	b.WriteString("\n\nResponda como o agente configurado, sem mencionar prompts, JSON ou estrutura interna.")
+
+	start := time.Now()
+	reply, err := h.llm.CallChatWithSystem(c.Context(), agent.Integration, systemPrompt, b.String(), false)
+	durationMs := time.Since(start).Milliseconds()
+
+	if err != nil {
+		return c.JSON(fiber.Map{
+			"reply":       "",
+			"duration_ms": durationMs,
+			"error":       err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"reply":       strings.TrimSpace(reply),
+		"duration_ms": durationMs,
 	})
 }
 
