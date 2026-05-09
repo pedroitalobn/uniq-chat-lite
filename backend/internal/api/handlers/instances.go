@@ -180,6 +180,12 @@ func (h *InstanceHandler) List(c *fiber.Ctx) error {
 		q = q.Where("user_id = ? OR workspace_id IN (SELECT workspace_id FROM user_workspaces WHERE user_id = ?)", user.ID, user.ID)
 	}
 
+	// Bypass do role validate — só pode ver instâncias WABA. Outras
+	// (whatsapp QR, instagram, telegram, etc) ficam ocultas.
+	if user.Role == models.RoleValidate {
+		q = q.Where("channel = ?", string(models.ChannelWABA))
+	}
+
 	if err := q.Find(&instances).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar instâncias"})
 	}
@@ -279,6 +285,15 @@ func (h *InstanceHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "canal inválido"})
 	}
 
+	// Bypass do role validate — só pode criar canal WABA. Front já
+	// esconde os outros, mas defendemos no backend pra evitar bypass via
+	// curl direto.
+	if user.Role == models.RoleValidate && channel != models.ChannelWABA {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "validate: apenas instâncias WABA permitidas",
+		})
+	}
+
 	instance := models.Instance{
 		UserID:      user.ID,
 		WorkspaceID: wsUUID,
@@ -357,6 +372,14 @@ func (h *InstanceHandler) Get(c *fiber.Ctx) error {
 	instance, ok := c.Locals("instance").(*models.Instance)
 	if !ok {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	// Bypass do role validate — bloqueia acesso direto via URL a
+	// instâncias que não sejam WABA (defesa contra navegação manual).
+	if user := middleware.GetCurrentUser(c); user != nil && user.Role == models.RoleValidate {
+		if instance.Channel != models.ChannelWABA {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+		}
 	}
 
 	// Live status usa a mesma regra do List — evita divergência entre card
