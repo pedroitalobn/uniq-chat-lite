@@ -57,7 +57,13 @@ export default function JourneysPage() {
       if (!id) throw new Error("id ausente");
       window.location.href = `/journeys/${id}`;
     } catch (e: any) {
-      toast.error(e?.response?.data?.error || "Falha ao criar jornada");
+      // Backend devolve { error, hint? }. Hint mostra a causa real
+      // (constraint, FK, plan limit) — concatenamos pro user saber
+      // o que ajustar. Sem fallback genérico encobre bug útil.
+      const data = e?.response?.data;
+      const msg = data?.error || "Falha ao criar jornada";
+      const hint = data?.hint || data?.detail;
+      toast.error(hint ? `${msg} — ${hint}` : msg, { duration: 8000 });
       setCreating(false);
     }
   };

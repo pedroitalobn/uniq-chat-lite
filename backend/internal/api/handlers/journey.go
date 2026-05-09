@@ -888,7 +888,16 @@ func (h *JourneyHandler) GetJourney(c *fiber.Ctx) error {
 
 	id := c.Params("id")
 	var journey models.Journey
-	if err := h.db.Preload("Instance").Where("id = ? AND user_id = ?", id, userID).First(&journey).Error; err != nil {
+	// Filter relaxado: dono direto OU jornada cuja instância pertence
+	// a workspace do user. Antes era só user_id = ? — quebrava pra
+	// jornadas criadas no modelo antigo (legacy user_id) ou criadas
+	// por outro membro do mesmo workspace. Mesmo padrão usado em
+	// CreateJourney pra contagem (linha 72).
+	q := h.db.Preload("Instance").Where(
+		"id = ? AND (user_id = ? OR (instance_id <> '' AND instance_id IN (SELECT id::text FROM instances WHERE workspace_id IN (SELECT workspace_id FROM user_workspaces WHERE user_id = ?))))",
+		id, userID.String(), userID,
+	)
+	if err := q.First(&journey).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "jornada não encontrada"})
 	}
 
@@ -1371,7 +1380,17 @@ func (h *JourneyHandler) createBlankJourney(c *fiber.Ctx, userID uuid.UUID, name
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao codificar flow inicial"})
 	}
 	if err := h.db.Create(&journey).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao salvar jornada no banco"})
+		// Hint inclui mensagem do GORM/driver pra ajudar debug — sem
+		// ele "falha ao salvar" não diz nada (constraint? FK? unique?).
+		log.Error().Err(err).
+			Str("user_id", userID.String()).
+			Str("name", name).
+			Str("instance_id", instanceID).
+			Msg("createBlankJourney: db.Create falhou")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "falha ao salvar jornada no banco",
+			"hint":  err.Error(),
+		})
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
