@@ -15,6 +15,19 @@ import (
 	"github.com/uniq-chat/backend/internal/storage"
 )
 
+const (
+	// avatarDownloadTimeout é o timeout máximo para baixar um avatar do CDN.
+	// A Meta pode responder lentamente em regiões distantes; 60s dá margem
+	// suficiente sem travar o caller indefinidamente.
+	avatarDownloadTimeout = 60 * time.Second
+
+	// avatarMaxRetries é o número de tentativas de download em caso de falha.
+	avatarMaxRetries = 2
+
+	// avatarRetryDelay é o delay base entre retries (backoff exponencial simples).
+	avatarRetryDelay = 2 * time.Second
+)
+
 // PersistAvatar — baixa os bytes da signed URL da Meta e sobe pro nosso
 // MinIO/S3, retornando uma URL permanente que o frontend pode usar pra
 // sempre. Resolve o problema crítico de signed URLs do CDN da Meta
@@ -56,35 +69,35 @@ func PersistAvatar(ctx context.Context, jid, signedURL string) string {
 		return signedURL
 	}
 
-	dlCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	var data []byte
+	var mime string
+	var err error
+	downloadCtx, cancel := context.WithTimeout(ctx, avatarDownloadTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(dlCtx, http.MethodGet, signedURL, nil)
+	for attempt := 0; attempt <= avatarMaxRetries; attempt++ {
+		var tryData []byte
+		var tryMime string
+		tryData, tryMime, err = downloadAvatar(downloadCtx, signedURL)
+		if err == nil {
+			data = tryData
+			mime = tryMime
+			break
+		}
+		if attempt < avatarMaxRetries {
+			delay := avatarRetryDelay * time.Duration(attempt+1)
+			log.Warn().Err(err).Str("jid", jid).Int("attempt", attempt+1).
+				Dur("retry_in", delay).Msg("avatar: download failed, retrying")
+			time.Sleep(delay)
+		}
+	}
 	if err != nil {
-		return signedURL
-	}
-	req.Header.Set("User-Agent", "uniq-chat/1.0")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Warn().Err(err).Str("jid", jid).Msg("avatar: download failed, keeping signed URL temporarily")
-		return signedURL
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		log.Warn().Int("status", resp.StatusCode).Str("jid", jid).Msg("avatar: download non-2xx")
-		return signedURL
-	}
-	// Limita tamanho — avatares são pequenos (geralmente 5-50KB). Evita
-	// abuse de URL maliciosa servindo arquivo grande. Cap em 2MB.
-	body := io.LimitReader(resp.Body, 2*1024*1024)
-	data, err := io.ReadAll(body)
-	if err != nil || len(data) == 0 {
+		log.Warn().Err(err).Str("jid", jid).Msg("avatar: all download attempts failed, keeping signed URL temporarily")
 		return signedURL
 	}
 
 	// Detecta MIME pela extensão da URL ou pelo magic byte. Meta serve
 	// JPEG por padrão, mas seja conservador.
-	mime := resp.Header.Get("Content-Type")
 	if mime == "" || strings.HasPrefix(mime, "application/octet-stream") {
 		mime = sniffImageMime(data)
 	}
@@ -94,12 +107,38 @@ func PersistAvatar(ctx context.Context, jid, signedURL string) string {
 	}
 	objectName := avatarObjectKey(jid, ext)
 
-	publicURL, err := storage.GlobalStorage.UploadBytes(dlCtx, objectName, data, mime)
+	publicURL, err := storage.GlobalStorage.UploadBytes(downloadCtx, objectName, data, mime)
 	if err != nil {
 		log.Warn().Err(err).Str("jid", jid).Msg("avatar: upload failed, keeping signed URL temporarily")
 		return signedURL
 	}
 	return publicURL
+}
+
+// downloadAvatar — baixa os bytes do avatar com contexto de timeout.
+// Retorna os bytes, o MIME e qualquer erro.
+func downloadAvatar(ctx context.Context, signedURL string) ([]byte, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, signedURL, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	req.Header.Set("User-Agent", "uniq-chat/1.0")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return nil, "", fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	// Limita tamanho — avatares são pequenos (geralmente 5-50KB). Evita
+	// abuse de URL maliciosa servindo arquivo grande. Cap em 2MB.
+	body := io.LimitReader(resp.Body, 2*1024*1024)
+	data, err := io.ReadAll(body)
+	if err != nil || len(data) == 0 {
+		return nil, "", fmt.Errorf("read body: %w", err)
+	}
+	return data, resp.Header.Get("Content-Type"), nil
 }
 
 // avatarObjectKey — sha1 do JID dá uma chave determinística e curta sem
