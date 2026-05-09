@@ -717,6 +717,12 @@ func (e *JourneyExecutor) startNew(journey *models.Journey, fromJID, fromName, g
 		LastInput: messageText,
 	}
 
+	// Holdout: sorteia se este contato vai pro grupo de controle.
+	// Quando true, criamos a execution mas NÃO chamamos run() — fica
+	// como completed marcada is_holdout=true. Analytics compara
+	// conversão entre is_holdout=true vs false pra medir lift real.
+	holdout := shouldHoldout(journey.HoldoutPercent)
+
 	execution := &models.JourneyExecution{
 		ID:          uuid.New().String(),
 		JourneyID:   journey.ID,
@@ -728,12 +734,28 @@ func (e *JourneyExecutor) startNew(journey *models.Journey, fromJID, fromName, g
 		CurrentStep: start.ID,
 		StepIndex:   0,
 		TotalSteps:  len(flow.Steps),
+		IsHoldout:   holdout,
 		StartedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
 	e.saveVars(execution, vars)
 	execution.AddMessage("inbound", messageText, "trigger")
 	e.db.Create(execution)
+
+	if holdout {
+		// Sorteado pro controle — não roda steps, marca completed
+		// pra que goal-event tracking ainda detecte conversões
+		// (lift = conversão_treatment - conversão_holdout).
+		log.Info().Str("journey", journey.ID).Str("exec", execution.ID).Str("contact", fromJID).
+			Int("holdout_pct", journey.HoldoutPercent).
+			Msg("journey: contato sorteado pro grupo de controle (holdout)")
+		now := time.Now()
+		execution.Status = models.ExecutionCompleted
+		execution.CompletedAt = &now
+		execution.UpdatedAt = now
+		e.db.Save(execution)
+		return
+	}
 
 	ctx := &execCtx{
 		journey:    journey,
@@ -902,7 +924,22 @@ func (e *JourneyExecutor) run(ctx *execCtx, step *models.FlowStep) {
 }
 
 // executeStep processa um step e retorna (próximo step, pausar para input, erro)
-func (e *JourneyExecutor) executeStep(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
+func (e *JourneyExecutor) executeStep(ctx *execCtx, step *models.FlowStep) (next *models.FlowStep, pause bool, err error) {
+	// Instrumentação de métricas (Fase 5). Skip em simulação pra não
+	// poluir contadores com previews. "entered" sempre incrementa;
+	// "completed/errored" baseado no resultado via defer.
+	if !ctx.simulate {
+		e.incStepMetric(ctx.journey.ID, step.ID, string(step.Type), step.Label, "entered")
+		defer func() {
+			if err != nil {
+				e.incStepMetric(ctx.journey.ID, step.ID, string(step.Type), step.Label, "errored")
+				e.recordStepError(ctx.journey.ID, step.ID, err.Error())
+			} else {
+				e.incStepMetric(ctx.journey.ID, step.ID, string(step.Type), step.Label, "completed")
+			}
+		}()
+	}
+
 	switch step.Type {
 	case models.StepTypeMessage:
 		return e.stepMessage(ctx, step)

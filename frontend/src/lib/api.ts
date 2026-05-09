@@ -1485,6 +1485,40 @@ export const journeysApi = {
       `/v1/journeys/${id}/enroll`,
       data,
     ),
+  // Analytics dashboard (Fase 5) — funnel + totals + holdout lift
+  analytics: (id: string) =>
+    api.get<{
+      journey_id: string;
+      name: string;
+      funnel: Array<{
+        step_id: string;
+        step_type: string;
+        step_label?: string;
+        entered: number;
+        completed: number;
+        errored: number;
+        skipped: number;
+        last_error_message?: string;
+      }>;
+      totals: {
+        all: number;
+        active: number;
+        completed: number;
+        failed: number;
+        waiting: number;
+        waiting_input: number;
+      };
+      holdout: {
+        control_count: number;
+        treatment_count: number;
+        control_completed: number;
+        treatment_completed: number;
+        holdout_percent: number;
+        lift_pct?: number;
+        goal_event?: string;
+        goal_count?: number;
+      };
+    }>(`/v1/journeys/${id}/analytics`),
   listEnrollments: (id: string, params?: { status?: string }) =>
     api.get<{
       items: Array<{
