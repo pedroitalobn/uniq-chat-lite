@@ -11,7 +11,7 @@ import {
 import { toast } from "sonner";
 import { showConfirm } from "@/lib/confirm";
 import { cn } from "@/lib/utils";
-import type { User, Plan } from "@/types";
+import type { User, Plan, UserRole } from "@/types";
 import { useState, useEffect } from "react";
 import { BillingLinkModal } from "@/components/admin/BillingLinkModal";
 
@@ -109,6 +109,8 @@ function CreateUserModal({ plans, onClose, onCreated }: {
               <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>Role</label>
               <select value={form.role} onChange={e => f("role")(e.target.value)} className="input-field w-full">
                 <option value="customer">Customer</option>
+                <option value="lead">Lead</option>
+                <option value="validate">Validate (só WABA)</option>
                 <option value="super_admin">Super Admin</option>
               </select>
             </div>
@@ -436,6 +438,26 @@ export default function AdminUsersPage() {
     updateMutation.mutate({ id: user.id, data: { role: newRole } });
   };
 
+  // handleRoleChange — versão livre que aceita qualquer role válida.
+  // Promoção pra super_admin pede confirmação extra (alta sensibilidade);
+  // demais transições aplicam direto. Se selecionar mesmo role, no-op.
+  const handleRoleChange = async (user: User, newRole: UserRole) => {
+    if (newRole === user.role) return;
+    if (newRole === "super_admin") {
+      if (!await showConfirm(
+        `Promover "${user.email}" a super_admin? Esse role tem acesso global a todos os workspaces e dados da plataforma.`,
+        { title: "Promover a Super Admin", confirmLabel: "Promover", danger: true },
+      )) return;
+    }
+    if (newRole === "validate") {
+      if (!await showConfirm(
+        `Tornar "${user.email}" um usuário Validate? Ele só verá instâncias WABA — todos os outros canais (WhatsApp QR, Instagram, etc) ficam ocultos.`,
+        { title: "Validate (bypass WABA)", confirmLabel: "Aplicar", danger: false },
+      )) return;
+    }
+    updateMutation.mutate({ id: user.id, data: { role: newRole } });
+  };
+
   const handleBetaToggle = async (user: User) => {
     if (!isSuperAdmin) return;
     const newBeta = !user.is_beta;
@@ -548,6 +570,11 @@ export default function AdminUsersPage() {
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 80%)" }}>
                           {user.name}
+                          {user.role === "validate" && (
+                            <span className="ml-2 text-xs font-medium px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/20">
+                              VALIDATE
+                            </span>
+                          )}
                           {user.is_beta && (
                             <span className="ml-2 text-xs font-medium px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 border border-purple-500/20">
                               BETA
@@ -646,23 +673,34 @@ export default function AdminUsersPage() {
                         {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
 
-                      {/* Toggle role (non-self protection built in backend) */}
-                      {user.role !== "super_admin" && (
-                        <ActionBtn
-                          icon={<Shield className="w-3.5 h-3.5" />}
-                          label="Tornar Super Admin"
-                          color="#fbbf24"
-                          onClick={(e) => { e.stopPropagation(); handleRoleToggle(user); }}
-                        />
-                      )}
-                      {user.role === "super_admin" && (
-                        <ActionBtn
-                          icon={<UserIcon className="w-3.5 h-3.5" />}
-                          label="Rebaixar para User"
-                          color="hsl(240 8% 55%)"
-                          onClick={(e) => { e.stopPropagation(); handleRoleToggle(user); }}
-                        />
-                      )}
+                      {/* Role select — antes era 2 botões só pra
+                         super_admin↔customer; agora cobre os 4 roles
+                         (super_admin / customer / lead / validate). */}
+                      <select
+                        value={user.role}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          handleRoleChange(user, e.target.value as UserRole);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs rounded-lg px-2.5 py-1.5 outline-none"
+                        style={{
+                          background: "hsl(240 12% 9%)",
+                          border: "1px solid hsl(240 12% 16%)",
+                          color:
+                            user.role === "super_admin"
+                              ? "#fbbf24"
+                              : user.role === "validate"
+                              ? "#60a5fa"
+                              : "hsl(240 15% 72%)",
+                        }}
+                        title="Alterar role do usuário"
+                      >
+                        <option value="customer">Customer</option>
+                        <option value="lead">Lead</option>
+                        <option value="validate">Validate (só WABA)</option>
+                        <option value="super_admin">Super Admin</option>
+                      </select>
 
                       {/* Reset password */}
                       <ActionBtn
