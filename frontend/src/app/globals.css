@@ -583,6 +583,16 @@
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+/* uniq-blink — usado pelo WABAWindowTimer quando faltam menos de
+   1h pra janela 24h fechar. Pulsa opacity sutilmente pra chamar
+   atenção sem dar epilepsy. 1.6s ciclo, easeInOut natural. */
+@keyframes uniq-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+.uniq-blink {
+  animation: uniq-blink 1.6s ease-in-out infinite;
+}
 @keyframes uniq-scale-in {
   from { opacity: 0; transform: scale(0.96) translateY(6px); }
   to   { opacity: 1; transform: scale(1)    translateY(0); }

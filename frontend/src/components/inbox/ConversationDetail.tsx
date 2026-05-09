@@ -26,6 +26,7 @@ import { MediaViewer, type MediaViewerSource } from "@/components/inbox/MediaVie
 import { AgentPanel } from "@/components/inbox/AgentPanel";
 import { WindowKeeperToggle } from "@/components/inbox/WindowKeeperToggle";
 import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi, crmContactsApi, linkPreviewApi, dealsApi, crmApi, callsApi, departmentsApi } from "@/lib/api";
+import { WABAWindowTimer } from "./WABAWindowTimer";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TemplatePicker } from "@/components/inbox/TemplatePicker";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -217,6 +218,25 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     enabled: !!wsId && canView,
     refetchInterval: 10_000,
   });
+
+  // Send constraints — exposto no escopo principal pra que o header
+  // tenha acesso ao window_expires_at sem duplicar fetch (queryKey
+  // compartilhado entre header e Composer => cache reaproveitado).
+  const constraintsHeaderQ = useQuery({
+    queryKey: ["send-constraints", wsId, conversationId],
+    queryFn: () =>
+      conversationsApi.sendConstraints(wsId as string, conversationId).then(
+        (r) =>
+          r.data as {
+            channel: string;
+            window_open: boolean;
+            window_expires_at?: string;
+          },
+      ),
+    enabled: !!wsId && canView,
+    staleTime: 60_000,
+  });
+  const constraints = constraintsHeaderQ.data;
 
   // Infinite scroll pela timeline: a primeira página traz as 100 mensagens
   // mais recentes; conforme o agente rola pro topo, fetchNextPage puxa
@@ -799,6 +819,14 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                   {conv.instance.name}
                 </span>
               )}
+              {/* Cronômetro da janela 24h da Cloud API (WABA + IG).
+                 Pisca quando faltam <1h, vermelho quando fechada,
+                 amarelo entre 1-6h, neutro >6h. */}
+              <WABAWindowTimer
+                channel={conv?.channel_type || conv?.instance?.channel}
+                expiresAt={constraints?.window_expires_at}
+                windowOpen={!!constraints?.window_open}
+              />
               {conv?.assigned_user?.name ? (
                 <span className="truncate">{conv.assigned_user.name}</span>
               ) : (
@@ -3567,6 +3595,7 @@ function Composer({
           r.data as {
             channel: string;
             window_open: boolean;
+            window_expires_at?: string;
             allows_template: boolean;
             supports_reply: boolean;
             supports_reaction: boolean;
