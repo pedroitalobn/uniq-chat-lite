@@ -238,6 +238,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 		config.AppConfig.AppURL,
 	)
 	handlers.SetAuthHandlerAppURL(config.AppConfig.AppURL)
+	// Plug email no journey executor pra StepTypeEmail (Fase 4). O
+	// executor é criado no main.go como singleton — pegamos do global.
+	if services.GlobalJourneyExecutor != nil {
+		services.GlobalJourneyExecutor.SetEmail(emailSvc)
+	}
 
 	// Handlers
 	authH := handlers.NewAuthHandler(db, emailSvc, manager)

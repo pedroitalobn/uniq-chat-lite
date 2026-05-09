@@ -38,6 +38,8 @@ import {
   Wand2,
   AlertTriangle,
   UserPlus,
+  Mail,
+  Smartphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { journeysApi } from "@/lib/api";
@@ -73,7 +75,9 @@ const QUICK_ACTIONS: Array<{
   icon: typeof MessageSquare;
   color: string;
 }> = [
-  { label: "Adicionar mensagem",  prompt: "Adicione uma nova mensagem com o texto: ",                icon: MessageSquare, color: "#00d46a" },
+  { label: "WhatsApp msg",        prompt: "Adicione uma mensagem WhatsApp com o texto: ",             icon: MessageSquare, color: "#00d46a" },
+  { label: "Email",               prompt: "Envie um email com assunto e corpo: ",                     icon: Mail,          color: "#3b82f6" },
+  { label: "SMS",                 prompt: "Envie um SMS com o texto: ",                                icon: Smartphone,    color: "#ec4899" },
   { label: "Adicionar pergunta",  prompt: "Adicione uma pergunta ao usuário: ",                       icon: Hand,          color: "#fbbf24" },
   { label: "Adicionar espera",    prompt: "Adicione um wait de ",                                     icon: Clock,         color: "#a78bfa" },
   { label: "Adicionar condição",  prompt: "Adicione uma condição que checa: ",                        icon: GitBranch,     color: "#f97316" },
