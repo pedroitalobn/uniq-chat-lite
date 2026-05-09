@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { X, Search, Sparkles, Image as ImageIcon, Video, FileText, MapPin, Save, Check } from "lucide-react";
 import { wabaApi, conversationsApi, type WABATemplateDefault } from "@/lib/api";
+import { TemplateMediaUpload } from "@/components/waba/TemplateMediaUpload";
 
 // Meta message template — payload bruto da Graph API:
 //   { name, language, category, components: [
@@ -406,6 +407,9 @@ export function TemplatePicker({
                       })
                     }
                     saving={saveDefault.isPending}
+                    instanceId={instanceId}
+                    templateName={selected.name}
+                    templateLanguage={selected.language}
                   />
                 )}
 
@@ -518,6 +522,9 @@ function MediaHeaderInputs({
   matchesDefault,
   onSaveDefault,
   saving,
+  instanceId,
+  templateName,
+  templateLanguage,
 }: {
   format: "IMAGE" | "VIDEO" | "DOCUMENT";
   media: MediaState;
@@ -526,6 +533,9 @@ function MediaHeaderInputs({
   matchesDefault: boolean;
   onSaveDefault: () => void;
   saving: boolean;
+  instanceId: string;
+  templateName: string;
+  templateLanguage: string;
 }) {
   const meta = {
     IMAGE: { label: "Imagem", icon: ImageIcon, hint: "URL pública (.jpg/.png/.webp). Recomendado: até 5MB.", placeholder: "https://exemplo.com/imagem.jpg" },
@@ -575,17 +585,27 @@ function MediaHeaderInputs({
           </button>
         )}
       </div>
-      <input
-        value={media.url}
-        onChange={(e) => onChange({ ...media, url: e.target.value })}
-        placeholder={meta.placeholder}
-        className="w-full rounded-md px-3 py-2 text-xs outline-none"
-        style={{
-          background: "var(--surface-2)",
-          border: "1px solid hsl(240 12% 16%)",
-          color: "hsl(240 15% 90%)",
-        }}
-      />
+      <div className="flex items-center gap-2">
+        <input
+          value={media.url}
+          onChange={(e) => onChange({ ...media, url: e.target.value })}
+          placeholder={meta.placeholder}
+          className="flex-1 rounded-md px-3 py-2 text-xs outline-none"
+          style={{
+            background: "var(--surface-2)",
+            border: "1px solid hsl(240 12% 16%)",
+            color: "hsl(240 15% 90%)",
+          }}
+        />
+        <TemplateMediaUpload
+          instanceId={instanceId}
+          templateName={templateName}
+          templateLanguage={templateLanguage}
+          format={format}
+          saveAsDefault
+          onUploaded={(url) => onChange({ ...media, url })}
+        />
+      </div>
       <p className="text-[10px]" style={{ color: "hsl(240 8% 48%)" }}>
         {meta.hint}
         {hasDefault && (
@@ -593,6 +613,9 @@ function MediaHeaderInputs({
             URL padrão carregada — ajuste se precisar.
           </span>
         )}
+        <span className="ml-1" style={{ color: "hsl(240 8% 50%)" }}>
+          Sem URL? Clique em <b>Subir arquivo</b> que a Uniq hospeda pra você.
+        </span>
       </p>
       {format === "DOCUMENT" && (
         <input

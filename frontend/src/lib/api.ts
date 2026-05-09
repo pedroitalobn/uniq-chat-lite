@@ -836,6 +836,24 @@ export const wabaApi = {
       header_location_address?: string;
     },
   ) => api.put(`/v1/instances/${instanceId}/waba/templates/defaults`, data),
+  // Upload direto da mídia pro storage da Uniq. Devolve URL pública
+  // pronta pra usar no header do template Meta. Quando template_name
+  // + template_language vêm, salva como default na mesma request.
+  uploadTemplateMedia: (
+    instanceId: string,
+    file: File,
+    opts?: { template_name?: string; template_language?: string },
+  ) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    if (opts?.template_name) fd.append("template_name", opts.template_name);
+    if (opts?.template_language) fd.append("template_language", opts.template_language);
+    return api.post<{ url: string; content_type: string; size_bytes: number; default_saved: boolean }>(
+      `/v1/instances/${instanceId}/waba/templates/upload-media`,
+      fd,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+  },
   register: (instanceId: string, pin: string) =>
     api.post(`/v1/instances/${instanceId}/waba/register`, { pin }),
   subscribe: (instanceId: string) =>

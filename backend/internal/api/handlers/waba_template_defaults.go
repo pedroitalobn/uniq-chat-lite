@@ -4,6 +4,9 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/models"
 )
@@ -114,4 +117,26 @@ func (h *WABAHandler) UpsertTemplateDefault(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.Status(fiber.StatusCreated).JSON(def)
+}
+
+// upsertWABATemplateDefault — helper compartilhado pelo endpoint
+// manual (UpsertTemplateDefault) e pelo upload de mídia
+// (UploadTemplateMedia). Salva só o header_media_url; demais campos
+// vazios. Quando já existe, atualiza só o url sem mexer no resto.
+func upsertWABATemplateDefault(db *gorm.DB, instanceID uuid.UUID, tplName, tplLang, mediaURL string) error {
+	var existing models.WABATemplateDefault
+	q := db.Where(
+		"instance_id = ? AND template_name = ? AND template_language = ?",
+		instanceID, tplName, tplLang,
+	)
+	if err := q.First(&existing).Error; err == nil {
+		existing.HeaderMediaURL = mediaURL
+		return db.Save(&existing).Error
+	}
+	return db.Create(&models.WABATemplateDefault{
+		InstanceID:       instanceID,
+		TemplateName:     tplName,
+		TemplateLanguage: tplLang,
+		HeaderMediaURL:   mediaURL,
+	}).Error
 }

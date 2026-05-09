@@ -20,6 +20,7 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 import { wabaApi, instancesApi, mediaUploadApi } from "@/lib/api";
+import { TemplateMediaUpload } from "@/components/waba/TemplateMediaUpload";
 import { WABAConnectButton } from "@/components/instances/WABAConnectButton";
 import { showConfirm } from "@/lib/confirm";
 
@@ -1376,20 +1377,30 @@ function TestSendSection({ instanceId, templates = [] }: {
         <div className="mt-2 rounded-lg p-3 space-y-2"
           style={{ background: "rgba(96,165,250,0.06)", border: "1px solid rgba(96,165,250,0.20)" }}>
           <p className="text-[10px] uppercase tracking-wider" style={{ color: "#60a5fa" }}>
-            Header · {headerFormat.toLowerCase()} (URL pública)
+            Header · {headerFormat.toLowerCase()}
           </p>
-          <input
-            value={templateMedia.url}
-            onChange={(e) => setTemplateMedia((p) => ({ ...p, url: e.target.value }))}
-            placeholder={
-              headerFormat === "IMAGE"
-                ? "https://exemplo.com/imagem.jpg"
-                : headerFormat === "VIDEO"
-                ? "https://exemplo.com/video.mp4"
-                : "https://exemplo.com/arquivo.pdf"
-            }
-            className="input-field w-full"
-          />
+          <div className="flex items-center gap-2">
+            <input
+              value={templateMedia.url}
+              onChange={(e) => setTemplateMedia((p) => ({ ...p, url: e.target.value }))}
+              placeholder={
+                headerFormat === "IMAGE"
+                  ? "https://exemplo.com/imagem.jpg"
+                  : headerFormat === "VIDEO"
+                  ? "https://exemplo.com/video.mp4"
+                  : "https://exemplo.com/arquivo.pdf"
+              }
+              className="input-field flex-1"
+            />
+            <TemplateMediaUpload
+              instanceId={instanceId}
+              templateName={templateName}
+              templateLanguage={templateLang}
+              format={headerFormat as "IMAGE" | "VIDEO" | "DOCUMENT"}
+              saveAsDefault
+              onUploaded={(url) => setTemplateMedia((p) => ({ ...p, url }))}
+            />
+          </div>
           {headerFormat === "DOCUMENT" && (
             <input
               value={templateMedia.filename}

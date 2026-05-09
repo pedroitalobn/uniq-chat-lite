@@ -904,6 +904,10 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	// URL pode vir do nosso DB sem digitação repetida).
 	instanceWaba.Get("/templates/defaults", wabaH.ListTemplateDefaults)
 	instanceWaba.Put("/templates/defaults", wabaH.UpsertTemplateDefault)
+	// Upload direto de mídia pra usar como header de template — sobe
+	// pro MinIO da Uniq e devolve URL pública pronta pra Meta. Elimina
+	// dependência de S3/Cloudinary externo do user.
+	instanceWaba.Post("/templates/upload-media", wabaH.UploadTemplateMedia)
 	instanceWaba.Get("/templates/:templateId", wabaH.GetTemplate)
 	instanceWaba.Post("/templates/:templateId", wabaH.EditTemplate)
 	instanceWaba.Delete("/templates/:name", wabaH.DeleteTemplate)

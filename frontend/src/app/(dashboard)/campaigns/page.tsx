@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { usePreferences } from "@/lib/preferences";
 import { AudioInput } from "@/components/campaigns/AudioInput";
 import { VariableInsertButton } from "@/components/campaigns/VariableInsertButton";
+import { TemplateMediaUpload } from "@/components/waba/TemplateMediaUpload";
 import { FunnelOptionPicker, StageOptionPicker } from "@/components/crm/FunnelStagePicker";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 
@@ -310,11 +311,12 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
   })();
   const tplBodyVars = Array.from(tplBodyText.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g))
     .map((m) => m[1]).filter((v, i, a) => a.indexOf(v) === i);
-  const tplHasMediaHeader: boolean = (() => {
-    if (!selectedTpl) return false;
+  const tplHeaderFormat: string = (() => {
+    if (!selectedTpl) return "";
     const h = selectedTpl.components?.find((c: any) => c.type === "HEADER");
-    return h && ["IMAGE", "VIDEO", "DOCUMENT"].includes(h.format);
+    return (h?.format || "").toUpperCase();
   })();
+  const tplHasMediaHeader: boolean = ["IMAGE", "VIDEO", "DOCUMENT"].includes(tplHeaderFormat);
 
   const { data: segmentOptions } = useQuery({
     queryKey: ["segment-options"],
@@ -1168,13 +1170,25 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                   {tplHasMediaHeader && (
                     <div>
                       <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>URL da mídia do header *</label>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <input value={tplHeaderURL} onChange={(e) => setTplHeaderURL(e.target.value)}
                           placeholder="https://... ou {{ csv.image_url }}" className="input-field flex-1 text-xs font-mono" />
+                        <TemplateMediaUpload
+                          instanceId={selectedInstance?.id ?? ""}
+                          templateName={selectedTpl?.name}
+                          templateLanguage={selectedTpl?.language}
+                          format={
+                            (tplHeaderFormat === "IMAGE" || tplHeaderFormat === "VIDEO" || tplHeaderFormat === "DOCUMENT")
+                              ? tplHeaderFormat
+                              : undefined
+                          }
+                          saveAsDefault
+                          onUploaded={(url) => setTplHeaderURL(url)}
+                        />
                         <VariableMenu onPick={(expr) => setTplHeaderURL((p) => (p + expr).trim())} />
                       </div>
                       <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 45%)" }}>
-                        URL fixa pra todos OU dinâmica por contato (ex: <code>{`{{ csv.image_url }}`}</code>).
+                        Sem URL? Clique em <b>Subir arquivo</b> e a Uniq hospeda. Ou cole link público direto, ou use uma variável dinâmica (ex: <code>{`{{ csv.image_url }}`}</code>).
                       </p>
                     </div>
                   )}
