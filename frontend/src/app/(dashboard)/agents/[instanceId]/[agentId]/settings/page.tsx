@@ -8,6 +8,7 @@ import { WhenRespondsCard } from "../_components/WhenRespondsCard";
 import { TeamAccessCard } from "../_components/TeamAccessCard";
 import { AdvancedCard } from "../_components/AdvancedCard";
 import { StatusCard } from "../_components/StatusCard";
+import { MobileStatusBar } from "../_components/MobileStatusBar";
 
 // Settings — configurações operacionais do agente. Cards: Inteligência
 // (LLM), Quando e como responde (modo + schedule + trigger + ritmo),
@@ -56,9 +57,10 @@ export default function AgentSettingsPage() {
   const logsHref = `/agents?inst=${instanceId}${realAgentId ? `&agent=${realAgentId}` : ""}#logs`;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl mx-auto">
+    <div className="px-4 sm:px-6 lg:px-8 py-4 lg:py-6 max-w-6xl mx-auto">
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-4">
         <div className="space-y-3 min-w-0">
+          <MobileStatusBar form={form} />
           <IntelligenceCard form={form} update={updateForm} />
           <WhenRespondsCard form={form} update={updateForm} />
           <TeamAccessCard />

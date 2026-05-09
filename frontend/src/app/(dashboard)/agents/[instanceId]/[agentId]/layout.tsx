@@ -89,31 +89,34 @@ function Inner({ children }: { children: React.ReactNode }) {
             label="Settings"
           />
 
-          <span className="w-px h-5 mx-1" style={{ background: "var(--surface-border)" }} />
+          <span className="hidden sm:block w-px h-5 mx-1" style={{ background: "var(--surface-border)" }} />
 
-          {/* Botão Testar — abre o painel de preview ao vivo */}
+          {/* Botão Testar — abre o painel de preview ao vivo. Em
+             mobile vira só ícone pra economizar espaço. */}
           <button
             type="button"
             onClick={() => setPreviewOpen(true)}
-            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 text-xs font-medium px-2 sm:px-2.5 py-1.5 rounded-lg transition-colors"
             style={{
               background: previewOpen ? "rgba(0,212,106,0.12)" : "var(--surface-2)",
               border: `1px solid ${previewOpen ? "rgba(0,212,106,0.30)" : "var(--surface-border)"}`,
               color: previewOpen ? "var(--green)" : "var(--text-2)",
             }}
             title="Testar agente (preview ao vivo, sem persistir)"
+            aria-label="Testar agente"
           >
-            <MessageSquareDashed className="w-3 h-3" />
-            Testar
+            <MessageSquareDashed className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
+            <span className="hidden sm:inline">Testar</span>
           </button>
 
-          {/* Toggle de ativação — independente do save geral */}
+          {/* Toggle de ativação — em mobile mostra só ícone + estado em chip */}
           <button
             type="button"
             onClick={() => toggleActive(!active)}
             disabled={isToggling}
             title={active ? "Desativar agente" : "Ativar agente"}
-            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+            aria-label={active ? "Desativar agente" : "Ativar agente"}
+            className="flex items-center gap-1.5 text-xs font-medium px-2 sm:px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50"
             style={
               active
                 ? {
@@ -128,19 +131,19 @@ function Inner({ children }: { children: React.ReactNode }) {
                   }
             }
           >
-            <Power className="w-3 h-3" />
-            {active ? "Ativo" : "Inativo"}
+            <Power className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
+            <span className="hidden sm:inline">{active ? "Ativo" : "Inativo"}</span>
           </button>
 
-          {/* Save button — só aparece se tiver mudança não salva */}
+          {/* Save — sempre com label porque é a ação primária */}
           <button
             type="button"
             onClick={() => save()}
             disabled={!dirty || isSaving}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ background: "var(--green)", color: "var(--green-fg)" }}
           >
-            {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+            {isSaving ? <Loader2 className="w-3.5 h-3.5 sm:w-3 sm:h-3 animate-spin" /> : <Save className="w-3.5 h-3.5 sm:w-3 sm:h-3" />}
             Salvar
           </button>
         </div>
@@ -177,7 +180,9 @@ function TabLink({
   return (
     <Link
       href={href}
-      className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+      title={label}
+      aria-label={label}
+      className="flex items-center gap-1.5 text-xs font-medium px-2 sm:px-2.5 py-1.5 rounded-lg transition-colors"
       style={
         active
           ? {
@@ -192,8 +197,8 @@ function TabLink({
             }
       }
     >
-      <Icon className="w-3 h-3" />
-      {label}
+      <Icon className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
+      <span className="hidden sm:inline">{label}</span>
     </Link>
   );
 }

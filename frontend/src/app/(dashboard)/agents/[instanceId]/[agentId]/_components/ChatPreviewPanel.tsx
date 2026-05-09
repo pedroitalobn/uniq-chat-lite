@@ -206,10 +206,14 @@ export function ChatPreviewPanel({
           )}
         </div>
 
-        {/* Composer */}
+        {/* Composer — safe-area-inset garante que o input não fica
+           atrás do home indicator no iPhone. */}
         <div
           className="px-3 py-3 flex-shrink-0"
-          style={{ borderTop: "1px solid var(--surface-border)" }}
+          style={{
+            borderTop: "1px solid var(--surface-border)",
+            paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
+          }}
         >
           <div
             className="flex items-end gap-2 rounded-xl px-3 py-2"
