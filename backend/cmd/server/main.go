@@ -252,6 +252,10 @@ func main() {
 	// enrollments pendentes a cada 60s. Roda em background, encerra
 	// quando o ctx do server cancela.
 	journeyExec.StartEnrollmentRunner(context.Background())
+	// Worker de deferred steps — retoma execuções que estavam num
+	// wait longo (>60s). Tick de 30s; mata o cap antigo de 24h e
+	// sobrevive a crash do processo.
+	journeyExec.StartDeferredStepRunner(context.Background())
 	ttsService := services.NewTTSService()
 	agentRuntime := services.NewAgentRuntime(db, manager, journeyLLM, ttsService)
 	manager.SetJourneyExecutor(journeyExec)
@@ -455,6 +459,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.TaktikDevice{},
 		&models.Journey{},
 		&models.JourneyEnrollment{},
+		&models.JourneyDeferredStep{},
 		&models.JourneyExecution{},
 		&models.Funnel{},
 		&models.FunnelStage{},
