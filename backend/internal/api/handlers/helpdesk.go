@@ -10,11 +10,62 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/services"
 	"github.com/uniq-chat/backend/internal/storage"
 	"gorm.io/gorm"
 )
+
+// helpCenterCandidates pega até 5 slugs válidos pra mostrar como hint
+// quando o lookup público dá miss. Inclui workspace.slug e
+// HelpDeskConfig.custom_slug (que tenham conteúdo).
+func (h *HelpDeskHandler) helpCenterCandidates() []string {
+	out := []string{}
+	var wsSlugs []string
+	h.db.Model(&models.Workspace{}).
+		Where("slug IS NOT NULL AND slug <> ''").
+		Order("created_at DESC").Limit(5).Pluck("slug", &wsSlugs)
+	out = append(out, wsSlugs...)
+	var custom []string
+	h.db.Model(&models.HelpDeskConfig{}).
+		Where("custom_slug IS NOT NULL AND custom_slug <> ''").
+		Order("updated_at DESC").Limit(5).Pluck("custom_slug", &custom)
+	for _, s := range custom {
+		dup := false
+		for _, e := range out {
+			if e == s {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			out = append(out, s)
+		}
+	}
+	if len(out) > 5 {
+		out = out[:5]
+	}
+	return out
+}
+
+// publicNotFound responde 404 com diagnóstico — slug pedido + slugs
+// disponíveis + hint legível. Usar em todas as rotas públicas em vez
+// do fiber.NewError(404, "...") genérico, que era invisível pro user.
+func (h *HelpDeskHandler) publicNotFound(c *fiber.Ctx, slug, scope string) error {
+	candidates := h.helpCenterCandidates()
+	log.Warn().
+		Str("requested_slug", slug).
+		Str("scope", scope).
+		Strs("available_slugs", candidates).
+		Msg("helpdesk: public lookup miss")
+	return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+		"error":           "central de ajuda não encontrada",
+		"requested_slug":  slug,
+		"available_slugs": candidates,
+		"hint":            "verifique o slug do workspace ou configure custom_slug em /help-desk → Configurações.",
+	})
+}
 
 // HelpDeskHandler handles knowledge base categories and articles.
 type HelpDeskHandler struct {
@@ -437,8 +488,26 @@ func (h *HelpDeskHandler) GetConfig(c *fiber.Ctx) error {
 			Title:         ws.Name + " · Central de Ajuda",
 			PrimaryColor:  "#00d46a",
 			WidgetEnabled: true,
+			// Persiste um slug humano logo na criação (preferindo
+			// workspace.slug). Sem isso, o link compartilhado caía no
+			// UUID e quando o admin depois mexia no workspace.slug, o
+			// link antigo quebrava silenciosamente.
+			CustomSlug: ws.Slug,
 		}
 		h.db.Create(&cfg)
+	} else if cfg.CustomSlug == "" && ws.Slug != "" {
+		// Backfill pra configs antigas que ficaram sem custom_slug —
+		// previne 404 em links compartilhados quando algo no workspace
+		// muda. Best-effort: se o slug do workspace já estiver em uso
+		// como custom_slug em outro tenant (improvável), só ignora.
+		var clash int64
+		h.db.Model(&models.HelpDeskConfig{}).
+			Where("custom_slug = ? AND workspace_id <> ?", ws.Slug, wsID).
+			Count(&clash)
+		if clash == 0 {
+			h.db.Model(&cfg).Update("custom_slug", ws.Slug)
+			cfg.CustomSlug = ws.Slug
+		}
 	}
 
 	// Slug efetivo: custom > workspace > UUID. Cair no UUID quando os
@@ -535,9 +604,10 @@ func (h *HelpDeskHandler) lookupWorkspaceBySlug(slug string) (*models.Workspace,
 
 // PublicGetConfig GET /v1/public/helpdesk/:workspace_slug/config
 func (h *HelpDeskHandler) PublicGetConfig(c *fiber.Ctx) error {
-	ws, err := h.lookupWorkspaceBySlug(c.Params("workspace_slug"))
+	slug := c.Params("workspace_slug")
+	ws, err := h.lookupWorkspaceBySlug(slug)
 	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "help center não encontrado")
+		return h.publicNotFound(c, slug, "config")
 	}
 
 	var cfg models.HelpDeskConfig
@@ -581,9 +651,10 @@ func (h *HelpDeskHandler) PublicGetConfig(c *fiber.Ctx) error {
 
 // PublicListArticles GET /v1/public/helpdesk/:workspace_slug/articles?q=&category=
 func (h *HelpDeskHandler) PublicListArticles(c *fiber.Ctx) error {
-	ws, err := h.lookupWorkspaceBySlug(c.Params("workspace_slug"))
+	slug := c.Params("workspace_slug")
+	ws, err := h.lookupWorkspaceBySlug(slug)
 	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "workspace não encontrado")
+		return h.publicNotFound(c, slug, "articles")
 	}
 
 	query := h.db.Model(&models.HelpDeskArticle{}).
@@ -610,9 +681,10 @@ func (h *HelpDeskHandler) PublicListArticles(c *fiber.Ctx) error {
 // (UUID), depois fuzzy LIKE pra cobrir casos de slug renomeado. Sempre
 // exige status='published' — rascunhos nunca são públicos.
 func (h *HelpDeskHandler) PublicGetArticle(c *fiber.Ctx) error {
-	ws, err := h.lookupWorkspaceBySlug(c.Params("workspace_slug"))
+	wsSlug := c.Params("workspace_slug")
+	ws, err := h.lookupWorkspaceBySlug(wsSlug)
 	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "workspace não encontrado")
+		return h.publicNotFound(c, wsSlug, "article")
 	}
 
 	identifier := strings.TrimSpace(c.Params("slug"))
@@ -679,9 +751,10 @@ func (h *HelpDeskHandler) PublicGetArticle(c *fiber.Ctx) error {
 
 // PublicAsk POST /v1/public/helpdesk/:workspace_slug/ask
 func (h *HelpDeskHandler) PublicAsk(c *fiber.Ctx) error {
-	ws, err := h.lookupWorkspaceBySlug(c.Params("workspace_slug"))
+	slug := c.Params("workspace_slug")
+	ws, err := h.lookupWorkspaceBySlug(slug)
 	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "workspace não encontrado")
+		return h.publicNotFound(c, slug, "ask")
 	}
 
 	var body struct {

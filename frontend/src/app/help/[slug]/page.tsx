@@ -86,6 +86,7 @@ export default function HelpCenterPage({ params }: { params: { slug: string } })
   const [aiAnswer, setAiAnswer] = useState<{ answer: string; sources: { id: string; title: string; slug: string }[] } | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [notFoundHint, setNotFoundHint] = useState<{ requested?: string; available?: string[]; hint?: string } | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -98,7 +99,20 @@ export default function HelpCenterPage({ params }: { params: { slug: string } })
           fetch(`${API}/v1/public/helpdesk/${slug}/config`),
           fetch(`${API}/v1/public/helpdesk/${slug}/articles`),
         ]);
-        if (cfgRes.status === 404) { setNotFound(true); return; }
+        if (cfgRes.status === 404) {
+          setNotFound(true);
+          // Backend agora devolve { error, requested_slug, available_slugs[], hint }
+          // — exibimos pra o admin não ficar adivinhando qual slug usar.
+          try {
+            const data = await cfgRes.json();
+            setNotFoundHint({
+              requested: data?.requested_slug,
+              available: Array.isArray(data?.available_slugs) ? data.available_slugs : [],
+              hint: data?.hint,
+            });
+          } catch {}
+          return;
+        }
         const cfgData = await cfgRes.json();
         setConfig(cfgData);
         const arts: Article[] = await catsRes.json();
@@ -155,11 +169,26 @@ export default function HelpCenterPage({ params }: { params: { slug: string } })
     : articles);
 
   if (notFound) return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0d0d0d", color: "#fff" }}>
-      <div style={{ textAlign: "center" }}>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0d0d0d", color: "#fff", padding: 24 }}>
+      <div style={{ textAlign: "center", maxWidth: 520 }}>
         <div style={{ fontSize: 64, marginBottom: 16 }}>🔍</div>
         <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Central de ajuda não encontrada</h1>
-        <p style={{ color: "#888" }}>O link pode estar errado ou a Central de Ajuda ainda não foi configurada.</p>
+        <p style={{ color: "#888", marginBottom: 16 }}>
+          {notFoundHint?.requested ? <>Procuramos por <code style={{ background: "#1a1a1a", padding: "2px 6px", borderRadius: 4 }}>{notFoundHint.requested}</code> e não achamos.</> : "O link pode estar errado ou a Central de Ajuda ainda não foi configurada."}
+        </p>
+        {notFoundHint?.available && notFoundHint.available.length > 0 && (
+          <div style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 16, marginTop: 12, textAlign: "left" }}>
+            <p style={{ fontSize: 13, color: "#a0a0a0", marginBottom: 8 }}>Centrais disponíveis:</p>
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+              {notFoundHint.available.map((s) => (
+                <li key={s}>
+                  <Link href={`/help/${s}`} style={{ color: "#00d46a", textDecoration: "none", fontSize: 14 }}>/help/{s}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {notFoundHint?.hint && <p style={{ fontSize: 12, color: "#666", marginTop: 16 }}>{notFoundHint.hint}</p>}
       </div>
     </div>
   );
