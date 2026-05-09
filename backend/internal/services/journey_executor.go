@@ -865,10 +865,17 @@ func (e *JourneyExecutor) run(ctx *execCtx, step *models.FlowStep) {
 			return
 		}
 		if pause {
-			// Aguardando input - salvar estado e sair
-			ctx.execution.Status = "waiting_input"
-			ctx.vars.WaitingStep = step.ID
-			e.saveVars(ctx.execution, ctx.vars)
+			// Pause vem de DOIS caminhos diferentes:
+			//   • StepTypeInput → "waiting_input" (esperando user responder)
+			//   • StepTypeWait deferido → "waiting" (job em fila pra worker)
+			// O stepWait já setou status="waiting" + CurrentStep=NextStepID
+			// antes de retornar; aqui preservamos isso. Pros demais
+			// (Input, etc) caímos no comportamento antigo.
+			if ctx.execution.Status != "waiting" {
+				ctx.execution.Status = "waiting_input"
+				ctx.vars.WaitingStep = step.ID
+				e.saveVars(ctx.execution, ctx.vars)
+			}
 			if !ctx.simulate {
 				e.db.Save(ctx.execution)
 			}
@@ -1062,6 +1069,24 @@ func (e *JourneyExecutor) stepInput(ctx *execCtx, step *models.FlowStep) (*model
 	return nil, true, nil
 }
 
+// stepWait — política de espera com 2 caminhos:
+//
+//   • Curtos (<= deferThreshold, default 60s): time.Sleep síncrono na
+//     própria goroutine. Mais rápido, sem overhead de DB. Risco de
+//     perder em crash é aceitável (segundos).
+//
+//   • Longos (> 60s OU acima de 24h): cria JourneyDeferredStep
+//     persistente, marca execution.status="waiting" + CurrentStep
+//     no próximo step, e retorna pause=true pra sair da goroutine.
+//     O worker DeferredStepRunner pega quando fire_at <= now e chama
+//     resumeDeferred() que continua o flow. Crash do processo não
+//     perde execução: ao reiniciar, worker pega os pendings.
+//
+// Isso elimina o cap antigo de 24h — agora dá pra fazer wait de
+// múltiplos dias / semanas (drip de nutrição, etc) com persistência
+// total.
+const waitDeferThreshold = 60 * time.Second
+
 func (e *JourneyExecutor) stepWait(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
 	var cfg struct {
 		Duration string `json:"duration"`
@@ -1071,14 +1096,81 @@ func (e *JourneyExecutor) stepWait(ctx *execCtx, step *models.FlowStep) (*models
 	if err != nil || d <= 0 {
 		d = 2 * time.Second
 	}
-	if d > 24*time.Hour {
-		d = 24 * time.Hour
-	}
 	ctx.emit(step.ID, string(step.Type), "wait", map[string]interface{}{"duration_ms": d.Milliseconds()})
-	if !ctx.simulate {
-		time.Sleep(d)
+
+	// Simulação ignora o tempo (preview frontend).
+	if ctx.simulate {
+		return ctx.flow.FindStep(step.NextStepID), false, nil
 	}
-	return ctx.flow.FindStep(step.NextStepID), false, nil
+
+	// Curto: sleep direto.
+	if d <= waitDeferThreshold {
+		time.Sleep(d)
+		return ctx.flow.FindStep(step.NextStepID), false, nil
+	}
+
+	// Longo: defer persistente.
+	if err := e.deferStep(ctx, step, d); err != nil {
+		log.Warn().Err(err).Str("exec", ctx.execution.ID).Str("step", step.ID).
+			Msg("journey: falha ao deferir wait — caindo pro sleep síncrono")
+		// Fallback: dorme até o limite seguro de 24h pra não bloquear
+		// goroutine indefinidamente.
+		fallback := d
+		if fallback > 24*time.Hour {
+			fallback = 24 * time.Hour
+		}
+		time.Sleep(fallback)
+		return ctx.flow.FindStep(step.NextStepID), false, nil
+	}
+	// Sinaliza pause pro run() salvar estado e sair. Worker continua.
+	return nil, true, nil
+}
+
+// deferStep persiste um JourneyDeferredStep e atualiza a execution
+// pra refletir o estado "waiting (deferred)". O run() vê pause=true
+// e salva — mas precisamos garantir CurrentStep aponta pro NEXT step
+// (não pro próprio wait), pra que resumeDeferred saiba de onde
+// retomar.
+func (e *JourneyExecutor) deferStep(ctx *execCtx, step *models.FlowStep, d time.Duration) error {
+	// Journey legacy schema não tem workspace_id direto; o worker
+	// filtra por journey_id (que tem unicidade global). Mantemos
+	// workspace_id zero — campo só pra audit, não pra lookup.
+	deferred := models.JourneyDeferredStep{
+		ID:          uuid.New(),
+		WorkspaceID: uuid.Nil,
+		JourneyID:   ctx.journey.ID,
+		ExecutionID: ctx.execution.ID,
+		InstanceID:  ctx.instanceID,
+		ContactJID:  ctx.fromJID,
+		ContactName: ctx.fromName,
+		GroupJID:    ctx.groupJID,
+		FromStepID:  step.ID,
+		NextStepID:  step.NextStepID,
+		FireAt:      time.Now().UTC().Add(d),
+		Status:      models.JourneyDeferredPending,
+	}
+	if err := e.db.Create(&deferred).Error; err != nil {
+		return err
+	}
+	// Salva vars no execution antes de sair — vão ser carregadas no
+	// resumeDeferred. Status="waiting" diferencia de "waiting_input".
+	e.saveVars(ctx.execution, ctx.vars)
+	ctx.execution.Status = "waiting"
+	ctx.execution.CurrentStep = step.NextStepID
+	ctx.execution.UpdatedAt = time.Now()
+	if err := e.db.Save(ctx.execution).Error; err != nil {
+		// Defer já criada — mesmo com erro no save da execution,
+		// vamos pausar (worker carrega execution fresh ao retomar).
+		log.Warn().Err(err).Msg("journey: deferStep — falha ao salvar execution; segue mesmo assim")
+	}
+	log.Info().
+		Str("exec", ctx.execution.ID).
+		Str("step", step.ID).
+		Str("next", step.NextStepID).
+		Dur("wait", d).
+		Time("fire_at", deferred.FireAt).
+		Msg("journey: wait deferido pro runner")
+	return nil
 }
 
 func (e *JourneyExecutor) stepCondition(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
