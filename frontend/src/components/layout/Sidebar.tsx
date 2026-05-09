@@ -177,7 +177,7 @@ export function Sidebar() {
     { href: "/inbox",        label: t("nav_inbox"),        icon: Headset,         exact: false, show: canSeeInbox },
     { href: "/crm",          label: t("nav_crm"),          icon: Contact,         exact: false, show: canSeeCRM && !isValidate },
     { href: "/campaigns",    label: t("nav_campaigns"),    icon: Megaphone,       exact: false, show: canSeeCampaigns && planAllows("allow_campaigns") },
-    { href: "/journeys",     label: "Jornadas",            icon: Wand2,           exact: false, show: canSeeJourneys && planAllows("allow_journeys") },
+    { href: "/journeys",     label: "Jornadas",            icon: Wand2,           exact: false, show: canSeeJourneys && planAllows("allow_journeys") && !isValidate },
     { href: "/agents",       label: "Agentes",             icon: Bot,             exact: false, show: canSeeAgents && !isValidate },
     { href: "/help-desk",    label: "Help Desk",           icon: BookOpen,        exact: false, show: planAllows("allow_helpdesk") },
     { href: "/shops",        label: "Shops",               icon: ShoppingBag,     exact: false, show: !isValidate },
