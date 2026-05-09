@@ -898,6 +898,12 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	instanceWaba.Get("/phone-numbers", wabaH.ListPhoneNumbers)
 	instanceWaba.Get("/templates", wabaH.ListTemplates)
 	instanceWaba.Post("/templates", wabaH.CreateTemplate)
+	// Template defaults — usuário salva URL de mídia/local uma vez por
+	// template+idioma e o front auto-preenche em chamadas futuras
+	// (Meta exige um link/handle fresco em cada envio, mas a fonte da
+	// URL pode vir do nosso DB sem digitação repetida).
+	instanceWaba.Get("/templates/defaults", wabaH.ListTemplateDefaults)
+	instanceWaba.Put("/templates/defaults", wabaH.UpsertTemplateDefault)
 	instanceWaba.Get("/templates/:templateId", wabaH.GetTemplate)
 	instanceWaba.Post("/templates/:templateId", wabaH.EditTemplate)
 	instanceWaba.Delete("/templates/:name", wabaH.DeleteTemplate)

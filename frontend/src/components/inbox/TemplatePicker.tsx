@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { X, Search, Sparkles, Image as ImageIcon, Video, FileText, MapPin } from "lucide-react";
-import { wabaApi, conversationsApi } from "@/lib/api";
+import { X, Search, Sparkles, Image as ImageIcon, Video, FileText, MapPin, Save, Check } from "lucide-react";
+import { wabaApi, conversationsApi, type WABATemplateDefault } from "@/lib/api";
 
 // Meta message template — payload bruto da Graph API:
 //   { name, language, category, components: [
@@ -68,15 +68,48 @@ export function TemplatePicker({
   onClose: () => void;
   onSent: () => void;
 }) {
+  const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<MetaTemplate | null>(null);
   const [variables, setVariables] = useState<Record<string, string>>({});
   const [media, setMedia] = useState<MediaState>(emptyMedia);
+  // Track se o user já mexeu no media depois do auto-fill — sem isso
+  // a edição é sobrescrita quando o defaults query re-fetcha.
+  const [mediaTouched, setMediaTouched] = useState(false);
 
   const templatesQ = useQuery({
     queryKey: ["waba-templates", instanceId],
     queryFn: () =>
       wabaApi.templates(instanceId).then((r) => (r.data as { items: MetaTemplate[] }).items ?? []),
+  });
+
+  // Defaults persistidos por (template_name, template_language). Auto-fill
+  // os inputs de mídia quando o user seleciona um template — evita
+  // digitar a URL toda vez (Meta exige link/handle fresco em cada envio,
+  // mas a fonte não precisa mudar).
+  const defaultsQ = useQuery({
+    queryKey: ["waba-template-defaults", instanceId],
+    queryFn: () => wabaApi.templateDefaults(instanceId).then((r) => r.data.items ?? []),
+  });
+
+  const saveDefault = useMutation({
+    mutationFn: (data: WABATemplateDefault) =>
+      wabaApi.saveTemplateDefault(instanceId, {
+        template_name: data.template_name,
+        template_language: data.template_language,
+        header_media_url: data.header_media_url,
+        header_filename: data.header_filename,
+        header_latitude: data.header_latitude,
+        header_longitude: data.header_longitude,
+        header_location_name: data.header_location_name,
+        header_location_address: data.header_location_address,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["waba-template-defaults", instanceId] });
+      toast.success("Salvo como padrão pra próxima vez.");
+    },
+    onError: (e: any) =>
+      toast.error(e?.response?.data?.error || "Falha ao salvar padrão"),
   });
 
   const send = useMutation({
@@ -126,12 +159,66 @@ export function TemplatePicker({
   const needsMedia = headerFormat === "IMAGE" || headerFormat === "VIDEO" || headerFormat === "DOCUMENT";
   const needsLocation = headerFormat === "LOCATION";
 
+  // Reset vars + media quando troca de template. Marca mediaTouched=false
+  // pra permitir que o effect de auto-fill rode (abaixo).
   useEffect(() => {
-    if (selected) {
-      setVariables({});
-      setMedia(emptyMedia);
-    }
+    if (!selected) return;
+    setVariables({});
+    setMedia(emptyMedia);
+    setMediaTouched(false);
   }, [selected]);
+
+  // Auto-fill do media a partir dos defaults persistidos. Roda quando o
+  // template selecionado ou os defaults mudam, mas só se o user ainda
+  // não editou (mediaTouched=false) — assim a digitação manual nunca é
+  // sobrescrita pelo refetch.
+  useEffect(() => {
+    if (!selected || mediaTouched) return;
+    const def = (defaultsQ.data ?? []).find(
+      (d) => d.template_name === selected.name && d.template_language === selected.language,
+    );
+    if (def) {
+      setMedia({
+        url: def.header_media_url ?? "",
+        filename: def.header_filename ?? "",
+        latitude: def.header_latitude != null && def.header_latitude !== 0 ? String(def.header_latitude) : "",
+        longitude: def.header_longitude != null && def.header_longitude !== 0 ? String(def.header_longitude) : "",
+        name: def.header_location_name ?? "",
+        address: def.header_location_address ?? "",
+      });
+    }
+  }, [selected, defaultsQ.data, mediaTouched]);
+
+  // Wrapper do setter de media que marca como tocado — usado nos
+  // inputs pra que o auto-fill (effect acima) só rode na primeira
+  // seleção, não em cada refetch dos defaults.
+  const updateMedia = (m: MediaState) => {
+    setMediaTouched(true);
+    setMedia(m);
+  };
+
+  // Tem default salvo bate com os valores atuais? (pra mostrar/esconder
+  // o botão "Salvar como padrão")
+  const currentDefault = useMemo(() => {
+    if (!selected) return null;
+    return (
+      (defaultsQ.data ?? []).find(
+        (d) => d.template_name === selected.name && d.template_language === selected.language,
+      ) ?? null
+    );
+  }, [selected, defaultsQ.data]);
+
+  const matchesDefault = useMemo(() => {
+    if (!currentDefault) return false;
+    return (
+      (currentDefault.header_media_url ?? "") === media.url &&
+      (currentDefault.header_filename ?? "") === media.filename &&
+      String(currentDefault.header_latitude ?? "") === media.latitude &&
+      String(currentDefault.header_longitude ?? "") === media.longitude &&
+      (currentDefault.header_location_name ?? "") === media.name &&
+      (currentDefault.header_location_address ?? "") === media.address
+    );
+  }, [currentDefault, media]);
 
   const canSend =
     !!selected &&
@@ -304,11 +391,46 @@ export function TemplatePicker({
                   <MediaHeaderInputs
                     format={headerFormat as "IMAGE" | "VIDEO" | "DOCUMENT"}
                     media={media}
-                    onChange={setMedia}
+                    onChange={updateMedia}
+                    hasDefault={!!currentDefault}
+                    matchesDefault={matchesDefault}
+                    onSaveDefault={() =>
+                      selected &&
+                      saveDefault.mutate({
+                        id: "",
+                        instance_id: "",
+                        template_name: selected.name,
+                        template_language: selected.language,
+                        header_media_url: media.url,
+                        header_filename: media.filename,
+                      })
+                    }
+                    saving={saveDefault.isPending}
                   />
                 )}
 
-                {needsLocation && <LocationHeaderInputs media={media} onChange={setMedia} />}
+                {needsLocation && (
+                  <LocationHeaderInputs
+                    media={media}
+                    onChange={updateMedia}
+                    hasDefault={!!currentDefault}
+                    matchesDefault={matchesDefault}
+                    onSaveDefault={() =>
+                      selected &&
+                      saveDefault.mutate({
+                        id: "",
+                        instance_id: "",
+                        template_name: selected.name,
+                        template_language: selected.language,
+                        header_latitude: parseFloat(media.latitude) || 0,
+                        header_longitude: parseFloat(media.longitude) || 0,
+                        header_location_name: media.name,
+                        header_location_address: media.address,
+                      })
+                    }
+                    saving={saveDefault.isPending}
+                  />
+                )}
 
                 {/* Variáveis de texto (BODY + HEADER text) */}
                 {vars.length > 0 && (
@@ -392,10 +514,18 @@ function MediaHeaderInputs({
   format,
   media,
   onChange,
+  hasDefault,
+  matchesDefault,
+  onSaveDefault,
+  saving,
 }: {
   format: "IMAGE" | "VIDEO" | "DOCUMENT";
   media: MediaState;
   onChange: (m: MediaState) => void;
+  hasDefault: boolean;
+  matchesDefault: boolean;
+  onSaveDefault: () => void;
+  saving: boolean;
 }) {
   const meta = {
     IMAGE: { label: "Imagem", icon: ImageIcon, hint: "URL pública (.jpg/.png/.webp). Recomendado: até 5MB.", placeholder: "https://exemplo.com/imagem.jpg" },
@@ -403,6 +533,7 @@ function MediaHeaderInputs({
     DOCUMENT: { label: "Documento", icon: FileText, hint: "URL pública (.pdf é o mais usado). Até 100MB.", placeholder: "https://exemplo.com/arquivo.pdf" },
   }[format];
   const Icon = meta.icon;
+  const canSave = media.url.trim().length > 0;
   return (
     <div
       className="mt-4 rounded-xl p-4 space-y-2"
@@ -411,13 +542,39 @@ function MediaHeaderInputs({
         border: "1px solid rgba(96,165,250,0.20)",
       }}
     >
-      <h4
-        className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest"
-        style={{ color: "#60a5fa" }}
-      >
-        <Icon className="h-3 w-3" />
-        Header · {meta.label}
-      </h4>
+      <div className="flex items-center justify-between gap-2">
+        <h4
+          className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest"
+          style={{ color: "#60a5fa" }}
+        >
+          <Icon className="h-3 w-3" />
+          Header · {meta.label}
+          {hasDefault && matchesDefault && (
+            <span className="inline-flex items-center gap-0.5 normal-case font-normal text-[10px] tracking-normal"
+              style={{ color: "#00d46a" }}>
+              <Check className="h-2.5 w-2.5" />
+              padrão
+            </span>
+          )}
+        </h4>
+        {canSave && !matchesDefault && (
+          <button
+            type="button"
+            onClick={onSaveDefault}
+            disabled={saving}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium disabled:opacity-50"
+            style={{
+              background: "rgba(0,212,106,0.10)",
+              color: "#00d46a",
+              border: "1px solid rgba(0,212,106,0.25)",
+            }}
+            title={hasDefault ? "Atualizar padrão pra este template" : "Salvar como padrão pra próxima vez"}
+          >
+            <Save className="h-2.5 w-2.5" />
+            {hasDefault ? "Atualizar padrão" : "Salvar como padrão"}
+          </button>
+        )}
+      </div>
       <input
         value={media.url}
         onChange={(e) => onChange({ ...media, url: e.target.value })}
@@ -431,6 +588,11 @@ function MediaHeaderInputs({
       />
       <p className="text-[10px]" style={{ color: "hsl(240 8% 48%)" }}>
         {meta.hint}
+        {hasDefault && (
+          <span className="ml-1" style={{ color: "#00d46a" }}>
+            URL padrão carregada — ajuste se precisar.
+          </span>
+        )}
       </p>
       {format === "DOCUMENT" && (
         <input
@@ -452,10 +614,19 @@ function MediaHeaderInputs({
 function LocationHeaderInputs({
   media,
   onChange,
+  hasDefault,
+  matchesDefault,
+  onSaveDefault,
+  saving,
 }: {
   media: MediaState;
   onChange: (m: MediaState) => void;
+  hasDefault: boolean;
+  matchesDefault: boolean;
+  onSaveDefault: () => void;
+  saving: boolean;
 }) {
+  const canSave = media.latitude.trim() !== "" && media.longitude.trim() !== "";
   return (
     <div
       className="mt-4 rounded-xl p-4 space-y-2"
@@ -464,13 +635,38 @@ function LocationHeaderInputs({
         border: "1px solid rgba(0,212,106,0.20)",
       }}
     >
-      <h4
-        className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest"
-        style={{ color: "#00d46a" }}
-      >
-        <MapPin className="h-3 w-3" />
-        Header · Localização
-      </h4>
+      <div className="flex items-center justify-between gap-2">
+        <h4
+          className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest"
+          style={{ color: "#00d46a" }}
+        >
+          <MapPin className="h-3 w-3" />
+          Header · Localização
+          {hasDefault && matchesDefault && (
+            <span className="inline-flex items-center gap-0.5 normal-case font-normal text-[10px] tracking-normal"
+              style={{ color: "#00d46a" }}>
+              <Check className="h-2.5 w-2.5" />
+              padrão
+            </span>
+          )}
+        </h4>
+        {canSave && !matchesDefault && (
+          <button
+            type="button"
+            onClick={onSaveDefault}
+            disabled={saving}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium disabled:opacity-50"
+            style={{
+              background: "rgba(0,212,106,0.10)",
+              color: "#00d46a",
+              border: "1px solid rgba(0,212,106,0.25)",
+            }}
+          >
+            <Save className="h-2.5 w-2.5" />
+            {hasDefault ? "Atualizar padrão" : "Salvar como padrão"}
+          </button>
+        )}
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <input
           value={media.latitude}
