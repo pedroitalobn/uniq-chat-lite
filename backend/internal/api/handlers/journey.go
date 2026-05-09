@@ -69,7 +69,7 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 			var count int64
 			// Conta jornadas em todos workspaces que o owner é dono
 			h.db.Model(&models.Journey{}).
-				Where("user_id = ? OR instance_id IN (SELECT id::text FROM instances WHERE workspace_id IN (SELECT id FROM workspaces WHERE owner_id = ?))",
+				Where("user_id = ? OR instance_id IN (SELECT CAST(id AS TEXT) FROM instances WHERE workspace_id IN (SELECT id FROM workspaces WHERE owner_id = ?))",
 					ownerID.String(), ownerID).
 				Count(&count)
 			if int(count) >= plan.MaxJourneys {
@@ -773,7 +773,7 @@ func (h *JourneyHandler) ListJourneys(c *fiber.Ctx) error {
 			// Journey não tem WorkspaceID direto — filtra via JOIN nas
 			// instances daquele workspace + journey sem instance_id
 			// (jornadas globais ficam sempre visíveis).
-			q = q.Where("instance_id = '' OR instance_id IS NULL OR instance_id IN (SELECT id::text FROM instances WHERE workspace_id = ?)", wsID)
+			q = q.Where("instance_id = '' OR instance_id IS NULL OR instance_id IN (SELECT CAST(id AS TEXT) FROM instances WHERE workspace_id = ?)", wsID)
 		}
 	}
 
@@ -894,7 +894,7 @@ func (h *JourneyHandler) GetJourney(c *fiber.Ctx) error {
 	// por outro membro do mesmo workspace. Mesmo padrão usado em
 	// CreateJourney pra contagem (linha 72).
 	q := h.db.Preload("Instance").Where(
-		"id = ? AND (user_id = ? OR (instance_id <> '' AND instance_id IN (SELECT id::text FROM instances WHERE workspace_id IN (SELECT workspace_id FROM user_workspaces WHERE user_id = ?))))",
+		"id = ? AND (user_id = ? OR (instance_id <> '' AND instance_id IN (SELECT CAST(id AS TEXT) FROM instances WHERE workspace_id IN (SELECT workspace_id FROM user_workspaces WHERE user_id = ?))))",
 		id, userID.String(), userID,
 	)
 	if err := q.First(&journey).Error; err != nil {
