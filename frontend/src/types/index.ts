@@ -13,7 +13,7 @@ export interface User {
   created_at: string;
 }
 
-export type UserRole = "super_admin" | "customer" | "lead";
+export type UserRole = "super_admin" | "customer" | "lead" | "validate";
 
 export interface Proxy {
   id: string;

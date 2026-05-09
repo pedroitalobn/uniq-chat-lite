@@ -14,6 +14,11 @@ const (
 	RoleSuperAdmin UserRole = "super_admin"
 	RoleCustomer   UserRole = "customer"
 	RoleLead       UserRole = "lead"
+	// RoleValidate — role bypass pra validação Meta. Só pode criar/ver
+	// instâncias WABA (Cloud API). Outros canais (WhatsApp QR, Instagram,
+	// TikTok, etc) ficam ocultos no front e bloqueados no backend. Usado
+	// pra contas que precisam só do fluxo WABA validado pela Meta.
+	RoleValidate UserRole = "validate"
 )
 
 type User struct {

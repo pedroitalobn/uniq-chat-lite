@@ -76,8 +76,11 @@ const CHANNEL_ICONS: Record<string, React.ReactNode> = {
 };
 
 export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: Props) {
-  const [step, setStep] = useState<"channel" | "config">("channel");
-  const [selectedChannel, setSelectedChannel] = useState<string>("whatsapp");
+  const { data: sessionData } = useSession();
+  const isValidate = sessionData?.user?.role === "validate";
+  const [step, setStep] = useState<"channel" | "config">(isValidate ? "config" : "channel");
+  // Validate user só pode criar WABA — força o canal e pula o seletor.
+  const [selectedChannel, setSelectedChannel] = useState<string>(isValidate ? "waba" : "whatsapp");
   const [name, setName] = useState("");
   const [serverId, setServerId] = useState("");
   const [customToken, setCustomToken] = useState("");
@@ -96,7 +99,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
   // Todos os outros canais (WhatsApp não-oficial, Instagram, TikTok, etc.) precisam.
   const requiresServer = !isWABA && selectedChannel !== "instagram_api";
 
-  const { data: session } = useSession();
+  const session = sessionData;
   const isSuperAdmin = session?.user?.role === "super_admin";
   const isBeta = session?.user?.is_beta === true || isSuperAdmin;
 
@@ -107,7 +110,12 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
     staleTime: Infinity,
   });
 
-  const availableChannels = channels || FALLBACK_CHANNELS(isBeta);
+  const allChannels = channels || FALLBACK_CHANNELS(isBeta);
+  // Validate role só vê WABA. Backend bloqueia a criação dos demais
+  // canais mas escondemos no front pra UX limpa (sem opção dummy).
+  const availableChannels = isValidate
+    ? allChannels.filter((c) => c.id === "waba").map((c) => ({ ...c, available: true }))
+    : allChannels;
 
   // Servers filtrados por workspace — sem o param o backend devolve servers
   // de TODOS os workspaces do user, e o usuário poderia atachar server

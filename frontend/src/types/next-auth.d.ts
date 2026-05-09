@@ -9,14 +9,14 @@ declare module "next-auth" {
       name?: string | null;
       email?: string | null;
       image?: string | null;
-      role: "super_admin" | "customer" | "lead";
+      role: "super_admin" | "customer" | "lead" | "validate";
       is_beta?: boolean;
       plan?: Record<string, unknown>;
     };
   }
 
   interface User {
-    role: "super_admin" | "customer" | "lead";
+    role: "super_admin" | "customer" | "lead" | "validate";
     is_beta?: boolean;
     plan?: Record<string, unknown>;
     accessToken?: string;
