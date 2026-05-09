@@ -17,6 +17,8 @@ import {
   Repeat,
   CornerDownRight,
   StopCircle,
+  Mail,
+  Smartphone,
   type LucideIcon,
 } from "lucide-react";
 
@@ -44,7 +46,9 @@ type Flow = {
 };
 
 const TYPE_META: Record<string, { icon: LucideIcon; color: string; label: string }> = {
-  message:        { icon: MessageSquare, color: "#00d46a", label: "Mensagem" },
+  message:        { icon: MessageSquare, color: "#00d46a", label: "WhatsApp" },
+  email:          { icon: Mail,          color: "#3b82f6", label: "Email" },
+  sms:            { icon: Smartphone,    color: "#ec4899", label: "SMS" },
   buttons:        { icon: ListChecks,    color: "#60a5fa", label: "Botões" },
   list:           { icon: ListChecks,    color: "#60a5fa", label: "Lista" },
   input:          { icon: Hand,          color: "#fbbf24", label: "Pergunta" },
@@ -266,6 +270,16 @@ function summarizeStep(type: string, cfg: Record<string, any>): string {
   switch (type) {
     case "message":
       return cfg.message || "";
+    case "email":
+      return [
+        cfg.to ? `→ ${cfg.to}` : "→ contact.email",
+        cfg.subject ? `📧 ${cfg.subject}` : "",
+      ].filter(Boolean).join("\n");
+    case "sms":
+      return [
+        cfg.to ? `→ ${cfg.to}` : "→ contact.phone",
+        cfg.text || "",
+      ].filter(Boolean).join("\n");
     case "buttons": {
       const b = (cfg.buttons || []).map((x: any) => x.text).join(" · ");
       return [cfg.message, b ? `[${b}]` : ""].filter(Boolean).join("\n");

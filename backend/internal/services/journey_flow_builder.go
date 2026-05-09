@@ -31,7 +31,7 @@ FORMATO OBRIGATÓRIO (responda APENAS com JSON válido, sem markdown, sem explic
   "steps": [
     {
       "id": "<uuid curto único>",
-      "type": "<um destes: message | buttons | list | input | wait | condition | ai_response | http_request | media | handoff | goto | randomize | set_variable | add_tag | remove_tag | update_stage | end>",
+      "type": "<um destes: message | email | sms | buttons | list | input | wait | condition | ai_response | http_request | media | handoff | goto | randomize | set_variable | add_tag | remove_tag | update_stage | end>",
       "label": "<rótulo curto legível>",
       "config": { ... objeto JSON específico ao type ... },
       "next_step_id": "<id do próximo step ou vazio>",
@@ -44,6 +44,11 @@ FORMATO OBRIGATÓRIO (responda APENAS com JSON válido, sem markdown, sem explic
 
 CONFIGS POR TYPE:
 - message: { "message": "texto com {{name}} ou {{last_input}}", "mode": "private|group" }
+- email:   { "to": "{{contact.email}}", "subject": "Assunto", "body_html": "<p>HTML</p>", "body_text": "Plain text fallback" }
+  * "to" opcional — sem ele usa o email do contato no CRM
+  * use email pra drips B2B / nurture / pós-venda longo prazo
+- sms:     { "to": "{{contact.phone}}", "text": "Texto curto", "provider": "twilio" }
+  * SMS é caro — use só quando precisar de delivery garantido sem internet
 - buttons: { "message": "texto", "buttons": [{"id":"b1","text":"Opção 1"}, ...], "mode":"private" }
   * buttons pausam para input; use branches mapeando ID→step via condition após
 - list: { "message": "texto", "button_text": "Ver opções", "sections": [{"title":"Seção","rows":[{"id":"r1","title":"Item","description":"desc"}]}] }

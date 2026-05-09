@@ -398,6 +398,12 @@ const (
 	StepTypeMultivariate    StepType = "multivariate"     // A/B/C com pesos percentuais
 	StepTypeSendInTimezone  StepType = "send_in_timezone" // wait até janela horária do contato
 	StepTypeUnsubscribe     StepType = "unsubscribe"      // adiciona à suppression list (LGPD)
+
+	// Multi-canal (Fase 4) — antes só WhatsApp via sender. Agora a
+	// mesma jornada pode mandar email + SMS pra atender drips B2B
+	// (welcome → email → wait 1d → SMS lembrete → wait 3d → WhatsApp).
+	StepTypeEmail StepType = "email" // envia email (provider Maileroo)
+	StepTypeSMS   StepType = "sms"   // envia SMS (provider Twilio/Zenvia)
 )
 
 type FlowStep struct {

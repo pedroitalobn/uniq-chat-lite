@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+	"github.com/uniq-chat/backend/internal/email"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/senders"
 	"github.com/uniq-chat/backend/internal/services/template"
@@ -41,6 +42,10 @@ type JourneyExecutor struct {
 	db     *gorm.DB
 	sender MessageSender
 	llm    *LLMService
+	// email injetado via SetEmail() depois do constructor pra evitar
+	// refactor cascata. Usado pelos handlers de StepTypeEmail (Fase 4
+	// multi-canal). Quando nil, stepEmail vira no-op com log.
+	email *email.Service
 	// MaxSteps limita o total de steps executados por execução. Flows
 	// normais têm 3-10 steps; se estamos passando disso algo está
 	// errado (ciclo, build defeituoso do LLM, etc).
@@ -943,6 +948,11 @@ func (e *JourneyExecutor) executeStep(ctx *execCtx, step *models.FlowStep) (*mod
 		return e.stepSendInTimezone(ctx, step)
 	case models.StepTypeUnsubscribe:
 		return e.stepUnsubscribe(ctx, step)
+	// Multi-canal (Fase 4) — Email via Maileroo + SMS stub.
+	case models.StepTypeEmail:
+		return e.stepEmail(ctx, step)
+	case models.StepTypeSMS:
+		return e.stepSMS(ctx, step)
 	case models.StepTypeEnd:
 		return nil, false, nil
 	default:
