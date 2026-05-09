@@ -3,19 +3,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { X, Search, Sparkles } from "lucide-react";
+import { X, Search, Sparkles, Image as ImageIcon, Video, FileText, MapPin } from "lucide-react";
 import { wabaApi, conversationsApi } from "@/lib/api";
 
-// Meta message template model (simplified — o backend devolve o payload
-// bruto da Graph API):
+// Meta message template — payload bruto da Graph API:
 //   { name, language, category, components: [
 //       { type: "HEADER" | "BODY" | "FOOTER" | "BUTTONS",
-//         text?: "olá {{1}}, seu pedido…", example?: {...}, buttons?: [...] }
+//         format?: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | "LOCATION",
+//         text?: "olá {{1}}, seu pedido…", buttons?: [...] }
 //   ] }
 //
-// O componente extrai as {{N}} de BODY e HEADER(text) e gera campos de
-// variáveis. Ao enviar, monta o `components` no formato que a Meta aceita:
-//   [{ type: "body", parameters: [{type:"text", text:"<valor>"}, ...] }]
+// O componente extrai as {{N}} de BODY e HEADER(format=TEXT) e gera campos
+// de texto. Pra HEADER com format IMAGE/VIDEO/DOCUMENT/LOCATION, mostra
+// inputs específicos (URL pra mídia, lat/lng pra location). Ao enviar,
+// monta `components` no formato exato que a Meta espera, evitando o erro
+// 132012 ("expected IMAGE, received UNKNOWN") quando o template foi
+// aprovado com mídia mas o request omite o parâmetro.
+
 interface MetaTemplate {
   name: string;
   language: string;
@@ -29,6 +33,27 @@ interface MetaTemplate {
     buttons?: Array<{ type: string; text: string }>;
   }>;
 }
+
+type HeaderFormat = "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | "LOCATION";
+
+type MediaState = {
+  url: string;
+  filename: string; // pra DOCUMENT
+  // pra LOCATION
+  latitude: string;
+  longitude: string;
+  name: string;
+  address: string;
+};
+
+const emptyMedia: MediaState = {
+  url: "",
+  filename: "",
+  latitude: "",
+  longitude: "",
+  name: "",
+  address: "",
+};
 
 export function TemplatePicker({
   wsId,
@@ -46,6 +71,7 @@ export function TemplatePicker({
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<MetaTemplate | null>(null);
   const [variables, setVariables] = useState<Record<string, string>>({});
+  const [media, setMedia] = useState<MediaState>(emptyMedia);
 
   const templatesQ = useQuery({
     queryKey: ["waba-templates", instanceId],
@@ -56,7 +82,7 @@ export function TemplatePicker({
   const send = useMutation({
     mutationFn: () => {
       if (!selected) throw new Error("no template");
-      const components = buildMetaComponents(selected, variables);
+      const components = buildMetaComponents(selected, variables, media);
       return conversationsApi.sendMessage(wsId, conversationId, {
         type: "template",
         template_name: selected.name,
@@ -69,7 +95,10 @@ export function TemplatePicker({
       onSent();
       onClose();
     },
-    onError: () => toast.error("Falha ao enviar template"),
+    onError: (e: any) => {
+      const raw = e?.response?.data?.error || "Falha ao enviar template";
+      toast.error(raw, { duration: 8000 });
+    },
   });
 
   const templates = useMemo(() => {
@@ -85,12 +114,30 @@ export function TemplatePicker({
   }, [templatesQ.data, q]);
 
   const vars = useMemo(() => (selected ? extractVariables(selected) : []), [selected]);
+  const headerFormat = useMemo<HeaderFormat | null>(() => {
+    const h = selected?.components?.find((c) => c.type === "HEADER");
+    if (!h?.format) return null;
+    const f = h.format.toUpperCase();
+    if (["TEXT", "IMAGE", "VIDEO", "DOCUMENT", "LOCATION"].includes(f)) {
+      return f as HeaderFormat;
+    }
+    return null;
+  }, [selected]);
+  const needsMedia = headerFormat === "IMAGE" || headerFormat === "VIDEO" || headerFormat === "DOCUMENT";
+  const needsLocation = headerFormat === "LOCATION";
 
   useEffect(() => {
-    if (selected) setVariables({});
+    if (selected) {
+      setVariables({});
+      setMedia(emptyMedia);
+    }
   }, [selected]);
 
-  const canSend = selected && vars.every((v) => (variables[v] ?? "").trim().length > 0);
+  const canSend =
+    !!selected &&
+    vars.every((v) => (variables[v] ?? "").trim().length > 0) &&
+    (!needsMedia || media.url.trim().length > 0) &&
+    (!needsLocation || (media.latitude.trim() !== "" && media.longitude.trim() !== ""));
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
@@ -101,10 +148,7 @@ export function TemplatePicker({
       />
       <div
         className="relative flex h-[640px] w-full max-w-3xl overflow-hidden rounded-2xl shadow-2xl uniq-scale-in"
-        style={{
-          background: "hsl(240 18% 6%)",
-          border: "1px solid hsl(240 12% 14%)",
-        }}
+        style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}
       >
         {/* List */}
         <aside
@@ -147,8 +191,7 @@ export function TemplatePicker({
             )}
             {templatesQ.isError && (
               <li className="px-4 py-6 text-xs" style={{ color: "#ef4444" }}>
-                Falha ao buscar templates. Verifique se esta instância é WABA e
-                se o business_id + access_token estão configurados.
+                Falha ao buscar templates. Verifique se esta instância é WABA.
               </li>
             )}
             {!templatesQ.isLoading && templates.length === 0 && (
@@ -158,6 +201,7 @@ export function TemplatePicker({
             )}
             {templates.map((tpl) => {
               const active = selected?.name === tpl.name && selected.language === tpl.language;
+              const hf = tpl.components?.find((c) => c.type === "HEADER")?.format?.toUpperCase();
               return (
                 <li key={`${tpl.name}-${tpl.language}`}>
                   <button
@@ -179,6 +223,19 @@ export function TemplatePicker({
                       >
                         {tpl.language}
                       </span>
+                      {hf && hf !== "TEXT" && (
+                        <span
+                          className="rounded px-1 text-[9px] uppercase"
+                          style={{
+                            background: "rgba(96,165,250,0.10)",
+                            color: "#60a5fa",
+                            border: "1px solid rgba(96,165,250,0.20)",
+                          }}
+                          title="Header de mídia"
+                        >
+                          {hf.toLowerCase()}
+                        </span>
+                      )}
                     </div>
                     {tpl.category && (
                       <div className="mt-0.5 text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>
@@ -211,6 +268,9 @@ export function TemplatePicker({
               {selected && (
                 <p className="text-[10px]" style={{ color: "hsl(240 8% 44%)" }}>
                   Idioma {selected.language} · {selected.category ?? "marketing"}
+                  {headerFormat && headerFormat !== "TEXT" && (
+                    <> · header <b style={{ color: "#60a5fa" }}>{headerFormat.toLowerCase()}</b></>
+                  )}
                 </p>
               )}
             </div>
@@ -237,7 +297,20 @@ export function TemplatePicker({
 
             {selected && (
               <>
-                <TemplatePreview tpl={selected} variables={variables} />
+                <TemplatePreview tpl={selected} variables={variables} media={media} />
+
+                {/* Inputs por formato de header */}
+                {needsMedia && (
+                  <MediaHeaderInputs
+                    format={headerFormat as "IMAGE" | "VIDEO" | "DOCUMENT"}
+                    media={media}
+                    onChange={setMedia}
+                  />
+                )}
+
+                {needsLocation && <LocationHeaderInputs media={media} onChange={setMedia} />}
+
+                {/* Variáveis de texto (BODY + HEADER text) */}
                 {vars.length > 0 && (
                   <div
                     className="mt-4 rounded-xl p-4"
@@ -313,17 +386,159 @@ export function TemplatePicker({
   );
 }
 
-function TemplatePreview({ tpl, variables }: { tpl: MetaTemplate; variables: Record<string, string> }) {
-  const headerText = renderText(
-    tpl.components?.find((c) => c.type === "HEADER" && c.format === "TEXT")?.text,
-    variables,
+// ─── Inputs por formato de header ──────────────────────────────────────────
+
+function MediaHeaderInputs({
+  format,
+  media,
+  onChange,
+}: {
+  format: "IMAGE" | "VIDEO" | "DOCUMENT";
+  media: MediaState;
+  onChange: (m: MediaState) => void;
+}) {
+  const meta = {
+    IMAGE: { label: "Imagem", icon: ImageIcon, hint: "URL pública (.jpg/.png/.webp). Recomendado: até 5MB.", placeholder: "https://exemplo.com/imagem.jpg" },
+    VIDEO: { label: "Vídeo", icon: Video, hint: "URL pública .mp4 (h264) ou .3gp. Recomendado: até 16MB.", placeholder: "https://exemplo.com/video.mp4" },
+    DOCUMENT: { label: "Documento", icon: FileText, hint: "URL pública (.pdf é o mais usado). Até 100MB.", placeholder: "https://exemplo.com/arquivo.pdf" },
+  }[format];
+  const Icon = meta.icon;
+  return (
+    <div
+      className="mt-4 rounded-xl p-4 space-y-2"
+      style={{
+        background: "rgba(96,165,250,0.04)",
+        border: "1px solid rgba(96,165,250,0.20)",
+      }}
+    >
+      <h4
+        className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest"
+        style={{ color: "#60a5fa" }}
+      >
+        <Icon className="h-3 w-3" />
+        Header · {meta.label}
+      </h4>
+      <input
+        value={media.url}
+        onChange={(e) => onChange({ ...media, url: e.target.value })}
+        placeholder={meta.placeholder}
+        className="w-full rounded-md px-3 py-2 text-xs outline-none"
+        style={{
+          background: "var(--surface-2)",
+          border: "1px solid hsl(240 12% 16%)",
+          color: "hsl(240 15% 90%)",
+        }}
+      />
+      <p className="text-[10px]" style={{ color: "hsl(240 8% 48%)" }}>
+        {meta.hint}
+      </p>
+      {format === "DOCUMENT" && (
+        <input
+          value={media.filename}
+          onChange={(e) => onChange({ ...media, filename: e.target.value })}
+          placeholder="Nome do arquivo (opcional, ex: Contrato.pdf)"
+          className="w-full rounded-md px-3 py-2 text-xs outline-none"
+          style={{
+            background: "var(--surface-2)",
+            border: "1px solid hsl(240 12% 16%)",
+            color: "hsl(240 15% 90%)",
+          }}
+        />
+      )}
+    </div>
   );
-  const bodyText = renderText(
-    tpl.components?.find((c) => c.type === "BODY")?.text,
-    variables,
+}
+
+function LocationHeaderInputs({
+  media,
+  onChange,
+}: {
+  media: MediaState;
+  onChange: (m: MediaState) => void;
+}) {
+  return (
+    <div
+      className="mt-4 rounded-xl p-4 space-y-2"
+      style={{
+        background: "rgba(0,212,106,0.04)",
+        border: "1px solid rgba(0,212,106,0.20)",
+      }}
+    >
+      <h4
+        className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest"
+        style={{ color: "#00d46a" }}
+      >
+        <MapPin className="h-3 w-3" />
+        Header · Localização
+      </h4>
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          value={media.latitude}
+          onChange={(e) => onChange({ ...media, latitude: e.target.value })}
+          placeholder="Latitude (-23.5505)"
+          className="w-full rounded-md px-3 py-2 text-xs outline-none"
+          style={{
+            background: "var(--surface-2)",
+            border: "1px solid hsl(240 12% 16%)",
+            color: "hsl(240 15% 90%)",
+          }}
+        />
+        <input
+          value={media.longitude}
+          onChange={(e) => onChange({ ...media, longitude: e.target.value })}
+          placeholder="Longitude (-46.6333)"
+          className="w-full rounded-md px-3 py-2 text-xs outline-none"
+          style={{
+            background: "var(--surface-2)",
+            border: "1px solid hsl(240 12% 16%)",
+            color: "hsl(240 15% 90%)",
+          }}
+        />
+      </div>
+      <input
+        value={media.name}
+        onChange={(e) => onChange({ ...media, name: e.target.value })}
+        placeholder="Nome do local (opcional)"
+        className="w-full rounded-md px-3 py-2 text-xs outline-none"
+        style={{
+          background: "var(--surface-2)",
+          border: "1px solid hsl(240 12% 16%)",
+          color: "hsl(240 15% 90%)",
+        }}
+      />
+      <input
+        value={media.address}
+        onChange={(e) => onChange({ ...media, address: e.target.value })}
+        placeholder="Endereço (opcional)"
+        className="w-full rounded-md px-3 py-2 text-xs outline-none"
+        style={{
+          background: "var(--surface-2)",
+          border: "1px solid hsl(240 12% 16%)",
+          color: "hsl(240 15% 90%)",
+        }}
+      />
+    </div>
   );
+}
+
+// ─── Preview ───────────────────────────────────────────────────────────────
+
+function TemplatePreview({
+  tpl,
+  variables,
+  media,
+}: {
+  tpl: MetaTemplate;
+  variables: Record<string, string>;
+  media: MediaState;
+}) {
+  const headerComp = tpl.components?.find((c) => c.type === "HEADER");
+  const headerFormat = headerComp?.format?.toUpperCase();
+  const headerText = headerFormat === "TEXT" ? renderText(headerComp?.text, variables) : "";
+  const bodyText = renderText(tpl.components?.find((c) => c.type === "BODY")?.text, variables);
   const footerText = tpl.components?.find((c) => c.type === "FOOTER")?.text;
   const buttons = tpl.components?.find((c) => c.type === "BUTTONS")?.buttons ?? [];
+
   return (
     <div
       className="mx-auto max-w-md rounded-2xl p-3 shadow-sm"
@@ -334,6 +549,52 @@ function TemplatePreview({ tpl, variables }: { tpl: MetaTemplate; variables: Rec
         color: "hsl(240 15% 92%)",
       }}
     >
+      {/* Preview do header de mídia */}
+      {headerFormat === "IMAGE" && (
+        <div
+          className="mb-2 overflow-hidden rounded-lg"
+          style={{ background: "rgba(255,255,255,0.04)", aspectRatio: "16/9" }}
+        >
+          {media.url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={media.url} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full items-center justify-center text-[10px]" style={{ color: "hsl(240 8% 44%)" }}>
+              📷 imagem aparecerá aqui
+            </div>
+          )}
+        </div>
+      )}
+      {headerFormat === "VIDEO" && (
+        <div
+          className="mb-2 flex items-center justify-center rounded-lg text-[11px]"
+          style={{ background: "rgba(0,0,0,0.4)", aspectRatio: "16/9", color: "hsl(240 15% 70%)" }}
+        >
+          🎬 {media.url ? "Vídeo" : "vídeo aparecerá aqui"}
+        </div>
+      )}
+      {headerFormat === "DOCUMENT" && (
+        <div
+          className="mb-2 flex items-center gap-2 rounded-lg p-2"
+          style={{ background: "rgba(255,255,255,0.05)" }}
+        >
+          <FileText className="h-5 w-5" style={{ color: "hsl(240 8% 60%)" }} />
+          <span className="text-[11px]" style={{ color: "hsl(240 15% 80%)" }}>
+            {media.filename || "documento.pdf"}
+          </span>
+        </div>
+      )}
+      {headerFormat === "LOCATION" && (
+        <div
+          className="mb-2 flex items-center gap-2 rounded-lg p-2"
+          style={{ background: "rgba(0,212,106,0.06)" }}
+        >
+          <MapPin className="h-5 w-5" style={{ color: "#00d46a" }} />
+          <span className="text-[11px]" style={{ color: "hsl(240 15% 80%)" }}>
+            {media.name || `${media.latitude || "?"}, ${media.longitude || "?"}`}
+          </span>
+        </div>
+      )}
       {headerText && (
         <div className="mb-2 text-sm font-medium" style={{ color: "#00d46a" }}>
           {headerText}
@@ -366,7 +627,7 @@ function TemplatePreview({ tpl, variables }: { tpl: MetaTemplate; variables: Rec
   );
 }
 
-// ── utils ──────────────────────────────────────────────────────────────────
+// ─── utils ──────────────────────────────────────────────────────────────────
 
 function getBodyText(tpl: MetaTemplate): string {
   return tpl.components?.find((c) => c.type === "BODY")?.text ?? "";
@@ -377,6 +638,9 @@ function extractVariables(tpl: MetaTemplate): string[] {
   const set = new Set<string>();
   (tpl.components ?? []).forEach((c) => {
     if (!c.text) return;
+    // Header de mídia (IMAGE/VIDEO/DOC) não tem {{N}}; o input é o
+    // próprio URL — não conta como variável de texto.
+    if (c.type === "HEADER" && c.format && c.format.toUpperCase() !== "TEXT") return;
     let m;
     while ((m = rx.exec(c.text)) !== null) set.add(m[1]);
   });
@@ -388,24 +652,66 @@ function renderText(text: string | undefined, variables: Record<string, string>)
   return text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, k) => variables[k] || `{{${k}}}`);
 }
 
-// buildMetaComponents converte { "1": "olá", "2": "João" } no formato que
-// a Meta aceita:
-//   [{ type: "body", parameters: [{type:"text", text:"olá"}, {type:"text",text:"João"}] }]
-// Apenas BODY por enquanto — header/button params raramente precisam ser
-// preenchidos no operador; se o template tem {{N}} no header text, o valor
-// vai no component type:"header".
-function buildMetaComponents(tpl: MetaTemplate, variables: Record<string, string>): Array<Record<string, unknown>> {
+// buildMetaComponents — converte os inputs do user no payload exato que
+// a Meta espera. Cada formato de header tem seu próprio shape:
+//
+// TEXT:     { type: "header", parameters: [{ type: "text", text: "..." }] }
+// IMAGE:    { type: "header", parameters: [{ type: "image", image: { link: "..." } }] }
+// VIDEO:    { type: "header", parameters: [{ type: "video", video: { link: "..." } }] }
+// DOCUMENT: { type: "header", parameters: [{ type: "document", document: { link, filename? } }] }
+// LOCATION: { type: "header", parameters: [{ type: "location", location: { latitude, longitude, name?, address? } }] }
+//
+// BODY:     { type: "body", parameters: [{ type: "text", text: "..." }, ...] }
+//
+// Header sem variável (TEXT estático) e sem mídia não vai no array.
+function buildMetaComponents(
+  tpl: MetaTemplate,
+  variables: Record<string, string>,
+  media: MediaState,
+): Array<Record<string, unknown>> {
   const out: Array<Record<string, unknown>> = [];
 
-  const headerComp = tpl.components?.find((c) => c.type === "HEADER" && c.format === "TEXT");
-  if (headerComp?.text) {
-    const headerVars = (headerComp.text.match(/\{\{\s*(\d+)\s*\}\}/g) ?? []).map((m) =>
-      m.replace(/[{}\s]/g, ""),
-    );
-    if (headerVars.length > 0) {
+  const headerComp = tpl.components?.find((c) => c.type === "HEADER");
+  if (headerComp) {
+    const fmt = (headerComp.format || "TEXT").toUpperCase();
+
+    if (fmt === "TEXT" && headerComp.text) {
+      const headerVars = (headerComp.text.match(/\{\{\s*(\d+)\s*\}\}/g) ?? []).map((m) =>
+        m.replace(/[{}\s]/g, ""),
+      );
+      if (headerVars.length > 0) {
+        out.push({
+          type: "header",
+          parameters: headerVars.map((k) => ({ type: "text", text: variables[k] ?? "" })),
+        });
+      }
+    } else if (fmt === "IMAGE" && media.url.trim()) {
       out.push({
         type: "header",
-        parameters: headerVars.map((k) => ({ type: "text", text: variables[k] ?? "" })),
+        parameters: [{ type: "image", image: { link: media.url.trim() } }],
+      });
+    } else if (fmt === "VIDEO" && media.url.trim()) {
+      out.push({
+        type: "header",
+        parameters: [{ type: "video", video: { link: media.url.trim() } }],
+      });
+    } else if (fmt === "DOCUMENT" && media.url.trim()) {
+      const doc: Record<string, string> = { link: media.url.trim() };
+      if (media.filename.trim()) doc.filename = media.filename.trim();
+      out.push({
+        type: "header",
+        parameters: [{ type: "document", document: doc }],
+      });
+    } else if (fmt === "LOCATION" && media.latitude.trim() && media.longitude.trim()) {
+      const loc: Record<string, unknown> = {
+        latitude: parseFloat(media.latitude),
+        longitude: parseFloat(media.longitude),
+      };
+      if (media.name.trim()) loc.name = media.name.trim();
+      if (media.address.trim()) loc.address = media.address.trim();
+      out.push({
+        type: "header",
+        parameters: [{ type: "location", location: loc }],
       });
     }
   }
