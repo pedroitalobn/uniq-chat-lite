@@ -48,12 +48,19 @@ export function CollapsibleCard({
         >
           <Icon className="w-3.5 h-3.5" />
         </span>
-        <h3 className="text-sm font-semibold text-left" style={{ color: "var(--text-1)" }}>
+        <h3 className="text-sm font-semibold text-left flex-shrink-0" style={{ color: "var(--text-1)" }}>
           {title}
         </h3>
-        {meta && <div className="ml-auto flex items-center gap-2">{meta}</div>}
+        {/* Meta wrappa quando tem muitos chips (KnowledgeCard tem 3+
+           chips em mobile). flex-1 permite ocupar espaço; justify-end
+           empurra os chips pra direita. */}
+        {meta && (
+          <div className="ml-auto flex items-center gap-1.5 flex-wrap justify-end min-w-0">
+            {meta}
+          </div>
+        )}
         <ChevronDown
-          className={`w-4 h-4 transition-transform duration-200 ${meta ? "" : "ml-auto"}`}
+          className={`w-4 h-4 transition-transform duration-200 flex-shrink-0 ${meta ? "" : "ml-auto"}`}
           style={{
             color: "var(--text-3)",
             transform: open ? "rotate(0deg)" : "rotate(-90deg)",

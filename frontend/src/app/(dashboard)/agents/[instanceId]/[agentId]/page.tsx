@@ -7,6 +7,7 @@ import { VoiceCard } from "./_components/VoiceCard";
 import { KnowledgeCard } from "./_components/KnowledgeCard";
 import { SkillsCard } from "./_components/SkillsCard";
 import { StatusCard } from "./_components/StatusCard";
+import { MobileStatusBar } from "./_components/MobileStatusBar";
 
 // Studio — página principal de configuração do agente.
 // Layout: cards à esquerda (scroll vertical), status card sticky
@@ -50,9 +51,10 @@ export default function AgentStudioPage() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl mx-auto">
+    <div className="px-4 sm:px-6 lg:px-8 py-4 lg:py-6 max-w-6xl mx-auto">
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-4">
         <div className="space-y-3 min-w-0">
+          <MobileStatusBar form={form} />
           <PersonalityCard form={form} update={updateForm} />
           <VoiceCard form={form} update={updateForm} />
           <KnowledgeCard form={form} update={updateForm} instanceId={instanceId} />
