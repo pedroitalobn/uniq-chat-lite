@@ -618,6 +618,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	app.Delete("/v1/helpdesk/articles/:id", append(hdChain, helpDeskH.DeleteArticle)...)
 	app.Post("/v1/helpdesk/articles/:id/publish", append(hdChain, helpDeskH.PublishArticle)...)
 
+	// Helpdesk widget endpoints — config do widget embarcável (GET/PUT).
+	// GET auto-provisiona Instance(webchat) + WebChatConfig se não existirem.
+	app.Get("/v1/helpdesk/widget", append(hdChain, helpDeskH.GetWidget)...)
+	app.Put("/v1/helpdesk/widget", append(hdChain, helpDeskH.UpdateWidget)...)
+
 	// Auth: apikey / X-Instance-Token / Authorization: Bearer <instance_token>.
 	// IMPORTANT: registered BEFORE the protected /v1 group because Fiber's
 	// Group middlewares only apply to routes registered AFTER them — declaring

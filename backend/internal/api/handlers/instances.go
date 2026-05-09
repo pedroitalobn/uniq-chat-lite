@@ -186,6 +186,14 @@ func (h *InstanceHandler) List(c *fiber.Ctx) error {
 		q = q.Where("channel = ?", string(models.ChannelWABA))
 	}
 
+	// Esconde instâncias webchat por padrão — elas são auto-provisionadas
+	// pelo módulo Help Desk como storage de token do widget e não devem
+	// aparecer na listagem de canais "reais" (WhatsApp, Instagram, etc).
+	// Pra debug/admin, ?include_webchat=1 traz tudo.
+	if c.Query("include_webchat") != "1" {
+		q = q.Where("channel <> ?", string(models.ChannelWebChat))
+	}
+
 	if err := q.Find(&instances).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao buscar instâncias"})
 	}

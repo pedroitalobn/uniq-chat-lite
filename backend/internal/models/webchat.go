@@ -19,6 +19,18 @@ type WebChatConfig struct {
 	Position               string    `gorm:"type:varchar(30);default:'bottom-right'" json:"position"`
 	AvatarURL              string    `gorm:"type:varchar(512)" json:"avatar_url,omitempty"`
 	WhatsappRedirectNumber string    `gorm:"type:varchar(30)" json:"whatsapp_redirect_number,omitempty"`
+	// DestinationType controla pra onde a mensagem do widget vai:
+	//   - "inbox" (default): cria conversation webchat na inbox; operador
+	//     responde dali. Modo "widget puro" — bidirecional dentro do site.
+	//   - "redirect_instance": widget mostra CTA "Continuar no WhatsApp"
+	//     que abre wa.me/<número da instância destino> com a mensagem
+	//     pré-preenchida. Não cria conversation webchat — a conversa vai
+	//     acontecer via WhatsApp na instância referenciada.
+	// O número resolvido vem de DestinationInstanceID.PhoneJID; o legado
+	// WhatsappRedirectNumber continua funcionando como fallback até as
+	// configs serem migradas.
+	DestinationType        string    `gorm:"type:varchar(30);default:'inbox'" json:"destination_type"`
+	DestinationInstanceID  *uuid.UUID `gorm:"type:uuid" json:"destination_instance_id,omitempty"`
 	HelpDeskEnabled        bool      `gorm:"default:false" json:"help_desk_enabled"`
 	CreatedAt              time.Time `json:"created_at"`
 	UpdatedAt              time.Time `json:"updated_at"`
@@ -34,6 +46,9 @@ func (w *WebChatConfig) BeforeCreate(tx *gorm.DB) error {
 	}
 	if w.Position == "" {
 		w.Position = "bottom-right"
+	}
+	if w.DestinationType == "" {
+		w.DestinationType = "inbox"
 	}
 	return nil
 }
