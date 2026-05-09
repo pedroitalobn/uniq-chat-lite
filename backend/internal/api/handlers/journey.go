@@ -888,16 +888,42 @@ func (h *JourneyHandler) GetJourney(c *fiber.Ctx) error {
 
 	id := c.Params("id")
 	var journey models.Journey
-	// Filter relaxado: dono direto OU jornada cuja instância pertence
-	// a workspace do user. Antes era só user_id = ? — quebrava pra
-	// jornadas criadas no modelo antigo (legacy user_id) ou criadas
-	// por outro membro do mesmo workspace. Mesmo padrão usado em
-	// CreateJourney pra contagem (linha 72).
-	q := h.db.Preload("Instance").Where(
-		"id = ? AND (user_id = ? OR (instance_id <> '' AND instance_id IN (SELECT CAST(id AS TEXT) FROM instances WHERE workspace_id IN (SELECT workspace_id FROM user_workspaces WHERE user_id = ?))))",
-		id, userID.String(), userID,
-	)
-	if err := q.First(&journey).Error; err != nil {
+	// Fetch sem filtro de owner — fazemos a checagem de acesso em Go.
+	// Versão anterior fazia tudo num WHERE com subquery (`SELECT id::text
+	// FROM instances ... WHERE workspace_id IN (...)`) que falhava
+	// silenciosamente quando o tipo da coluna instances.id não casava
+	// com o tipo do instance_id (uuid vs text), devolvendo 404 mesmo
+	// pra jornada que o user acabou de criar. Resolver em Go é simples,
+	// portátil entre dialects e dá log decente quando nega acesso.
+	if err := h.db.Where("id = ?", id).First(&journey).Error; err != nil {
+		log.Warn().Err(err).Str("journey_id", id).Str("user_id", userID.String()).Msg("GetJourney: jornada não existe no banco")
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "jornada não encontrada"})
+	}
+
+	// Checagem de acesso: dono direto OU jornada cuja instance pertence
+	// a workspace do user. Resolvida em Go pra evitar mismatch de tipo
+	// uuid vs text na subquery (instance_id é string, instances.id é uuid).
+	allowed := journey.UserID == userID.String()
+	if !allowed && journey.InstanceID != "" {
+		var wsIDs []uuid.UUID
+		h.db.Table("user_workspaces").Where("user_id = ?", userID).Pluck("workspace_id", &wsIDs)
+		if len(wsIDs) > 0 {
+			var instUUID uuid.UUID
+			if parsed, perr := uuid.Parse(journey.InstanceID); perr == nil {
+				instUUID = parsed
+				var n int64
+				h.db.Table("instances").Where("id = ? AND workspace_id IN ?", instUUID, wsIDs).Count(&n)
+				allowed = n > 0
+			}
+		}
+	}
+	if !allowed {
+		log.Warn().
+			Str("journey_id", journey.ID).
+			Str("journey_user_id", journey.UserID).
+			Str("journey_instance_id", journey.InstanceID).
+			Str("requesting_user_id", userID.String()).
+			Msg("GetJourney: user sem acesso à jornada")
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "jornada não encontrada"})
 	}
 
