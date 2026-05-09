@@ -21,7 +21,9 @@ import { VariableInsertButton } from "@/components/campaigns/VariableInsertButto
 import { TemplateMediaUpload } from "@/components/waba/TemplateMediaUpload";
 import { FunnelOptionPicker, StageOptionPicker } from "@/components/crm/FunnelStagePicker";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { zonedTimeToUTC, detectBrowserTimezone, formatTimezoneLabel } from "@/lib/timezone";
+import { zonedTimeToUTC, detectBrowserTimezone } from "@/lib/timezone";
+import { TimezonePicker } from "@/components/ui/TimezonePicker";
+import { convertHHMMBetweenTimezones, currentOffsetLabel } from "@/lib/timezones";
 
 function fmtDate(s: string) {
   const d = new Date(s);
@@ -173,6 +175,7 @@ interface CampaignPrefill {
 
 function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => void; onCreated: () => void; prefill?: CampaignPrefill }) {
   const { currentWorkspace } = useWorkspace();
+  const { timezone: accountTz } = usePreferences();
   const [step, setStep] = useState(1);
 
   // Step 1
@@ -231,11 +234,6 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
 
   // Step 6: Schedule & safety
   const [startDate, setStartDate]         = useState("");
-  // Timezone — onde "as horas escolhidas pelo user" devem ser
-  // interpretadas. Default: TZ do workspace; se não houver, do browser.
-  // O user pode trocar (override pontual) com o seletor abaixo do
-  // datetime-local.
-  const [tz, setTz]                       = useState<string>("");
   const [endDate, setEndDate]             = useState("");
   const [timesTotal, setTimesTotal]       = useState(1);
   const [timesPerDay, setTimesPerDay]     = useState(1);
@@ -244,6 +242,10 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
   // — agora é array de {from, to} com precisão de minuto.
   // Empty = qualquer horário.
   const [scheduleWindows, setScheduleWindows] = useState<Array<{ from: string; to: string }>>([]);
+  // Timezone da campanha — vazio = usa workspace TZ. User pode escolher
+  // explícito quando o público-alvo está em outro fuso (ex: agência BR
+  // disparando pra Orlando → "America/New_York").
+  const [campaignTz, setCampaignTz] = useState<string>("");
   const [delayMin, setDelayMin]           = useState(5);
   const [delayMax, setDelayMax]           = useState(15);
   const [dailyLimit, setDailyLimit]       = useState(0);
@@ -273,12 +275,12 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
   const selectedInstance = instances.find((i) => i.id === instanceId);
   const isWABA = selectedInstance?.channel === "waba" || channel === "waba";
 
-  // Inicializa o TZ uma vez quando o workspace carrega — workspace.timezone
-  // tem prioridade; cai pro browser se workspace não expõe.
+  // Inicializa o campaignTz uma vez quando o workspace carrega — pega
+  // workspace.timezone (default da conta); fallback no browser.
   React.useEffect(() => {
-    if (tz) return;
+    if (campaignTz) return;
     const wsTz = (currentWorkspace as any)?.timezone as string | undefined;
-    setTz(wsTz || detectBrowserTimezone());
+    setCampaignTz(wsTz || detectBrowserTimezone());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWorkspace?.id]);
 
@@ -508,17 +510,17 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
         template_variables:   isWABA ? tplVars : undefined,
         template_header_url:  isWABA && tplHasMediaHeader ? tplHeaderURL : undefined,
         // datetime-local não tem TZ no string; interpretamos como hora
-        // local NO TZ DO USER (selecionado abaixo), não no TZ do browser.
+        // local NO campaignTz (TZ alvo do disparo), não no TZ do browser.
         // Sem isso, agendamento sai 3h fora pra user em SP usando navegador
         // em UTC, ou 4h fora se passou o horário de verão.
-        start_date:           startDate ? zonedTimeToUTC(startDate, tz).toISOString() : undefined,
-        end_date:             endDate   ? zonedTimeToUTC(endDate, tz).toISOString()   : undefined,
-        timezone:             tz || undefined,
+        start_date:           startDate ? zonedTimeToUTC(startDate, campaignTz).toISOString() : undefined,
+        end_date:             endDate   ? zonedTimeToUTC(endDate, campaignTz).toISOString()   : undefined,
         times_total:          timesTotal,
         times_per_day:        timesPerDay,
         // schedule_hours agora aceita janelas HH:MM (formato novo)
         // ou int array (legacy). Backend reconhece os dois.
         schedule_hours:       JSON.stringify(scheduleWindows),
+        time_zone:            campaignTz,
         delay_seconds:        delayMin,
         delay_min_seconds:    delayMin,
         delay_max_seconds:    delayMax,
@@ -1324,50 +1326,6 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                 </div>
               </div>
 
-              {/* Seletor de TZ — explicita pra qual fuso o user está
-                 agendando. Default vem do workspace; pode trocar pra
-                 caso de "moro em PT mas atendo cliente no BR". */}
-              <div>
-                <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>
-                  Fuso horário do agendamento
-                </label>
-                <select
-                  value={tz}
-                  onChange={(e) => setTz(e.target.value)}
-                  className="input-field w-full text-xs"
-                >
-                  {[
-                    "America/Sao_Paulo",
-                    "America/Recife",
-                    "America/Manaus",
-                    "America/Belem",
-                    "America/Fortaleza",
-                    "America/Bahia",
-                    "America/Cuiaba",
-                    "America/Rio_Branco",
-                    "America/Noronha",
-                    "America/New_York",
-                    "America/Los_Angeles",
-                    "America/Mexico_City",
-                    "America/Buenos_Aires",
-                    "America/Santiago",
-                    "Europe/Lisbon",
-                    "Europe/Madrid",
-                    "Europe/Paris",
-                    "Europe/London",
-                    "UTC",
-                  ].map((zone) => (
-                    <option key={zone} value={zone}>
-                      {zone === tz ? formatTimezoneLabel(zone) : zone}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 45%)" }}>
-                  As datas/horas acima são interpretadas neste fuso. Padrão é o
-                  do workspace; troque se estiver agendando pra outro local.
-                </p>
-              </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>Ações totais / destinatário</label>
@@ -1482,7 +1440,36 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                 </div>
 
                 <p className="text-[10px] mt-2" style={{ color: "hsl(240 8% 42%)" }}>
-                  Horários no fuso da sua conta. Janelas que cruzam meia-noite são suportadas (ex: 22:00-02:00).
+                  Janelas que cruzam meia-noite são suportadas (ex: 22:00-02:00).
+                </p>
+              </div>
+
+              {/* Fuso horário da campanha — independente da conta. Útil
+                  pra disparar pra outro fuso ("9h em Orlando" enquanto
+                  o user está em São Paulo). Vazio = usa o do workspace. */}
+              <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>
+                  Fuso horário do disparo
+                  <span className="ml-1.5 text-[10px]" style={{ color: "hsl(240 8% 42%)" }}>
+                    (opcional · padrão = workspace)
+                  </span>
+                </label>
+                <TimezonePicker
+                  value={campaignTz}
+                  onChange={setCampaignTz}
+                  placeholder="Padrão da conta — ou busque cidade do público"
+                />
+                {campaignTz && scheduleWindows.length > 0 && (
+                  <CampaignSchedulePreview
+                    campaignTz={campaignTz}
+                    accountTz={accountTz}
+                    windows={scheduleWindows}
+                  />
+                )}
+                <p className="text-[10px] mt-2" style={{ color: "hsl(240 8% 42%)" }}>
+                  As janelas acima serão avaliadas neste fuso. Ex: <span className="font-mono">9:00–18:00</span> com
+                  fuso <span className="font-mono">America/New_York</span> dispara entre 9h e 18h horário de NY,
+                  mesmo se sua conta está em São Paulo.
                 </p>
               </div>
 
@@ -2296,6 +2283,49 @@ export default function CampaignsPage() {
           onCreated={() => queryClient.invalidateQueries({ queryKey: ["campaigns"] })}
           prefill={prefill} />
       )}
+    </div>
+  );
+}
+
+
+// CampaignSchedulePreview — quando o user escolhe um TZ diferente da
+// conta, mostra side-by-side o que cada janela vira no fuso da conta.
+// Ex: "9:00–18:00 em America/New_York = 11:00–20:00 no seu horário (BRT)".
+// Sem isso o user nunca tinha certeza se "9h" significava 9 da manhã na
+// origem ou 9 da manhã no destino.
+function CampaignSchedulePreview({ campaignTz, accountTz, windows }: {
+  campaignTz: string;
+  accountTz: string;
+  windows: Array<{ from: string; to: string }>;
+}) {
+  if (!campaignTz || !accountTz || campaignTz === accountTz) return null;
+  const campOff = currentOffsetLabel(campaignTz);
+  const accOff = currentOffsetLabel(accountTz);
+  return (
+    <div
+      className="mt-2 rounded-lg p-2.5 text-[11px] space-y-1"
+      style={{
+        background: "rgba(96,165,250,0.06)",
+        border: "1px solid rgba(96,165,250,0.20)",
+        color: "var(--text-2)",
+      }}
+    >
+      <p className="font-medium" style={{ color: "var(--text-1)" }}>
+        Equivalência no seu horário ({accountTz}, {accOff})
+      </p>
+      {windows.map((w, i) => {
+        const fromAcc = convertHHMMBetweenTimezones(w.from, campaignTz, accountTz);
+        const toAcc = convertHHMMBetweenTimezones(w.to, campaignTz, accountTz);
+        return (
+          <div key={i} className="flex items-center gap-2 font-mono tabular-nums">
+            <span style={{ color: "#60a5fa" }}>{w.from}–{w.to}</span>
+            <span style={{ color: "var(--text-3)" }}>({campOff})</span>
+            <span style={{ color: "var(--text-3)" }}>=</span>
+            <span style={{ color: "var(--text-1)" }}>{fromAcc}–{toAcc}</span>
+            <span style={{ color: "var(--text-3)" }}>(seu horário)</span>
+          </div>
+        );
+      })}
     </div>
   );
 }

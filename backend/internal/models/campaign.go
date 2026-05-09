@@ -81,13 +81,13 @@ type Campaign struct {
 	// Scheduling window
 	StartDate *time.Time `json:"start_date,omitempty"`
 	EndDate   *time.Time `json:"end_date,omitempty"`
-	// Timezone — IANA TZ (ex: "America/Sao_Paulo") em que as datas/horas
-	// foram informadas pelo user. start_date é convertido pra UTC pra
-	// armazenar (o tipo TIMESTAMPTZ do Postgres já faz isso), mas
-	// schedule_hours fica como horário LOCAL nesse TZ. Sem este campo,
-	// o scheduler caía no TZ do workspace (default São Paulo) — quando
-	// usuário fora do BR agendava, batia em horário errado.
-	Timezone string `gorm:"type:varchar(64)" json:"timezone,omitempty"`
+	// TimeZone — IANA TZ (ex: "America/Sao_Paulo") em que datas/horas
+	// foram informadas pelo user. start_date vira UTC no DB (TIMESTAMPTZ),
+	// mas schedule_hours fica como horário LOCAL nesse TZ. Permite a
+	// agência em SP disparar campanha pra contatos de Orlando escolhendo
+	// "America/New_York" e o "10:00" vira horário de Orlando. Vazio =
+	// fallback pro Workspace.Timezone → São Paulo → UTC.
+	TimeZone string `gorm:"type:varchar(64)" json:"time_zone,omitempty"`
 
 	// Frequency
 	TimesTotal    int    `gorm:"default:1" json:"times_total"`

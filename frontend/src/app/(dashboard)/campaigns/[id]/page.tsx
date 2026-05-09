@@ -300,7 +300,10 @@ export default function CampaignDetailPage() {
             {(campaign.start_date || campaign.schedule_hours) && (
               <span className="text-[10px] px-2 py-0.5 rounded-lg font-mono flex items-center gap-1"
                 style={{ background: "rgba(96,165,250,0.08)", color: "#60a5fa", border: "1px solid rgba(96,165,250,0.15)" }}>
-                🕐 {timezone}
+                🕐 {campaign.time_zone || timezone}
+                {campaign.time_zone && campaign.time_zone !== timezone && (
+                  <span className="opacity-60">(disparo)</span>
+                )}
               </span>
             )}
           </div>

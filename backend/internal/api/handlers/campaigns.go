@@ -141,17 +141,17 @@ func validateOrFallbackTZ(tz string) string {
 	return ""
 }
 
-// workspaceLocation devolve o time.Location associado à campanha.
-// Hierarquia de fallback:
-//   1. Campaign.Timezone (informado pelo user no momento do agendamento)
-//   2. Workspace.Timezone (default global do workspace)
-//   3. America/Sao_Paulo (último recurso pra preservar comportamento legado)
-//   4. UTC se o nome da TZ não for resolvível
+// workspaceLocation devolve o time.Location pra avaliar agendamento da
+// campanha. Cascade:
+//   1. Campaign.TimeZone (escolha explícita do user no setup) — permite
+//      disparar pra contatos em fuso diferente da conta. Ex: agência em
+//      São Paulo agendando campanha pra clientes em Orlando, escolhe
+//      "America/New_York" e o "10:00" do schedule é horário de Orlando.
+//   2. Workspace.Timezone (default da conta).
+//   3. America/Sao_Paulo.
+//   4. UTC.
 func (h *CampaignHandler) workspaceLocation(c *models.Campaign) *time.Location {
-	tzName := ""
-	if c.Timezone != "" {
-		tzName = c.Timezone
-	}
+	tzName := strings.TrimSpace(c.TimeZone)
 	if tzName == "" && c.WorkspaceID != nil {
 		var ws models.Workspace
 		if err := h.db.Select("timezone").First(&ws, "id = ?", c.WorkspaceID).Error; err == nil && ws.Timezone != "" {
@@ -510,13 +510,23 @@ func (h *CampaignHandler) List(c *fiber.Ctx) error {
 func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 
-	// Plan limit enforcement — antes Free user (MaxCampaigns=0) criava
-	// ilimitadas campanhas e elas rodavam normalmente no scheduler.
-	// MaxCampaigns: -1 = ilimitado, 0 = bloqueado, N = limite.
+	// Plan limit enforcement — checa AllowCampaigns (feature flag) +
+	// MaxCampaigns (cap quantitativo). Combinação esperada:
+	//   AllowCampaigns=false                 → bloqueado (route já barra
+	//                                          via RequireFeature, mas
+	//                                          defesa em profundidade).
+	//   AllowCampaigns=true, MaxCampaigns=-1 → ilimitado.
+	//   AllowCampaigns=true, MaxCampaigns=N>0→ até N ativas.
+	//   AllowCampaigns=true, MaxCampaigns=0  → ilimitado (feature ligada
+	//                                          sem cap específico = não
+	//                                          faz sentido ser zero).
+	// Antes: MaxCampaigns=0 retornava plan_does_not_allow_campaigns
+	// MESMO com AllowCampaigns=true — confuso pra plano Business onde
+	// admin liga a feature mas esquece de setar o cap, e bloqueia tudo.
 	if user != nil && user.PlanID != nil {
 		var plan models.Plan
 		if err := h.db.First(&plan, "id = ?", *user.PlanID).Error; err == nil {
-			if plan.MaxCampaigns == 0 {
+			if !plan.AllowCampaigns {
 				return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
 					"error":   "plan_does_not_allow_campaigns",
 					"message": "seu plano não permite criar campanhas — faça upgrade",
@@ -559,10 +569,10 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		TemplateHeaderURL string            `json:"template_header_url"`
 		StartDate     *time.Time `json:"start_date"`
 		EndDate       *time.Time `json:"end_date"`
-		// Timezone — IANA TZ em que start_date+schedule_hours foram
+		// TimeZone — IANA TZ em que start_date+schedule_hours foram
 		// escolhidos pelo user. Frontend converte datetime-local pra
 		// UTC usando este TZ; backend usa pra avaliar schedule_hours.
-		Timezone      string     `json:"timezone"`
+		TimeZone      string     `json:"time_zone"`
 		TimesTotal    int        `json:"times_total"`
 		TimesPerDay   int        `json:"times_per_day"`
 		ScheduleHours string     `json:"schedule_hours"`
@@ -715,7 +725,10 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		TemplateHeaderURL:    req.TemplateHeaderURL,
 		StartDate:            req.StartDate,
 		EndDate:              req.EndDate,
-		Timezone:             validateOrFallbackTZ(req.Timezone),
+		// validateOrFallbackTZ ignora valores que não resolvem em
+		// time.LoadLocation — typo do user não quebra o scheduler
+		// silenciosamente; o workspaceLocation cai pro workspace tz.
+		TimeZone:             validateOrFallbackTZ(req.TimeZone),
 		TimesTotal:           timesTotal,
 		TimesPerDay:          timesPerDay,
 		ScheduleHours:        schedHours,
