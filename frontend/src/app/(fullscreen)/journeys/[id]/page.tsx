@@ -40,6 +40,7 @@ import {
   UserPlus,
   Mail,
   Smartphone,
+  BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
 import { journeysApi } from "@/lib/api";
@@ -289,6 +290,19 @@ export default function JourneyConversationalBuilderPage() {
         </div>
 
         <div className="ml-auto flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={() => router.push(`/journeys/${params.id}/analytics`)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg"
+            style={{
+              background: "var(--surface-2)",
+              border: "1px solid var(--surface-border)",
+              color: "var(--text-2)",
+            }}
+            title="Ver dashboard de analytics"
+          >
+            <BarChart3 className="w-3 h-3" />
+            <span className="hidden sm:inline">Analytics</span>
+          </button>
           <button
             onClick={() => setEnrollOpen(true)}
             className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg"

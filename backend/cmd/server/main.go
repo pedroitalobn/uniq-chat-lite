@@ -460,6 +460,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.Journey{},
 		&models.JourneyEnrollment{},
 		&models.JourneyDeferredStep{},
+		&models.JourneyStepMetric{},
 		&models.JourneyExecution{},
 		&models.Funnel{},
 		&models.FunnelStage{},

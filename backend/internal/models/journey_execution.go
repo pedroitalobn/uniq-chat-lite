@@ -40,6 +40,11 @@ type JourneyExecution struct {
 	Messages     string                 `gorm:"type:text;default:'[]'" json:"messages,omitempty"`
 	Metadata     string                 `gorm:"type:text;default:'{}'" json:"metadata,omitempty"`
 	ErrorMessage string                 `gorm:"type:text" json:"error_message,omitempty"`
+	// IsHoldout — true quando o contato foi sorteado pro grupo de
+	// controle (não recebe nenhuma mensagem). Status fica "completed"
+	// imediatamente após o sorteio. Analytics compara conversão entre
+	// is_holdout=true vs false pra medir lift real do journey.
+	IsHoldout    bool                   `gorm:"default:false;index" json:"is_holdout"`
 	StartedAt    time.Time              `json:"started_at"`
 	CompletedAt  *time.Time             `json:"completed_at,omitempty"`
 	UpdatedAt    time.Time              `json:"updated_at"`

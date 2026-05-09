@@ -1531,6 +1531,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	// criados pelo worker via segment-as-trigger.
 	journeys.Post("/:id/enroll", journeyH.EnrollContacts)
 	journeys.Get("/:id/enrollments", journeyH.ListEnrollments)
+	// Analytics dashboard (Fase 5) — funnel + totals + holdout lift.
+	journeys.Get("/:id/analytics", journeyH.GetAnalytics)
 
 	// Help Desk (knowledge base)
 	// Help Desk routes ficam registradas APENAS no chain top-level

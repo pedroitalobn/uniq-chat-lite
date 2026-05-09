@@ -42,6 +42,13 @@ type Journey struct {
 	// "never": só uma vez. "always": cada vez que o trigger bate.
 	// "after_days:N": só depois de N dias do último run.
 	ReEntryRule     string     `gorm:"type:varchar(40);default:'never'" json:"re_entry_rule"`
+	// HoldoutPercent — % de contatos que ENTRAM no journey mas NÃO
+	// recebem nada (grupo de controle). Sorteio random no startNew
+	// usa rand < HoldoutPercent/100. Útil pra medir lift real do
+	// journey: comparar conversão de quem recebeu vs quem ficou de
+	// fora. Range válido: 0..50 (acima disso, mais holdout que
+	// tratamento — não faz sentido). Default 0 (sem holdout).
+	HoldoutPercent  int        `gorm:"default:0" json:"holdout_percent"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
