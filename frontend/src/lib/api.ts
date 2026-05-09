@@ -785,6 +785,19 @@ export const linkPreviewApi = {
 // WABA (WhatsApp API / Cloud API oficial Meta) — Tech Provider flow.
 // Endpoints: get embedded signup URL, callback, listar/criar/deletar
 // templates, register phone (PIN), subscribe webhooks.
+export interface WABATemplateDefault {
+  id: string;
+  instance_id: string;
+  template_name: string;
+  template_language: string;
+  header_media_url?: string;
+  header_filename?: string;
+  header_latitude?: number;
+  header_longitude?: number;
+  header_location_name?: string;
+  header_location_address?: string;
+}
+
 export const wabaApi = {
   getAuthURL: () => api.get(`/v1/waba/auth-url`),
   callback: (code: string) => api.post(`/v1/waba/callback`, { code }),
@@ -804,6 +817,25 @@ export const wabaApi = {
     api.post(`/v1/instances/${instanceId}/waba/templates/${templateId}`, data),
   deleteTemplate: (instanceId: string, name: string) =>
     api.delete(`/v1/instances/${instanceId}/waba/templates/${name}`),
+  // Template defaults — defaults persistidos por (instance, name, language).
+  // Frontend usa pra auto-preencher URL de mídia/local em cada envio.
+  templateDefaults: (instanceId: string) =>
+    api.get<{ items: WABATemplateDefault[] }>(
+      `/v1/instances/${instanceId}/waba/templates/defaults`,
+    ),
+  saveTemplateDefault: (
+    instanceId: string,
+    data: {
+      template_name: string;
+      template_language: string;
+      header_media_url?: string;
+      header_filename?: string;
+      header_latitude?: number;
+      header_longitude?: number;
+      header_location_name?: string;
+      header_location_address?: string;
+    },
+  ) => api.put(`/v1/instances/${instanceId}/waba/templates/defaults`, data),
   register: (instanceId: string, pin: string) =>
     api.post(`/v1/instances/${instanceId}/waba/register`, { pin }),
   subscribe: (instanceId: string) =>

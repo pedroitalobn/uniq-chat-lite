@@ -470,6 +470,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.GlobalCommunicationSettings{},
 		// WABA
 		&models.WABAInstance{},
+		&models.WABATemplateDefault{},
 		// Ticketing / Atendimento
 		&models.Department{},
 		&models.Team{},
