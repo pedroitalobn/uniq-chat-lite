@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { Settings, Sparkles, Loader2, Save, Power } from "lucide-react";
+import { Settings, Sparkles, Loader2, Save, Power, MessageSquareDashed } from "lucide-react";
 import { AgentFormProvider, useAgentFormContext } from "../../_shared/AgentFormContext";
+import { ChatPreviewPanel } from "./_components/ChatPreviewPanel";
 
 // Layout do escopo "agente" — engloba Studio (/) e Settings (/settings).
 // O AgentFormProvider compartilha o form entre as 2 páginas: Save e o
@@ -27,6 +29,7 @@ function Inner({ children }: { children: React.ReactNode }) {
   const isSettings = pathname.endsWith("/settings");
   const agentName = form.agent_name || (isPrimary ? "Agente primário" : "Agente");
   const active = !!form.is_active;
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   return (
     <div className="flex flex-col h-full">
@@ -88,6 +91,22 @@ function Inner({ children }: { children: React.ReactNode }) {
 
           <span className="w-px h-5 mx-1" style={{ background: "var(--surface-border)" }} />
 
+          {/* Botão Testar — abre o painel de preview ao vivo */}
+          <button
+            type="button"
+            onClick={() => setPreviewOpen(true)}
+            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors"
+            style={{
+              background: previewOpen ? "rgba(0,212,106,0.12)" : "var(--surface-2)",
+              border: `1px solid ${previewOpen ? "rgba(0,212,106,0.30)" : "var(--surface-border)"}`,
+              color: previewOpen ? "var(--green)" : "var(--text-2)",
+            }}
+            title="Testar agente (preview ao vivo, sem persistir)"
+          >
+            <MessageSquareDashed className="w-3 h-3" />
+            Testar
+          </button>
+
           {/* Toggle de ativação — independente do save geral */}
           <button
             type="button"
@@ -128,6 +147,18 @@ function Inner({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto">{children}</div>
+
+      {/* Slide-over de preview — vive no layout pra Studio E Settings
+         poderem abrir, e o estado da conversa não some ao trocar de
+         tab (componente fica montado, painel só esconde via translate). */}
+      <ChatPreviewPanel
+        instanceId={params.instanceId}
+        agentId={params.agentId}
+        agentName={agentName}
+        open={previewOpen}
+        dirty={dirty}
+        onClose={() => setPreviewOpen(false)}
+      />
     </div>
   );
 }

@@ -274,6 +274,10 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	// OPENAI_API_KEY ausente).
 	llmService := services.NewLLMService()
 	llmService.SetDB(db)
+	// Injeta o LLM no integrationH pra alimentar o endpoint de preview
+	// de agente — só funciona se a llmService já existir, então fica
+	// depois da criação dela.
+	integrationH.SetLLM(llmService)
 	helpDeskH := handlers.NewHelpDeskHandler(db, llmService)
 	webChatH := handlers.NewWebChatHandler(db, llmService)
 	toolsH := handlers.NewToolsHandler(db, manager)
@@ -1535,6 +1539,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	instance.Put("/agent", integrationH.UpdateAgent)
 	instance.Post("/agent/assets", integrationH.UploadAgentAsset)
 	instance.Delete("/agent/assets/:assetId", integrationH.DeleteAgentAsset)
+	// Preview / dry-run — chama a LLM com a config salva sem persistir
+	// nada. Suporta histórico in-memory passado pelo cliente.
+	instance.Post("/agent/preview", integrationH.PreviewAgent)
 	// Sprint 9 — RAG ingestion sem upload de arquivo
 	instance.Post("/agent/ingest-url", integrationH.IngestAgentURL)
 	instance.Post("/agent/ingest-text", integrationH.IngestAgentText)
