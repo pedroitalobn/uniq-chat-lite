@@ -21,6 +21,7 @@ import { VariableInsertButton } from "@/components/campaigns/VariableInsertButto
 import { TemplateMediaUpload } from "@/components/waba/TemplateMediaUpload";
 import { FunnelOptionPicker, StageOptionPicker } from "@/components/crm/FunnelStagePicker";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { zonedTimeToUTC, detectBrowserTimezone, formatTimezoneLabel } from "@/lib/timezone";
 
 function fmtDate(s: string) {
   const d = new Date(s);
@@ -230,6 +231,11 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
 
   // Step 6: Schedule & safety
   const [startDate, setStartDate]         = useState("");
+  // Timezone — onde "as horas escolhidas pelo user" devem ser
+  // interpretadas. Default: TZ do workspace; se não houver, do browser.
+  // O user pode trocar (override pontual) com o seletor abaixo do
+  // datetime-local.
+  const [tz, setTz]                       = useState<string>("");
   const [endDate, setEndDate]             = useState("");
   const [timesTotal, setTimesTotal]       = useState(1);
   const [timesPerDay, setTimesPerDay]     = useState(1);
@@ -266,6 +272,15 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
 
   const selectedInstance = instances.find((i) => i.id === instanceId);
   const isWABA = selectedInstance?.channel === "waba" || channel === "waba";
+
+  // Inicializa o TZ uma vez quando o workspace carrega — workspace.timezone
+  // tem prioridade; cai pro browser se workspace não expõe.
+  React.useEffect(() => {
+    if (tz) return;
+    const wsTz = (currentWorkspace as any)?.timezone as string | undefined;
+    setTz(wsTz || detectBrowserTimezone());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentWorkspace?.id]);
 
   const { data: groupsResp, isLoading: groupsLoading, error: groupsError, refetch: refetchGroups } = useQuery<{ groups: Group[]; hint?: string }, Error>({
     queryKey: ["groups", instanceId],
@@ -492,8 +507,13 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
         template_language:    isWABA ? tplLang : undefined,
         template_variables:   isWABA ? tplVars : undefined,
         template_header_url:  isWABA && tplHasMediaHeader ? tplHeaderURL : undefined,
-        start_date:           startDate ? new Date(startDate).toISOString() : undefined,
-        end_date:             endDate   ? new Date(endDate).toISOString()   : undefined,
+        // datetime-local não tem TZ no string; interpretamos como hora
+        // local NO TZ DO USER (selecionado abaixo), não no TZ do browser.
+        // Sem isso, agendamento sai 3h fora pra user em SP usando navegador
+        // em UTC, ou 4h fora se passou o horário de verão.
+        start_date:           startDate ? zonedTimeToUTC(startDate, tz).toISOString() : undefined,
+        end_date:             endDate   ? zonedTimeToUTC(endDate, tz).toISOString()   : undefined,
+        timezone:             tz || undefined,
         times_total:          timesTotal,
         times_per_day:        timesPerDay,
         // schedule_hours agora aceita janelas HH:MM (formato novo)
@@ -1302,6 +1322,50 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                   <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>Data de fim</label>
                   <input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="input-field w-full text-xs" />
                 </div>
+              </div>
+
+              {/* Seletor de TZ — explicita pra qual fuso o user está
+                 agendando. Default vem do workspace; pode trocar pra
+                 caso de "moro em PT mas atendo cliente no BR". */}
+              <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>
+                  Fuso horário do agendamento
+                </label>
+                <select
+                  value={tz}
+                  onChange={(e) => setTz(e.target.value)}
+                  className="input-field w-full text-xs"
+                >
+                  {[
+                    "America/Sao_Paulo",
+                    "America/Recife",
+                    "America/Manaus",
+                    "America/Belem",
+                    "America/Fortaleza",
+                    "America/Bahia",
+                    "America/Cuiaba",
+                    "America/Rio_Branco",
+                    "America/Noronha",
+                    "America/New_York",
+                    "America/Los_Angeles",
+                    "America/Mexico_City",
+                    "America/Buenos_Aires",
+                    "America/Santiago",
+                    "Europe/Lisbon",
+                    "Europe/Madrid",
+                    "Europe/Paris",
+                    "Europe/London",
+                    "UTC",
+                  ].map((zone) => (
+                    <option key={zone} value={zone}>
+                      {zone === tz ? formatTimezoneLabel(zone) : zone}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 45%)" }}>
+                  As datas/horas acima são interpretadas neste fuso. Padrão é o
+                  do workspace; troque se estiver agendando pra outro local.
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

@@ -126,11 +126,33 @@ func (h *CampaignHandler) evaluateCampaign(c *models.Campaign, now time.Time, _ 
 	return ""
 }
 
-// workspaceLocation devolve o time.Location do workspace dono da
-// campanha. Fallback America/Sao_Paulo, depois UTC.
+// validateOrFallbackTZ — aceita o TZ informado pelo user só se ele
+// resolve via time.LoadLocation. Caso contrário devolve string vazia
+// (workspaceLocation cai pro workspace tz). Evita que typo do user
+// quebre o scheduler silenciosamente.
+func validateOrFallbackTZ(tz string) string {
+	tz = strings.TrimSpace(tz)
+	if tz == "" {
+		return ""
+	}
+	if _, err := time.LoadLocation(tz); err == nil {
+		return tz
+	}
+	return ""
+}
+
+// workspaceLocation devolve o time.Location associado à campanha.
+// Hierarquia de fallback:
+//   1. Campaign.Timezone (informado pelo user no momento do agendamento)
+//   2. Workspace.Timezone (default global do workspace)
+//   3. America/Sao_Paulo (último recurso pra preservar comportamento legado)
+//   4. UTC se o nome da TZ não for resolvível
 func (h *CampaignHandler) workspaceLocation(c *models.Campaign) *time.Location {
 	tzName := ""
-	if c.WorkspaceID != nil {
+	if c.Timezone != "" {
+		tzName = c.Timezone
+	}
+	if tzName == "" && c.WorkspaceID != nil {
 		var ws models.Workspace
 		if err := h.db.Select("timezone").First(&ws, "id = ?", c.WorkspaceID).Error; err == nil && ws.Timezone != "" {
 			tzName = ws.Timezone
@@ -537,6 +559,10 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		TemplateHeaderURL string            `json:"template_header_url"`
 		StartDate     *time.Time `json:"start_date"`
 		EndDate       *time.Time `json:"end_date"`
+		// Timezone — IANA TZ em que start_date+schedule_hours foram
+		// escolhidos pelo user. Frontend converte datetime-local pra
+		// UTC usando este TZ; backend usa pra avaliar schedule_hours.
+		Timezone      string     `json:"timezone"`
 		TimesTotal    int        `json:"times_total"`
 		TimesPerDay   int        `json:"times_per_day"`
 		ScheduleHours string     `json:"schedule_hours"`
@@ -689,6 +715,7 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		TemplateHeaderURL:    req.TemplateHeaderURL,
 		StartDate:            req.StartDate,
 		EndDate:              req.EndDate,
+		Timezone:             validateOrFallbackTZ(req.Timezone),
 		TimesTotal:           timesTotal,
 		TimesPerDay:          timesPerDay,
 		ScheduleHours:        schedHours,

@@ -420,6 +420,10 @@ export interface Workspace {
   // o default visual (#7c3aed + Building2).
   color?: string;
   icon?: string;
+  // IANA TZ (ex: "America/Sao_Paulo"). Default no backend é
+  // America/Sao_Paulo quando não setado. Usado pra interpretar
+  // datetime-local em campanhas e outras programações.
+  timezone?: string;
   plan_id?: string;
   is_active: boolean;
   is_owner: boolean;
