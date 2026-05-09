@@ -90,9 +90,9 @@ export function Sidebar() {
   const isAdmin = isSuperAdmin;
   const isBeta = !!(session?.user?.is_beta) || isSuperAdmin;
   // Validate role — bypass enxuto pra contas restritas a WABA. Esconde
-  // tudo que não é necessário pro fluxo: Agentes, CRM, Shops, Servers
-  // e Integrações somem do menu (também são bloqueados/filtrados no
-  // backend onde aplicável). Ainda vê Inbox/Campanhas/Workspace pra
+  // tudo que não é necessário pro fluxo: Uniq AI, Agentes, CRM, Shops,
+  // Servers e Integrações somem do menu (também são bloqueados/filtrados
+  // no backend onde aplicável). Ainda vê Inbox/Campanhas/Workspace pra
   // operar a conversa em si.
   const isValidate = session?.user?.role === "validate";
   const planName = (session?.user?.plan as { name?: string } | undefined)?.name ?? session?.user?.role;
@@ -172,7 +172,7 @@ export function Sidebar() {
     // estavam atrás de `isBeta` antes — agora respeitam plan.allow_*.
     // Adicionar planAllows nos demais sobre-bloqueia clientes pagantes
     // cujo session.user.plan não traz a flag explicitamente.
-    { href: "/uniq-ai",      label: "Uniq AI",             icon: Sparkles,        exact: false, show: canSeeUniqAi },
+    { href: "/uniq-ai",      label: "Uniq AI",             icon: Sparkles,        exact: false, show: canSeeUniqAi && !isValidate },
     { href: "/dashboard",    label: t("nav_dashboard"),    icon: LayoutDashboard, exact: true,  show: canSeeDashboard },
     { href: "/inbox",        label: t("nav_inbox"),        icon: Headset,         exact: false, show: canSeeInbox },
     { href: "/crm",          label: t("nav_crm"),          icon: Contact,         exact: false, show: canSeeCRM && !isValidate },
