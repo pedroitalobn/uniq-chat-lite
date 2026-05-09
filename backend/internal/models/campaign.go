@@ -81,10 +81,12 @@ type Campaign struct {
 	// Scheduling window
 	StartDate *time.Time `json:"start_date,omitempty"`
 	EndDate   *time.Time `json:"end_date,omitempty"`
-	// TimeZone — IANA tz pra avaliar schedule_hours e quiet_hours.
-	// Ex: "America/New_York" pra disparar campanha pra contatos de
-	// Orlando mesmo com a conta no horário de Brasília. Vazio = usa
-	// o timezone do workspace (fallback Brasília → UTC).
+	// TimeZone — IANA TZ (ex: "America/Sao_Paulo") em que datas/horas
+	// foram informadas pelo user. start_date vira UTC no DB (TIMESTAMPTZ),
+	// mas schedule_hours fica como horário LOCAL nesse TZ. Permite a
+	// agência em SP disparar campanha pra contatos de Orlando escolhendo
+	// "America/New_York" e o "10:00" vira horário de Orlando. Vazio =
+	// fallback pro Workspace.Timezone → São Paulo → UTC.
 	TimeZone string `gorm:"type:varchar(64)" json:"time_zone,omitempty"`
 
 	// Frequency

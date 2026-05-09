@@ -126,6 +126,21 @@ func (h *CampaignHandler) evaluateCampaign(c *models.Campaign, now time.Time, _ 
 	return ""
 }
 
+// validateOrFallbackTZ — aceita o TZ informado pelo user só se ele
+// resolve via time.LoadLocation. Caso contrário devolve string vazia
+// (workspaceLocation cai pro workspace tz). Evita que typo do user
+// quebre o scheduler silenciosamente.
+func validateOrFallbackTZ(tz string) string {
+	tz = strings.TrimSpace(tz)
+	if tz == "" {
+		return ""
+	}
+	if _, err := time.LoadLocation(tz); err == nil {
+		return tz
+	}
+	return ""
+}
+
 // workspaceLocation devolve o time.Location pra avaliar agendamento da
 // campanha. Cascade:
 //   1. Campaign.TimeZone (escolha explícita do user no setup) — permite
@@ -554,10 +569,13 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		TemplateHeaderURL string            `json:"template_header_url"`
 		StartDate     *time.Time `json:"start_date"`
 		EndDate       *time.Time `json:"end_date"`
+		// TimeZone — IANA TZ em que start_date+schedule_hours foram
+		// escolhidos pelo user. Frontend converte datetime-local pra
+		// UTC usando este TZ; backend usa pra avaliar schedule_hours.
+		TimeZone      string     `json:"time_zone"`
 		TimesTotal    int        `json:"times_total"`
 		TimesPerDay   int        `json:"times_per_day"`
 		ScheduleHours string     `json:"schedule_hours"`
-		TimeZone      string     `json:"time_zone"`
 		// Safety / rate limiting
 		DelaySeconds         int `json:"delay_seconds"`
 		DelayMinSeconds      int `json:"delay_min_seconds"`
@@ -707,10 +725,13 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		TemplateHeaderURL:    req.TemplateHeaderURL,
 		StartDate:            req.StartDate,
 		EndDate:              req.EndDate,
+		// validateOrFallbackTZ ignora valores que não resolvem em
+		// time.LoadLocation — typo do user não quebra o scheduler
+		// silenciosamente; o workspaceLocation cai pro workspace tz.
+		TimeZone:             validateOrFallbackTZ(req.TimeZone),
 		TimesTotal:           timesTotal,
 		TimesPerDay:          timesPerDay,
 		ScheduleHours:        schedHours,
-		TimeZone:             strings.TrimSpace(req.TimeZone),
 		DelaySeconds:         delay,
 		DelayMinSeconds:      delayMin,
 		DelayMaxSeconds:      delayMax,

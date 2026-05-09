@@ -715,6 +715,11 @@ func (h *ConversationHandler) SendConstraints(c *fiber.Ctx) error {
 	type cons struct {
 		Channel          string   `json:"channel"`
 		WindowOpen       bool     `json:"window_open"`
+		// WindowExpiresAt — timestamp em que a janela 24h fecha. Só
+		// preenchido pra canais que têm essa restrição (WABA, Instagram).
+		// Frontend usa pra mostrar countdown no header da conversa e
+		// piscar quando estiver perto do fim.
+		WindowExpiresAt  *time.Time `json:"window_expires_at,omitempty"`
 		AllowsTemplate   bool     `json:"allows_template"`
 		SupportsReply    bool     `json:"supports_reply"`
 		SupportsReaction bool     `json:"supports_reaction"`
@@ -726,6 +731,14 @@ func (h *ConversationHandler) SendConstraints(c *fiber.Ctx) error {
 	out := cons{
 		Channel:    string(inst.Channel),
 		WindowOpen: windowOpen,
+	}
+	// Janela 24h tem efeito real só em WABA + Instagram (whatsmeow é
+	// E2E direto, sem janela). Quando temos LastCustomerMsgAt, devolve
+	// o timestamp de expiração pro front renderizar countdown.
+	if (inst.Channel == models.ChannelWABA || inst.Channel == models.ChannelInstagram) &&
+		conv.LastCustomerMsgAt != nil {
+		expiry := conv.LastCustomerMsgAt.Add(24 * time.Hour)
+		out.WindowExpiresAt = &expiry
 	}
 	switch inst.Channel {
 	case models.ChannelWhatsApp:

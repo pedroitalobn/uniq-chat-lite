@@ -21,6 +21,7 @@ import { VariableInsertButton } from "@/components/campaigns/VariableInsertButto
 import { TemplateMediaUpload } from "@/components/waba/TemplateMediaUpload";
 import { FunnelOptionPicker, StageOptionPicker } from "@/components/crm/FunnelStagePicker";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { zonedTimeToUTC, detectBrowserTimezone } from "@/lib/timezone";
 import { TimezonePicker } from "@/components/ui/TimezonePicker";
 import { convertHHMMBetweenTimezones, currentOffsetLabel } from "@/lib/timezones";
 
@@ -274,6 +275,15 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
   const selectedInstance = instances.find((i) => i.id === instanceId);
   const isWABA = selectedInstance?.channel === "waba" || channel === "waba";
 
+  // Inicializa o campaignTz uma vez quando o workspace carrega — pega
+  // workspace.timezone (default da conta); fallback no browser.
+  React.useEffect(() => {
+    if (campaignTz) return;
+    const wsTz = (currentWorkspace as any)?.timezone as string | undefined;
+    setCampaignTz(wsTz || detectBrowserTimezone());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentWorkspace?.id]);
+
   const { data: groupsResp, isLoading: groupsLoading, error: groupsError, refetch: refetchGroups } = useQuery<{ groups: Group[]; hint?: string }, Error>({
     queryKey: ["groups", instanceId],
     queryFn: async () => {
@@ -499,8 +509,12 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
         template_language:    isWABA ? tplLang : undefined,
         template_variables:   isWABA ? tplVars : undefined,
         template_header_url:  isWABA && tplHasMediaHeader ? tplHeaderURL : undefined,
-        start_date:           startDate ? new Date(startDate).toISOString() : undefined,
-        end_date:             endDate   ? new Date(endDate).toISOString()   : undefined,
+        // datetime-local não tem TZ no string; interpretamos como hora
+        // local NO campaignTz (TZ alvo do disparo), não no TZ do browser.
+        // Sem isso, agendamento sai 3h fora pra user em SP usando navegador
+        // em UTC, ou 4h fora se passou o horário de verão.
+        start_date:           startDate ? zonedTimeToUTC(startDate, campaignTz).toISOString() : undefined,
+        end_date:             endDate   ? zonedTimeToUTC(endDate, campaignTz).toISOString()   : undefined,
         times_total:          timesTotal,
         times_per_day:        timesPerDay,
         // schedule_hours agora aceita janelas HH:MM (formato novo)
