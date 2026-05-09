@@ -163,6 +163,11 @@ type CampaignRecipient struct {
 	SentAt      *time.Time `json:"sent_at,omitempty"`
 	DeliveredAt *time.Time `json:"delivered_at,omitempty"` // webhook delivered (WABA)
 	ReadAt      *time.Time `json:"read_at,omitempty"`      // webhook read (WABA)
+	// ExtraFields — colunas extras vindas do CSV/paste (ex: email, cidade,
+	// codigo_promo). Disponíveis pra render Liquid no template via
+	// `{{ csv.<coluna> }}` / `{{ extra.<coluna> }}`. JSON blob {key:value}.
+	// Sem schema fixo — o que vier no upload fica disponível.
+	ExtraFields string `gorm:"type:text" json:"extra_fields,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 }
 
