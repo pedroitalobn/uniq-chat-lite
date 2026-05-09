@@ -1,72 +1,27 @@
 "use client";
 
-// Módulo Jornadas — top-level. Cabeçalho concentra todas as formas de
-// criar uma jornada (Uniq AI / Templates / Canvas em branco). Tabs
-// dividem listagem e atividade em tempo real.
+// Módulo Jornadas — top-level. Versão enxuta:
+//
+//   • 1 CTA PRIMÁRIO ("Nova jornada") cria blank e leva direto pro
+//     Conversational Builder com Uniq AI já pronta pra ajudar.
+//   • 1 CTA SECUNDÁRIO ("Templates") abre o modal — único caminho
+//     pra ver templates pré-montados.
+//   • Estado vazio com explicação visual dos 2 caminhos pra começar.
+//
+// Antes a página tinha 3 botões competindo (Uniq AI / Templates /
+// Canvas) + um grid de preview de templates + botão duplicado
+// "Ver todos templates" dentro do grid. Confundia o user sobre por
+// onde começar. Esta versão consolida tudo num fluxo único.
 
 import React, { useState } from "react";
-import Link from "next/link";
-import { Activity, LayoutTemplate, Plus, Sparkles, Wand2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Activity, LayoutTemplate, Plus, Sparkles, Wand2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { journeysApi } from "@/lib/api";
 import { JourneysList } from "@/features/journeys/journeys-list";
 import { ActivityPanel } from "@/features/journeys/activity-panel";
 import { TemplatesDialog } from "@/features/journeys/templates-dialog";
 import { cn } from "@/lib/utils";
-
-const JOURNEY_TEMPLATE_PREVIEWS = [
-  { id: "recuperacao-clientes",     name: "Recuperação de Clientes",    description: "Reengaje clientes inativos com mensagem personalizada", emoji: "🔄", color: "#f59e0b", category: "Retenção",    steps: 5 },
-  { id: "boas-vindas-onboarding",   name: "Boas-vindas & Onboarding",   description: "Receba novos contatos e direcione cada um para o caminho certo", emoji: "🚀", color: "#3b82f6", category: "Captação",    steps: 5 },
-  { id: "aniversariantes",          name: "Aniversariantes",            description: "Surpreenda clientes no aniversário com mensagem e cupom exclusivo", emoji: "🎂", color: "#ec4899", category: "Engajamento", steps: 3 },
-  { id: "solicitacao-indicacao",    name: "Solicitação de Indicação",   description: "Ative clientes VIP para indicarem conhecidos e recompense automaticamente", emoji: "🤝", color: "#10b981", category: "Retenção",    steps: 6 },
-  { id: "retencao-pos-compra",      name: "Retenção Pós-compra",        description: "Fidelize compradores com acompanhamento pós-venda e upsell", emoji: "💎", color: "#8b5cf6", category: "Retenção",    steps: 6 },
-  { id: "qualificacao-leads",       name: "Qualificação de Leads",      description: "Classifique leads automaticamente por interesse e comportamento", emoji: "🎯", color: "#f97316", category: "Captação",    steps: 8 },
-];
-
-function JourneyTemplateCards({ onOpenAll, onCreateFromTemplate }: { onOpenAll: () => void; onCreateFromTemplate: (id: string) => void }) {
-  return (
-    <div className="space-y-3 flex-shrink-0">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Templates de Jornada</h2>
-          <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>Comece com uma jornada pré-montada e personalize</p>
-        </div>
-        <button onClick={onOpenAll}
-          className="text-xs px-2.5 py-1.5 rounded-lg transition"
-          style={{ color: "var(--text-3)", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}>
-          Ver todos os templates
-        </button>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-        {JOURNEY_TEMPLATE_PREVIEWS.map((tpl) => (
-          <div key={tpl.id}
-            className="rounded-2xl p-3.5 flex flex-col gap-2 cursor-pointer transition-all duration-200"
-            style={{
-              background: `${tpl.color}08`,
-              border: `1px solid ${tpl.color}18`,
-              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-            }}
-            onClick={() => onCreateFromTemplate(tpl.id)}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 16px ${tpl.color}20, 0 0 0 1px ${tpl.color}28`}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)"}>
-            <div className="flex items-start justify-between gap-1">
-              <span className="text-xl leading-none">{tpl.emoji}</span>
-              <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full shrink-0"
-                style={{ background: `${tpl.color}15`, color: tpl.color }}>
-                {tpl.steps} passos
-              </span>
-            </div>
-            <div>
-              <p className="text-xs font-semibold leading-tight" style={{ color: "var(--text-1)" }}>{tpl.name}</p>
-              <p className="text-[11px] mt-0.5 leading-snug line-clamp-2" style={{ color: "var(--text-3)" }}>{tpl.description}</p>
-            </div>
-            <span className="text-[10px] font-medium mt-auto" style={{ color: tpl.color }}>{tpl.category}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 type Tab = "list" | "activity";
 
@@ -78,8 +33,24 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 export default function JourneysPage() {
   const [tab, setTab] = useState<Tab>("list");
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
 
+  // Conta de jornadas pra decidir entre estado vazio e listagem.
+  // Reusa a mesma queryKey do JourneysList pra cache compartilhado.
+  const journeysQ = useQuery({
+    queryKey: ["journeys-list"],
+    queryFn: () => journeysApi.list().then((r) => r.data),
+    staleTime: 10_000,
+  });
+  const journeyCount = Array.isArray(journeysQ.data) ? journeysQ.data.length : 0;
+  const isEmpty = !journeysQ.isLoading && journeyCount === 0;
+
+  // CTA primário: cria journey blank e leva pro Conversational
+  // Builder. A Uniq AI já cumprimenta o user lá ("descreve o que
+  // essa jornada deve fazer") — sem fricção.
   const createBlank = async () => {
+    if (creating) return;
+    setCreating(true);
     try {
       const res = await journeysApi.createBlank();
       const id = res.data?.id;
@@ -87,132 +58,248 @@ export default function JourneysPage() {
       window.location.href = `/journeys/${id}`;
     } catch (e: any) {
       toast.error(e?.response?.data?.error || "Falha ao criar jornada");
+      setCreating(false);
     }
   };
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-y-auto">
-      {/* Header */}
-      <div className="mb-3 sm:mb-4 flex-shrink-0">
+      {/* Header — subtítulo + 2 CTAs claros */}
+      <div className="mb-4 flex-shrink-0">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            {/* Título "Jornadas" agora no ModuleHeader (layout). */}
-            <p className="text-xs sm:text-sm" style={{ color: "var(--text-3)" }}>
-              Cadências e regras de relacionamento — crie via canvas, template ou linguagem natural pelo Uniq AI.
-            </p>
-          </div>
+          <p className="text-xs sm:text-sm max-w-2xl" style={{ color: "var(--text-3)" }}>
+            Sequências automáticas de mensagens que rodam sozinhas. Crie do zero conversando com a
+            Uniq AI ou comece a partir de um template pronto.
+          </p>
           <div className="flex items-center gap-2 flex-wrap">
-            <Link
-              href="/uniq-ai"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium"
-              style={{
-                background: "linear-gradient(135deg, rgba(0,212,106,0.12) 0%, rgba(0,212,106,0.05) 100%)",
-                backdropFilter: "blur(12px) saturate(180%)",
-                WebkitBackdropFilter: "blur(12px) saturate(180%)",
-                border: "1px solid rgba(0,212,106,0.20)",
-                color: "var(--green)",
-                transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(0,212,106,0.20) 0%, rgba(0,212,106,0.10) 100%)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(0,212,106,0.12) 0%, rgba(0,212,106,0.05) 100%)"; }}
-            >
-              <Sparkles className="w-4 h-4" />
-              <span className="hidden sm:inline">Criar via Uniq AI</span>
-              <span className="sm:hidden">Uniq AI</span>
-            </Link>
             <button
               onClick={() => setTemplatesOpen(true)}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium"
               style={{
-                background: "linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(139,92,246,0.05) 100%)",
-                backdropFilter: "blur(12px) saturate(180%)",
-                WebkitBackdropFilter: "blur(12px) saturate(180%)",
-                border: "1px solid rgba(139,92,246,0.20)",
-                color: "#a78bfa",
-                transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+                background: "var(--surface-2)",
+                border: "1px solid var(--surface-border)",
+                color: "var(--text-2)",
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(139,92,246,0.20) 0%, rgba(139,92,246,0.10) 100%)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(139,92,246,0.05) 100%)"; }}
+              title="Ver templates prontos"
             >
               <LayoutTemplate className="w-4 h-4" />
               Templates
             </button>
             <button
               onClick={createBlank}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium"
+              disabled={creating}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold disabled:opacity-60"
               style={{
-                background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
-                backdropFilter: "blur(12px) saturate(180%)",
-                WebkitBackdropFilter: "blur(12px) saturate(180%)",
-                border: "1px solid rgba(255,255,255,0.10)",
-                color: "var(--text-1)",
-                transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+                background: "var(--green)",
+                color: "var(--green-fg)",
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.05) 100%)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)"; }}
+              title="Criar uma jornada conversando com a Uniq AI (sem trocar de página)"
             >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Canvas em branco</span>
-              <span className="sm:hidden">Canvas</span>
+              <Sparkles className="w-4 h-4" />
+              Nova jornada
             </button>
           </div>
         </div>
       </div>
 
-      {/* Template Cards */}
-      <div className="mb-4 sm:mb-5 flex-shrink-0">
-        <JourneyTemplateCards
-          onOpenAll={() => setTemplatesOpen(true)}
-          onCreateFromTemplate={() => setTemplatesOpen(true)}
+      {/* Empty state — só aparece quando não há nenhuma jornada.
+         Explica os 2 caminhos pra começar com cards visuais grandes
+         (zero ambiguidade sobre por onde começar). */}
+      {isEmpty && (
+        <EmptyHero
+          onCreate={createBlank}
+          onOpenTemplates={() => setTemplatesOpen(true)}
+          creating={creating}
         />
-      </div>
-
-      {/* Tabs */}
-      <div
-        className="flex gap-1 p-1 rounded-xl mb-3 sm:mb-4 flex-shrink-0 self-start"
-        style={{
-          background: "rgba(255,255,255,0.04)",
-          backdropFilter: "blur(12px) saturate(180%)",
-          WebkitBackdropFilter: "blur(12px) saturate(180%)",
-          border: "1px solid rgba(255,255,255,0.09)",
-        }}
-      >
-        {TABS.map((t) => {
-          const Icon = t.icon;
-          const isActive = tab === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={cn(
-                "flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium",
-              )}
-              style={{
-                background: isActive
-                  ? "linear-gradient(135deg, rgba(0,212,106,0.18) 0%, rgba(0,212,106,0.08) 100%)"
-                  : "transparent",
-                backdropFilter: isActive ? "blur(8px)" : "none",
-                border: isActive ? "1px solid rgba(0,212,106,0.20)" : "1px solid transparent",
-                color: isActive ? "var(--green)" : "var(--text-3)",
-                transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
-              }}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-h-0 rounded-2xl overflow-hidden border" style={{ borderColor: "var(--surface-border)" }}>
-        {tab === "list" && <JourneysList />}
-        {tab === "activity" && <ActivityPanel />}
-      </div>
-
-      {templatesOpen && (
-        <TemplatesDialog onClose={() => setTemplatesOpen(false)} />
       )}
+
+      {/* Tabs + listagem — só quando tem jornadas */}
+      {!isEmpty && (
+        <>
+          <div
+            className="flex gap-1 p-1 rounded-xl mb-3 sm:mb-4 flex-shrink-0 self-start"
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              backdropFilter: "blur(12px) saturate(180%)",
+              WebkitBackdropFilter: "blur(12px) saturate(180%)",
+              border: "1px solid rgba(255,255,255,0.09)",
+            }}
+          >
+            {TABS.map((t) => {
+              const Icon = t.icon;
+              const isActive = tab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium",
+                  )}
+                  style={{
+                    background: isActive
+                      ? "linear-gradient(135deg, rgba(0,212,106,0.18) 0%, rgba(0,212,106,0.08) 100%)"
+                      : "transparent",
+                    backdropFilter: isActive ? "blur(8px)" : "none",
+                    border: isActive ? "1px solid rgba(0,212,106,0.20)" : "1px solid transparent",
+                    color: isActive ? "var(--green)" : "var(--text-3)",
+                    transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
+                  }}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div
+            className="flex-1 min-h-0 rounded-2xl overflow-hidden border"
+            style={{ borderColor: "var(--surface-border)" }}
+          >
+            {tab === "list" && <JourneysList />}
+            {tab === "activity" && <ActivityPanel />}
+          </div>
+        </>
+      )}
+
+      {templatesOpen && <TemplatesDialog onClose={() => setTemplatesOpen(false)} />}
+    </div>
+  );
+}
+
+// ─── EmptyHero ─────────────────────────────────────────────────────
+//
+// Aparece quando o user nunca criou uma jornada. 2 cards grandes
+// explicando como começar — zero ambiguidade. CTA primário verde
+// chama atenção pro caminho recomendado (com IA).
+
+function EmptyHero({
+  onCreate,
+  onOpenTemplates,
+  creating,
+}: {
+  onCreate: () => void;
+  onOpenTemplates: () => void;
+  creating: boolean;
+}) {
+  return (
+    <div className="flex-1 flex items-center justify-center py-8">
+      <div className="w-full max-w-3xl space-y-5">
+        <div className="text-center space-y-2">
+          <span
+            className="inline-flex w-12 h-12 rounded-2xl items-center justify-center"
+            style={{
+              background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.06))",
+              border: "1px solid rgba(0,212,106,0.30)",
+              color: "var(--green)",
+            }}
+          >
+            <Wand2 className="w-5 h-5" />
+          </span>
+          <h2 className="text-lg sm:text-xl font-semibold" style={{ color: "var(--text-1)" }}>
+            Crie sua primeira jornada
+          </h2>
+          <p className="text-sm max-w-xl mx-auto" style={{ color: "var(--text-3)" }}>
+            Jornadas são sequências automáticas de mensagens que rodam sozinhas. Bem-vindas,
+            recuperação, follow-up, NPS — escolha um caminho e comece.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Caminho 1 — IA (recomendado) */}
+          <button
+            onClick={onCreate}
+            disabled={creating}
+            className="text-left rounded-2xl p-5 transition-all group disabled:opacity-60"
+            style={{
+              background: "linear-gradient(135deg, rgba(0,212,106,0.10), rgba(0,212,106,0.03))",
+              border: "1px solid rgba(0,212,106,0.30)",
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <span
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{
+                  background: "rgba(0,212,106,0.15)",
+                  border: "1px solid rgba(0,212,106,0.30)",
+                  color: "var(--green)",
+                }}
+              >
+                <Sparkles className="w-4 h-4" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
+                    Conversar com a Uniq AI
+                  </p>
+                  <span
+                    className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full font-semibold"
+                    style={{ background: "var(--green)", color: "var(--green-fg)" }}
+                  >
+                    Recomendado
+                  </span>
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: "var(--text-3)" }}>
+                  Você descreve em texto o que quer ("manda boas-vindas, espera 1 dia, pergunta
+                  o objetivo do cliente") e a IA monta os passos pra você. Edite por chat até
+                  ficar do jeito certo.
+                </p>
+                <span
+                  className="inline-flex items-center gap-1 text-[11px] font-medium mt-3 transition-transform group-hover:translate-x-1"
+                  style={{ color: "var(--green)" }}
+                >
+                  Começar do zero
+                  <ArrowRight className="w-3 h-3" />
+                </span>
+              </div>
+            </div>
+          </button>
+
+          {/* Caminho 2 — Templates */}
+          <button
+            onClick={onOpenTemplates}
+            className="text-left rounded-2xl p-5 transition-all group"
+            style={{
+              background: "var(--surface-1)",
+              border: "1px solid var(--surface-border)",
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <span
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{
+                  background: "rgba(139,92,246,0.12)",
+                  border: "1px solid rgba(139,92,246,0.25)",
+                  color: "#a78bfa",
+                }}
+              >
+                <LayoutTemplate className="w-4 h-4" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold mb-1" style={{ color: "var(--text-1)" }}>
+                  Começar de um template
+                </p>
+                <p className="text-xs leading-relaxed" style={{ color: "var(--text-3)" }}>
+                  Mais rápido pra casos comuns. Boas-vindas, qualificação de leads, NPS,
+                  agendamento, recuperação de carrinho. Personaliza depois com a IA.
+                </p>
+                <span
+                  className="inline-flex items-center gap-1 text-[11px] font-medium mt-3 transition-transform group-hover:translate-x-1"
+                  style={{ color: "#a78bfa" }}
+                >
+                  Ver templates
+                  <ArrowRight className="w-3 h-3" />
+                </span>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        <p className="text-[11px] text-center" style={{ color: "var(--text-4)" }}>
+          Depois de criada, você pode editar via chat com IA, no canvas avançado, ver
+          analytics e enrolar contatos.
+        </p>
+      </div>
     </div>
   );
 }
