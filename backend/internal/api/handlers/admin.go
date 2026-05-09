@@ -572,8 +572,18 @@ func (h *AdminHandler) UpdateUser(c *fiber.Ctx) error {
 	if req.Name != "" {
 		updates["name"] = req.Name
 	}
-	if req.Role == "admin" || req.Role == "user" {
+	// Aceita só roles válidas. Antes esse check usava "admin"/"user"
+	// (legado de antes da renomeação) e silenciosamente ignorava
+	// qualquer mudança de role vinda do front — bug.
+	switch req.Role {
+	case string(models.RoleSuperAdmin), string(models.RoleCustomer), string(models.RoleLead), string(models.RoleValidate):
 		updates["role"] = req.Role
+	case "":
+		// não veio no payload — não toca no role
+	default:
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "role inválido — use super_admin, customer, lead ou validate",
+		})
 	}
 	if req.IsBeta != nil {
 		updates["is_beta"] = *req.IsBeta
