@@ -37,10 +37,12 @@ import {
   Network,
   Wand2,
   AlertTriangle,
+  UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { journeysApi } from "@/lib/api";
 import { JourneyPreview } from "@/components/journeys/JourneyPreview";
+import { EnrollContactsModal } from "@/components/journeys/EnrollContactsModal";
 
 type ChatMsg = {
   id: string;
@@ -88,6 +90,7 @@ export default function JourneyConversationalBuilderPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [changedStepIds, setChangedStepIds] = useState<Set<string>>(new Set());
+  const [enrollOpen, setEnrollOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -283,6 +286,19 @@ export default function JourneyConversationalBuilderPage() {
 
         <div className="ml-auto flex items-center gap-1.5 flex-wrap">
           <button
+            onClick={() => setEnrollOpen(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg"
+            style={{
+              background: "rgba(0,212,106,0.10)",
+              border: "1px solid rgba(0,212,106,0.25)",
+              color: "var(--green)",
+            }}
+            title="Enrolar contatos manualmente nesta jornada"
+          >
+            <UserPlus className="w-3 h-3" />
+            <span className="hidden sm:inline">Enrolar contatos</span>
+          </button>
+          <button
             onClick={() => router.push(`/journeys/${params.id}/canvas`)}
             className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg"
             style={{
@@ -462,6 +478,15 @@ export default function JourneyConversationalBuilderPage() {
           <JourneyPreview flow={flow} changedStepIds={changedStepIds} />
         </aside>
       </div>
+
+      {/* Modal de enrollment proativo (Fase 2) */}
+      {enrollOpen && (
+        <EnrollContactsModal
+          journeyId={params.id}
+          journeyName={journey.name || "Jornada sem nome"}
+          onClose={() => setEnrollOpen(false)}
+        />
+      )}
     </div>
   );
 }

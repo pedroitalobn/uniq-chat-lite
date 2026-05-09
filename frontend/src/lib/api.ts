@@ -1471,6 +1471,34 @@ export const journeysApi = {
   listTemplates: () => api.get("/v1/journeys/templates"),
   createFromTemplate: (slug: string, instanceId?: string, name?: string) =>
     api.post(`/v1/journeys/from-template/${slug}`, { instance_id: instanceId, name }),
+  // Fase 2 — Enrollment proativo. Admin enrola contatos via UI/CSV
+  // ou checa enrollments criados pelo worker via segment-as-trigger.
+  enroll: (
+    id: string,
+    data: {
+      contact_ids?: string[];
+      phones?: string[];
+      scheduled_at?: string; // ISO 8601 UTC
+    },
+  ) =>
+    api.post<{ enrolled: number; duplicates: number; skipped: string[]; scheduled_at: string }>(
+      `/v1/journeys/${id}/enroll`,
+      data,
+    ),
+  listEnrollments: (id: string, params?: { status?: string }) =>
+    api.get<{
+      items: Array<{
+        id: string;
+        contact_id: string;
+        source: string;
+        status: string;
+        scheduled_at: string;
+        started_at?: string;
+        completed_at?: string;
+        error?: string;
+      }>;
+      total: number;
+    }>(`/v1/journeys/${id}/enrollments`, { params }),
 };
 
 export const aiApi = {

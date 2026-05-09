@@ -248,6 +248,10 @@ func main() {
 	journeyLLM.SetDB(db)
 	journeySender := whatsapp.NewManagerSender(manager)
 	journeyExec := services.NewJourneyExecutor(db, journeySender, journeyLLM)
+	// Worker proativo de enrollments — varre segments-as-trigger e
+	// enrollments pendentes a cada 60s. Roda em background, encerra
+	// quando o ctx do server cancela.
+	journeyExec.StartEnrollmentRunner(context.Background())
 	ttsService := services.NewTTSService()
 	agentRuntime := services.NewAgentRuntime(db, manager, journeyLLM, ttsService)
 	manager.SetJourneyExecutor(journeyExec)
@@ -450,6 +454,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.SocialTarget{},
 		&models.TaktikDevice{},
 		&models.Journey{},
+		&models.JourneyEnrollment{},
 		&models.JourneyExecution{},
 		&models.Funnel{},
 		&models.FunnelStage{},

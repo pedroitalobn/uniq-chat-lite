@@ -1521,6 +1521,11 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	journeys.Delete("/:id", journeyH.DeleteJourney)
 	journeys.Get("/:id", journeyH.GetJourney)
 	journeys.Get("/:id/executions", agentH.GetJourneyExecutions)
+	// Enrollment proativo (Fase 2 do redesign de Jornadas) — admin
+	// enrola contatos em lote (manual/csv) ou checa enrollments
+	// criados pelo worker via segment-as-trigger.
+	journeys.Post("/:id/enroll", journeyH.EnrollContacts)
+	journeys.Get("/:id/enrollments", journeyH.ListEnrollments)
 
 	// Help Desk (knowledge base)
 	// Help Desk routes ficam registradas APENAS no chain top-level
