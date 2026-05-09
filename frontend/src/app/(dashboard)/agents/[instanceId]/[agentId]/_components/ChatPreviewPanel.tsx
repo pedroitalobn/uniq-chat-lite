@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Send, X, MessageSquareDashed, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
+import { Send, X, MessageSquareDashed, Loader2, RefreshCw, Pencil } from "lucide-react";
 import { integrationsApi } from "@/lib/api";
+import type { AgentForm } from "../../../_shared/types";
 
 type Msg = { id: string; role: "user" | "agent"; text: string; ms?: number };
 
@@ -11,14 +12,17 @@ type Msg = { id: string; role: "user" | "agent"; text: string; ms?: number };
 // agent/preview, que chama LLM in-memory sem persistir. Mantém
 // histórico local pra dar contexto multi-turno (envia até 25 turnos).
 //
-// IMPORTANTE: usa a config SALVA do agente. Mudanças no form não
-// salvas não aparecem no preview — daí o aviso "salve antes de testar".
+// Quando o form tem mudanças não salvas (dirty), o painel envia o
+// objeto `override` no payload — o backend aplica essas mudanças em
+// memória pra construir o system prompt, sem tocar no DB. Isso
+// permite iterar identidade/objetivo/restrições e testar em segundos.
 export function ChatPreviewPanel({
   instanceId,
   agentId,
   agentName,
   open,
   dirty,
+  form,
   onClose,
 }: {
   instanceId: string;
@@ -26,6 +30,7 @@ export function ChatPreviewPanel({
   agentName: string;
   open: boolean;
   dirty: boolean;
+  form: AgentForm;
   onClose: () => void;
 }) {
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -38,10 +43,23 @@ export function ChatPreviewPanel({
   const sendMutation = useMutation({
     mutationFn: async (text: string) => {
       const history = messages.slice(-24).map((m) => ({ role: m.role, text: m.text }));
+      // Sempre manda override com o form atual — assim o preview
+      // reflete o que está na tela mesmo sem ter salvado. Backend
+      // só usa override se os campos vierem (e vêm sempre).
       const r = await integrationsApi.previewAgent(instanceId, {
         message: text,
         history,
         agent_id: realAgentId,
+        override: {
+          agent_name: form.agent_name,
+          identity: form.identity,
+          objective: form.objective,
+          communication_guidelines: form.communication_guidelines,
+          service_instructions: form.service_instructions,
+          restrictions: form.restrictions,
+          knowledge_base: form.knowledge_base,
+          system_prompt: form.system_prompt,
+        },
       });
       return r.data;
     },
@@ -161,19 +179,21 @@ export function ChatPreviewPanel({
           </button>
         </div>
 
-        {/* Aviso de mudanças não salvas */}
+        {/* Banner azul quando há edições — agora positivo: o preview
+           já aplica as mudanças não salvas. Só lembra que persistir
+           ainda exige Salvar. */}
         {dirty && (
           <div
             className="flex items-start gap-2 px-4 py-2 flex-shrink-0"
             style={{
-              background: "rgba(245,158,11,0.06)",
-              borderBottom: "1px solid rgba(245,158,11,0.20)",
+              background: "rgba(99,102,241,0.06)",
+              borderBottom: "1px solid rgba(99,102,241,0.20)",
             }}
           >
-            <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" style={{ color: "#f59e0b" }} />
-            <p className="text-[10px]" style={{ color: "#fbbf24" }}>
-              O preview usa a configuração <b>salva</b>. Suas mudanças atuais ainda não foram aplicadas.
-              Clique em <b>Salvar</b> antes de testar.
+            <Pencil className="w-3 h-3 mt-0.5 flex-shrink-0" style={{ color: "#a5b4fc" }} />
+            <p className="text-[10px]" style={{ color: "#a5b4fc" }}>
+              Testando com suas <b>edições não salvas</b>. Clique em Salvar quando estiver feliz com o
+              resultado pra persistir.
             </p>
           </div>
         )}

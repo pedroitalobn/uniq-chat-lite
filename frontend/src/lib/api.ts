@@ -1229,12 +1229,24 @@ export const integrationsApi = {
     api.get(`/v1/instances/${instanceId}/agent/logs`, { params }),
   // Preview / dry-run — chama o LLM com a config salva, sem persistir
   // nada (não cria conversa, não dispara ações, não consome quota).
+  // override: campos do form ainda não salvos que sobrescrevem a config
+  // do DB pra esse preview específico.
   previewAgent: (
     instanceId: string,
     data: {
       message: string;
       history?: Array<{ role: "user" | "agent"; text: string }>;
       agent_id?: string;
+      override?: {
+        agent_name?: string;
+        identity?: string;
+        objective?: string;
+        communication_guidelines?: string;
+        service_instructions?: string;
+        restrictions?: string;
+        knowledge_base?: string;
+        system_prompt?: string;
+      };
     },
   ) =>
     api.post<{ reply: string; duration_ms: number; error?: string }>(

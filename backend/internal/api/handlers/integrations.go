@@ -618,9 +618,57 @@ func (h *IntegrationHandler) GetAgent(c *fiber.Ctx) error {
 		"mcp_server_url":           agent.MCPServerURL,
 		"assets":                   agent.Assets,
 		"compiled_prompt":          services.BuildAgentSystemPrompt(&agent, agent.Assets),
+		"access_restricted":        agent.AccessRestricted,
+		"editor_role_ids":          safeJSONArray(agent.EditorRoleIDs),
 		"created_at":               agent.CreatedAt,
 		"updated_at":               agent.UpdatedAt,
 	})
+}
+
+// canEditAgent — checa se o user atual pode editar este agente.
+// Hierarquia:
+//   1. Super-admin global → sempre pode
+//   2. Dono do workspace (UserWorkspace.IsOwner=true) → sempre pode
+//   3. !AccessRestricted → pode (já passou pelo middleware de perm
+//      do workspace antes de chegar aqui)
+//   4. AccessRestricted + papel do user em EditorRoleIDs → pode
+//   5. Caso contrário → não pode
+func canEditAgent(db *gorm.DB, user *models.User, agent *models.InstanceAgent, workspaceID uuid.UUID) bool {
+	if user == nil {
+		return false
+	}
+	if user.Role == models.RoleSuperAdmin {
+		return true
+	}
+	var membership models.UserWorkspace
+	if err := db.Where("user_id = ? AND workspace_id = ?", user.ID, workspaceID).First(&membership).Error; err == nil {
+		if membership.IsOwner {
+			return true
+		}
+		if !agent.AccessRestricted {
+			return true
+		}
+		// Restrito: confere se o papel do user está na lista de editores.
+		var allowed []string
+		if agent.EditorRoleIDs != "" {
+			_ = json.Unmarshal([]byte(agent.EditorRoleIDs), &allowed)
+		}
+		if len(allowed) == 0 {
+			// restricted mas sem ninguém listado = só dono pode editar.
+			return false
+		}
+		if membership.RoleID == nil {
+			return false
+		}
+		userRoleID := membership.RoleID.String()
+		for _, allowedID := range allowed {
+			if allowedID == userRoleID {
+				return true
+			}
+		}
+		return false
+	}
+	return false
 }
 
 // POST /instances/:id/agent/preview
@@ -649,6 +697,20 @@ func (h *IntegrationHandler) PreviewAgent(c *fiber.Ctx) error {
 			Text string `json:"text"`
 		} `json:"history"`
 		AgentID string `json:"agent_id"`
+		// Override (opcional) — campos do form que ainda não foram salvos.
+		// Quando presentes, sobrescrevem o que está no DB pra permitir
+		// preview ao vivo de mudanças não persistidas. Manda só os campos
+		// que o usuário editou; os demais ficam com o valor salvo.
+		Override *struct {
+			AgentName               *string `json:"agent_name"`
+			Identity                *string `json:"identity"`
+			Objective               *string `json:"objective"`
+			CommunicationGuidelines *string `json:"communication_guidelines"`
+			ServiceInstructions     *string `json:"service_instructions"`
+			Restrictions            *string `json:"restrictions"`
+			KnowledgeBase           *string `json:"knowledge_base"`
+			SystemPrompt            *string `json:"system_prompt"`
+		} `json:"override,omitempty"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -674,6 +736,36 @@ func (h *IntegrationHandler) PreviewAgent(c *fiber.Ctx) error {
 	}
 	if err := q.First(&agent).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "agente não encontrado"})
+	}
+
+	// Aplica override do form em memória (NÃO persiste). Permite o
+	// usuário testar mudanças não salvas. Como agent é um valor local
+	// no handler, modificar não impacta nenhuma outra requisição.
+	if req.Override != nil {
+		if v := req.Override.AgentName; v != nil {
+			agent.AgentName = *v
+		}
+		if v := req.Override.Identity; v != nil {
+			agent.Identity = *v
+		}
+		if v := req.Override.Objective; v != nil {
+			agent.Objective = *v
+		}
+		if v := req.Override.CommunicationGuidelines; v != nil {
+			agent.CommunicationGuidelines = *v
+		}
+		if v := req.Override.ServiceInstructions; v != nil {
+			agent.ServiceInstructions = *v
+		}
+		if v := req.Override.Restrictions; v != nil {
+			agent.Restrictions = *v
+		}
+		if v := req.Override.KnowledgeBase; v != nil {
+			agent.KnowledgeBase = *v
+		}
+		if v := req.Override.SystemPrompt; v != nil {
+			agent.SystemPrompt = *v
+		}
 	}
 
 	// System prompt vem do mesmo builder do runtime real, garantindo
@@ -760,6 +852,10 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		// Ritmo e tamanho das respostas.
 		ResponsePace   *string `json:"response_pace"`
 		ResponseLength *string `json:"response_length"`
+		// Acesso da equipe — quem do workspace pode editar este agente.
+		// AccessRestricted=false (default) preserva comportamento legado.
+		AccessRestricted *bool     `json:"access_restricted"`
+		EditorRoleIDs    *[]string `json:"editor_role_ids"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -783,12 +879,28 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 			Skills:             "[]",
 			AppAccess:          "[]",
 			HandoffSkills:      "[]",
+			EditorRoleIDs:      "[]",
 			RAGEnabled:         true,
 			IsPrimary:          true,
 			Role:               "primary",
 			Priority:           100,
 			ActionConfirmation: "client",
 		}
+	}
+
+	// Enforcement do controle granular de acesso. Owner do workspace e
+	// super-admin sempre passam; quando AccessRestricted=true e o user
+	// não está na lista de papéis editores, devolve 403 antes de salvar.
+	user := middleware.GetCurrentUser(c)
+	var wsID uuid.UUID
+	if inst.WorkspaceID != nil {
+		wsID = *inst.WorkspaceID
+	}
+	if !canEditAgent(h.db, user, &agent, wsID) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "agente_restrito",
+			"hint":  "este agente está com edição restrita a papéis específicos do workspace",
+		})
 	}
 
 	if req.IntegrationID != nil {
@@ -912,6 +1024,29 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		case "always", "business_hours", "off_hours", "new_contact_only", "custom":
 			agent.ActivationMode = strings.ToLower(*req.ActivationMode)
 		}
+	}
+	// Acesso da equipe — persistência. EditorRoleIDs guarda como JSON
+	// pra reaproveitar safeJSONArray na leitura. Mudanças aqui são
+	// barradas por canEditAgent acima quando user não é dono/super.
+	if req.AccessRestricted != nil {
+		agent.AccessRestricted = *req.AccessRestricted
+	}
+	if req.EditorRoleIDs != nil {
+		// Filtra strings vazias e duplicatas, valida que são UUIDs.
+		seen := map[string]bool{}
+		clean := make([]string, 0, len(*req.EditorRoleIDs))
+		for _, raw := range *req.EditorRoleIDs {
+			id := strings.TrimSpace(raw)
+			if id == "" || seen[id] {
+				continue
+			}
+			if _, err := uuid.Parse(id); err != nil {
+				continue
+			}
+			seen[id] = true
+			clean = append(clean, id)
+		}
+		agent.EditorRoleIDs = marshalJSONString(clean, "[]")
 	}
 	if req.Schedule != nil {
 		agent.Schedule = marshalJSONString(*req.Schedule, "{}")
