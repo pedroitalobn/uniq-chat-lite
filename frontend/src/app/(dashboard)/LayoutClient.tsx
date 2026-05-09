@@ -168,6 +168,10 @@ export function LayoutClient({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (sessionLoading || !sessionData) return;
     if (pathname === "/onboarding" || pathname?.startsWith("/admin")) return;
+    // Validate role pula o onboarding — fluxo dele é exclusivo WABA
+    // (criação direta via /instances), não faz sentido o tour
+    // agent-first com QR/whatsmeow.
+    if ((sessionData as any)?.user?.role === "validate") return;
     const userId = (sessionData as any)?.id;
     if (!userId) return;
     const key = `uniq_onboarding_done_${userId}`;

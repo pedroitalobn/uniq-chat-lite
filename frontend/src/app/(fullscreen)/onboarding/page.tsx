@@ -132,6 +132,15 @@ export default function OnboardingPage() {
   const { data: session } = useSession();
   const { currentWorkspace } = useWorkspace();
 
+  // Validate role pula direto pra /instances — onboarding agent-first
+  // (com QR/whatsmeow + jornadas) não faz sentido pra esse fluxo que
+  // só lida com WABA. Cobre tanto auto-redirect quanto navegação manual.
+  useEffect(() => {
+    if ((session as any)?.user?.role === "validate") {
+      router.replace("/instances");
+    }
+  }, [session, router]);
+
   const [step, setStep] = useState<Step>(0);
   const [messages, setMessages] = useState<Message[]>([]);
 
