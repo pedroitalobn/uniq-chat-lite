@@ -608,6 +608,8 @@ func seedPlans(db *gorm.DB) {
 			MaxMessagesPerDay:     100,
 			MaxUsers:              1,
 			MaxWorkspaces:         1,
+			MaxJourneys:           0,
+			AllowJourneys:         false,
 			Features:              `{"support":"community","channels":["whatsapp"]}`,
 			AllowProxy:            false,
 			AllowProxyResidencial: false,
@@ -620,6 +622,8 @@ func seedPlans(db *gorm.DB) {
 			MaxMessagesPerDay:     100,
 			MaxUsers:              3,
 			MaxWorkspaces:         1,
+			MaxJourneys:           3,
+			AllowJourneys:         true,
 			Features:              `{"whatsapp":true,"instagram":false,"crm":true,"campaigns":false,"integrations":false,"api":false,"webhooks":false,"mcp":false,"description":"Para pequenos negócios"}`,
 			AllowProxy:            false,
 			AllowProxyResidencial: false,
@@ -636,6 +640,8 @@ func seedPlans(db *gorm.DB) {
 			MaxMessagesPerDay:     -1,
 			MaxUsers:              5,
 			MaxWorkspaces:         2,
+			MaxJourneys:           50,
+			AllowJourneys:         true,
 			Features:              `{"support":"email","webhooks":true,"channels":["whatsapp","instagram"]}`,
 			AllowProxy:            true,
 			AllowProxyResidencial: true,
@@ -651,6 +657,8 @@ func seedPlans(db *gorm.DB) {
 			MaxMessagesPerDay:     -1,
 			MaxUsers:              10,
 			MaxWorkspaces:         -1,
+			MaxJourneys:           -1,
+			AllowJourneys:         true,
 			Features:              `{"support":"priority","webhooks":true,"channels":["whatsapp","instagram","telegram","linkedin"],"custom_domain":true,"mcp":true}`,
 			AllowProxy:            true,
 			AllowProxyResidencial: true,
@@ -668,6 +676,28 @@ func seedPlans(db *gorm.DB) {
 		}
 		// Existing plans are never overwritten — all fields are managed via the admin panel.
 	}
+
+	// Self-heal: garante que planos existentes tenham AllowJourneys + MaxJourneys
+	// setados, independente de quando foram criados (antes esses campos não existiam
+	// no seed). Só toca quem ainda tem o default zero/false.
+	db.Model(&models.Plan{}).
+		Where("name = 'Starter' AND (allow_journeys = false OR allow_journeys IS NULL)").
+		Updates(map[string]interface{}{
+			"allow_journeys": true,
+			"max_journeys":   3,
+		})
+	db.Model(&models.Plan{}).
+		Where("name = 'Pro' AND (allow_journeys = false OR allow_journeys IS NULL)").
+		Updates(map[string]interface{}{
+			"allow_journeys": true,
+			"max_journeys":   50,
+		})
+	db.Model(&models.Plan{}).
+		Where("name = 'Business' AND (allow_journeys = false OR allow_journeys IS NULL)").
+		Updates(map[string]interface{}{
+			"allow_journeys": true,
+			"max_journeys":   -1,
+		})
 
 	// Migrate legacy "Enterprise" plan → rename to "Business" (if Business doesn't already exist)
 	var businessExists models.Plan
