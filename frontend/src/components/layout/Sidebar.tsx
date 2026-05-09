@@ -89,6 +89,12 @@ export function Sidebar() {
   const { hasPerm, hasAnyPerm, isOwner, isSuperAdmin, isLoading: permsLoading } = useWorkspacePermissions();
   const isAdmin = isSuperAdmin;
   const isBeta = !!(session?.user?.is_beta) || isSuperAdmin;
+  // Validate role — bypass enxuto pra contas restritas a WABA. Esconde
+  // tudo que não é necessário pro fluxo: Agentes, CRM, Shops, Servers
+  // e Integrações somem do menu (também são bloqueados/filtrados no
+  // backend onde aplicável). Ainda vê Inbox/Campanhas/Workspace pra
+  // operar a conversa em si.
+  const isValidate = session?.user?.role === "validate";
   const planName = (session?.user?.plan as { name?: string } | undefined)?.name ?? session?.user?.role;
   // Flags do plano (allow_*) — gate primário pra módulos pagos. Antes a
   // sidebar usava só `isBeta` e perm, então plano Business com
@@ -169,15 +175,15 @@ export function Sidebar() {
     { href: "/uniq-ai",      label: "Uniq AI",             icon: Sparkles,        exact: false, show: canSeeUniqAi },
     { href: "/dashboard",    label: t("nav_dashboard"),    icon: LayoutDashboard, exact: true,  show: canSeeDashboard },
     { href: "/inbox",        label: t("nav_inbox"),        icon: Headset,         exact: false, show: canSeeInbox },
-    { href: "/crm",          label: t("nav_crm"),          icon: Contact,         exact: false, show: canSeeCRM },
+    { href: "/crm",          label: t("nav_crm"),          icon: Contact,         exact: false, show: canSeeCRM && !isValidate },
     { href: "/campaigns",    label: t("nav_campaigns"),    icon: Megaphone,       exact: false, show: canSeeCampaigns && planAllows("allow_campaigns") },
     { href: "/journeys",     label: "Jornadas",            icon: Wand2,           exact: false, show: canSeeJourneys && planAllows("allow_journeys") },
-    { href: "/agents",       label: "Agentes",             icon: Bot,             exact: false, show: canSeeAgents },
+    { href: "/agents",       label: "Agentes",             icon: Bot,             exact: false, show: canSeeAgents && !isValidate },
     { href: "/help-desk",    label: "Help Desk",           icon: BookOpen,        exact: false, show: planAllows("allow_helpdesk") },
-    { href: "/shops",        label: "Shops",               icon: ShoppingBag,     exact: false, show: true },
-    { href: "/servers",      label: t("nav_servers"),      icon: Server,          exact: false, show: canSeeServers },
+    { href: "/shops",        label: "Shops",               icon: ShoppingBag,     exact: false, show: !isValidate },
+    { href: "/servers",      label: t("nav_servers"),      icon: Server,          exact: false, show: canSeeServers && !isValidate },
     { href: "/instances",    label: t("nav_instances"),    icon: Smartphone,      exact: false, show: canSeeInstances },
-    { href: "/integrations", label: t("nav_integrations"), icon: Plug,            exact: false, show: canSeeIntegrations },
+    { href: "/integrations", label: t("nav_integrations"), icon: Plug,            exact: false, show: canSeeIntegrations && !isValidate },
     // /workspace é onde mora time, papéis, mensageria/timezone, bloqueios
     // e tópicos de assinatura. Antes só dava pra acessar via botão pequeno
     // dentro do card de workspace (escondia em sidebar collapsed). Agora
