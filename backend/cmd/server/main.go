@@ -106,6 +106,17 @@ func main() {
 				WHERE instance_id NOT IN (SELECT instance_id FROM instance_agents WHERE is_primary = true)
 				ORDER BY instance_id, created_at ASC
 			)`).Error
+
+		// Fix do índice único de trigger_webhook_slug — o `uniqueIndex` do
+		// GORM cria índice global, e como o slug é "" (vazio) por default
+		// pra agentes em modo any/keyword, o segundo agente criado batia
+		// no constraint (todos compartilhando ""). Convertemos em índice
+		// PARCIAL: só enforça unicidade quando o slug está preenchido.
+		// Idempotente — DROP IF EXISTS + CREATE com nome próprio.
+		_ = db.Exec(`DROP INDEX IF EXISTS idx_instance_agents_trigger_webhook_slug`).Error
+		_ = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_instance_agents_trigger_webhook_slug
+			ON instance_agents (trigger_webhook_slug)
+			WHERE trigger_webhook_slug IS NOT NULL AND trigger_webhook_slug <> ''`).Error
 	}
 
 	// Apply raw-SQL ticketing indexes that AutoMigrate cannot express
