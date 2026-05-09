@@ -216,10 +216,17 @@ type InstanceAgent struct {
 	WebhookURL    string `gorm:"type:varchar(255)" json:"webhook_url,omitempty"`
 	WebhookSecret string `gorm:"type:varchar(255)" json:"webhook_secret,omitempty"`
 	// MCP server URL (for MCP tool calling)
-	MCPServerURL string       `gorm:"type:varchar(255)" json:"mcp_server_url,omitempty"`
-	Assets       []AgentAsset `gorm:"foreignKey:InstanceAgentID" json:"assets,omitempty"`
-	CreatedAt    time.Time    `json:"created_at"`
-	UpdatedAt    time.Time    `json:"updated_at"`
+	MCPServerURL string `gorm:"type:varchar(255)" json:"mcp_server_url,omitempty"`
+	// Acesso da equipe — controle granular de quem pode editar este
+	// agente específico. Por default desligado: qualquer um com
+	// agents:manage no workspace pode editar (comportamento legado).
+	// Quando AccessRestricted=true, edição fica limitada aos papéis
+	// listados em EditorRoleIDs (+ dono do workspace + super-admin).
+	AccessRestricted bool   `gorm:"default:false" json:"access_restricted"`
+	EditorRoleIDs    string `gorm:"type:text;default:'[]'" json:"editor_role_ids,omitempty"`
+	Assets           []AgentAsset `gorm:"foreignKey:InstanceAgentID" json:"assets,omitempty"`
+	CreatedAt        time.Time    `json:"created_at"`
+	UpdatedAt        time.Time    `json:"updated_at"`
 }
 
 func (a *InstanceAgent) BeforeCreate(tx *gorm.DB) error {

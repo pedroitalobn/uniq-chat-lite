@@ -63,7 +63,7 @@ export default function AgentSettingsPage() {
           <MobileStatusBar form={form} />
           <IntelligenceCard form={form} update={updateForm} />
           <WhenRespondsCard form={form} update={updateForm} />
-          <TeamAccessCard />
+          <TeamAccessCard form={form} update={updateForm} />
           <AdvancedCard form={form} update={updateForm} />
 
           {/* Logs — link, não card grande */}

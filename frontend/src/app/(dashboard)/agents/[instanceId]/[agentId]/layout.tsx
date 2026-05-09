@@ -160,6 +160,7 @@ function Inner({ children }: { children: React.ReactNode }) {
         agentName={agentName}
         open={previewOpen}
         dirty={dirty}
+        form={form}
         onClose={() => setPreviewOpen(false)}
       />
     </div>
