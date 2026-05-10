@@ -612,13 +612,17 @@ func (h *HelpDeskHandler) PublicGetConfig(c *fiber.Ctx) error {
 
 	var cfg models.HelpDeskConfig
 	if err := h.db.Where("workspace_id = ?", ws.ID).First(&cfg).Error; err != nil {
-		// Return default config
 		return c.JSON(fiber.Map{
-			"title":         ws.Name + " · Central de Ajuda",
-			"description":   "",
-			"primary_color": "#00d46a",
-			"logo_url":      "",
-			"widget_enabled": true,
+			"title":              ws.Name + " · Central de Ajuda",
+			"description":        "",
+			"primary_color":      "#00d46a",
+			"logo_url":           "",
+			"widget_enabled":     true,
+			"theme_mode":         "dark",
+			"font_family":        "inter",
+			"custom_domain":      "",
+			"layout_style":       "glass",
+			"hide_uniq_branding": false,
 		})
 	}
 
@@ -629,13 +633,18 @@ func (h *HelpDeskHandler) PublicGetConfig(c *fiber.Ctx) error {
 		Count(&articleCount)
 
 	resp := fiber.Map{
-		"title":          cfg.Title,
-		"description":    cfg.Description,
-		"primary_color":  cfg.PrimaryColor,
-		"logo_url":       cfg.LogoURL,
-		"widget_enabled": cfg.WidgetEnabled,
-		"article_count":  articleCount,
-		"workspace_name": ws.Name,
+		"title":              cfg.Title,
+		"description":        cfg.Description,
+		"primary_color":      cfg.PrimaryColor,
+		"logo_url":           cfg.LogoURL,
+		"widget_enabled":     cfg.WidgetEnabled,
+		"article_count":      articleCount,
+		"workspace_name":     ws.Name,
+		"theme_mode":         cfg.ThemeMode,
+		"font_family":        cfg.FontFamily,
+		"custom_domain":      cfg.CustomDomain,
+		"layout_style":       cfg.LayoutStyle,
+		"hide_uniq_branding": cfg.HideUniqBranding,
 	}
 
 	// Resolve webchat token so the public page can embed the floating widget

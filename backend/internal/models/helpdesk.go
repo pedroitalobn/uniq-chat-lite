@@ -102,8 +102,18 @@ type HelpDeskConfig struct {
 	LogoURL           string     `gorm:"type:varchar(500)" json:"logo_url"`
 	WebchatInstanceID *uuid.UUID `gorm:"type:uuid" json:"webchat_instance_id,omitempty"`
 	WidgetEnabled     bool       `gorm:"default:true" json:"widget_enabled"`
-	CreatedAt         time.Time  `json:"created_at"`
-	UpdatedAt         time.Time  `json:"updated_at"`
+	// ThemeMode: "dark" | "light" | "system"
+	ThemeMode string `gorm:"type:varchar(12);default:'dark'" json:"theme_mode"`
+	// FontFamily: "inter" | "geist" | "manrope" | "jetbrains"
+	FontFamily string `gorm:"type:varchar(20);default:'inter'" json:"font_family"`
+	// CustomDomain: CNAME personalizado pra central (ex: ajuda.meusite.com)
+	CustomDomain string `gorm:"type:varchar(255)" json:"custom_domain,omitempty"`
+	// LayoutStyle: "default" | "glass" | "mintlify"
+	LayoutStyle string `gorm:"type:varchar(20);default:'glass'" json:"layout_style"`
+	// HideUniqBranding: esconde "Powered by Uniq Chat" no footer
+	HideUniqBranding bool `gorm:"default:false" json:"hide_uniq_branding"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 func (h *HelpDeskConfig) BeforeCreate(tx *gorm.DB) error {
