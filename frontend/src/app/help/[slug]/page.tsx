@@ -3,17 +3,17 @@
 import Link from "next/link";
 import { use, useEffect, useRef, useState } from "react";
 
-// Helper: deriva a URL do backend mesmo quando NEXT_PUBLIC_API_URL
-// está vazio ou apontando localhost no build de produção. Usado em
-// rotas públicas que rodam em qualquer subdomínio.
+// ─── Helpers ────────────────────────────────────────────────────────────────────
+
 function getApiBase(): string {
   const env = process.env.NEXT_PUBLIC_API_URL ?? "";
   if (env && !/localhost|127\.0\.0\.1/.test(env)) return env.replace(/\/v1\/?$/, "");
   if (typeof window !== "undefined" && window.location.hostname && !/localhost|127\.0\.0\.1/.test(window.location.hostname)) {
     const host = window.location.hostname;
-    const apiHost = host.startsWith("app.") || host.startsWith("admin.") || host.startsWith("dashboard.") || host.startsWith("help.")
-      ? "api." + host.split(".").slice(1).join(".")
-      : "api." + host;
+    const apiHost =
+      host.startsWith("app.") || host.startsWith("admin.") || host.startsWith("dashboard.") || host.startsWith("help.")
+        ? "api." + host.split(".").slice(1).join(".")
+        : "api." + host;
     return `${window.location.protocol}//${apiHost}`;
   }
   return env || "https://api.uniq.chat";
@@ -28,6 +28,11 @@ interface Config {
   webchat_token?: string;
   article_count: number;
   workspace_name: string;
+  theme_mode: "dark" | "light" | "system";
+  font_family: string;
+  custom_domain: string;
+  layout_style: string;
+  hide_uniq_branding: boolean;
 }
 
 interface Category {
@@ -49,48 +54,163 @@ interface Article {
   status: string;
   view_count: number;
   category_id?: string;
+  category?: Category;
   updated_at: string;
 }
 
-function mdToHtml(md: string): string {
-  return md
-    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
-    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
-    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/`(.+?)`/g, "<code>$1</code>")
-    .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
-    .replace(/^- (.+)$/gm, "<li>$1</li>")
-    .replace(/(<li>[\s\S]*?<\/li>)/g, "<ul>$1</ul>")
-    .replace(/\n{2,}/g, "</p><p>")
-    .replace(/^(?!<[hul])(.+)$/gm, "<p>$1</p>")
-    .replace(/<p><\/p>/g, "");
+// ─── Font loader ────────────────────────────────────────────────────────────────
+
+const FONT_URLS: Record<string, string> = {
+  inter: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+  geist: "", // Geist is bundled via next/font
+  manrope: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap",
+  jetbrains: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap",
+};
+
+const FONT_STACKS: Record<string, string> = {
+  inter: "'Inter', system-ui, -apple-system, sans-serif",
+  geist: "var(--font-sans), system-ui, -apple-system, sans-serif",
+  manrope: "'Manrope', system-ui, -apple-system, sans-serif",
+  jetbrains: "'JetBrains Mono', monospace",
+};
+
+// ─── Article Card ───────────────────────────────────────────────────────────────
+
+function ArticleCard({
+  article,
+  slug,
+  color,
+  isLight,
+}: {
+  article: Article;
+  slug: string;
+  color: string;
+  isLight: boolean;
+}) {
+  return (
+    <Link
+      href={`/help/${slug}/${article.slug}`}
+      style={{ textDecoration: "none" }}
+    >
+      <div
+        className="hc-article-card"
+        style={{
+          padding: "20px 22px",
+          borderRadius: 16,
+          background: isLight ? "#fff" : "rgba(255,255,255,0.03)",
+          border: isLight ? "1px solid rgba(0,0,0,0.06)" : "1px solid rgba(255,255,255,0.06)",
+          cursor: "pointer",
+          transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+          position: "relative" as const,
+          overflow: "hidden",
+        }}
+      >
+        {/* Hover glow */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            opacity: 0,
+            background: `radial-gradient(circle at 50% 0%, ${color}12 0%, transparent 70%)`,
+            transition: "opacity 0.3s ease",
+          }}
+          className="hc-glow"
+        />
+
+        <div style={{ position: "relative", zIndex: 1 }}>
+          {article.category && (
+            <span
+              style={{
+                display: "inline-block",
+                padding: "3px 10px",
+                borderRadius: 8,
+                background: `${color}14`,
+                color: color,
+                fontSize: 11,
+                fontWeight: 600,
+                marginBottom: 10,
+              }}
+            >
+              {article.category.icon} {article.category.name}
+            </span>
+          )}
+          <h3
+            style={{
+              fontSize: 15,
+              fontWeight: 600,
+              color: isLight ? "#0f172a" : "#f1f5f9",
+              margin: "0 0 6px",
+              lineHeight: 1.4,
+            }}
+          >
+            {article.title}
+          </h3>
+          {article.summary && (
+            <p
+              style={{
+                fontSize: 13,
+                color: isLight ? "#64748b" : "#94a3b8",
+                lineHeight: 1.5,
+                margin: 0,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {article.summary}
+            </p>
+          )}
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              marginTop: 12,
+              fontSize: 11,
+              color: isLight ? "#94a3b8" : "#64748b",
+            }}
+          >
+            <span>{article.view_count} views</span>
+            <span>
+              {new Date(article.updated_at).toLocaleDateString("pt-BR", {
+                month: "short",
+                day: "numeric",
+              })}
+            </span>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
 }
 
-export default function HelpCenterPage({ params }: { params: Promise<{ slug: string }> }) {
+// ─── Main Page ──────────────────────────────────────────────────────────────────
+
+export default function HelpCenterPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
   const { slug } = use(params);
-  // Derivado lazy via window — sem isso o build de produção com env
-  // vazio caía em fetch relativo (`/v1/public/...`) batendo no front
-  // em vez do backend e devolvendo 404 do Next pra "Central de Ajuda".
   const [API] = useState(() => getApiBase());
   const [config, setConfig] = useState<Config | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
-  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [search, setSearch] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<Article[] | null>(null);
-  const [aiQuestion, setAiQuestion] = useState("");
-  const [aiAnswer, setAiAnswer] = useState<{ answer: string; sources: { id: string; title: string; slug: string }[] } | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [notFoundHint, setNotFoundHint] = useState<{ requested?: string; available?: string[]; hint?: string } | null>(null);
+  const [notFoundHint, setNotFoundHint] = useState<{
+    requested?: string;
+    available?: string[];
+    hint?: string;
+  } | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [fontLoaded, setFontLoaded] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const primaryColor = config?.primary_color ?? "#00d46a";
+  // ─── Load data ───────────────────────────────────────────────────────────—
 
   useEffect(() => {
     async function load() {
@@ -112,340 +232,650 @@ export default function HelpCenterPage({ params }: { params: Promise<{ slug: str
           } catch {}
           return;
         }
-        const cfgData = await cfgRes.json();
+        const cfgData: Config = await cfgRes.json();
         setConfig(cfgData);
 
         if (catsRes.ok) {
-          const cats: Category[] = await catsRes.json();
-          setCategories(cats);
+          setCategories((await catsRes.json()) as Category[]);
         }
-
-        const arts: Article[] = await artsRes.json();
-        setArticles(arts);
+        setArticles((await artsRes.json()) as Article[]);
       } catch {
         setNotFound(true);
       }
     }
     load();
-  }, [slug]);
+  }, [slug, API]);
 
-  // Debounced search
+  // ─── Load font ───────────────────────────────────────────────────────────—
+
   useEffect(() => {
-    if (!search.trim()) { setSearchResults(null); return; }
+    if (!config?.font_family || config.font_family === "inter" || config.font_family === "geist")
+      return;
+    const url = FONT_URLS[config.font_family];
+    if (!url) return;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = url;
+    link.onload = () => setFontLoaded(true);
+    document.head.appendChild(link);
+    return () => {
+      document.head.removeChild(link);
+    };
+  }, [config?.font_family]);
+
+  // ─── Search ───────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!search.trim()) {
+      setSearchResults(null);
+      return;
+    }
     if (searchTimer.current) clearTimeout(searchTimer.current);
     setSearching(true);
     searchTimer.current = setTimeout(async () => {
       try {
-        const res = await fetch(`${API}/v1/public/helpdesk/${slug}/articles?q=${encodeURIComponent(search)}`);
-        setSearchResults(await res.json());
-      } catch { setSearchResults([]); }
-      finally { setSearching(false); }
-    }, 350);
-  }, [search, slug]);
+        const res = await fetch(
+          `${API}/v1/public/helpdesk/${slug}/articles?q=${encodeURIComponent(search)}`
+        );
+        setSearchResults((await res.json()) as Article[]);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+  }, [search, slug, API]);
 
-  async function askAI() {
-    if (!aiQuestion.trim()) return;
-    setAiLoading(true);
-    setAiAnswer(null);
-    try {
-      const res = await fetch(`${API}/v1/public/helpdesk/${slug}/ask`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: aiQuestion }),
-      });
-      setAiAnswer(await res.json());
-    } catch { setAiAnswer({ answer: "Erro ao processar sua pergunta.", sources: [] }); }
-    finally { setAiLoading(false); }
-  }
+  // ─── Derived values ───────────────────────────────────────────────────────
 
-  const displayedArticles = searchResults ?? (selectedCat
+  const color = config?.primary_color ?? "#00d46a";
+  const themeMode = config?.theme_mode ?? "dark";
+  const fontFamily =
+    FONT_STACKS[config?.font_family ?? "inter"] ?? FONT_STACKS.inter;
+  const hideBranding = config?.hide_uniq_branding ?? false;
+
+  const prefersDark =
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+  const isDark =
+    themeMode === "system" ? prefersDark : themeMode === "dark";
+  const isLight = !isDark;
+
+  // ─── Theme tokens ─────────────────────────────────────────────────────────
+
+  const t = {
+    bg: isLight ? "#f8fafc" : "#08090d",
+    surface: isLight ? "#ffffff" : "rgba(255,255,255,0.03)",
+    surfaceHover: isLight ? "#f1f5f9" : "rgba(255,255,255,0.05)",
+    border: isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.06)",
+    borderStrong: isLight ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)",
+    text: isLight ? "#0f172a" : "#f1f5f9",
+    text2: isLight ? "#475569" : "#94a3b8",
+    text3: isLight ? "#94a3b8" : "#64748b",
+    glass: isLight
+      ? "rgba(255,255,255,0.70)"
+      : "rgba(255,255,255,0.04)",
+    glassBorder: isLight
+      ? "rgba(0,0,0,0.06)"
+      : "rgba(255,255,255,0.06)",
+    inputBg: isLight ? "#f1f5f9" : "rgba(255,255,255,0.04)",
+  };
+
+  const filteredArticles = searchResults ?? (selectedCat
     ? articles.filter((a) => a.category_id === selectedCat)
     : articles);
 
-  if (notFound) return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0d0d0d", color: "#fff", padding: 24 }}>
-      <div style={{ textAlign: "center", maxWidth: 520 }}>
-        <div style={{ fontSize: 64, marginBottom: 16 }}>🔍</div>
-        <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Central de ajuda não encontrada</h1>
-        <p style={{ color: "#888", marginBottom: 16 }}>
-          {notFoundHint?.requested ? <>Procuramos por <code style={{ background: "#1a1a1a", padding: "2px 6px", borderRadius: 4 }}>{notFoundHint.requested}</code> e não achamos.</> : "O link pode estar errado ou a Central de Ajuda ainda não foi configurada."}
-        </p>
-        {notFoundHint?.available && notFoundHint.available.length > 0 && (
-          <div style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 16, marginTop: 12, textAlign: "left" }}>
-            <p style={{ fontSize: 13, color: "#a0a0a0", marginBottom: 8 }}>Centrais disponíveis:</p>
-            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+  // ─── 404 ──────────────────────────────────────────────────────────────────
+
+  if (notFound) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: t.bg,
+          color: t.text,
+          fontFamily,
+        }}
+      >
+        <div style={{ textAlign: "center", maxWidth: 480, padding: 40 }}>
+          <div style={{ fontSize: 56, marginBottom: 16, opacity: 0.4 }}>404</div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>
+            Central não encontrada
+          </h1>
+          <p style={{ color: t.text2, marginBottom: 20, fontSize: 14 }}>
+            {notFoundHint?.requested ? (
+              <>
+                <code
+                  style={{
+                    background: t.surface,
+                    padding: "2px 8px",
+                    borderRadius: 6,
+                    fontSize: 13,
+                  }}
+                >
+                  {notFoundHint.requested}
+                </code>{" "}
+                não localizado.
+              </>
+            ) : (
+              "O link pode estar errado ou a central ainda não foi configurada."
+            )}
+          </p>
+          {notFoundHint?.available && notFoundHint.available.length > 0 && (
+            <div
+              style={{
+                background: t.surface,
+                border: `1px solid ${t.border}`,
+                borderRadius: 14,
+                padding: 16,
+                textAlign: "left",
+              }}
+            >
+              <p style={{ fontSize: 12, color: t.text3, marginBottom: 10 }}>
+                Centrais disponíveis:
+              </p>
               {notFoundHint.available.map((s) => (
-                <li key={s}>
-                  <Link href={`/help/${s}`} style={{ color: "#00d46a", textDecoration: "none", fontSize: 14 }}>/help/{s}</Link>
-                </li>
+                <Link
+                  key={s}
+                  href={`/help/${s}`}
+                  style={{
+                    display: "block",
+                    color,
+                    textDecoration: "none",
+                    fontSize: 13,
+                    padding: "5px 0",
+                  }}
+                >
+                  /help/{s}
+                </Link>
               ))}
-            </ul>
-          </div>
-        )}
-        {notFoundHint?.hint && <p style={{ fontSize: 12, color: "#666", marginTop: 16 }}>{notFoundHint.hint}</p>}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
-  if (!config) return (
-    <div style={{ minHeight: "100vh", background: "#0d0d0d", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: 36, height: 36, border: `3px solid ${primaryColor}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  );
+  // ─── Loading ──────────────────────────────────────────────────────────────
 
-  const bg = "#0d0d0d";
-  const surface = "#161616";
-  const border = "rgba(255,255,255,0.08)";
-  const text1 = "#f0f0f0";
-  const text2 = "#a0a0a0";
-  const text3 = "#666";
+  if (!config) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: t.bg,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            border: `2.5px solid ${color}`,
+            borderTopColor: "transparent",
+            borderRadius: "50%",
+            animation: "hc-spin 0.7s linear infinite",
+          }}
+        />
+      </div>
+    );
+  }
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ minHeight: "100vh", background: bg, color: text1 }}>
+    <div style={{ minHeight: "100vh", background: t.bg, fontFamily }}>
+      {/* ── Global styles ─────────────────────────────────────────────────── */}
       <style>{`
-        *{box-sizing:border-box;}
-        a{color:${primaryColor};text-decoration:none;}
-        a:hover{text-decoration:underline;}
-        .art-body h1,.art-body h2,.art-body h3{color:${text1};margin:1.4em 0 0.5em}
-        .art-body p{color:${text2};line-height:1.75;margin:0.6em 0}
-        .art-body ul{color:${text2};padding-left:1.5em;line-height:1.75}
-        .art-body code{background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;font-size:0.85em}
-        .art-body strong{color:${text1}}
-        .search-input::placeholder{color:${text3}}
-        .cat-btn:hover{background:rgba(255,255,255,0.06)!important}
-        .art-card:hover{border-color:${primaryColor}44!important;transform:translateY(-2px)}
-        @keyframes spin{to{transform:rotate(360deg)}}
-        @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-        .fade-in{animation:fadeIn 0.3s ease}
+        @keyframes hc-spin { to { transform: rotate(360deg); } }
+        @keyframes hc-fade-up {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes hc-shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        .hc-article-card:hover {
+          transform: translateY(-2px);
+          border-color: ${color}40 !important;
+          box-shadow: 0 8px 30px ${color}10;
+        }
+        .hc-article-card:hover .hc-glow { opacity: 1; }
+        .hc-search:focus { border-color: ${color}60 !important; box-shadow: 0 0 0 3px ${color}10; }
+        .hc-cat-btn {
+          transition: all 0.15s ease;
+        }
+        .hc-cat-btn:hover {
+          background: ${color}10 !important;
+          color: ${color} !important;
+        }
+        * { box-sizing: border-box; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: ${t.text3}40; border-radius: 4px; }
       `}</style>
 
-      {/* Header */}
-      <header style={{ background: surface, borderBottom: `1px solid ${border}`, padding: "0 24px" }}>
-        <div style={{ maxWidth: 960, margin: "0 auto", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {config.logo_url
-              ? <img src={config.logo_url} alt="logo" style={{ height: 32, borderRadius: 6 }} />
-              : <div style={{ width: 32, height: 32, borderRadius: 8, background: primaryColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>💬</div>
-            }
-            <span style={{ fontWeight: 600, fontSize: 16, color: text1 }}>{config.title}</span>
+      {/* ── Glass header ─────────────────────────────────────────────────── */}
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 50,
+          background: t.glass,
+          backdropFilter: "blur(20px) saturate(180%)",
+          WebkitBackdropFilter: "blur(20px) saturate(180%)",
+          borderBottom: `1px solid ${t.glassBorder}`,
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 1040,
+            margin: "0 auto",
+            padding: "0 24px",
+            height: 56,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {config.logo_url ? (
+              <img
+                src={config.logo_url}
+                alt=""
+                style={{ height: 26, borderRadius: 6 }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 8,
+                  background: `linear-gradient(135deg, ${color}, ${color}cc)`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 14,
+                }}
+              >
+                ?
+              </div>
+            )}
+            <span style={{ fontWeight: 600, fontSize: 15, color: t.text }}>
+              {config.title}
+            </span>
           </div>
-          <span style={{ fontSize: 13, color: text3 }}>{config.article_count} artigo{config.article_count !== 1 ? "s" : ""}</span>
+          <span style={{ fontSize: 12, color: t.text3 }}>
+            {config.article_count} artigo{config.article_count !== 1 ? "s" : ""}
+          </span>
         </div>
       </header>
 
-      {/* Hero + Search */}
-      {!selectedArticle && (
-        <div style={{ padding: "56px 24px 40px", textAlign: "center", background: `linear-gradient(180deg, ${primaryColor}08 0%, transparent 100%)` }}>
-          <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 12, color: text1 }}>
-            {config.title}
-          </h1>
-          {config.description && (
-            <p style={{ fontSize: 16, color: text2, marginBottom: 32, maxWidth: 480, margin: "0 auto 32px" }}>
-              {config.description}
-            </p>
-          )}
-          <div style={{ maxWidth: 560, margin: "0 auto", position: "relative" }}>
-            <input
-              className="search-input"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar artigos..."
-              style={{
-                width: "100%", padding: "14px 20px 14px 48px", fontSize: 15, borderRadius: 14,
-                background: surface, border: `1px solid ${search ? primaryColor + "60" : border}`,
-                color: text1, outline: "none", transition: "border-color 0.2s",
-              }}
-            />
-            <span style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: text3, fontSize: 18 }}>🔍</span>
-            {searching && (
-              <span style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)" }}>
-                <div style={{ width: 18, height: 18, border: `2px solid ${primaryColor}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 24px 80px", display: "flex", gap: 32 }}>
-        {/* Sidebar */}
-        {!selectedArticle && (
-          <aside style={{ width: 220, flexShrink: 0, paddingTop: search ? 0 : 0 }}>
-            {categories.length > 0 && !search && (
-              <div>
-                <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", color: text3, textTransform: "uppercase", marginBottom: 8 }}>
-                  Categorias
-                </p>
-                <button
-                  className="cat-btn"
-                  onClick={() => setSelectedCat(null)}
-                  style={{ width: "100%", textAlign: "left", padding: "8px 12px", borderRadius: 10, border: "none", cursor: "pointer", marginBottom: 4, background: selectedCat === null ? `${primaryColor}18` : "transparent", color: selectedCat === null ? primaryColor : text2, fontWeight: 500, fontSize: 14, transition: "background 0.15s" }}
-                >
-                  📚 Todos ({articles.length})
-                </button>
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    className="cat-btn"
-                    onClick={() => setSelectedCat(cat.id)}
-                    style={{ width: "100%", textAlign: "left", padding: "8px 12px", borderRadius: 10, border: "none", cursor: "pointer", marginBottom: 4, background: selectedCat === cat.id ? `${primaryColor}18` : "transparent", color: selectedCat === cat.id ? primaryColor : text2, fontWeight: 500, fontSize: 14, transition: "background 0.15s" }}
-                  >
-                    {cat.icon || "📂"} {cat.name} ({cat.article_count})
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* AI Ask box */}
-            {!search && (
-              <div style={{ marginTop: 32, padding: "16px", background: surface, border: `1px solid ${border}`, borderRadius: 14 }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: text1, marginBottom: 10 }}>✨ Perguntar à IA</p>
-                <textarea
-                  value={aiQuestion}
-                  onChange={(e) => setAiQuestion(e.target.value)}
-                  placeholder="Qual é minha dúvida..."
-                  rows={3}
-                  style={{ width: "100%", background: "#1e1e1e", border: `1px solid ${border}`, borderRadius: 10, color: text1, padding: "10px 12px", fontSize: 13, resize: "vertical", outline: "none" }}
-                />
-                <button
-                  onClick={askAI}
-                  disabled={aiLoading || !aiQuestion.trim()}
-                  style={{ marginTop: 8, width: "100%", padding: "9px", borderRadius: 10, border: "none", background: primaryColor, color: "#000", fontWeight: 600, fontSize: 13, cursor: aiLoading ? "not-allowed" : "pointer", opacity: aiLoading ? 0.7 : 1 }}
-                >
-                  {aiLoading ? "Processando..." : "Perguntar"}
-                </button>
-                {aiAnswer && (
-                  <div className="fade-in" style={{ marginTop: 12 }}>
-                    <p style={{ fontSize: 13, color: text1, lineHeight: 1.6, marginBottom: 8 }}>{aiAnswer.answer}</p>
-                    {aiAnswer.sources.length > 0 && (
-                      <div>
-                        <p style={{ fontSize: 11, color: text3, marginBottom: 4 }}>Fontes:</p>
-                        {aiAnswer.sources.map((s) => (
-                          <button
-                            key={s.id}
-                            onClick={() => { const art = articles.find((a) => a.slug === s.slug || a.id === s.id); if (art) setSelectedArticle(art); }}
-                            style={{ display: "block", fontSize: 12, color: primaryColor, background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: "2px 0" }}
-                          >
-                            → {s.title}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </aside>
+      {/* ── Hero ──────────────────────────────────────────────────────────── */}
+      <div
+        style={{
+          padding: "48px 24px 40px",
+          textAlign: "center",
+          background: isLight
+            ? `linear-gradient(180deg, ${color}06 0%, transparent 100%)`
+            : `linear-gradient(180deg, ${color}08 0%, transparent 100%)`,
+        }}
+      >
+        <h1
+          style={{
+            fontSize: 32,
+            fontWeight: 700,
+            color: t.text,
+            marginBottom: 8,
+            letterSpacing: "-0.02em",
+          }}
+        >
+          {config.title}
+        </h1>
+        {config.description && (
+          <p
+            style={{
+              fontSize: 15,
+              color: t.text2,
+              marginBottom: 28,
+              maxWidth: 440,
+              margin: "0 auto 28px",
+            }}
+          >
+            {config.description}
+          </p>
         )}
 
-        {/* Main content */}
-        <main style={{ flex: 1, minWidth: 0 }}>
-          {/* Article reader */}
-          {selectedArticle ? (
-            <div className="fade-in">
-              <button
-                onClick={() => setSelectedArticle(null)}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 24, background: "none", border: "none", color: text3, cursor: "pointer", fontSize: 14 }}
+        {/* Search */}
+        <div
+          style={{
+            maxWidth: 500,
+            margin: "0 auto",
+            position: "relative",
+          }}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={t.text3}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)" }}
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            className="hc-search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar artigos..."
+            style={{
+              width: "100%",
+              padding: "13px 18px 13px 46px",
+              fontSize: 14,
+              borderRadius: 14,
+              background: t.inputBg,
+              border: `1px solid ${t.borderStrong}`,
+              color: t.text,
+              outline: "none",
+              transition: "all 0.2s ease",
+              fontFamily: "inherit",
+            }}
+          />
+          {searching && (
+            <div
+              style={{
+                position: "absolute",
+                right: 16,
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: 18,
+                height: 18,
+                border: `2px solid ${color}`,
+                borderTopColor: "transparent",
+                borderRadius: "50%",
+                animation: "hc-spin 0.7s linear infinite",
+              }}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* ── Content ───────────────────────────────────────────────────────── */}
+      <div
+        style={{
+          maxWidth: 1040,
+          margin: "0 auto",
+          padding: "0 24px 80px",
+          display: "flex",
+          gap: 40,
+        }}
+      >
+        {/* Sidebar */}
+        <aside style={{ width: 220, flexShrink: 0, paddingTop: 4 }}>
+          {categories.length > 0 && !search && (
+            <div>
+              <p
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.14em",
+                  color: t.text3,
+                  textTransform: "uppercase",
+                  marginBottom: 10,
+                }}
               >
-                ← Voltar
+                Categorias
+              </p>
+              <button
+                className="hc-cat-btn"
+                onClick={() => setSelectedCat(null)}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "8px 12px",
+                  borderRadius: 10,
+                  border: "none",
+                  cursor: "pointer",
+                  marginBottom: 3,
+                  background: !selectedCat ? `${color}14` : "transparent",
+                  color: !selectedCat ? color : t.text2,
+                  fontWeight: 500,
+                  fontSize: 13,
+                  fontFamily: "inherit",
+                }}
+              >
+                Todos ({articles.length})
               </button>
-              <article>
-                {/* Hero image: capa renderizada acima do título quando o
-                    artigo tem hero_image_url. Aspect ratio largo, sombra
-                    sutil pra integrar com o fundo. */}
-                {selectedArticle.hero_image_url && (
-                  <div
-                    style={{
-                      marginBottom: 24,
-                      borderRadius: 16,
-                      overflow: "hidden",
-                      aspectRatio: "16 / 7",
-                      background: "rgba(255,255,255,0.04)",
-                      border: `1px solid ${border}`,
-                    }}
-                  >
-                    <img
-                      src={selectedArticle.hero_image_url}
-                      alt={selectedArticle.title}
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                    />
-                  </div>
-                )}
-                <h1 style={{ fontSize: 28, fontWeight: 700, color: text1, marginBottom: 8 }}>{selectedArticle.title}</h1>
-                {selectedArticle.summary && (
-                  <p style={{ fontSize: 16, color: text2, marginBottom: 24, paddingBottom: 24, borderBottom: `1px solid ${border}` }}>{selectedArticle.summary}</p>
-                )}
-                {/* O content agora é HTML produzido pelo Tiptap (editor
-                    rich text). Ainda detectamos artigos antigos em Markdown
-                    e os renderizamos via mdToHtml — heurística: começa com
-                    `#` ou não tem nenhuma tag HTML. */}
-                <div
-                  className="art-body"
-                  dangerouslySetInnerHTML={{
-                    __html: /<[a-zA-Z][^>]*>/.test(selectedArticle.content)
-                      ? selectedArticle.content
-                      : mdToHtml(selectedArticle.content),
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  className="hc-cat-btn"
+                  onClick={() => setSelectedCat(cat.id)}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "8px 12px",
+                    borderRadius: 10,
+                    border: "none",
+                    cursor: "pointer",
+                    marginBottom: 3,
+                    background: selectedCat === cat.id ? `${color}14` : "transparent",
+                    color: selectedCat === cat.id ? color : t.text2,
+                    fontWeight: 500,
+                    fontSize: 13,
+                    fontFamily: "inherit",
                   }}
-                />
-                <div style={{ marginTop: 48, paddingTop: 24, borderTop: `1px solid ${border}`, display: "flex", gap: 16, fontSize: 13, color: text3 }}>
-                  <span>{selectedArticle.view_count} visualizações</span>
-                  <span>Atualizado {new Date(selectedArticle.updated_at).toLocaleDateString("pt-BR")}</span>
-                </div>
-              </article>
+                >
+                  {cat.icon || "📂"} {cat.name}{" "}
+                  <span style={{ color: t.text3, fontSize: 11 }}>
+                    {cat.article_count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* AI Ask */}
+          {!search && (
+            <div
+              style={{
+                marginTop: 28,
+                padding: 16,
+                background: t.surface,
+                border: `1px solid ${t.border}`,
+                borderRadius: 14,
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: t.text,
+                  marginBottom: 8,
+                }}
+              >
+                Perguntar à IA
+              </p>
+              <textarea
+                id="hc-ai-input"
+                placeholder="Tire sua dúvida..."
+                rows={2}
+                style={{
+                  width: "100%",
+                  background: t.inputBg,
+                  border: `1px solid ${t.border}`,
+                  borderRadius: 10,
+                  color: t.text,
+                  padding: "9px 11px",
+                  fontSize: 12,
+                  resize: "vertical",
+                  outline: "none",
+                  fontFamily: "inherit",
+                }}
+              />
+              <button
+                onClick={async () => {
+                  const input = document.getElementById("hc-ai-input") as HTMLTextAreaElement;
+                  const q = input?.value?.trim();
+                  if (!q) return;
+                  input.value = "";
+                  const btn = document.getElementById("hc-ai-btn") as HTMLButtonElement;
+                  const ans = document.getElementById("hc-ai-answer");
+                  if (btn) { btn.disabled = true; btn.textContent = "Pensando..."; }
+                  try {
+                    const res = await fetch(`${API}/v1/public/helpdesk/${slug}/ask`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ question: q }),
+                    });
+                    const data = await res.json();
+                    if (ans) {
+                      ans.innerHTML = `
+                        <p style="margin:0 0 8px;font-size:12px;line-height:1.5;color:${t.text}">${data.answer}</p>
+                        ${data.sources?.length ? `<p style="margin:0;font-size:10px;color:${t.text3}">Fontes: ${data.sources.map((s: { title: string }) => s.title).join(", ")}</p>` : ""}
+                      `;
+                    }
+                  } catch {
+                    if (ans) ans.innerHTML = `<p style="margin:0;font-size:12px;color:${t.text2}">Erro ao consultar.</p>`;
+                  } finally {
+                    if (btn) { btn.disabled = false; btn.textContent = "Perguntar"; }
+                  }
+                }}
+                id="hc-ai-btn"
+                style={{
+                  marginTop: 8,
+                  width: "100%",
+                  padding: "8px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: color,
+                  color: "#000",
+                  fontWeight: 600,
+                  fontSize: 12,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                Perguntar
+              </button>
+              <div id="hc-ai-answer" style={{ marginTop: 10 }} />
+            </div>
+          )}
+        </aside>
+
+        {/* Main */}
+        <main style={{ flex: 1, minWidth: 0 }}>
+          {search && searchResults !== null && (
+            <p
+              style={{
+                fontSize: 12,
+                color: t.text3,
+                marginBottom: 16,
+              }}
+            >
+              {searchResults.length} resultado{searchResults.length !== 1 ? "s" : ""}{" "}
+              para &ldquo;{search}&rdquo;
+            </p>
+          )}
+
+          {filteredArticles.length === 0 ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "60px 0",
+                color: t.text3,
+              }}
+            >
+              <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.5 }}>
+                📭
+              </div>
+              <p style={{ fontSize: 14 }}>
+                {search
+                  ? "Nenhum artigo encontrado."
+                  : "Nenhum artigo publicado ainda."}
+              </p>
             </div>
           ) : (
-            <div className="fade-in">
-              {search && searchResults !== null && (
-                <p style={{ fontSize: 13, color: text3, marginBottom: 16 }}>
-                  {searchResults.length} resultado{searchResults.length !== 1 ? "s" : ""} para "{search}"
-                </p>
-              )}
-              {displayedArticles.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "60px 0", color: text3 }}>
-                  <div style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
-                  <p>{search ? "Nenhum artigo encontrado para essa busca." : "Nenhum artigo publicado ainda."}</p>
+            <div style={{ display: "grid", gap: 12 }}>
+              {filteredArticles.map((art, i) => (
+                <div
+                  key={art.id}
+                  style={{
+                    animation: `hc-fade-up 0.35s ease ${i * 0.04}s both`,
+                  }}
+                >
+                  <ArticleCard
+                    article={art}
+                    slug={slug}
+                    color={color}
+                    isLight={isLight}
+                  />
                 </div>
-              ) : (
-                <div style={{ display: "grid", gap: 16 }}>
-                  {displayedArticles.map((art) => (
-                    <Link
-                      key={art.id}
-                      href={`/help/${slug}/${art.slug}`}
-                      className="art-card"
-                      style={{ display: "block", width: "100%", textAlign: "left", padding: "20px 24px", borderRadius: 14, background: surface, border: `1px solid ${border}`, cursor: "pointer", transition: "all 0.2s", textDecoration: "none" }}
-                    >
-                      <h3 style={{ fontSize: 16, fontWeight: 600, color: text1, marginBottom: 6 }}>{art.title}</h3>
-                      {art.summary && <p style={{ fontSize: 14, color: text2, lineHeight: 1.5, marginBottom: 8 }}>{art.summary}</p>}
-                      <div style={{ display: "flex", gap: 12, fontSize: 12, color: text3 }}>
-                        <span>{art.view_count} views</span>
-                        <span>{new Date(art.updated_at).toLocaleDateString("pt-BR")}</span>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
+              ))}
             </div>
           )}
         </main>
       </div>
 
-      {/* Footer */}
-      <footer style={{ borderTop: `1px solid ${border}`, padding: "20px 24px", textAlign: "center" }}>
-        <p style={{ fontSize: 12, color: text3 }}>
-          Powered by <span style={{ color: primaryColor }}>Uniq Chat</span>
-        </p>
-      </footer>
+      {/* ── Footer ────────────────────────────────────────────────────────── */}
+      {!hideBranding && (
+        <footer
+          style={{
+            borderTop: `1px solid ${t.border}`,
+            padding: "16px 24px",
+            textAlign: "center",
+          }}
+        >
+          <p style={{ fontSize: 11, color: t.text3, margin: 0 }}>
+            Powered by{" "}
+            <a
+              href="https://uniq.chat"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color, textDecoration: "none", fontWeight: 600 }}
+            >
+              Uniq Chat
+            </a>
+          </p>
+        </footer>
+      )}
 
-      {/* Floating chat widget */}
+      {/* ── Floating chat widget ──────────────────────────────────────────── */}
       {config.widget_enabled && config.webchat_token && (
-        <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 12 }}>
+        <div
+          style={{
+            position: "fixed",
+            bottom: 20,
+            right: 20,
+            zIndex: 9999,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 12,
+          }}
+        >
           {chatOpen && (
             <iframe
               src={`/embed/chat/${config.webchat_token}`}
               style={{
-                width: 380, height: 580, border: "none", borderRadius: 16,
-                boxShadow: "0 8px 40px rgba(0,0,0,0.25)", background: "#fff",
-                animation: "chatFadeIn 0.2s ease",
+                width: 380,
+                height: 560,
+                border: "none",
+                borderRadius: 20,
+                boxShadow: `0 12px 48px rgba(0,0,0,0.30), 0 0 0 1px ${t.border}`,
+                background: "#fff",
+                animation: "hc-fade-up 0.25s ease",
               }}
               allow="microphone"
               title="Chat"
@@ -454,27 +884,34 @@ export default function HelpCenterPage({ params }: { params: Promise<{ slug: str
           <button
             onClick={() => setChatOpen((v) => !v)}
             style={{
-              width: 56, height: 56, borderRadius: "50%", border: "none",
-              background: primaryColor, color: "#fff", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: `0 4px 20px ${primaryColor}60`,
-              transition: "transform 0.2s",
+              width: 50,
+              height: 50,
+              borderRadius: "50%",
+              border: "none",
+              background: `linear-gradient(135deg, ${color}, ${color}dd)`,
+              color: "#000",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: `0 4px 20px ${color}40`,
+              transition: "transform 0.2s ease",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.06)")}
             onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
             aria-label={chatOpen ? "Fechar chat" : "Abrir chat"}
           >
             {chatOpen ? (
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             ) : (
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
             )}
           </button>
-          <style>{`@keyframes chatFadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}`}</style>
         </div>
       )}
     </div>
