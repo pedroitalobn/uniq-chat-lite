@@ -61,7 +61,7 @@ function NavLink({
   const showTip = !expanded && hovered;
 
   return (
-    <div style={{ position: "relative" }}>
+    <div style={{ position: "relative", isolation: "isolate" }}>
       <Link
         href={href}
         onClick={onClick}
@@ -82,19 +82,19 @@ function NavLink({
           border: isActive ? `1px solid rgba(0,212,106,0.28)` : "1px solid transparent",
           boxShadow: isActive ? "0 0 14px rgba(0,212,106,0.18)" : "none",
           color: isActive ? C.active : hovered ? C.text1 : C.text2,
-          transition: "all 0.18s cubic-bezier(0.34,1.2,0.64,1)",
-          transform: hovered && !expanded ? "scale(1.07) translateX(2px)" : "scale(1)",
+          transition: "all 0.18s cubic-bezier(0.34,1.56,0.64,1)",
+          transform: hovered && !expanded ? "scale(1.10)" : "scale(1)",
         }}
       >
         {/* Icon wrapper */}
         <span style={{
-          width: 22, height: 22,
+          width: 26, height: 26,
           display: "flex", alignItems: "center", justifyContent: "center",
           flexShrink: 0, position: "relative",
-          borderRadius: 7,
+          borderRadius: 8,
           background: isActive ? "rgba(0,212,106,0.18)" : "transparent",
         }}>
-          <Icon style={{ width: 15, height: 15 }} strokeWidth={isActive ? 2.2 : 1.8} />
+          <Icon style={{ width: 16, height: 16 }} strokeWidth={isActive ? 2.2 : 1.8} />
           {/* Badge dot when collapsed */}
           {!expanded && badge != null && (
             <span style={{
@@ -354,7 +354,7 @@ export function SidebarDock() {
         WebkitBackdropFilter: "blur(28px) saturate(200%)",
         border: `1px solid ${C.border}`,
         boxShadow: "0 24px 64px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)",
-        overflow: "hidden",
+        overflow: "visible",
         padding: "10px 10px 8px",
         gap: 0,
         maxHeight: "calc(100vh - 32px)",
@@ -389,7 +389,7 @@ export function SidebarDock() {
       {/* ── Nav items ── */}
       <div style={{
         display: "flex", flexDirection: "column", gap: 2,
-        flex: 1, overflowY: "auto", width: "100%",
+        flex: 1, overflowY: "auto", overflowX: "clip", width: "100%",
         scrollbarWidth: "none",
       }}>
         {navItems.map((item) => (
@@ -699,8 +699,8 @@ function WorkspaceSection({
             cursor: "pointer", outline: "none",
             transition: "all 0.18s cubic-bezier(0.34,1.56,0.64,1)",
           }}
-          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.07) translateX(2px)"; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1) translateX(0)"; }}
+          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.10)"; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
         >
           <WsIcon style={{ width: 16, height: 16, color: wsColor }} />
         </button>
