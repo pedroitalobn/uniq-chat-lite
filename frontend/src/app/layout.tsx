@@ -3,6 +3,7 @@ import { Inter_Tight, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { ServiceWorkerRegister } from "./ServiceWorkerRegister";
+import HelpCenterWidget from "@/components/HelpCenterWidget";
 
 // Inter — fonte default do uniq.chat (Apr/26). Pesos cobrindo a hierarquia:
 //   300 light    → metadados secundários (timestamps, captions, hints)
@@ -64,6 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="pt-BR" className="dark" suppressHydrationWarning>
       <body className={`${sans.variable} ${mono.variable} font-sans antialiased`} suppressHydrationWarning>
         <Providers>{children}</Providers>
+        <HelpCenterWidget />
         <ServiceWorkerRegister />
       </body>
     </html>
