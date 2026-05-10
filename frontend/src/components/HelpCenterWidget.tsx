@@ -1,8 +1,7 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-// Deriva a URL do backend — mesmo helper usado nas rotas públicas
 function getApiBase(): string {
   const env = process.env.NEXT_PUBLIC_API_URL ?? "";
   if (env && !/localhost|127\.0\.0\.1/.test(env)) return env.replace(/\/v1\/?$/, "");
@@ -26,17 +25,14 @@ export default function HelpCenterWidget() {
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [color, setColor] = useState(DEFAULT_COLOR);
+  const [hover, setHover] = useState(false);
   const fetched = useRef(false);
 
   useEffect(() => {
     if (fetched.current) return;
     fetched.current = true;
-
     fetch(`${api}/v1/public/helpdesk/${WORKSPACE_SLUG}/config`)
-      .then((res) => {
-        if (!res.ok) return null;
-        return res.json();
-      })
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.widget_enabled && data?.webchat_token) {
           setToken(data.webchat_token);
@@ -47,74 +43,119 @@ export default function HelpCenterWidget() {
       .finally(() => setReady(true));
   }, [api]);
 
-  // Não mostra nada se o workspace não tiver chat configurado
   if (!ready || !token) return null;
 
   return (
     <>
-      {open && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 90,
-            right: 24,
-            width: 400,
-            height: 600,
-            maxHeight: "calc(100vh - 120px)",
-            borderRadius: 20,
-            overflow: "hidden",
-            boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
-            zIndex: 99999,
-            animation: "uniq-widget-fade-in 0.2s ease",
-          }}
-        >
+      {/* Backdrop */}
+      <div
+        onClick={() => setOpen(false)}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: open ? "rgba(0,0,0,0.30)" : "transparent",
+          pointerEvents: open ? "auto" : "none",
+          zIndex: 99998,
+          transition: "background 0.35s ease",
+          backdropFilter: open ? "blur(2px)" : "none",
+          WebkitBackdropFilter: open ? "blur(2px)" : "none",
+        }}
+      />
+
+      {/* Modal */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: 92,
+          right: 24,
+          width: 400,
+          height: 600,
+          maxHeight: "calc(100vh - 120px)",
+          borderRadius: 24,
+          overflow: "hidden",
+          background: "#0f1117",
+          boxShadow: open
+            ? `0 32px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.08), 0 0 80px ${color}15`
+            : "0 8px 32px rgba(0,0,0,0.20)",
+          zIndex: 99999,
+          opacity: open ? 1 : 0,
+          transform: open ? "translateY(0) scale(1)" : "translateY(20px) scale(0.96)",
+          pointerEvents: open ? "auto" : "none",
+          transition: "all 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
+          transformOrigin: "bottom right",
+        }}
+      >
+        {open && token && (
           <iframe
-            src={`/embed/chat/${token}`}
+            src={`/embed/widget/${token}`}
             style={{ width: "100%", height: "100%", border: "none" }}
             allow="microphone"
-            title="Chat"
+            title="Suporte Uniq"
           />
-        </div>
-      )}
+        )}
+      </div>
+
+      {/* Floating button */}
       <button
         onClick={() => setOpen((v) => !v)}
-        title="Suporte"
-        aria-label={open ? "Fechar chat" : "Abrir chat"}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        aria-label={open ? "Fechar suporte" : "Abrir suporte"}
         style={{
           position: "fixed",
           bottom: 24,
           right: 24,
-          width: 52,
-          height: 52,
-          borderRadius: "50%",
+          width: 56,
+          height: 56,
+          borderRadius: open ? 18 : 28,
           border: "none",
           cursor: "pointer",
-          background: color,
+          background: `linear-gradient(135deg, ${color}, ${color}dd)`,
           color: "#000",
-          fontSize: 22,
-          fontWeight: 800,
-          boxShadow: `0 4px 24px ${color}66`,
           zIndex: 99999,
-          transition: "transform 0.2s",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          boxShadow: hover
+            ? `0 8px 32px ${color}50, 0 0 0 4px ${color}18`
+            : `0 4px 20px ${color}40`,
+          transition: "all 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
+          transform: hover ? "scale(1.06)" : "scale(1)",
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.08)")}
-        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
       >
+        {/* Pulse ring */}
+        {!open && (
+          <span
+            style={{
+              position: "absolute",
+              inset: -6,
+              borderRadius: 34,
+              border: `2px solid ${color}40`,
+              animation: "widget-pulse 2s ease-out infinite",
+              pointerEvents: "none",
+            }}
+          />
+        )}
+
         {open ? (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         ) : (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            <path d="M8 10h.01M12 10h.01M16 10h.01" strokeWidth="2.5" />
           </svg>
         )}
       </button>
-      <style>{`@keyframes uniq-widget-fade-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}`}</style>
+
+      <style>{`
+        @keyframes widget-pulse {
+          0% { transform: scale(1); opacity: 1; }
+          100% { transform: scale(1.5); opacity: 0; }
+        }
+      `}</style>
     </>
   );
 }
