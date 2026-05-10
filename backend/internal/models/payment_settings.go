@@ -13,7 +13,7 @@ type PaymentProvider string
 const (
 	PaymentProviderStripe  PaymentProvider = "stripe"
 	PaymentProviderAsaas   PaymentProvider = "asaas"
-	PaymentProviderHotmart PaymentProvider = "hotmart"
+	PaymentProviderAbacatePay PaymentProvider = "abacatepay"
 )
 
 // PaymentSettings holds global payment provider configuration
@@ -32,9 +32,11 @@ type PaymentSettings struct {
 	AsaasEnvironment   string `gorm:"type:varchar(20);default:'sandbox'" json:"asaas_environment"`
 	AsaasCheckoutType  string `gorm:"type:varchar(20);default:'transparent'" json:"asaas_checkout_type"`
 
-	// Hotmart (reserved for future)
-	HotmartAPIKey        string `gorm:"type:text" json:"hotmart_api_key,omitempty"`
-	HotmartWebhookSecret string `gorm:"type:text" json:"hotmart_webhook_secret,omitempty"`
+	// AbacatePay
+	AbacatepayAPIKey        string `gorm:"type:text" json:"abacatepay_api_key,omitempty"`
+	AbacatepayWebhookSecret string `gorm:"type:text" json:"abacatepay_webhook_secret,omitempty"`
+	AbacatepayEnvironment   string `gorm:"type:varchar(20);default:'sandbox'" json:"abacatepay_environment"`
+	AbacatepayCheckoutType  string `gorm:"type:varchar(20);default:'transparent'" json:"abacatepay_checkout_type"`
 
 	// Status do último teste de conectividade por provider. UI usa pra
 	// distinguir "credencial salva no DB" vs "credencial valida que o
@@ -48,9 +50,9 @@ type PaymentSettings struct {
 	AsaasTestStatus     string     `gorm:"type:varchar(20)" json:"asaas_test_status,omitempty"`
 	AsaasTestedAt       *time.Time `json:"asaas_tested_at,omitempty"`
 	AsaasTestError      string     `gorm:"type:text" json:"asaas_test_error,omitempty"`
-	HotmartTestStatus   string     `gorm:"type:varchar(20)" json:"hotmart_test_status,omitempty"`
-	HotmartTestedAt     *time.Time `json:"hotmart_tested_at,omitempty"`
-	HotmartTestError    string     `gorm:"type:text" json:"hotmart_test_error,omitempty"`
+	AbacatepayTestStatus  string     `gorm:"type:varchar(20)" json:"abacatepay_test_status,omitempty"`
+	AbacatepayTestedAt    *time.Time `json:"abacatepay_tested_at,omitempty"`
+	AbacatepayTestError   string     `gorm:"type:text" json:"abacatepay_test_error,omitempty"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`

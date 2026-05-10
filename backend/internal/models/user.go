@@ -68,6 +68,11 @@ type User struct {
 	// no servidor Asaas quando bate.
 	AsaasCancelAt *time.Time `json:"asaas_cancel_at,omitempty"`
 
+	// AbacatePay — mesmo tratamento: IDs internos ocultos, status público.
+	AbacatepayCheckoutID        string `gorm:"type:varchar(255)" json:"-"`
+	AbacatepaySubscriptionID     string `gorm:"type:varchar(255)" json:"-"`
+	AbacatepaySubscriptionStatus string `gorm:"type:varchar(50)" json:"abacatepay_subscription_status,omitempty"`
+
 	Workspaces []UserWorkspace `gorm:"foreignKey:UserID" json:"workspaces,omitempty"`
 	CreatedAt  time.Time       `json:"created_at"`
 	UpdatedAt  time.Time       `json:"updated_at"`

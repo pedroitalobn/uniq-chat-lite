@@ -66,8 +66,9 @@ type Plan struct {
 	MaxProxyPool          int  `gorm:"default:0" json:"max_proxy_pool"`              // total entries
 
 	// ── Provider IDs ──────────────────────────────────────────────────
-	StripePriceID  string `gorm:"type:varchar(255)" json:"stripe_price_id,omitempty"`
-	AsaasProductID string `gorm:"type:varchar(255)" json:"asaas_product_id,omitempty"`
+	StripePriceID      string `gorm:"type:varchar(255)" json:"stripe_price_id,omitempty"`
+	AsaasProductID     string `gorm:"type:varchar(255)" json:"asaas_product_id,omitempty"`
+	AbacatepayProductID string `gorm:"type:varchar(255)" json:"abacatepay_product_id,omitempty"`
 
 	// JSON livre pra atributos custom (display_order, color, badge, etc).
 	// Não é usado pra autorização — só metadata UI.

@@ -516,7 +516,7 @@ func autoMigrate(db *gorm.DB) error {
 		// Sprint billing — usage counters
 		&models.UsageCounter{},
 		&models.PlanChangeLog{},
-		// Webhook dedup (Stripe/Asaas/Hotmart event.id idempotência)
+		// Webhook dedup (Stripe/Asaas/AbacatePay event.id idempotência)
 		&models.ProcessedWebhookEvent{},
 		// Email/Maileroo config — tabela armazenada no /admin/providers
 		&models.EmailSettings{},
@@ -632,6 +632,7 @@ func seedPlans(db *gorm.DB) {
 			// Antes ficava hardcoded num price antigo (price_1TFmWy...) que
 			// sobreviveu pra rows existentes mesmo após o admin trocar o env.
 			StripePriceID:         os.Getenv("STRIPE_PRICE_STARTER"),
+			AbacatepayProductID:   os.Getenv("ABACATEPAY_PRODUCT_STARTER"),
 		},
 		{
 			Name:                  "Pro",
@@ -649,6 +650,7 @@ func seedPlans(db *gorm.DB) {
 			MaxProxyPool:          10,
 			IsActive:              true,
 			StripePriceID:         os.Getenv("STRIPE_PRICE_PRO"),
+			AbacatepayProductID:   os.Getenv("ABACATEPAY_PRODUCT_PRO"),
 		},
 		{
 			Name:                  "Business",
@@ -666,6 +668,7 @@ func seedPlans(db *gorm.DB) {
 			MaxProxyPool:          50,
 			IsActive:              true,
 			StripePriceID:         os.Getenv("STRIPE_PRICE_BUSINESS"),
+			AbacatepayProductID:   os.Getenv("ABACATEPAY_PRODUCT_BUSINESS"),
 		},
 	}
 
@@ -732,6 +735,20 @@ func seedPlans(db *gorm.DB) {
 	setPriceIDIfEmpty("Starter", "STRIPE_PRICE_STARTER")
 	setPriceIDIfEmpty("Pro", "STRIPE_PRICE_PRO")
 	setPriceIDIfEmpty("Business", "STRIPE_PRICE_BUSINESS")
+
+	// Self-heal: preenche abacatepay_product_id do env se a coluna DB estiver vazia
+	setAbacatePayProductIDIfEmpty := func(planName, envKey string) {
+		productID := os.Getenv(envKey)
+		if productID == "" {
+			return
+		}
+		db.Model(&models.Plan{}).
+			Where("name = ? AND (abacatepay_product_id IS NULL OR abacatepay_product_id = '')", planName).
+			Update("abacatepay_product_id", productID)
+	}
+	setAbacatePayProductIDIfEmpty("Starter", "ABACATEPAY_PRODUCT_STARTER")
+	setAbacatePayProductIDIfEmpty("Pro", "ABACATEPAY_PRODUCT_PRO")
+	setAbacatePayProductIDIfEmpty("Business", "ABACATEPAY_PRODUCT_BUSINESS")
 }
 
 // applyTicketingIndexes installs the partial unique index and hot-path
@@ -877,6 +894,7 @@ func applyPlansMigration(db *gorm.DB) {
 		`UPDATE plans SET allow_helpdesk = true, allow_webchat = true WHERE name IN ('Pro', 'Business') AND (allow_helpdesk = false OR allow_webchat = false)`,
 		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS stripe_price_id VARCHAR(255)`,
 		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS asaas_product_id VARCHAR(255)`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS abacatepay_product_id VARCHAR(255)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_plans_slug ON plans(slug) WHERE slug != ''`,
 	}
 	for _, s := range stmts {

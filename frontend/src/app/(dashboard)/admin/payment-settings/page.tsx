@@ -16,41 +16,47 @@ interface PaymentSettings {
   asaas_webhook_secret?: string;
   asaas_environment?: string;
   asaas_checkout_type?: string;
-  hotmart_api_key?: string;
-  hotmart_webhook_secret?: string;
+  abacatepay_api_key?: string;
+  abacatepay_webhook_secret?: string;
+  abacatepay_environment?: string;
+  abacatepay_checkout_type?: string;
+  abacatepay_test_status?: string;
+  abacatepay_tested_at?: string | null;
+  abacatepay_test_error?: string;
   // Configuration status
   stripe_configured?: boolean;
   asaas_configured?: boolean;
-  hotmart_configured?: boolean;
+  abacatepay_configured?: boolean;
   // Webhook URLs
   stripe_webhook_url?: string;
   asaas_webhook_url?: string;
+  abacatepay_webhook_url?: string;
 }
 
 const PROVIDERS = [
-  { 
-    id: "stripe", 
-    label: "Stripe", 
-    icon: "💳", 
-    color: "#635bff", 
+  {
+    id: "stripe",
+    label: "Stripe",
+    icon: "💳",
+    color: "#635bff",
     desc: "Cartão Internacional",
     descConfigured: "Cartão Internacional (Configurado)"
   },
-  { 
-    id: "asaas", 
-    label: "Asaas", 
-    icon: "🇧🇷", 
-    color: "#22c55e", 
+  {
+    id: "asaas",
+    label: "Asaas",
+    icon: "🇧🇷",
+    color: "#22c55e",
     desc: "Pix, Boleto, Cartão (BR) - Configure no painel",
     descConfigured: "Pix, Boleto, Cartão (BR) (Configurado)"
   },
-  { 
-    id: "hotmart", 
-    label: "Hotmart", 
-    icon: "🎯", 
-    color: "#fbbf24", 
-    desc: "Em breve",
-    descConfigured: "Em breve"
+  {
+    id: "abacatepay",
+    label: "AbacatePay",
+    icon: "🥑",
+    color: "#0ea5e9",
+    desc: "PIX Transparente — checkout otimizado",
+    descConfigured: "PIX Transparente (Configurado)"
   },
 ];
 
@@ -67,8 +73,10 @@ interface PaymentConfig {
   asaas_webhook_secret: string;
   asaas_environment: string;
   asaas_checkout_type: "redirect" | "transparent";
-  hotmart_api_key: string;
-  hotmart_webhook_secret: string;
+  abacatepay_api_key: string;
+  abacatepay_webhook_secret: string;
+  abacatepay_environment: string;
+  abacatepay_checkout_type: "redirect" | "transparent";
 }
 
 export default function PaymentSettingsPage() {
@@ -88,8 +96,10 @@ export default function PaymentSettingsPage() {
     asaas_webhook_secret: "",
     asaas_environment: "sandbox",
     asaas_checkout_type: "transparent",
-    hotmart_api_key: "",
-    hotmart_webhook_secret: "",
+    abacatepay_api_key: "",
+    abacatepay_webhook_secret: "",
+    abacatepay_environment: "sandbox",
+    abacatepay_checkout_type: "transparent",
   });
 
   const [activeProvider, setActiveProvider] = useState("stripe");
@@ -110,7 +120,11 @@ export default function PaymentSettingsPage() {
       newForm.asaas_api_key !== "" ||
       newForm.asaas_webhook_secret !== (settings.asaas_webhook_secret || "") ||
       newForm.asaas_environment !== (settings.asaas_environment || "sandbox") ||
-      newForm.asaas_checkout_type !== (settings.asaas_checkout_type || "transparent")
+      newForm.asaas_checkout_type !== (settings.asaas_checkout_type || "transparent") ||
+      newForm.abacatepay_api_key !== "" ||
+      newForm.abacatepay_webhook_secret !== (settings.abacatepay_webhook_secret || "") ||
+      newForm.abacatepay_environment !== (settings.abacatepay_environment || "sandbox") ||
+      newForm.abacatepay_checkout_type !== (settings.abacatepay_checkout_type || "transparent")
     );
   };
 
@@ -126,8 +140,10 @@ export default function PaymentSettingsPage() {
         asaas_webhook_secret: settings.asaas_webhook_secret || "",
         asaas_environment: settings.asaas_environment || "sandbox",
         asaas_checkout_type: settings.asaas_checkout_type as "redirect" | "transparent" || "transparent",
-        hotmart_api_key: settings.hotmart_api_key || "",
-        hotmart_webhook_secret: settings.hotmart_webhook_secret || "",
+        abacatepay_api_key: settings.abacatepay_api_key || "",
+        abacatepay_webhook_secret: settings.abacatepay_webhook_secret || "",
+        abacatepay_environment: settings.abacatepay_environment || "sandbox",
+        abacatepay_checkout_type: settings.abacatepay_checkout_type as "redirect" | "transparent" || "transparent",
       }));
       setHasChanges(false);
     }
@@ -205,35 +221,39 @@ export default function PaymentSettingsPage() {
       {/* Status do Provedor Ativo */}
       <div
         className="rounded-2xl p-4 flex items-center justify-between"
-        style={{ 
-          background: settings?.active_provider && 
+        style={{
+          background: settings?.active_provider &&
             ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
-             (settings.active_provider === 'asaas' && settings.asaas_configured)) 
-            ? "rgba(0,212,106,0.08)" 
-            : "rgba(251,191,36,0.08)", 
+             (settings.active_provider === 'asaas' && settings.asaas_configured) ||
+             (settings.active_provider === 'abacatepay' && settings.abacatepay_configured))
+            ? "rgba(0,212,106,0.08)"
+            : "rgba(251,191,36,0.08)",
           border: `1px solid ${
-            settings?.active_provider && 
+            settings?.active_provider &&
             ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
-             (settings.active_provider === 'asaas' && settings.asaas_configured))
-            ? "rgba(0,212,106,0.2)" 
+             (settings.active_provider === 'asaas' && settings.asaas_configured) ||
+             (settings.active_provider === 'abacatepay' && settings.abacatepay_configured))
+            ? "rgba(0,212,106,0.2)"
             : "rgba(251,191,36,0.2)"
-          }` 
+          }`
         }}
       >
         <div className="flex items-center gap-3">
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ 
-              background: settings?.active_provider && 
+            style={{
+              background: settings?.active_provider &&
                 ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
-                 (settings.active_provider === 'asaas' && settings.asaas_configured))
-                ? "rgba(0,212,106,0.15)" 
+                 (settings.active_provider === 'asaas' && settings.asaas_configured) ||
+                 (settings.active_provider === 'abacatepay' && settings.abacatepay_configured))
+                ? "rgba(0,212,106,0.15)"
                 : "rgba(251,191,36,0.15)"
             }}
           >
-            {settings?.active_provider && 
+            {settings?.active_provider &&
               ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
-               (settings.active_provider === 'asaas' && settings.asaas_configured)) ? (
+               (settings.active_provider === 'asaas' && settings.asaas_configured) ||
+               (settings.active_provider === 'abacatepay' && settings.abacatepay_configured)) ? (
               <Check className="w-4 h-4" style={{ color: "var(--green)" }} />
             ) : (
               <Shield className="w-4 h-4" style={{ color: "#fbbf24" }} />
@@ -244,7 +264,7 @@ export default function PaymentSettingsPage() {
               Provedor Ativo
             </p>
             <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>
-              {PROVIDERS.find((p) => p.id === settings?.active_provider)?.descConfigured || 
+              {PROVIDERS.find((p) => p.id === settings?.active_provider)?.descConfigured ||
                PROVIDERS.find((p) => p.id === settings?.active_provider)?.desc ||
                "Não configurado"}
             </p>
@@ -256,31 +276,35 @@ export default function PaymentSettingsPage() {
               Alterações pendentes
             </span>
           )}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ 
-            background: settings?.active_provider && 
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{
+            background: settings?.active_provider &&
               ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
-               (settings.active_provider === 'asaas' && settings.asaas_configured))
-              ? "rgba(0,212,106,0.15)" 
+               (settings.active_provider === 'asaas' && settings.asaas_configured) ||
+               (settings.active_provider === 'abacatepay' && settings.abacatepay_configured))
+              ? "rgba(0,212,106,0.15)"
               : "rgba(251,191,36,0.15)"
           }}>
-            <span style={{ 
-              color: settings?.active_provider && 
+            <span style={{
+              color: settings?.active_provider &&
                 ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
-                 (settings.active_provider === 'asaas' && settings.asaas_configured))
-                ? "var(--green)" 
+                 (settings.active_provider === 'asaas' && settings.asaas_configured) ||
+                 (settings.active_provider === 'abacatepay' && settings.abacatepay_configured))
+                ? "var(--green)"
                 : "#fbbf24"
             }}>
               {PROVIDERS.find((p) => p.id === settings?.active_provider)?.icon}
             </span>
-            <span className="text-sm font-medium" style={{ 
-              color: settings?.active_provider && 
+            <span className="text-sm font-medium" style={{
+              color: settings?.active_provider &&
                 ((settings.active_provider === 'stripe' && settings.stripe_configured) ||
-                 (settings.active_provider === 'asaas' && settings.asaas_configured))
-                ? "var(--green)" 
+                 (settings.active_provider === 'asaas' && settings.asaas_configured) ||
+                 (settings.active_provider === 'abacatepay' && settings.abacatepay_configured))
+                ? "var(--green)"
                 : "#fbbf24"
             }}>
               {settings?.active_provider === 'stripe' && settings?.stripe_configured ? 'Stripe' :
                settings?.active_provider === 'asaas' && settings?.asaas_configured ? 'Asaas' :
+               settings?.active_provider === 'abacatepay' && settings?.abacatepay_configured ? 'AbacatePay' :
                settings?.active_provider || 'Stripe'}
             </span>
           </div>
@@ -301,10 +325,10 @@ export default function PaymentSettingsPage() {
 
         <div className="grid grid-cols-3 gap-3">
           {PROVIDERS.map((provider) => {
-            const isConfigured = 
+            const isConfigured =
               (provider.id === 'stripe' && settings?.stripe_configured) ||
               (provider.id === 'asaas' && settings?.asaas_configured) ||
-              (provider.id === 'hotmart' && settings?.hotmart_configured);
+              (provider.id === 'abacatepay' && settings?.abacatepay_configured);
             
             return (
               <button
@@ -607,6 +631,166 @@ export default function PaymentSettingsPage() {
               Configure esta URL no painel do Asaas em: Configurações → Webhooks
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Configurações do AbacatePay */}
+      {displayProvider === "abacatepay" && (
+        <div
+          className="rounded-2xl p-6 space-y-4"
+          style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: settings?.abacatepay_configured ? "rgba(14,165,233,0.15)" : "rgba(251,191,36,0.15)" }}>
+                {settings?.abacatepay_configured ? (
+                  <Shield className="w-4 h-4" style={{ color: "#0ea5e9" }} />
+                ) : (
+                  <Shield className="w-4 h-4" style={{ color: "#fbbf24" }} />
+                )}
+              </div>
+              <div>
+                <h3 className="font-medium" style={{ color: "hsl(240 15% 93%)" }}>AbacatePay</h3>
+                <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>Gateway PIX brasileiro {settings?.abacatepay_configured ? "(configurado)" : "(não configurado)"}</p>
+              </div>
+            </div>
+            <span className="text-xs px-2 py-1 rounded" style={{
+              background: settings?.abacatepay_configured ? "rgba(0,212,106,0.15)" : "rgba(251,191,36,0.15)",
+              color: settings?.abacatepay_configured ? "var(--green)" : "#fbbf24"
+            }}>
+              {settings?.abacatepay_configured ? "Configurado" : "Não configurado"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Ambiente</label>
+              <select
+                value={form.abacatepay_environment}
+                onChange={(e) => updateForm({ abacatepay_environment: e.target.value })}
+                className="input-field w-full text-xs"
+              >
+                {ASAAS_ENVIRONMENTS.map((env) => (
+                  <option key={env.id} value={env.id}>{env.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Webhook Secret</label>
+              <input
+                type="text"
+                value={form.abacatepay_webhook_secret}
+                onChange={(e) => updateForm({ abacatepay_webhook_secret: e.target.value })}
+                placeholder={settings?.abacatepay_webhook_secret ? maskKey(settings.abacatepay_webhook_secret) : "whsec_..."}
+                className="input-field w-full font-mono text-xs"
+              />
+              {isKeyFilled(settings?.abacatepay_webhook_secret) && (
+                <p className="text-[10px] mt-1" style={{ color: "var(--green)" }}>✓ Configurado</p>
+              )}
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>AbacatePay API Key</label>
+              <div className="relative">
+                <input
+                  type={showKeys.abacatepay_api_key ? "text" : "password"}
+                  value={form.abacatepay_api_key}
+                  onChange={(e) => updateForm({ abacatepay_api_key: e.target.value })}
+                  placeholder={settings?.abacatepay_api_key ? maskKey(settings.abacatepay_api_key) : "abac_..."}
+                  className="input-field w-full pr-8 font-mono text-xs"
+                />
+                <button type="button" onClick={() => toggleKey("abacatepay_api_key")} className="absolute right-2 top-1/2 -translate-y-1/2">
+                  {showKeys.abacatepay_api_key ? <X className="w-3.5 h-3.5" /> : <Key className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              {isKeyFilled(settings?.abacatepay_api_key) && (
+                <p className="text-[10px] mt-1" style={{ color: "var(--green)" }}>
+                  ✓ Configurado ({maskKey(settings?.abacatepay_api_key || "")})
+                </p>
+              )}
+              <p className="text-[10px] mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>Deixe vazio para manter o atual</p>
+            </div>
+          </div>
+
+          <div className="border-t" style={{ borderColor: "hsl(240 12% 15%)" }}>
+            <div className="pt-4">
+              <label className="text-xs block mb-2" style={{ color: "hsl(240 8% 46%)" }}>Tipo de Checkout</label>
+              <div className="flex gap-3">
+                <label className="flex items-center gap-2 cursor-pointer flex-1">
+                  <input
+                    type="radio"
+                    name="abacatepay_checkout"
+                    checked={form.abacatepay_checkout_type === "transparent"}
+                    onChange={() => updateForm({ abacatepay_checkout_type: "transparent" })}
+                    className="accent-[#0ea5e9]"
+                  />
+                  <div className="text-xs" style={{ color: "hsl(240 15% 80%)" }}>
+                    <span className="font-medium">Transparente</span>
+                    <p style={{ color: "hsl(240 8% 46%)" }}>PIX direto na aplicação (checkout Uniq)</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer flex-1">
+                  <input
+                    type="radio"
+                    name="abacatepay_checkout"
+                    checked={form.abacatepay_checkout_type === "redirect"}
+                    onChange={() => updateForm({ abacatepay_checkout_type: "redirect" })}
+                    className="accent-[#0ea5e9]"
+                  />
+                  <div className="text-xs" style={{ color: "hsl(240 15% 80%)" }}>
+                    <span className="font-medium">Redirect</span>
+                    <p style={{ color: "hsl(240 8% 46%)" }}>Redireciona para página do AbacatePay</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Webhook URL */}
+          <div className="border-t pt-4" style={{ borderColor: "hsl(240 12% 15%)" }}>
+            <label className="text-xs block mb-2" style={{ color: "hsl(240 8% 46%)" }}>URL do Webhook (para configurar no AbacatePay)</label>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 12% 10%)", color: "hsl(240 8% 60%)" }}>
+                {settings?.abacatepay_webhook_url || `${process.env.NEXT_PUBLIC_API_URL?.replace('/v1', '') || 'https://api.uniq.chat'}/abacatepay/webhook`}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  const url = settings?.abacatepay_webhook_url || `${process.env.NEXT_PUBLIC_API_URL?.replace('/v1', '') || 'https://api.uniq.chat'}/abacatepay/webhook`;
+                  navigator.clipboard.writeText(url);
+                  toast.success("URL copiada!");
+                }}
+                className="p-2 rounded hover:bg-white/5"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 38%)" }}>
+              Configure esta URL no painel do AbacatePay em: Configurações → Webhooks
+            </p>
+          </div>
+
+          {/* Status do teste de conexão */}
+          {settings?.abacatepay_test_status && (
+            <div className="border-t pt-4" style={{ borderColor: "hsl(240 12% 15%)" }}>
+              <div className="flex items-center gap-3">
+                <span className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>Status da API:</span>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  settings.abacatepay_test_status === "ok" ? "bg-[rgba(0,212,106,0.15)] text-[var(--green)]" :
+                  "bg-[rgba(239,68,68,0.15)] text-[#ef4444]"
+                }`}>
+                  {settings.abacatepay_test_status === "ok" ? "✓ Conectado" : "✕ Falhou"}
+                </span>
+                {settings.abacatepay_tested_at && (
+                  <span className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>
+                    {new Date(settings.abacatepay_tested_at).toLocaleString("pt-BR")}
+                  </span>
+                )}
+              </div>
+              {settings.abacatepay_test_error && (
+                <p className="text-[10px] mt-1" style={{ color: "#ef4444" }}>{settings.abacatepay_test_error}</p>
+              )}
+            </div>
+          )}
         </div>
       )}
 

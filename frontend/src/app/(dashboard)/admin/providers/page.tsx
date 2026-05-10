@@ -41,12 +41,15 @@ interface PaymentSettings {
   asaas_test_status?: string;
   asaas_tested_at?: string | null;
   asaas_test_error?: string;
-  hotmart_configured?: boolean;
-  hotmart_api_key_preview?: string;
-  hotmart_webhook_secret_preview?: string;
-  hotmart_test_status?: string;
-  hotmart_tested_at?: string | null;
-  hotmart_test_error?: string;
+  abacatepay_environment?: string;
+  abacatepay_configured?: boolean;
+  abacatepay_checkout_type?: string;
+  abacatepay_webhook_url?: string;
+  abacatepay_api_key_preview?: string;
+  abacatepay_webhook_secret_preview?: string;
+  abacatepay_test_status?: string;
+  abacatepay_tested_at?: string | null;
+  abacatepay_test_error?: string;
 }
 
 interface EmailSettings {
@@ -135,7 +138,7 @@ function StatusBadge({ ok, label }: { ok: boolean; label?: string }) {
 // Asaas: GET /api/v3/customers?limit=1) e atualiza test_status. Refresh
 // do query "admin-payment-settings" pra UI re-renderizar com o novo
 // status assim que volta.
-function TestConnectionButton({ provider, disabled }: { provider: "stripe" | "asaas"; disabled?: boolean }) {
+function TestConnectionButton({ provider, disabled }: { provider: "stripe" | "asaas" | "abacatepay"; disabled?: boolean }) {
   const queryClient = useQueryClient();
   const testMut = useMutation({
     mutationFn: () => adminApi.testPaymentProvider(provider),
@@ -211,7 +214,7 @@ function PaymentProviderBadge({
 
 // ─── Sidebar nav ──────────────────────────────────────────────────────────────
 const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] = [
-  { id: "payment",       label: "Pagamento",    icon: CreditCard,    desc: "Stripe, Asaas, Hotmart" },
+  { id: "payment",       label: "Pagamento",    icon: CreditCard,    desc: "Stripe, Asaas, AbacatePay" },
   { id: "communication", label: "Comunicação",  icon: Mail,          desc: "Email, templates, OTP" },
   // AI: configura provedores globais (OpenAI, Anthropic, etc.) usados
   // por todos os módulos da plataforma — Uniq AI chat, transcrição
@@ -230,10 +233,10 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] 
 ];
 
 // ─── Payment Tab ──────────────────────────────────────────────────────────────
-const PROVIDERS = [
+const PROVIDERS: { id: string; label: string; icon: string; color: string; disabled?: boolean }[] = [
   { id: "stripe",  label: "Stripe",  icon: "💳", color: "#635bff" },
   { id: "asaas",   label: "Asaas",   icon: "🇧🇷", color: "#22c55e" },
-  { id: "hotmart", label: "Hotmart", icon: "🎯", color: "#fbbf24", disabled: true },
+  { id: "abacatepay", label: "AbacatePay", icon: "🥑", color: "#0ea5e9" },
 ];
 
 function PaymentTab() {
@@ -247,7 +250,7 @@ function PaymentTab() {
   const [form, setForm] = useState({
     stripe_secret_key: "", stripe_webhook_secret: "", stripe_checkout_type: "redirect",
     asaas_api_key: "", asaas_webhook_secret: "", asaas_environment: "sandbox",
-    hotmart_api_key: "",
+    abacatepay_api_key: "", abacatepay_webhook_secret: "", abacatepay_environment: "sandbox", abacatepay_checkout_type: "transparent",
   });
 
   useEffect(() => {
@@ -317,6 +320,7 @@ function PaymentTab() {
   // configurados no Stripe/Asaas.
   const stripeWebhookURL = `${apiBase}/v1/payments/webhook/stripe`;
   const asaasWebhookURL = `${apiBase}/v1/payments/webhook/asaas`;
+  const abacatepayWebhookURL = `${apiBase}/abacatepay/webhook`;
 
   return (
     <div className="space-y-5">
@@ -330,13 +334,10 @@ function PaymentTab() {
             const isActive = provider === p.id;
             const isConfigured = p.id === "stripe" ? settings?.stripe_configured
               : p.id === "asaas" ? settings?.asaas_configured
-              : settings?.hotmart_configured;
-            // test_status reflete o resultado real do último teste de
-            // conectividade contra o provider — diferente de
-            // isConfigured que só checa se há key no DB.
+              : settings?.abacatepay_configured;
             const testStatus = p.id === "stripe" ? settings?.stripe_test_status
               : p.id === "asaas" ? settings?.asaas_test_status
-              : settings?.hotmart_test_status;
+              : settings?.abacatepay_test_status;
             return (
               <button key={p.id} onClick={() => !p.disabled && setProvider(p.id)}
                 disabled={p.disabled}
@@ -586,6 +587,117 @@ function PaymentTab() {
                 </li>
                 <li>
                   Eventos recomendados: <span className="font-mono">PAYMENT_CONFIRMED</span>, <span className="font-mono">PAYMENT_RECEIVED</span>, <span className="font-mono">PAYMENT_OVERDUE</span>, <span className="font-mono">PAYMENT_REFUNDED</span>, <span className="font-mono">SUBSCRIPTION_CREATED</span>, <span className="font-mono">SUBSCRIPTION_DELETED</span>.
+                </li>
+              </ol>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* AbacatePay config */}
+      {provider === "abacatepay" && (
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>AbacatePay</h3>
+            <div className="flex items-center gap-2">
+              <PaymentProviderBadge configured={!!settings?.abacatepay_configured} testStatus={settings?.abacatepay_test_status} />
+              <TestConnectionButton provider="abacatepay" disabled={!settings?.abacatepay_configured} />
+            </div>
+          </div>
+          {settings?.abacatepay_test_status === "failed" && settings?.abacatepay_test_error && (
+            <div className="mb-4 p-3 rounded-lg text-xs"
+              style={{ background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.22)", color: "#fca5a5" }}>
+              <strong className="font-semibold">Último teste falhou:</strong> {settings.abacatepay_test_error}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <Label>API Key</Label>
+              <Input type="password" value={form.abacatepay_api_key}
+                onChange={e => setForm(f => ({ ...f, abacatepay_api_key: e.target.value }))}
+                placeholder={settings?.abacatepay_api_key_preview || "abac_..."} />
+              {settings?.abacatepay_api_key_preview && (
+                <div className="flex items-center gap-2 mt-1.5">
+                  <code className="text-[11px] font-mono px-1.5 py-0.5 rounded"
+                    style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 65%)" }}>
+                    {settings.abacatepay_api_key_preview}
+                  </code>
+                  {settings?.abacatepay_environment === "production" && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                      style={{ background: "rgba(0,212,106,0.12)", color: "#00d46a" }}>
+                      Produção
+                    </span>
+                  )}
+                  {settings?.abacatepay_environment === "sandbox" && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                      style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24" }}>
+                      Sandbox
+                    </span>
+                  )}
+                </div>
+              )}
+              <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 40%)" }}>Deixe vazio para manter o atual</p>
+            </div>
+            <div>
+              <Label>Ambiente</Label>
+              <Select value={form.abacatepay_environment} onChange={e => setForm(f => ({ ...f, abacatepay_environment: e.target.value }))}>
+                <option value="sandbox">Sandbox (Homologação)</option>
+                <option value="production">Produção</option>
+              </Select>
+            </div>
+            <div>
+              <Label>Webhook Secret</Label>
+              <Input type="password" value={form.abacatepay_webhook_secret}
+                onChange={e => setForm(f => ({ ...f, abacatepay_webhook_secret: e.target.value }))}
+                placeholder={settings?.abacatepay_webhook_secret_preview || "whsec_..."} />
+              {settings?.abacatepay_webhook_secret_preview && (
+                <code className="inline-block mt-1.5 text-[11px] font-mono px-1.5 py-0.5 rounded"
+                  style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 65%)" }}>
+                  {settings.abacatepay_webhook_secret_preview}
+                </code>
+              )}
+            </div>
+          </div>
+          <div className="mt-4">
+            <Label>Tipo de Checkout</Label>
+            <div className="flex gap-4">
+              {["transparent", "redirect"].map(t => (
+                <label key={t} className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="abacatepay_checkout" checked={form.abacatepay_checkout_type === t}
+                    onChange={() => setForm(f => ({ ...f, abacatepay_checkout_type: t }))}
+                    className="accent-[#0ea5e9]" />
+                  <span className="text-xs capitalize" style={{ color: "hsl(240 15% 80%)" }}>{t === "transparent" ? "Transparente (PIX Uniq)" : "Redirect"}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="mt-4 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+            <Label>URL do Webhook</Label>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 60%)" }}>
+                {abacatepayWebhookURL}
+              </code>
+              <button onClick={() => copyUrl(abacatepayWebhookURL)} className="p-2 rounded hover:bg-white/5" title="Copiar URL">
+                <Key className="w-4 h-4" style={{ color: "hsl(240 8% 55%)" }} />
+              </button>
+            </div>
+            <div className="mt-3 rounded-lg p-3 space-y-2.5"
+              style={{ background: "rgba(14,165,233,0.06)", border: "1px solid rgba(14,165,233,0.18)" }}>
+              <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "#7dd3fc" }}>
+                Como configurar no AbacatePay
+              </p>
+              <ol className="text-[11px] space-y-1.5 list-decimal pl-4" style={{ color: "hsl(240 8% 70%)" }}>
+                <li>
+                  No <a href="https://abacatepay.com/dashboard" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "#7dd3fc" }}>Painel AbacatePay → Configurações → Webhooks</a>, clique em <span className="font-semibold">Adicionar webhook</span>.
+                </li>
+                <li>
+                  Cole a URL acima em <span className="font-mono">URL de notificação</span>.
+                </li>
+                <li>
+                  Copie o <span className="font-semibold">Webhook Secret</span> gerado e cole no campo <span className="font-semibold">Webhook Secret</span> acima.
+                </li>
+                <li>
+                  Eventos recomendados: <span className="font-mono">checkout.paid</span>, <span className="font-mono">checkout.cancelled</span>, <span className="font-mono">subscription.activated</span>, <span className="font-mono">subscription.cancelled</span>.
                 </li>
               </ol>
             </div>

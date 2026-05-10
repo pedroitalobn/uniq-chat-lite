@@ -38,6 +38,10 @@ type Config struct {
 	AsaasWebhookSecret string
 	AsaasEnvironment   string // "sandbox" ou "production"
 
+	// AbacatePay — PIX payment provider (loaded from DB with env fallback)
+	AbacatepayAPIKey        string
+	AbacatepayWebhookSecret string
+
 	// Resend — transactional email (legacy)
 	ResendAPIKey string
 	FromEmail    string
@@ -108,6 +112,10 @@ func Load() *Config {
 		AsaasAPIKey:        getEnv("ASAAS_API_KEY", ""),
 		AsaasWebhookSecret: getEnv("ASAAS_WEBHOOK_SECRET", ""),
 		AsaasEnvironment:   getEnv("ASAAS_ENVIRONMENT", "sandbox"),
+
+		// AbacatePay
+		AbacatepayAPIKey:        getEnv("ABACATEPAY_API_KEY", ""),
+		AbacatepayWebhookSecret: getEnv("ABACATEPAY_WEBHOOK_SECRET", ""),
 
 		// Resend (legacy)
 		ResendAPIKey: getEnv("RESEND_API_KEY", ""),

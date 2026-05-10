@@ -70,7 +70,7 @@ func (h *AdminHandler) GetPaymentSettings(c *fiber.Ctx) error {
 	// DB".
 	stripeConfigured := settings.StripeSecretKey != ""
 	asaasConfigured := settings.AsaasAPIKey != ""
-	hotmartConfigured := settings.HotmartAPIKey != ""
+	abacatepayConfigured := settings.AbacatepayAPIKey != ""
 
 	// Active provider is exactly what was saved in the panel
 	activeProvider := string(settings.ActiveProvider)
@@ -87,6 +87,7 @@ func (h *AdminHandler) GetPaymentSettings(c *fiber.Ctx) error {
 	}
 	stripeWebhookURL := apiURL + "/stripe/webhook"
 	asaasWebhookURL := apiURL + "/asaas/webhook"
+	abacatepayWebhookURL := apiURL + "/abacatepay/webhook"
 
 	return c.JSON(fiber.Map{
 		"id":                   settings.ID,
@@ -94,36 +95,39 @@ func (h *AdminHandler) GetPaymentSettings(c *fiber.Ctx) error {
 		"stripe_checkout_type": settings.StripeCheckoutType,
 		"asaas_environment":    settings.AsaasEnvironment,
 		"asaas_checkout_type":  settings.AsaasCheckoutType,
+		"abacatepay_environment":  settings.AbacatepayEnvironment,
+		"abacatepay_checkout_type": settings.AbacatepayCheckoutType,
 		// Previews mascarados — UI mostra os primeiros/últimos 4
 		// chars pra admin saber qual chave/ambiente está salvo
 		// (ex.: sk_live_*** vs sk_test_***) sem expor o segredo.
 		// Não retornamos a key crua na resposta.
-		"stripe_secret_key_preview":     maskCredential(settings.StripeSecretKey),
-		"stripe_secret_key_env":         detectStripeEnv(settings.StripeSecretKey),
-		"stripe_webhook_secret_preview": maskCredential(settings.StripeWebhookSecret),
-		"asaas_api_key_preview":         maskCredential(settings.AsaasAPIKey),
-		"asaas_webhook_secret_preview":  maskCredential(settings.AsaasWebhookSecret),
-		"hotmart_api_key_preview":       maskCredential(settings.HotmartAPIKey),
-		"hotmart_webhook_secret_preview": maskCredential(settings.HotmartWebhookSecret),
+		"stripe_secret_key_preview":      maskCredential(settings.StripeSecretKey),
+		"stripe_secret_key_env":          detectStripeEnv(settings.StripeSecretKey),
+		"stripe_webhook_secret_preview":  maskCredential(settings.StripeWebhookSecret),
+		"asaas_api_key_preview":          maskCredential(settings.AsaasAPIKey),
+		"asaas_webhook_secret_preview":   maskCredential(settings.AsaasWebhookSecret),
+		"abacatepay_api_key_preview":     maskCredential(settings.AbacatepayAPIKey),
+		"abacatepay_webhook_secret_preview": maskCredential(settings.AbacatepayWebhookSecret),
 		// Status de configuração: existe credencial salva (estado fraco).
-		"stripe_configured":  stripeConfigured,
-		"asaas_configured":   asaasConfigured,
-		"hotmart_configured": hotmartConfigured,
+		"stripe_configured":    stripeConfigured,
+		"asaas_configured":     asaasConfigured,
+		"abacatepay_configured": abacatepayConfigured,
 		// Status real de conectividade — populado por Test/auto-test.
 		// UI deve mostrar isso como "Conectado/Falhou/Não testado" e
 		// só dizer "Pronto pra cobrar" quando test_status == "ok".
-		"stripe_test_status":  settings.StripeTestStatus,
-		"stripe_tested_at":    settings.StripeTestedAt,
-		"stripe_test_error":   settings.StripeTestError,
-		"asaas_test_status":   settings.AsaasTestStatus,
-		"asaas_tested_at":     settings.AsaasTestedAt,
-		"asaas_test_error":    settings.AsaasTestError,
-		"hotmart_test_status": settings.HotmartTestStatus,
-		"hotmart_tested_at":   settings.HotmartTestedAt,
-		"hotmart_test_error":  settings.HotmartTestError,
+		"stripe_test_status":     settings.StripeTestStatus,
+		"stripe_tested_at":       settings.StripeTestedAt,
+		"stripe_test_error":      settings.StripeTestError,
+		"asaas_test_status":      settings.AsaasTestStatus,
+		"asaas_tested_at":        settings.AsaasTestedAt,
+		"asaas_test_error":       settings.AsaasTestError,
+		"abacatepay_test_status": settings.AbacatepayTestStatus,
+		"abacatepay_tested_at":   settings.AbacatepayTestedAt,
+		"abacatepay_test_error":  settings.AbacatepayTestError,
 		// Webhook URLs
-		"stripe_webhook_url": stripeWebhookURL,
-		"asaas_webhook_url":  asaasWebhookURL,
+		"stripe_webhook_url":     stripeWebhookURL,
+		"asaas_webhook_url":      asaasWebhookURL,
+		"abacatepay_webhook_url": abacatepayWebhookURL,
 	})
 }
 
@@ -196,6 +200,36 @@ func (h *AdminHandler) testPaymentProvider(provider string, settings *models.Pay
 			hint = " (endpoint não encontrado — provavelmente ambiente errado: prod vs sandbox)"
 		}
 		return false, fmt.Sprintf("HTTP %d%s — %s", resp.StatusCode, hint, truncErr(string(body), 200))
+	case "abacatepay":
+		key := strings.TrimSpace(settings.AbacatepayAPIKey)
+		if key == "" {
+			return false, "api_key vazia"
+		}
+		// AbacatePay: GET /v2/ping pra verificar credencial.
+		// Base URL: https://api.abacatepay.com/v2
+		baseURL := "https://api.abacatepay.com"
+		if settings.AbacatepayEnvironment == "sandbox" {
+			baseURL = "https://sandbox.abacatepay.com"
+		}
+		req, _ := http.NewRequest("GET", baseURL+"/v2/ping", nil)
+		req.Header.Set("Authorization", "Bearer "+key)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := client.Do(req)
+		if err != nil {
+			return false, "erro de rede: " + err.Error()
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == 200 {
+			return true, ""
+		}
+		body, _ := io.ReadAll(resp.Body)
+		hint := ""
+		if resp.StatusCode == 401 {
+			hint = " (api_key inválida — confira se copiou inteira do painel AbacatePay)"
+		} else if resp.StatusCode == 403 {
+			hint = " (api_key válida mas sem permissão)"
+		}
+		return false, fmt.Sprintf("HTTP %d%s — %s", resp.StatusCode, hint, truncErr(string(body), 200))
 	}
 	return false, "provider não suportado"
 }
@@ -240,16 +274,18 @@ func detectStripeEnv(s string) string {
 // PUT /admin/payment-settings
 func (h *AdminHandler) UpdatePaymentSettings(c *fiber.Ctx) error {
 	var req struct {
-		ActiveProvider       string `json:"active_provider"`
-		StripeSecretKey      string `json:"stripe_secret_key"`
-		StripeWebhookSecret  string `json:"stripe_webhook_secret"`
-		StripeCheckoutType   string `json:"stripe_checkout_type"`
-		AsaasAPIKey          string `json:"asaas_api_key"`
-		AsaasEnvironment     string `json:"asaas_environment"`
-		AsaasWebhookSecret   string `json:"asaas_webhook_secret"`
-		AsaasCheckoutType    string `json:"asaas_checkout_type"`
-		HotmartAPIKey        string `json:"hotmart_api_key"`
-		HotmartWebhookSecret string `json:"hotmart_webhook_secret"`
+		ActiveProvider         string `json:"active_provider"`
+		StripeSecretKey        string `json:"stripe_secret_key"`
+		StripeWebhookSecret    string `json:"stripe_webhook_secret"`
+		StripeCheckoutType     string `json:"stripe_checkout_type"`
+		AsaasAPIKey            string `json:"asaas_api_key"`
+		AsaasEnvironment       string `json:"asaas_environment"`
+		AsaasWebhookSecret     string `json:"asaas_webhook_secret"`
+		AsaasCheckoutType      string `json:"asaas_checkout_type"`
+		AbacatepayAPIKey       string `json:"abacatepay_api_key"`
+		AbacatepayWebhookSecret string `json:"abacatepay_webhook_secret"`
+		AbacatepayEnvironment   string `json:"abacatepay_environment"`
+		AbacatepayCheckoutType  string `json:"abacatepay_checkout_type"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -293,11 +329,17 @@ func (h *AdminHandler) UpdatePaymentSettings(c *fiber.Ctx) error {
 	if req.AsaasCheckoutType != "" {
 		updates["asaas_checkout_type"] = req.AsaasCheckoutType
 	}
-	if req.HotmartAPIKey != "" {
-		updates["hotmart_api_key"] = req.HotmartAPIKey
+	if req.AbacatepayAPIKey != "" {
+		updates["abacatepay_api_key"] = req.AbacatepayAPIKey
 	}
-	if req.HotmartWebhookSecret != "" {
-		updates["hotmart_webhook_secret"] = req.HotmartWebhookSecret
+	if req.AbacatepayWebhookSecret != "" {
+		updates["abacatepay_webhook_secret"] = req.AbacatepayWebhookSecret
+	}
+	if req.AbacatepayEnvironment != "" {
+		updates["abacatepay_environment"] = req.AbacatepayEnvironment
+	}
+	if req.AbacatepayCheckoutType != "" {
+		updates["abacatepay_checkout_type"] = req.AbacatepayCheckoutType
 	}
 
 	if len(updates) > 0 {
@@ -334,27 +376,42 @@ func (h *AdminHandler) UpdatePaymentSettings(c *fiber.Ctx) error {
 		}
 		h.db.Model(&settings).Updates(patch)
 	}
+	if req.AbacatepayAPIKey != "" {
+		ok, errMsg := h.testPaymentProvider("abacatepay", &settings)
+		patch := map[string]any{"abacatepay_tested_at": now, "abacatepay_test_error": errMsg}
+		if ok {
+			patch["abacatepay_test_status"] = "ok"
+		} else {
+			patch["abacatepay_test_status"] = "failed"
+		}
+		h.db.Model(&settings).Updates(patch)
+	}
 	h.db.First(&settings, "id = ?", "default")
 
 	return c.JSON(fiber.Map{
-		"id":                             settings.ID,
-		"active_provider":                string(settings.ActiveProvider),
-		"stripe_checkout_type":           settings.StripeCheckoutType,
-		"stripe_test_status":             settings.StripeTestStatus,
-		"stripe_tested_at":               settings.StripeTestedAt,
-		"stripe_test_error":              settings.StripeTestError,
-		"asaas_environment":              settings.AsaasEnvironment,
-		"asaas_checkout_type":            settings.AsaasCheckoutType,
-		"asaas_test_status":              settings.AsaasTestStatus,
-		"asaas_tested_at":                settings.AsaasTestedAt,
-		"asaas_test_error":               settings.AsaasTestError,
-		"stripe_secret_key_preview":      maskCredential(settings.StripeSecretKey),
-		"stripe_secret_key_env":          detectStripeEnv(settings.StripeSecretKey),
-		"stripe_webhook_secret_preview":  maskCredential(settings.StripeWebhookSecret),
-		"asaas_api_key_preview":          maskCredential(settings.AsaasAPIKey),
-		"asaas_webhook_secret_preview":   maskCredential(settings.AsaasWebhookSecret),
-		"hotmart_api_key_preview":        maskCredential(settings.HotmartAPIKey),
-		"hotmart_webhook_secret_preview": maskCredential(settings.HotmartWebhookSecret),
+		"id":                                  settings.ID,
+		"active_provider":                     string(settings.ActiveProvider),
+		"stripe_checkout_type":                settings.StripeCheckoutType,
+		"stripe_test_status":                  settings.StripeTestStatus,
+		"stripe_tested_at":                    settings.StripeTestedAt,
+		"stripe_test_error":                   settings.StripeTestError,
+		"asaas_environment":                   settings.AsaasEnvironment,
+		"asaas_checkout_type":                 settings.AsaasCheckoutType,
+		"asaas_test_status":                   settings.AsaasTestStatus,
+		"asaas_tested_at":                     settings.AsaasTestedAt,
+		"asaas_test_error":                    settings.AsaasTestError,
+		"abacatepay_environment":              settings.AbacatepayEnvironment,
+		"abacatepay_checkout_type":            settings.AbacatepayCheckoutType,
+		"abacatepay_test_status":              settings.AbacatepayTestStatus,
+		"abacatepay_tested_at":                settings.AbacatepayTestedAt,
+		"abacatepay_test_error":               settings.AbacatepayTestError,
+		"stripe_secret_key_preview":           maskCredential(settings.StripeSecretKey),
+		"stripe_secret_key_env":               detectStripeEnv(settings.StripeSecretKey),
+		"stripe_webhook_secret_preview":       maskCredential(settings.StripeWebhookSecret),
+		"asaas_api_key_preview":               maskCredential(settings.AsaasAPIKey),
+		"asaas_webhook_secret_preview":        maskCredential(settings.AsaasWebhookSecret),
+		"abacatepay_api_key_preview":          maskCredential(settings.AbacatepayAPIKey),
+		"abacatepay_webhook_secret_preview":   maskCredential(settings.AbacatepayWebhookSecret),
 	})
 }
 
@@ -364,8 +421,8 @@ func (h *AdminHandler) UpdatePaymentSettings(c *fiber.Ctx) error {
 // uma config antiga (ex.: rotação de chave do lado do provider).
 func (h *AdminHandler) TestPaymentProvider(c *fiber.Ctx) error {
 	provider := c.Params("provider")
-	if provider != "stripe" && provider != "asaas" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "provider inválido (use stripe|asaas)"})
+	if provider != "stripe" && provider != "asaas" && provider != "abacatepay" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "provider inválido (use stripe|asaas|abacatepay)"})
 	}
 	var settings models.PaymentSettings
 	if err := h.db.Where("id = ?", "default").First(&settings).Error; err != nil {
@@ -374,7 +431,8 @@ func (h *AdminHandler) TestPaymentProvider(c *fiber.Ctx) error {
 	ok, errMsg := h.testPaymentProvider(provider, &settings)
 	now := time.Now()
 	patch := map[string]any{}
-	if provider == "stripe" {
+	switch provider {
+	case "stripe":
 		patch["stripe_tested_at"] = now
 		patch["stripe_test_error"] = errMsg
 		if ok {
@@ -382,13 +440,21 @@ func (h *AdminHandler) TestPaymentProvider(c *fiber.Ctx) error {
 		} else {
 			patch["stripe_test_status"] = "failed"
 		}
-	} else {
+	case "asaas":
 		patch["asaas_tested_at"] = now
 		patch["asaas_test_error"] = errMsg
 		if ok {
 			patch["asaas_test_status"] = "ok"
 		} else {
 			patch["asaas_test_status"] = "failed"
+		}
+	case "abacatepay":
+		patch["abacatepay_tested_at"] = now
+		patch["abacatepay_test_error"] = errMsg
+		if ok {
+			patch["abacatepay_test_status"] = "ok"
+		} else {
+			patch["abacatepay_test_status"] = "failed"
 		}
 	}
 	h.db.Model(&settings).Updates(patch)

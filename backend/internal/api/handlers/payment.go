@@ -12,13 +12,14 @@ import (
 )
 
 type PaymentHandler struct {
-	db      *gorm.DB
-	stripeH *StripeHandler
-	asaasH  *AsaasHandler
+	db         *gorm.DB
+	stripeH    *StripeHandler
+	asaasH     *AsaasHandler
+	abacatepayH *AbacatePayHandler
 }
 
-func NewPaymentHandler(db *gorm.DB, stripeH *StripeHandler, asaasH *AsaasHandler) *PaymentHandler {
-	return &PaymentHandler{db: db, stripeH: stripeH, asaasH: asaasH}
+func NewPaymentHandler(db *gorm.DB, stripeH *StripeHandler, asaasH *AsaasHandler, abacatepayH *AbacatePayHandler) *PaymentHandler {
+	return &PaymentHandler{db: db, stripeH: stripeH, asaasH: asaasH, abacatepayH: abacatepayH}
 }
 
 // getActiveProvider returns the active provider saved in the DB, defaulting to stripe
@@ -33,8 +34,11 @@ func (h *PaymentHandler) getActiveProvider() string {
 // ListPlans proxy
 func (h *PaymentHandler) ListPlans(c *fiber.Ctx) error {
 	provider := h.getActiveProvider()
-	if provider == string(models.PaymentProviderAsaas) {
+	switch provider {
+	case string(models.PaymentProviderAsaas):
 		return h.asaasH.ListPlans(c)
+	case string(models.PaymentProviderAbacatePay):
+		return h.abacatepayH.ListPlans(c)
 	}
 	return h.stripeH.ListPlans(c)
 }
@@ -42,8 +46,11 @@ func (h *PaymentHandler) ListPlans(c *fiber.Ctx) error {
 // CreateCheckout proxy
 func (h *PaymentHandler) CreateCheckout(c *fiber.Ctx) error {
 	provider := h.getActiveProvider()
-	if provider == string(models.PaymentProviderAsaas) {
+	switch provider {
+	case string(models.PaymentProviderAsaas):
 		return h.asaasH.CreateCheckout(c)
+	case string(models.PaymentProviderAbacatePay):
+		return h.abacatepayH.CreateCheckout(c)
 	}
 	return h.stripeH.CreateCheckout(c)
 }
@@ -51,8 +58,11 @@ func (h *PaymentHandler) CreateCheckout(c *fiber.Ctx) error {
 // GetSubscription proxy
 func (h *PaymentHandler) GetSubscription(c *fiber.Ctx) error {
 	provider := h.getActiveProvider()
-	if provider == string(models.PaymentProviderAsaas) {
+	switch provider {
+	case string(models.PaymentProviderAsaas):
 		return h.asaasH.GetSubscription(c)
+	case string(models.PaymentProviderAbacatePay):
+		return h.abacatepayH.GetSubscription(c)
 	}
 	return h.stripeH.GetSubscription(c)
 }
@@ -115,6 +125,10 @@ func (h *PaymentHandler) FinalizeRegistration(c *fiber.Ctx) error {
 	case "asaas":
 		// Asaas finalize ainda não implementado — quando estiver,
 		// segue o mesmo padrão. Por ora, cai no 202 abaixo.
+	case "abacatepay":
+		// AbacatePay: webhook é o caminho principal. Se o user já foi
+		// materializado pelo webhook, o Caminho 1 já resolveu acima.
+		// Se ainda não, o poll do front vai tentar de novo.
 	}
 
 	// Caminho 3: ainda processando — front deve fazer poll.
@@ -130,6 +144,9 @@ func (h *PaymentHandler) FinalizeRegistration(c *fiber.Ctx) error {
 func (h *PaymentHandler) detectProvider(p *models.PendingRegistration) string {
 	if p.StripeSessionID != "" || p.StripePIID != "" || p.StripeCustomerID != "" {
 		return "stripe"
+	}
+	if p.AbaCustID != "" {
+		return "abacatepay"
 	}
 	return h.getActiveProvider()
 }

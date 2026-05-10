@@ -66,13 +66,16 @@ function SuccessContent() {
       return () => { cancelled = true; };
     }
     // Fluxo legado (lead_id) — mantém pra cobranças de upgrade de
-    // user já existente.
+    // user já existente. O endpoint funciona como "melhor esforço":
+    // se falhar o lead continua existindo e pode ser ativado manualmente.
     if (leadId) {
       fetch(`${API}/stripe/activate-lead`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lead_id: leadId }),
-      }).catch(console.error);
+      }).catch(() => {
+        // Silencioso — lead pode ser ativado depois via admin
+      });
     }
   }, [pendingId, leadId, sessionId, paymentIntentId]);
 
@@ -126,7 +129,7 @@ function SuccessContent() {
         </h1>
         <p className="text-sm mb-2" style={{ color: "hsl(240 8% 55%)" }}>
           {finalizing
-            ? "Estamos conferindo seu pagamento com o Stripe. Isso leva alguns segundos."
+            ? "Estamos conferindo seu pagamento. Isso leva alguns segundos."
             : finalizeError
               ? finalizeError + ". Aguarde alguns segundos e tente novamente."
               : "Seu plano foi ativado com sucesso. Aproveite todos os recursos da Uniq.chat."}

@@ -248,7 +248,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	authH := handlers.NewAuthHandler(db, emailSvc, manager)
 	stripeH := handlers.NewStripeHandler(db, emailSvc)
 	asaasH := handlers.NewAsaasHandler(db, emailSvc)
-	paymentH := handlers.NewPaymentHandler(db, stripeH, asaasH)
+	abacatepayH := handlers.NewAbacatePayHandler(db, emailSvc)
+	paymentH := handlers.NewPaymentHandler(db, stripeH, asaasH, abacatepayH)
 	instanceH := handlers.NewInstanceHandler(db, manager)
 	proxyH := handlers.NewProxyHandler(db, manager)
 	msgH := handlers.NewMessageHandler(db, manager)
@@ -412,6 +413,10 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	app.Post("/asaas/webhook", asaasH.Webhook)
 	app.Post("/v1/asaas/webhook", asaasH.Webhook)
 	app.Post("/v1/payments/webhook/asaas", asaasH.Webhook)
+
+	// AbacatePay webhook (public)
+	app.Post("/abacatepay/webhook", abacatepayH.HandleWebhook)
+	app.Post("/v1/abacatepay/webhook", abacatepayH.HandleWebhook)
 
 	// ─── Auth routes (public) ─────────────────────────────────────────────────
 	// Rate limits separados por sensibilidade:
@@ -1484,6 +1489,14 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	asaasRoutes := api.Group("/asaas")
 	asaasRoutes.Post("/checkout", asaasH.CreateCheckout)
 	asaasRoutes.Get("/subscription", asaasH.GetSubscription)
+
+	// AbacatePay (protected) — PIX transparente e checkout hospedado.
+	abacatepayRoutes := api.Group("/abacatepay")
+	abacatepayRoutes.Post("/checkout", abacatepayH.CreateCheckout)
+	abacatepayRoutes.Post("/subscription", abacatepayH.CreateSubscriptionCheckout)
+	abacatepayRoutes.Post("/qr", abacatepayH.CreateQRCode)
+	abacatepayRoutes.Get("/subscription", abacatepayH.GetSubscription)
+	abacatepayRoutes.Get("/test", abacatepayH.TestConnection)
 
 	// Payments (protected) — proxy que escolhe provider via active_provider
 	// (default Stripe). Mantido pra compat. Novos clientes devem usar
