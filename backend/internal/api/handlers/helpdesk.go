@@ -649,6 +649,38 @@ func (h *HelpDeskHandler) PublicGetConfig(c *fiber.Ctx) error {
 	return c.JSON(resp)
 }
 
+// PublicListCategories GET /v1/public/helpdesk/:workspace_slug/categories
+func (h *HelpDeskHandler) PublicListCategories(c *fiber.Ctx) error {
+	slug := c.Params("workspace_slug")
+	ws, err := h.lookupWorkspaceBySlug(slug)
+	if err != nil {
+		return h.publicNotFound(c, slug, "categories")
+	}
+
+	var cats []models.HelpDeskCategory
+	if err := h.db.Where("workspace_id = ?", ws.ID).
+		Order("position ASC, created_at ASC").
+		Find(&cats).Error; err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+
+	type categoryWithCount struct {
+		models.HelpDeskCategory
+		ArticleCount int64 `json:"article_count"`
+	}
+	result := make([]categoryWithCount, len(cats))
+	for i, cat := range cats {
+		var cnt int64
+		h.db.Model(&models.HelpDeskArticle{}).
+			Where("workspace_id = ? AND category_id = ? AND status = ? AND deleted_at IS NULL",
+				ws.ID, cat.ID, models.ArticlePublished).
+			Count(&cnt)
+		result[i] = categoryWithCount{HelpDeskCategory: cat, ArticleCount: cnt}
+	}
+
+	return c.JSON(result)
+}
+
 // PublicListArticles GET /v1/public/helpdesk/:workspace_slug/articles?q=&category=
 func (h *HelpDeskHandler) PublicListArticles(c *fiber.Ctx) error {
 	slug := c.Params("workspace_slug")
@@ -658,6 +690,7 @@ func (h *HelpDeskHandler) PublicListArticles(c *fiber.Ctx) error {
 	}
 
 	query := h.db.Model(&models.HelpDeskArticle{}).
+		Preload("Category").
 		Where("workspace_id = ? AND status = ?", ws.ID, models.ArticlePublished)
 
 	if q := c.Query("q"); q != "" {

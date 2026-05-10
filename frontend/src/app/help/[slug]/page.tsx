@@ -95,14 +95,13 @@ export default function HelpCenterPage({ params }: { params: { slug: string } })
   useEffect(() => {
     async function load() {
       try {
-        const [cfgRes, catsRes] = await Promise.all([
+        const [cfgRes, catsRes, artsRes] = await Promise.all([
           fetch(`${API}/v1/public/helpdesk/${slug}/config`),
+          fetch(`${API}/v1/public/helpdesk/${slug}/categories`),
           fetch(`${API}/v1/public/helpdesk/${slug}/articles`),
         ]);
         if (cfgRes.status === 404) {
           setNotFound(true);
-          // Backend agora devolve { error, requested_slug, available_slugs[], hint }
-          // — exibimos pra o admin não ficar adivinhando qual slug usar.
           try {
             const data = await cfgRes.json();
             setNotFoundHint({
@@ -115,19 +114,14 @@ export default function HelpCenterPage({ params }: { params: { slug: string } })
         }
         const cfgData = await cfgRes.json();
         setConfig(cfgData);
-        const arts: Article[] = await catsRes.json();
-        setArticles(arts);
 
-        // Derive categories from articles
-        const catMap: Record<string, Category> = {};
-        arts.forEach((a) => {
-          if ((a as any).category) {
-            const cat = (a as any).category;
-            if (!catMap[cat.id]) catMap[cat.id] = { ...cat, article_count: 0 };
-            catMap[cat.id].article_count++;
-          }
-        });
-        setCategories(Object.values(catMap));
+        if (catsRes.ok) {
+          const cats: Category[] = await catsRes.json();
+          setCategories(cats);
+        }
+
+        const arts: Article[] = await artsRes.json();
+        setArticles(arts);
       } catch {
         setNotFound(true);
       }
