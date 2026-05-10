@@ -88,6 +88,9 @@ func (h *AdminHandler) GetPaymentSettings(c *fiber.Ctx) error {
 	stripeWebhookURL := apiURL + "/stripe/webhook"
 	asaasWebhookURL := apiURL + "/asaas/webhook"
 	abacatepayWebhookURL := apiURL + "/abacatepay/webhook"
+	if settings.AbacatepayWebhookSecret != "" {
+		abacatepayWebhookURL = abacatepayWebhookURL + "?webhookSecret=" + settings.AbacatepayWebhookSecret
+	}
 
 	return c.JSON(fiber.Map{
 		"id":                   settings.ID,

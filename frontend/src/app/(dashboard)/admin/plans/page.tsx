@@ -64,6 +64,7 @@ interface EditState {
   is_active: boolean;
   stripe_price_id: string;
   asaas_product_id: string;
+  abacatepay_product_id: string;
   description: string;
   highlights: string[];
   features: string;
@@ -137,7 +138,7 @@ function featuresObjToCheckboxes(featObj: Record<string, unknown>): Record<strin
 
 function checkboxesToFeaturesObj(
   checkboxes: Record<string, boolean>,
-  extra: { description: string; stripe_price_id: string; highlights: string[]; support?: string; asaas_product_id?: string }
+  extra: { description: string; stripe_price_id: string; highlights: string[]; support?: string; asaas_product_id?: string; abacatepay_product_id?: string }
 ): Record<string, unknown> {
   const obj: Record<string, unknown> = {};
   FEATURE_KEYS.forEach(({ key }) => {
@@ -147,6 +148,7 @@ function checkboxesToFeaturesObj(
   if (extra.highlights.length > 0) obj["highlights"] = extra.highlights;
   if (extra.stripe_price_id) obj["stripe_price_id"] = extra.stripe_price_id;
   if (extra.asaas_product_id) obj["asaas_product_id"] = extra.asaas_product_id;
+  if (extra.abacatepay_product_id) obj["abacatepay_product_id"] = extra.abacatepay_product_id;
   return obj;
 }
 
@@ -348,6 +350,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
     is_active: p?.is_active ?? true,
     stripe_price_id: p?.stripe_price_id ?? "",
     asaas_product_id: p?.asaas_product_id ?? "",
+    abacatepay_product_id: p?.abacatepay_product_id ?? "",
     description: typeof featObj["description"] === "string" ? featObj["description"] : "",
     highlights: (() => {
       const saved = Array.isArray(featObj["highlights"]) ? (featObj["highlights"] as string[]) : [];
@@ -414,6 +417,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
         is_active: form.is_active,
         stripe_price_id: form.stripe_price_id || undefined,
         asaas_product_id: form.asaas_product_id || undefined,
+        abacatepay_product_id: form.abacatepay_product_id || undefined,
         // features JSON é derivado dos toggles reais — antes tinha um
         // grid de "Canais marketing" separado que duplicava info; foi
         // removido. Agora a lista pública/cards reflete EXATAMENTE
@@ -432,6 +436,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
           stripe_price_id: form.stripe_price_id,
           highlights: form.highlights,
           asaas_product_id: form.asaas_product_id,
+          abacatepay_product_id: form.abacatepay_product_id,
         })),
       };
 
@@ -753,6 +758,17 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                     className="input-field w-full font-mono text-xs"
                   />
                   <p className="text-[10px] mt-1.5" style={{ color: "hsl(240 8% 38%)" }}>Mapeado apenas em integrações compatíveis no Asaas.</p>
+                </div>
+                <div>
+                  <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>AbacatePay Product ID</label>
+                  <input
+                    type="text"
+                    value={form.abacatepay_product_id}
+                    onChange={(e) => setForm({ ...form, abacatepay_product_id: e.target.value })}
+                    placeholder="prod_xxxxxxxxxxxxxxxxx"
+                    className="input-field w-full font-mono text-xs"
+                  />
+                  <p className="text-[10px] mt-1.5" style={{ color: "hsl(240 8% 38%)" }}>ID do produto no painel da AbacatePay para checkout PIX recorrente.</p>
                 </div>
               </div>
             )}

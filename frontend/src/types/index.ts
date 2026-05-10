@@ -146,6 +146,7 @@ export interface Plan {
   is_active: boolean;
   stripe_price_id?: string;
   asaas_product_id?: string;
+  abacatepay_product_id?: string;
   features: string; // JSON-encoded string from API
   created_at: string;
   updated_at: string;

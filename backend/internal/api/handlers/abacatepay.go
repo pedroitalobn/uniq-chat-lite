@@ -3,8 +3,9 @@ package handlers
 import (
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/hex"
+	"encoding/base64"
 	"encoding/json"
+	"crypto/subtle"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,17 +34,15 @@ func NewAbacatePayHandler(db *gorm.DB, emailSvc *email.Service) *AbacatePayHandl
 	}
 }
 
-// abacatepayClient retorna o base URL configurado (sandbox ou produção).
+// AbacatePay public key for webhook HMAC signature verification.
+// This is a public key, not a secret — same for all accounts.
+const abacatepayPublicKey = "t9dXRhHHo3yDEj5pVDYz0frf7q6bMKyMRmxxCPIPp3RCplBfXRxqlC6ZpiWmOqj4L63qEaeUOtrCI8P0VMUgo6iIga2ri9ogaHFs0WIIywSMg0q7RmBfybe1E5XJcfC4IW3alNqym0tXoAKkzvfEjZxV6bE0oG2zJrNNYmUCKZyV0KZ3JS8Votf9EAWWYdiDkMkpbMdPggfh1EqHlVkMiTady6jOR3hyzGEHrIz2Ret0xHKMbiqkr9HS1JhNHDX9"
+
+// abacatepayClient retorna o base URL da API AbacatePay.
+// A AbacatePay usa URL única — o ambiente (sandbox/production) é
+// determinado pela API key, não pela URL.
 func (h *AbacatePayHandler) abacatepayClient() string {
-	var settings models.PaymentSettings
-	env := "sandbox"
-	if h.db.Where("id = ?", "default").First(&settings).Error == nil && settings.AbacatepayEnvironment != "" {
-		env = settings.AbacatepayEnvironment
-	}
-	if env == "production" {
-		return "https://api.abacatepay.com"
-	}
-	return "https://sandbox.abacatepay.com"
+	return "https://api.abacatepay.com"
 }
 
 // getAPIKey retorna a API key configurada (DB > env).
@@ -62,6 +61,16 @@ func (h *AbacatePayHandler) getWebhookSecret() string {
 		return settings.AbacatepayWebhookSecret
 	}
 	return config.AppConfig.AbacatepayWebhookSecret
+}
+
+// webhookURL monta a URL de callback com o secret como query param.
+func (h *AbacatePayHandler) webhookURL(baseURL string) string {
+	u := baseURL + "/v1/abacatepay/webhook"
+	secret := h.getWebhookSecret()
+	if secret != "" {
+		u += "?webhookSecret=" + secret
+	}
+	return u
 }
 
 // checkoutMode retorna "transparent" ou "redirect" conforme configuração.
@@ -140,10 +149,14 @@ type abacatepaySubscriptionResponse struct {
 
 // ─── Webhook ────────────────────────────────────────────────────────────────
 
-// abacatepayWebhookPayload representa o payload de webhook da AbacatePay.
+// abacatepayWebhookPayload representa o payload v2 de webhook da AbacatePay.
+// Estrutura: {"id":"log_...", "event":"checkout.completed", "apiVersion":2, "devMode":false, "data":{...}}
 type abacatepayWebhookPayload struct {
-	Event   string           `json:"event"`   // checkout.paid, checkout.cancelled, etc.
-	Data    checkoutWebhookData `json:"data"`
+	ID         string             `json:"id"`
+	Event      string             `json:"event"`
+	APIVersion int                `json:"apiVersion"`
+	DevMode    bool               `json:"devMode"`
+	Data       checkoutWebhookData `json:"data"`
 }
 
 type checkoutWebhookData struct {
@@ -221,7 +234,7 @@ func (h *AbacatePayHandler) CreateCheckout(c *fiber.Ctx) error {
 			"plan_id":   plan.ID.String(),
 			"plan_name": plan.Name,
 		},
-		CallbackURL: c.BaseURL() + "/v1/abacatepay/webhook",
+		CallbackURL: h.webhookURL(c.BaseURL()),
 	}
 
 	body, _ := json.Marshal(checkoutReq)
@@ -311,11 +324,11 @@ func (h *AbacatePayHandler) CreateSubscriptionCheckout(c *fiber.Ctx) error {
 	subReq := abacatepaySubscriptionRequest{
 		PlanID:     productID,
 		ExternalID: user.ID.String(),
-		CallbackURL: c.BaseURL() + "/v1/abacatepay/webhook",
-	}
+		CallbackURL: h.webhookURL(c.BaseURL()),
+		}
 
-	body, _ := json.Marshal(subReq)
-	respBytes, err := h.apiRequest("POST", "/subscriptions", body)
+		body, _ := json.Marshal(subReq)
+		respBytes, err := h.apiRequest("POST", "/subscriptions", body)
 	if err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
 			"error":   "abacatepay_subscription_failed",
@@ -425,28 +438,37 @@ func (h *AbacatePayHandler) CreateQRCode(c *fiber.Ctx) error {
 }
 
 // POST /abacatepay/webhook — handle AbacatePay webhook events (public)
+// URL esperada: /v1/abacatepay/webhook?webhookSecret=SEU_SECRET
+// Segurança em 2 camadas: query param webhookSecret + HMAC-SHA256 (base64) com chave pública.
 func (h *AbacatePayHandler) HandleWebhook(c *fiber.Ctx) error {
-	payload := c.Body()
-	sigHeader := c.Get("X-AbacatePay-Signature")
+	// Camada 1: valida query param webhookSecret
+	querySecret := c.Query("webhookSecret")
 	webhookSecret := h.getWebhookSecret()
 
 	if webhookSecret == "" {
-		log.Warn().Msg("abacatepay webhook recebido sem secret configurado — rejeitando")
+		log.Warn().Msg("abacatepay webhook: secret não configurado no servidor")
 		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
 			"error": "abacatepay webhook secret não configurado",
 		})
 	}
 
-	// Valida HMAC-SHA256
+	if querySecret != webhookSecret {
+		log.Warn().Msg("abacatepay webhook: query param webhookSecret inválido")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "secret inválido"})
+	}
+
+	// Camada 2: valida HMAC-SHA256 (base64) com chave pública da AbacatePay
+	payload := c.Body()
+	sigHeader := c.Get("X-Webhook-Signature")
 	if sigHeader == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "assinatura ausente"})
 	}
 
-	mac := hmac.New(sha256.New, []byte(webhookSecret))
+	mac := hmac.New(sha256.New, []byte(abacatepayPublicKey))
 	mac.Write(payload)
-	expectedSig := hex.EncodeToString(mac.Sum(nil))
+	expectedSig := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 
-	if !hmac.Equal([]byte(sigHeader), []byte(expectedSig)) {
+	if subtle.ConstantTimeCompare([]byte(sigHeader), []byte(expectedSig)) != 1 {
 		log.Warn().Msg("abacatepay webhook: HMAC inválido")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "assinatura inválida"})
 	}
@@ -456,11 +478,11 @@ func (h *AbacatePayHandler) HandleWebhook(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
 	}
 
-	// Idempotência
-	if event.Data.ID != "" {
+	// Idempotência via event.id (log_abc123xyz)
+	if event.ID != "" {
 		res := h.db.Exec(
 			"INSERT INTO processed_webhook_events (event_id, provider, processed_at) VALUES (?, 'abacatepay', ?) ON CONFLICT DO NOTHING",
-			event.Data.ID, time.Now(),
+			event.ID, time.Now(),
 		)
 		if res.Error == nil && res.RowsAffected == 0 {
 			return c.JSON(fiber.Map{"received": true, "duplicate": true})
@@ -468,16 +490,17 @@ func (h *AbacatePayHandler) HandleWebhook(c *fiber.Ctx) error {
 	}
 
 	switch event.Event {
-	case "checkout.paid":
+	case "checkout.completed", "transparent.completed":
 		h.handleCheckoutPaid(&event.Data)
-	case "checkout.cancelled", "checkout.expired":
+	case "checkout.refunded", "checkout.disputed",
+		"transparent.refunded", "transparent.disputed":
 		h.handleCheckoutCancelled(&event.Data)
-	case "subscription.activated":
+	case "subscription.completed":
 		h.handleSubscriptionActivated(&event.Data)
-	case "subscription.cancelled", "subscription.expired":
+	case "subscription.cancelled":
 		h.handleSubscriptionCancelled(&event.Data)
-	case "chargeback.payment":
-		h.handleChargeback(&event.Data)
+	case "subscription.renewed":
+		h.handleSubscriptionRenewed(&event.Data)
 	}
 
 	return c.JSON(fiber.Map{"received": true})
@@ -563,6 +586,14 @@ func (h *AbacatePayHandler) handleSubscriptionActivated(data *checkoutWebhookDat
 	}
 }
 
+func (h *AbacatePayHandler) handleSubscriptionRenewed(data *checkoutWebhookData) {
+	if data.ExternalReference == "" {
+		return
+	}
+	log.Info().Str("subscription_id", data.ID).Str("user_id", data.ExternalReference).
+		Msg("abacatepay subscription renewed")
+}
+
 func (h *AbacatePayHandler) handleSubscriptionCancelled(data *checkoutWebhookData) {
 	if data.ExternalReference == "" {
 		return
@@ -583,14 +614,6 @@ func (h *AbacatePayHandler) handleSubscriptionCancelled(data *checkoutWebhookDat
 			go h.emailSvc.SendSubscriptionCanceled(user.Email, user.Name)
 		}
 	}
-}
-
-func (h *AbacatePayHandler) handleChargeback(data *checkoutWebhookData) {
-	if data.ExternalReference == "" {
-		return
-	}
-	log.Warn().Str("checkout_id", data.ID).Str("user_id", data.ExternalReference).
-		Msg("abacatepay chargeback detected")
 }
 
 // GET /abacatepay/plans — list plans with AbacatePay info (public)
