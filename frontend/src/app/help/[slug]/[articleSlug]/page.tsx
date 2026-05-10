@@ -12,7 +12,7 @@
 // HelpDeskConfig do workspace.
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 
 // Mesmo helper de getApiBase do /help/[slug] — derivado do hostname
 // quando env não está setado/aponta localhost. Sem isso, build prod
@@ -54,9 +54,9 @@ interface Article {
 export default function ArticlePage({
   params,
 }: {
-  params: { slug: string; articleSlug: string };
+  params: Promise<{ slug: string; articleSlug: string }>;
 }) {
-  const { slug, articleSlug } = params;
+  const { slug, articleSlug } = use(params);
   const [API] = useState(() => getApiBase());
   const [config, setConfig] = useState<Config | null>(null);
   const [article, setArticle] = useState<Article | null>(null);

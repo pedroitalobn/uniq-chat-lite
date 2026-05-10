@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 
 // Helper: deriva a URL do backend mesmo quando NEXT_PUBLIC_API_URL
 // está vazio ou apontando localhost no build de produção. Usado em
@@ -68,8 +68,8 @@ function mdToHtml(md: string): string {
     .replace(/<p><\/p>/g, "");
 }
 
-export default function HelpCenterPage({ params }: { params: { slug: string } }) {
-  const { slug } = params;
+export default function HelpCenterPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = use(params);
   // Derivado lazy via window — sem isso o build de produção com env
   // vazio caía em fetch relativo (`/v1/public/...`) batendo no front
   // em vez do backend e devolvendo 404 do Next pra "Central de Ajuda".
