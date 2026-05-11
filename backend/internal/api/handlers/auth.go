@@ -529,6 +529,7 @@ type AuthHandler struct {
 	emailSvc    *email.Service
 	manager     *whatsapp.Manager
 	abacatepayH *AbacatePayHandler
+	asaasH      *AsaasHandler
 }
 
 // createDefaultWorkspace cria (idempotente) um workspace "default" pro usuário:
@@ -608,8 +609,8 @@ func createDefaultWorkspace(db *gorm.DB, user *models.User, name string) *models
 	return ws
 }
 
-func NewAuthHandler(db *gorm.DB, emailSvc *email.Service, manager *whatsapp.Manager, abacatepayH *AbacatePayHandler) *AuthHandler {
-	return &AuthHandler{db: db, emailSvc: emailSvc, manager: manager, abacatepayH: abacatepayH}
+func NewAuthHandler(db *gorm.DB, emailSvc *email.Service, manager *whatsapp.Manager, abacatepayH *AbacatePayHandler, asaasH *AsaasHandler) *AuthHandler {
+	return &AuthHandler{db: db, emailSvc: emailSvc, manager: manager, abacatepayH: abacatepayH, asaasH: asaasH}
 }
 
 // validateAnthropicKey checks if the key is valid by hitting Anthropic Models API.
@@ -1536,10 +1537,87 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 			return c.JSON(out)
 
 		case models.PaymentProviderAsaas:
-			return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
-				"error":   "asaas_not_implemented",
-				"message": "Fluxo de registro com Asaas ainda não implementado — use Stripe ou AbacatePay",
-			})
+			if h.asaasH == nil {
+				return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "Asaas não está disponível"})
+			}
+			cpf := req.TaxID
+			if cpf == "" {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "CPF é obrigatório para pagamento via Asaas"})
+			}
+			// Cria customer no Asaas
+			custReq := AsaasCustomerRequest{
+				Name:  req.Name,
+				Email: pending.Email,
+				Cpf:   cpf,
+			}
+			custBody, _ := json.Marshal(custReq)
+			custResp, err := h.asaasH.apiRequest("POST", "/api/v3/customers", custBody)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar cliente Asaas"})
+			}
+			var cust AsaasCustomerResponse
+			if err := json.Unmarshal(custResp, &cust); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao processar resposta Asaas"})
+			}
+			customerID := cust.ID
+
+			// Cria subscription recorrente PIX
+			subReq := AsaasSubscriptionRequest{
+				Customer:          customerID,
+				Plan:              plan.AsaasProductID,
+				Price:             plan.Price,
+				Cycle:             "MONTHLY",
+				PaymentMethod:     "PIX",
+				NextDueDate:       time.Now().AddDate(0, 0, 1).Format("2006-01-02"),
+				Description:       "Assinatura " + plan.Name + " — Uniq Chat",
+				ExternalReference: pending.ID.String() + "|" + plan.ID.String(),
+			}
+			subBody, _ := json.Marshal(subReq)
+			subRespBytes, err := h.asaasH.apiRequest("POST", "/api/v3/subscriptions", subBody)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar assinatura Asaas"})
+			}
+			var subResp AsaasSubscriptionResponse
+			if err := json.Unmarshal(subRespBytes, &subResp); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "resposta Asaas inválida"})
+			}
+			if subResp.ID == "" {
+				return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+					"error":  "asaas_error",
+					"detail": string(subRespBytes),
+				})
+			}
+
+			patch["asaas_subscription_id"] = subResp.ID
+			h.db.Model(&pending).Updates(patch)
+
+			// Busca primeira fatura pra mostrar QR PIX
+			listResp, _ := h.asaasH.apiRequest("GET", "/api/v3/payments?subscription="+subResp.ID+"&limit=1", nil)
+			var listed struct {
+				Data []struct {
+					ID         string `json:"id"`
+					InvoiceURL string `json:"invoiceUrl"`
+					Status     string `json:"status"`
+				} `json:"data"`
+			}
+			json.Unmarshal(listResp, &listed)
+
+			out := fiber.Map{
+				"checkout_type":   "subscription",
+				"subscription_id": subResp.ID,
+				"plan_name":       plan.Name,
+				"plan_price":      plan.Price,
+				"payment_method":  "PIX",
+				"recurrence":      "MONTHLY",
+				"status":          subResp.Status,
+				"pending_id":      pending.ID.String(),
+				"message":         "Assinatura PIX recorrente criada. Pague a primeira fatura pra ativar.",
+			}
+			if len(listed.Data) > 0 {
+				out["first_invoice_url"] = listed.Data[0].InvoiceURL
+				out["first_payment_id"] = listed.Data[0].ID
+			}
+			return c.JSON(out)
 
 		default: // stripe
 			if plan.StripePriceID == "" {

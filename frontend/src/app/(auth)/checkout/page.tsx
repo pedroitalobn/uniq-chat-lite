@@ -35,12 +35,15 @@ function CheckoutContent() {
   const planName = searchParams.get("plan_name");
   const planPrice = searchParams.get("plan_price");
   const providerFromUrl = searchParams.get("provider");
+  const subscriptionId = searchParams.get("subscription_id");
+  const firstInvoiceUrl = searchParams.get("first_invoice_url");
 
   // For old flow
   const planId = searchParams.get("plan_id");
   const provider = providerFromUrl || "asaas";
 
   const isTransparentCheckout = !!clientSecret;
+  const isAsaasSubscription = !!subscriptionId;
   const isAbacatePay = provider === "abacatepay";
   const hasBrCode = !!checkoutData?.br_code && !checkoutData?.payment_link;
   const hasPaymentLink = !!checkoutData?.payment_link;
@@ -62,7 +65,7 @@ function CheckoutContent() {
 
   // Poll for payment confirmation in transparent mode
   useEffect(() => {
-    if (!hasBrCode || !pendingId || pollingPayment) return;
+    if ((!hasBrCode && !isAsaasSubscription) || !pendingId || pollingPayment) return;
     if (pixTimeLeft !== null && pixTimeLeft <= 0) return;
 
     setPollingPayment(true);
@@ -74,6 +77,7 @@ function CheckoutContent() {
           body: JSON.stringify({
             pending_id: pendingId,
             payment_intent_id: paymentIntentId || undefined,
+            subscription_id: subscriptionId || undefined,
           }),
         });
         if (r.status === 202) return; // still processing
@@ -87,7 +91,7 @@ function CheckoutContent() {
     const interval = setInterval(poll, 5000);
     poll(); // immediate first poll
     return () => clearInterval(interval);
-  }, [hasBrCode, pendingId, paymentIntentId, pollingPayment, pixTimeLeft, router]);
+  }, [hasBrCode, isAsaasSubscription, pendingId, paymentIntentId, subscriptionId, pollingPayment, pixTimeLeft, router]);
 
   useEffect(() => {
     if (isTransparentCheckout) {
@@ -101,12 +105,23 @@ function CheckoutContent() {
       });
       setStep("checkout");
       setLoading(false);
+    } else if (isAsaasSubscription) {
+      setCheckoutData({
+        checkout_type: "subscription",
+        plan_name: planName || "Plano",
+        plan_price: parseFloat(planPrice || "0"),
+        subscription_id: subscriptionId,
+        first_invoice_url: firstInvoiceUrl,
+        provider: "asaas",
+      });
+      setStep("checkout");
+      setLoading(false);
     } else if (planId) {
       loadCheckoutData();
     } else {
       setLoading(false);
     }
-  }, [isTransparentCheckout, clientSecret]);
+  }, [isTransparentCheckout, isAsaasSubscription, clientSecret, subscriptionId]);
 
   const loadCheckoutData = async () => {
     try {
@@ -133,7 +148,7 @@ function CheckoutContent() {
   const handlePayment = async () => {
     setProcessing(true);
 
-    if (isTransparentCheckout && pendingId) {
+    if ((isTransparentCheckout || isAsaasSubscription) && pendingId) {
       try {
         const r = await fetch(`${API}/v1/payments/finalize-registration`, {
           method: "POST",
@@ -141,6 +156,7 @@ function CheckoutContent() {
           body: JSON.stringify({
             pending_id: pendingId,
             payment_intent_id: paymentIntentId || undefined,
+            subscription_id: subscriptionId || undefined,
           }),
         });
         const data = await r.json();
@@ -472,7 +488,59 @@ function CheckoutContent() {
               </motion.div>
             )}
 
-            {step === "checkout" && !hasBrCode && (
+            {step === "checkout" && isAsaasSubscription && (
+              <motion.div
+                key="asaas-sub"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                className="space-y-4"
+              >
+                <div className="text-center space-y-3">
+                  <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center"
+                    style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)" }}>
+                    <QrCode className="w-8 h-8" style={{ color: "#22c55e" }} />
+                  </div>
+                  <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Pagamento via PIX — Asaas</p>
+                  <p className="text-xs" style={{ color: "var(--text-3)" }}>
+                    Sua assinatura foi criada. Clique no botão abaixo para acessar o QR Code PIX.
+                  </p>
+                </div>
+
+                {checkoutData?.first_invoice_url && (
+                  <motion.button
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => window.open(checkoutData.first_invoice_url, "_blank")}
+                    className="w-full py-3 rounded-xl font-medium flex items-center justify-center gap-2"
+                    style={{ background: "#22c55e", color: "white" }}
+                  >
+                    <Banknote className="w-4 h-4" />
+                    Abrir QR Code PIX
+                  </motion.button>
+                )}
+
+                <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: "rgba(0,212,106,0.08)" }}>
+                  <span className="text-sm" style={{ color: "var(--text-3)" }}>Total a pagar</span>
+                  <span className="text-lg font-semibold" style={{ color: "var(--green)" }}>
+                    R$ {checkoutData?.plan_price?.toFixed(2) || "99,00"}
+                  </span>
+                </div>
+
+                {/* Polling indicator */}
+                {pollingPayment && (
+                  <div className="flex items-center justify-center gap-2 text-xs" style={{ color: "var(--text-3)" }}>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Aguardando confirmação do pagamento...
+                  </div>
+                )}
+
+                <p className="text-[10px] text-center" style={{ color: "var(--text-4)" }}>
+                  Após o pagamento, sua conta será ativada automaticamente.
+                </p>
+              </motion.div>
+            )}
+
+            {step === "checkout" && !hasBrCode && !isAsaasSubscription && (
               <motion.div
                 key="payment-methods"
                 initial={{ opacity: 0, x: 20 }}

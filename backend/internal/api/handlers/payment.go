@@ -105,6 +105,7 @@ func (h *PaymentHandler) FinalizeRegistration(c *fiber.Ctx) error {
 		PendingID       string `json:"pending_id"`
 		PaymentIntentID string `json:"payment_intent_id"`
 		SessionID       string `json:"session_id"`
+		SubscriptionID  string `json:"subscription_id"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
@@ -137,8 +138,22 @@ func (h *PaymentHandler) FinalizeRegistration(c *fiber.Ctx) error {
 			}
 		}
 	case "asaas":
-		// Asaas finalize ainda não implementado — quando estiver,
-		// segue o mesmo padrão. Por ora, cai no 202 abaixo.
+		subID := req.SubscriptionID
+		if subID == "" {
+			subID = pending.AsaasSubscriptionID
+		}
+		if subID != "" {
+			paid, apiErr := h.asaasH.GetPaymentStatus(subID)
+			if apiErr != nil {
+				log.Warn().Str("subscription_id", subID).Err(apiErr).Msg("asaas fallback: erro ao consultar API")
+			} else if paid {
+				if _, err := h.materializeFromPending(&pending); err != nil {
+					log.Error().Err(err).Str("pending_id", pendingID.String()).Msg("asaas fallback: erro ao materializar")
+				} else if user, ok := h.lookupMaterializedUser(&pending); ok {
+					return h.respondWithSession(c, user)
+				}
+			}
+		}
 	case "abacatepay":
 		// Fallback: consulta API AbacatePay pra confirmar pagamento.
 		checkoutID := pending.AbaCustID
@@ -181,6 +196,9 @@ func (h *PaymentHandler) detectProvider(p *models.PendingRegistration) string {
 	}
 	if p.AbaCustID != "" {
 		return "abacatepay"
+	}
+	if p.AsaasSubscriptionID != "" {
+		return "asaas"
 	}
 	return h.getActiveProvider()
 }

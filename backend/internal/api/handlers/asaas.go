@@ -412,6 +412,33 @@ func (h *AsaasHandler) Webhook(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"received": true})
 }
 
+// GetPaymentStatus consulta o Asaas pra verificar se a primeira fatura de
+// uma subscription recorrente foi paga. Retorna true se houver pelo menos
+// um payment com status RECEIVED ou CONFIRMED.
+func (h *AsaasHandler) GetPaymentStatus(subscriptionID string) (paid bool, err error) {
+	if subscriptionID == "" {
+		return false, nil
+	}
+	respBytes, err := h.apiRequest("GET", "/api/v3/payments?subscription="+subscriptionID+"&limit=10", nil)
+	if err != nil {
+		return false, err
+	}
+	var result struct {
+		Data []struct {
+			Status string `json:"status"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(respBytes, &result); err != nil {
+		return false, err
+	}
+	for _, p := range result.Data {
+		if p.Status == "RECEIVED" || p.Status == "CONFIRMED" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // GET /asaas/plans — list plans with Asaas info (public)
 func (h *AsaasHandler) ListPlans(c *fiber.Ctx) error {
 	var plans []models.Plan

@@ -35,10 +35,11 @@ type PendingRegistration struct {
 	Username         string `gorm:"type:varchar(60)" json:"-"`
 	WorkspaceName    string `gorm:"type:varchar(120)" json:"-"`
 	PasswordHash     string `gorm:"type:varchar(255)" json:"-"`
-	StripeCustomerID string `gorm:"type:varchar(64);index" json:"-"`
-	StripeSessionID  string `gorm:"type:varchar(128);index" json:"-"`
-	StripePIID       string `gorm:"type:varchar(128);index" json:"-"`
-	AbaCustID        string `gorm:"type:varchar(128);index" json:"-"`
+	StripeCustomerID   string `gorm:"type:varchar(64);index" json:"-"`
+	StripeSessionID    string `gorm:"type:varchar(128);index" json:"-"`
+	StripePIID         string `gorm:"type:varchar(128);index" json:"-"`
+	AbaCustID          string `gorm:"type:varchar(128);index" json:"-"`
+	AsaasSubscriptionID string `gorm:"type:varchar(128);index" json:"-"`
 }
 
 func (p *PendingRegistration) BeforeCreate(_ *gorm.DB) error {

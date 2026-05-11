@@ -358,6 +358,20 @@ function CompleteForm({
         router.push(`/checkout?${params.toString()}`);
         return;
       }
+      // Paid plan, Asaas subscription (PIX recorrente)
+      if (data.checkout_type === "subscription" && data.subscription_id) {
+        const params = new URLSearchParams({
+          subscription_id: data.subscription_id,
+          plan_name: data.plan_name ?? "",
+          plan_price: String(data.plan_price ?? ""),
+          email,
+        });
+        if (data.pending_id) params.set("pending_id", data.pending_id);
+        if (data.first_invoice_url) params.set("first_invoice_url", data.first_invoice_url);
+        if (data.first_payment_id) params.set("first_payment_id", data.first_payment_id);
+        router.push(`/checkout?${params.toString()}`);
+        return;
+      }
 
       // Free plan — sign in
       if (data.access_token) {
