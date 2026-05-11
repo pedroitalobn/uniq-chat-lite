@@ -99,7 +99,7 @@ export default function PaymentSettingsPage() {
     abacatepay_api_key: "",
     abacatepay_webhook_secret: "",
     abacatepay_environment: "sandbox",
-    abacatepay_checkout_type: "transparent",
+    abacatepay_checkout_type: "redirect",
   });
 
   const [activeProvider, setActiveProvider] = useState("stripe");
@@ -143,7 +143,7 @@ export default function PaymentSettingsPage() {
         abacatepay_api_key: settings.abacatepay_api_key || "",
         abacatepay_webhook_secret: settings.abacatepay_webhook_secret || "",
         abacatepay_environment: settings.abacatepay_environment || "sandbox",
-        abacatepay_checkout_type: settings.abacatepay_checkout_type as "redirect" | "transparent" || "transparent",
+        abacatepay_checkout_type: settings.abacatepay_checkout_type as "redirect" | "transparent" || "redirect",
       }));
       setHasChanges(false);
     }
@@ -329,7 +329,10 @@ export default function PaymentSettingsPage() {
               (provider.id === 'stripe' && settings?.stripe_configured) ||
               (provider.id === 'asaas' && settings?.asaas_configured) ||
               (provider.id === 'abacatepay' && settings?.abacatepay_configured);
-            
+            const isActive = provider.id === activeProvider;
+            const isPending = provider.id === pendingProvider && provider.id !== activeProvider;
+            const isSelected = displayProvider === provider.id;
+
             return (
               <button
                 key={provider.id}
@@ -340,32 +343,48 @@ export default function PaymentSettingsPage() {
                 }}
                 className="p-3 rounded-xl border-2 transition-all text-center relative"
                 style={{
-                  borderColor: displayProvider === provider.id ? provider.color : isConfigured ? "hsl(240 12% 15%)" : "hsl(240 12% 10%)",
-                  background: displayProvider === provider.id ? `${provider.color}10` : "transparent",
+                  borderColor: isSelected ? provider.color : isActive ? "var(--green)" : isConfigured ? "hsl(240 12% 15%)" : "hsl(240 12% 10%)",
+                  background: isSelected ? `${provider.color}10` : isActive ? "rgba(0,212,106,0.06)" : "transparent",
                   opacity: provider.id === "hotmart" ? 0.5 : (isConfigured ? 1 : 0.6),
                 }}
                 disabled={provider.id === "hotmart"}
               >
-                <div className="text-2xl mb-1">{provider.icon}</div>
-                <div className="font-medium text-sm" style={{ color: displayProvider === provider.id ? provider.color : isConfigured ? "hsl(240 15% 93%)" : "hsl(240 8% 46%)" }}>
+                {/* Badge de status no topo */}
+                <div className="absolute top-2 left-2 right-2 flex justify-between">
+                  <div>
+                    {!isConfigured && provider.id !== 'hotmart' && (
+                      <Shield className="w-3 h-3" style={{ color: "#fbbf24" }} />
+                    )}
+                  </div>
+                  <div>
+                    {isActive && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider"
+                        style={{ background: "rgba(0,212,106,0.18)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.35)" }}>
+                        ATIVO
+                      </span>
+                    )}
+                    {isPending && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                        style={{ background: `${provider.color}18`, color: provider.color, border: `1px solid ${provider.color}40` }}>
+                        selecionado
+                      </span>
+                    )}
+                    {isSelected && !isActive && !isPending && (
+                      <Check className="w-4 h-4" style={{ color: provider.color }} />
+                    )}
+                  </div>
+                </div>
+
+                <div className="text-2xl mb-1 mt-3">{provider.icon}</div>
+                <div className="font-medium text-sm" style={{ color: isSelected ? provider.color : isActive ? "var(--green)" : isConfigured ? "hsl(240 15% 93%)" : "hsl(240 8% 46%)" }}>
                   {provider.label}
                   {isConfigured && (
                     <Check className="w-3 h-3 inline ml-1" style={{ color: "var(--green)" }} />
                   )}
                 </div>
                 <div className="text-[10px]" style={{ color: isConfigured ? "var(--green)" : "hsl(240 8% 46%)" }}>
-                  {isConfigured ? provider.descConfigured : provider.desc}
+                  {isActive ? "Provedor ativo" : isConfigured ? provider.descConfigured : provider.desc}
                 </div>
-                {displayProvider === provider.id && (
-                  <div className="absolute top-2 right-2">
-                    <Check className="w-4 h-4" style={{ color: provider.color }} />
-                  </div>
-                )}
-                {!isConfigured && provider.id !== 'hotmart' && (
-                  <div className="absolute top-2 left-2">
-                    <Shield className="w-3 h-3" style={{ color: "#fbbf24" }} />
-                  </div>
-                )}
               </button>
             );
           })}

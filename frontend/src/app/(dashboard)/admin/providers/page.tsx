@@ -246,31 +246,32 @@ function PaymentTab() {
     queryFn: () => adminApi.getPaymentSettings().then((r) => r.data),
   });
 
-  const [provider, setProvider] = useState("stripe");
+  const [activeProvider, setActiveProvider] = useState("stripe");
+  const [pendingProvider, setPendingProvider] = useState<string | null>(null);
+  const displayProvider = pendingProvider ?? activeProvider;
   const [form, setForm] = useState({
     stripe_secret_key: "", stripe_webhook_secret: "", stripe_checkout_type: "redirect",
     asaas_api_key: "", asaas_webhook_secret: "", asaas_environment: "sandbox",
-    abacatepay_api_key: "", abacatepay_webhook_secret: "", abacatepay_environment: "sandbox", abacatepay_checkout_type: "transparent",
+    abacatepay_api_key: "", abacatepay_webhook_secret: "", abacatepay_environment: "sandbox", abacatepay_checkout_type: "redirect",
   });
 
   useEffect(() => {
     if (settings) {
-      setProvider(settings.active_provider || "stripe");
-      // Os campos de credencial ficam vazios — backend não devolve a
-      // key crua mais, só preview mascarado. Se o admin quiser
-      // alterar, digita a nova; se deixar vazio, o save preserva
-      // a atual (handler ignora strings vazias).
+      setActiveProvider(settings.active_provider || "stripe");
+      setPendingProvider(null);
       setForm(f => ({
         ...f,
         stripe_checkout_type: settings.stripe_checkout_type || "redirect",
         asaas_environment: settings.asaas_environment || "sandbox",
+        abacatepay_environment: settings.abacatepay_environment || "sandbox",
+        abacatepay_checkout_type: settings.abacatepay_checkout_type || "redirect",
       }));
     }
   }, [settings]);
 
   const saveMut = useMutation({
-    mutationFn: () => adminApi.updatePaymentSettings({ active_provider: provider, ...form }),
-    onSuccess: () => { toast.success("Configurações salvas!"); queryClient.invalidateQueries({ queryKey: ["admin-payment-settings"] }); },
+    mutationFn: () => adminApi.updatePaymentSettings({ active_provider: displayProvider, ...form }),
+    onSuccess: () => { toast.success("Configurações salvas!"); setActiveProvider(displayProvider); setPendingProvider(null); queryClient.invalidateQueries({ queryKey: ["admin-payment-settings"] }); },
     onError: () => toast.error("Erro ao salvar"),
   });
 
@@ -331,7 +332,9 @@ function PaymentTab() {
         <p className="text-xs font-medium mb-3" style={{ color: "hsl(240 8% 55%)" }}>PROVEDOR ATIVO</p>
         <div className="grid grid-cols-3 gap-3">
           {PROVIDERS.map((p) => {
-            const isActive = provider === p.id;
+            const isActive = p.id === activeProvider;
+            const isPending = p.id === pendingProvider && p.id !== activeProvider;
+            const isSelected = displayProvider === p.id;
             const isConfigured = p.id === "stripe" ? settings?.stripe_configured
               : p.id === "asaas" ? settings?.asaas_configured
               : settings?.abacatepay_configured;
@@ -339,19 +342,38 @@ function PaymentTab() {
               : p.id === "asaas" ? settings?.asaas_test_status
               : settings?.abacatepay_test_status;
             return (
-              <button key={p.id} onClick={() => !p.disabled && setProvider(p.id)}
+              <button key={p.id} onClick={() => { if (!p.disabled) setPendingProvider(p.id); }}
                 disabled={p.disabled}
                 className="p-3 rounded-xl border-2 text-center relative transition-all"
                 style={{
-                  borderColor: isActive ? p.color : "rgba(255,255,255,0.08)",
-                  background: isActive ? `${p.color}12` : "transparent",
+                  borderColor: isSelected ? p.color : isActive ? "var(--green)" : "rgba(255,255,255,0.08)",
+                  background: isSelected ? `${p.color}12` : isActive ? "rgba(0,212,106,0.06)" : "transparent",
                   opacity: p.disabled ? 0.45 : 1,
                 }}>
-                <div className="text-2xl mb-1">{p.icon}</div>
-                <div className="text-sm font-medium" style={{ color: isActive ? p.color : "hsl(240 15% 85%)" }}>{p.label}</div>
-                {testStatus === "ok" && <Check className="w-3 h-3 absolute top-2 right-2 text-[#00d46a]" />}
-                {testStatus === "failed" && <X className="w-3 h-3 absolute top-2 right-2" style={{ color: "#f87171" }} />}
-                {!isConfigured && !p.disabled && <Shield className="w-3 h-3 absolute top-2 left-2" style={{ color: "#fbbf24" }} />}
+                {/* Badges no topo */}
+                <div className="absolute top-2 left-2 right-2 flex justify-between">
+                  <div>
+                    {!isConfigured && !p.disabled && <Shield className="w-3 h-3" style={{ color: "#fbbf24" }} />}
+                  </div>
+                  <div>
+                    {isActive && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider"
+                        style={{ background: "rgba(0,212,106,0.18)", color: "var(--green)", border: "1px solid rgba(0,212,106,0.35)" }}>
+                        ATIVO
+                      </span>
+                    )}
+                    {isPending && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                        style={{ background: `${p.color}18`, color: p.color, border: `1px solid ${p.color}40` }}>
+                        selecionado
+                      </span>
+                    )}
+                    {testStatus === "ok" && !isActive && !isPending && <Check className="w-3 h-3 text-[#00d46a]" />}
+                    {testStatus === "failed" && !isActive && !isPending && <X className="w-3 h-3" style={{ color: "#f87171" }} />}
+                  </div>
+                </div>
+                <div className="text-2xl mb-1 mt-3">{p.icon}</div>
+                <div className="text-sm font-medium" style={{ color: isSelected ? p.color : isActive ? "var(--green)" : "hsl(240 15% 85%)" }}>{p.label}</div>
                 <div className="mt-1"><PaymentProviderBadge configured={!!isConfigured} testStatus={testStatus} disabled={!!p.disabled} /></div>
               </button>
             );
@@ -360,7 +382,7 @@ function PaymentTab() {
       </Card>
 
       {/* Stripe config */}
-      {provider === "stripe" && (
+      {displayProvider === "stripe" && (
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Stripe</h3>
@@ -497,7 +519,7 @@ function PaymentTab() {
       )}
 
       {/* Asaas config */}
-      {provider === "asaas" && (
+      {displayProvider === "asaas" && (
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Asaas</h3>
@@ -595,7 +617,7 @@ function PaymentTab() {
       )}
 
       {/* AbacatePay config */}
-      {provider === "abacatepay" && (
+      {displayProvider === "abacatepay" && (
         <Card>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>AbacatePay</h3>
