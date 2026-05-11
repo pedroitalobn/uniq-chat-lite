@@ -213,93 +213,22 @@ function SectionTitle({ icon: Icon, title, subtitle }: { icon: React.ElementType
 
 // ─── Contact Hero Card ───────────────────────────────────────────────────────
 
-function ContactHeroCard({ conv, presence, onAvatarClick }: { conv: Conversation | undefined; presence: Presence; onAvatarClick: (url: string, name: string) => void }) {
+function ContactHeroCard({ conv, presence }: { conv: Conversation | undefined; presence: Presence }) {
   if (!conv) return null;
   const name = conv.contact?.name || conv.push_name || conv.subject || "Atendimento";
-  const avatarUrl = conv.contact?.avatar_url || conv.avatar_url;
-  const status = STATUS_LABELS[conv.status];
-  const isGroup = (conv.channel_key || "").toLowerCase().endsWith("@g.us");
-
-  let initials = "?";
-  const words = name.split(/\s+/).filter(Boolean);
-  if (words.length >= 2) initials = (words[0][0] + words[1][0]).toUpperCase();
-  else if (words.length === 1) initials = words[0].slice(0, 2).toUpperCase();
-
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
-  const hue = Math.abs(hash) % 360;
 
   return (
-    <GlassCard className="p-5">
-      <div className="flex items-start gap-4">
-        {/* Avatar */}
-        <div className="flex-shrink-0">
-          {avatarUrl ? (
-            <button
-              onClick={() => onAvatarClick(avatarUrl, name)}
-              className="w-16 h-16 rounded-2xl overflow-hidden transition-all hover:scale-105 hover:shadow-lg ring-2 ring-transparent hover:ring-green-500/20"
-              style={{ background: "var(--surface-2)" }}
-            >
-              <img src={avatarUrl} alt={name} className="w-16 h-16 object-cover" />
-            </button>
-          ) : isGroup ? (
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.25)" }}>
-              <User className="w-7 h-7" style={{ color: "#c4b5fd" }} />
-            </div>
-          ) : (
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-lg" style={{ background: `hsl(${hue} 55% 18%)`, color: `hsl(${hue} 70% 72%)`, border: `1px solid hsl(${hue} 55% 28%)` }}>
-              {initials}
-            </div>
-          )}
-          {/* Online dot */}
-          <div className="flex items-center justify-center mt-1.5">
-            <span className={`w-2 h-2 rounded-full ${presence.online ? "bg-emerald-500 animate-pulse" : "bg-zinc-500"}`} />
-            <span className="text-[10px] ml-1.5" style={{ color: "var(--text-4)" }}>
-              {presence.online ? "Online" : presence.lastSeen ? `Visto ${relativeTime(presence.lastSeen)}` : "Offline"}
-            </span>
-          </div>
-        </div>
-
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-base font-semibold truncate" style={{ color: "var(--text-1)" }}>{name}</h2>
-            {status && (
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ background: status.bg, color: status.color, border: `1px solid ${status.color}30` }}>
-                {status.label}
-              </span>
-            )}
-          </div>
-          <div className="mt-1 space-y-0.5">
-            {conv.contact?.phone && (
-              <p className="text-[11px] font-mono truncate" style={{ color: "var(--text-3)" }}>
-                {conv.contact.phone}
-              </p>
-            )}
-            {conv.contact?.email && (
-              <p className="text-[11px] truncate" style={{ color: "var(--text-3)" }}>
-                {conv.contact.email}
-              </p>
-            )}
-          </div>
-          <div className="mt-2 flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium" style={{ background: channelColor(conv.channel_type) + "14", color: channelColor(conv.channel_type), border: `1px solid ${channelColor(conv.channel_type)}30` }}>
-              {channelLabel(conv.channel_type)}
-            </span>
-            {conv.assigned_user && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: "var(--surface-2)", color: "var(--text-3)", border: "1px solid var(--surface-border)" }}>
-                👤 {conv.assigned_user.name}
-              </span>
-            )}
-            {conv.reopen_count ? (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: "rgba(245,158,11,0.10)", color: "#fbbf24", border: "1px solid rgba(245,158,11,0.20)" }}>
-                reaberto {conv.reopen_count}×
-              </span>
-            ) : null}
-          </div>
+    <div className="flex items-center justify-between px-1 py-1">
+      <div className="min-w-0">
+        <h2 className="text-sm font-semibold truncate" style={{ color: "var(--text-1)" }}>{name}</h2>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <span className={`w-1.5 h-1.5 rounded-full ${presence.online ? "bg-emerald-500 animate-pulse" : "bg-zinc-500"}`} />
+          <span className="text-[10px]" style={{ color: "var(--text-4)" }}>
+            {presence.online ? "Online" : presence.lastSeen ? `Visto ${relativeTime(presence.lastSeen)}` : "Offline"}
+          </span>
         </div>
       </div>
-    </GlassCard>
+    </div>
   );
 }
 
@@ -598,13 +527,19 @@ function AgentQueryPanel({ workspaceId, conversationId }: { workspaceId: string;
 
 // ─── Quick Actions ───────────────────────────────────────────────────────────
 
-function QuickActions({ conv, canAssign, canClose, canReopen, canSnooze, canUpdate, onClaim, onUnassign, onResolve, onClose, onReopen, onSnooze, onPin, onMute }: {
+function QuickActionsWithMode({
+  conv, canAssign, canClose, canReopen, canSnooze, canUpdate,
+  convMode, onModeChange,
+  onClaim, onUnassign, onResolve, onClose, onReopen, onSnooze, onPin, onMute,
+}: {
   conv: Conversation | undefined;
   canAssign: boolean;
   canClose: boolean;
   canReopen: boolean;
   canSnooze: boolean;
   canUpdate: boolean;
+  convMode: "human" | "ai" | "observing";
+  onModeChange: (mode: "human" | "ai" | "observing") => void;
   onClaim: () => void;
   onUnassign: () => void;
   onResolve: () => void;
@@ -629,19 +564,48 @@ function QuickActions({ conv, canAssign, canClose, canReopen, canSnooze, canUpda
 
   return (
     <GlassCard className="p-4">
-      <SectionTitle icon={Zap} title="Ações Rápidas" />
-      <div className="flex flex-wrap gap-2">
-        {actions.map((action) => (
-          <button
-            key={action.label}
-            onClick={action.onClick}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all hover:brightness-110"
-            style={{ background: `${action.color}10`, border: `1px solid ${action.color}25`, color: action.color }}
-          >
-            <action.icon className="w-3 h-3" />
-            {action.label}
-          </button>
-        ))}
+      <div className="flex flex-col sm:flex-row gap-4">
+        {/* Mode selector */}
+        <div className="flex-shrink-0">
+          <label className="text-[10px] font-medium uppercase tracking-wider mb-1.5 block" style={{ color: "var(--text-4)" }}>Modo</label>
+          <div className="flex items-center rounded-lg overflow-hidden border"
+            style={{ border: "1px solid var(--border-default)", background: "rgba(255,255,255,0.03)" }}>
+            {([
+              { id: "human" as const, label: "Humano", icon: UserCheck },
+              { id: "ai" as const, label: "IA", icon: Bot },
+              { id: "observing" as const, label: "Obs", icon: Eye },
+            ]).map(({ id, label, icon: Icon }) => (
+              <button key={id}
+                onClick={() => onModeChange(id)}
+                className="px-2.5 py-1.5 text-[10px] font-medium flex items-center gap-1 transition-all"
+                style={{
+                  background: convMode === id ? (id === "ai" ? "rgba(167,139,250,0.2)" : id === "human" ? "rgba(0,212,106,0.15)" : "rgba(255,255,255,0.08)") : "transparent",
+                  color: convMode === id ? (id === "ai" ? "#c4b5fd" : id === "human" ? "#00d46a" : "hsl(240 15% 80%)") : "var(--text-3)",
+                }}>
+                <Icon className="h-3 w-3" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex-1 min-w-0">
+          <label className="text-[10px] font-medium uppercase tracking-wider mb-1.5 block" style={{ color: "var(--text-4)" }}>Ações rápidas</label>
+          <div className="flex flex-wrap gap-2">
+            {actions.map((action) => (
+              <button
+                key={action.label}
+                onClick={action.onClick}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all hover:brightness-110"
+                style={{ background: `${action.color}10`, border: `1px solid ${action.color}25`, color: action.color }}
+              >
+                <action.icon className="w-3 h-3" />
+                {action.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </GlassCard>
   );
@@ -725,7 +689,29 @@ export function ContactIntelligenceDashboard({
     <div className="flex flex-col h-full min-h-0">
       {/* Scrollable dashboard content */}
       <div className="flex-1 overflow-auto p-4 space-y-3 custom-scrollbar">
-        <ContactHeroCard conv={conversation} presence={presence} onAvatarClick={onAvatarClick} />
+        {/* Header: nome + modo + ações rápidas */}
+        <ContactHeroCard conv={conversation} presence={presence} />
+
+        <QuickActionsWithMode
+          conv={conversation}
+          canAssign={canAssign}
+          canClose={canClose}
+          canReopen={canReopen}
+          canSnooze={canSnooze}
+          canUpdate={canUpdate}
+          convMode={convMode}
+          onModeChange={onModeChange || (() => {})}
+          onClaim={onClaim}
+          onUnassign={onUnassign}
+          onResolve={onResolve}
+          onClose={onClose}
+          onReopen={onReopen}
+          onSnooze={onSnooze}
+          onPin={onPin}
+          onMute={onMute}
+        />
+
+        <ChannelJourneyCards conv={conversation} />
 
         {/* Agent Orchestrator */}
         {conversation?.id && (
@@ -747,27 +733,6 @@ export function ContactIntelligenceDashboard({
 
         {/* Campaigns & Journeys */}
         <CampaignJourneyPanel contactId={contactId} />
-
-        <QuickActions
-          conv={conversation}
-          canAssign={canAssign}
-          canClose={canClose}
-          canReopen={canReopen}
-          canSnooze={canSnooze}
-          canUpdate={canUpdate}
-          onClaim={onClaim}
-          onUnassign={onUnassign}
-          onResolve={onResolve}
-          onClose={onClose}
-          onReopen={onReopen}
-          onSnooze={onSnooze}
-          onPin={onPin}
-          onMute={onMute}
-        />
-
-        <ChannelJourneyCards conv={conversation} />
-
-        {contactId && <CRMInsightCards workspaceId={wsId} contactId={contactId} />}
 
         <ConversationMetrics conv={conversation} />
 

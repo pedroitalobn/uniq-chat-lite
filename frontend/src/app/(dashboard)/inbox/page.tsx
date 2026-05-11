@@ -11,7 +11,7 @@ import {
   Lock, Search, ChevronDown, User as UserIcon, MessageSquare,
   Layers, Smartphone, Radio, RefreshCw, Check, BarChart3,
   MoreVertical, Users, Building2, Zap, Bell, BellOff, X, Phone, PhoneMissed, Sparkles,
-  Filter, UserCircle2, Megaphone, Plus, Archive, Pin, PinOff, Trash2,
+  Filter, UserCircle2, Megaphone, Plus, Archive, Pin, PinOff, Trash2, RotateCcw,
 } from "lucide-react";
 import { usePreferences } from "@/lib/preferences";
 import {
@@ -789,6 +789,24 @@ function InboxPage() {
 
           {viewMode === "conversations" && (
             <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+              <button
+                onClick={() => {
+                  listQ.refetch();
+                  statsQ.refetch();
+                  countsQ.refetch();
+                  if (selectedId) {
+                    qc.invalidateQueries({ queryKey: ["conversation", wsId, selectedId] });
+                    qc.invalidateQueries({ queryKey: ["conversation-timeline", wsId, selectedId] });
+                  }
+                }}
+                disabled={listQ.isFetching}
+                className="flex items-center justify-center rounded-lg flex-shrink-0 transition-colors disabled:opacity-50"
+                style={{ width: 30, height: 30, background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-subtle)", color: "var(--text-3)" }}
+                title="Atualizar conversas"
+                aria-label="Atualizar conversas"
+              >
+                <RotateCcw className={`h-3.5 w-3.5 ${listQ.isFetching ? "animate-spin" : ""}`} />
+              </button>
               <button
                 onClick={() => setShowNewConvModal(true)}
                 className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium"
