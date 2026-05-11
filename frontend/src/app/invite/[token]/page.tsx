@@ -132,7 +132,7 @@ export default function InviteAcceptPage({
           className="rounded-2xl p-7 space-y-5"
           style={{
             background: "var(--surface-solid)",
-            boxShadow: "0 0 0 1px hsl(240 12% 13%), 0 24px 64px rgba(0,0,0,0.5)",
+            boxShadow: "0 0 0 1px var(--border-default), 0 24px 64px rgba(0,0,0,0.5)",
           }}
         >
           {inner}

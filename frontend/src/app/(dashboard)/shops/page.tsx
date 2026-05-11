@@ -145,22 +145,22 @@ export default function ShopsPage() {
               href={`/shops/${shop.id}`}
               className="rounded-xl p-4 block relative"
               style={{
-                background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+                background: "linear-gradient(135deg, var(--border-default) 0%, rgba(255,255,255,0.02) 100%)",
                 backdropFilter: "blur(20px) saturate(180%)",
                 WebkitBackdropFilter: "blur(20px) saturate(180%)",
-                border: "1px solid rgba(255,255,255,0.10)",
+                border: "1px solid var(--border-default)",
                 borderRadius: "20px",
-                boxShadow: "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 var(--border-default)",
                 transition: "all 0.35s cubic-bezier(0.16,1,0.3,1)",
               }}
               onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.12)";
-                (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.16)";
+                (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 var(--border-strong)";
+                (e.currentTarget as HTMLElement).style.borderColor = "var(--border-strong)";
                 (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)";
               }}
               onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)";
-                (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.10)";
+                (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 var(--border-default)";
+                (e.currentTarget as HTMLElement).style.borderColor = "var(--border-default)";
                 (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
               }}
             >
@@ -186,10 +186,10 @@ export default function ShopsPage() {
                   <span
                     className="inline-block text-[10px] mt-1 px-2 py-0.5"
                     style={{
-                      background: "rgba(255,255,255,0.06)",
+                      background: "var(--border-subtle)",
                       backdropFilter: "blur(8px)",
                       WebkitBackdropFilter: "blur(8px)",
-                      border: "1px solid rgba(255,255,255,0.10)",
+                      border: "1px solid var(--border-default)",
                       borderRadius: "10px",
                       color: "var(--text-4)",
                       transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
@@ -241,18 +241,18 @@ export default function ShopsPage() {
           <div
             className="w-full max-w-md rounded-2xl p-6 relative"
             style={{
-              background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+              background: "linear-gradient(135deg, var(--border-default) 0%, rgba(255,255,255,0.02) 100%)",
               backdropFilter: "blur(20px) saturate(180%)",
               WebkitBackdropFilter: "blur(20px) saturate(180%)",
-              border: "1px solid rgba(255,255,255,0.10)",
+              border: "1px solid var(--border-default)",
               borderRadius: "20px",
-              boxShadow: "0 8px 24px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.10)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.40), inset 0 1px 0 var(--border-default)",
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{
               position: "absolute", top: 0, left: "15%", right: "15%", height: "1px",
-              background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)",
+              background: "linear-gradient(90deg, transparent, var(--border-strong), transparent)",
               pointerEvents: "none",
             }} />
             <h3 className="text-lg font-semibold mb-4" style={{ color: "var(--text-1)" }}>
@@ -272,7 +272,7 @@ export default function ShopsPage() {
                     background: "var(--input)",
                     backdropFilter: "blur(8px)",
                     color: "var(--text-1)",
-                    border: "1px solid rgba(255,255,255,0.10)",
+                    border: "1px solid var(--border-default)",
                     transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
                   }}
                 />
@@ -290,7 +290,7 @@ export default function ShopsPage() {
                     background: "var(--input)",
                     backdropFilter: "blur(8px)",
                     color: "var(--text-1)",
-                    border: "1px solid rgba(255,255,255,0.10)",
+                    border: "1px solid var(--border-default)",
                     transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
                   }}
                 />
@@ -307,7 +307,7 @@ export default function ShopsPage() {
                     background: "var(--input)",
                     backdropFilter: "blur(8px)",
                     color: "var(--text-1)",
-                    border: "1px solid rgba(255,255,255,0.10)",
+                    border: "1px solid var(--border-default)",
                     transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
                   }}
                 >
@@ -324,12 +324,12 @@ export default function ShopsPage() {
                 style={{
                   background: "var(--input)",
                   backdropFilter: "blur(8px)",
-                  border: "1px solid rgba(255,255,255,0.09)",
+                  border: "1px solid var(--border-default)",
                   color: "var(--text-2)",
                   transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.09)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--border-default)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "var(--input)"; }}
               >
                 Cancelar
               </button>

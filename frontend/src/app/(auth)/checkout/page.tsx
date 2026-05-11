@@ -292,7 +292,7 @@ function CheckoutContent() {
         }}
       >
         {/* Header */}
-        <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: "hsl(240 12% 15%)" }}>
+        <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border-default)" }}>
           {step === "checkout" && !hasBrCode && (
             <button onClick={() => setStep("plan")} className="flex items-center gap-1 text-sm hover:opacity-80 transition-opacity" style={{ color: "var(--text-3)" }}>
               <ArrowLeft className="w-4 h-4" /> Voltar
@@ -378,7 +378,7 @@ function CheckoutContent() {
                       value={checkoutData.br_code}
                       size={160}
                       level="M"
-                      fgColor="#000000"
+                      fgColor="var(--text-1)"
                     />
                   </motion.div>
                   <p className="text-xs mb-1" style={{ color: "hsl(240 8% 46%)" }}>
@@ -490,7 +490,7 @@ function CheckoutContent() {
                         onClick={() => setPaymentMethod(m.id)}
                         className="p-3 rounded-xl border-2 transition-all text-center"
                         style={{
-                          borderColor: paymentMethod === m.id ? m.color : "hsl(240 12% 15%)",
+                          borderColor: paymentMethod === m.id ? m.color : "var(--border-default)",
                           background: paymentMethod === m.id ? `${m.color}12` : "transparent",
                         }}
                       >
@@ -498,9 +498,9 @@ function CheckoutContent() {
                           animate={{ scale: paymentMethod === m.id ? 1.1 : 1 }}
                           className="mb-1 flex justify-center"
                         >
-                          <m.icon size={20} color={paymentMethod === m.id ? m.color : "hsl(240 8% 60%)"} />
+                          <m.icon size={20} color={paymentMethod === m.id ? m.color : "var(--text-3)"} />
                         </motion.div>
-                        <div className="text-xs font-medium" style={{ color: paymentMethod === m.id ? m.color : "hsl(240 8% 60%)" }}>
+                        <div className="text-xs font-medium" style={{ color: paymentMethod === m.id ? m.color : "var(--text-3)" }}>
                           {m.label}
                         </div>
                       </motion.button>

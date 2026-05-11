@@ -98,7 +98,7 @@ export default function TasksPage() {
                   className="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0"
                   style={active
                     ? { background: f.color + "1a", color: f.color, border: `1px solid ${f.color}55` }
-                    : { background: "rgba(255,255,255,0.04)", color: "var(--text-3)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    : { background: "var(--input)", color: "var(--text-3)", border: "1px solid var(--border-default)" }}>
                   {f.label}
                 </button>
               );
@@ -125,7 +125,7 @@ export default function TasksPage() {
             onEdit={(t) => { setEditing(t); setShowModal(true); }}
             onDelete={(t) => deleteMut.mutate(t.id)}
             onComplete={(t) => completeMut.mutate(t.id)} />
-          <Section title="Sem data" tasks={groups.undated} accent="hsl(240 8% 50%)"
+          <Section title="Sem data" tasks={groups.undated} accent="var(--text-3)"
             onEdit={(t) => { setEditing(t); setShowModal(true); }}
             onDelete={(t) => deleteMut.mutate(t.id)}
             onComplete={(t) => completeMut.mutate(t.id)} />

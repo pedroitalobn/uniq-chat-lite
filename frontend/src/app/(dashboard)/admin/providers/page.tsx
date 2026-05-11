@@ -77,7 +77,7 @@ interface InstanceRow { name: string; type?: string; channel?: string; status: s
 // ─── Shared primitives ────────────────────────────────────────────────────────
 const CARD: React.CSSProperties = {
   background: "rgba(255,255,255,0.035)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  border: "1px solid var(--border-default)",
   borderRadius: 16,
   padding: 24,
 };
@@ -162,7 +162,7 @@ function TestConnectionButton({ provider, disabled }: { provider: "stripe" | "as
       className="text-[10px] px-2.5 py-1 rounded-md font-medium disabled:opacity-50"
       style={{
         background: "var(--input)",
-        border: "1px solid rgba(255,255,255,0.10)",
+        border: "1px solid var(--border-default)",
         color: "hsl(240 15% 80%)",
       }}
     >
@@ -209,7 +209,7 @@ function PaymentProviderBadge({
   }
   return (
     <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-      style={{ background: "rgba(255,255,255,0.07)", color: "var(--text-3)" }}>
+      style={{ background: "var(--border-default)", color: "var(--text-3)" }}>
       Não testado
     </span>
   );
@@ -439,7 +439,7 @@ function PaymentTab() {
                 disabled={p.disabled}
                 className="p-3 rounded-xl border-2 text-center relative transition-all"
                 style={{
-                  borderColor: isSelected ? p.color : isActive ? "var(--green)" : "rgba(255,255,255,0.08)",
+                  borderColor: isSelected ? p.color : isActive ? "var(--green)" : "var(--border-default)",
                   background: isSelected ? `${p.color}12` : isActive ? "rgba(0,212,106,0.06)" : "transparent",
                   opacity: p.disabled ? 0.45 : 1,
                 }}>
@@ -466,7 +466,7 @@ function PaymentTab() {
                   </div>
                 </div>
                 <div className="text-2xl mb-1 mt-3">{p.icon}</div>
-                <div className="text-sm font-medium" style={{ color: isSelected ? p.color : isActive ? "var(--green)" : "hsl(240 15% 85%)" }}>{p.label}</div>
+                <div className="text-sm font-medium" style={{ color: isSelected ? p.color : isActive ? "var(--green)" : "var(--text-1)" }}>{p.label}</div>
                 <div className="mt-1"><PaymentProviderBadge configured={!!isConfigured} testStatus={testStatus} disabled={!!p.disabled} /></div>
               </button>
             );
@@ -548,7 +548,7 @@ function PaymentTab() {
               ))}
             </div>
           </div>
-          <div className="mt-4 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+          <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--border-default)" }}>
             <Label>URL do Webhook</Label>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 18% 5%)", color: "var(--text-3)" }}>
@@ -677,7 +677,7 @@ function PaymentTab() {
               )}
             </div>
           </div>
-          <div className="mt-4 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+          <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--border-default)" }}>
             <Label>URL do Webhook</Label>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 18% 5%)", color: "var(--text-3)" }}>
@@ -804,7 +804,7 @@ function PaymentTab() {
               ))}
             </div>
           </div>
-          <div className="mt-4 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+          <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--border-default)" }}>
             <Label>URL do Webhook</Label>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 18% 5%)", color: "var(--text-3)" }}>
@@ -918,14 +918,14 @@ function EmailSection() {
           </label>
         </div>
       </div>
-      <div className="mt-4 pt-4 flex items-end gap-3" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+      <div className="mt-4 pt-4 flex items-end gap-3" style={{ borderTop: "1px solid var(--border-default)" }}>
         <div className="flex-1">
           <Label>Testar Email</Label>
           <Input type="email" value={testEmail} onChange={e => setTestEmail(e.target.value)} placeholder="email@teste.com" />
         </div>
         <button onClick={() => testMut.mutate()} disabled={!testEmail || testMut.isPending}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50"
-          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "hsl(240 15% 80%)" }}>
+          style={{ background: "var(--border-subtle)", border: "1px solid rgba(255,255,255,0.1)", color: "hsl(240 15% 80%)" }}>
           {testMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
           Testar
         </button>
@@ -995,7 +995,7 @@ function TemplatesSection() {
         <div className="space-y-2">
           {templates.map(t => (
             <div key={t.id} className="flex items-center justify-between p-3 rounded-xl"
-              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+              style={{ background: "var(--input)", border: "1px solid var(--border-subtle)" }}>
               <div>
                 <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{t.name}</p>
                 <p className="text-xs font-mono" style={{ color: "var(--text-3)" }}>{t.slug}</p>
@@ -1080,7 +1080,7 @@ function OtpSection() {
         </div>
 
         {/* Auto Message Provider */}
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 16 }}>
+        <div style={{ borderTop: "1px solid var(--border-default)", paddingTop: 16 }}>
           <Label>Provedor de Mensagens Automáticas</Label>
           <div className="flex gap-4">
             {["email", "whatsapp"].map(p => (
@@ -1124,11 +1124,11 @@ function CommunicationTab() {
   return (
     <div className="space-y-5">
       <SectionTitle>Comunicação</SectionTitle>
-      <div className="flex gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+      <div className="flex gap-1 p-1 rounded-xl" style={{ background: "var(--input)", border: "1px solid var(--border-default)" }}>
         {SUB_TABS.map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setSub(id)}
             className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-medium transition-all"
-            style={{ background: sub === id ? "rgba(0,212,106,0.15)" : "transparent", color: sub === id ? "#00d46a" : "hsl(240 8% 55%)" }}>
+            style={{ background: sub === id ? "rgba(0,212,106,0.15)" : "transparent", color: sub === id ? "#00d46a" : "var(--text-3)" }}>
             <Icon className="w-3.5 h-3.5" />{label}
           </button>
         ))}
@@ -1161,11 +1161,11 @@ function ServerTab() {
   return (
     <div className="space-y-5">
       <SectionTitle>Servidor</SectionTitle>
-      <div className="flex gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+      <div className="flex gap-1 p-1 rounded-xl" style={{ background: "var(--input)", border: "1px solid var(--border-default)" }}>
         {(["servers", "instances"] as const).map(v => (
           <button key={v} onClick={() => setView(v)}
             className="flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all"
-            style={{ background: view === v ? "rgba(0,212,106,0.15)" : "transparent", color: view === v ? "#00d46a" : "hsl(240 8% 55%)" }}>
+            style={{ background: view === v ? "rgba(0,212,106,0.15)" : "transparent", color: view === v ? "#00d46a" : "var(--text-3)" }}>
             {v === "servers" ? "Servidores" : "Instâncias"}
           </button>
         ))}
@@ -1310,7 +1310,7 @@ function ProvidersPageInner() {
         {/* Sidebar */}
         <aside className="hidden sm:flex w-44 lg:w-52 flex-shrink-0 sticky top-0">
           <nav className="rounded-2xl overflow-hidden w-full"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            style={{ background: "var(--input)", border: "1px solid var(--border-default)" }}>
             {TABS.map((tab, i) => {
               const Icon = tab.icon;
               const isActive = active === tab.id;
@@ -1318,15 +1318,15 @@ function ProvidersPageInner() {
                 <button key={tab.id} onClick={() => handleTabClick(tab.id)}
                   className={`w-full flex items-center gap-3 px-3 lg:px-4 py-3 lg:py-3.5 text-left relative${i < TABS.length - 1 ? " border-b" : ""}`}
                   style={{ borderColor: "var(--border-subtle)", background: isActive ? "rgba(0,212,106,0.10)" : "transparent", transition: "background 0.2s" }}
-                  onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+                  onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--input)"; }}
                   onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}>
                   {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r" style={{ background: "#00d46a" }} />}
                   <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ background: isActive ? "rgba(0,212,106,0.15)" : "rgba(255,255,255,0.05)", border: `1px solid ${isActive ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.08)"}` }}>
-                    <Icon className="w-3.5 h-3.5" style={{ color: isActive ? "#00d46a" : "hsl(240 8% 55%)" }} />
+                    style={{ background: isActive ? "rgba(0,212,106,0.15)" : "var(--input)", border: `1px solid ${isActive ? "rgba(0,212,106,0.25)" : "var(--border-default)"}` }}>
+                    <Icon className="w-3.5 h-3.5" style={{ color: isActive ? "#00d46a" : "var(--text-3)" }} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium truncate" style={{ color: isActive ? "#00d46a" : "hsl(240 15% 88%)" }}>{tab.label}</p>
+                    <p className="text-xs font-medium truncate" style={{ color: isActive ? "#00d46a" : "var(--text-1)" }}>{tab.label}</p>
                     <p className="text-[10px] truncate mt-0.5 hidden lg:block" style={{ color: "var(--text-3)" }}>{tab.desc}</p>
                   </div>
                 </button>
@@ -1336,11 +1336,11 @@ function ProvidersPageInner() {
         </aside>
 
         {/* Mobile tabs */}
-        <div className="sm:hidden flex gap-1 p-1 rounded-xl w-full" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+        <div className="sm:hidden flex gap-1 p-1 rounded-xl w-full" style={{ background: "var(--input)", border: "1px solid var(--border-default)" }}>
           {TABS.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => handleTabClick(id)}
               className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium"
-              style={{ background: active === id ? "rgba(0,212,106,0.15)" : "transparent", color: active === id ? "#00d46a" : "hsl(240 8% 55%)" }}>
+              style={{ background: active === id ? "rgba(0,212,106,0.15)" : "transparent", color: active === id ? "#00d46a" : "var(--text-3)" }}>
               <Icon className="w-3.5 h-3.5" />
               <span className="truncate">{label.split(" ")[0]}</span>
             </button>

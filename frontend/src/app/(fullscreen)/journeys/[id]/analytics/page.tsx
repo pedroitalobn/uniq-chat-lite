@@ -249,7 +249,7 @@ function FunnelBlock({ funnel, totals }: { funnel: any[]; totals: any }) {
               </div>
               <div
                 className="h-2 rounded-full overflow-hidden"
-                style={{ background: "rgba(255,255,255,0.04)" }}
+                style={{ background: "var(--input)" }}
               >
                 <div
                   className="h-full transition-[width] duration-500"

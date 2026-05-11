@@ -146,12 +146,12 @@ export function CommandPalette() {
               left: "50%",
               width: "min(600px, 90vw)",
               zIndex: 9999,
-              background: "linear-gradient(160deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 50%, rgba(0,0,0,0.10) 100%)",
+              background: "linear-gradient(160deg, var(--border-default) 0%, var(--input) 50%, rgba(0,0,0,0.10) 100%)",
               backdropFilter: "blur(32px) saturate(200%) brightness(1.1)",
               WebkitBackdropFilter: "blur(32px) saturate(200%) brightness(1.1)",
-              border: "1px solid rgba(255,255,255,0.15)",
+              border: "1px solid var(--border-strong)",
               borderRadius: "24px",
-              boxShadow: "0 40px 80px rgba(0,0,0,0.70), 0 16px 32px rgba(0,0,0,0.50), 0 4px 8px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.20)",
+              boxShadow: "0 40px 80px rgba(0,0,0,0.70), 0 16px 32px rgba(0,0,0,0.50), 0 4px 8px rgba(0,0,0,0.30), inset 0 1px 0 var(--border-strong), inset 0 -1px 0 rgba(0,0,0,0.20)",
               overflow: "hidden",
               maxHeight: "60vh",
               display: "flex",
@@ -165,7 +165,7 @@ export function CommandPalette() {
               left: "20%",
               right: "20%",
               height: "1px",
-              background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.30), transparent)",
+              background: "linear-gradient(90deg, transparent, var(--border-strong), transparent)",
               pointerEvents: "none",
             }} />
 
@@ -201,7 +201,7 @@ export function CommandPalette() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar páginas e ações..."
                 style={{
-                  background: "rgba(255,255,255,0.06)",
+                  background: "var(--border-subtle)",
                   backdropFilter: "blur(8px)",
                   border: "none",
                   borderBottom: "1px solid var(--border-default)",
@@ -280,7 +280,7 @@ export function CommandPalette() {
                             width: "calc(100% - 16px)",
                             textAlign: "left",
                             border: "none",
-                            background: isActive ? "rgba(255,255,255,0.08)" : "transparent",
+                            background: isActive ? "var(--border-default)" : "transparent",
                             backdropFilter: isActive ? "blur(4px)" : undefined,
                             borderLeft: isActive ? "2px solid var(--green)" : "2px solid transparent",
                             boxShadow: isActive ? "inset 0 0 20px rgba(0,212,106,0.05)" : "none",
@@ -297,7 +297,7 @@ export function CommandPalette() {
                               height: "28px",
                               borderRadius: "8px",
                               flexShrink: 0,
-                              background: isActive ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.06)",
+                              background: isActive ? "rgba(0,212,106,0.12)" : "var(--border-subtle)",
                               color: isActive ? "var(--green)" : "var(--text-3)",
                               transition: "all 0.15s cubic-bezier(0.16,1,0.3,1)",
                             }}
@@ -314,8 +314,8 @@ export function CommandPalette() {
                                     fontSize: "10px",
                                     padding: "2px 6px",
                                     borderRadius: "4px",
-                                    background: "rgba(255,255,255,0.06)",
-                                    border: "1px solid rgba(255,255,255,0.10)",
+                                    background: "var(--border-subtle)",
+                                    border: "1px solid var(--border-default)",
                                     color: "var(--text-4)",
                                     fontFamily: "monospace",
                                   }}

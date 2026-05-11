@@ -105,9 +105,9 @@ export function MobileDock() {
             background: "rgba(10,10,20,0.78)",
             backdropFilter: "blur(28px) saturate(200%)",
             WebkitBackdropFilter: "blur(28px) saturate(200%)",
-            border: "1px solid rgba(255,255,255,0.10)",
+            border: "1px solid var(--border-default)",
             borderRadius: 28,
-            boxShadow: "0 12px 40px rgba(0,0,0,0.50), 0 -2px 12px rgba(0,212,106,0.08), inset 0 1px 0 rgba(255,255,255,0.10)",
+            boxShadow: "0 12px 40px rgba(0,0,0,0.50), 0 -2px 12px rgba(0,212,106,0.08), inset 0 1px 0 var(--border-default)",
           }}
         >
           {PRIMARY_LEFT.map((item, i) => (
@@ -160,7 +160,7 @@ export function MobileDock() {
                 backdropFilter: "blur(28px) saturate(200%)",
                 WebkitBackdropFilter: "blur(28px) saturate(200%)",
                 borderTop: "1px solid var(--border-default)",
-                boxShadow: "0 -16px 48px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08)",
+                boxShadow: "0 -16px 48px rgba(0,0,0,0.55), inset 0 1px 0 var(--border-default)",
                 paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
               }}
               initial={{ y: "100%" }}
@@ -170,7 +170,7 @@ export function MobileDock() {
             >
               {/* Drag handle visual (não funcional — UX iOS) */}
               <div className="flex justify-center pt-2 pb-1">
-                <div className="w-10 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }} />
+                <div className="w-10 h-1 rounded-full" style={{ background: "var(--border-strong)" }} />
               </div>
               <div
                 className="flex items-center justify-between px-5 pt-2 pb-3"
@@ -180,7 +180,7 @@ export function MobileDock() {
                 <button
                   onClick={() => setSheetOpen(false)}
                   className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ background: "rgba(255,255,255,0.06)", color: "var(--text-2)" }}
+                  style={{ background: "var(--border-subtle)", color: "var(--text-2)" }}
                   aria-label="Fechar"
                 >
                   <X className="w-4 h-4" />
@@ -210,7 +210,7 @@ export function MobileDock() {
                               }
                             : {
                                 background: "var(--input)",
-                                border: "1px solid rgba(255,255,255,0.08)",
+                                border: "1px solid var(--border-default)",
                                 color: "var(--text-1)",
                               }
                         }
@@ -270,7 +270,7 @@ function UniqAICenterButton({ open }: { open: () => void }) {
           height: 56,
           top: -16, // raised acima da linha do dock
           background: "linear-gradient(135deg, #00d46a 0%, #00b259 100%)",
-          boxShadow: "0 8px 24px rgba(0,212,106,0.45), 0 0 0 4px rgba(10,10,20,0.78), inset 0 1px 0 rgba(255,255,255,0.30)",
+          boxShadow: "0 8px 24px rgba(0,212,106,0.45), 0 0 0 4px rgba(10,10,20,0.78), inset 0 1px 0 var(--border-strong)",
         }}
         aria-label="Abrir Uniq AI"
       >

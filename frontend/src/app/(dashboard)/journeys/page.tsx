@@ -125,10 +125,10 @@ export default function JourneysPage() {
           <div
             className="flex gap-1 p-1 rounded-xl mb-3 sm:mb-4 flex-shrink-0 self-start"
             style={{
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--input)",
               backdropFilter: "blur(12px) saturate(180%)",
               WebkitBackdropFilter: "blur(12px) saturate(180%)",
-              border: "1px solid rgba(255,255,255,0.09)",
+              border: "1px solid var(--border-default)",
             }}
           >
             {TABS.map((t) => {

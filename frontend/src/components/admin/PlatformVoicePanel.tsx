@@ -132,7 +132,7 @@ export function PlatformVoicePanel() {
                     <span className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{c.name || meta?.label}</span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
                       style={{
-                        background: c.is_active ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.05)",
+                        background: c.is_active ? "rgba(0,212,106,0.12)" : "var(--input)",
                         color: c.is_active ? "var(--green)" : "var(--text-3)",
                         border: `1px solid ${c.is_active ? "rgba(0,212,106,0.25)" : "var(--surface-border)"}`,
                       }}>

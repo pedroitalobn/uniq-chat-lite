@@ -58,8 +58,8 @@ export function IntelligenceCard({ form, update }: Props) {
           <span
             className="flex items-center justify-center w-8 h-8 rounded-lg flex-shrink-0"
             style={{
-              background: usingUniqAI ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.04)",
-              border: `1px solid ${usingUniqAI ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.06)"}`,
+              background: usingUniqAI ? "rgba(0,212,106,0.12)" : "var(--input)",
+              border: `1px solid ${usingUniqAI ? "rgba(0,212,106,0.25)" : "var(--border-subtle)"}`,
               color: usingUniqAI ? "var(--green)" : "var(--text-3)",
             }}
           >

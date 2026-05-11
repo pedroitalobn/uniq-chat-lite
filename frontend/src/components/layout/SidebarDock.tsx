@@ -26,13 +26,13 @@ const LS_KEY = "uniq-dock-expanded";
 // ─── Design tokens (inline, dark theme) ──────────────────────────────────────
 const C = {
   bg:       "rgba(10,10,17,0.88)",
-  border:   "rgba(255,255,255,0.07)",
+  border:   "var(--border-default)",
   text1:    "rgba(255,255,255,0.88)",
   text2:    "rgba(255,255,255,0.55)",
   text3:    "rgba(255,255,255,0.28)",
   active:   "#00d46a",
   activeB:  "rgba(0,212,106,0.14)",
-  hover:    "rgba(255,255,255,0.07)",
+  hover:    "var(--border-default)",
   amber:    "rgba(245,158,11,0.75)",
   amberB:   "rgba(245,158,11,0.08)",
   red:      "#f87171",
@@ -100,7 +100,7 @@ function NavLink({
             <span style={{
               position: "absolute", top: -3, right: -3,
               minWidth: 14, height: 14, borderRadius: 99,
-              background: C.active, color: "#000",
+              background: C.active, color: "var(--text-1)",
               fontSize: 8, fontWeight: 700,
               display: "flex", alignItems: "center", justifyContent: "center",
               padding: "0 2px",
@@ -133,7 +133,7 @@ function NavLink({
         {expanded && badge != null && (
           <span style={{
             marginLeft: "auto", minWidth: 18, height: 18, borderRadius: 99,
-            background: C.active, color: "#000", fontSize: 9, fontWeight: 700,
+            background: C.active, color: "var(--text-1)", fontSize: 9, fontWeight: 700,
             display: "flex", alignItems: "center", justifyContent: "center",
             padding: "0 4px", flexShrink: 0,
           }}>
@@ -353,7 +353,7 @@ export function SidebarDock() {
         backdropFilter: "blur(28px) saturate(200%)",
         WebkitBackdropFilter: "blur(28px) saturate(200%)",
         border: `1px solid ${C.border}`,
-        boxShadow: "0 24px 64px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)",
+        boxShadow: "0 24px 64px rgba(0,0,0,0.55), inset 0 1px 0 var(--border-subtle)",
         overflow: "visible",
         padding: "10px 10px 8px",
         gap: 0,
@@ -660,7 +660,7 @@ function WorkspaceSection({
             border: "none", background: "transparent", cursor: "pointer",
             transition: "background 0.15s",
           }}
-          onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+          onMouseEnter={e => (e.currentTarget.style.background = "var(--input)")}
           onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
         >
           <span style={{
@@ -745,7 +745,7 @@ function WorkspaceSection({
                       fontSize: 13, fontWeight: 500, textAlign: "left",
                       transition: "background 0.12s",
                     }}
-                    onMouseEnter={e => { if (!isCurrent) e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+                    onMouseEnter={e => { if (!isCurrent) e.currentTarget.style.background = "var(--border-subtle)"; }}
                     onMouseLeave={e => { if (!isCurrent) e.currentTarget.style.background = "transparent"; }}
                   >
                     <span style={{
@@ -774,7 +774,7 @@ function WorkspaceSection({
                   background: "transparent", color: C.text2, fontSize: 12, fontWeight: 500,
                   transition: "background 0.12s",
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                onMouseEnter={e => (e.currentTarget.style.background = "var(--border-subtle)")}
                 onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
               >
                 <Settings style={{ width: 12, height: 12 }} />
@@ -827,7 +827,7 @@ function UserSection({
       >
         <div style={{
           width: 28, height: 28, borderRadius: 9, flexShrink: 0,
-          background: avatarGradient, color: "#fff",
+          background: avatarGradient, color: "var(--text-1)",
           fontSize: 11, fontWeight: 700,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
@@ -1118,7 +1118,7 @@ function MobileDrawer({
               {item.badge != null && (
                 <span style={{
                   marginLeft: "auto", minWidth: 18, height: 18, borderRadius: 99,
-                  background: C.active, color: "#000", fontSize: 9, fontWeight: 700,
+                  background: C.active, color: "var(--text-1)", fontSize: 9, fontWeight: 700,
                   display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px",
                 }}>
                   {item.badge}
@@ -1164,12 +1164,12 @@ function MobileDrawer({
           style={{
             width: "100%", display: "flex", alignItems: "center", gap: 10,
             padding: "8px 10px", borderRadius: 10, border: "none",
-            background: "rgba(255,255,255,0.03)", cursor: "pointer", marginBottom: 4,
+            background: "var(--input)", cursor: "pointer", marginBottom: 4,
           }}
         >
           <div style={{
             width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-            background: avatarGradient, color: "#fff", fontSize: 11, fontWeight: 700,
+            background: avatarGradient, color: "var(--text-1)", fontSize: 11, fontWeight: 700,
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
             {initials}

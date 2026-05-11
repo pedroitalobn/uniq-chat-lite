@@ -191,9 +191,9 @@ export function ContactCRMPanel({ workspaceId, contactId }: { workspaceId: strin
                   onClick={() => toggleTag(t.id)}
                   className="px-2 py-0.5 rounded-full text-[10px] transition-colors"
                   style={{
-                    background: on ? t.color + "22" : "rgba(255,255,255,0.04)",
+                    background: on ? t.color + "22" : "var(--input)",
                     color: on ? t.color : "var(--text-3)",
-                    border: `1px solid ${on ? t.color + "44" : "rgba(255,255,255,0.08)"}`,
+                    border: `1px solid ${on ? t.color + "44" : "var(--border-default)"}`,
                   }}
                 >
                   {t.name}

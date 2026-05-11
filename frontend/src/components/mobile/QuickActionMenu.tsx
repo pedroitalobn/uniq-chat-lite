@@ -105,7 +105,7 @@ export function QuickActionMenu({
               background: "rgba(20,20,30,0.96)",
               backdropFilter: "blur(28px) saturate(200%)",
               WebkitBackdropFilter: "blur(28px) saturate(200%)",
-              border: "1px solid rgba(255,255,255,0.10)",
+              border: "1px solid var(--border-default)",
               boxShadow: "0 24px 48px rgba(0,0,0,0.55)",
             }}
             initial={{ opacity: 0, scale: 0.85 }}
@@ -134,7 +134,7 @@ export function QuickActionMenu({
                   className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors active:bg-white/10"
                   style={{
                     color: item.destructive ? "#ef4444" : "var(--text-1)",
-                    borderTop: idx > 0 ? "1px solid rgba(255,255,255,0.05)" : undefined,
+                    borderTop: idx > 0 ? "1px solid var(--input)" : undefined,
                   }}
                 >
                   {item.icon && (

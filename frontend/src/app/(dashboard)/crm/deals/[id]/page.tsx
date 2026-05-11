@@ -230,7 +230,7 @@ export default function DealDetailPage({ params }: { params: Promise<{ id: strin
               sem owner ou pra repassar pra outro atendente. */}
           <div
             className="rounded-xl p-3 flex flex-col gap-1"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+            style={{ background: "var(--input)", border: "1px solid var(--border-subtle)" }}
           >
             <span className="text-[10px] uppercase tracking-wider" style={{ color: uniq.textFaint }}>
               Responsável

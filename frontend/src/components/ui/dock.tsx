@@ -43,15 +43,15 @@ export function DockIcon({ icon: Icon, label, badge, pulse, active, onClick, dan
           flexShrink: 0,
           border: active
             ? "1px solid rgba(0,212,106,0.35)"
-            : "1px solid rgba(255,255,255,0.07)",
+            : "1px solid var(--border-default)",
           background: active
             ? "linear-gradient(135deg, rgba(0,212,106,0.22), rgba(0,212,106,0.08))"
             : hovered
-            ? "rgba(255,255,255,0.08)"
-            : "rgba(255,255,255,0.04)",
+            ? "var(--border-default)"
+            : "var(--input)",
           color: active ? "#00d46a" : danger ? "#f87171" : "rgba(255,255,255,0.65)",
           boxShadow: active
-            ? "0 0 16px rgba(0,212,106,0.25), inset 0 1px 0 rgba(255,255,255,0.10)"
+            ? "0 0 16px rgba(0,212,106,0.25), inset 0 1px 0 var(--border-default)"
             : hovered && !danger
             ? "0 4px 16px rgba(0,0,0,0.3)"
             : "none",
@@ -124,7 +124,7 @@ export function DockIcon({ icon: Icon, label, badge, pulse, active, onClick, dan
               padding: "4px 10px",
               borderRadius: 8,
               background: "rgba(20,20,30,0.95)",
-              border: "1px solid rgba(255,255,255,0.10)",
+              border: "1px solid var(--border-default)",
               color: "rgba(255,255,255,0.92)",
               fontSize: 11,
               fontWeight: 500,
@@ -158,7 +158,7 @@ export function DockDivider() {
     <div style={{
       width: 24,
       height: 1,
-      background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.10), transparent)",
+      background: "linear-gradient(90deg, transparent, var(--border-default), transparent)",
       margin: "2px 0",
     }} />
   );
@@ -179,8 +179,8 @@ export function DockContainer({ children }: { children: React.ReactNode }) {
         background: "rgba(10,10,16,0.82)",
         backdropFilter: "blur(24px) saturate(200%)",
         WebkitBackdropFilter: "blur(24px) saturate(200%)",
-        border: "1px solid rgba(255,255,255,0.07)",
-        boxShadow: "0 24px 64px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.06) inset, 4px 0 24px rgba(0,0,0,0.2)",
+        border: "1px solid var(--border-default)",
+        boxShadow: "0 24px 64px rgba(0,0,0,0.55), 0 1px 0 var(--border-subtle) inset, 4px 0 24px rgba(0,0,0,0.2)",
       }}
     >
       {children}

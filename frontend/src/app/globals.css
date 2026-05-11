@@ -56,17 +56,17 @@
     /* opaco — pra modais/dropdowns onde transparência atrapalha leitura */
     --surface-solid: rgb(14, 15, 26);
     /* alias mantido pra código legacy */
-    --surface-border: rgba(255, 255, 255, 0.08);
+    --surface-border: var(--border-default);
 
     /* Borders — alpha sobre branco (warm-ish) */
-    --border-subtle: rgba(255, 255, 255, 0.06);
-    --border-default: rgba(255, 255, 255, 0.10);
-    --border-strong: rgba(255, 255, 255, 0.16);
+    --border-subtle: var(--border-subtle);
+    --border-default: var(--border-default);
+    --border-strong: var(--border-strong);
 
     /* Text levels — evita pure white pra reduzir contraste agressivo. */
-    --text-1: hsl(240 15% 90%);  /* primary (titles, labels emphasis) */
+    --text-1: var(--text-1);  /* primary (titles, labels emphasis) */
     --text-2: hsl(240 8% 68%);   /* body */
-    --text-3: hsl(240 8% 50%);   /* secondary / hint */
+    --text-3: var(--text-3);   /* secondary / hint */
     --text-4: hsl(240 8% 38%);   /* tertiary / placeholder */
 
     /* Semantic */
@@ -81,7 +81,7 @@
 
     /* Sidebar — alpha pra deixar gradient mesh vazar */
     --sidebar-bg: rgba(6, 7, 16, 0.82);
-    --sidebar-border: rgba(255, 255, 255, 0.07);
+    --sidebar-border: var(--border-default);
 
     /* Shadows — escala 4 níveis VoltAgent-inspired pra dar mais
        hierarquia de profundidade. Single source = depth alpha-only. */
@@ -89,7 +89,7 @@
     --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.32);
     --shadow-3: 0 10px 28px rgba(0, 0, 0, 0.40);
     --shadow-4: 0 24px 60px rgba(0, 0, 0, 0.55);
-    --shadow-glow: 0 0 0 1px rgba(255,255,255,0.06), 0 8px 24px rgba(0,0,0,0.45);
+    --shadow-glow: 0 0 0 1px var(--border-subtle), 0 8px 24px rgba(0,0,0,0.45);
 
     /* Radius — VoltAgent: stack 4/8/12/20/pill */
     --radius-sm: 4px;
@@ -425,10 +425,10 @@
 
   /* ── Glass / frost surface ─────────────────────────────────────────── */
   .glass {
-    background: rgba(255,255,255,0.03);
+    background: var(--input);
     backdrop-filter: blur(16px) saturate(180%);
     -webkit-backdrop-filter: blur(16px) saturate(180%);
-    border: 1px solid rgba(255,255,255,0.06);
+    border: 1px solid var(--border-subtle);
   }
   .light .glass {
     background: rgba(255,255,255,0.72);
@@ -687,15 +687,15 @@ a:active:not([aria-disabled="true"]),
 /* ─── Scrollbar — ultra-thin, modern ──────────────────────────────── */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.08) transparent;
+  scrollbar-color: var(--border-default) transparent;
 }
 ::-webkit-scrollbar { width: 3px; height: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.08);
+  background: var(--border-default);
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 .light ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.10); }
 .light ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.20); }
 
@@ -892,17 +892,17 @@ html { scroll-behavior: smooth; }
   -webkit-backdrop-filter: blur(20px) saturate(180%) brightness(1.02);
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.07) 0%,
+    var(--border-default) 0%,
     rgba(255, 255, 255, 0.02) 100%
   );
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  border: 1px solid var(--border-default);
 }
 
 .glass-sm {
   backdrop-filter: blur(10px) saturate(160%);
   -webkit-backdrop-filter: blur(10px) saturate(160%);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--input);
+  border: 1px solid var(--border-default);
 }
 
 .glass-card {
@@ -911,16 +911,16 @@ html { scroll-behavior: smooth; }
   -webkit-backdrop-filter: blur(24px) saturate(200%) brightness(1.03);
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.09) 0%,
-    rgba(255, 255, 255, 0.03) 60%,
+    var(--border-default) 0%,
+    var(--input) 60%,
     rgba(0, 212, 106, 0.02) 100%
   );
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--border-strong);
   box-shadow:
     0 4px 6px rgba(0, 0, 0, 0.20),
     0 10px 25px rgba(0, 0, 0, 0.30),
     0 20px 40px rgba(0, 0, 0, 0.20),
-    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 0 1px 0 var(--border-default),
     inset 0 -1px 0 rgba(0, 0, 0, 0.10);
 }
 
@@ -931,7 +931,7 @@ html { scroll-behavior: smooth; }
   border-radius: inherit;
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.06) 0%,
+    var(--border-subtle) 0%,
     transparent 50%,
     rgba(0, 0, 0, 0.04) 100%
   );
@@ -944,12 +944,12 @@ html { scroll-behavior: smooth; }
 .glass-card-hover:hover {
   transform: translateY(-2px) scale(1.002);
   backdrop-filter: blur(28px) saturate(220%) brightness(1.05);
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: var(--border-strong);
   box-shadow:
     0 8px 16px rgba(0, 0, 0, 0.24),
     0 20px 40px rgba(0, 0, 0, 0.35),
     0 40px 60px rgba(0, 0, 0, 0.20),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 1px 0 var(--border-strong),
     0 0 0 1px rgba(0, 212, 106, 0.08);
 }
 
@@ -983,10 +983,10 @@ html { scroll-behavior: smooth; }
   border-radius: inherit;
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.20) 0%,
-    rgba(255, 255, 255, 0.05) 30%,
+    var(--border-strong) 0%,
+    var(--input) 30%,
     rgba(0, 212, 106, 0.10) 70%,
-    rgba(255, 255, 255, 0.08) 100%
+    var(--border-default) 100%
   );
   z-index: -1;
   pointer-events: none;
@@ -996,19 +996,19 @@ html { scroll-behavior: smooth; }
 .shadow-glass-xs {
   box-shadow:
     0 2px 4px rgba(0, 0, 0, 0.20),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    inset 0 1px 0 var(--border-subtle);
 }
 .shadow-glass-sm {
   box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.28),
     0 1px 3px rgba(0, 0, 0, 0.20),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    inset 0 1px 0 var(--border-default);
 }
 .shadow-glass-md {
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.35),
     0 3px 8px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 1px 0 var(--border-default),
     inset 0 -1px 0 rgba(0, 0, 0, 0.08);
 }
 .shadow-glass-lg {
@@ -1016,7 +1016,7 @@ html { scroll-behavior: smooth; }
     0 20px 50px rgba(0, 0, 0, 0.50),
     0 8px 20px rgba(0, 0, 0, 0.35),
     0 2px 6px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 0 1px 0 var(--border-default),
     inset 0 -1px 0 rgba(0, 0, 0, 0.12);
 }
 .shadow-glass-xl {
@@ -1024,7 +1024,7 @@ html { scroll-behavior: smooth; }
     0 40px 80px rgba(0, 0, 0, 0.60),
     0 20px 40px rgba(0, 0, 0, 0.40),
     0 8px 16px rgba(0, 0, 0, 0.30),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 1px 0 var(--border-strong),
     inset 0 -2px 0 rgba(0, 0, 0, 0.15);
 }
 
@@ -1037,9 +1037,9 @@ html { scroll-behavior: smooth; }
   background: linear-gradient(
     90deg,
     rgba(255,255,255,0.00) 0%,
-    rgba(255,255,255,0.04) 20%,
-    rgba(255,255,255,0.08) 40%,
-    rgba(255,255,255,0.04) 60%,
+    var(--input) 20%,
+    var(--border-default) 40%,
+    var(--input) 60%,
     rgba(255,255,255,0.00) 80%
   );
   background-size: 300% 100%;
@@ -1124,7 +1124,7 @@ html { scroll-behavior: smooth; }
     90deg,
     var(--text-2) 0%,
     var(--text-1) 30%,
-    rgba(255,255,255,0.95) 50%,
+    var(--text-1) 50%,
     var(--text-1) 70%,
     var(--text-2) 100%
   );
@@ -1166,18 +1166,18 @@ html { scroll-behavior: smooth; }
  * cinza-claro). Estas classes fixam o tema dark do app sem precisar
  * reescrever cada página. */
 .uniq-input-dark {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: var(--input);
+  border: 1px solid var(--border-default);
   color: var(--text-1);
   outline: none;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 .uniq-input-dark:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--border-subtle);
 }
 .uniq-input-dark:focus {
   border-color: rgba(0, 212, 106, 0.45);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--border-subtle);
 }
 .uniq-input-dark::placeholder {
   color: var(--text-3);
@@ -1188,18 +1188,18 @@ html { scroll-behavior: smooth; }
 }
 
 .uniq-card-dark {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--input);
+  border: 1px solid var(--border-default);
   color: var(--text-1);
 }
 
 .uniq-list-dark {
   background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-default);
   color: var(--text-1);
 }
 .uniq-list-dark > * + * {
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid var(--input);
 }
 
 /* ─── Mobile polish: momentum scroll + tap feedback nativo ─────────────── */

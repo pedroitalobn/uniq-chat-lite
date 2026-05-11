@@ -34,10 +34,10 @@ export function CrmHeader({
     <header
       className="rounded-2xl px-4 sm:px-5 py-3 space-y-3"
       style={{
-        background: "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)",
+        background: "linear-gradient(135deg, var(--input) 0%, rgba(255,255,255,0.01) 100%)",
         backdropFilter: "blur(16px) saturate(180%)",
         WebkitBackdropFilter: "blur(16px) saturate(180%)",
-        border: "1px solid rgba(255,255,255,0.08)",
+        border: "1px solid var(--border-default)",
       }}
     >
       {(subtitle || actions) && (
@@ -71,16 +71,16 @@ export function CrmHeaderButton({
     background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
     border: "1px solid rgba(0,212,106,0.30)",
     color: "var(--green)",
-    boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)",
+    boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 var(--border-strong)",
   };
   const activeStyle: React.CSSProperties = {
-    background: "rgba(255,255,255,0.10)",
-    border: "1px solid rgba(255,255,255,0.18)",
+    background: "var(--border-default)",
+    border: "1px solid var(--border-strong)",
     color: "var(--text-1)",
   };
   const idleStyle: React.CSSProperties = {
-    background: "rgba(255,255,255,0.04)",
-    border: "1px solid rgba(255,255,255,0.08)",
+    background: "var(--input)",
+    border: "1px solid var(--border-default)",
     color: "var(--text-2)",
   };
   return (
@@ -104,7 +104,7 @@ export function CrmHeaderToggleGroup({ children }: { children: ReactNode }) {
       className="flex items-center gap-0.5 rounded-xl p-0.5"
       style={{
         background: "var(--input)",
-        border: "1px solid rgba(255,255,255,0.09)",
+        border: "1px solid var(--border-default)",
       }}
     >
       {children}

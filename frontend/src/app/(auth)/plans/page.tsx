@@ -128,8 +128,8 @@ function PlanCard({ plan, onSelect, loading, disabled }: {
         isPopular ? "ring-2" : !disabled ? "hover:ring-1" : ""
       )}
       style={{
-        background: isPopular ? "hsl(240 18% 7%)" : "hsl(240 18% 6%)",
-        border: isPopular ? `2px solid ${meta.color}` : "1px solid hsl(240 12% 13%)",
+        background: isPopular ? "hsl(240 18% 7%)" : "var(--surface-solid)",
+        border: isPopular ? `2px solid ${meta.color}` : "1px solid var(--border-default)",
         boxShadow: isPopular ? `0 0 40px ${meta.color}18` : undefined,
       }}
       onClick={() => !disabled && onSelect(plan)}
@@ -316,7 +316,7 @@ function PlansContent() {
                     ? "1px solid rgba(239,68,68,0.35)"
                     : inviteValid === true
                     ? "1px solid rgba(0,212,106,0.4)"
-                    : "1px solid hsl(240 12% 13%)",
+                    : "1px solid var(--border-default)",
                   color: "var(--text-1)",
                 }}
               />

@@ -155,8 +155,8 @@ export function AudioInput({
             onClick={reset}
             className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium"
             style={{
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              background: "var(--input)",
+              border: "1px solid var(--border-default)",
               color: "var(--text-2)",
             }}
           >
@@ -186,7 +186,7 @@ export function AudioInput({
           type="button"
           onClick={stopRecording}
           className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-medium"
-          style={{ background: "#ef4444", color: "#fff" }}
+          style={{ background: "#ef4444", color: "var(--text-1)" }}
         >
           <Square className="w-3.5 h-3.5" /> Parar e usar
         </button>
@@ -199,7 +199,7 @@ export function AudioInput({
       <div
         className="rounded-xl p-4 flex flex-col items-center gap-3"
         style={{
-          border: "2px dashed rgba(255,255,255,0.12)",
+          border: "2px dashed var(--border-strong)",
           background: "rgba(255,255,255,0.02)",
         }}
       >
@@ -213,8 +213,8 @@ export function AudioInput({
             onClick={() => fileRef.current?.click()}
             className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium"
             style={{
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.10)",
+              background: "var(--input)",
+              border: "1px solid var(--border-default)",
               color: "var(--text-2)",
             }}
           >

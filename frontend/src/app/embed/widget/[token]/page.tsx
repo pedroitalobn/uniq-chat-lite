@@ -90,19 +90,19 @@ function ArticleCard({ article, color }: { article: Article; color: string }) {
       style={{
         padding: "14px 16px",
         borderRadius: 14,
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        background: "var(--input)",
+        border: "1px solid var(--border-subtle)",
         cursor: "pointer",
         transition: "all 0.2s ease",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "rgba(255,255,255,0.07)";
+        e.currentTarget.style.background = "var(--border-default)";
         e.currentTarget.style.borderColor = `${color}40`;
         e.currentTarget.style.transform = "translateY(-1px)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = "rgba(255,255,255,0.04)";
-        e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
+        e.currentTarget.style.background = "var(--input)";
+        e.currentTarget.style.borderColor = "var(--border-subtle)";
         e.currentTarget.style.transform = "none";
       }}
     >
@@ -379,8 +379,8 @@ export default function EmbedWidgetPage() {
               width: 40,
               height: 40,
               borderRadius: 12,
-              background: "rgba(255,255,255,0.20)",
-              border: "1.5px solid rgba(255,255,255,0.30)",
+              background: "var(--border-strong)",
+              border: "1.5px solid var(--border-strong)",
               overflow: "hidden",
               display: "flex",
               alignItems: "center",
@@ -401,10 +401,10 @@ export default function EmbedWidgetPage() {
           </div>
 
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ margin: 0, color: "#fff", fontWeight: 700, fontSize: 15, lineHeight: 1.3 }}>
+            <p style={{ margin: 0, color: "var(--text-1)", fontWeight: 700, fontSize: 15, lineHeight: 1.3 }}>
               {name}
             </p>
-            <p style={{ margin: 0, color: "rgba(255,255,255,0.75)", fontSize: 11, lineHeight: 1.3 }}>
+            <p style={{ margin: 0, color: "var(--text-2)", fontSize: 11, lineHeight: 1.3 }}>
               Respondemos em até 1 minuto
             </p>
           </div>
@@ -435,8 +435,8 @@ export default function EmbedWidgetPage() {
                   fontWeight: 600,
                   fontSize: 12,
                   transition: "all 0.2s ease",
-                  background: tab === t ? "rgba(255,255,255,0.95)" : "transparent",
-                  color: tab === t ? "#0f1117" : "rgba(255,255,255,0.80)",
+                  background: tab === t ? "var(--text-1)" : "transparent",
+                  color: tab === t ? "#0f1117" : "var(--text-2)",
                 }}
               >
                 {t === "chat" ? "Conversa" : "Artigos"}
@@ -486,8 +486,8 @@ export default function EmbedWidgetPage() {
                       borderRadius: isUser ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
                       background: isUser
                         ? `linear-gradient(135deg, ${color}, ${color}dd)`
-                        : "rgba(255,255,255,0.06)",
-                      color: isUser ? "#fff" : "#e2e8f0",
+                        : "var(--border-subtle)",
+                      color: isUser ? "var(--text-1)" : "#e2e8f0",
                       fontSize: 13,
                       lineHeight: 1.55,
                       wordBreak: "break-word",
@@ -501,7 +501,7 @@ export default function EmbedWidgetPage() {
 
             {isLoading && (
               <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: "18px 18px 18px 4px", padding: "8px 14px" }}>
+                <div style={{ background: "var(--border-subtle)", borderRadius: "18px 18px 18px 4px", padding: "8px 14px" }}>
                   <TypingDots color={color} />
                 </div>
               </div>
@@ -542,7 +542,7 @@ export default function EmbedWidgetPage() {
           <div
             style={{
               padding: "10px 12px",
-              borderTop: "1px solid rgba(255,255,255,0.06)",
+              borderTop: "1px solid var(--border-subtle)",
               flexShrink: 0,
             }}
           >
@@ -559,8 +559,8 @@ export default function EmbedWidgetPage() {
                   flex: 1,
                   padding: "10px 16px",
                   borderRadius: 28,
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid var(--border-default)",
+                  background: "var(--input)",
                   fontSize: 13,
                   color: "#f1f5f9",
                   outline: "none",
@@ -568,7 +568,7 @@ export default function EmbedWidgetPage() {
                   fontFamily: "inherit",
                 }}
                 onFocus={(e) => ((e.target as HTMLInputElement).style.borderColor = `${color}80`)}
-                onBlur={(e) => ((e.target as HTMLInputElement).style.borderColor = "rgba(255,255,255,0.08)")}
+                onBlur={(e) => ((e.target as HTMLInputElement).style.borderColor = "var(--border-default)")}
               />
               <button
                 onClick={sendMessage}
@@ -577,7 +577,7 @@ export default function EmbedWidgetPage() {
                   width: 38,
                   height: 38,
                   borderRadius: "50%",
-                  background: !inputText.trim() || isLoading ? "rgba(255,255,255,0.06)" : color,
+                  background: !inputText.trim() || isLoading ? "var(--border-subtle)" : color,
                   border: "none",
                   cursor: !inputText.trim() || isLoading ? "not-allowed" : "pointer",
                   display: "flex",
@@ -594,14 +594,14 @@ export default function EmbedWidgetPage() {
                       width: 14,
                       height: 14,
                       border: "2px solid rgba(255,255,255,0.4)",
-                      borderTopColor: "#fff",
+                      borderTopColor: "var(--text-1)",
                       borderRadius: "50%",
                       animation: "spin 0.8s linear infinite",
                       display: "block",
                     }}
                   />
                 ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-1)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="22" y1="2" x2="11" y2="13" />
                     <polygon points="22 2 15 22 11 13 2 9 22 2" />
                   </svg>
@@ -626,8 +626,8 @@ export default function EmbedWidgetPage() {
                 width: "100%",
                 padding: "9px 14px",
                 borderRadius: 12,
-                border: "1px solid rgba(255,255,255,0.08)",
-                background: "rgba(255,255,255,0.03)",
+                border: "1px solid var(--border-default)",
+                background: "var(--input)",
                 fontSize: 12,
                 color: "#f1f5f9",
                 outline: "none",
@@ -635,7 +635,7 @@ export default function EmbedWidgetPage() {
                 transition: "border-color 0.2s",
               }}
               onFocus={(e) => ((e.target as HTMLInputElement).style.borderColor = `${color}60`)}
-              onBlur={(e) => ((e.target as HTMLInputElement).style.borderColor = "rgba(255,255,255,0.08)")}
+              onBlur={(e) => ((e.target as HTMLInputElement).style.borderColor = "var(--border-default)")}
             />
           </div>
 

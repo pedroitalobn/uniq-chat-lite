@@ -63,7 +63,7 @@ export default function ClaudeOAuthCallbackPage() {
           <button
             onClick={() => router.replace("/integrations")}
             className="mt-6 rounded-xl px-4 py-2 text-sm font-medium"
-            style={{ background: "#d97706", color: "#fff" }}
+            style={{ background: "#d97706", color: "var(--text-1)" }}
           >
             Voltar para integrações
           </button>

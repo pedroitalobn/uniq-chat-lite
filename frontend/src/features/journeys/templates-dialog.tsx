@@ -723,9 +723,9 @@ function ChannelBadge({ channel }: { channel: string }) {
     <span
       className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
       style={{
-        background: colors[channel] ?? "rgba(255,255,255,0.08)",
+        background: colors[channel] ?? "var(--border-default)",
         color:      text[channel]   ?? "rgba(255,255,255,0.6)",
-        border:     `1px solid ${text[channel] ?? "rgba(255,255,255,0.12)"}22`,
+        border:     `1px solid ${text[channel] ?? "var(--border-strong)"}22`,
       }}
     >
       {channel}
@@ -751,8 +751,8 @@ function TemplateCard({
     <div
       className="relative flex flex-col rounded-xl overflow-hidden transition-all duration-200"
       style={{
-        background:   "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
-        border:       "1px solid rgba(255,255,255,0.10)",
+        background:   "linear-gradient(135deg, var(--border-default) 0%, rgba(255,255,255,0.02) 100%)",
+        border:       "1px solid var(--border-default)",
         borderLeft:   `4px solid ${template.color}`,
         backdropFilter: "blur(12px)",
         transform:    "translateY(0)",
@@ -808,7 +808,7 @@ function TemplateCard({
         {/* Description */}
         <p
           className="text-xs leading-relaxed line-clamp-2"
-          style={{ color: "rgba(255,255,255,0.50)" }}
+          style={{ color: "var(--text-3)" }}
         >
           {template.description}
         </p>
@@ -936,7 +936,7 @@ export function TemplatesDialog({ onClose, instanceId }: TemplatesDialogProps) {
         className="relative w-full max-w-4xl rounded-2xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col"
         style={{
           background:     "linear-gradient(135deg, rgba(12,12,22,0.97) 0%, rgba(8,8,16,0.99) 100%)",
-          border:         "1px solid rgba(255,255,255,0.08)",
+          border:         "1px solid var(--border-default)",
           backdropFilter: "blur(24px)",
         }}
       >
@@ -949,7 +949,7 @@ export function TemplatesDialog({ onClose, instanceId }: TemplatesDialogProps) {
             <h2 className="text-base font-semibold" style={{ color: "rgba(255,255,255,0.92)" }}>
               Biblioteca de Templates
             </h2>
-            <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.40)" }}>
+            <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
               Comece com um fluxo pronto. Personalize no canvas depois.
             </p>
           </div>
@@ -957,7 +957,7 @@ export function TemplatesDialog({ onClose, instanceId }: TemplatesDialogProps) {
             onClick={onClose}
             className="rounded-lg p-1.5 transition-colors"
             style={{ color: "rgba(255,255,255,0.35)" }}
-            onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.75)")}
+            onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.color = "var(--text-2)")}
             onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.35)")}
           >
             <X className="w-4 h-4" />
@@ -973,7 +973,7 @@ export function TemplatesDialog({ onClose, instanceId }: TemplatesDialogProps) {
           <div className="relative flex-1 w-full sm:max-w-xs">
             <Search
               className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none"
-              style={{ color: "rgba(255,255,255,0.30)" }}
+              style={{ color: "var(--border-strong)" }}
             />
             <input
               type="text"
@@ -982,12 +982,12 @@ export function TemplatesDialog({ onClose, instanceId }: TemplatesDialogProps) {
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg outline-none transition-all"
               style={{
-                background:   "rgba(255,255,255,0.05)",
-                border:       "1px solid rgba(255,255,255,0.10)",
-                color:        "rgba(255,255,255,0.85)",
+                background:   "var(--input)",
+                border:       "1px solid var(--border-default)",
+                color:        "var(--text-1)",
               }}
               onFocus={e => ((e.target as HTMLInputElement).style.borderColor = "rgba(0,212,106,0.45)")}
-              onBlur={e  => ((e.target as HTMLInputElement).style.borderColor = "rgba(255,255,255,0.10)")}
+              onBlur={e  => ((e.target as HTMLInputElement).style.borderColor = "var(--border-default)")}
             />
           </div>
 
@@ -1005,11 +1005,11 @@ export function TemplatesDialog({ onClose, instanceId }: TemplatesDialogProps) {
                   onClick={() => setActiveCategory(tab.value)}
                   className="px-3 py-1 rounded-full text-xs font-medium transition-all duration-150"
                   style={{
-                    background: isActive ? `${color}22` : "rgba(255,255,255,0.04)",
+                    background: isActive ? `${color}22` : "var(--input)",
                     color:      isActive ? color         : "rgba(255,255,255,0.45)",
                     border:     isActive
                       ? `1px solid ${color}44`
-                      : "1px solid rgba(255,255,255,0.08)",
+                      : "1px solid var(--border-default)",
                   }}
                 >
                   {tab.label}
@@ -1046,7 +1046,7 @@ export function TemplatesDialog({ onClose, instanceId }: TemplatesDialogProps) {
         {/* Footer */}
         <div
           className="px-5 py-3 flex items-center justify-between"
-          style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+          style={{ borderTop: "1px solid var(--border-subtle)" }}
         >
           <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.25)" }}>
             {BUILTIN_TEMPLATES.length} templates disponíveis
@@ -1055,9 +1055,9 @@ export function TemplatesDialog({ onClose, instanceId }: TemplatesDialogProps) {
             onClick={onClose}
             className="text-xs px-4 py-1.5 rounded-lg transition-all"
             style={{
-              background: "rgba(255,255,255,0.06)",
-              color:      "rgba(255,255,255,0.50)",
-              border:     "1px solid rgba(255,255,255,0.10)",
+              background: "var(--border-subtle)",
+              color:      "var(--text-3)",
+              border:     "1px solid var(--border-default)",
             }}
           >
             Fechar

@@ -52,7 +52,7 @@ export function BottomNav() {
           backdropFilter: "blur(24px) saturate(180%)",
           WebkitBackdropFilter: "blur(24px) saturate(180%)",
           borderTop: "1px solid var(--border-default)",
-          boxShadow: "0 -8px 32px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.08)",
+          boxShadow: "0 -8px 32px rgba(0,0,0,0.40), inset 0 1px 0 var(--border-default)",
         }}
       >
         {PRIMARY.map((item, index) => {
@@ -156,7 +156,7 @@ export function BottomNav() {
           backdropFilter: "blur(24px) saturate(180%)",
           WebkitBackdropFilter: "blur(24px) saturate(180%)",
           borderTop: "1px solid var(--border-default)",
-          boxShadow: "0 -8px 32px rgba(0,0,0,0.50), inset 0 1px 0 rgba(255,255,255,0.08)",
+          boxShadow: "0 -8px 32px rgba(0,0,0,0.50), inset 0 1px 0 var(--border-default)",
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
         }}
       >
@@ -198,8 +198,8 @@ export function BottomNav() {
                         transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                       }
                     : {
-                        background: "rgba(255,255,255,0.04)",
-                        border: "1px solid rgba(255,255,255,0.06)",
+                        background: "var(--input)",
+                        border: "1px solid var(--border-subtle)",
                         color: "var(--text-2)",
                         transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                       }

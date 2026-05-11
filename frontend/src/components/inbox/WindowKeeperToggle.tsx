@@ -98,7 +98,7 @@ export function WindowKeeperToggle({ wsId, conversationId, enabled, message = ""
               onClick={saveMsg}
               disabled={mutation.isPending || localMsg.trim() === (message || DEFAULT_MSG)}
               className="mt-1.5 text-[10px] font-medium px-2 py-1 rounded-md disabled:opacity-40"
-              style={{ background: "var(--green)", color: "#000" }}>
+              style={{ background: "var(--green)", color: "var(--text-1)" }}>
               Salvar mensagem
             </button>
           )}

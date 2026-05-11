@@ -134,7 +134,7 @@ export function VoicesSection() {
         <button
           onClick={() => setShowAdd(true)}
           className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all hover:opacity-90"
-          style={{ background: "var(--green)", color: "#000" }}>
+          style={{ background: "var(--green)", color: "var(--text-1)" }}>
           <Plus className="w-3.5 h-3.5" />
           Adicionar provider
         </button>
@@ -307,7 +307,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       </div>
       <button onClick={onAdd}
         className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:opacity-90"
-        style={{ background: "var(--green)", color: "#000" }}>
+        style={{ background: "var(--green)", color: "var(--text-1)" }}>
         <Plus className="w-4 h-4" />
         Adicionar provider
       </button>
@@ -419,7 +419,7 @@ function AddProviderModal({ onClose, workspaceId }: { onClose: () => void; works
           onClick={() => create.mutate()}
           disabled={!apiKey.trim() || create.isPending}
           className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 disabled:opacity-40"
-          style={{ background: "var(--green)", color: "#000" }}>
+          style={{ background: "var(--green)", color: "var(--text-1)" }}>
           {create.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
           Conectar
         </button>

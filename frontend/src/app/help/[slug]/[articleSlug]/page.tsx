@@ -97,17 +97,17 @@ export default function ArticlePage({
 
   const t = {
     bg: isLight ? "#f8fafc" : "#08090d",
-    surface: isLight ? "#ffffff" : "rgba(255,255,255,0.03)",
-    border: isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.06)",
+    surface: isLight ? "var(--text-1)" : "var(--input)",
+    border: isLight ? "rgba(0,0,0,0.06)" : "var(--border-subtle)",
     text: isLight ? "#0f172a" : "#f1f5f9",
     text2: isLight ? "#475569" : "#94a3b8",
     text3: isLight ? "#94a3b8" : "#64748b",
     glass: isLight
       ? "rgba(255,255,255,0.70)"
-      : "rgba(255,255,255,0.04)",
+      : "var(--input)",
     glassBorder: isLight
       ? "rgba(0,0,0,0.06)"
-      : "rgba(255,255,255,0.06)",
+      : "var(--border-subtle)",
   };
 
   return (
@@ -144,14 +144,14 @@ export default function ArticlePage({
           text-underline-offset: 3px;
         }
         .article-body code {
-          background: ${isLight ? "#f1f5f9" : "rgba(255,255,255,0.06)"};
+          background: ${isLight ? "#f1f5f9" : "var(--border-subtle)"};
           padding: 2px 8px;
           border-radius: 6px;
           font-size: 13px;
           font-family: 'JetBrains Mono', monospace;
         }
         .article-body pre {
-          background: ${isLight ? "#f1f5f9" : "rgba(255,255,255,0.04)"};
+          background: ${isLight ? "#f1f5f9" : "var(--input)"};
           padding: 16px 20px;
           border-radius: 14px;
           overflow-x: auto;
@@ -187,7 +187,7 @@ export default function ArticlePage({
           text-align: left;
         }
         .article-body th {
-          background: ${isLight ? "#f8fafc" : "rgba(255,255,255,0.03)"};
+          background: ${isLight ? "#f8fafc" : "var(--input)"};
           font-weight: 600;
         }
         ::-webkit-scrollbar { width: 4px; }
@@ -283,7 +283,7 @@ export default function ArticlePage({
                 padding: "10px 22px",
                 borderRadius: 12,
                 background: color,
-                color: "#000",
+                color: "var(--text-1)",
                 fontWeight: 600,
                 textDecoration: "none",
                 fontSize: 13,

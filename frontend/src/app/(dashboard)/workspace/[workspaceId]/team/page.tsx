@@ -566,7 +566,7 @@ export default function TeamPage() {
           className="flex items-center gap-2 text-sm px-4 py-2 rounded-xl transition-colors"
           style={{ background: "var(--surface-solid)", border: "1px solid var(--border)", color: "var(--text-3)" }}
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "hsl(240 12% 20%)"; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "hsl(240 12% 13%)"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--border-default)"; }}
         >
           Gerenciar Funções
         </button>

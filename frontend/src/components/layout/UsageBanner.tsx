@@ -51,8 +51,8 @@ export function UsageBanner({ collapsed }: { collapsed: boolean }) {
         title="Consumo"
         className="mx-1.5 mb-2 flex items-center justify-center p-2 rounded-xl"
         style={{
-          background: "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.06)",
+          background: "var(--input)",
+          border: "1px solid var(--border-subtle)",
           color: "var(--text-3)",
         }}
       >
@@ -61,10 +61,10 @@ export function UsageBanner({ collapsed }: { collapsed: boolean }) {
     ) : (
       <div className="mx-2 mb-2 rounded-xl px-3 py-2.5 animate-pulse"
         style={{
-          background: "rgba(255,255,255,0.03)",
-          border: "1px solid rgba(255,255,255,0.05)",
+          background: "var(--input)",
+          border: "1px solid var(--input)",
         }}>
-        <div className="h-3 w-16 rounded mb-2" style={{ background: "rgba(255,255,255,0.06)" }} />
+        <div className="h-3 w-16 rounded mb-2" style={{ background: "var(--border-subtle)" }} />
         <div className="h-1.5 w-full rounded" style={{ background: "var(--input)" }} />
       </div>
     );
@@ -115,8 +115,8 @@ export function UsageBanner({ collapsed }: { collapsed: boolean }) {
         background: `linear-gradient(135deg, ${barColor}14 0%, ${barColor}05 60%, rgba(255,255,255,0.02) 100%)`,
         border: `1px solid ${barColor}33`,
         boxShadow: isOver
-          ? `0 4px 16px ${barColor}33, inset 0 1px 0 rgba(255,255,255,0.08)`
-          : `0 2px 10px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.05)`,
+          ? `0 4px 16px ${barColor}33, inset 0 1px 0 var(--border-default)`
+          : `0 2px 10px rgba(0,0,0,0.20), inset 0 1px 0 var(--input)`,
       }}
     >
       {/* Header */}
@@ -147,7 +147,7 @@ export function UsageBanner({ collapsed }: { collapsed: boolean }) {
 
       {/* Barra principal — categoria mais crítica */}
       <div className="h-1.5 rounded-full overflow-hidden mb-2"
-        style={{ background: "rgba(255,255,255,0.06)" }}>
+        style={{ background: "var(--border-subtle)" }}>
         <div
           className="h-full rounded-full transition-[width] duration-700 ease-out"
           style={{

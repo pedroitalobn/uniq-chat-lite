@@ -95,7 +95,7 @@ export function SkillsCard({ form, update }: Props) {
                   <span
                     className="flex items-center justify-center w-6 h-6 rounded flex-shrink-0"
                     style={{
-                      background: on ? `${color}22` : "rgba(255,255,255,0.04)",
+                      background: on ? `${color}22` : "var(--input)",
                       color: on ? color : "var(--text-4)",
                     }}
                   >

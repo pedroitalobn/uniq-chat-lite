@@ -49,7 +49,7 @@ function InputField({
           className={inputCls}
           style={{
             paddingLeft: icon ? "2.5rem" : undefined,
-            borderColor: focused ? "#00d46a" : "hsl(240 12% 13%)",
+            borderColor: focused ? "#00d46a" : "var(--border-default)",
             boxShadow: focused ? "0 0 0 3px rgba(0,212,106,0.10)" : "none",
           }}
         />
@@ -367,14 +367,14 @@ function RegisterContent() {
                     ? "#00d46a"
                     : i === step
                       ? "#00d46a"
-                      : "hsl(240 12% 16%)",
+                      : "var(--border-default)",
                   opacity: i > step ? 0.5 : 1,
                 }}
               />
               {i < 2 && (
                 <div
                   className="h-px w-6 transition-all duration-500"
-                  style={{ background: i < step ? "#00d46a" : "hsl(240 12% 16%)" }}
+                  style={{ background: i < step ? "#00d46a" : "var(--border-default)" }}
                 />
               )}
             </div>

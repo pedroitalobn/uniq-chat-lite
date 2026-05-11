@@ -1095,7 +1095,7 @@ function CopyBtn({
           : isPrimary
             ? "1px solid rgba(0,212,106,0.2)"
             : "1px solid var(--border-default)",
-        color: copied || isPrimary ? "#00d46a" : "hsl(240 8% 60%)",
+        color: copied || isPrimary ? "#00d46a" : "var(--text-3)",
       }}
     >
       {copied ? <Check className={iconSize} /> : <Copy className={iconSize} />}
@@ -1196,7 +1196,7 @@ function EndpointCard({
         </div>
 
         {endpoint.body && (
-          <div className="mt-3" style={{ borderTop: "1px solid hsl(240 12% 11%)", paddingTop: 10 }}>
+          <div className="mt-3" style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 10 }}>
             <div className="flex items-center justify-between gap-2">
               <button
                 type="button"
@@ -1215,7 +1215,7 @@ function EndpointCard({
                   style={{
                     background: showRaw ? "rgba(0,212,106,0.08)" : "var(--surface-2)",
                     border: "1px solid " + (showRaw ? "rgba(0,212,106,0.2)" : "var(--surface-2)"),
-                    color: showRaw ? "#00d46a" : "hsl(240 8% 60%)",
+                    color: showRaw ? "#00d46a" : "var(--text-3)",
                   }}
                 >
                   {showRaw ? "Tabela" : "JSON cru"}
@@ -1291,7 +1291,7 @@ function EndpointCard({
         )}
 
         {endpoint.response && (
-          <div className="mt-3" style={{ borderTop: "1px solid hsl(240 12% 11%)", paddingTop: 10 }}>
+          <div className="mt-3" style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 10 }}>
             <div className="flex items-center justify-between gap-2 mb-1.5">
               <span className="text-[10px] font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
                 Resposta de exemplo

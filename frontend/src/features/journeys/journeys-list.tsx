@@ -319,7 +319,7 @@ export function JourneysList() {
         className="flex flex-col gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b flex-shrink-0"
         style={{
           borderColor: "var(--border-subtle)",
-          background: "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)",
+          background: "linear-gradient(135deg, var(--input) 0%, rgba(255,255,255,0.02) 100%)",
           backdropFilter: "blur(20px) saturate(180%)",
           WebkitBackdropFilter: "blur(20px) saturate(180%)",
         }}
@@ -458,23 +458,23 @@ export function JourneysList() {
               key={j.id}
               className="rounded-xl overflow-hidden relative"
               style={{
-                background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+                background: "linear-gradient(135deg, var(--border-default) 0%, rgba(255,255,255,0.02) 100%)",
                 backdropFilter: "blur(20px) saturate(180%)",
                 WebkitBackdropFilter: "blur(20px) saturate(180%)",
-                border: j.status === "active" ? "1px solid rgba(0,212,106,0.20)" : "1px solid rgba(255,255,255,0.09)",
-                borderLeft: j.status === "active" ? "3px solid rgba(0,212,106,0.60)" : "3px solid rgba(255,255,255,0.08)",
+                border: j.status === "active" ? "1px solid rgba(0,212,106,0.20)" : "1px solid var(--border-default)",
+                borderLeft: j.status === "active" ? "3px solid rgba(0,212,106,0.60)" : "3px solid var(--border-default)",
                 boxShadow: j.status === "active"
-                  ? "0 4px 16px rgba(0,0,0,0.25), 0 0 0 0 rgba(0,212,106,0.10), inset 0 1px 0 rgba(255,255,255,0.08)"
-                  : "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)",
+                  ? "0 4px 16px rgba(0,0,0,0.25), 0 0 0 0 rgba(0,212,106,0.10), inset 0 1px 0 var(--border-default)"
+                  : "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 var(--border-default)",
                 transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
               }}
               onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.12)";
+                (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 var(--border-strong)";
               }}
               onMouseLeave={e => {
                 (e.currentTarget as HTMLElement).style.boxShadow = j.status === "active"
-                  ? "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)"
-                  : "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)";
+                  ? "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 var(--border-default)"
+                  : "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 var(--border-default)";
               }}
             >
               <div
@@ -505,10 +505,10 @@ export function JourneysList() {
                       <span
                         className="text-[10px] px-1.5 py-0.5 rounded hidden sm:inline"
                         style={{
-                          background: "rgba(255,255,255,0.06)",
+                          background: "var(--border-subtle)",
                           backdropFilter: "blur(8px)",
                           WebkitBackdropFilter: "blur(8px)",
-                          border: "1px solid rgba(255,255,255,0.10)",
+                          border: "1px solid var(--border-default)",
                           borderRadius: "10px",
                           color: "var(--text-3)",
                         }}
@@ -543,7 +543,7 @@ export function JourneysList() {
                   </div>
                   {/* Mini completion bar */}
                   {j.invocations > 0 && (
-                    <div className="mt-2 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)", maxWidth: 180 }}>
+                    <div className="mt-2 h-1 rounded-full overflow-hidden" style={{ background: "var(--border-subtle)", maxWidth: 180 }}>
                       <div className="h-full rounded-full transition-all duration-700"
                         style={{
                           width: `${Math.min(100, j.completion_rate || 0)}%`,
@@ -588,7 +588,7 @@ export function JourneysList() {
                   className="p-3 sm:p-4 border-t"
                   style={{
                     borderColor: "var(--border-subtle)",
-                    background: "rgba(255,255,255,0.03)",
+                    background: "var(--input)",
                   }}
                 >
                   <FlowPreview flow={j.flow} trigger={j.trigger_filter} />

@@ -59,12 +59,12 @@ export function ConfirmDialog({
           transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
           className="w-full max-w-sm"
           style={{
-            background: "linear-gradient(160deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 50%, rgba(0,0,0,0.10) 100%)",
+            background: "linear-gradient(160deg, var(--border-default) 0%, var(--input) 50%, rgba(0,0,0,0.10) 100%)",
             backdropFilter: "blur(32px) saturate(200%) brightness(1.1)",
             WebkitBackdropFilter: "blur(32px) saturate(200%) brightness(1.1)",
-            border: "1px solid rgba(255,255,255,0.15)",
+            border: "1px solid var(--border-strong)",
             borderRadius: "20px",
-            boxShadow: "0 40px 80px rgba(0,0,0,0.70), 0 16px 32px rgba(0,0,0,0.50), 0 4px 8px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.20)",
+            boxShadow: "0 40px 80px rgba(0,0,0,0.70), 0 16px 32px rgba(0,0,0,0.50), 0 4px 8px rgba(0,0,0,0.30), inset 0 1px 0 var(--border-strong), inset 0 -1px 0 rgba(0,0,0,0.20)",
             overflow: "hidden",
             position: "relative",
           }}
@@ -77,7 +77,7 @@ export function ConfirmDialog({
             left: "20%",
             right: "20%",
             height: "1px",
-            background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.30), transparent)",
+            background: "linear-gradient(90deg, transparent, var(--border-strong), transparent)",
             pointerEvents: "none",
           }} />
 

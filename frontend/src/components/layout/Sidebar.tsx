@@ -212,17 +212,17 @@ export function Sidebar() {
         collapsed ? "w-14" : "w-56"
       )}
       style={{
-        background: "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)",
+        background: "linear-gradient(180deg, var(--input) 0%, rgba(255,255,255,0.01) 100%)",
         backdropFilter: "blur(24px) saturate(180%)",
         WebkitBackdropFilter: "blur(24px) saturate(180%)",
-        borderRight: "1px solid rgba(255,255,255,0.08)",
-        boxShadow: "4px 0 24px rgba(0,0,0,0.30), inset -1px 0 0 rgba(255,255,255,0.05)",
+        borderRight: "1px solid var(--border-default)",
+        boxShadow: "4px 0 24px rgba(0,0,0,0.30), inset -1px 0 0 var(--input)",
       }}
     >
       {/* Linha difusa no topo — luz ambiente */}
       <div style={{
         position: "absolute", top: 0, left: 0, right: 0, height: "1px",
-        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
+        background: "linear-gradient(90deg, transparent, var(--border-strong), transparent)",
         pointerEvents: "none",
         zIndex: 1,
       }} />
@@ -256,7 +256,7 @@ export function Sidebar() {
 
       {/* Workspace — compacto, sem borda pesada */}
       {!collapsed && (
-        <div className="px-3 pt-3 pb-2 flex-shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+        <div className="px-3 pt-3 pb-2 flex-shrink-0" style={{ borderBottom: "1px solid var(--input)" }}>
           <div className="flex items-center gap-2.5 mb-2">
             <button
               onClick={() => currentWorkspace && setCustomizeOpen(true)}
@@ -266,7 +266,7 @@ export function Sidebar() {
               style={{
                 background: `linear-gradient(135deg, ${wsColor}30, ${wsColor}12)`,
                 border: `1px solid ${wsColor}30`,
-                boxShadow: `0 0 20px rgba(0,212,106,0.15), 0 0 0 1px rgba(255,255,255,0.12)`,
+                boxShadow: `0 0 20px rgba(0,212,106,0.15), 0 0 0 1px var(--border-strong)`,
                 transition: "box-shadow 0.3s ease",
               }}
             >
@@ -391,7 +391,7 @@ export function Sidebar() {
                     }
                 }
                 onMouseEnter={e => {
-                  if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+                  if (!active) e.currentTarget.style.background = "var(--border-subtle)";
                 }}
                 onMouseLeave={e => {
                   if (!active) e.currentTarget.style.background = "transparent";
@@ -405,13 +405,13 @@ export function Sidebar() {
                         background: "linear-gradient(135deg, rgba(0,212,106,0.28), rgba(0,212,106,0.12))",
                         backdropFilter: "blur(12px)",
                         border: "1px solid rgba(0,212,106,0.35)",
-                        boxShadow: "0 0 16px rgba(0,212,106,0.30), inset 0 1px 0 rgba(255,255,255,0.12)",
+                        boxShadow: "0 0 16px rgba(0,212,106,0.30), inset 0 1px 0 var(--border-strong)",
                         color: "var(--green)",
                         transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                       }
                     : {
                         background: "var(--input)",
-                        border: "1px solid rgba(255,255,255,0.07)",
+                        border: "1px solid var(--border-default)",
                         color: "inherit",
                         transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                       }
@@ -429,7 +429,7 @@ export function Sidebar() {
                 {!collapsed && isInbox && unreadCount > 0 && (
                   <span
                     className="ml-auto flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex-shrink-0"
-                    style={{ background: "var(--green)", color: "#000", boxShadow: "0 0 6px rgba(0,212,106,0.4)" }}
+                    style={{ background: "var(--green)", color: "var(--text-1)", boxShadow: "0 0 6px rgba(0,212,106,0.4)" }}
                   >
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
@@ -486,7 +486,7 @@ export function Sidebar() {
                         }
                     }
                     onMouseEnter={e => {
-                      if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+                      if (!active) e.currentTarget.style.background = "var(--border-subtle)";
                     }}
                     onMouseLeave={e => {
                       if (!active) e.currentTarget.style.background = "transparent";
@@ -504,8 +504,8 @@ export function Sidebar() {
                             transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                           }
                         : {
-                            background: "rgba(255,255,255,0.06)",
-                            border: "1px solid rgba(255,255,255,0.08)",
+                            background: "var(--border-subtle)",
+                            border: "1px solid var(--border-default)",
                             color: "inherit",
                             transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                           }
@@ -539,14 +539,14 @@ export function Sidebar() {
               backdropFilter: "blur(12px)",
               border: "1px solid rgba(0,212,106,0.28)",
               color: "var(--green)",
-              boxShadow: "0 4px 16px rgba(0,212,106,0.15), inset 0 1px 0 rgba(255,255,255,0.10)",
+              boxShadow: "0 4px 16px rgba(0,212,106,0.15), inset 0 1px 0 var(--border-default)",
               transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.boxShadow = "0 4px 24px rgba(0,212,106,0.25), inset 0 1px 0 rgba(255,255,255,0.15)";
+              e.currentTarget.style.boxShadow = "0 4px 24px rgba(0,212,106,0.25), inset 0 1px 0 var(--border-strong)";
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,212,106,0.15), inset 0 1px 0 rgba(255,255,255,0.10)";
+              e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,212,106,0.15), inset 0 1px 0 var(--border-default)";
             }}
           >
             <Zap className="w-3 h-3" />
@@ -558,7 +558,7 @@ export function Sidebar() {
       {/* User section */}
       <div
         className="flex-shrink-0 p-2"
-        style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}
+        style={{ borderTop: "1px solid var(--input)" }}
       >
         <div
           className={cn(
@@ -566,7 +566,7 @@ export function Sidebar() {
             collapsed ? "justify-center px-2 py-2.5" : "gap-2.5 px-2.5 py-2"
           )}
           style={{
-            background: "rgba(255,255,255,0.03)",
+            background: "var(--input)",
             transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
           }}
         >
@@ -575,7 +575,7 @@ export function Sidebar() {
             className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold flex-shrink-0"
             style={{
               background: avatarGradient,
-              color: "#fff",
+              color: "var(--text-1)",
               boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
             }}
           >

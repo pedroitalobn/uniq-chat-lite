@@ -28,10 +28,10 @@ function escapeHTML(s: string): string {
 // ─── Style helpers ─────────────────────────────────────────────────────────
 
 const glassCard: CSSProperties = {
-  background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+  background: "linear-gradient(135deg, var(--border-subtle) 0%, rgba(255,255,255,0.02) 100%)",
   backdropFilter: "blur(20px) saturate(180%)",
   WebkitBackdropFilter: "blur(20px) saturate(180%)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  border: "1px solid var(--border-default)",
   borderRadius: "20px",
 };
 
@@ -47,7 +47,7 @@ const inp: CSSProperties = {
 };
 
 const STATUS_BADGE: Record<HelpDeskArticle["status"], CSSProperties> = {
-  draft: { background: "rgba(255,255,255,0.10)", color: "var(--text-3)", border: "1px solid rgba(255,255,255,0.08)" },
+  draft: { background: "var(--border-default)", color: "var(--text-3)", border: "1px solid var(--border-default)" },
   published: { background: "rgba(0,212,106,0.12)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.20)" },
   archived: { background: "rgba(255,191,36,0.10)", color: "#fbbf24", border: "1px solid rgba(255,191,36,0.20)" },
 };
@@ -668,8 +668,8 @@ function HeroImageField({ value, onChange, wsId }: {
             placeholder="https://… ou faça upload ao lado"
             className="w-full rounded-lg px-3 py-2 text-sm outline-none"
             style={{
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.10)",
+              background: "var(--input)",
+              border: "1px solid var(--border-default)",
               color: "var(--text-1)",
             }}
           />
@@ -701,7 +701,7 @@ function HeroImageField({ value, onChange, wsId }: {
         </div>
         {value && (
           <div className="rounded-lg overflow-hidden flex-shrink-0"
-            style={{ width: 96, height: 64, border: "1px solid rgba(255,255,255,0.10)" }}>
+            style={{ width: 96, height: 64, border: "1px solid var(--border-default)" }}>
             <img src={value} alt="Hero preview" className="w-full h-full object-cover" />
           </div>
         )}

@@ -39,7 +39,7 @@ function ConfirmDialog({
         borderRadius: "18px",
         padding: "24px",
         display: "flex", flexDirection: "column", gap: "20px",
-        boxShadow: "0 32px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)",
+        boxShadow: "0 32px 80px rgba(0,0,0,0.55), 0 0 0 1px var(--input)",
         animation: "confirm-pop 0.15s cubic-bezier(0.34,1.56,0.64,1)",
       }}>
         {/* Icon + text */}

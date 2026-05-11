@@ -117,15 +117,15 @@ function FlowNode({ data, selected }: NodeProps) {
     <div
       style={{
         background: selected
-          ? `linear-gradient(135deg, ${meta.bg} 0%, rgba(255,255,255,0.04) 100%)`
-          : "linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)",
+          ? `linear-gradient(135deg, ${meta.bg} 0%, var(--input) 100%)`
+          : "linear-gradient(135deg, var(--border-default) 0%, var(--input) 100%)",
         backdropFilter: "blur(20px) saturate(180%)",
         WebkitBackdropFilter: "blur(20px) saturate(180%)",
-        border: selected ? `1.5px solid ${meta.color}` : "1px solid rgba(255,255,255,0.12)",
+        border: selected ? `1.5px solid ${meta.color}` : "1px solid var(--border-strong)",
         borderRadius: 16,
         boxShadow: selected
           ? `0 0 0 3px ${meta.color}22, 0 8px 24px rgba(0,0,0,0.40)`
-          : "0 4px 16px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.08)",
+          : "0 4px 16px rgba(0,0,0,0.30), inset 0 1px 0 var(--border-default)",
         minWidth: 220,
         maxWidth: 260,
         padding: "10px 12px",
@@ -432,7 +432,7 @@ function StepLibrary({ onAdd }: { onAdd: (type: StepType) => void }) {
       <div style={{
         padding: "12px 12px 8px",
         borderBottom: "1px solid var(--border-subtle)",
-        background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)",
+        background: "linear-gradient(135deg, var(--input) 0%, rgba(255,255,255,0.01) 100%)",
       }}>
         <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", opacity: 0.5, marginBottom: 8 }}>
           Passos
@@ -444,7 +444,7 @@ function StepLibrary({ onAdd }: { onAdd: (type: StepType) => void }) {
             placeholder="Buscar..."
             style={{
               width: "100%", padding: "5px 8px 5px 28px", borderRadius: 8, fontSize: 11,
-              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.10)",
+              background: "var(--border-subtle)", border: "1px solid var(--border-default)",
               color: "rgba(255,255,255,0.8)", outline: "none", boxSizing: "border-box",
             }}
           />
@@ -465,7 +465,7 @@ function StepLibrary({ onAdd }: { onAdd: (type: StepType) => void }) {
                   onClick={() => onAdd(t)}
                   style={{
                     padding: "8px 6px", borderRadius: 10, textAlign: "center",
-                    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                    background: "var(--input)", border: "1px solid var(--border-default)",
                     cursor: "pointer", transition: "all 0.15s ease",
                   }}
                   onMouseEnter={e => {
@@ -473,8 +473,8 @@ function StepLibrary({ onAdd }: { onAdd: (type: StepType) => void }) {
                     (e.currentTarget as HTMLElement).style.borderColor = meta.color + "44";
                   }}
                   onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
-                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.08)";
+                    (e.currentTarget as HTMLElement).style.background = "var(--input)";
+                    (e.currentTarget as HTMLElement).style.borderColor = "var(--border-default)";
                   }}
                 >
                   <div style={{ width: 28, height: 28, borderRadius: 8, background: meta.bg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 4px" }}>
@@ -501,7 +501,7 @@ function StepLibrary({ onAdd }: { onAdd: (type: StepType) => void }) {
                       onClick={() => onAdd(t)}
                       style={{
                         padding: "7px 6px", borderRadius: 10, textAlign: "center",
-                        background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
+                        background: "var(--input)", border: "1px solid var(--border-default)",
                         cursor: "pointer", transition: "all 0.15s ease",
                       }}
                       onMouseEnter={e => {
@@ -509,8 +509,8 @@ function StepLibrary({ onAdd }: { onAdd: (type: StepType) => void }) {
                         (e.currentTarget as HTMLElement).style.borderColor = meta.color + "44";
                       }}
                       onMouseLeave={e => {
-                        (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)";
-                        (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.07)";
+                        (e.currentTarget as HTMLElement).style.background = "var(--input)";
+                        (e.currentTarget as HTMLElement).style.borderColor = "var(--border-default)";
                       }}
                     >
                       <div style={{ width: 26, height: 26, borderRadius: 7, background: meta.bg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 3px" }}>
@@ -1781,8 +1781,8 @@ function BuilderCanvas() {
         {/* Step count pill */}
         <div style={{
           fontSize: 10, padding: "4px 8px", borderRadius: 6,
-          background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)",
-          border: "1px solid rgba(255,255,255,0.08)",
+          background: "var(--border-subtle)", color: "rgba(255,255,255,0.5)",
+          border: "1px solid var(--border-default)",
         }}>
           {nodes.length} step{nodes.length !== 1 ? "s" : ""}
         </div>
@@ -1826,7 +1826,7 @@ function BuilderCanvas() {
             maxZoom={2}
             colorMode="dark"
           >
-            <Background color="rgba(255,255,255,0.04)" gap={24} size={1} />
+            <Background color="var(--input)" gap={24} size={1} />
             <Controls className="!bg-[var(--surface-2)] !border-[var(--surface-border)]" />
             <MiniMap className="!bg-[var(--surface-2)]" nodeColor={(n) => {
               const s = n.data?.step as FlowStep | undefined;
@@ -1839,11 +1839,11 @@ function BuilderCanvas() {
             style={{ zIndex: 10 }}>
             <div style={{
               borderRadius: 20, overflow: "hidden",
-              background: "linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%)",
+              background: "linear-gradient(135deg, var(--border-default) 0%, var(--input) 100%)",
               backdropFilter: "blur(24px) saturate(200%)",
               WebkitBackdropFilter: "blur(24px) saturate(200%)",
-              border: "1px solid rgba(255,255,255,0.12)",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.10)",
+              border: "1px solid var(--border-strong)",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.40), inset 0 1px 0 var(--border-default)",
             }}>
               <div className="flex items-center gap-2 px-4 pt-2 text-[10px] uppercase tracking-wider"
                 style={{ color: "var(--text-3)" }}>

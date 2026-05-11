@@ -723,7 +723,7 @@ function InboxPage() {
         className="border-b px-4 sm:px-6 py-3 sm:py-4"
         style={{
           borderColor: "var(--border-subtle)",
-          background: "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)",
+          background: "linear-gradient(135deg, var(--input) 0%, rgba(255,255,255,0.01) 100%)",
           backdropFilter: "blur(16px) saturate(180%)",
           WebkitBackdropFilter: "blur(16px) saturate(180%)",
           // Em mobile, quando uma conversa está aberta, escondemos o
@@ -878,7 +878,7 @@ function InboxPage() {
                 <Link
                   href="/inbox/queues"
                   className="block border-t px-3 py-2 text-xs"
-                  style={{ color: "hsl(240 8% 52%)", borderColor: "hsl(240 12% 16%)" }}
+                  style={{ color: "hsl(240 8% 52%)", borderColor: "var(--border-default)" }}
                 >
                   {t("inbox_manage_queues")}
                 </Link>
@@ -1139,7 +1139,7 @@ function InboxPage() {
             onMouseDown={(e) => startResize(e.clientX)}
             onDoubleClick={() => setListWidth(340)}
             className="group relative flex-shrink-0 cursor-col-resize"
-            style={{ width: 4, background: "hsl(240 12% 14%)" }}
+            style={{ width: 4, background: "var(--border-default)" }}
             title="Arraste para redimensionar · duplo-clique restaura"
           >
             <div
@@ -1222,11 +1222,11 @@ function AgentDropdown({
   // "all" é o default do agente (visão geral). Qualquer outro valor é
   // considerado filtro ativo e ganha a cor verde.
   const isActive = agentScope !== "all";
-  const bg = isActive ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.06)";
-  const bgHover = isActive ? "rgba(0,212,106,0.18)" : "rgba(255,255,255,0.10)";
-  const border = isActive ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.10)";
-  const borderHover = isActive ? "rgba(0,212,106,0.35)" : "rgba(255,255,255,0.15)";
-  const fg = isActive ? "#00d46a" : "hsl(240 15% 90%)";
+  const bg = isActive ? "rgba(0,212,106,0.12)" : "var(--border-subtle)";
+  const bgHover = isActive ? "rgba(0,212,106,0.18)" : "var(--border-default)";
+  const border = isActive ? "rgba(0,212,106,0.25)" : "var(--border-default)";
+  const borderHover = isActive ? "rgba(0,212,106,0.35)" : "var(--border-strong)";
+  const fg = isActive ? "#00d46a" : "var(--text-1)";
   return (
     <Dropdown
       open={open}
@@ -1311,11 +1311,11 @@ function SingleSelectDropdown({
 }) {
   const [open, setOpen] = useState(false);
   // Cores conforme estado (active = filtro divergindo do default).
-  const triggerBg = active ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.06)";
-  const triggerBgHover = active ? "rgba(0,212,106,0.18)" : "rgba(255,255,255,0.10)";
-  const triggerBorder = active ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.10)";
-  const triggerBorderHover = active ? "rgba(0,212,106,0.35)" : "rgba(255,255,255,0.15)";
-  const triggerColor = active ? "#00d46a" : "hsl(240 15% 90%)";
+  const triggerBg = active ? "rgba(0,212,106,0.12)" : "var(--border-subtle)";
+  const triggerBgHover = active ? "rgba(0,212,106,0.18)" : "var(--border-default)";
+  const triggerBorder = active ? "rgba(0,212,106,0.25)" : "var(--border-default)";
+  const triggerBorderHover = active ? "rgba(0,212,106,0.35)" : "var(--border-strong)";
+  const triggerColor = active ? "#00d46a" : "var(--text-1)";
   const iconColor = active ? "#00d46a" : "hsl(240 8% 48%)";
   return (
     <Dropdown
@@ -1389,22 +1389,22 @@ function MultiSelectDropdown({
           className="flex items-center gap-1.5 rounded-lg px-2 sm:px-3 py-1.5 text-xs font-medium"
           title={label}
           style={{
-            background: selected.length > 0 ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.06)",
+            background: selected.length > 0 ? "rgba(0,212,106,0.12)" : "var(--border-subtle)",
             backdropFilter: "blur(8px)",
-            border: `1px solid ${selected.length > 0 ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.10)"}`,
+            border: `1px solid ${selected.length > 0 ? "rgba(0,212,106,0.25)" : "var(--border-default)"}`,
             boxShadow: selected.length > 0 ? "0 0 12px rgba(0,212,106,0.10)" : "none",
-            color: selected.length > 0 ? "#00d46a" : "hsl(240 15% 90%)",
+            color: selected.length > 0 ? "#00d46a" : "var(--text-1)",
             transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
           }}
           onMouseEnter={e => {
             const active = selected.length > 0;
-            e.currentTarget.style.background = active ? "rgba(0,212,106,0.18)" : "rgba(255,255,255,0.10)";
-            e.currentTarget.style.borderColor = active ? "rgba(0,212,106,0.35)" : "rgba(255,255,255,0.15)";
+            e.currentTarget.style.background = active ? "rgba(0,212,106,0.18)" : "var(--border-default)";
+            e.currentTarget.style.borderColor = active ? "rgba(0,212,106,0.35)" : "var(--border-strong)";
           }}
           onMouseLeave={e => {
             const active = selected.length > 0;
-            e.currentTarget.style.background = active ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.06)";
-            e.currentTarget.style.borderColor = active ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.10)";
+            e.currentTarget.style.background = active ? "rgba(0,212,106,0.12)" : "var(--border-subtle)";
+            e.currentTarget.style.borderColor = active ? "rgba(0,212,106,0.25)" : "var(--border-default)";
           }}
         >
           <span style={{ color: selected.length > 0 ? "#00d46a" : "hsl(240 8% 48%)", display: "inline-flex" }}>{icon}</span>
@@ -1420,7 +1420,7 @@ function MultiSelectDropdown({
           onClick={() => onChange([])}
           className="w-full border-b px-3 py-2 text-left text-[10px] uppercase tracking-widest"
           style={{
-            borderColor: "hsl(240 12% 16%)",
+            borderColor: "var(--border-default)",
             color: "hsl(240 8% 52%)",
           }}
         >
@@ -1553,7 +1553,7 @@ function DropdownItem({
       onClick={onClick}
       className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-white/5"
       style={{
-        color: active ? "#00d46a" : "hsl(240 15% 90%)",
+        color: active ? "#00d46a" : "var(--text-1)",
         background: active ? "rgba(0,212,106,0.08)" : "transparent",
         transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
       }}
@@ -1628,7 +1628,7 @@ function EmptyState({ agentScope, statusTab }: { agentScope: string; statusTab: 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-12 text-center">
       <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
-        background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-subtle)",
+        background: "var(--input)", border: "1px solid var(--border-subtle)",
       }}>
         <MessageSquare className="h-5 w-5" style={{ color: "var(--text-3)", opacity: 0.5 }} />
       </div>
@@ -1811,10 +1811,10 @@ function InboxMenu({
           onClick={() => setOpen((o) => !o)}
           className="flex items-center justify-center rounded-lg p-1.5"
           style={{
-            background: open ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.06)",
+            background: open ? "rgba(0,212,106,0.12)" : "var(--border-subtle)",
             backdropFilter: "blur(8px)",
             border: open ? "1px solid rgba(0,212,106,0.25)" : "1px solid var(--border-default)",
-            color: open ? "#00d46a" : "hsl(240 8% 60%)",
+            color: open ? "#00d46a" : "var(--text-3)",
             transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
           }}
           title="Mais opções do inbox"
@@ -1930,9 +1930,9 @@ function NotificationsButton({
       ? muted ? "Reativar som e notificações" : "Silenciar notificações"
       : "Ativar notificações desktop e som de mensagens";
   // Verde quando ativas (perm granted + não-muted). Cinza quando off/denied.
-  const bg = showOff ? "rgba(255,255,255,0.06)" : "rgba(0,212,106,0.10)";
-  const border = showOff ? "rgba(255,255,255,0.10)" : "rgba(0,212,106,0.22)";
-  const fg = showOff ? "hsl(240 8% 60%)" : "#00d46a";
+  const bg = showOff ? "var(--border-subtle)" : "rgba(0,212,106,0.10)";
+  const border = showOff ? "var(--border-default)" : "rgba(0,212,106,0.22)";
+  const fg = showOff ? "var(--text-3)" : "#00d46a";
   return (
     <button
       type="button"
@@ -2089,7 +2089,7 @@ function GlobalSearchButton({ wsId }: { wsId?: string }) {
       {open && (
         <div className="fixed inset-0 z-[150] flex items-start justify-center pt-24" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }} onClick={() => setOpen(false)}>
           <div className="w-full max-w-xl rounded-2xl shadow-2xl" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-2 border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
+            <div className="flex items-center gap-2 border-b px-4 py-3" style={{ borderColor: "var(--border-default)" }}>
               <Search className="h-4 w-4 flex-shrink-0" style={{ color: "var(--text-3)" }} />
               <input
                 autoFocus
@@ -2122,7 +2122,7 @@ function GlobalSearchButton({ wsId }: { wsId?: string }) {
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 text-[11px]" style={{ color: "var(--text-3)" }}>
-                            <span className="font-medium" style={{ color: h.direction === "out" ? "#00d46a" : "hsl(240 15% 88%)" }}>
+                            <span className="font-medium" style={{ color: h.direction === "out" ? "#00d46a" : "var(--text-1)" }}>
                               {h.contact_name || h.sender_name || h.channel_key}
                             </span>
                             <span>·</span>

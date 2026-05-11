@@ -98,7 +98,7 @@ export function DealCard({ deal, isDragging = false }: { deal: DealCardData; isD
           {prob !== null && prob > 0 && (
             <span className="flex items-center gap-1 ml-auto">
               <svg width="26" height="26" viewBox="0 0 26 26" className="flex-shrink-0 -rotate-90">
-                <circle cx="13" cy="13" r="10" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="2.5" />
+                <circle cx="13" cy="13" r="10" fill="none" stroke="var(--border-default)" strokeWidth="2.5" />
                 <circle
                   cx="13" cy="13" r="10" fill="none"
                   stroke={prob >= 70 ? "#10b981" : prob >= 40 ? "#f59e0b" : "#ef4444"}

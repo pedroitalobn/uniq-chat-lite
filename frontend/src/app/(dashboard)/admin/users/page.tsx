@@ -63,7 +63,7 @@ function CreateUserModal({ plans, onClose, onCreated }: {
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-md rounded-2xl p-6 animate-fade-in-up"
-        style={{ background: "var(--surface-1)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 32px 80px rgba(0,0,0,0.6)" }}>
+        style={{ background: "var(--surface-1)", boxShadow: "0 0 0 1px var(--border-default), 0 32px 80px rgba(0,0,0,0.6)" }}>
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center"
@@ -157,7 +157,7 @@ function ResetPasswordModal({ user, onClose }: { user: User; onClose: () => void
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl p-6 animate-fade-in-up"
-        style={{ background: "var(--surface-1)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 24px 64px rgba(0,0,0,0.5)" }}>
+        style={{ background: "var(--surface-1)", boxShadow: "0 0 0 1px var(--border-default), 0 24px 64px rgba(0,0,0,0.5)" }}>
         <div className="flex items-center gap-3 mb-5">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center"
             style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.18)" }}>
@@ -213,7 +213,7 @@ function BlockModal({ user, onClose, onConfirm }: {
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl p-6 animate-fade-in-up"
-        style={{ background: "var(--surface-1)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 24px 64px rgba(0,0,0,0.5)" }}>
+        style={{ background: "var(--surface-1)", boxShadow: "0 0 0 1px var(--border-default), 0 24px 64px rgba(0,0,0,0.5)" }}>
         <div className="flex items-center gap-3 mb-5">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center"
             style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)" }}>
@@ -351,7 +351,7 @@ function InviteSystemToggle() {
       </div>
       <button onClick={toggle} disabled={loading}
         className="relative w-12 h-7 rounded-full transition-all duration-200 disabled:opacity-50"
-        style={{ background: enabled ? "var(--green)" : "hsl(240 12% 15%)" }}>
+        style={{ background: enabled ? "var(--green)" : "var(--border-default)" }}>
         <span className="absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-all duration-200"
           style={{ left: enabled ? "26px" : "4px" }} />
       </button>

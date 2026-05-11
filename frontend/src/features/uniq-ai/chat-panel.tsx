@@ -379,9 +379,9 @@ function ComposerArea({
           isEmpty && "mx-auto w-full max-w-2xl",
         )}
         style={{
-          background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)",
-          border: "1px solid rgba(255,255,255,0.13)",
-          boxShadow: "0 8px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10)",
+          background: "linear-gradient(135deg, var(--border-default) 0%, var(--input) 100%)",
+          border: "1px solid var(--border-strong)",
+          boxShadow: "0 8px 40px rgba(0,0,0,0.35), inset 0 1px 0 var(--border-default)",
           backdropFilter: "blur(40px) saturate(200%)",
           WebkitBackdropFilter: "blur(40px) saturate(200%)",
         }}

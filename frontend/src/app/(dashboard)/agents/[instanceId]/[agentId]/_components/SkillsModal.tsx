@@ -183,8 +183,8 @@ export function SkillsModal({ form, update, onClose }: Props) {
                         <span
                           className="flex items-center justify-center w-7 h-7 rounded-md flex-shrink-0 mt-0.5"
                           style={{
-                            background: enabled ? `${cat.color}22` : "rgba(255,255,255,0.04)",
-                            border: `1px solid ${enabled ? cat.color + "55" : "rgba(255,255,255,0.06)"}`,
+                            background: enabled ? `${cat.color}22` : "var(--input)",
+                            border: `1px solid ${enabled ? cat.color + "55" : "var(--border-subtle)"}`,
                             color: enabled ? cat.color : "var(--text-3)",
                           }}
                         >

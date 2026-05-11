@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 const baseClass = "animate-pulse rounded-md";
 const baseStyle: React.CSSProperties = {
-  background: "linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.04) 100%)",
+  background: "linear-gradient(90deg, var(--input) 0%, var(--border-default) 50%, var(--input) 100%)",
   backgroundSize: "200% 100%",
   animation: "skeleton-shimmer 1.4s ease-in-out infinite",
 };
@@ -49,7 +49,7 @@ export function SkeletonAvatar({
 export function SkeletonCard({ rows = 3, withAvatar = true }: { rows?: number; withAvatar?: boolean }) {
   return (
     <div className="flex items-start gap-3 p-3 rounded-2xl"
-      style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+      style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--input)" }}>
       {withAvatar && <SkeletonAvatar />}
       <div className="flex-1 space-y-2">
         {Array.from({ length: rows }).map((_, i) => (

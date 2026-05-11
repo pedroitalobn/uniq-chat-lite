@@ -167,9 +167,9 @@ function Field({ def, value, onChange }: { def: CustomFieldDef; value: unknown; 
                 onClick={() => toggle(o)}
                 className="px-2.5 py-1 rounded-lg text-xs font-medium transition-colors"
                 style={{
-                  background: on ? "var(--green-dim)" : "rgba(255,255,255,0.04)",
+                  background: on ? "var(--green-dim)" : "var(--input)",
                   color: on ? "var(--green)" : "var(--text-2)",
-                  border: `1px solid ${on ? "var(--green-border)" : "rgba(255,255,255,0.08)"}`,
+                  border: `1px solid ${on ? "var(--green-border)" : "var(--border-default)"}`,
                 }}
               >
                 {o}

@@ -145,7 +145,7 @@ export function ActivityPanel() {
                             <span>Passo {(item.step_index || 0) + 1} de {item.total_steps}</span>
                             <span>{stepPct}%</span>
                           </div>
-                          <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                          <div className="h-1 rounded-full overflow-hidden" style={{ background: "var(--border-subtle)" }}>
                             <div className="h-full rounded-full transition-all duration-500"
                               style={{
                                 width: `${stepPct}%`,

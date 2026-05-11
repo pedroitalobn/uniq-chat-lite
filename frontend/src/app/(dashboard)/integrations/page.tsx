@@ -135,7 +135,7 @@ export default function IntegrationsPage() {
         <div className="mb-6 relative">
           {/* Section header glass line */}
           <div className="absolute -bottom-3 left-0 right-0 h-px pointer-events-none"
-            style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)" }} />
+            style={{ background: "linear-gradient(90deg, transparent, var(--border-default), transparent)" }} />
           {/* Título "Integrações" + ícone agora no ModuleHeader (layout). */}
           <p className="text-xs hidden sm:block" style={{ color: "var(--text-3)" }}>
             LLMs, agentes, webhooks, shop e mais
@@ -163,11 +163,11 @@ export default function IntegrationsPage() {
           {/* Desktop sidebar */}
           <aside className="hidden sm:flex w-44 lg:w-52 flex-shrink-0 sticky top-4">
             <nav className="rounded-2xl overflow-hidden w-full" style={{
-              background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+              background: "linear-gradient(135deg, var(--border-default) 0%, rgba(255,255,255,0.02) 100%)",
               backdropFilter: "blur(20px) saturate(180%)",
               WebkitBackdropFilter: "blur(20px) saturate(180%)",
-              border: "1px solid rgba(255,255,255,0.10)",
-              boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.10)",
+              border: "1px solid var(--border-default)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 var(--border-default)",
             }}>
               {sections.map((s, i) => {
                 const Icon = s.icon;
@@ -248,7 +248,7 @@ function UniqAICard() {
           background: "linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(139,92,246,0.04) 100%)",
           border: "1px solid rgba(139,92,246,0.25)",
           borderRadius: "16px",
-          boxShadow: "0 4px 16px rgba(139,92,246,0.08), inset 0 1px 0 rgba(255,255,255,0.06)",
+          boxShadow: "0 4px 16px rgba(139,92,246,0.08), inset 0 1px 0 var(--border-subtle)",
         }}
       >
         <div
@@ -371,7 +371,7 @@ function LLMSection() {
         </div>
 
         {integrations.length === 0 ? (
-          <div className="rounded-2xl p-10 text-center" style={{ background: "var(--surface-2)", border: "1px dashed rgba(255,255,255,0.08)" }}>
+          <div className="rounded-2xl p-10 text-center" style={{ background: "var(--surface-2)", border: "1px dashed var(--border-default)" }}>
             <Bot className="w-8 h-8 mx-auto mb-3 opacity-25" style={{ color: "var(--text-3)" }} />
             <p className="text-sm font-medium mb-1" style={{ color: "var(--text-2)" }}>Nenhum LLM configurado</p>
             <p className="text-xs mb-4" style={{ color: "var(--text-3)" }}>Conecte Claude, GPT-4o, Gemini e outros para usar nos agentes de IA.</p>
@@ -401,12 +401,12 @@ function IntegrationCard({ integration }: { integration: Integration }) {
   const color = provider?.color ?? "#64748b";
   return (
     <div className="rounded-2xl p-4 flex items-center gap-4" style={{
-      background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+      background: "linear-gradient(135deg, var(--border-subtle) 0%, rgba(255,255,255,0.02) 100%)",
       backdropFilter: "blur(16px) saturate(160%)",
       WebkitBackdropFilter: "blur(16px) saturate(160%)",
-      border: "1px solid rgba(255,255,255,0.09)",
+      border: "1px solid var(--border-default)",
       borderRadius: "16px",
-      boxShadow: "0 4px 12px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.08)",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.20), inset 0 1px 0 var(--border-default)",
     }}>
       <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${color}18`, border: `1px solid ${color}30` }}><Plug className="w-5 h-5" style={{ color }} /></div>
       <div className="flex-1 min-w-0">
@@ -1216,7 +1216,7 @@ function MarketingSection() {
             className="relative rounded-2xl p-4 flex flex-col gap-3"
             style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", opacity: 0.72 }}>
             <span className="absolute top-3 right-3 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full"
-              style={{ background: "rgba(255,255,255,0.07)", color: "var(--text-3)", border: "1px solid rgba(255,255,255,0.10)" }}>
+              style={{ background: "var(--border-default)", color: "var(--text-3)", border: "1px solid var(--border-default)" }}>
               Em breve
             </span>
             <div className="flex items-center gap-3">

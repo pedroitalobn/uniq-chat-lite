@@ -93,7 +93,7 @@ function SignalBars({ status }: { status: string }) {
           className="w-[4px] rounded-sm transition-all duration-700"
           style={{
             height: bar.height,
-            background: i < strength ? color : "rgba(255,255,255,0.10)",
+            background: i < strength ? color : "var(--border-default)",
             opacity: i < strength ? 1 : 0.4,
             boxShadow: i < strength && status === "connected" ? `0 0 4px ${color}80` : "none",
             transitionDelay: bar.delay,
@@ -123,7 +123,7 @@ function StatusRing({ status, children }: { status: string; children: React.Reac
       >
         {/* Track */}
         <circle cx={size / 2} cy={size / 2} r={r}
-          fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="2" />
+          fill="none" stroke="var(--border-subtle)" strokeWidth="2" />
 
         {/* Connected: slow orbit arc */}
         {isConnected && (
@@ -255,22 +255,22 @@ function InstanceCard({
       style={{
         background: isReconnecting
           ? "linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(255,255,255,0.02) 100%)"
-          : "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+          : "linear-gradient(135deg, var(--border-default) 0%, rgba(255,255,255,0.02) 100%)",
         backdropFilter: "blur(20px) saturate(180%)",
         WebkitBackdropFilter: "blur(20px) saturate(180%)",
         border: isConnected
           ? "1px solid rgba(0,212,106,0.22)"
           : isReconnecting
             ? "1px solid rgba(245,158,11,0.22)"
-            : "1px solid rgba(255,255,255,0.09)",
+            : "1px solid var(--border-default)",
         borderRadius: "20px",
         boxShadow: hovered
           ? isConnected
-            ? "0 16px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,212,106,0.12), inset 0 1px 0 rgba(255,255,255,0.12)"
-            : "0 16px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.12)"
+            ? "0 16px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,212,106,0.12), inset 0 1px 0 var(--border-strong)"
+            : "0 16px 40px rgba(0,0,0,0.45), inset 0 1px 0 var(--border-strong)"
           : isConnected
-            ? "0 0 0 1px rgba(0,212,106,0.06), 0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.10)"
-            : "0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.10)",
+            ? "0 0 0 1px rgba(0,212,106,0.06), 0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 var(--border-default)"
+            : "0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 var(--border-default)",
         animationDelay: `${index * 60}ms`,
         animationFillMode: "both",
         transformStyle: "preserve-3d",
@@ -286,7 +286,7 @@ function InstanceCard({
             ? "linear-gradient(90deg, transparent, rgba(0,212,106,0.45), transparent)"
             : isReconnecting
               ? "linear-gradient(90deg, transparent, rgba(245,158,11,0.35), transparent)"
-              : "linear-gradient(90deg, transparent, rgba(255,255,255,0.10), transparent)"
+              : "linear-gradient(90deg, transparent, var(--border-default), transparent)"
         }} />
 
       {/* Reconnecting shimmer overlay */}
@@ -466,7 +466,7 @@ function InstanceCard({
 
         {/* Throughput sparkline */}
         <div className="flex items-end justify-between gap-2 px-0.5"
-          style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10 }}>
+          style={{ borderTop: "1px solid var(--input)", paddingTop: 10 }}>
           <div className="flex flex-col gap-0.5">
             <span className="text-[9px] uppercase tracking-wider font-medium"
               style={{ color: "hsl(240 8% 36%)" }}>
@@ -569,15 +569,15 @@ function FleetHealthBar({ instances, reconnectingIds }: {
   return (
     <div className="rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-4"
       style={{
-        background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)",
-        border: "1px solid rgba(255,255,255,0.07)",
+        background: "linear-gradient(135deg, var(--input) 0%, rgba(255,255,255,0.01) 100%)",
+        border: "1px solid var(--border-default)",
         backdropFilter: "blur(16px)",
       }}>
       {/* Left: Health score */}
       <div className="flex items-center gap-4 flex-shrink-0">
         <div className="relative w-12 h-12">
           <svg className="absolute inset-0 -rotate-90" width={48} height={48} viewBox="0 0 48 48">
-            <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
+            <circle cx="24" cy="24" r="20" fill="none" stroke="var(--border-subtle)" strokeWidth="4" />
             <circle cx="24" cy="24" r="20" fill="none"
               stroke={healthColor} strokeWidth="4"
               strokeDasharray={`${(pct / 100) * 2 * Math.PI * 20} ${2 * Math.PI * 20}`}
@@ -598,7 +598,7 @@ function FleetHealthBar({ instances, reconnectingIds }: {
       </div>
 
       {/* Divider */}
-      <div className="hidden sm:block w-px self-stretch" style={{ background: "rgba(255,255,255,0.07)" }} />
+      <div className="hidden sm:block w-px self-stretch" style={{ background: "var(--border-default)" }} />
 
       {/* Stats */}
       <div className="flex items-center gap-6 flex-wrap">
@@ -610,7 +610,7 @@ function FleetHealthBar({ instances, reconnectingIds }: {
         ].map(({ count, label, color }) => (
           <div key={label} className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full" style={{ background: color, opacity: count > 0 ? 1 : 0.3 }} />
-            <span className="text-sm font-semibold" style={{ color: count > 0 ? "hsl(240 15% 90%)" : "hsl(240 8% 36%)" }}>
+            <span className="text-sm font-semibold" style={{ color: count > 0 ? "var(--text-1)" : "hsl(240 8% 36%)" }}>
               {count}
             </span>
             <span className="text-[11px]" style={{ color: "hsl(240 8% 42%)" }}>{label}</span>
@@ -620,7 +620,7 @@ function FleetHealthBar({ instances, reconnectingIds }: {
 
       {/* Health bar full width at bottom */}
       <div className="sm:ml-auto flex-shrink-0 hidden sm:flex items-center gap-2">
-        <div className="w-32 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+        <div className="w-32 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--border-default)" }}>
           <div className="h-full rounded-full transition-all duration-700"
             style={{
               width: `${pct}%`,
@@ -735,7 +735,7 @@ function InstancesContent() {
               backdropFilter: "blur(12px)",
               WebkitBackdropFilter: "blur(12px)",
               border: "1px solid rgba(0,212,106,0.30)",
-              boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)",
+              boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 var(--border-strong)",
               color: "#00d46a",
             }}
             onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,212,106,0.28), rgba(0,212,106,0.12))"; }}
@@ -764,18 +764,18 @@ function InstancesContent() {
                 onClick={() => setChannelFilter(ch)}
                 className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl transition-all duration-150"
                 style={isActive ? {
-                  background: meta ? `${meta.color}15` : "rgba(255,255,255,0.08)",
+                  background: meta ? `${meta.color}15` : "var(--border-default)",
                   backdropFilter: "blur(8px)",
                   WebkitBackdropFilter: "blur(8px)",
                   color: meta ? meta.color : "hsl(240 15% 93%)",
-                  border: `1px solid ${meta ? `${meta.color}35` : "rgba(255,255,255,0.15)"}`,
+                  border: `1px solid ${meta ? `${meta.color}35` : "var(--border-strong)"}`,
                   borderRadius: "10px",
                 } : {
-                  background: "rgba(255,255,255,0.04)",
+                  background: "var(--input)",
                   backdropFilter: "blur(8px)",
                   WebkitBackdropFilter: "blur(8px)",
                   color: "var(--text-3)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  border: "1px solid var(--border-default)",
                   borderRadius: "10px",
                 }}
               >
@@ -842,7 +842,7 @@ function InstancesContent() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl p-14 text-center animate-fade-in-up"
-          style={{ background: "var(--surface-solid)", border: "1px dashed hsl(240 12% 16%)" }}>
+          style={{ background: "var(--surface-solid)", border: "1px dashed var(--border-default)" }}>
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
             style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
             <Smartphone className="w-6 h-6" style={{ color: "hsl(240 8% 35%)" }} />
@@ -861,7 +861,7 @@ function InstancesContent() {
               backdropFilter: "blur(12px)",
               WebkitBackdropFilter: "blur(12px)",
               border: "1px solid rgba(0,212,106,0.30)",
-              boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)",
+              boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 var(--border-strong)",
               color: "#00d46a",
             }}
             onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(0,212,106,0.28), rgba(0,212,106,0.12))"; }}

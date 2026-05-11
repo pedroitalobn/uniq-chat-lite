@@ -234,8 +234,8 @@ function ModeOption({
       <span
         className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
         style={{
-          background: active ? `${color}22` : "rgba(255,255,255,0.04)",
-          border: `1px solid ${active ? `${color}55` : "rgba(255,255,255,0.06)"}`,
+          background: active ? `${color}22` : "var(--input)",
+          border: `1px solid ${active ? `${color}55` : "var(--border-subtle)"}`,
           color: active ? color : "var(--text-3)",
         }}
       >

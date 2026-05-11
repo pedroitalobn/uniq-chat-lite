@@ -90,13 +90,13 @@ export default function AdminInspectPage() {
       {/* Tabs */}
       <div className="flex gap-1 p-1 rounded-xl" style={{ background: "hsl(240 12% 6%)", border: "1px solid var(--border)" }}>
         <button onClick={() => setTab("servers")} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
-          style={{ background: tab === "servers" ? "hsl(240 12% 13%)" : "transparent", color: tab === "servers" ? "hsl(240 15% 93%)" : "hsl(240 8% 46%)" }}>
+          style={{ background: tab === "servers" ? "var(--border-default)" : "transparent", color: tab === "servers" ? "hsl(240 15% 93%)" : "hsl(240 8% 46%)" }}>
           <Server className="w-4 h-4" />
           <span className="hidden sm:inline">Servidores</span>
           <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full">{servers.length}</span>
         </button>
         <button onClick={() => setTab("instances")} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
-          style={{ background: tab === "instances" ? "hsl(240 12% 13%)" : "transparent", color: tab === "instances" ? "hsl(240 15% 93%)" : "hsl(240 8% 46%)" }}>
+          style={{ background: tab === "instances" ? "var(--border-default)" : "transparent", color: tab === "instances" ? "hsl(240 15% 93%)" : "hsl(240 8% 46%)" }}>
           <Smartphone className="w-4 h-4" />
           <span className="hidden sm:inline">Instâncias</span>
           <span className="sm:hidden">Inst.</span>

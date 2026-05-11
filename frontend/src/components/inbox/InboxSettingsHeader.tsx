@@ -23,7 +23,7 @@ export function InboxSettingsHeader({
         href="/inbox"
         className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors"
         style={{
-          background: "rgba(255,255,255,0.04)",
+          background: "var(--input)",
           border: "1px solid var(--border-subtle)",
           color: "var(--text-3)",
           width: "fit-content",
@@ -34,8 +34,8 @@ export function InboxSettingsHeader({
           e.currentTarget.style.color = "#00d46a";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = "rgba(255,255,255,0.04)";
-          e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+          e.currentTarget.style.background = "var(--input)";
+          e.currentTarget.style.borderColor = "var(--border-default)";
           e.currentTarget.style.color = "var(--text-3)";
         }}
       >

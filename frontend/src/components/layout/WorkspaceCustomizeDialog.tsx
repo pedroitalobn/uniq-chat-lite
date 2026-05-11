@@ -93,17 +93,17 @@ export function WorkspaceCustomizeDialog({
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl overflow-hidden"
         style={{
-          background: "linear-gradient(160deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 50%, rgba(0,0,0,0.10) 100%)",
+          background: "linear-gradient(160deg, var(--border-default) 0%, var(--input) 50%, rgba(0,0,0,0.10) 100%)",
           backdropFilter: "blur(32px) saturate(200%) brightness(1.1)",
           WebkitBackdropFilter: "blur(32px) saturate(200%) brightness(1.1)",
-          border: "1px solid rgba(255,255,255,0.15)",
-          boxShadow: "0 40px 80px rgba(0,0,0,0.70), 0 16px 32px rgba(0,0,0,0.50), 0 4px 8px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.20)",
+          border: "1px solid var(--border-strong)",
+          boxShadow: "0 40px 80px rgba(0,0,0,0.70), 0 16px 32px rgba(0,0,0,0.50), 0 4px 8px rgba(0,0,0,0.30), inset 0 1px 0 var(--border-strong), inset 0 -1px 0 rgba(0,0,0,0.20)",
         }}
       >
         {/* Top light line */}
         <div style={{
           position: "absolute", top: 0, left: "20%", right: "20%", height: "1px",
-          background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.30), transparent)",
+          background: "linear-gradient(90deg, transparent, var(--border-strong), transparent)",
           pointerEvents: "none",
         }} />
         {/* Ambient orb */}
@@ -228,7 +228,7 @@ export function WorkspaceCustomizeDialog({
             onClick={() => saveMutation.mutate()}
             disabled={!isOwner || saveMutation.isPending}
             className="px-4 py-2 rounded-lg text-sm font-medium transition-opacity disabled:opacity-50"
-            style={{ background: color, color: "#fff" }}
+            style={{ background: color, color: "var(--text-1)" }}
           >
             {saveMutation.isPending ? "Salvando..." : "Salvar"}
           </button>

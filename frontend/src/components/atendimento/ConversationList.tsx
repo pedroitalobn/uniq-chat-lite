@@ -440,14 +440,14 @@ export function ConversationList({
                       onBlur={() => commitEdit(conv)}
                       onClick={e => e.preventDefault()}
                       className="min-w-0 flex-1 rounded px-1 py-0 text-sm outline-none"
-                      style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(0,212,106,0.35)", color: "hsl(240 15% 95%)" }}
+                      style={{ background: "var(--border-default)", border: "1px solid rgba(0,212,106,0.35)", color: "hsl(240 15% 95%)" }}
                       autoFocus
                     />
                   ) : (
                     <span
                       className="truncate"
                       style={{
-                        color: hasUnread ? "hsl(240 15% 95%)" : "hsl(240 15% 90%)",
+                        color: hasUnread ? "hsl(240 15% 95%)" : "var(--text-1)",
                         fontWeight: hasUnread ? 600 : 500,
                         fontStyle: baseName === "Nome não identificado" ? "italic" : undefined,
                         opacity: baseName === "Nome não identificado" ? 0.55 : undefined,

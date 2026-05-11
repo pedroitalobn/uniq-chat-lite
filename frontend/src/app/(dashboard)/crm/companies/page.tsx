@@ -93,8 +93,8 @@ export default function CompaniesPage() {
                 placeholder="Nome, domínio, CNPJ…"
                 className="w-full rounded-xl py-1.5 pl-8 pr-3 text-xs outline-none"
                 style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "var(--input)",
+                  border: "1px solid var(--border-default)",
                   color: "var(--text-1)",
                 }}
               />

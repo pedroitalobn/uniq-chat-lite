@@ -75,7 +75,7 @@ export default function HelpCenterWidget() {
           overflow: "hidden",
           background: "#0f1117",
           boxShadow: open
-            ? `0 32px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.08), 0 0 80px ${color}15`
+            ? `0 32px 80px rgba(0,0,0,0.55), 0 0 0 1px var(--border-default), 0 0 80px ${color}15`
             : "0 8px 32px rgba(0,0,0,0.20)",
           zIndex: 99999,
           opacity: open ? 1 : 0,
@@ -111,7 +111,7 @@ export default function HelpCenterWidget() {
           border: "none",
           cursor: "pointer",
           background: `linear-gradient(135deg, ${color}, ${color}dd)`,
-          color: "#000",
+          color: "var(--text-1)",
           zIndex: 99999,
           display: "flex",
           alignItems: "center",

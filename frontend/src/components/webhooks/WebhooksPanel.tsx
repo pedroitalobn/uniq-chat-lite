@@ -141,7 +141,7 @@ export function WebhooksPanel({ showHeader = true }: { showHeader?: boolean }) {
           <button
             onClick={() => setEditing({ ...EMPTY_DRAFT })}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            style={{ background: "#8b5cf6", color: "#fff" }}
+            style={{ background: "#8b5cf6", color: "var(--text-1)" }}
           >
             <Plus className="w-4 h-4" />
             Novo Webhook
@@ -158,7 +158,7 @@ export function WebhooksPanel({ showHeader = true }: { showHeader?: boolean }) {
           <button
             onClick={() => setEditing({ ...EMPTY_DRAFT })}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-            style={{ background: "#8b5cf6", color: "#fff" }}
+            style={{ background: "#8b5cf6", color: "var(--text-1)" }}
           >
             <Plus className="w-3.5 h-3.5" />
             Novo Webhook
@@ -626,7 +626,7 @@ function WebhookEditor({
                               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all active:scale-95"
                               style={{
                                 background: selected ? "#8b5cf6" : "var(--surface-2)",
-                                color: selected ? "#fff" : "var(--text-2)",
+                                color: selected ? "var(--text-1)" : "var(--text-2)",
                                 border: `1px solid ${
                                   selected ? "#8b5cf6" : "var(--surface-border)"
                                 }`,
@@ -636,7 +636,7 @@ function WebhookEditor({
                               }}
                             >
                               {selected && <Check className="w-3 h-3" strokeWidth={3} />}
-                              {ev.admin_only && <Lock className="w-3 h-3" style={{ color: selected ? "#fff" : "#f59e0b" }} />}
+                              {ev.admin_only && <Lock className="w-3 h-3" style={{ color: selected ? "var(--text-1)" : "#f59e0b" }} />}
                               {ev.name}
                             </button>
                           );
@@ -668,7 +668,7 @@ function WebhookEditor({
             onClick={() => onSave(draft)}
             disabled={!canSave}
             className="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2"
-            style={{ background: "#8b5cf6", color: "#fff" }}
+            style={{ background: "#8b5cf6", color: "var(--text-1)" }}
           >
             {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             {draft.id ? "Salvar" : "Criar"}
@@ -747,7 +747,7 @@ function SecretRevealModal({
         <button
           onClick={onClose}
           className="w-full px-4 py-2 rounded-lg text-sm font-medium"
-          style={{ background: "#8b5cf6", color: "#fff" }}
+          style={{ background: "#8b5cf6", color: "var(--text-1)" }}
         >
           Entendi, fechar
         </button>

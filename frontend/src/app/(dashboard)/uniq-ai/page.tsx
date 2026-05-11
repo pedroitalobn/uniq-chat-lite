@@ -66,11 +66,11 @@ const EVENT_ICON: Record<AgentEvent["type"], React.ReactNode> = {
 
 // Glassmorphism panel base style
 const glassStyle: React.CSSProperties = {
-  background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)",
+  background: "linear-gradient(135deg, var(--border-default) 0%, var(--input) 100%)",
   backdropFilter: "blur(24px) saturate(180%)",
   WebkitBackdropFilter: "blur(24px) saturate(180%)",
-  border: "1px solid rgba(255,255,255,0.09)",
-  boxShadow: "0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08)",
+  border: "1px solid var(--border-default)",
+  boxShadow: "0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 var(--border-default)",
 };
 
 // Drawer panel — conversations history
@@ -103,7 +103,7 @@ function ConversationsDrawer({
             style={glassStyle}
           >
             {/* Top shimmer */}
-            <div style={{ position: "absolute", top: 0, left: "10%", right: "10%", height: "1px", background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent)" }} />
+            <div style={{ position: "absolute", top: 0, left: "10%", right: "10%", height: "1px", background: "linear-gradient(90deg, transparent, var(--border-strong), transparent)" }} />
 
             <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: "var(--border-subtle)" }}>
               <div className="flex items-center gap-2">
@@ -193,7 +193,7 @@ function ActivityDrawer({ open, onClose, events }: { open: boolean; onClose: () 
             className="fixed inset-y-0 right-0 z-50 w-72 flex flex-col overflow-hidden rounded-l-2xl"
             style={glassStyle}
           >
-            <div style={{ position: "absolute", top: 0, left: "10%", right: "10%", height: "1px", background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent)" }} />
+            <div style={{ position: "absolute", top: 0, left: "10%", right: "10%", height: "1px", background: "linear-gradient(90deg, transparent, var(--border-strong), transparent)" }} />
 
             <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: "var(--border-subtle)" }}>
               <div className="flex items-center gap-2">
@@ -214,7 +214,7 @@ function ActivityDrawer({ open, onClose, events }: { open: boolean; onClose: () 
                 </div>
               ) : (
                 <div className="relative">
-                  <div className="absolute left-[7px] top-2 bottom-2 w-px" style={{ background: "rgba(255,255,255,0.07)" }} />
+                  <div className="absolute left-[7px] top-2 bottom-2 w-px" style={{ background: "var(--border-default)" }} />
                   <div className="space-y-3">
                     {events.map((event) => (
                       <motion.div key={event.id} className="flex gap-3 items-start pl-1"
@@ -375,7 +375,7 @@ export default function UniqAIPage() {
           style={{
             ...glassStyle,
             color: agentEvents.length > 0 ? "var(--green)" : "var(--text-2)",
-            borderColor: agentEvents.length > 0 ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.09)",
+            borderColor: agentEvents.length > 0 ? "rgba(0,212,106,0.25)" : "var(--border-default)",
           }}
           title="Atividade do agente"
         >

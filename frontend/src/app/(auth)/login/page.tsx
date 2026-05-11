@@ -51,12 +51,12 @@ function Field({
           style={{
             paddingLeft: icon ? "2.75rem" : "1rem",
             paddingRight: isPassword ? "2.75rem" : "1rem",
-            background: "rgba(255,255,255,0.03)",
+            background: "var(--input)",
             border: error
               ? "1px solid rgba(239,68,68,0.4)"
               : focused
                 ? "1px solid rgba(0,212,106,0.5)"
-                : "1px solid rgba(255,255,255,0.07)",
+                : "1px solid var(--border-default)",
             boxShadow: focused
               ? error ? "0 0 0 3px rgba(239,68,68,0.08)" : "0 0 0 3px rgba(0,212,106,0.08)"
               : "none",
@@ -88,8 +88,8 @@ function SocialBtn({ icon, label, onClick }: { icon: React.ReactNode; label: str
       onMouseLeave={() => setHover(false)}
       className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all duration-150"
       style={{
-        background: hover ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.025)",
-        border: `1px solid ${hover ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.06)"}`,
+        background: hover ? "var(--input)" : "rgba(255,255,255,0.025)",
+        border: `1px solid ${hover ? "rgba(255,255,255,0.1)" : "var(--border-subtle)"}`,
         color: "var(--text-2)",
       }}>
       {icon}
@@ -166,7 +166,7 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
             onChange={e => setTotpCode(e.target.value.replace(/\D/g, ""))}
             autoFocus placeholder="000000"
             className="w-full py-3 px-4 rounded-xl text-sm text-center tracking-widest font-mono outline-none transition-all text-[hsl(240_15%_90%)] placeholder:text-[hsl(240_8%_32%)]"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }} />
+            style={{ background: "var(--input)", border: "1px solid var(--border-default)" }} />
           <p className="text-xs text-[hsl(240_8%_40%)]">Use o código de 6 dígitos do seu app autenticador.</p>
         </div>
         <GreenBtn disabled={totpCode.length !== 6 || loading} loading={loading}>Verificar</GreenBtn>
@@ -279,8 +279,8 @@ function LoginContent() {
             background: "rgba(13,14,20,0.75)",
             backdropFilter: "blur(24px)",
             WebkitBackdropFilter: "blur(24px)",
-            border: "1px solid rgba(255,255,255,0.07)",
-            boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 32px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,212,106,0.04)",
+            border: "1px solid var(--border-default)",
+            boxShadow: "0 0 0 1px var(--input) inset, 0 32px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,212,106,0.04)",
           }}
         >
           {/* Card header */}
@@ -317,13 +317,13 @@ function LoginContent() {
 
             {/* Divider */}
             <div className="flex items-center gap-3">
-              <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+              <div className="flex-1 h-px" style={{ background: "var(--border-subtle)" }} />
               <span className="text-[10px] font-medium uppercase tracking-widest text-[hsl(240_8%_30%)]">ou</span>
-              <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+              <div className="flex-1 h-px" style={{ background: "var(--border-subtle)" }} />
             </div>
 
             {/* Form */}
-            <Suspense fallback={<div className="h-40 animate-pulse rounded-xl" style={{ background: "rgba(255,255,255,0.03)" }} />}>
+            <Suspense fallback={<div className="h-40 animate-pulse rounded-xl" style={{ background: "var(--input)" }} />}>
               <LoginForm onSuccess={onSuccess} />
             </Suspense>
 

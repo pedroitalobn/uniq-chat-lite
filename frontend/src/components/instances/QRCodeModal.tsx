@@ -276,7 +276,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
         style={{
           background: "var(--surface-solid)",
           border: "1px solid var(--border)",
-          boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 32px 80px rgba(0,0,0,0.6)",
+          boxShadow: "0 0 0 1px var(--border-default), 0 32px 80px rgba(0,0,0,0.6)",
         }}
       >
         {/* Header */}
@@ -378,7 +378,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
                 )}
                 <div
                   className="p-3 rounded-2xl"
-                  style={{ background: "#ffffff", boxShadow: "0 0 0 1px rgba(0,212,106,0.2), 0 8px 32px rgba(0,0,0,0.4)" }}
+                  style={{ background: "var(--text-1)", boxShadow: "0 0 0 1px rgba(0,212,106,0.2), 0 8px 32px rgba(0,0,0,0.4)" }}
                 >
                   <QRCodeSVG value={qrCode} size={200} />
                 </div>

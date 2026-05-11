@@ -98,32 +98,32 @@ function BentoCard({
       style={{
         background: highlight
           ? "linear-gradient(135deg, rgba(0,212,106,0.10) 0%, rgba(0,212,106,0.04) 100%)"
-          : "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+          : "linear-gradient(135deg, var(--border-subtle) 0%, rgba(255,255,255,0.02) 100%)",
         backdropFilter: "blur(20px) saturate(180%)",
         WebkitBackdropFilter: "blur(20px) saturate(180%)",
         border: highlight
           ? "1px solid rgba(0,212,106,0.25)"
-          : "1px solid rgba(255,255,255,0.08)",
-        boxShadow: "0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.07)",
+          : "1px solid var(--border-default)",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 var(--border-default)",
         transition: "border-color 0.2s, box-shadow 0.2s",
       }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLElement).style.borderColor = highlight
           ? "rgba(0,212,106,0.4)"
-          : "rgba(255,255,255,0.14)";
-        (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.09)";
+          : "var(--border-strong)";
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 var(--border-default)";
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLElement).style.borderColor = highlight
           ? "rgba(0,212,106,0.25)"
-          : "rgba(255,255,255,0.08)";
-        (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.07)";
+          : "var(--border-default)";
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 var(--border-default)";
       }}
     >
       {/* Top shimmer line */}
       <div style={{
         position: "absolute", top: 0, left: "10%", right: "10%", height: "1px",
-        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)",
+        background: "linear-gradient(90deg, transparent, var(--border-strong), transparent)",
         pointerEvents: "none",
       }} />
       {children}
@@ -154,9 +154,9 @@ function StatCard({
   const c = COLOR_MAP[color];
   if (isLoading) return (
     <div className="rounded-2xl p-4 sm:p-5 animate-pulse h-full"
-      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-      <div className="w-8 h-8 rounded-xl mb-3" style={{ background: "rgba(255,255,255,0.07)" }} />
-      <div className="h-6 w-14 rounded-lg mb-2" style={{ background: "rgba(255,255,255,0.07)" }} />
+      style={{ background: "var(--input)", border: "1px solid var(--border-default)" }}>
+      <div className="w-8 h-8 rounded-xl mb-3" style={{ background: "var(--border-default)" }} />
+      <div className="h-6 w-14 rounded-lg mb-2" style={{ background: "var(--border-default)" }} />
       <div className="h-3 w-20 rounded" style={{ background: "var(--input)" }} />
     </div>
   );
@@ -237,7 +237,7 @@ function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-xl px-3 py-2 text-xs"
-      style={{ background: "rgba(10,10,18,0.95)", border: "1px solid rgba(255,255,255,0.12)", color: "var(--text-1)" }}>
+      style={{ background: "rgba(10,10,18,0.95)", border: "1px solid var(--border-strong)", color: "var(--text-1)" }}>
       <p style={{ color: "var(--text-3)", marginBottom: 4 }}>{label}</p>
       {payload.map((p: any) => (
         <p key={p.name} style={{ color: p.stroke }}>{p.name}: <strong>{p.value}</strong></p>
@@ -443,7 +443,7 @@ export default function DashboardPage() {
                 <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>Conversas e jornadas ativas</p>
               </div>
               <span className="text-[10px] font-medium px-2 py-1 rounded-lg"
-                style={{ background: "rgba(255,255,255,0.06)", color: "var(--text-3)" }}>
+                style={{ background: "var(--border-subtle)", color: "var(--text-3)" }}>
                 Últimos 7 dias
               </span>
             </div>
@@ -639,16 +639,16 @@ export default function DashboardPage() {
               <Link key={href} href={href}
                 className="group flex items-center gap-3 rounded-2xl p-3 sm:p-4 transition-all duration-200"
                 style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.07)",
+                  background: "var(--input)",
+                  border: "1px solid var(--border-default)",
                 }}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLElement).style.borderColor = color + "55";
                   (e.currentTarget as HTMLElement).style.background = color + "0d";
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.07)";
-                  (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
+                  (e.currentTarget as HTMLElement).style.borderColor = "var(--border-default)";
+                  (e.currentTarget as HTMLElement).style.background = "var(--input)";
                 }}
               >
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors"

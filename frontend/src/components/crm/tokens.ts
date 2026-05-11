@@ -11,7 +11,7 @@ export const uniq = {
 
   // Bordas
   border: "var(--surface-border)",
-  borderSoft: "rgba(255,255,255,0.07)",
+  borderSoft: "var(--border-default)",
   borderFaint: "var(--surface-border)",
 
   // Texto

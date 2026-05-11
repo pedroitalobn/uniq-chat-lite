@@ -429,7 +429,7 @@ export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: s
           style={{
             background: "linear-gradient(135deg, rgba(0,212,106,0.25) 0%, rgba(0,212,106,0.08) 100%)",
             border: "1px solid rgba(0,212,106,0.5)",
-            boxShadow: "0 0 40px rgba(0,212,106,0.5), 0 0 80px rgba(0,212,106,0.2), inset 0 1px 0 rgba(255,255,255,0.15)",
+            boxShadow: "0 0 40px rgba(0,212,106,0.5), 0 0 80px rgba(0,212,106,0.2), inset 0 1px 0 var(--border-strong)",
             backdropFilter: "blur(12px)",
           }}
           animate={{ scale: [1, 1.05, 1] }}
@@ -437,7 +437,7 @@ export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: s
         >
           <motion.div
             className="absolute inset-0"
-            style={{ background: "conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.15) 60deg, transparent 120deg)" }}
+            style={{ background: "conic-gradient(from 0deg, transparent 0deg, var(--border-strong) 60deg, transparent 120deg)" }}
             animate={{ rotate: 360 }}
             transition={{ duration: 3.5, repeat: Infinity, ease: "linear" }}
           />
@@ -468,11 +468,11 @@ export function EmptyState({ onSuggestionClick }: { onSuggestionClick: (label: s
             onClick={() => onSuggestionClick(item.label)}
             className="p-4 sm:p-5 rounded-2xl text-left relative overflow-hidden"
             style={{
-              background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
-              border: "1px solid rgba(255,255,255,0.09)",
+              background: "linear-gradient(135deg, var(--border-subtle) 0%, rgba(255,255,255,0.02) 100%)",
+              border: "1px solid var(--border-default)",
               backdropFilter: "blur(16px) saturate(180%)",
               WebkitBackdropFilter: "blur(16px) saturate(180%)",
-              boxShadow: "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 var(--border-default)",
             }}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}

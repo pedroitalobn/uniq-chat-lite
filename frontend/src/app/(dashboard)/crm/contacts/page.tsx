@@ -1549,7 +1549,7 @@ export default function CRMPage() {
               )}
             </CrmHeaderButton>
             <div className="flex items-center gap-2 rounded-xl px-3 py-2 flex-1 min-w-[180px]"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              style={{ background: "var(--input)", border: "1px solid var(--border-default)" }}>
               <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--text-3)" }} />
               <input
                 value={search}
@@ -1568,9 +1568,9 @@ export default function CRMPage() {
         <div className="flex gap-1.5 flex-wrap items-center">
           <button onClick={() => setActiveTagFilter(null)} className="px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all"
             style={{
-              background: activeTagFilter === null ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.04)",
+              background: activeTagFilter === null ? "var(--border-default)" : "var(--input)",
               color: activeTagFilter === null ? "var(--text-1)" : "var(--text-3)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              border: "1px solid var(--border-default)",
             }}>
             Todos
           </button>
@@ -1578,9 +1578,9 @@ export default function CRMPage() {
             <button key={tag.id} onClick={() => setActiveTagFilter(activeTagFilter === tag.id ? null : tag.id)}
               className="px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all"
               style={{
-                background: activeTagFilter === tag.id ? tag.color + "22" : "rgba(255,255,255,0.04)",
+                background: activeTagFilter === tag.id ? tag.color + "22" : "var(--input)",
                 color: activeTagFilter === tag.id ? tag.color : "var(--text-3)",
-                border: `1px solid ${activeTagFilter === tag.id ? tag.color + "44" : "rgba(255,255,255,0.08)"}`,
+                border: `1px solid ${activeTagFilter === tag.id ? tag.color + "44" : "var(--border-default)"}`,
               }}>
               {tag.name}
             </button>

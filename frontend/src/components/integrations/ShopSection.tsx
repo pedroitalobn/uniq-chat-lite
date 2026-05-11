@@ -181,7 +181,7 @@ function ConnectModal({ provider, shops, wsId, onClose }: ConnectModalProps) {
           onClick={onClose}
           className="absolute top-4 right-4 w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
           style={{
-            background: "rgba(255,255,255,0.06)",
+            background: "var(--border-subtle)",
             color: "var(--text-3)",
           }}
         >
@@ -226,11 +226,11 @@ function ConnectModal({ provider, shops, wsId, onClose }: ConnectModalProps) {
                     background:
                       selectedShop === s.id
                         ? "rgba(var(--green-rgb, 34,197,94),0.12)"
-                        : "rgba(255,255,255,0.04)",
+                        : "var(--input)",
                     border:
                       selectedShop === s.id
                         ? "1px solid var(--green)"
-                        : "1px solid rgba(255,255,255,0.07)",
+                        : "1px solid var(--border-default)",
                     color:
                       selectedShop === s.id ? "var(--green)" : "var(--text-1)",
                   }}
@@ -389,8 +389,8 @@ function ProviderCard({ provider, onConnect }: ProviderCardProps) {
     <div
       className="group relative rounded-2xl p-4 flex flex-col items-center text-center transition-all hover:scale-[1.02]"
       style={{
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.07)",
+        background: "var(--input)",
+        border: "1px solid var(--border-default)",
       }}
     >
       {/* Status badge — canto superior direito */}
@@ -472,8 +472,8 @@ function ActiveIntegrationCard({
     <div
       className="rounded-xl p-3 flex items-center gap-3"
       style={{
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.07)",
+        background: "var(--input)",
+        border: "1px solid var(--border-default)",
       }}
     >
       <div

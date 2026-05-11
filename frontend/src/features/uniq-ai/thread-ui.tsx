@@ -104,7 +104,7 @@ const MARKDOWN_OVERRIDES = {
         )}
         style={{
           background: "rgba(0,0,0,0.35)",
-          border: "1px solid rgba(255,255,255,0.07)",
+          border: "1px solid var(--border-default)",
           color: "#e2e8f0",
         }}
       >
@@ -129,14 +129,14 @@ const MARKDOWN_OVERRIDES = {
   },
   // Tables
   table: ({ children, ...props }: React.HTMLAttributes<HTMLTableElement>) => (
-    <div className="overflow-x-auto my-3 rounded-xl" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+    <div className="overflow-x-auto my-3 rounded-xl" style={{ border: "1px solid var(--border-default)" }}>
       <table className="w-full text-sm" {...props}>{children}</table>
     </div>
   ),
   th: ({ children, ...props }: React.HTMLAttributes<HTMLTableCellElement>) => (
     <th
       className="px-4 py-2.5 text-left text-xs font-semibold tracking-wide"
-      style={{ background: "rgba(255,255,255,0.04)", color: "var(--text-2)", borderBottom: "1px solid var(--border-subtle)" }}
+      style={{ background: "var(--input)", color: "var(--text-2)", borderBottom: "1px solid var(--border-subtle)" }}
       {...props}
     >
       {children}
@@ -145,7 +145,7 @@ const MARKDOWN_OVERRIDES = {
   td: ({ children, ...props }: React.HTMLAttributes<HTMLTableCellElement>) => (
     <td
       className="px-4 py-2.5 text-sm"
-      style={{ color: "var(--text-1)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+      style={{ color: "var(--text-1)", borderBottom: "1px solid var(--input)" }}
       {...props}
     >
       {children}
@@ -335,7 +335,7 @@ export function UserMessage() {
             border: "1px solid rgba(0,212,106,0.22)",
             backdropFilter: "blur(20px) saturate(160%)",
             WebkitBackdropFilter: "blur(20px) saturate(160%)",
-            boxShadow: "0 4px 20px rgba(0,212,106,0.08), inset 0 1px 0 rgba(255,255,255,0.06)",
+            boxShadow: "0 4px 20px rgba(0,212,106,0.08), inset 0 1px 0 var(--border-subtle)",
             color: "var(--text-1)",
           }}
         >
@@ -364,7 +364,7 @@ export function UserMessage() {
       </div>
       <div
         className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-        style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}
+        style={{ background: "var(--border-default)", border: "1px solid var(--border-strong)" }}
       >
         <User className="w-4 h-4" style={{ color: "var(--text-2)" }} />
       </div>
@@ -458,7 +458,7 @@ export function ScrollToBottom() {
         className="absolute bottom-4 right-4 p-2 rounded-full shadow-lg transition-colors hover:scale-110"
         style={{
           background: "rgba(20,20,30,0.9)",
-          border: "1px solid rgba(255,255,255,0.12)",
+          border: "1px solid var(--border-strong)",
           backdropFilter: "blur(8px)",
           color: "var(--text-2)",
         }}
@@ -557,11 +557,11 @@ function OrbitModule({
           gap: 4,
           background: hovered
             ? `linear-gradient(135deg, ${color}22, ${color}10)`
-            : "rgba(255,255,255,0.04)",
-          border: `1px solid ${hovered ? color + "66" : "rgba(255,255,255,0.09)"}`,
+            : "var(--input)",
+          border: `1px solid ${hovered ? color + "66" : "var(--border-default)"}`,
           boxShadow: hovered
-            ? `0 0 28px ${color}44, 0 8px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)`
-            : "inset 0 1px 0 rgba(255,255,255,0.04)",
+            ? `0 0 28px ${color}44, 0 8px 24px rgba(0,0,0,0.4), inset 0 1px 0 var(--border-default)`
+            : "inset 0 1px 0 var(--input)",
           backdropFilter: "blur(14px)",
           WebkitBackdropFilter: "blur(14px)",
           transition: "background 0.2s, border-color 0.2s, box-shadow 0.2s",
@@ -701,7 +701,7 @@ function UniqOrbHero({ size = 120 }: { size?: number }) {
             animate={{ scale: [0.85, 1.12, 0.85], opacity: [0.7, 1, 0.7] }}
             transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
           >
-            <Sparkles className="w-8 h-8" style={{ color: "rgba(255,255,255,0.95)", filter: "drop-shadow(0 0 8px rgba(0,212,106,0.8))" }} />
+            <Sparkles className="w-8 h-8" style={{ color: "var(--text-1)", filter: "drop-shadow(0 0 8px rgba(0,212,106,0.8))" }} />
           </motion.div>
         </div>
       </motion.div>
@@ -721,7 +721,7 @@ export function EmptyStateView({ onSuggestionClick }: { onSuggestionClick: (text
           <svg className="absolute inset-0 pointer-events-none" width={ORBIT_SIZE} height={ORBIT_SIZE}>
             <motion.circle
               cx={ORBIT_CENTER} cy={ORBIT_CENTER} r={ORBIT_RADIUS}
-              fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth={1} strokeDasharray="5 9"
+              fill="none" stroke="var(--border-strong)" strokeWidth={1} strokeDasharray="5 9"
               initial={{ pathLength: 0, opacity: 0 }}
               animate={{ pathLength: 1, opacity: 1 }}
               transition={{ duration: 1.2, delay: 0.2, ease: "easeOut" }}
@@ -795,8 +795,8 @@ export function EmptyStateView({ onSuggestionClick }: { onSuggestionClick: (text
                 style={{
                   display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                   gap: 4, padding: "10px 4px", borderRadius: 14,
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.09)",
+                  background: "var(--input)",
+                  border: "1px solid var(--border-default)",
                 }}
                 whileHover={{ scale: 1.06, borderColor: mod.color + "55", background: mod.color + "11" }}
                 whileTap={{ scale: 0.93 }}

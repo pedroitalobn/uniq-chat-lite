@@ -848,7 +848,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           {/* Mode selector: Humano / IA / Observando */}
           {conv && (
             <div className="flex items-center rounded-lg overflow-hidden border flex-shrink-0"
-              style={{ border: "1px solid var(--border-default)", background: "rgba(255,255,255,0.03)" }}>
+              style={{ border: "1px solid var(--border-default)", background: "var(--input)" }}>
               {([
                 { id: "human",     label: "Humano", icon: UserCheck },
                 { id: "ai",        label: "IA",     icon: Bot },
@@ -873,8 +873,8 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                   title={label}
                   aria-label={label}
                   style={{
-                    background: convMode === id ? (id === "ai" ? "rgba(167,139,250,0.2)" : id === "human" ? "rgba(0,212,106,0.15)" : "rgba(255,255,255,0.08)") : "transparent",
-                    color: convMode === id ? (id === "ai" ? "#c4b5fd" : id === "human" ? "#00d46a" : "hsl(240 15% 80%)") : "hsl(240 8% 50%)",
+                    background: convMode === id ? (id === "ai" ? "rgba(167,139,250,0.2)" : id === "human" ? "rgba(0,212,106,0.15)" : "var(--border-default)") : "transparent",
+                    color: convMode === id ? (id === "ai" ? "#c4b5fd" : id === "human" ? "#00d46a" : "hsl(240 15% 80%)") : "var(--text-3)",
                   }}>
                   <Icon className="h-3 w-3" />
                   {/* Em mobile o ícone fala por si — esconde label pra
@@ -909,7 +909,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               }}
               disabled={timelineQ.isFetching || convQ.isFetching}
               className="flex items-center justify-center rounded-lg flex-shrink-0 transition-colors disabled:opacity-50"
-              style={{ width: 30, height: 30, background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-subtle)", color: "var(--text-3)" }}
+              style={{ width: 30, height: 30, background: "var(--input)", border: "1px solid var(--border-subtle)", color: "var(--text-3)" }}
               title="Atualizar mensagens"
               aria-label="Atualizar mensagens"
             >
@@ -922,7 +922,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             <button
               onClick={() => setMobileActionsOpen((v) => !v)}
               className="flex items-center justify-center rounded-lg"
-              style={{ width: 30, height: 30, background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-subtle)", color: "var(--text-3)" }}
+              style={{ width: 30, height: 30, background: "var(--input)", border: "1px solid var(--border-subtle)", color: "var(--text-3)" }}
               title="Mais ações"
               aria-label="Mais ações"
             >
@@ -1677,7 +1677,7 @@ function TransferDialog({
                 {options.map((o) => {
                   const isSelected = selected === o.id;
                   return (
-                    <li key={o.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                    <li key={o.id} style={{ borderBottom: "1px solid var(--input)" }}>
                       <button
                         onClick={() => setSelected(o.id)}
                         className="flex w-full items-center justify-between px-5 py-2.5 text-left text-sm transition-colors"
@@ -1686,7 +1686,7 @@ function TransferDialog({
                           color: "var(--text-1)",
                         }}
                         onMouseEnter={(e) => {
-                          if (!isSelected) e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                          if (!isSelected) e.currentTarget.style.background = "var(--input)";
                         }}
                         onMouseLeave={(e) => {
                           if (!isSelected) e.currentTarget.style.background = "transparent";
@@ -1730,17 +1730,17 @@ function TransferDialog({
             onChange={(e) => setNote(e.target.value)}
             placeholder="Contexto para quem receber…"
             style={{
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--input)",
               border: "1px solid var(--border-default)",
               color: "var(--text-1)",
             }}
             onFocus={(e) => {
               e.currentTarget.style.borderColor = "rgba(0,212,106,0.45)";
-              e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+              e.currentTarget.style.background = "var(--border-subtle)";
             }}
             onBlur={(e) => {
-              e.currentTarget.style.borderColor = "rgba(255,255,255,0.10)";
-              e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+              e.currentTarget.style.borderColor = "var(--border-default)";
+              e.currentTarget.style.background = "var(--input)";
             }}
           />
           <div className="mt-3 flex items-center justify-end gap-2">
@@ -1752,8 +1752,8 @@ function TransferDialog({
                 border: "1px solid var(--border-default)",
                 color: "var(--text-2)",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--border-default)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "var(--input)"; }}
             >
               Cancelar
             </button>
@@ -1980,7 +1980,7 @@ function MessageBubble({
         {m.reply_to && <QuotedReply reply={m.reply_to} isOut={isOut} />}
 
         {(parsed.isViewOnce || parsed.isEphemeral) && (
-          <div className="mb-1 flex items-center gap-1.5 text-[10px]" style={{ color: parsed.isViewOnce ? "#a78bfa" : "hsl(240 8% 60%)" }}>
+          <div className="mb-1 flex items-center gap-1.5 text-[10px]" style={{ color: parsed.isViewOnce ? "#a78bfa" : "var(--text-3)" }}>
             {parsed.isViewOnce ? (
               <>
                 <span className="inline-block h-3 w-3 text-center leading-3">👁</span>
@@ -2808,7 +2808,7 @@ function ContactCard({
               className="flex items-center justify-center gap-1.5 rounded-md flex-1 py-1.5 text-[11px] font-medium transition-colors disabled:opacity-60"
               style={{
                 background: added ? "rgba(245,158,11,0.12)" : "var(--surface-2)",
-                color: added ? "#f59e0b" : "hsl(240 15% 88%)",
+                color: added ? "#f59e0b" : "var(--text-1)",
                 border: `1px solid ${added ? "rgba(245,158,11,0.25)" : "var(--border-default)"}`,
               }}
               title="Adicionar ao CRM"
@@ -3316,7 +3316,7 @@ function TranscriptionBlock({
         className="text-[11px] italic flex items-center gap-1.5 px-2 py-1 rounded-md"
         style={{
           color: isOut ? "rgba(255,255,255,0.55)" : "var(--text-3)",
-          background: isOut ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)",
+          background: isOut ? "var(--border-subtle)" : "var(--input)",
           border: "1px solid var(--border-subtle)",
           width: "fit-content",
           maxWidth: "100%",
@@ -3356,7 +3356,7 @@ function TranscriptionBlock({
         className="text-[10px] flex items-center gap-1.5 px-2 py-1 rounded-md transition-opacity disabled:opacity-50"
         style={{
           color: isOut ? "rgba(255,255,255,0.65)" : "var(--text-3)",
-          background: isOut ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)",
+          background: isOut ? "var(--border-subtle)" : "var(--input)",
           border: "1px solid var(--border-subtle)",
           width: "fit-content",
           maxWidth: "100%",
@@ -3378,7 +3378,7 @@ function TranscriptionBlock({
       className="text-[12px] leading-relaxed px-2.5 py-1.5 rounded-md"
       style={{
         color: isOut ? "rgba(255,255,255,0.78)" : "var(--text-2)",
-        background: isOut ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)",
+        background: isOut ? "var(--border-subtle)" : "var(--input)",
         border: "1px solid var(--border-subtle)",
         whiteSpace: "pre-wrap",
         wordBreak: "break-word",
@@ -4088,7 +4088,7 @@ function Composer({
             <div
               className="flex items-center gap-2 border-b px-3 py-1.5 text-[11px]"
               style={{
-                borderColor: "hsl(240 12% 16%)",
+                borderColor: "var(--border-default)",
                 color: "hsl(240 8% 52%)",
               }}
             >
@@ -4234,7 +4234,7 @@ function Composer({
               className="w-full resize-none rounded-3xl pl-4 pr-11 py-2.5 text-[15px] outline-none"
               style={{
                 background: "var(--surface-2)",
-                border: `1px solid ${mode === "note" ? "rgba(245,158,11,0.45)" : "hsl(240 12% 16%)"}`,
+                border: `1px solid ${mode === "note" ? "rgba(245,158,11,0.45)" : "var(--border-default)"}`,
                 color: "var(--text-1)",
                 minHeight: 44,
                 maxHeight: 140,
@@ -4267,7 +4267,7 @@ function Composer({
               disabled={!canSend || mode !== "message"}
               aria-label="Emoji"
               className="absolute right-2 bottom-1.5 flex h-9 w-9 items-center justify-center rounded-full disabled:opacity-40"
-              style={{ color: emojiOpen ? "var(--green)" : "hsl(240 8% 60%)" }}
+              style={{ color: emojiOpen ? "var(--green)" : "var(--text-3)" }}
             >
               <Smile className="h-5 w-5" />
             </button>
@@ -4404,7 +4404,7 @@ function Composer({
             className="min-h-[44px] max-h-40 flex-1 resize-y rounded-md px-3 py-2 text-sm outline-none"
             style={{
               background: "var(--surface-2)",
-              border: `1px solid ${mode === "note" ? "rgba(245,158,11,0.35)" : "hsl(240 12% 16%)"}`,
+              border: `1px solid ${mode === "note" ? "rgba(245,158,11,0.35)" : "var(--border-default)"}`,
               color: "var(--text-1)",
             }}
             placeholder={mode === "message"
@@ -4465,7 +4465,7 @@ function Composer({
         {constraints && mode === "message" && text.length > constraints.max_body_chars * 0.8 && (
           <div
             className="mt-1 text-right text-[10px] tabular-nums"
-            style={{ color: tooLong ? "#ef4444" : "hsl(240 8% 55%)" }}
+            style={{ color: tooLong ? "#ef4444" : "var(--text-3)" }}
           >
             {text.length} / {constraints.max_body_chars}
           </div>
@@ -4594,7 +4594,7 @@ function ActionRow({
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = "transparent";
-          e.currentTarget.style.borderColor = "hsl(240 12% 16%)";
+          e.currentTarget.style.borderColor = "var(--border-default)";
         }}
       >
         <span style={{ color: "#00d46a" }}>{icon}</span>
@@ -4608,7 +4608,7 @@ function ActionRow({
       className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-all"
       type="button"
       style={{ color: "var(--text-2)" }}
-      onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+      onMouseEnter={e => { e.currentTarget.style.background = "var(--input)"; }}
       onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
     >
       <span style={{ color: "var(--text-3)" }}>{icon}</span>
@@ -4663,7 +4663,7 @@ function ForwardDialog({
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
-        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
+        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--border-default)" }}>
           <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Encaminhar mensagem</h3>
           <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "var(--text-3)" }}>
             <X className="h-4 w-4" />
@@ -4708,7 +4708,7 @@ function ForwardDialog({
             )}
           </div>
         </div>
-        <div className="flex items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
+        <div className="flex items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: "var(--border-default)" }}>
           <button type="button" onClick={onClose} className="rounded-md px-3 py-1.5 text-xs" style={{ color: "hsl(240 8% 70%)" }}>Cancelar</button>
           <button type="button" onClick={() => onSubmit(Array.from(selected))} disabled={selected.size === 0 || isPending} className="rounded-md px-4 py-1.5 text-xs font-medium disabled:opacity-50" style={{ background: "#00d46a", color: "#03170a" }}>
             {isPending ? "Enviando…" : `Encaminhar ${selected.size > 0 ? `(${selected.size})` : ""}`}
@@ -4732,7 +4732,7 @@ function EditMessageDialog({
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
-        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
+        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--border-default)" }}>
           <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Editar mensagem</h3>
           <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "var(--text-3)" }}>
             <X className="h-4 w-4" />
@@ -4742,7 +4742,7 @@ function EditMessageDialog({
           <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={4} className="w-full rounded-md px-3 py-2 text-sm outline-none" style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-1)" }} />
           <p className="mt-1 text-[10px]" style={{ color: "var(--text-3)" }}>WhatsApp aceita edição em até 15 minutos do envio.</p>
         </div>
-        <div className="flex items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
+        <div className="flex items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: "var(--border-default)" }}>
           <button type="button" onClick={onClose} className="rounded-md px-3 py-1.5 text-xs" style={{ color: "hsl(240 8% 70%)" }}>Cancelar</button>
           <button type="button" onClick={() => onSubmit(text.trim())} disabled={text.trim() === "" || text.trim() === initial || isPending} className="rounded-md px-4 py-1.5 text-xs font-medium disabled:opacity-50" style={{ background: "#00d46a", color: "#03170a" }}>
             {isPending ? "Salvando…" : "Salvar"}
@@ -4781,7 +4781,7 @@ function MessageInfoDialog({
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
-        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
+        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--border-default)" }}>
           <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Informações da mensagem</h3>
           <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "var(--text-3)" }}>
             <X className="h-4 w-4" />
@@ -4852,7 +4852,7 @@ function StatusCard({
       <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest" style={{ color }}>
         {icon} {label}
       </div>
-      <div className="mt-0.5 text-xs" style={{ color: when ? "hsl(240 15% 88%)" : "hsl(240 8% 50%)" }}>
+      <div className="mt-0.5 text-xs" style={{ color: when ? "var(--text-1)" : "var(--text-3)" }}>
         {when ? new Date(when).toLocaleString("pt-BR") : "Aguardando"}
       </div>
     </div>
@@ -4910,7 +4910,7 @@ function EmojiPickerPanel({ onPick, onClose }: { onPick: (e: string) => void; on
         maxHeight: 360,
       }}
     >
-      <div className="p-2 border-b" style={{ borderColor: "hsl(240 12% 14%)" }}>
+      <div className="p-2 border-b" style={{ borderColor: "var(--border-default)" }}>
         <input
           type="text"
           value={search}
@@ -5052,7 +5052,7 @@ function SnoozeDialog({
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}>
       <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
-        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
+        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--border-default)" }}>
           <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Colocar em soneca</h3>
           <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "var(--text-3)" }}>
             <X className="h-4 w-4" />
@@ -5076,7 +5076,7 @@ function SnoozeDialog({
               </span>
             </button>
           ))}
-          <div className="border-t pt-3 mt-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
+          <div className="border-t pt-3 mt-3" style={{ borderColor: "var(--border-default)" }}>
             <div className="text-[10px] font-medium uppercase tracking-widest mb-1" style={{ color: "var(--text-3)" }}>
               Personalizar
             </div>

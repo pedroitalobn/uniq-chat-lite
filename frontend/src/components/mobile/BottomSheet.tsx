@@ -92,7 +92,7 @@ export function BottomSheet({
               backdropFilter: "blur(28px) saturate(200%)",
               WebkitBackdropFilter: "blur(28px) saturate(200%)",
               borderTop: "1px solid var(--border-default)",
-              boxShadow: "0 -16px 48px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08)",
+              boxShadow: "0 -16px 48px rgba(0,0,0,0.55), inset 0 1px 0 var(--border-default)",
               maxHeight,
               paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
               transform: `translateY(${dragY}px)`,
@@ -110,7 +110,7 @@ export function BottomSheet({
                 onTouchMove={onTouchMove}
                 onTouchEnd={onTouchEnd}
               >
-                <div className="w-10 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }} />
+                <div className="w-10 h-1 rounded-full" style={{ background: "var(--border-strong)" }} />
               </div>
             )}
             {title && (
@@ -122,7 +122,7 @@ export function BottomSheet({
                 <button
                   onClick={onClose}
                   className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ background: "rgba(255,255,255,0.06)", color: "var(--text-2)" }}
+                  style={{ background: "var(--border-subtle)", color: "var(--text-2)" }}
                   aria-label="Fechar"
                 >
                   <X className="w-4 h-4" />

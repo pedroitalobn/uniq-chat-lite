@@ -302,7 +302,7 @@ export function TemplatePicker({
                   >
                     <div
                       className="flex items-center gap-1.5 text-xs font-medium"
-                      style={{ color: active ? "#00d46a" : "hsl(240 15% 90%)" }}
+                      style={{ color: active ? "#00d46a" : "var(--text-1)" }}
                     >
                       {tpl.name}
                       <span

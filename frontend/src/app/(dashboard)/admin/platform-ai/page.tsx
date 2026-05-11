@@ -20,17 +20,17 @@ import { toast } from "sonner";
 
 // ─── Dark theme tokens (inline — avoids Tailwind CSS var conflicts) ──────────
 const T = {
-  bg:       "hsl(240 18% 6%)",
+  bg:       "var(--surface-solid)",
   card:     "hsl(240 14% 10%)",
-  card2:    "hsl(240 12% 13%)",
-  border:   "rgba(255,255,255,0.07)",
+  card2:    "var(--border-default)",
+  border:   "var(--border-default)",
   text1:    "rgba(255,255,255,0.92)",
   text2:    "rgba(255,255,255,0.55)",
-  text3:    "rgba(255,255,255,0.30)",
+  text3:    "var(--border-strong)",
   violet:   "#8b5cf6",
   green:    "#00d46a",
   red:      "#f87171",
-  input:    "hsl(240 12% 15%)",
+  input:    "var(--border-default)",
 } as const;
 
 const PROVIDERS = [
@@ -95,7 +95,7 @@ function ActiveBadge({ active }: { active: boolean }) {
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 4,
       padding: "1px 8px", borderRadius: 99, fontSize: 11, fontWeight: 600,
-      background: active ? "rgba(0,212,106,0.08)" : "rgba(255,255,255,0.05)",
+      background: active ? "rgba(0,212,106,0.08)" : "var(--input)",
       color: active ? T.green : T.text2,
       border: `1px solid ${active ? "rgba(0,212,106,0.20)" : T.border}`,
     }}>
@@ -184,7 +184,7 @@ function Toggle({ checked, onChange, label, hint }: {
           position: "relative", display: "inline-flex", flexShrink: 0,
           width: 36, height: 20, borderRadius: 99,
           border: "none", cursor: "pointer",
-          background: checked ? T.violet : "rgba(255,255,255,0.12)",
+          background: checked ? T.violet : "var(--border-strong)",
           transition: "background 0.2s",
         }}
       >

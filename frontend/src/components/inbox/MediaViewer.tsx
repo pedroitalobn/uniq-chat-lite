@@ -359,7 +359,7 @@ function ToolBtn({
       aria-label={title}
       className="flex items-center justify-center rounded-lg p-2 transition-colors"
       style={{
-        color: intent === "close" ? "hsl(240 15% 90%)" : "hsl(240 8% 65%)",
+        color: intent === "close" ? "var(--text-1)" : "hsl(240 8% 65%)",
         background: "var(--surface-2)",
         border: "1px solid var(--border-default)",
       }}
@@ -369,7 +369,7 @@ function ToolBtn({
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "var(--surface-2)";
-        e.currentTarget.style.color = intent === "close" ? "hsl(240 15% 90%)" : "hsl(240 8% 65%)";
+        e.currentTarget.style.color = intent === "close" ? "var(--text-1)" : "hsl(240 8% 65%)";
       }}
     >
       {children}

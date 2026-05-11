@@ -69,23 +69,23 @@ export function AudioPlayer({ url, className, variant = "in" }: Props) {
   const colors = variant === "out"
     ? {
         bg: "#005c4b",
-        playBg: "#ffffff",
+        playBg: "var(--text-1)",
         playFg: "#005c4b",
         barIdle: "rgba(255,255,255,0.35)",
-        barActive: "#ffffff",
-        text: "rgba(255,255,255,0.85)",
-        speedBg: "rgba(255,255,255,0.18)",
-        speedFg: "#ffffff",
+        barActive: "var(--text-1)",
+        text: "var(--text-1)",
+        speedBg: "var(--border-strong)",
+        speedFg: "var(--text-1)",
       }
     : {
         bg: "#1f2c34",
         playBg: "#00a884",
-        playFg: "#ffffff",
+        playFg: "var(--text-1)",
         barIdle: "rgba(255,255,255,0.25)",
         barActive: "#53bdeb",
         text: "rgba(255,255,255,0.7)",
-        speedBg: "rgba(255,255,255,0.12)",
-        speedFg: "#ffffff",
+        speedBg: "var(--border-strong)",
+        speedFg: "var(--text-1)",
       };
 
   useEffect(() => {

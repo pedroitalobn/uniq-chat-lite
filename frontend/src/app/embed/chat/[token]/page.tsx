@@ -204,7 +204,7 @@ export default function EmbedChatPage() {
           alignItems: "center",
           justifyContent: "center",
           height: "100vh",
-          background: "#ffffff",
+          background: "var(--text-1)",
           fontFamily:
             "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         }}
@@ -234,7 +234,7 @@ export default function EmbedChatPage() {
           alignItems: "center",
           justifyContent: "center",
           height: "100vh",
-          background: "#ffffff",
+          background: "var(--text-1)",
           fontFamily:
             "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
           padding: 24,
@@ -266,7 +266,7 @@ export default function EmbedChatPage() {
         display: "flex",
         flexDirection: "column",
         height: "100vh",
-        background: "#ffffff",
+        background: "var(--text-1)",
         fontFamily:
           "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
         overflow: "hidden",
@@ -291,7 +291,7 @@ export default function EmbedChatPage() {
             height: 36,
             borderRadius: "50%",
             background: "rgba(255,255,255,0.25)",
-            border: "2px solid rgba(255,255,255,0.40)",
+            border: "2px solid var(--text-3)",
             overflow: "hidden",
             display: "flex",
             alignItems: "center",
@@ -309,7 +309,7 @@ export default function EmbedChatPage() {
               }}
             />
           ) : (
-            <span style={{ color: "#ffffff", fontSize: 16 }}>💬</span>
+            <span style={{ color: "var(--text-1)", fontSize: 16 }}>💬</span>
           )}
         </div>
 
@@ -317,7 +317,7 @@ export default function EmbedChatPage() {
         <div style={{ flex: 1, minWidth: 0 }}>
           <p
             style={{
-              color: "#ffffff",
+              color: "var(--text-1)",
               fontWeight: 700,
               fontSize: 15,
               margin: 0,
@@ -328,7 +328,7 @@ export default function EmbedChatPage() {
           </p>
           <p
             style={{
-              color: "rgba(255,255,255,0.80)",
+              color: "var(--text-2)",
               fontSize: 11,
               margin: 0,
               lineHeight: 1.2,
@@ -384,7 +384,7 @@ export default function EmbedChatPage() {
                   padding: "10px 14px",
                   borderRadius: isUser ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
                   background: isUser ? primaryColor : "#f3f4f6",
-                  color: isUser ? "#ffffff" : "#1f2937",
+                  color: isUser ? "var(--text-1)" : "#1f2937",
                   fontSize: 14,
                   lineHeight: 1.5,
                   wordBreak: "break-word",
@@ -422,7 +422,7 @@ export default function EmbedChatPage() {
         style={{
           padding: "10px 12px",
           borderTop: "1px solid #e5e7eb",
-          background: "#ffffff",
+          background: "var(--text-1)",
           flexShrink: 0,
         }}
       >

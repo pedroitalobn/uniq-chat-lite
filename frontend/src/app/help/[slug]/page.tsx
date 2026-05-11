@@ -97,8 +97,8 @@ function ArticleCard({
         style={{
           padding: "20px 22px",
           borderRadius: 16,
-          background: isLight ? "#fff" : "rgba(255,255,255,0.03)",
-          border: isLight ? "1px solid rgba(0,0,0,0.06)" : "1px solid rgba(255,255,255,0.06)",
+          background: isLight ? "var(--text-1)" : "var(--input)",
+          border: isLight ? "1px solid rgba(0,0,0,0.06)" : "1px solid var(--border-subtle)",
           cursor: "pointer",
           transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
           position: "relative" as const,
@@ -305,20 +305,20 @@ export default function HelpCenterPage({
 
   const t = {
     bg: isLight ? "#f8fafc" : "#08090d",
-    surface: isLight ? "#ffffff" : "rgba(255,255,255,0.03)",
-    surfaceHover: isLight ? "#f1f5f9" : "rgba(255,255,255,0.05)",
-    border: isLight ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.06)",
-    borderStrong: isLight ? "rgba(0,0,0,0.10)" : "rgba(255,255,255,0.10)",
+    surface: isLight ? "var(--text-1)" : "var(--input)",
+    surfaceHover: isLight ? "#f1f5f9" : "var(--input)",
+    border: isLight ? "rgba(0,0,0,0.06)" : "var(--border-subtle)",
+    borderStrong: isLight ? "rgba(0,0,0,0.10)" : "var(--border-default)",
     text: isLight ? "#0f172a" : "#f1f5f9",
     text2: isLight ? "#475569" : "#94a3b8",
     text3: isLight ? "#94a3b8" : "#64748b",
     glass: isLight
       ? "rgba(255,255,255,0.70)"
-      : "rgba(255,255,255,0.04)",
+      : "var(--input)",
     glassBorder: isLight
       ? "rgba(0,0,0,0.06)"
-      : "rgba(255,255,255,0.06)",
-    inputBg: isLight ? "#f1f5f9" : "rgba(255,255,255,0.04)",
+      : "var(--border-subtle)",
+    inputBg: isLight ? "#f1f5f9" : "var(--input)",
   };
 
   const filteredArticles = searchResults ?? (selectedCat
@@ -760,7 +760,7 @@ export default function HelpCenterPage({
                   borderRadius: 10,
                   border: "none",
                   background: color,
-                  color: "#000",
+                  color: "var(--text-1)",
                   fontWeight: 600,
                   fontSize: 12,
                   cursor: "pointer",
@@ -874,7 +874,7 @@ export default function HelpCenterPage({
                 border: "none",
                 borderRadius: 20,
                 boxShadow: `0 12px 48px rgba(0,0,0,0.30), 0 0 0 1px ${t.border}`,
-                background: "#fff",
+                background: "var(--text-1)",
                 animation: "hc-fade-up 0.25s ease",
               }}
               allow="microphone"
@@ -889,7 +889,7 @@ export default function HelpCenterPage({
               borderRadius: "50%",
               border: "none",
               background: `linear-gradient(135deg, ${color}, ${color}dd)`,
-              color: "#000",
+              color: "var(--text-1)",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",

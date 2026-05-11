@@ -1019,7 +1019,7 @@ export function MentionPicker({
           onMouseDown={(e) => { e.preventDefault(); /* evita blur do editor */ }}
         >
           {/* Header com label + search */}
-          <div className="px-3 pt-2.5 pb-2" style={{ borderBottom: "1px solid hsl(240 12% 14%)" }}>
+          <div className="px-3 pt-2.5 pb-2" style={{ borderBottom: "1px solid var(--border-default)" }}>
             <div className="flex items-center gap-1.5 mb-1.5 text-[10px] uppercase tracking-wider"
               style={{ color: "hsl(240 8% 48%)" }}>
               {picker.mode === "followUp" ? (

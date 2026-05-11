@@ -236,7 +236,7 @@ export function UniqAIIsland() {
           ? "1px solid rgba(0,212,106,0.35)"
           : "1px solid var(--border-default)",
         boxShadow: isExpanded
-          ? "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,212,106,0.2), inset 0 1px 0 rgba(255,255,255,0.06)"
+          ? "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,212,106,0.2), inset 0 1px 0 var(--border-subtle)"
           : "0 8px 32px rgba(0,0,0,0.5), inset 0 0 0 1px var(--border-default)",
         transition: "background 0.2s, border-color 0.2s, box-shadow 0.2s",
       }}
@@ -276,7 +276,7 @@ export function UniqAIIsland() {
                 return pref ? (
                   <span
                     className="text-[9px] font-medium px-1.5 py-0.5 rounded truncate max-w-[100px]"
-                    style={{ background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.65)" }}
+                    style={{ background: "var(--border-strong)", color: "rgba(255,255,255,0.65)" }}
                   >
                     {pref.model || pref.integrationName}
                   </span>
@@ -310,13 +310,13 @@ export function UniqAIIsland() {
             a.href ? (
               <a key={i} href={a.href} onClick={dismissNotification}
                 className="text-[11px] font-medium px-2.5 py-1 rounded-full whitespace-nowrap"
-                style={{ background: "rgba(255,255,255,0.12)", color: "white" }}>
+                style={{ background: "var(--border-strong)", color: "white" }}>
                 {a.label}
               </a>
             ) : (
               <button key={i} onClick={() => { a.onClick?.(); dismissNotification(); }}
                 className="text-[11px] font-medium px-2.5 py-1 rounded-full whitespace-nowrap"
-                style={{ background: "rgba(255,255,255,0.12)", color: "white" }}>
+                style={{ background: "var(--border-strong)", color: "white" }}>
                 {a.label}
               </button>
             )

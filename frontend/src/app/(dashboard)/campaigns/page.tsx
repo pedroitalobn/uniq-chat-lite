@@ -627,7 +627,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                       className={`flex flex-col gap-2.5 p-4 rounded-xl border text-left transition-all`}
                       style={isSelected
                         ? { background: `rgba(${meta.color === "#25d366" ? "37,211,102" : meta.color === "#0088ff" ? "0,136,255" : meta.color === "#e1306c" ? "225,48,108" : "44,165,224"},0.1)`, borderColor: meta.color + "40", boxShadow: `0 0 0 1px ${meta.color}25` }
-                        : { background: "var(--surface-2)", borderColor: "hsl(240 12% 14%)" }}>
+                        : { background: "var(--surface-2)", borderColor: "var(--border-default)" }}>
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-lg flex items-center justify-center"
                           style={{ background: meta.color + "20" }}>
@@ -684,13 +684,13 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                     className="w-full flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all"
                     style={isSelected
                       ? { background: action.color + "12", borderColor: action.color + "35" }
-                      : { background: "var(--surface-2)", borderColor: "hsl(240 12% 14%)" }}>
+                      : { background: "var(--surface-2)", borderColor: "var(--border-default)" }}>
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                       style={{ background: action.color + "20" }}>
                       <Icon className="w-4 h-4" style={{ color: action.color }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium" style={{ color: isSelected ? action.color : "hsl(240 15% 85%)" }}>
+                      <p className="text-xs font-medium" style={{ color: isSelected ? action.color : "var(--text-1)" }}>
                         {action.label}
                       </p>
                       <p className="text-[10px] mt-0.5" style={{ color: "hsl(240 8% 46%)" }}>
@@ -758,7 +758,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
 
                   {/* Toggle pra exibir filtros manuais quando não tem segmento salvo
                       ou quando o user quer combinar. */}
-                  <details className="rounded-xl" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <details className="rounded-xl" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border-subtle)" }}>
                     <summary className="cursor-pointer px-3.5 py-2.5 text-xs font-medium" style={{ color: "var(--text-2)" }}>
                       Ou filtre manualmente (funil, tags, compras...)
                     </summary>
@@ -805,7 +805,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                               className="text-[11px] px-2.5 py-1 rounded-full border transition-all"
                               style={sel
                                 ? { background: "rgba(168,85,247,0.15)", borderColor: "rgba(168,85,247,0.3)", color: "#a855f7" }
-                                : { background: "var(--surface-2)", borderColor: "hsl(240 12% 14%)", color: "hsl(240 8% 52%)" }}>
+                                : { background: "var(--surface-2)", borderColor: "var(--border-default)", color: "hsl(240 8% 52%)" }}>
                               {tag.name}
                             </button>
                           );
@@ -921,7 +921,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                       )}
                     </div>
                   ) : (
-                    <div className="rounded-xl p-3 text-center" style={{ background: "var(--surface-2)", border: "1px dashed hsl(240 12% 14%)" }}>
+                    <div className="rounded-xl p-3 text-center" style={{ background: "var(--surface-2)", border: "1px dashed var(--border-default)" }}>
                       <p className="text-xs" style={{ color: "hsl(240 8% 36%)" }}>Aplique filtros para prévia de contatos</p>
                     </div>
                   )}
@@ -1054,7 +1054,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                         </button>
                       </div>
                     ) : filtered.length === 0 ? (
-                      <div className="rounded-xl py-6 px-4 text-center space-y-2" style={{ border: "1px dashed hsl(240 12% 16%)" }}>
+                      <div className="rounded-xl py-6 px-4 text-center space-y-2" style={{ border: "1px dashed var(--border-default)" }}>
                         <p className="text-xs" style={{ color: "var(--text-4)" }}>
                           {groups.length === 0
                             ? (groupsHint || "Esta instância não está em nenhum grupo. Adicione o número aos grupos antes de criar a campanha.")
@@ -1085,7 +1085,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all"
                               style={sel
                                 ? { background: "rgba(0,212,106,0.06)", borderColor: "rgba(0,212,106,0.2)" }
-                                : { background: "var(--surface-2)", borderColor: "hsl(240 12% 13%)" }}>
+                                : { background: "var(--surface-2)", borderColor: "var(--border-default)" }}>
                               <div className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center"
                                 style={sel
                                   ? { background: "rgba(0,212,106,0.2)", border: "1px solid rgba(0,212,106,0.4)" }
@@ -1225,7 +1225,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                           className="flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl border text-xs font-medium transition-all"
                           style={msgType === value
                             ? { background: "rgba(0,212,106,0.08)", borderColor: "rgba(0,212,106,0.25)", color: "var(--green)" }
-                            : { background: "var(--surface-2)", borderColor: "hsl(240 12% 14%)", color: "hsl(240 8% 48%)" }}>
+                            : { background: "var(--surface-2)", borderColor: "var(--border-default)", color: "hsl(240 8% 48%)" }}>
                           <Icon className="w-4 h-4" />
                           {label}
                         </button>
@@ -1261,7 +1261,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                       </label>
                       <div
                         className="rounded-xl p-4 flex flex-col items-center gap-2 cursor-pointer"
-                        style={{ border: `2px dashed ${mediaFile ? "var(--green)" : "hsl(240 12% 16%)"}`, background: mediaFile ? "rgba(0,212,106,0.04)" : "var(--surface-2)" }}
+                        style={{ border: `2px dashed ${mediaFile ? "var(--green)" : "var(--border-default)"}`, background: mediaFile ? "rgba(0,212,106,0.04)" : "var(--surface-2)" }}
                         onClick={() => fileRef.current?.click()}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) setMediaFile(f); }}>
@@ -1496,7 +1496,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                 )}
                 {postActions.map((a, idx) => (
                   <div key={idx} className="rounded-lg p-2 space-y-1.5"
-                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    style={{ background: "var(--input)", border: "1px solid var(--border-default)" }}>
                     <div className="flex gap-2 items-center">
                       <select
                         value={a.type}
@@ -1593,20 +1593,20 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
 // ─── Glass style constants ─────────────────────────────────────────────────────
 
 const glassCard: React.CSSProperties = {
-  background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+  background: "linear-gradient(135deg, var(--border-default) 0%, rgba(255,255,255,0.02) 100%)",
   backdropFilter: "blur(20px) saturate(180%)",
   WebkitBackdropFilter: "blur(20px) saturate(180%)",
-  border: "1px solid rgba(255,255,255,0.10)",
+  border: "1px solid var(--border-default)",
   borderRadius: "20px",
-  boxShadow: "0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.10)",
+  boxShadow: "0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 var(--border-default)",
   transition: "all 0.35s cubic-bezier(0.16,1,0.3,1)",
 };
 
 const glassPill: React.CSSProperties = {
-  background: "rgba(255,255,255,0.06)",
+  background: "var(--border-subtle)",
   backdropFilter: "blur(8px)",
   WebkitBackdropFilter: "blur(8px)",
-  border: "1px solid rgba(255,255,255,0.10)",
+  border: "1px solid var(--border-default)",
   borderRadius: "10px",
 };
 
@@ -1615,7 +1615,7 @@ const glassBtn: React.CSSProperties = {
   backdropFilter: "blur(12px)",
   WebkitBackdropFilter: "blur(12px)",
   border: "1px solid rgba(0,212,106,0.30)",
-  boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)",
+  boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 var(--border-strong)",
 };
 
 // ─── Variable Menu ──────────────────────────────────────────────────────────
@@ -1682,7 +1682,7 @@ function VariableMenu({ onPick }: { onPick: (expr: string) => void }) {
         className="px-2 py-1.5 rounded-md text-xs font-bold transition-colors"
         style={{
           background: open ? "rgba(0,212,106,0.15)" : "var(--surface-2)",
-          border: `1px solid ${open ? "rgba(0,212,106,0.30)" : "hsl(240 12% 16%)"}`,
+          border: `1px solid ${open ? "rgba(0,212,106,0.30)" : "var(--border-default)"}`,
           color: open ? "var(--green)" : "hsl(240 8% 70%)",
         }}
       >
@@ -1705,7 +1705,7 @@ function VariableMenu({ onPick }: { onPick: (expr: string) => void }) {
                   style={{
                     color: "var(--text-3)",
                     background: "hsl(240 14% 10%)",
-                    borderBottom: "1px solid hsl(240 12% 14%)",
+                    borderBottom: "1px solid var(--border-default)",
                   }}
                 >
                   {g.label}
@@ -1786,16 +1786,16 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
         border: isRunning
           ? "1px solid rgba(0,212,106,0.22)"
           : hovered
-            ? "1px solid rgba(255,255,255,0.14)"
-            : "1px solid rgba(255,255,255,0.08)",
+            ? "1px solid var(--border-strong)"
+            : "1px solid var(--border-default)",
         transition: "border-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease",
         ...(hovered ? {
           transform: "translateY(-2px)",
           boxShadow: isRunning
-            ? "0 12px 32px rgba(0,0,0,0.40), 0 0 24px rgba(0,212,106,0.10), inset 0 1px 0 rgba(255,255,255,0.12)"
-            : "0 12px 32px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.12)",
+            ? "0 12px 32px rgba(0,0,0,0.40), 0 0 24px rgba(0,212,106,0.10), inset 0 1px 0 var(--border-strong)"
+            : "0 12px 32px rgba(0,0,0,0.40), inset 0 1px 0 var(--border-strong)",
         } : isRunning ? {
-          boxShadow: "0 4px 20px rgba(0,212,106,0.12), inset 0 1px 0 rgba(255,255,255,0.08)",
+          boxShadow: "0 4px 20px rgba(0,212,106,0.12), inset 0 1px 0 var(--border-default)",
         } : {}),
       }}
       onMouseEnter={() => setHovered(true)}
@@ -1805,7 +1805,7 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
       <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
         style={{ background: isRunning
           ? "linear-gradient(90deg, transparent, rgba(0,212,106,0.45), transparent)"
-          : "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)" }} />
+          : "linear-gradient(90deg, transparent, var(--border-strong), transparent)" }} />
       {/* Running live indicator */}
       {isRunning && (
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
@@ -1881,7 +1881,7 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
             </span>
           </div>
           {/* Segmented progress bar */}
-          <div className="h-2 rounded-full overflow-hidden flex gap-px" style={{ background: "rgba(255,255,255,0.06)" }}>
+          <div className="h-2 rounded-full overflow-hidden flex gap-px" style={{ background: "var(--border-subtle)" }}>
             {campaign.sent_count > 0 && (
               <div className="h-full rounded-full transition-all duration-700"
                 style={{
@@ -1919,7 +1919,7 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
           <Link href={`/campaigns/${campaign.id}`}
             className="flex-1 text-center text-xs font-medium py-2 px-3 rounded-xl transition-all"
             style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 62%)" }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--surface-3)"; (e.currentTarget as HTMLElement).style.color = "hsl(240 15% 90%)"; }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--surface-3)"; (e.currentTarget as HTMLElement).style.color = "var(--text-1)"; }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "var(--surface-2)"; (e.currentTarget as HTMLElement).style.color = "hsl(240 8% 62%)"; }}>
             Detalhes
           </Link>
@@ -2121,7 +2121,7 @@ function CampaignTemplateCards({ onSelect }: { onSelect: (t: typeof CAMPAIGN_TEM
             }}
           >
             <div className="flex justify-center pt-2 pb-1">
-              <div className="w-10 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }} />
+              <div className="w-10 h-1 rounded-full" style={{ background: "var(--border-strong)" }} />
             </div>
             <div className="flex items-center justify-between px-5 pb-3"
               style={{ borderBottom: "1px solid var(--border-subtle)" }}>
@@ -2131,7 +2131,7 @@ function CampaignTemplateCards({ onSelect }: { onSelect: (t: typeof CAMPAIGN_TEM
               <button
                 onClick={() => setMobileSheetOpen(false)}
                 className="w-8 h-8 rounded-full flex items-center justify-center"
-                style={{ background: "rgba(255,255,255,0.06)", color: "var(--text-3)" }}
+                style={{ background: "var(--border-subtle)", color: "var(--text-3)" }}
                 aria-label="Fechar"
               >
                 ✕

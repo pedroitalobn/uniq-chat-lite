@@ -175,7 +175,7 @@ export function AudioHoldButton({
         <span className="text-sm font-mono tabular-nums flex-shrink-0" style={{ color: "#ef4444" }}>
           {fmt(seconds)}
         </span>
-        <span className="flex-1 text-xs truncate text-right" style={{ color: willCancel ? "#ef4444" : "hsl(240 8% 60%)" }}>
+        <span className="flex-1 text-xs truncate text-right" style={{ color: willCancel ? "#ef4444" : "var(--text-3)" }}>
           {willCancel ? "Solte para cancelar" : "← deslize para cancelar"}
         </span>
         {willCancel && <Trash2 className="h-4 w-4 flex-shrink-0" style={{ color: "#ef4444" }} />}

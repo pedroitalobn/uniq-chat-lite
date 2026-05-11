@@ -32,10 +32,10 @@ const TOOL_ITEMS: NavItem[] = [
 ];
 
 const glassPanel: React.CSSProperties = {
-  background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+  background: "linear-gradient(135deg, var(--border-subtle) 0%, rgba(255,255,255,0.02) 100%)",
   backdropFilter: "blur(16px) saturate(180%)",
   WebkitBackdropFilter: "blur(16px) saturate(180%)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  border: "1px solid var(--border-default)",
 };
 
 export function CRMNav() {
@@ -94,8 +94,8 @@ export function CRMNav() {
                 <div
                   className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                   style={{
-                    background: active ? "rgba(0,212,106,0.18)" : "rgba(255,255,255,0.04)",
-                    border: `1px solid ${active ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.06)"}`,
+                    background: active ? "rgba(0,212,106,0.18)" : "var(--input)",
+                    border: `1px solid ${active ? "rgba(0,212,106,0.25)" : "var(--border-subtle)"}`,
                   }}
                 >
                   <Icon className="w-3.5 h-3.5" style={{ color: active ? "var(--green)" : "var(--text-3)" }} />
@@ -137,8 +137,8 @@ export function CRMNav() {
                 <div
                   className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
                   style={{
-                    background: active ? "rgba(0,212,106,0.18)" : "rgba(255,255,255,0.04)",
-                    border: `1px solid ${active ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.06)"}`,
+                    background: active ? "rgba(0,212,106,0.18)" : "var(--input)",
+                    border: `1px solid ${active ? "rgba(0,212,106,0.25)" : "var(--border-subtle)"}`,
                   }}
                 >
                   <Icon className="w-3 h-3" style={{ color: active ? "var(--green)" : "var(--text-3)" }} />

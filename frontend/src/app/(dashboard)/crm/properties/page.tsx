@@ -55,8 +55,8 @@ export default function PropertiesPage() {
                   style={{
                     background: active
                       ? "linear-gradient(135deg, rgba(0,212,106,0.18), rgba(0,212,106,0.06))"
-                      : "rgba(255,255,255,0.04)",
-                    border: active ? "1px solid rgba(0,212,106,0.25)" : "1px solid rgba(255,255,255,0.08)",
+                      : "var(--input)",
+                    border: active ? "1px solid rgba(0,212,106,0.25)" : "1px solid var(--border-default)",
                     color: active ? "var(--green)" : "var(--text-2)",
                   }}
                 >
@@ -72,10 +72,10 @@ export default function PropertiesPage() {
       <div
         className="rounded-2xl p-4 sm:p-5"
         style={{
-          background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)",
+          background: "linear-gradient(135deg, var(--input) 0%, rgba(255,255,255,0.01) 100%)",
           backdropFilter: "blur(16px) saturate(180%)",
           WebkitBackdropFilter: "blur(16px) saturate(180%)",
-          border: "1px solid rgba(255,255,255,0.06)",
+          border: "1px solid var(--border-subtle)",
         }}
       >
         {tab === "funnels" && <FunnelManagerPanel workspaceId={wsId} />}
@@ -132,8 +132,8 @@ function TagsPanel({ wsId }: { wsId?: string }) {
               onKeyDown={(e) => e.key === "Enter" && name.trim() && createTag.mutate()}
               className="w-full rounded-xl px-3 py-2 text-sm outline-none"
               style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                background: "var(--input)",
+                border: "1px solid var(--border-default)",
                 color: "var(--text-1)",
               }}
             />
@@ -168,7 +168,7 @@ function TagsPanel({ wsId }: { wsId?: string }) {
         </h3>
         {tags.length === 0 ? (
           <p className="text-xs py-6 text-center rounded-xl"
-            style={{ color: "var(--text-3)", background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.08)" }}>
+            style={{ color: "var(--text-3)", background: "rgba(255,255,255,0.02)", border: "1px dashed var(--border-default)" }}>
             Nenhuma tag ainda. Crie a primeira acima.
           </p>
         ) : (

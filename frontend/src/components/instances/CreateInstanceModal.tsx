@@ -310,7 +310,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
         style={{
           background: "var(--surface-solid)",
           border: "1px solid var(--border)",
-          boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 32px 80px rgba(0,0,0,0.6)",
+          boxShadow: "0 0 0 1px var(--border-default), 0 32px 80px rgba(0,0,0,0.6)",
         }}
       >
         {/* Header */}
@@ -416,7 +416,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
             {/* Instagram challenge verification */}
             {selectedChannel === "instagram" && challenge && (
               <>
-                <div className="border-t pt-3" style={{ borderColor: "hsl(240 12% 13%)" }}>
+                <div className="border-t pt-3" style={{ borderColor: "var(--border-default)" }}>
                   <p className="text-xs font-medium mb-2" style={{ color: "#e1306c" }}>
                     Verificação do Instagram ({challenge.challenge_type || "código"})
                   </p>
@@ -480,7 +480,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
             {/* Instagram/TikTok credentials */}
             {isSocial && !challenge && (
               <>
-                <div className="border-t pt-3" style={{ borderColor: "hsl(240 12% 13%)" }}>
+                <div className="border-t pt-3" style={{ borderColor: "var(--border-default)" }}>
                   <p className="text-xs font-medium mb-2 flex items-center gap-1.5" style={{ color: ch.color }}>
                     <User className="w-3 h-3" />
                     Credenciais da conta {ch.label}

@@ -457,7 +457,7 @@ export default function RolesPage() {
                       onClick={() => startEdit(role)}
                       className="p-2 rounded-lg transition-colors"
                       style={{ color: "hsl(240 8% 32%)" }}
-                      onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 8% 55%)")}
+                      onMouseEnter={e => (e.currentTarget.style.color = "var(--text-3)")}
                       onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 32%)")}
                     >
                       <Pencil className="w-4 h-4" />

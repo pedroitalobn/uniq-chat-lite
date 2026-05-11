@@ -146,7 +146,7 @@ export default function CampaignDetailPage() {
         <Link href="/campaigns"
           className="p-2 rounded-xl transition-all"
           style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 46%)" }}
-          onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 15% 90%)")}
+          onMouseEnter={e => (e.currentTarget.style.color = "var(--text-1)")}
           onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 46%)")}
         >
           <ArrowLeft className="w-4 h-4" />
@@ -248,7 +248,7 @@ export default function CampaignDetailPage() {
         </div>
 
         {/* Message + schedule info */}
-        <div className="mt-4 pt-4 border-t space-y-3" style={{ borderColor: "hsl(240 12% 11%)" }}>
+        <div className="mt-4 pt-4 border-t space-y-3" style={{ borderColor: "var(--border-subtle)" }}>
           <div className="flex items-start gap-3">
             {(() => { const MsgIcon = MSG_ICON[campaign.message_type] ?? MessageSquare; return <MsgIcon className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "var(--text-4)" }} />; })()}
             <div className="flex-1 min-w-0">

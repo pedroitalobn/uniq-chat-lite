@@ -493,7 +493,7 @@ export default function OnboardingPage() {
                   ? { width: 20, height: 6, backgroundColor: "rgb(52,211,153)", opacity: [1, 0.6, 1] }
                   : s < step
                   ? { width: 6, height: 6, backgroundColor: "rgb(52,211,153)", opacity: 0.9 }
-                  : { width: 6, height: 6, backgroundColor: "rgba(255,255,255,0.15)", opacity: 1 }
+                  : { width: 6, height: 6, backgroundColor: "var(--border-strong)", opacity: 1 }
               }
               transition={
                 step === s
@@ -547,8 +547,8 @@ export default function OnboardingPage() {
                   <div
                     className="max-w-[78%] px-4 py-2.5 rounded-2xl rounded-bl-sm text-sm text-white/90 leading-relaxed"
                     style={{
-                      background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.04) 100%)",
-                      border: "1px solid rgba(255,255,255,0.09)",
+                      background: "linear-gradient(135deg, var(--border-default) 0%, var(--input) 100%)",
+                      border: "1px solid var(--border-default)",
                     }}
                   >
                     {msg.text.replace(/\*\*(.*?)\*\*/g, "$1")}
@@ -622,7 +622,7 @@ export default function OnboardingPage() {
                 <div className="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
                   <div className="w-2 h-2 rounded-full bg-emerald-400" />
                 </div>
-                <div className="px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1.5" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.09)" }}>
+                <div className="px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1.5" style={{ background: "var(--border-subtle)", border: "1px solid var(--border-default)" }}>
                   <span className="text-sm text-white/60">📱 Aguardando conexão</span>
                   {[0, 1, 2].map((i) => (
                     <motion.span key={i} className="w-1 h-1 rounded-full bg-white/50 inline-block" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.25 }} />
@@ -655,8 +655,8 @@ export default function OnboardingPage() {
                       style={{
                         background: selected
                           ? "linear-gradient(135deg, rgba(52,211,153,0.12) 0%, rgba(16,185,129,0.08) 100%)"
-                          : "rgba(255,255,255,0.04)",
-                        border: selected ? "1px solid rgba(52,211,153,0.3)" : "1px solid rgba(255,255,255,0.08)",
+                          : "var(--input)",
+                        border: selected ? "1px solid rgba(52,211,153,0.3)" : "1px solid var(--border-default)",
                       }}
                     >
                       <span className="text-xl flex-shrink-0">{jt.emoji}</span>
@@ -698,8 +698,8 @@ export default function OnboardingPage() {
                     transition={{ delay: i * 0.06 }}
                     onClick={() => handleNicheSelect(niche)}
                     className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-all duration-200"
-                    style={{ background: "var(--input)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.75)" }}
-                    whileHover={{ scale: 1.04, background: "rgba(52,211,153,0.1)", borderColor: "rgba(52,211,153,0.35)", color: "rgba(255,255,255,0.95)" } as any}
+                    style={{ background: "var(--input)", border: "1px solid var(--border-strong)", color: "var(--text-2)" }}
+                    whileHover={{ scale: 1.04, background: "rgba(52,211,153,0.1)", borderColor: "rgba(52,211,153,0.35)", color: "var(--text-1)" } as any}
                     whileTap={{ scale: 0.97 }}
                   >
                     <span>{niche.emoji}</span>
@@ -712,7 +712,7 @@ export default function OnboardingPage() {
             {/* Step 1: business name input */}
             {step === 1 && (
               <motion.div key="biz-name" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ type: "spring", stiffness: 320, damping: 28 }}>
-                <div className="flex items-center gap-2 rounded-2xl px-4 py-3" style={{ background: "var(--input)", border: "1px solid rgba(255,255,255,0.12)" }}>
+                <div className="flex items-center gap-2 rounded-2xl px-4 py-3" style={{ background: "var(--input)", border: "1px solid var(--border-strong)" }}>
                   <input
                     autoFocus
                     type="text"
@@ -726,7 +726,7 @@ export default function OnboardingPage() {
                     onClick={handleBusinessNameSubmit}
                     disabled={!businessNameInput.trim()}
                     className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 disabled:opacity-30"
-                    style={{ background: businessNameInput.trim() ? "linear-gradient(135deg,#10b981,#059669)" : "rgba(255,255,255,0.08)" }}
+                    style={{ background: businessNameInput.trim() ? "linear-gradient(135deg,#10b981,#059669)" : "var(--border-default)" }}
                   >
                     <Send className="w-3.5 h-3.5 text-white" />
                   </button>

@@ -79,8 +79,8 @@ export function RichTextEditor({
           "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2 " +
           "[&_p]:my-2 [&_p]:leading-relaxed " +
           "[&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 " +
-          "[&_blockquote]:border-l-2 [&_blockquote]:border-[rgba(255,255,255,0.15)] [&_blockquote]:pl-3 [&_blockquote]:italic " +
-          "[&_code]:bg-[rgba(255,255,255,0.06)] [&_code]:px-1 [&_code]:rounded [&_code]:text-[0.9em] " +
+          "[&_blockquote]:border-l-2 [&_blockquote]:border-[var(--border-strong)] [&_blockquote]:pl-3 [&_blockquote]:italic " +
+          "[&_code]:bg-[var(--border-subtle)] [&_code]:px-1 [&_code]:rounded [&_code]:text-[0.9em] " +
           "[&_pre]:bg-[rgba(0,0,0,0.45)] [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:overflow-x-auto " +
           "[&_iframe]:rounded-lg [&_iframe]:my-3 " +
           "[&_img]:rounded-lg [&_img]:my-3",
@@ -105,7 +105,7 @@ export function RichTextEditor({
     return (
       <div
         className="rounded-xl min-h-[400px] flex items-center justify-center"
-        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--text-3)" }}
+        style={{ background: "var(--input)", border: "1px solid var(--border-default)", color: "var(--text-3)" }}
       >
         Carregando editor…
       </div>
@@ -117,7 +117,7 @@ export function RichTextEditor({
       className="rounded-xl overflow-hidden"
       style={{
         background: "rgba(255,255,255,0.02)",
-        border: "1px solid rgba(255,255,255,0.10)",
+        border: "1px solid var(--border-default)",
       }}
     >
       <Toolbar editor={editor} />
@@ -260,7 +260,7 @@ function ToolbarButton({
       }}
       onMouseEnter={(e) => {
         if (disabled) return;
-        if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+        if (!active) e.currentTarget.style.background = "var(--border-subtle)";
       }}
       onMouseLeave={(e) => {
         if (!active) e.currentTarget.style.background = "transparent";
@@ -275,7 +275,7 @@ function Divider() {
   return (
     <span
       className="mx-1 inline-block"
-      style={{ width: 1, height: 18, background: "rgba(255,255,255,0.10)" }}
+      style={{ width: 1, height: 18, background: "var(--border-default)" }}
     />
   );
 }

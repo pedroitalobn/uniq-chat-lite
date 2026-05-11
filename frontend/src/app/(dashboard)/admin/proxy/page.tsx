@@ -333,7 +333,7 @@ function SetDefaultModal({
 
         <div className="flex gap-2 pt-2">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-medium"
-            style={{ background: "hsl(240 12% 15%)", color: "hsl(240 8% 70%)" }}>
+            style={{ background: "var(--border-default)", color: "hsl(240 8% 70%)" }}>
             Cancelar
           </button>
           <button onClick={() => onConfirm(selectedCountry)} className="flex-1 py-2.5 rounded-xl text-sm font-medium"
@@ -381,11 +381,11 @@ function DeleteModal({
 
         <div className="flex gap-2 pt-2">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-medium"
-            style={{ background: "hsl(240 12% 15%)", color: "hsl(240 8% 70%)" }}>
+            style={{ background: "var(--border-default)", color: "hsl(240 8% 70%)" }}>
             Cancelar
           </button>
           <button onClick={onConfirm} disabled={!confirming} className="flex-1 py-2.5 rounded-xl text-sm font-medium"
-            style={{ background: "#ef4444", color: "#fff", opacity: confirming ? 1 : 0.5 }}>
+            style={{ background: "#ef4444", color: "var(--text-1)", opacity: confirming ? 1 : 0.5 }}>
             Excluir
           </button>
         </div>
@@ -537,7 +537,7 @@ export default function AdminProxyPage() {
         <button
           onClick={() => setProxyModal({ open: true, proxy: null })}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
-          style={{ background: "var(--green)", color: "#000" }}
+          style={{ background: "var(--green)", color: "var(--text-1)" }}
         >
           + <span className="hidden sm:inline">Novo Proxy</span>
           <span className="sm:hidden">Novo</span>
@@ -564,7 +564,7 @@ export default function AdminProxyPage() {
             Proxies Configurados
           </h2>
           <div className="flex items-center gap-2">
-            <span className="text-xs px-2 py-1 rounded-lg" style={{ background: "hsl(240 12% 15%)", color: "var(--text-3)" }}>
+            <span className="text-xs px-2 py-1 rounded-lg" style={{ background: "var(--border-default)", color: "var(--text-3)" }}>
               {configs.length} proxy{configs.length !== 1 ? "s" : ""}
             </span>
             {configs.length > 0 && (
@@ -597,7 +597,7 @@ export default function AdminProxyPage() {
                     {/* Live status dot */}
                     <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 flex items-center justify-center"
                       style={{
-                        borderColor: "hsl(240 18% 6%)",
+                        borderColor: "var(--surface-solid)",
                         background: ts.status === "testing" ? "#facc15"
                           : ts.status === "ok" ? "#22c55e"
                           : ts.status === "fail" ? "#ef4444"
@@ -616,7 +616,7 @@ export default function AdminProxyPage() {
                         Padrão
                         </span>
                       )}
-                      <span className="ml-2 px-1.5 py-0.5 rounded text-[10px]" style={{ background: "hsl(240 12% 15%)", color: "var(--text-3)" }}>
+                      <span className="ml-2 px-1.5 py-0.5 rounded text-[10px]" style={{ background: "var(--border-default)", color: "var(--text-3)" }}>
                         {country.flag} {country.label}
                       </span>
                     </p>
@@ -678,7 +678,7 @@ export default function AdminProxyPage() {
             <button
               onClick={() => setProxyModal({ open: true, proxy: null })}
               className="mt-3 px-4 py-2 rounded-xl text-sm font-medium"
-              style={{ background: "var(--green)", color: "#000" }}
+              style={{ background: "var(--green)", color: "var(--text-1)" }}
             >
               + Novo Proxy
             </button>

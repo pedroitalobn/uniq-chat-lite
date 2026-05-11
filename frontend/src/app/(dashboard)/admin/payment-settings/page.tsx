@@ -343,7 +343,7 @@ export default function PaymentSettingsPage() {
                 }}
                 className="p-3 rounded-xl border-2 transition-all text-center relative"
                 style={{
-                  borderColor: isSelected ? provider.color : isActive ? "var(--green)" : isConfigured ? "hsl(240 12% 15%)" : "hsl(240 12% 10%)",
+                  borderColor: isSelected ? provider.color : isActive ? "var(--green)" : isConfigured ? "var(--border-default)" : "hsl(240 12% 10%)",
                   background: isSelected ? `${provider.color}10` : isActive ? "rgba(0,212,106,0.06)" : "transparent",
                   opacity: provider.id === "hotmart" ? 0.5 : (isConfigured ? 1 : 0.6),
                 }}
@@ -456,7 +456,7 @@ export default function PaymentSettingsPage() {
             </div>
           </div>
 
-          <div className="border-t" style={{ borderColor: "hsl(240 12% 15%)" }}>
+          <div className="border-t" style={{ borderColor: "var(--border-default)" }}>
             <div className="pt-4">
               <label className="text-xs block mb-2" style={{ color: "hsl(240 8% 46%)" }}>Tipo de Checkout</label>
               <div className="flex gap-3">
@@ -491,7 +491,7 @@ export default function PaymentSettingsPage() {
           </div>
 
           {/* Webhook URL */}
-          <div className="border-t pt-4" style={{ borderColor: "hsl(240 12% 15%)" }}>
+          <div className="border-t pt-4" style={{ borderColor: "var(--border-default)" }}>
             <label className="text-xs block mb-2" style={{ color: "hsl(240 8% 46%)" }}>URL do Webhook (para configurar no Stripe)</label>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 12% 10%)", color: "var(--text-3)" }}>
@@ -593,7 +593,7 @@ export default function PaymentSettingsPage() {
             </div>
           </div>
 
-          <div className="border-t" style={{ borderColor: "hsl(240 12% 15%)" }}>
+          <div className="border-t" style={{ borderColor: "var(--border-default)" }}>
             <div className="pt-4">
               <label className="text-xs block mb-2" style={{ color: "hsl(240 8% 46%)" }}>Tipo de Checkout</label>
               <div className="flex gap-3">
@@ -628,7 +628,7 @@ export default function PaymentSettingsPage() {
           </div>
 
           {/* Webhook URL */}
-          <div className="border-t pt-4" style={{ borderColor: "hsl(240 12% 15%)" }}>
+          <div className="border-t pt-4" style={{ borderColor: "var(--border-default)" }}>
             <label className="text-xs block mb-2" style={{ color: "hsl(240 8% 46%)" }}>URL do Webhook (para configurar no Asaas)</label>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 12% 10%)", color: "var(--text-3)" }}>
@@ -746,7 +746,7 @@ export default function PaymentSettingsPage() {
             </div>
           </div>
 
-          <div className="border-t" style={{ borderColor: "hsl(240 12% 15%)" }}>
+          <div className="border-t" style={{ borderColor: "var(--border-default)" }}>
             <div className="pt-4">
               <label className="text-xs block mb-2" style={{ color: "hsl(240 8% 46%)" }}>Tipo de Checkout</label>
               <div className="flex gap-3">
@@ -781,7 +781,7 @@ export default function PaymentSettingsPage() {
           </div>
 
           {/* Webhook URL */}
-          <div className="border-t pt-4" style={{ borderColor: "hsl(240 12% 15%)" }}>
+          <div className="border-t pt-4" style={{ borderColor: "var(--border-default)" }}>
             <label className="text-xs block mb-2" style={{ color: "hsl(240 8% 46%)" }}>URL do Webhook (para configurar no AbacatePay)</label>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 12% 10%)", color: "var(--text-3)" }}>
@@ -837,7 +837,7 @@ export default function PaymentSettingsPage() {
 
           {/* Status do teste de conexão */}
           {settings?.abacatepay_test_status && (
-            <div className="border-t pt-4" style={{ borderColor: "hsl(240 12% 15%)" }}>
+            <div className="border-t pt-4" style={{ borderColor: "var(--border-default)" }}>
               <div className="flex items-center gap-3">
                 <span className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>Status da API:</span>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${

@@ -1068,7 +1068,7 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
                 )}
                 {(headerType === "IMAGE" || headerType === "VIDEO" || headerType === "DOCUMENT") && (
                   <div className="mb-1.5 rounded h-20 flex items-center justify-center text-[10px] uppercase tracking-wider"
-                    style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)" }}>
+                    style={{ background: "var(--border-subtle)", color: "rgba(255,255,255,0.4)" }}>
                     [{headerType.toLowerCase()}]
                   </div>
                 )}

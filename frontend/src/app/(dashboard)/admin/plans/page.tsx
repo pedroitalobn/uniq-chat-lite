@@ -284,7 +284,7 @@ function FeatureGrid({ checkboxes, onChange }: { checkboxes: Record<string, bool
               border: checkboxes[key] ? "1px solid rgba(0,212,106,0.18)" : "1px solid var(--border-default)",
             }}>
             <span className="text-sm leading-none flex-shrink-0">{icon}</span>
-            <span className="text-xs flex-1 truncate min-w-0" style={{ color: checkboxes[key] ? "hsl(240 15% 88%)" : "hsl(240 8% 50%)" }}>{label}</span>
+            <span className="text-xs flex-1 truncate min-w-0" style={{ color: checkboxes[key] ? "var(--text-1)" : "var(--text-3)" }}>{label}</span>
             <Toggle checked={checkboxes[key]} onChange={(v) => onChange(key, v)} />
           </label>
         ))}
@@ -846,21 +846,21 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
         WebkitBackdropFilter: "blur(20px) saturate(180%)",
         border: `1px solid ${style.border}`,
         borderRadius: "20px",
-        boxShadow: "0 4px 16px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.06)",
+        boxShadow: "0 4px 16px rgba(0,0,0,0.30), inset 0 1px 0 var(--border-subtle)",
         transition: "all 0.35s cubic-bezier(0.16,1,0.3,1)",
       }}
       onMouseEnter={e => {
-        (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 30px rgba(0,0,0,0.50), inset 0 1px 0 rgba(255,255,255,0.10)";
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 30px rgba(0,0,0,0.50), inset 0 1px 0 var(--border-default)";
         (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
       }}
       onMouseLeave={e => {
-        (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.06)";
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.30), inset 0 1px 0 var(--border-subtle)";
         (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
       }}
     >
       <div style={{
         position: "absolute", top: 0, left: "15%", right: "15%", height: "1px",
-        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent)",
+        background: "linear-gradient(90deg, transparent, var(--border-strong), transparent)",
         pointerEvents: "none",
       }} />
       <div className="flex flex-wrap lg:flex-nowrap items-center gap-4 sm:gap-6">

@@ -137,14 +137,14 @@ export function AmbientAIPanel() {
               width: PANEL_WIDTH,
               background: "rgba(10, 12, 16, 0.88)",
               backdropFilter: "blur(32px) saturate(200%) brightness(1.08)",
-              borderLeft: "1px solid rgba(255,255,255,0.07)",
-              boxShadow: "-20px 0 60px rgba(0,0,0,0.5), inset 1px 0 0 rgba(255,255,255,0.05)",
+              borderLeft: "1px solid var(--border-default)",
+              boxShadow: "-20px 0 60px rgba(0,0,0,0.5), inset 1px 0 0 var(--input)",
             }}
           >
             {/* Top highlight */}
             <div
               className="absolute top-0 left-0 right-0 h-px"
-              style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)" }}
+              style={{ background: "linear-gradient(90deg, transparent, var(--border-strong), transparent)" }}
             />
 
             {/* Ambient orb — verde suave */}
@@ -218,11 +218,11 @@ export function AmbientAIPanel() {
                       onClick={() => handleSuggestion(s.prompt)}
                       className="text-left px-3 py-2.5 rounded-xl text-sm transition-all group flex items-center gap-2"
                       style={{
-                        background: "rgba(255,255,255,0.04)",
-                        border: "1px solid rgba(255,255,255,0.06)",
-                        color: "rgba(255,255,255,0.75)",
+                        background: "var(--input)",
+                        border: "1px solid var(--border-subtle)",
+                        color: "var(--text-2)",
                       }}
-                      whileHover={{ backgroundColor: "rgba(255,255,255,0.07)", x: 2 }}
+                      whileHover={{ backgroundColor: "var(--border-default)", x: 2 }}
                       whileTap={{ scale: 0.98 }}
                     >
                       <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-40 group-hover:opacity-70 transition-opacity" />

@@ -65,7 +65,7 @@ function Field({
           style={{
             paddingLeft: icon ? "2.5rem" : undefined,
             paddingRight: rightEl ? "2.75rem" : undefined,
-            borderColor: error ? "rgba(239,68,68,0.5)" : focused ? "#00d46a" : "hsl(240 12% 13%)",
+            borderColor: error ? "rgba(239,68,68,0.5)" : focused ? "#00d46a" : "var(--border-default)",
             boxShadow: error
               ? "0 0 0 3px rgba(239,68,68,0.08)"
               : focused ? "0 0 0 3px rgba(0,212,106,0.10)" : "none",
@@ -98,7 +98,7 @@ function PhoneField({
       <div
         className="grid grid-cols-[minmax(112px,132px)_1fr] rounded-xl border overflow-hidden transition-all duration-150 bg-[hsl(240_18%_5%)]"
         style={{
-          borderColor: error ? "rgba(239,68,68,0.5)" : focused ? "#00d46a" : "hsl(240 12% 13%)",
+          borderColor: error ? "rgba(239,68,68,0.5)" : focused ? "#00d46a" : "var(--border-default)",
           boxShadow: error
             ? "0 0 0 3px rgba(239,68,68,0.08)"
             : focused ? "0 0 0 3px rgba(0,212,106,0.10)" : "none",
@@ -161,7 +161,7 @@ function PasswordStrength({ password }: { password: string }) {
       <div className="flex gap-1">
         {[0, 1, 2].map(i => (
           <div key={i} className="flex-1 h-1 rounded-full transition-all duration-300"
-            style={{ background: i < score ? colors[score - 1] : "hsl(240 12% 16%)" }} />
+            style={{ background: i < score ? colors[score - 1] : "var(--border-default)" }} />
         ))}
       </div>
       <div className="flex items-center justify-between">
@@ -494,7 +494,7 @@ function CompleteForm({
                   className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-left transition-all"
                   style={{
                     background: active ? "rgba(0,212,106,0.06)" : "hsl(240 18% 5%)",
-                    border: `1px solid ${active ? "#00d46a" : "hsl(240 12% 13%)"}`,
+                    border: `1px solid ${active ? "#00d46a" : "var(--border-default)"}`,
                     boxShadow: active ? "0 0 0 3px rgba(0,212,106,0.10)" : "none",
                   }}
                 >
@@ -616,7 +616,7 @@ function VerifyContent() {
                         style={{
                           width: i === 2 ? 24 : 7,
                           height: 7,
-                          background: i < 2 ? "#00d46a" : i === 2 ? "#00d46a" : "hsl(240 12% 16%)",
+                          background: i < 2 ? "#00d46a" : i === 2 ? "#00d46a" : "var(--border-default)",
                         }} />
                       {i < 2 && (
                         <div className="h-px w-6" style={{ background: "#00d46a" }} />

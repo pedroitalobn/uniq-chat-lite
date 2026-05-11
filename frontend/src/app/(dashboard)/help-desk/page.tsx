@@ -17,10 +17,10 @@ type PageTab = "articles" | "settings";
 // ─── Style helpers ─────────────────────────────────────────────────────────
 
 const glassCard: CSSProperties = {
-  background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+  background: "linear-gradient(135deg, var(--border-subtle) 0%, rgba(255,255,255,0.02) 100%)",
   backdropFilter: "blur(20px) saturate(180%)",
   WebkitBackdropFilter: "blur(20px) saturate(180%)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  border: "1px solid var(--border-default)",
   borderRadius: "20px",
 };
 
@@ -45,7 +45,7 @@ const STATUS_LABELS: Record<StatusFilter, string> = {
 };
 
 const STATUS_BADGE: Record<HelpDeskArticle["status"], CSSProperties> = {
-  draft: { background: "rgba(255,255,255,0.10)", color: "var(--text-3)", border: "1px solid rgba(255,255,255,0.08)" },
+  draft: { background: "var(--border-default)", color: "var(--text-3)", border: "1px solid var(--border-default)" },
   published: { background: "rgba(0,212,106,0.12)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.20)" },
   archived: { background: "rgba(255,191,36,0.10)", color: "#fbbf24", border: "1px solid rgba(255,191,36,0.20)" },
 };
@@ -360,7 +360,7 @@ function HelpCenterSettings({ workspaceId }: { workspaceId: string }) {
             </button>
           </div>
           <p className="text-xs" style={{ color: "var(--text-3)" }}>Cole este snippet antes do {"</body>"} do seu site.</p>
-          <div className="rounded-xl p-3 overflow-x-auto" style={{ background: "#0d0d0d", border: "1px solid rgba(255,255,255,0.06)" }}>
+          <div className="rounded-xl p-3 overflow-x-auto" style={{ background: "#0d0d0d", border: "1px solid var(--border-subtle)" }}>
             <pre className="text-xs font-mono whitespace-pre-wrap" style={{ color: "#a78bfa", margin: 0 }}>{embedSnippet}</pre>
           </div>
         </div>
@@ -368,9 +368,9 @@ function HelpCenterSettings({ workspaceId }: { workspaceId: string }) {
         <div className="rounded-2xl p-5 space-y-3" style={glassCard}>
           <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Preview do widget</h3>
           <div className="relative rounded-xl overflow-hidden flex items-center justify-center"
-            style={{ background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.08)", height: 200 }}>
+            style={{ background: "#1a1a2e", border: "1px solid var(--border-default)", height: 200 }}>
             <div style={{ position: "absolute", bottom: 20, right: 20 }}>
-              <div style={{ width: 52, height: 52, borderRadius: "50%", background: widgetColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 800, color: "#000", boxShadow: `0 4px 20px ${widgetColor}66` }}>?</div>
+              <div style={{ width: 52, height: 52, borderRadius: "50%", background: widgetColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 800, color: "var(--text-1)", boxShadow: `0 4px 20px ${widgetColor}66` }}>?</div>
             </div>
             <p className="text-xs text-center px-4" style={{ color: "rgba(255,255,255,0.3)" }}>Botão flutuante no canto inferior direito</p>
           </div>
@@ -403,7 +403,7 @@ function KnowledgeHero({
     <div className="relative rounded-2xl overflow-hidden p-6 sm:p-8"
       style={{
         background: "linear-gradient(135deg, rgba(0,212,106,0.06) 0%, rgba(167,139,250,0.04) 50%, rgba(255,255,255,0.02) 100%)",
-        border: "1px solid rgba(255,255,255,0.08)",
+        border: "1px solid var(--border-default)",
         backdropFilter: "blur(24px)",
       }}>
       {/* Decorative blobs */}
@@ -447,7 +447,7 @@ function KnowledgeHero({
           className="w-full rounded-2xl text-sm transition-all"
           style={{
             background: "var(--input)",
-            border: "1px solid rgba(255,255,255,0.10)",
+            border: "1px solid var(--border-default)",
             color: "var(--text-1)",
             padding: "14px 48px 14px 48px",
             outline: "none",
@@ -458,12 +458,12 @@ function KnowledgeHero({
             e.currentTarget.style.boxShadow = "0 0 0 3px rgba(0,212,106,0.08)";
           }}
           onBlur={e => {
-            e.currentTarget.style.border = "1px solid rgba(255,255,255,0.10)";
+            e.currentTarget.style.border = "1px solid var(--border-default)";
             e.currentTarget.style.boxShadow = "none";
           }}
         />
         <kbd className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-mono px-1.5 py-0.5 rounded hidden sm:block"
-          style={{ background: "rgba(255,255,255,0.06)", color: "var(--text-4)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          style={{ background: "var(--border-subtle)", color: "var(--text-4)", border: "1px solid var(--border-default)" }}>
           ⌘K
         </kbd>
         {search && (
@@ -514,8 +514,8 @@ function ArticleCard({ article, onClick }: { article: HelpDeskArticle; onClick: 
         padding: 16,
         borderRadius: 16,
         border: hovered
-          ? isPublished ? "1px solid rgba(0,212,106,0.20)" : "1px solid rgba(255,255,255,0.14)"
-          : "1px solid rgba(255,255,255,0.07)",
+          ? isPublished ? "1px solid rgba(0,212,106,0.20)" : "1px solid var(--border-strong)"
+          : "1px solid var(--border-default)",
         boxShadow: hovered ? "0 8px 28px rgba(0,0,0,0.35)" : "0 2px 12px rgba(0,0,0,0.20)",
         transform: hovered ? "translateY(-2px)" : "none",
       }}>
@@ -523,7 +523,7 @@ function ArticleCard({ article, onClick }: { article: HelpDeskArticle; onClick: 
       <div className="flex items-center justify-between gap-2">
         {article.category ? (
           <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
-            style={{ background: "rgba(255,255,255,0.08)", color: "var(--text-3)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            style={{ background: "var(--border-default)", color: "var(--text-3)", border: "1px solid var(--border-default)" }}>
             <Tag className="w-2.5 h-2.5" />
             {article.category.name}
           </span>
@@ -536,7 +536,7 @@ function ArticleCard({ article, onClick }: { article: HelpDeskArticle; onClick: 
 
       {/* Title */}
       <h3 className="text-sm font-semibold leading-snug line-clamp-2"
-        style={{ color: hovered ? "hsl(240 15% 98%)" : "hsl(240 15% 90%)", transition: "color 0.15s" }}>
+        style={{ color: hovered ? "hsl(240 15% 98%)" : "var(--text-1)", transition: "color 0.15s" }}>
         {article.title}
       </h3>
 
@@ -549,7 +549,7 @@ function ArticleCard({ article, onClick }: { article: HelpDeskArticle; onClick: 
 
       {/* Footer */}
       <div className="flex items-center justify-between mt-auto pt-1.5"
-        style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+        style={{ borderTop: "1px solid var(--input)" }}>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1 text-[11px]" style={{ color: "hsl(240 8% 42%)" }}>
             <Clock className="w-2.5 h-2.5" />
@@ -584,8 +584,8 @@ function CategoryPills({
           background: "rgba(0,212,106,0.12)", color: "#00d46a",
           border: "1px solid rgba(0,212,106,0.25)", borderRadius: 10,
         } : {
-          background: "rgba(255,255,255,0.04)", color: "hsl(240 8% 52%)",
-          border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10,
+          background: "var(--input)", color: "hsl(240 8% 52%)",
+          border: "1px solid var(--border-default)", borderRadius: 10,
         }}>
         <FolderOpen className="w-3 h-3" />
         Todos
@@ -604,14 +604,14 @@ function CategoryPills({
               background: "rgba(0,212,106,0.12)", color: "#00d46a",
               border: "1px solid rgba(0,212,106,0.25)", borderRadius: 10,
             } : {
-              background: "rgba(255,255,255,0.04)", color: "hsl(240 8% 52%)",
-              border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10,
+              background: "var(--input)", color: "hsl(240 8% 52%)",
+              border: "1px solid var(--border-default)", borderRadius: 10,
             }}>
             <span>{cat.icon || "📁"}</span>
             {cat.name}
             {cat.article_count !== undefined && (
               <span className="text-[10px] px-1 rounded-full ml-0.5"
-                style={{ background: "rgba(255,255,255,0.08)", color: "var(--text-4)" }}>
+                style={{ background: "var(--border-default)", color: "var(--text-4)" }}>
                 {cat.article_count}
               </span>
             )}
@@ -628,7 +628,7 @@ function CategoryPills({
       <button
         onClick={onNew}
         className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl transition-all duration-150"
-        style={{ color: "var(--text-4)", border: "1px dashed rgba(255,255,255,0.10)", borderRadius: 10 }}>
+        style={{ color: "var(--text-4)", border: "1px dashed var(--border-default)", borderRadius: 10 }}>
         <Plus className="w-3 h-3" />
         Nova
       </button>
@@ -764,7 +764,7 @@ export default function HelpDeskPage() {
             </div>
           ) : articles.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center rounded-2xl"
-              style={{ border: "1px dashed rgba(255,255,255,0.08)" }}>
+              style={{ border: "1px dashed var(--border-default)" }}>
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
                 style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
                 {search ? <Search className="w-6 h-6" style={{ color: "hsl(240 8% 35%)" }} /> : <BookOpen className="w-6 h-6" style={{ color: "hsl(240 8% 35%)" }} />}

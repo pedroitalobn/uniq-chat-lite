@@ -226,14 +226,14 @@ export default function DealsPage() {
           <div className="flex flex-wrap items-center gap-2">
             <div
               className="flex items-center gap-0.5 rounded-xl p-0.5"
-              style={{ background: "var(--input)", border: "1px solid rgba(255,255,255,0.09)" }}
+              style={{ background: "var(--input)", border: "1px solid var(--border-default)" }}
             >
               <ViewToggle active={viewMode === "kanban"} onClick={() => setViewMode("kanban")} label="Kanban" icon={<LayoutGrid className="h-3.5 w-3.5" />} />
               <ViewToggle active={viewMode === "list"} onClick={() => setViewMode("list")} label="Lista" icon={<List className="h-3.5 w-3.5" />} />
             </div>
             <div
               className="flex items-center gap-0.5 rounded-xl p-0.5"
-              style={{ background: "var(--input)", border: "1px solid rgba(255,255,255,0.09)" }}
+              style={{ background: "var(--input)", border: "1px solid var(--border-default)" }}
             >
               <ViewToggle active={ownerFilter === "all"} onClick={() => setOwnerFilter("all")} label="Todos" />
               <ViewToggle active={ownerFilter === "me"} onClick={() => setOwnerFilter("me")} label="Meus" />
@@ -246,8 +246,8 @@ export default function DealsPage() {
                 placeholder="Buscar deal…"
                 className="w-full rounded-xl py-1.5 pl-8 pr-3 text-xs outline-none"
                 style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "var(--input)",
+                  border: "1px solid var(--border-default)",
                   color: "var(--text-1)",
                 }}
               />
@@ -256,7 +256,7 @@ export default function DealsPage() {
               {activeFunnel?.probability_on && (
                 <span
                   className="hidden md:flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-[10px] font-medium"
-                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--text-3)" }}
+                  style={{ background: "var(--input)", border: "1px solid var(--border-default)", color: "var(--text-3)" }}
                 >
                   <TrendingUp className="h-3 w-3" /> Probabilidade ativa
                 </span>
@@ -392,15 +392,15 @@ function FunnelSelector({ funnels, activeId, onChange }: {
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium"
         style={{
-          background: "rgba(255,255,255,0.07)",
+          background: "var(--border-default)",
           backdropFilter: "blur(8px)",
-          border: "1px solid rgba(255,255,255,0.12)",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.08)",
+          border: "1px solid var(--border-strong)",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.20), inset 0 1px 0 var(--border-default)",
           color: uniq.textStrong,
           transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
         }}
-        onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.11)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)"; }}
-        onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
+        onMouseEnter={e => { e.currentTarget.style.background = "var(--border-strong)"; e.currentTarget.style.borderColor = "var(--border-strong)"; }}
+        onMouseLeave={e => { e.currentTarget.style.background = "var(--border-default)"; e.currentTarget.style.borderColor = "var(--border-strong)"; }}
       >
         <FilterIcon className="h-3.5 w-3.5" style={{ color: uniq.green }} aria-hidden />
         {active?.name ?? "Selecionar funil"}
@@ -415,8 +415,8 @@ function FunnelSelector({ funnels, activeId, onChange }: {
               background: "linear-gradient(135deg, rgba(18,18,30,0.95) 0%, rgba(10,10,20,0.98) 100%)",
               backdropFilter: "blur(20px) saturate(180%)",
               WebkitBackdropFilter: "blur(20px) saturate(180%)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              boxShadow: "0 16px 40px rgba(0,0,0,0.50), inset 0 1px 0 rgba(255,255,255,0.07)",
+              border: "1px solid var(--border-default)",
+              boxShadow: "0 16px 40px rgba(0,0,0,0.50), inset 0 1px 0 var(--border-default)",
               maxHeight: "60vh",
             }}
           >
@@ -482,7 +482,7 @@ function DealsList({ deals, stages, currency, isLoading }: {
             <tr
               key={d.id}
               className="hover:bg-white/5"
-              style={{ borderTop: "1px solid rgba(255,255,255,0.05)", transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)" }}
+              style={{ borderTop: "1px solid var(--input)", transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)" }}
             >
               <Td>
                 <Link href={`/crm/deals/${d.id}`} className="font-medium hover:underline">

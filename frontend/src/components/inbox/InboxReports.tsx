@@ -8,7 +8,7 @@ import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsCo
 
 // Relatórios do inbox — métricas de atendimento (volume, SLA, CSAT, fila/agente).
 // Mesmo backend do antigo /reports/overview, agora dentro de /inbox?view=reports
-// no tema escuro da Uniq.chat (hsl(240 18% 6%) + accent #00d46a).
+// no tema escuro da Uniq.chat (var(--surface-solid) + accent #00d46a).
 
 interface Overview {
   counts: { created: number; resolved: number; closed: number; open_now: number; backlog: number };
@@ -32,7 +32,7 @@ interface SLAReport {
   resolution_breaches: number;
 }
 
-const CARD_BG = "hsl(240 18% 6%)";
+const CARD_BG = "var(--surface-solid)";
 const CARD_BORDER = "1px solid var(--border)";
 
 export function InboxReports({ workspaceId }: { workspaceId: string }) {
@@ -329,7 +329,7 @@ function ReportsHeader({
             className="rounded-lg px-3 py-1 transition-colors"
             style={{
               background: range === r ? "rgba(0,212,106,0.12)" : "transparent",
-              color: range === r ? "#00d46a" : "hsl(240 8% 55%)",
+              color: range === r ? "#00d46a" : "var(--text-3)",
             }}
           >
             {r === "7d" ? "7 dias" : r === "30d" ? "30 dias" : "90 dias"}
@@ -456,7 +456,7 @@ function KPI({
     emerald: "#00d46a",
     amber: "#fbbf24",
     red: "#f87171",
-    zinc: "hsl(240 15% 85%)",
+    zinc: "var(--text-1)",
   }[tone];
   return (
     <div

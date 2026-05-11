@@ -98,7 +98,7 @@ function EntitySection({
   return (
     <div
       className="rounded-xl p-4 space-y-3"
-      style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+      style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--border-subtle)" }}
     >
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">
@@ -121,7 +121,7 @@ function EntitySection({
           className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium"
           style={
             creating
-              ? { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--text-2)" }
+              ? { background: "var(--input)", border: "1px solid var(--border-default)", color: "var(--text-2)" }
               : { background: "var(--green-dim)", border: "1px solid var(--green-border)", color: "var(--green)" }
           }
         >
@@ -150,7 +150,7 @@ function EntitySection({
               <div
                 key={f.id}
                 className="flex items-center gap-3 px-3 py-2 rounded-lg"
-                style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
+                style={{ background: "rgba(255,255,255,0.02)", border: "1px solid var(--input)" }}
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>{f.name}</p>
@@ -225,7 +225,7 @@ function FieldForm({
   return (
     <div
       className="rounded-xl p-3 space-y-2"
-      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+      style={{ background: "var(--input)", border: "1px solid var(--border-default)" }}
     >
       <div className="grid grid-cols-1 md:grid-cols-[1fr_180px] gap-2">
         <input

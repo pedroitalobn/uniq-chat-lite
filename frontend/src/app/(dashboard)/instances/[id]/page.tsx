@@ -108,7 +108,7 @@ function BridgeToggle({ label, color, enabled, onToggle, children }: {
   onToggle: () => void; children?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${enabled ? color + "30" : "hsl(240 12% 13%)"}` }}>
+    <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${enabled ? color + "30" : "var(--border-default)"}` }}>
       <div className="flex items-center justify-between px-3 py-2.5"
         style={{ background: enabled ? color + "08" : "var(--surface-2)" }}>
         <span className="text-xs font-medium" style={{ color: enabled ? color : "hsl(240 8% 42%)" }}>{label}</span>
@@ -245,7 +245,7 @@ function WebhookCard({ wh, instanceId, onDelete }: { wh: Webhook; instanceId: st
           transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
           style={{ overflow: "hidden" }}
         >
-        <div className="px-4 pb-4 space-y-2 border-t" style={{ borderColor: "hsl(240 12% 11%)" }}>
+        <div className="px-4 pb-4 space-y-2 border-t" style={{ borderColor: "var(--border-subtle)" }}>
           <p className="text-[10px] font-medium uppercase tracking-wider mt-3 mb-2" style={{ color: "hsl(240 8% 36%)" }}>
             Bridges — também enviar para:
           </p>
@@ -503,7 +503,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
         )}
 
         {webhooks.length === 0 && !creating ? (
-          <div className="rounded-2xl p-8 text-center" style={{ background: "hsl(240 18% 5.5%)", border: "1px dashed hsl(240 12% 14%)" }}>
+          <div className="rounded-2xl p-8 text-center" style={{ background: "hsl(240 18% 5.5%)", border: "1px dashed var(--border-default)" }}>
             <WebhookIcon className="w-6 h-6 mx-auto mb-2" style={{ color: "hsl(240 8% 28%)" }} />
             <p className="text-xs" style={{ color: "var(--text-4)" }}>Nenhum webhook. Clique em Novo para criar.</p>
           </div>
@@ -608,7 +608,7 @@ function LogsTab({ instanceId }: { instanceId: string }) {
       {messages.length === 0 ? (
         <div
           className="rounded-2xl p-10 text-center"
-          style={{ background: "var(--surface-solid)", border: "1px dashed hsl(240 12% 16%)" }}
+          style={{ background: "var(--surface-solid)", border: "1px dashed var(--border-default)" }}
         >
           <Activity className="w-7 h-7 mx-auto mb-3" style={{ color: "hsl(240 8% 30%)" }} />
           <p className="text-sm" style={{ color: "hsl(240 8% 42%)" }}>Nenhuma mensagem registrada</p>
@@ -1364,7 +1364,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
             <p className="text-[10px] mb-1" style={labelStyle}>Base URL</p>
             <div className="flex items-center gap-2 rounded-xl px-3 py-2"
               style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}>
-              <code className="text-xs flex-1 font-mono truncate" style={{ color: serverSlug ? "hsl(240 8% 55%)" : "hsl(240 8% 36%)" }}>
+              <code className="text-xs flex-1 font-mono truncate" style={{ color: serverSlug ? "var(--text-3)" : "hsl(240 8% 36%)" }}>
                 {v1Url}
               </code>
               <button onClick={copyUrl} className="transition-colors flex-shrink-0" style={{ color: "var(--text-4)" }}
@@ -1964,7 +1964,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
 
               {/* Challenge code input */}
               {igChallenge && (
-                <div className="space-y-3 pt-4 mt-4" style={{ borderTop: "1px solid hsl(240 12% 16%)" }}>
+                <div className="space-y-3 pt-4 mt-4" style={{ borderTop: "1px solid var(--border-default)" }}>
                   {/* Challenge Header */}
                   <div className="flex items-start gap-3 p-3 rounded-xl" style={{ background: "rgba(225,48,108,0.08)", border: "1px solid rgba(225,48,108,0.2)" }}>
                     <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "rgba(225,48,108,0.15)" }}>
@@ -2260,7 +2260,7 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
 
       {/* Schedule selector */}
       <div className="rounded-2xl" style={cardStyle}>
-        <div className="p-4 flex items-center gap-2" style={{ borderBottom: "1px solid hsl(240 12% 13%)" }}>
+        <div className="p-4 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border-default)" }}>
           <RotateCcw className="w-4 h-4" style={{ color: "#f59e0b" }} />
           <span className="font-medium text-sm" style={valText}>Backup automático de grupos</span>
         </div>
@@ -2296,7 +2296,7 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
         <>
           {/* Groups snapshot */}
           <div className="rounded-2xl" style={cardStyle}>
-            <div className="p-4 flex items-center justify-between" style={{ borderBottom: "1px solid hsl(240 12% 13%)" }}>
+            <div className="p-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-default)" }}>
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4" style={{ color: "#60a5fa" }} />
                 <span className="font-medium text-sm" style={valText}>Grupos salvos</span>
@@ -2320,7 +2320,7 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
                 <p className="text-xs mt-1" style={dimText}>Com a instância conectada, clique em "Salvar snapshot de grupos".</p>
               </div>
             ) : (
-              <div className="divide-y" style={{ borderColor: "hsl(240 12% 13%)" }}>
+              <div className="divide-y" style={{ borderColor: "var(--border-default)" }}>
                 {data.groups.map(g => (
                   <div key={g.jid} className="p-3.5 flex items-center gap-3">
                     <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -2356,7 +2356,7 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
 
           {/* Contact history */}
           <div className="rounded-2xl" style={cardStyle}>
-            <div className="p-4 flex items-center gap-2" style={{ borderBottom: "1px solid hsl(240 12% 13%)" }}>
+            <div className="p-4 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border-default)" }}>
               <Phone className="w-4 h-4" style={{ color: "#a78bfa" }} />
               <span className="font-medium text-sm" style={valText}>Histórico de contatos</span>
               {data?.contacts?.length ? (
@@ -2372,7 +2372,7 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
                 <p className="text-sm" style={dimText}>Nenhuma conversa enviada ainda.</p>
               </div>
             ) : (
-              <div className="divide-y" style={{ borderColor: "hsl(240 12% 13%)" }}>
+              <div className="divide-y" style={{ borderColor: "var(--border-default)" }}>
                 {data.contacts.map(c => (
                   <div key={c.jid} className="p-3.5 flex items-center gap-3">
                     <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -2757,7 +2757,7 @@ function ActionsTab({ instance }: { instance: Instance }) {
         </div>
       </div>
 
-      <div className="border-t pt-4" style={{ borderColor: "hsl(240 12% 13%)" }}>
+      <div className="border-t pt-4" style={{ borderColor: "var(--border-default)" }}>
         <p className="text-xs mb-2" style={{ color: "hsl(240 8% 46%)" }}>Filtros avançados (Insomniac)</p>
         <div className="grid grid-cols-2 gap-2">
           <input type="number" placeholder="Mín. seguidores" className="input-field text-xs" />
@@ -2851,7 +2851,7 @@ function ScrapingTab({ instance }: { instance: Instance }) {
       </div>
 
       {results.length > 0 && (
-        <div className="border-t pt-4" style={{ borderColor: "hsl(240 12% 13%)" }}>
+        <div className="border-t pt-4" style={{ borderColor: "var(--border-default)" }}>
           <p className="text-xs font-medium mb-2" style={{ color: "var(--text-3)" }}>
             Resultados ({results.length})
           </p>

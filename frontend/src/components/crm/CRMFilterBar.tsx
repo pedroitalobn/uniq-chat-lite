@@ -200,9 +200,9 @@ function FilterDropdown({
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
         style={{
-          background: active ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.06)",
-          border: `1px solid ${active ? "rgba(0,212,106,0.25)" : "rgba(255,255,255,0.10)"}`,
-          color: active ? "#00d46a" : "hsl(240 15% 90%)",
+          background: active ? "rgba(0,212,106,0.12)" : "var(--border-subtle)",
+          border: `1px solid ${active ? "rgba(0,212,106,0.25)" : "var(--border-default)"}`,
+          color: active ? "#00d46a" : "var(--text-1)",
           boxShadow: active ? "0 0 12px rgba(0,212,106,0.10)" : "none",
           transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
         }}
@@ -218,7 +218,7 @@ function FilterDropdown({
             maxHeight: "60vh",
             background: "linear-gradient(135deg, rgba(18,18,30,0.97) 0%, rgba(10,10,20,0.99) 100%)",
             backdropFilter: "blur(20px) saturate(180%)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            border: "1px solid var(--border-default)",
           }}
         >
           {options.map((opt) => {
@@ -229,7 +229,7 @@ function FilterDropdown({
                 onClick={() => { onSelect(opt.id); setOpen(false); }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-white/5"
                 style={{
-                  color: isSelected ? "#00d46a" : "hsl(240 15% 90%)",
+                  color: isSelected ? "#00d46a" : "var(--text-1)",
                   background: isSelected ? "rgba(0,212,106,0.08)" : "transparent",
                 }}
               >

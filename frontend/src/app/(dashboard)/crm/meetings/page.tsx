@@ -72,7 +72,7 @@ export default function MeetingsPage() {
                   className="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex-shrink-0"
                   style={active
                     ? { background: f.color + "1a", color: f.color, border: `1px solid ${f.color}55` }
-                    : { background: "rgba(255,255,255,0.04)", color: "var(--text-3)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    : { background: "var(--input)", color: "var(--text-3)", border: "1px solid var(--border-default)" }}>
                   {f.label}
                 </button>
               );

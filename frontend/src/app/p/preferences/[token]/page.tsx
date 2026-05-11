@@ -78,7 +78,7 @@ export default function PreferencesPage({ params }: { params: Promise<{ token: s
         <div className="rounded-2xl p-6"
           style={{
             background: "var(--surface-solid)",
-            boxShadow: "0 0 0 1px hsl(240 12% 13%), 0 24px 64px rgba(0,0,0,0.5)",
+            boxShadow: "0 0 0 1px var(--border-default), 0 24px 64px rgba(0,0,0,0.5)",
           }}>
           <div className="flex items-center gap-2 mb-1">
             <Mail className="w-4 h-4" style={{ color: "var(--green)" }} />

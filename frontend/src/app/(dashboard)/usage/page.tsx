@@ -242,7 +242,7 @@ function HeroGauge({ cat, data, period }: { cat: string; data: UsageCategoryView
       <div className="relative" style={{ width: 180, height: 180 }}>
         <svg width={180} height={180} viewBox="0 0 180 180" style={{ transform: "rotate(135deg)" }}>
           <circle cx={90} cy={90} r={r} fill="none"
-            stroke="rgba(255,255,255,0.06)" strokeWidth={10}
+            stroke="var(--border-subtle)" strokeWidth={10}
             strokeDasharray={`${c * 0.75} ${gapDash}`}
             strokeLinecap="round"
           />
@@ -443,7 +443,7 @@ function TimeseriesCard({ items }: { items: UsageTimeseriesPoint[] }) {
                 <stop offset="100%" stopColor="#00d46a" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="rgba(255,255,255,0.04)" vertical={false} />
+            <CartesianGrid stroke="var(--input)" vertical={false} />
             <XAxis dataKey="date" stroke="rgba(255,255,255,0.3)" fontSize={10} tickLine={false} axisLine={false} />
             <YAxis stroke="rgba(255,255,255,0.3)" fontSize={10} tickLine={false} axisLine={false} />
             <Tooltip
@@ -535,7 +535,7 @@ function EventRow({ ev, divider }: { ev: UsageEvent; divider: boolean }) {
           </span>
           {ev.resource && (
             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded"
-              style={{ background: "rgba(255,255,255,0.04)", color: "var(--text-3)" }}>
+              style={{ background: "var(--input)", color: "var(--text-3)" }}>
               {ev.resource}
             </span>
           )}

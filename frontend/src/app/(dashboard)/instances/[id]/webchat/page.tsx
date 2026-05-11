@@ -13,10 +13,10 @@ import { webChatApi, type WebChatConfig } from "@/lib/helpdesk-api";
 // ─── Style helpers ─────────────────────────────────────────────────────────
 
 const glassCard: CSSProperties = {
-  background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+  background: "linear-gradient(135deg, var(--border-subtle) 0%, rgba(255,255,255,0.02) 100%)",
   backdropFilter: "blur(20px) saturate(180%)",
   WebkitBackdropFilter: "blur(20px) saturate(180%)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  border: "1px solid var(--border-default)",
   borderRadius: "20px",
 };
 
@@ -39,8 +39,8 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       onClick={() => onChange(!checked)}
       className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0"
       style={{
-        background: checked ? "#00d46a" : "rgba(255,255,255,0.12)",
-        border: `1px solid ${checked ? "rgba(0,212,106,0.50)" : "rgba(255,255,255,0.15)"}`,
+        background: checked ? "#00d46a" : "var(--border-strong)",
+        border: `1px solid ${checked ? "rgba(0,212,106,0.50)" : "var(--border-strong)"}`,
       }}
     >
       <span
@@ -293,7 +293,7 @@ export default function WebChatConfigPage() {
                 style={{
                   background: "rgba(0,0,0,0.35)",
                   color: "#a78bfa",
-                  border: "1px solid rgba(255,255,255,0.06)",
+                  border: "1px solid var(--border-subtle)",
                   fontFamily: "monospace",
                   whiteSpace: "pre-wrap",
                   wordBreak: "break-all",

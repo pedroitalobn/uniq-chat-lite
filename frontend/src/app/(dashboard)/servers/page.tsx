@@ -150,7 +150,7 @@ function ServerModal({
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-md rounded-2xl p-6 animate-fade-in-up max-h-[90vh] overflow-y-auto"
-        style={{ background: "var(--surface-solid)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 32px 80px rgba(0,0,0,0.6)" }}>
+        style={{ background: "var(--surface-solid)", boxShadow: "0 0 0 1px var(--border-default), 0 32px 80px rgba(0,0,0,0.6)" }}>
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center"
@@ -192,7 +192,7 @@ function ServerModal({
               <div className="flex items-center gap-0 rounded-xl overflow-hidden"
                 style={{ border: "1px solid var(--border)", background: "var(--surface-solid)" }}>
                 <span className="px-3 py-2.5 text-sm font-mono flex-shrink-0"
-                  style={{ color: "var(--text-4)", borderRight: "1px solid hsl(240 12% 14%)" }}>
+                  style={{ color: "var(--text-4)", borderRight: "1px solid var(--border-default)" }}>
                   uniq.chat/
                 </span>
                 <input value={slug} onFocus={() => setSlugTouched(true)}
@@ -423,7 +423,7 @@ function ServerProxyModal({
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-lg rounded-2xl p-6 animate-fade-in-up max-h-[90vh] overflow-y-auto"
-        style={{ background: "var(--surface-solid)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 32px 80px rgba(0,0,0,0.6)" }}>
+        style={{ background: "var(--surface-solid)", boxShadow: "0 0 0 1px var(--border-default), 0 32px 80px rgba(0,0,0,0.6)" }}>
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center"
@@ -453,8 +453,8 @@ function ServerProxyModal({
             {/* Sem proxy */}
             <label className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all"
               style={{
-                background: selectedId === "none" ? "rgba(0,212,106,0.08)" : "hsl(240 12% 8%)",
-                border: `1px solid ${selectedId === "none" ? "rgba(0,212,106,0.3)" : "hsl(240 12% 14%)"}`,
+                background: selectedId === "none" ? "rgba(0,212,106,0.08)" : "var(--surface-solid)",
+                border: `1px solid ${selectedId === "none" ? "rgba(0,212,106,0.3)" : "var(--border-default)"}`,
               }}>
               <input type="radio" className="mt-1" checked={selectedId === "none"} onChange={() => setSelectedId("none")} />
               <div>
@@ -471,15 +471,15 @@ function ServerProxyModal({
                   <label key={p.id}
                     className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all"
                     style={{
-                      background: selectedId === p.id ? "rgba(0,212,106,0.08)" : "hsl(240 12% 8%)",
-                      border: `1px solid ${selectedId === p.id ? "rgba(0,212,106,0.3)" : "hsl(240 12% 14%)"}`,
+                      background: selectedId === p.id ? "rgba(0,212,106,0.08)" : "var(--surface-solid)",
+                      border: `1px solid ${selectedId === p.id ? "rgba(0,212,106,0.3)" : "var(--border-default)"}`,
                     }}>
                     <input type="radio" className="mt-1" checked={selectedId === p.id} onChange={() => setSelectedId(p.id)} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-medium" style={{ color: "var(--text-2)" }}>{p.name}</span>
                         {p.country && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "hsl(240 12% 14%)", color: "var(--text-2)" }}>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--border-default)", color: "var(--text-2)" }}>
                             {COUNTRY_FLAGS[p.country] || "🌐"} {p.country.toUpperCase()}
                           </span>
                         )}
@@ -594,26 +594,26 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
     <div
       className="rounded-2xl p-5 flex flex-col gap-4 group relative"
       style={{
-        background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+        background: "linear-gradient(135deg, var(--border-default) 0%, rgba(255,255,255,0.02) 100%)",
         backdropFilter: "blur(20px) saturate(180%)",
         WebkitBackdropFilter: "blur(20px) saturate(180%)",
-        border: "1px solid rgba(255,255,255,0.10)",
+        border: "1px solid var(--border-default)",
         borderRadius: "20px",
-        boxShadow: "0 4px 16px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.08)",
+        boxShadow: "0 4px 16px rgba(0,0,0,0.30), inset 0 1px 0 var(--border-default)",
         transition: "all 0.35s cubic-bezier(0.16,1,0.3,1)",
       }}
       onMouseEnter={e => {
-        (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.12)";
-        (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.16)";
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.40), inset 0 1px 0 var(--border-strong)";
+        (e.currentTarget as HTMLElement).style.borderColor = "var(--border-strong)";
       }}
       onMouseLeave={e => {
-        (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.08)";
-        (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.10)";
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.30), inset 0 1px 0 var(--border-default)";
+        (e.currentTarget as HTMLElement).style.borderColor = "var(--border-default)";
       }}
     >
       <div style={{
         position: "absolute", top: 0, left: "15%", right: "15%", height: "1px",
-        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)",
+        background: "linear-gradient(90deg, transparent, var(--border-strong), transparent)",
         pointerEvents: "none",
       }} />
 
@@ -667,7 +667,7 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
         </code>
         <button onClick={copySlug} className="transition-colors flex-shrink-0"
           style={{ color: "hsl(240 8% 36%)" }}
-          onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 8% 60%)")}
+          onMouseEnter={e => (e.currentTarget.style.color = "var(--text-3)")}
           onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 36%)")}>
           {copied ? <Check className="w-3.5 h-3.5" style={{ color: "var(--green)" }} /> : <Copy className="w-3.5 h-3.5" />}
         </button>
@@ -678,9 +678,9 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
         <div
           className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs"
           style={{
-            background: "rgba(255,255,255,0.06)",
+            background: "var(--border-subtle)",
             backdropFilter: "blur(8px)",
-            border: "1px solid rgba(255,255,255,0.09)",
+            border: "1px solid var(--border-default)",
             borderRadius: "10px",
             transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
           }}
@@ -691,9 +691,9 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
         <div
           className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs"
           style={{
-            background: connectedCount > 0 ? "rgba(0,212,106,0.08)" : "rgba(255,255,255,0.06)",
+            background: connectedCount > 0 ? "rgba(0,212,106,0.08)" : "var(--border-subtle)",
             backdropFilter: "blur(8px)",
-            border: connectedCount > 0 ? "1px solid rgba(0,212,106,0.20)" : "1px solid rgba(255,255,255,0.09)",
+            border: connectedCount > 0 ? "1px solid rgba(0,212,106,0.20)" : "1px solid var(--border-default)",
             borderRadius: "10px",
             boxShadow: connectedCount > 0 ? "0 0 8px rgba(0,212,106,0.15)" : "none",
             transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
@@ -839,7 +839,7 @@ export default function ServersPage() {
           backdropFilter: "blur(12px) saturate(180%)",
           WebkitBackdropFilter: "blur(12px) saturate(180%)",
           border: "1px solid rgba(96,165,250,0.14)",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
+          boxShadow: "inset 0 1px 0 var(--input)",
         }}
       >
         <p className="text-xs font-medium mb-1" style={{ color: "#60a5fa" }}>Como funcionam os Servers</p>
@@ -887,7 +887,7 @@ export default function ServersPage() {
         </div>
       ) : servers.length === 0 ? (
         <div className="rounded-2xl p-16 text-center animate-fade-in-up"
-          style={{ background: "var(--surface-solid)", border: "1px dashed hsl(240 12% 16%)" }}>
+          style={{ background: "var(--surface-solid)", border: "1px dashed var(--border-default)" }}>
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
             style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
             <ServerIcon className="w-5 h-5" style={{ color: "hsl(240 8% 30%)" }} />
@@ -924,13 +924,13 @@ export default function ServersPage() {
               "rounded-2xl p-5 border-2 border-dashed flex flex-col items-center justify-center gap-3",
               "transition-all min-h-[160px]",
             )}
-            style={{ borderColor: "hsl(240 12% 14%)", color: "hsl(240 8% 32%)" }}
+            style={{ borderColor: "var(--border-default)", color: "hsl(240 8% 32%)" }}
             onMouseEnter={e => {
               e.currentTarget.style.borderColor = "rgba(0,212,106,0.25)";
               e.currentTarget.style.color = "var(--green)";
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.borderColor = "hsl(240 12% 14%)";
+              e.currentTarget.style.borderColor = "var(--border-default)";
               e.currentTarget.style.color = "hsl(240 8% 32%)";
             }}>
             <Plus className="w-6 h-6" />

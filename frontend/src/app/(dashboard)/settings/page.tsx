@@ -48,12 +48,12 @@ function SectionWrap({ title, description, children }: {
 function Card({ children }: { children: React.ReactNode }) {
   return (
     <div className="rounded-2xl p-6" style={{
-      background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+      background: "linear-gradient(135deg, var(--border-default) 0%, rgba(255,255,255,0.02) 100%)",
       backdropFilter: "blur(20px) saturate(180%)",
       WebkitBackdropFilter: "blur(20px) saturate(180%)",
-      border: "1px solid rgba(255,255,255,0.08)",
+      border: "1px solid var(--border-default)",
       borderRadius: "20px",
-      boxShadow: "0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.10)",
+      boxShadow: "0 8px 24px rgba(0,0,0,0.30), inset 0 1px 0 var(--border-default)",
     }}>
       {children}
     </div>
@@ -220,8 +220,8 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
                   <div key={plan.id}
                     className="rounded-xl p-3.5 flex items-center justify-between"
                     style={{
-                      background: isCurrent ? "rgba(0,212,106,0.07)" : "rgba(255,255,255,0.03)",
-                      border: isCurrent ? "1px solid rgba(0,212,106,0.20)" : "1px solid rgba(255,255,255,0.07)",
+                      background: isCurrent ? "rgba(0,212,106,0.07)" : "var(--input)",
+                      border: isCurrent ? "1px solid rgba(0,212,106,0.20)" : "1px solid var(--border-default)",
                       backdropFilter: "blur(8px)",
                       transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                     }}>
@@ -245,17 +245,17 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
                           background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
                           backdropFilter: "blur(12px)",
                           border: "1px solid rgba(0,212,106,0.30)",
-                          boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)",
+                          boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 var(--border-strong)",
                           color: "var(--green)",
                           transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                         }}
                         onMouseEnter={e => {
                           e.currentTarget.style.transform = "translateY(-1px)";
-                          e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,212,106,0.28), inset 0 1px 0 rgba(255,255,255,0.16)";
+                          e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,212,106,0.28), inset 0 1px 0 var(--border-strong)";
                         }}
                         onMouseLeave={e => {
                           e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)";
+                          e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 var(--border-strong)";
                         }}
                       >
                         {checkoutMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowRight className="w-3 h-3" />}
@@ -411,19 +411,19 @@ function SecuritySection() {
                 background: "linear-gradient(135deg, rgba(96,165,250,0.15), rgba(96,165,250,0.06))",
                 backdropFilter: "blur(12px)",
                 border: "1px solid rgba(96,165,250,0.25)",
-                boxShadow: "0 4px 16px rgba(96,165,250,0.12), inset 0 1px 0 rgba(255,255,255,0.10)",
+                boxShadow: "0 4px 16px rgba(96,165,250,0.12), inset 0 1px 0 var(--border-default)",
                 color: "#60a5fa",
                 transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
               }}
               onMouseEnter={e => {
                 if (!mutation.isPending) {
                   e.currentTarget.style.transform = "translateY(-1px)";
-                  e.currentTarget.style.boxShadow = "0 8px 24px rgba(96,165,250,0.22), inset 0 1px 0 rgba(255,255,255,0.14)";
+                  e.currentTarget.style.boxShadow = "0 8px 24px rgba(96,165,250,0.22), inset 0 1px 0 var(--border-strong)";
                 }
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 4px 16px rgba(96,165,250,0.12), inset 0 1px 0 rgba(255,255,255,0.10)";
+                e.currentTarget.style.boxShadow = "0 4px 16px rgba(96,165,250,0.12), inset 0 1px 0 var(--border-default)";
               }}>
               {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
               Alterar senha
@@ -830,17 +830,17 @@ function InviteSection() {
               background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))",
               backdropFilter: "blur(12px)",
               border: "1px solid rgba(0,212,106,0.30)",
-              boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)",
+              boxShadow: "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 var(--border-strong)",
               color: "var(--green)",
               transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
             }}
             onMouseEnter={e => {
               e.currentTarget.style.transform = "translateY(-1px)";
-              e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,212,106,0.28), inset 0 1px 0 rgba(255,255,255,0.16)";
+              e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,212,106,0.28), inset 0 1px 0 var(--border-strong)";
             }}
             onMouseLeave={e => {
               e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 rgba(255,255,255,0.12)";
+              e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,212,106,0.18), inset 0 1px 0 var(--border-strong)";
             }}>
             {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ticket className="w-4 h-4" />}
             Gerar código
@@ -861,8 +861,8 @@ function InviteSection() {
             {codes.map((c) => (
               <div key={c.id} className="flex items-center justify-between p-3 rounded-xl"
                 style={{
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.07)",
+                  background: "var(--input)",
+                  border: "1px solid var(--border-default)",
                   backdropFilter: "blur(8px)",
                   transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                 }}>
@@ -917,10 +917,10 @@ export default function SettingsPage() {
         {/* ── Submenu sidebar - hidden on mobile, tabs visible on mobile ── */}
         {/* Mobile tabs */}
         <div className="sm:hidden flex gap-1 p-1 rounded-xl w-full" style={{
-          background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+          background: "linear-gradient(135deg, var(--border-subtle) 0%, rgba(255,255,255,0.02) 100%)",
           backdropFilter: "blur(16px) saturate(180%)",
           WebkitBackdropFilter: "blur(16px) saturate(180%)",
-          border: "1px solid rgba(255,255,255,0.08)",
+          border: "1px solid var(--border-default)",
           boxShadow: "0 4px 16px rgba(0,0,0,0.20)",
         }}>
           {SECTIONS.map((section) => {
@@ -944,11 +944,11 @@ export default function SettingsPage() {
         {/* Desktop sidebar */}
         <aside className="hidden sm:flex w-44 lg:w-52 flex-shrink-0 sticky top-0">
           <nav className="rounded-2xl overflow-hidden w-full" style={{
-            background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+            background: "linear-gradient(135deg, var(--border-default) 0%, rgba(255,255,255,0.02) 100%)",
             backdropFilter: "blur(16px) saturate(180%)",
             WebkitBackdropFilter: "blur(16px) saturate(180%)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.10)",
+            border: "1px solid var(--border-default)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 var(--border-default)",
           }}>
             {SECTIONS.map((section, i) => {
               const Icon = section.icon;
@@ -966,7 +966,7 @@ export default function SettingsPage() {
                     background: isActive ? "rgba(0,212,106,0.10)" : "transparent",
                     transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                   }}
-                  onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+                  onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--input)"; }}
                   onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
                 >
                   {/* Active indicator */}
