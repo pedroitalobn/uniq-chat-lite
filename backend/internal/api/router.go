@@ -417,6 +417,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	// AbacatePay webhook (public)
 	app.Post("/abacatepay/webhook", abacatepayH.HandleWebhook)
 	app.Post("/v1/abacatepay/webhook", abacatepayH.HandleWebhook)
+	app.Get("/abacatepay/webhook", abacatepayH.HandleReturn)
+	app.Get("/v1/abacatepay/webhook", abacatepayH.HandleReturn)
 
 	// ─── Auth routes (public) ─────────────────────────────────────────────────
 	// Rate limits separados por sensibilidade:

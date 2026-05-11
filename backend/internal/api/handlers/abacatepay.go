@@ -218,6 +218,7 @@ type abacatepaySubscriptionCreateRequest struct {
 	CustomerID    string           `json:"customerId,omitempty"`
 	ExternalID    string           `json:"externalId"`
 	CompletionURL string           `json:"completionUrl"`
+	ReturnURL     string           `json:"returnUrl,omitempty"`
 	Methods       []string         `json:"methods,omitempty"`
 }
 
@@ -317,6 +318,25 @@ func (h *AbacatePayHandler) ensureAbacatePayCustomer(customer *abacatepayCustome
 	return resp.ID, nil
 }
 
+func abacatepayFrontendBaseURL(fallbackBaseURL string) string {
+	if frontendURL := resolveFrontendURL(); frontendURL != "" {
+		return frontendURL
+	}
+	return strings.TrimRight(fallbackBaseURL, "/")
+}
+
+func abacatepayPendingSuccessURL(fallbackBaseURL, pendingID string) string {
+	u := abacatepayFrontendBaseURL(fallbackBaseURL) + "/payment/success"
+	if strings.TrimSpace(pendingID) != "" {
+		u += "?pending_id=" + url.QueryEscape(pendingID)
+	}
+	return u
+}
+
+func abacatepayDashboardURL(fallbackBaseURL string) string {
+	return abacatepayFrontendBaseURL(fallbackBaseURL) + "/dashboard"
+}
+
 // ─── Endpoints ──────────────────────────────────────────────────────────────
 
 // POST /abacatepay/checkout — create hosted / transparent checkout (protected)
@@ -355,6 +375,7 @@ func (h *AbacatePayHandler) CreateCheckout(c *fiber.Ctx) error {
 		"plan_id": plan.ID.String(),
 	})
 
+	successURL := abacatepayDashboardURL(c.BaseURL())
 	result, err := h.createCheckout(plan, user.ID.String(), map[string]string{
 		"user_id":   user.ID.String(),
 		"plan_id":   plan.ID.String(),
@@ -363,7 +384,7 @@ func (h *AbacatePayHandler) CreateCheckout(c *fiber.Ctx) error {
 		"name":      user.Name,
 		"phone":     user.Phone,
 		"tax_id":    user.TaxID,
-	}, customer, c.BaseURL(), mode)
+	}, customer, successURL, successURL, mode)
 	if err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
 			"error":   "abacatepay_checkout_failed",
@@ -394,6 +415,8 @@ func (h *AbacatePayHandler) CreateCheckoutForPending(pending *models.PendingRegi
 		"plan_id":    plan.ID.String(),
 	})
 
+	successURL := abacatepayPendingSuccessURL(baseURL, pending.ID.String())
+	returnURL := abacatepayFrontendBaseURL(baseURL) + "/register/verify?token=" + url.QueryEscape(pending.Token)
 	result, err := h.createCheckout(*plan, pending.ID.String(), map[string]string{
 		"pending_id": pending.ID.String(),
 		"plan_id":    plan.ID.String(),
@@ -402,7 +425,7 @@ func (h *AbacatePayHandler) CreateCheckoutForPending(pending *models.PendingRegi
 		"name":       pending.Name,
 		"phone":      pending.Phone,
 		"tax_id":     pending.TaxID,
-	}, customer, baseURL, mode)
+	}, customer, successURL, returnURL, mode)
 	if err != nil {
 		return nil, err
 	}
@@ -416,16 +439,16 @@ func (h *AbacatePayHandler) CreateCheckoutForPending(pending *models.PendingRegi
 }
 
 // createCheckout é o método interno que chama a API v2 correta conforme o modo.
-func (h *AbacatePayHandler) createCheckout(plan models.Plan, externalID string, metadata map[string]string, customer *abacatepayCustomer, baseURL string, mode string) (*AbacatePayCheckoutResult, error) {
+func (h *AbacatePayHandler) createCheckout(plan models.Plan, externalID string, metadata map[string]string, customer *abacatepayCustomer, completionURL string, returnURL string, mode string) (*AbacatePayCheckoutResult, error) {
 	switch mode {
 	case "transparent":
 		return h.createTransparentCheckout(plan, externalID, metadata, customer)
 	default:
-		return h.createRedirectCheckout(plan, externalID, metadata, customer, baseURL)
+		return h.createRedirectCheckout(plan, externalID, metadata, customer, completionURL, returnURL)
 	}
 }
 
-func (h *AbacatePayHandler) createRedirectCheckout(plan models.Plan, externalID string, metadata map[string]string, customer *abacatepayCustomer, baseURL string) (*AbacatePayCheckoutResult, error) {
+func (h *AbacatePayHandler) createRedirectCheckout(plan models.Plan, externalID string, metadata map[string]string, customer *abacatepayCustomer, completionURL string, returnURL string) (*AbacatePayCheckoutResult, error) {
 	productID := plan.AbacatepayProductID
 	if productID == "" {
 		return nil, fmt.Errorf("plano não tem abacatepay_product_id configurado — necessário para checkout redirect")
@@ -443,8 +466,8 @@ func (h *AbacatePayHandler) createRedirectCheckout(plan models.Plan, externalID 
 		Methods:       []string{"CARD"},
 		CustomerID:    customerID,
 		ExternalID:    externalID,
-		CompletionURL: h.webhookURL(baseURL),
-		ReturnURL:     baseURL + "/dashboard",
+		CompletionURL: completionURL,
+		ReturnURL:     returnURL,
 		Metadata:      metadata,
 	}
 
@@ -528,6 +551,12 @@ func (h *AbacatePayHandler) buildCheckoutResponse(result *AbacatePayCheckoutResu
 	return out
 }
 
+// HandleReturn keeps old AbacatePay links from landing on a JSON-only webhook URL.
+// New checkouts use completionUrl/returnUrl pointing directly to the frontend.
+func (h *AbacatePayHandler) HandleReturn(c *fiber.Ctx) error {
+	return c.Redirect(abacatepayPendingSuccessURL(c.BaseURL(), c.Query("pending_id")), fiber.StatusFound)
+}
+
 // POST /abacatepay/subscription — create recurring subscription (protected)
 func (h *AbacatePayHandler) CreateSubscriptionCheckout(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
@@ -571,7 +600,8 @@ func (h *AbacatePayHandler) CreateSubscriptionCheckout(c *fiber.Ctx) error {
 			{ID: productID, Quantity: 1},
 		},
 		ExternalID:    user.ID.String(),
-		CompletionURL: h.webhookURL(c.BaseURL()),
+		CompletionURL: abacatepayDashboardURL(c.BaseURL()),
+		ReturnURL:     abacatepayDashboardURL(c.BaseURL()),
 		Methods:       []string{"CARD"},
 	}
 
