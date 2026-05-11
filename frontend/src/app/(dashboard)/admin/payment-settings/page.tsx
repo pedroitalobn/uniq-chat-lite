@@ -124,7 +124,7 @@ export default function PaymentSettingsPage() {
       newForm.abacatepay_api_key !== "" ||
       newForm.abacatepay_webhook_secret !== (settings.abacatepay_webhook_secret || "") ||
       newForm.abacatepay_environment !== (settings.abacatepay_environment || "sandbox") ||
-      newForm.abacatepay_checkout_type !== (settings.abacatepay_checkout_type || "transparent")
+      newForm.abacatepay_checkout_type !== (settings.abacatepay_checkout_type || "redirect")
     );
   };
 
