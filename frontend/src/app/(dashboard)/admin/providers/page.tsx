@@ -647,9 +647,25 @@ function PaymentTab() {
             </div>
             <div>
               <Label>Webhook Secret</Label>
-              <Input type="password" value={form.abacatepay_webhook_secret}
-                onChange={e => setForm(f => ({ ...f, abacatepay_webhook_secret: e.target.value }))}
-                placeholder={settings?.abacatepay_webhook_secret_preview || "whsec_..."} />
+              <div className="flex items-center gap-2">
+                <Input type="password" value={form.abacatepay_webhook_secret}
+                  onChange={e => setForm(f => ({ ...f, abacatepay_webhook_secret: e.target.value }))}
+                  placeholder={settings?.abacatepay_webhook_secret_preview || "whsec_..."} />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const chars = "0123456789abcdef";
+                    let secret = "whsec_";
+                    for (let i = 0; i < 32; i++) secret += chars[Math.floor(Math.random() * 16)];
+                    setForm(f => ({ ...f, abacatepay_webhook_secret: secret }));
+                    toast.success("Secret gerado! Use o mesmo valor no AbacatePay.");
+                  }}
+                  className="text-[10px] px-3 py-2 rounded-lg font-medium shrink-0 hover:opacity-80 transition-opacity"
+                  style={{ background: "rgba(14,165,233,0.12)", border: "1px solid rgba(14,165,233,0.25)", color: "#7dd3fc" }}
+                >
+                  Gerar Secret
+                </button>
+              </div>
               {settings?.abacatepay_webhook_secret_preview && (
                 <code className="inline-block mt-1.5 text-[11px] font-mono px-1.5 py-0.5 rounded"
                   style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 65%)" }}>
@@ -675,9 +691,16 @@ function PaymentTab() {
             <Label>URL do Webhook</Label>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 60%)" }}>
-                {abacatepayWebhookURL}
+                {(() => {
+                  const secret = form.abacatepay_webhook_secret || settings?.abacatepay_webhook_secret_preview;
+                  return secret ? `${abacatepayWebhookURL}?webhookSecret=${secret}` : abacatepayWebhookURL;
+                })()}
               </code>
-              <button onClick={() => copyUrl(abacatepayWebhookURL)} className="p-2 rounded hover:bg-white/5" title="Copiar URL">
+              <button onClick={() => {
+                const secret = form.abacatepay_webhook_secret || settings?.abacatepay_webhook_secret_preview;
+                const url = secret ? `${abacatepayWebhookURL}?webhookSecret=${secret}` : abacatepayWebhookURL;
+                copyUrl(url);
+              }} className="p-2 rounded hover:bg-white/5" title="Copiar URL">
                 <Key className="w-4 h-4" style={{ color: "hsl(240 8% 55%)" }} />
               </button>
             </div>
@@ -688,16 +711,24 @@ function PaymentTab() {
               </p>
               <ol className="text-[11px] space-y-1.5 list-decimal pl-4" style={{ color: "hsl(240 8% 70%)" }}>
                 <li>
-                  No <a href="https://abacatepay.com/dashboard" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "#7dd3fc" }}>Painel AbacatePay → Configurações → Webhooks</a>, clique em <span className="font-semibold">Adicionar webhook</span>.
+                  Acesse o <a href="https://abacatepay.com/dashboard" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "#7dd3fc" }}>Painel AbacatePay → Webhooks</a> e clique em <span className="font-semibold">Criar webhook</span>.
                 </li>
                 <li>
-                  Cole a URL acima em <span className="font-mono">URL de notificação</span>.
+                  Cole a <span className="font-semibold">URL completa</span> acima (já inclui o <span className="font-mono">?webhookSecret=</span>) no campo <span className="font-semibold">URL</span> do AbacatePay.
                 </li>
                 <li>
-                  Copie o <span className="font-semibold">Webhook Secret</span> gerado e cole no campo <span className="font-semibold">Webhook Secret</span> acima.
+                  Copie o <span className="font-semibold">mesmo Secret</span> gerado acima e cole no campo <span className="font-semibold">Secret</span> do AbacatePay.
                 </li>
                 <li>
-                  Eventos recomendados: <span className="font-mono">checkout.paid</span>, <span className="font-mono">checkout.cancelled</span>, <span className="font-mono">subscription.activated</span>, <span className="font-mono">subscription.cancelled</span>.
+                  Selecione os eventos:
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {["checkout.completed", "transparent.completed", "subscription.completed", "subscription.cancelled", "subscription.renewed"].map((ev) => (
+                      <code key={ev} className="text-[10px] px-1.5 py-0.5 rounded font-mono"
+                        style={{ background: "rgba(14,165,233,0.10)", color: "#7dd3fc", border: "1px solid rgba(14,165,233,0.20)" }}>
+                        {ev}
+                      </code>
+                    ))}
+                  </div>
                 </li>
               </ol>
             </div>

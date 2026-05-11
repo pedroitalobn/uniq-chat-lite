@@ -532,10 +532,20 @@ func (h *AbacatePayHandler) handleCheckoutPaid(data *checkoutWebhookData) {
 	if planIDStr != "" {
 		var plan models.Plan
 		if h.db.First(&plan, "id = ?", planIDStr).Error == nil {
+			oldPlanID := user.PlanID
 			h.db.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
 				"plan_id":      plan.ID,
 				"is_active":    true,
 				"role":         models.RoleCustomer,
+			})
+			// Audit log
+			h.db.Create(&models.PlanChangeLog{
+				UserID:       user.ID,
+				FromPlanID:   oldPlanID,
+				ToPlanID:     &plan.ID,
+				FromPlanName: "",
+				ToPlanName:   plan.Name,
+				Source:       models.PlanChangeSourceAbacatepay,
 			})
 			go h.emailSvc.SendPaymentConfirmed(user.Email, user.Name, plan.Name, plan.Price)
 		}
@@ -568,20 +578,30 @@ func (h *AbacatePayHandler) handleSubscriptionActivated(data *checkoutWebhookDat
 		}
 	}
 
+	var user models.User
+	h.db.First(&user, "id = ?", userID)
+
 	updates := map[string]interface{}{
 		"abacatepay_subscription_status": "active",
 		"is_active": true,
 		"role":      models.RoleCustomer,
 	}
 
+	oldPlanID := user.PlanID
 	if plan.ID != uuid.Nil {
 		updates["plan_id"] = plan.ID
 	}
 
 	h.db.Model(&models.User{}).Where("id = ?", userID).Updates(updates)
 
-	var user models.User
-	if h.db.First(&user, "id = ?", userID).Error == nil && plan.ID != uuid.Nil {
+	if plan.ID != uuid.Nil {
+		h.db.Create(&models.PlanChangeLog{
+			UserID:     user.ID,
+			FromPlanID: oldPlanID,
+			ToPlanID:   &plan.ID,
+			ToPlanName: plan.Name,
+			Source:     models.PlanChangeSourceAbacatepay,
+		})
 		go h.emailSvc.SendPaymentConfirmed(user.Email, user.Name, plan.Name, plan.Price)
 	}
 }
@@ -603,16 +623,25 @@ func (h *AbacatePayHandler) handleSubscriptionCancelled(data *checkoutWebhookDat
 	var freePlan models.Plan
 
 	if h.db.First(&freePlan, "name = 'Free'").Error == nil {
+		var user models.User
+		h.db.First(&user, "id = ?", userID)
+		oldPlanID := user.PlanID
+
 		h.db.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
 			"plan_id":                        freePlan.ID,
 			"abacatepay_subscription_id":     "",
 			"abacatepay_subscription_status": "canceled",
 		})
 
-		var user models.User
-		if h.db.First(&user, "id = ?", userID).Error == nil {
-			go h.emailSvc.SendSubscriptionCanceled(user.Email, user.Name)
-		}
+		h.db.Create(&models.PlanChangeLog{
+			UserID:     user.ID,
+			FromPlanID: oldPlanID,
+			ToPlanID:   &freePlan.ID,
+			ToPlanName: freePlan.Name,
+			Source:     models.PlanChangeSourceAbacatepay,
+		})
+
+		go h.emailSvc.SendSubscriptionCanceled(user.Email, user.Name)
 	}
 }
 
@@ -669,6 +698,26 @@ func (h *AbacatePayHandler) GetSubscription(c *fiber.Ctx) error {
 		"br_code":         subResp.BrCode,
 		"payment_link":    subResp.PaymentLink,
 	})
+}
+
+// GetCheckoutStatus consulta o status de um checkout na API AbacatePay.
+// Retorna status ("pending", "paid", "cancelled", "expired") e se está pago.
+// Usado como fallback quando o webhook não chega (ex.: finalize-registration).
+func (h *AbacatePayHandler) GetCheckoutStatus(checkoutID string) (status string, paid bool, err error) {
+	respBytes, err := h.apiRequest("GET", "/checkout/"+checkoutID, nil)
+	if err != nil {
+		return "", false, fmt.Errorf("erro ao consultar checkout: %w", err)
+	}
+
+	var checkout struct {
+		ID     string `json:"id"`
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(respBytes, &checkout); err != nil {
+		return "", false, fmt.Errorf("resposta inválida: %w", err)
+	}
+
+	return checkout.Status, checkout.Status == "paid", nil
 }
 
 // GET /abacatepay/test — testa conectividade com a API (protegido, admin)

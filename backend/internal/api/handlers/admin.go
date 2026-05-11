@@ -1065,6 +1065,7 @@ func (h *AdminHandler) CreatePlan(c *fiber.Ctx) error {
 		AllowProxyResidencial bool `json:"allow_proxy_residencial"`
 		StripePriceID     string  `json:"stripe_price_id"`
 		AsaasProductID    string  `json:"asaas_product_id"`
+		AbacatepayProductID string `json:"abacatepay_product_id"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.Name == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'name' é obrigatório"})
@@ -1113,6 +1114,7 @@ func (h *AdminHandler) CreatePlan(c *fiber.Ctx) error {
 		AllowProxyResidencial: req.AllowProxyResidencial,
 		StripePriceID:     req.StripePriceID,
 		AsaasProductID:    req.AsaasProductID,
+		AbacatepayProductID: req.AbacatepayProductID,
 		IsActive:          true,
 	}
 
@@ -1189,6 +1191,7 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 		IsActive          *bool    `json:"is_active"`
 		StripePriceID     string   `json:"stripe_price_id"`
 		AsaasProductID    string   `json:"asaas_product_id"`
+		AbacatepayProductID string `json:"abacatepay_product_id"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -1376,6 +1379,9 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 	}
 	if req.AsaasProductID != "" {
 		updates["asaas_product_id"] = req.AsaasProductID
+	}
+	if req.AbacatepayProductID != "" {
+		updates["abacatepay_product_id"] = req.AbacatepayProductID
 	}
 
 	if err := h.db.Model(&plan).Updates(updates).Error; err != nil {

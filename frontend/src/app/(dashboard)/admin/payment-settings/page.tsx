@@ -677,13 +677,29 @@ export default function PaymentSettingsPage() {
             </div>
             <div>
               <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Webhook Secret</label>
-              <input
-                type="text"
-                value={form.abacatepay_webhook_secret}
-                onChange={(e) => updateForm({ abacatepay_webhook_secret: e.target.value })}
-                placeholder={settings?.abacatepay_webhook_secret ? maskKey(settings.abacatepay_webhook_secret) : "whsec_..."}
-                className="input-field w-full font-mono text-xs"
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={form.abacatepay_webhook_secret}
+                  onChange={(e) => updateForm({ abacatepay_webhook_secret: e.target.value })}
+                  placeholder={settings?.abacatepay_webhook_secret ? maskKey(settings.abacatepay_webhook_secret) : "whsec_..."}
+                  className="input-field flex-1 font-mono text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const chars = "0123456789abcdef";
+                    let secret = "whsec_";
+                    for (let i = 0; i < 32; i++) secret += chars[Math.floor(Math.random() * 16)];
+                    updateForm({ abacatepay_webhook_secret: secret });
+                    toast.success("Secret gerado! Use o mesmo valor no AbacatePay.");
+                  }}
+                  className="text-[10px] px-3 py-2 rounded-lg font-medium shrink-0 hover:opacity-80 transition-opacity"
+                  style={{ background: "rgba(14,165,233,0.12)", border: "1px solid rgba(14,165,233,0.25)", color: "#7dd3fc" }}
+                >
+                  Gerar Secret
+                </button>
+              </div>
               {isKeyFilled(settings?.abacatepay_webhook_secret) && (
                 <p className="text-[10px] mt-1" style={{ color: "var(--green)" }}>✓ Configurado</p>
               )}
@@ -750,12 +766,18 @@ export default function PaymentSettingsPage() {
             <label className="text-xs block mb-2" style={{ color: "hsl(240 8% 46%)" }}>URL do Webhook (para configurar no AbacatePay)</label>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 12% 10%)", color: "hsl(240 8% 60%)" }}>
-                {settings?.abacatepay_webhook_url || `${process.env.NEXT_PUBLIC_API_URL?.replace('/v1', '') || 'https://api.uniq.chat'}/abacatepay/webhook`}
+                {(() => {
+                  const base = settings?.abacatepay_webhook_url || `${process.env.NEXT_PUBLIC_API_URL?.replace('/v1', '') || 'https://api.uniq.chat'}/abacatepay/webhook`;
+                  const secret = form.abacatepay_webhook_secret || settings?.abacatepay_webhook_secret;
+                  return secret ? `${base}?webhookSecret=${secret}` : base;
+                })()}
               </code>
               <button
                 type="button"
                 onClick={() => {
-                  const url = settings?.abacatepay_webhook_url || `${process.env.NEXT_PUBLIC_API_URL?.replace('/v1', '') || 'https://api.uniq.chat'}/abacatepay/webhook`;
+                  const base = settings?.abacatepay_webhook_url || `${process.env.NEXT_PUBLIC_API_URL?.replace('/v1', '') || 'https://api.uniq.chat'}/abacatepay/webhook`;
+                  const secret = form.abacatepay_webhook_secret || settings?.abacatepay_webhook_secret;
+                  const url = secret ? `${base}?webhookSecret=${secret}` : base;
                   navigator.clipboard.writeText(url);
                   toast.success("URL copiada!");
                 }}
@@ -764,9 +786,34 @@ export default function PaymentSettingsPage() {
                 <Copy className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 38%)" }}>
-              Configure esta URL no painel do AbacatePay em: Configurações → Webhooks
-            </p>
+            <div className="mt-3 rounded-lg p-3 space-y-2.5"
+              style={{ background: "rgba(14,165,233,0.06)", border: "1px solid rgba(14,165,233,0.18)" }}>
+              <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "#7dd3fc" }}>
+                Como configurar no AbacatePay
+              </p>
+              <ol className="text-[11px] space-y-1.5 list-decimal pl-4" style={{ color: "hsl(240 8% 70%)" }}>
+                <li>
+                  Acesse o <a href="https://abacatepay.com/dashboard" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "#7dd3fc" }}>Painel AbacatePay → Webhooks</a> e clique em <span className="font-semibold">Criar webhook</span>.
+                </li>
+                <li>
+                  Cole a <span className="font-semibold">URL completa</span> acima (já inclui o <span className="font-mono">?webhookSecret=</span>) no campo <span className="font-semibold">URL</span> do AbacatePay.
+                </li>
+                <li>
+                  Copie o <span className="font-semibold">mesmo Secret</span> gerado acima e cole no campo <span className="font-semibold">Secret</span> do AbacatePay.
+                </li>
+                <li>
+                  Selecione os eventos:
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {["checkout.completed", "transparent.completed", "subscription.completed", "subscription.cancelled", "subscription.renewed"].map((ev) => (
+                      <code key={ev} className="text-[10px] px-1.5 py-0.5 rounded font-mono"
+                        style={{ background: "rgba(14,165,233,0.10)", color: "#7dd3fc", border: "1px solid rgba(14,165,233,0.20)" }}>
+                        {ev}
+                      </code>
+                    ))}
+                  </div>
+                </li>
+              </ol>
+            </div>
           </div>
 
           {/* Status do teste de conexão */}

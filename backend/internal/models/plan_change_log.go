@@ -11,9 +11,10 @@ import (
 type PlanChangeSource string
 
 const (
-	PlanChangeSourceStripe PlanChangeSource = "stripe"
-	PlanChangeSourceAsaas  PlanChangeSource = "asaas"
-	PlanChangeSourceAdmin  PlanChangeSource = "admin"  // troca manual via /admin/users
+	PlanChangeSourceStripe    PlanChangeSource = "stripe"
+	PlanChangeSourceAsaas     PlanChangeSource = "asaas"
+	PlanChangeSourceAbacatepay PlanChangeSource = "abacatepay"
+	PlanChangeSourceAdmin     PlanChangeSource = "admin"  // troca manual via /admin/users
 	PlanChangeSourceSelf   PlanChangeSource = "self"   // user clicou Upgrade
 	PlanChangeSourceTrial  PlanChangeSource = "trial"  // expirou trial → downgrade automático
 	PlanChangeSourceSignup PlanChangeSource = "signup" // novo cadastro

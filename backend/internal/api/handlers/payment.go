@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/models"
 	"gorm.io/gorm"
@@ -126,9 +127,29 @@ func (h *PaymentHandler) FinalizeRegistration(c *fiber.Ctx) error {
 		// Asaas finalize ainda não implementado — quando estiver,
 		// segue o mesmo padrão. Por ora, cai no 202 abaixo.
 	case "abacatepay":
-		// AbacatePay: webhook é o caminho principal. Se o user já foi
-		// materializado pelo webhook, o Caminho 1 já resolveu acima.
-		// Se ainda não, o poll do front vai tentar de novo.
+		// Fallback: consulta API AbacatePay pra confirmar pagamento.
+		checkoutID := pending.AbaCustID
+		if checkoutID != "" {
+			status, paid, apiErr := h.abacatepayH.GetCheckoutStatus(checkoutID)
+			if apiErr != nil {
+				log.Warn().Str("checkout_id", checkoutID).Err(apiErr).Msg("abacatepay fallback: erro ao consultar API")
+			} else if paid {
+				// Materializa o usuário se o checkout está pago mas webhook não chegou.
+				if _, err := h.materializeFromPending(&pending); err != nil {
+					log.Error().Err(err).Str("pending_id", pendingID.String()).Msg("abacatepay fallback: erro ao materializar")
+				} else if user, ok := h.lookupMaterializedUser(&pending); ok {
+					return h.respondWithSession(c, user)
+				}
+			} else if status == "pending" {
+				log.Debug().Str("checkout_id", checkoutID).Str("status", status).Msg("abacatepay fallback: ainda pendente")
+			} else {
+				// cancelled, expired — não faz sentido continuar polling
+				return c.Status(fiber.StatusGone).JSON(fiber.Map{
+					"status":  status,
+					"message": "pagamento expirado ou cancelado",
+				})
+			}
+		}
 	}
 
 	// Caminho 3: ainda processando — front deve fazer poll.
@@ -162,6 +183,91 @@ func (h *PaymentHandler) lookupMaterializedUser(p *models.PendingRegistration) (
 		return nil, false
 	}
 	return &user, true
+}
+
+// materializeFromPending cria User+Workspace a partir do snapshot no
+// PendingRegistration. Provider-agnóstico — usado como fallback quando o
+// webhook não chega mas a API do provider confirma pagamento.
+// Idempotente: claim atômico no completed_at evita duplicação.
+func (h *PaymentHandler) materializeFromPending(p *models.PendingRegistration) (*models.User, error) {
+	if p.Name == "" || p.PasswordHash == "" {
+		return nil, nil
+	}
+
+	now := time.Now()
+	res := h.db.Model(&models.PendingRegistration{}).
+		Where("id = ? AND completed_at IS NULL", p.ID).
+		Update("completed_at", now)
+	if res.Error != nil {
+		return nil, res.Error
+	}
+	if res.RowsAffected == 0 {
+		// Outro caminho (webhook) já materializou.
+		var existing models.User
+		if h.db.Where("email = ?", p.Email).First(&existing).Error == nil {
+			return &existing, nil
+		}
+		return nil, nil
+	}
+	p.CompletedAt = &now
+
+	var plan models.Plan
+	hasPlan := false
+	if p.PlanID != nil && *p.PlanID != uuid.Nil {
+		if h.db.First(&plan, "id = ?", *p.PlanID).Error == nil {
+			hasPlan = true
+		}
+	}
+
+	user := models.User{
+		Name:         p.Name,
+		Email:        p.Email,
+		Role:         models.RoleCustomer,
+		IsActive:     true,
+		PasswordHash: p.PasswordHash,
+	}
+	if p.Username != "" {
+		u := p.Username
+		user.Username = &u
+	}
+	if hasPlan {
+		user.PlanID = &plan.ID
+	}
+	if err := h.db.Create(&user).Error; err != nil {
+		return nil, err
+	}
+
+	if p.InviteCode != "" {
+		MarkInviteCodeUsed(h.db, p.InviteCode, user.ID)
+	}
+
+	wsName := p.WorkspaceName
+	if wsName == "" {
+		first := strings.Fields(p.Name)
+		if len(first) > 0 {
+			wsName = first[0] + "'s Workspace"
+		} else {
+			wsName = "Meu Workspace"
+		}
+	}
+	if ws := createDefaultWorkspace(h.db, &user, wsName); ws == nil {
+		log.Error().Str("user_id", user.ID.String()).Str("workspace_name", wsName).
+			Msg("materializeFromPending: createDefaultWorkspace falhou — user materializado sem workspace")
+	}
+
+	// PlanChangeLog de signup
+	if hasPlan {
+		changeLog := models.PlanChangeLog{
+			UserID:       user.ID,
+			ToPlanID:     &plan.ID,
+			ToPlanName:   plan.Name,
+			Source:       models.PlanChangeSourceSignup,
+			Notes:        "materializado via fallback de provider",
+		}
+		h.db.Create(&changeLog)
+	}
+
+	return &user, nil
 }
 
 // respondWithSession devolve access_token + refresh_token (cookie) +
