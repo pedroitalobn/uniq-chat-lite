@@ -35,6 +35,15 @@ ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_proxy_residencial BOOLEAN NOT N
 ALTER TABLE plans ADD COLUMN IF NOT EXISTS stripe_price_id VARCHAR(255);
 ALTER TABLE plans ADD COLUMN IF NOT EXISTS asaas_product_id VARCHAR(255);
 ALTER TABLE plans ADD COLUMN IF NOT EXISTS abacatepay_product_id VARCHAR(255);
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_whatsapp_qr BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_waba BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_voice BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_proxy BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS ai_credits_included_per_cycle BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS voice_credits_included_per_cycle BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS message_credits_included_per_cycle BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS overage_allowed_default BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS overage_millicents_per_credit BIGINT;
 
 -- Índice único no slug (só cria se não existir)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_plans_slug ON plans(slug) WHERE slug != '';

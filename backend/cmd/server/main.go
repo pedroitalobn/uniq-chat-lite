@@ -890,6 +890,16 @@ func applyPlansMigration(db *gorm.DB) {
 		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_proxy_residencial BOOLEAN NOT NULL DEFAULT false`,
 		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_helpdesk BOOLEAN NOT NULL DEFAULT false`,
 		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_webchat BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_whatsapp_qr BOOLEAN NOT NULL DEFAULT true`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_waba BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_voice BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS allow_proxy BOOLEAN NOT NULL DEFAULT false`,
+		// Créditos — sistema de consumo metered
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS ai_credits_included_per_cycle BIGINT NOT NULL DEFAULT 0`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS voice_credits_included_per_cycle BIGINT NOT NULL DEFAULT 0`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS message_credits_included_per_cycle BIGINT NOT NULL DEFAULT 0`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS overage_allowed_default BOOLEAN NOT NULL DEFAULT false`,
+		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS overage_millicents_per_credit BIGINT`,
 		// Habilita helpdesk e webchat para planos Pro e Business
 		`UPDATE plans SET allow_helpdesk = true, allow_webchat = true WHERE name IN ('Pro', 'Business') AND (allow_helpdesk = false OR allow_webchat = false)`,
 		`ALTER TABLE plans ADD COLUMN IF NOT EXISTS stripe_price_id VARCHAR(255)`,
