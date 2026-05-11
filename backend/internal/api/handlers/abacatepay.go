@@ -184,11 +184,6 @@ type abacatepayCustomerResponse struct {
 	ID string `json:"id"`
 }
 
-type abacatepayCustomerCreateRequest struct {
-	Data     abacatepayCustomer `json:"data"`
-	Metadata map[string]string  `json:"metadata,omitempty"`
-}
-
 type abacatepayCheckoutCreateResponse struct {
 	ID        string `json:"id"`
 	URL       string `json:"url"`
@@ -332,18 +327,20 @@ func (h *AbacatePayHandler) ensureAbacatePayCustomer(customer *abacatepayCustome
 	if customer == nil || strings.TrimSpace(customer.Email) == "" {
 		return "", nil
 	}
-	req := abacatepayCustomerCreateRequest{
-		Data: abacatepayCustomer{
-			Name:      customer.Name,
-			Cellphone: customer.Cellphone,
-			Email:     customer.Email,
-			TaxID:     customer.TaxID,
-		},
-		Metadata: customer.Metadata,
-	}
-	body, _ := json.Marshal(req)
+	body, _ := json.Marshal(customer)
 	var resp abacatepayCustomerResponse
 	if err := h.apiRequestV2("POST", "/customers/create", body, &resp); err != nil {
+		// taxId é útil para CPF/CNPJ, mas não pode impedir o checkout se
+		// o provider recusar o documento. Retentamos com nome/e-mail/celular.
+		if strings.TrimSpace(customer.TaxID) != "" {
+			retry := *customer
+			retry.TaxID = ""
+			body, _ = json.Marshal(retry)
+			resp = abacatepayCustomerResponse{}
+			if retryErr := h.apiRequestV2("POST", "/customers/create", body, &resp); retryErr == nil {
+				return resp.ID, nil
+			}
+		}
 		return "", err
 	}
 	return resp.ID, nil
