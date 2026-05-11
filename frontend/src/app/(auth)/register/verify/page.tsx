@@ -6,7 +6,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User, Building2, AtSign, Lock, Eye, EyeOff,
-  ArrowRight, Loader2, AlertCircle, CheckCircle2, XCircle,
+  ArrowRight, Loader2, AlertCircle, CheckCircle2, XCircle, Phone,
 } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { Logo } from "@/components/Logo";
@@ -126,6 +126,7 @@ function CompleteForm({
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [company, setCompany] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -170,9 +171,19 @@ function CompleteForm({
   const planLabel = hasPrefilledPlan ? prefilledPlanName : selectedPlan?.name;
   const planPriceVal = hasPrefilledPlan ? prefilledPlanPrice : selectedPlan?.price;
 
+  function formatPhone(v: string) {
+    const d = v.replace(/\D/g, "").slice(0, 11);
+    if (d.length <= 2) return d;
+    if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  }
+
   function validate() {
     const e: Record<string, string> = {};
     if (!name.trim()) e.name = "Nome é obrigatório";
+    const rawPhone = phone.replace(/\D/g, "");
+    if (!rawPhone) e.phone = "Telefone é obrigatório";
+    else if (rawPhone.length < 10) e.phone = "Telefone inválido — mínimo 10 dígitos";
     if (password.length < 8) e.password = "Mínimo 8 caracteres";
     if (confirmPassword !== password) e.confirmPassword = "Senhas não coincidem";
     setErrors(e);
@@ -193,10 +204,7 @@ function CompleteForm({
           username: username.trim().toLowerCase() || undefined,
           workspace_name: company.trim() || undefined,
           password,
-          // plan_id é o que o user escolheu agora; backend aceita como
-          // override do plan_id setado em /register/start. Se o user
-          // clicou no plano pago, o backend cria lead em IsActive=false e
-          // devolve url/client_secret pra Stripe.
+          phone: phone.replace(/\D/g, ""),
           plan_id: selectedPlanID || undefined,
         }),
       });
@@ -210,9 +218,23 @@ function CompleteForm({
         return;
       }
 
-      // Paid plan, redirect Stripe Checkout (Stripe hosted)
+      // Paid plan, redirect checkout (Stripe hosted / AbacatePay redirect)
       if (data.checkout_type === "redirect" && data.url) {
         window.location.href = data.url;
+        return;
+      }
+      // Paid plan, transparent PIX (AbacatePay)
+      if (data.checkout_type === "transparent" && data.br_code) {
+        const params = new URLSearchParams({
+          br_code: data.br_code,
+          br_code_base64: data.br_code_base64 ?? "",
+          plan_name: data.plan_name ?? "",
+          plan_price: String(data.plan_price ?? ""),
+          email,
+        });
+        if (data.pending_id) params.set("pending_id", data.pending_id);
+        if (data.checkout_id) params.set("checkout_id", data.checkout_id);
+        router.push(`/checkout?${params.toString()}`);
         return;
       }
       // Paid plan, transparent — leva pro próximo passo de pagamento
@@ -268,6 +290,10 @@ function CompleteForm({
 
       <Field label="Seu nome" value={name} onChange={setName} placeholder="João Silva"
         autoFocus icon={<User className="w-4 h-4" />} error={errors.name} />
+
+      <Field label="Telefone" value={phone} onChange={v => setPhone(formatPhone(v))}
+        placeholder="(11) 99999-8888" icon={<Phone className="w-4 h-4" />}
+        hint="WhatsApp para notificações" error={errors.phone} />
 
       <Field label="Username (opcional)" value={username} onChange={setUsername}
         placeholder="@joaosilva" icon={<AtSign className="w-4 h-4" />}

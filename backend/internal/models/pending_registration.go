@@ -29,6 +29,7 @@ type PendingRegistration struct {
 	// era criada inativa antes do checkout, agora só existe se o pagamento
 	// passou.
 	Name              string `gorm:"type:varchar(255)" json:"-"`
+	Phone             string `gorm:"type:varchar(30)" json:"-"`
 	Username          string `gorm:"type:varchar(60)" json:"-"`
 	WorkspaceName     string `gorm:"type:varchar(120)" json:"-"`
 	PasswordHash      string `gorm:"type:varchar(255)" json:"-"`

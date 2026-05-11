@@ -282,6 +282,51 @@ func (h *AbacatePayHandler) CreateCheckout(c *fiber.Ctx) error {
 	return c.JSON(out)
 }
 
+// CreateCheckoutForPending cria um checkout AbacatePay para uma
+// PendingRegistration, sem requerer usuário autenticado. Usado pelo
+// fluxo de register/complete quando active_provider = abacatepay.
+// Guarda o checkout ID no pending e devolve a resposta da API.
+func (h *AbacatePayHandler) CreateCheckoutForPending(pending *models.PendingRegistration, plan *models.Plan, baseURL string) (*abacatepayCheckoutResponse, error) {
+	apiKey := h.getAPIKey()
+	if apiKey == "" {
+		return nil, fmt.Errorf("abacatepay não configurado")
+	}
+
+	amount := int64(plan.Price * 100) // centavos
+
+	checkoutReq := abacatepayCheckoutRequest{
+		ExternalReference: pending.ID.String(),
+		Amount:            amount,
+		Currency:          "BRL",
+		Description:       fmt.Sprintf("Assinatura %s — Uniq Chat", plan.Name),
+		PaymentMethods:    []string{"pix"},
+		Metadata: map[string]string{
+			"pending_id": pending.ID.String(),
+			"plan_id":    plan.ID.String(),
+			"plan_name":  plan.Name,
+			"email":      pending.Email,
+		},
+		CallbackURL: h.webhookURL(baseURL),
+	}
+
+	body, _ := json.Marshal(checkoutReq)
+	respBytes, err := h.apiRequest("POST", "/checkout", body)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao criar checkout: %w", err)
+	}
+
+	var checkoutResp abacatepayCheckoutResponse
+	if err := json.Unmarshal(respBytes, &checkoutResp); err != nil {
+		return nil, fmt.Errorf("resposta inválida do AbacatePay: %w", err)
+	}
+
+	// Guarda o checkout ID no pending pra webhook/fallback identificar.
+	pending.AbaCustID = checkoutResp.ID
+	h.db.Model(pending).Update("aba_cust_id", checkoutResp.ID)
+
+	return &checkoutResp, nil
+}
+
 // POST /abacatepay/subscription — create recurring PIX subscription (protected)
 func (h *AbacatePayHandler) CreateSubscriptionCheckout(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
@@ -506,13 +551,27 @@ func (h *AbacatePayHandler) HandleWebhook(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"received": true})
 }
 
-// handleCheckoutPaid processa checkout pago (único, não recorrente).
-// externalReference contém o user_id.
+// handleCheckoutPaid processa checkout pago.
+// Suporta dois fluxos:
+//  1. Registro novo (metadata.pending_id) → materializa User+Workspace
+//  2. Upgrade de user existente (metadata.user_id) → ativa novo plano
 func (h *AbacatePayHandler) handleCheckoutPaid(data *checkoutWebhookData) {
 	if data.ExternalReference == "" {
 		return
 	}
 
+	var meta map[string]string
+	if data.Metadata != "" {
+		json.Unmarshal([]byte(data.Metadata), &meta)
+	}
+
+	// Fluxo 1: registro novo — externalReference = pending_id
+	if meta != nil && meta["pending_id"] != "" {
+		h.materializePendingRegistration(meta["pending_id"], meta["plan_id"])
+		return
+	}
+
+	// Fluxo 2: upgrade de user existente
 	userID := data.ExternalReference
 	var user models.User
 	if h.db.First(&user, "id = ?", userID).Error != nil {
@@ -520,15 +579,7 @@ func (h *AbacatePayHandler) handleCheckoutPaid(data *checkoutWebhookData) {
 		return
 	}
 
-	// Pega plan_id do metadata se existir
-	var planIDStr string
-	if data.Metadata != "" {
-		var meta map[string]string
-		if json.Unmarshal([]byte(data.Metadata), &meta) == nil {
-			planIDStr = meta["plan_id"]
-		}
-	}
-
+	planIDStr := meta["plan_id"]
 	if planIDStr != "" {
 		var plan models.Plan
 		if h.db.First(&plan, "id = ?", planIDStr).Error == nil {
@@ -538,7 +589,6 @@ func (h *AbacatePayHandler) handleCheckoutPaid(data *checkoutWebhookData) {
 				"is_active":    true,
 				"role":         models.RoleCustomer,
 			})
-			// Audit log
 			h.db.Create(&models.PlanChangeLog{
 				UserID:       user.ID,
 				FromPlanID:   oldPlanID,
@@ -550,6 +600,90 @@ func (h *AbacatePayHandler) handleCheckoutPaid(data *checkoutWebhookData) {
 			go h.emailSvc.SendPaymentConfirmed(user.Email, user.Name, plan.Name, plan.Price)
 		}
 	}
+}
+
+// materializePendingRegistration cria User+Workspace a partir do snapshot
+// no PendingRegistration quando o webhook da AbacatePay confirma pagamento.
+func (h *AbacatePayHandler) materializePendingRegistration(pendingIDStr, planIDStr string) {
+	pendingID, err := uuid.Parse(pendingIDStr)
+	if err != nil {
+		return
+	}
+	var pending models.PendingRegistration
+	if err := h.db.First(&pending, "id = ?", pendingID).Error; err != nil {
+		return
+	}
+	if pending.Name == "" || pending.PasswordHash == "" {
+		return
+	}
+
+	// Claim atômico — evita duplicação se webhook for reentregue.
+	now := time.Now()
+	res := h.db.Model(&models.PendingRegistration{}).
+		Where("id = ? AND completed_at IS NULL", pendingID).
+		Update("completed_at", now)
+	if res.Error != nil || res.RowsAffected == 0 {
+		return
+	}
+	pending.CompletedAt = &now
+
+	planID, _ := uuid.Parse(planIDStr)
+	var plan models.Plan
+	hasPlan := false
+	if planID != uuid.Nil {
+		if h.db.First(&plan, "id = ?", planID).Error == nil {
+			hasPlan = true
+		}
+	}
+
+	user := models.User{
+		Name:         pending.Name,
+		Email:        pending.Email,
+		Phone:        pending.Phone,
+		Role:         models.RoleCustomer,
+		IsActive:     true,
+		PasswordHash: pending.PasswordHash,
+	}
+	if pending.Username != "" {
+		u := pending.Username
+		user.Username = &u
+	}
+	if hasPlan {
+		user.PlanID = &plan.ID
+	}
+	if err := h.db.Create(&user).Error; err != nil {
+		return
+	}
+
+	if pending.InviteCode != "" {
+		MarkInviteCodeUsed(h.db, pending.InviteCode, user.ID)
+	}
+
+	wsName := pending.WorkspaceName
+	if wsName == "" {
+		first := strings.Fields(pending.Name)
+		if len(first) > 0 {
+			wsName = first[0] + "'s Workspace"
+		} else {
+			wsName = "Meu Workspace"
+		}
+	}
+	if ws := createDefaultWorkspace(h.db, &user, wsName); ws == nil {
+		log.Error().Str("user_id", user.ID.String()).Str("workspace_name", wsName).
+			Msg("abacatepay materializePendingRegistration: createDefaultWorkspace falhou")
+	}
+
+	if hasPlan {
+		h.db.Create(&models.PlanChangeLog{
+			UserID:     user.ID,
+			ToPlanID:   &plan.ID,
+			ToPlanName: plan.Name,
+			Source:     models.PlanChangeSourceAbacatepay,
+			Notes:      "materializado via webhook abacatepay",
+		})
+		go h.emailSvc.SendPaymentConfirmed(user.Email, user.Name, plan.Name, plan.Price)
+	}
+	go h.emailSvc.SendWelcome(user.Email, user.Name)
 }
 
 func (h *AbacatePayHandler) handleCheckoutCancelled(data *checkoutWebhookData) {

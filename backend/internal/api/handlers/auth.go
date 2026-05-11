@@ -475,9 +475,10 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 }
 
 type AuthHandler struct {
-	db       *gorm.DB
-	emailSvc *email.Service
-	manager  *whatsapp.Manager
+	db          *gorm.DB
+	emailSvc    *email.Service
+	manager     *whatsapp.Manager
+	abacatepayH *AbacatePayHandler
 }
 
 // createDefaultWorkspace cria (idempotente) um workspace "default" pro usuário:
@@ -557,8 +558,8 @@ func createDefaultWorkspace(db *gorm.DB, user *models.User, name string) *models
 	return ws
 }
 
-func NewAuthHandler(db *gorm.DB, emailSvc *email.Service, manager *whatsapp.Manager) *AuthHandler {
-	return &AuthHandler{db: db, emailSvc: emailSvc, manager: manager}
+func NewAuthHandler(db *gorm.DB, emailSvc *email.Service, manager *whatsapp.Manager, abacatepayH *AbacatePayHandler) *AuthHandler {
+	return &AuthHandler{db: db, emailSvc: emailSvc, manager: manager, abacatepayH: abacatepayH}
 }
 
 // validateAnthropicKey checks if the key is valid by hitting Anthropic Models API.
@@ -1306,6 +1307,7 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		Username              string `json:"username"`
 		WorkspaceName         string `json:"workspace_name"`
 		Password              string `json:"password"`
+		Phone                 string `json:"phone"`
 		PlanID                string `json:"plan_id"` // override plan if different from start
 	}
 	if err := c.BodyParser(&req); err != nil {
@@ -1315,6 +1317,7 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 	req.Username = strings.TrimSpace(strings.ToLower(req.Username))
 	req.WorkspaceName = strings.TrimSpace(req.WorkspaceName)
 	req.Password = strings.TrimSpace(req.Password)
+	req.Phone = strings.TrimSpace(req.Phone)
 
 	if req.PendingRegistrationID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "pending_registration_id é obrigatório"})
@@ -1324,6 +1327,9 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 	}
 	if len(req.Password) < 8 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "senha deve ter ao menos 8 caracteres"})
+	}
+	if req.Phone == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "telefone é obrigatório"})
 	}
 
 	prID, err := uuid.Parse(req.PendingRegistrationID)
@@ -1388,155 +1394,197 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 
 	// ────────────────────────────────────────────────────────────────
 	// Plano pago → adiamos a criação do User/Workspace até o webhook
-	// confirmar o pagamento. Antes a conta era criada com IsActive=false
-	// antes do checkout — isso vazava registros "fantasmas" quando o
-	// user abandonava o pagamento. Agora persistimos os dados do form
-	// no PendingRegistration; o User+Workspace só nascem em
-	// handleCheckoutCompleted/handlePaymentIntentSucceeded.
+	// confirmar o pagamento. O provider de checkout é determinado pelo
+	// active_provider salvo no DB (admin UI → /admin/providers).
 	// ────────────────────────────────────────────────────────────────
 	if isPaidPlan && plan != nil {
-		if plan.StripePriceID == "" {
-			// Plano configurado como pago no DB mas sem price_id no
-			// Stripe — config errada. Sem isso o subscription mode
-			// retornaria 500 do Stripe sem mensagem clara.
-			return c.Status(fiber.StatusFailedDependency).JSON(fiber.Map{
-				"error": "plano pago sem price_id do Stripe configurado — contacte o suporte",
-			})
-		}
-
 		hashed, err := models.HashPassword(req.Password)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao processar senha"})
 		}
 
-		loadStripeConfigFromDB(h.db)
-		if stripeKey == "" {
-			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "pagamento não configurado — contacte o suporte"})
-		}
-		stripe.Key = stripeKey
-
-		cp := &stripe.CustomerParams{
-			Email: stripe.String(pending.Email),
-			Name:  stripe.String(req.Name),
-			Metadata: map[string]string{
-				"pending_id": pending.ID.String(),
-			},
-		}
-		sc, err := stripecustomer.New(cp)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar cliente Stripe"})
-		}
-
-		// Snapshot do form no pending — vamos materializar User+Workspace
-		// no webhook usando esses dados. plan_id também vai aqui pra
-		// cobrir o caso onde o user escolheu o plano só no passo final
-		// (/register/verify) e não veio com plan_id já no /start —
-		// sem isso o materialize reads pending.PlanID nil e cria o
-		// User sem plano, caindo em "free" no feature gate.
+		// Snapshot comum a todos os providers — User+Workspace só
+		// nasce quando o pagamento confirma (webhook ou fallback).
 		patch := map[string]any{
-			"name":               req.Name,
-			"username":           req.Username,
-			"workspace_name":     req.WorkspaceName,
-			"password_hash":      hashed,
-			"stripe_customer_id": sc.ID,
-			"plan_id":            plan.ID,
+			"name":           req.Name,
+			"username":       req.Username,
+			"workspace_name": req.WorkspaceName,
+			"password_hash":  hashed,
+			"plan_id":        plan.ID,
+			"phone":          req.Phone,
 		}
-		h.db.Model(&pending).Updates(patch)
 
-		frontendURL := resolveFrontendURL()
-		if frontendURL == "" {
-			log.Error().Msg("stripe checkout: FRONTEND_URL e APP_URL ausentes/inválidas — defina em prod")
-			return SafeErr(c, fiber.StatusServiceUnavailable, "frontend_url_missing",
-				"configuração do servidor incompleta — FRONTEND_URL precisa estar setada", nil)
+		// Lê provider ativo do DB pra decidir qual gateway usar.
+		var settings models.PaymentSettings
+		activeProvider := models.PaymentProviderStripe
+		if h.db.Where("id = ?", "default").First(&settings).Error == nil && settings.ActiveProvider != "" {
+			activeProvider = settings.ActiveProvider
 		}
-		checkoutType := getStripeCheckoutType(h.db)
 
-		if checkoutType == "transparent" {
-			params := &stripe.PaymentIntentParams{
-				Amount:      stripe.Int64(int64(plan.Price * 100)),
-				Currency:    stripe.String("brl"),
-				Customer:    stripe.String(sc.ID),
-				Description: stripe.String("Assinatura " + plan.Name),
+		switch activeProvider {
+		case models.PaymentProviderAbacatePay:
+			if h.abacatepayH == nil {
+				return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "AbacatePay não está disponível"})
+			}
+			checkout, err := h.abacatepayH.CreateCheckoutForPending(&pending, plan, c.BaseURL())
+			if err != nil {
+				return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+					"error":   "abacatepay_checkout_failed",
+					"message": "Erro ao criar checkout no AbacatePay: " + err.Error(),
+				})
+			}
+			patch["aba_cust_id"] = checkout.ID
+			h.db.Model(&pending).Updates(patch)
+
+			mode := h.abacatepayH.checkoutMode()
+			out := fiber.Map{
+				"checkout_type": mode,
+				"checkout_id":   checkout.ID,
+				"plan_name":     plan.Name,
+				"plan_price":    plan.Price,
+				"amount_cents":  checkout.Amount,
+				"status":        checkout.Status,
+				"pending_id":    pending.ID.String(),
+			}
+			if mode == "transparent" && checkout.BrCode != "" {
+				out["br_code"] = checkout.BrCode
+				out["br_code_base64"] = generateQRBase64(checkout.BrCode)
+				out["payment_method"] = "pix"
+				out["message"] = "QR Code PIX gerado — escaneie com seu banco"
+			} else {
+				out["payment_link"] = checkout.PaymentLink
+				out["payment_method"] = "redirect"
+				out["url"] = checkout.PaymentLink
+				out["message"] = "Redirecione o usuário para o link de pagamento"
+			}
+			return c.JSON(out)
+
+		case models.PaymentProviderAsaas:
+			return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
+				"error":   "asaas_not_implemented",
+				"message": "Fluxo de registro com Asaas ainda não implementado — use Stripe ou AbacatePay",
+			})
+
+		default: // stripe
+			if plan.StripePriceID == "" {
+				return c.Status(fiber.StatusFailedDependency).JSON(fiber.Map{
+					"error": "plano pago sem price_id do Stripe configurado — contacte o suporte",
+				})
+			}
+
+			loadStripeConfigFromDB(h.db)
+			if stripeKey == "" {
+				return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "pagamento não configurado — contacte o suporte"})
+			}
+			stripe.Key = stripeKey
+
+			cp := &stripe.CustomerParams{
+				Email: stripe.String(pending.Email),
+				Name:  stripe.String(req.Name),
+				Phone: stripe.String(req.Phone),
+				Metadata: map[string]string{
+					"pending_id": pending.ID.String(),
+				},
+			}
+			sc, err := stripecustomer.New(cp)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar cliente Stripe"})
+			}
+
+			patch["stripe_customer_id"] = sc.ID
+			h.db.Model(&pending).Updates(patch)
+
+			frontendURL := resolveFrontendURL()
+			if frontendURL == "" {
+				log.Error().Msg("stripe checkout: FRONTEND_URL e APP_URL ausentes/inválidas — defina em prod")
+				return SafeErr(c, fiber.StatusServiceUnavailable, "frontend_url_missing",
+					"configuração do servidor incompleta — FRONTEND_URL precisa estar setada", nil)
+			}
+			checkoutType := getStripeCheckoutType(h.db)
+
+			if checkoutType == "transparent" {
+				params := &stripe.PaymentIntentParams{
+					Amount:      stripe.Int64(int64(plan.Price * 100)),
+					Currency:    stripe.String("brl"),
+					Customer:    stripe.String(sc.ID),
+					Description: stripe.String("Assinatura " + plan.Name),
+					Metadata: map[string]string{
+						"pending_id": pending.ID.String(),
+						"plan_id":    plan.ID.String(),
+					},
+					AutomaticPaymentMethods: &stripe.PaymentIntentAutomaticPaymentMethodsParams{
+						Enabled: stripe.Bool(true),
+					},
+				}
+				pi, err := paymentintent.New(params)
+				if err != nil {
+					msg := "não foi possível criar o pagamento — tente novamente em alguns instantes"
+					if se, ok := err.(*stripe.Error); ok {
+						switch se.Code {
+						case stripe.ErrorCodeResourceMissing:
+							msg = "recurso Stripe não encontrado — verifique se a chave/price está no modo certo (test/live)"
+						case stripe.ErrorCode("api_key_expired"):
+							msg = "chave Stripe expirada — admin precisa rotacionar em /admin/providers"
+						case stripe.ErrorCode("amount_too_small"):
+							msg = "valor do plano abaixo do mínimo aceito pela Stripe"
+						}
+					}
+					return SafeErr(c, fiber.StatusBadGateway, "stripe_payment_intent_failed", msg, err)
+				}
+				h.db.Model(&pending).Update("stripe_pi_id", pi.ID)
+				return c.JSON(fiber.Map{
+					"checkout_type":     "transparent",
+					"client_secret":     pi.ClientSecret,
+					"payment_intent_id": pi.ID,
+					"plan_name":         plan.Name,
+					"plan_price":        plan.Price,
+					"amount":            pi.Amount,
+					"pending_id":        pending.ID.String(),
+				})
+			}
+
+			params := &stripe.CheckoutSessionParams{
+				Customer: stripe.String(sc.ID),
+				Mode:     stripe.String(string(stripe.CheckoutSessionModeSubscription)),
+				LineItems: []*stripe.CheckoutSessionLineItemParams{
+					{Price: stripe.String(plan.StripePriceID), Quantity: stripe.Int64(1)},
+				},
+				SuccessURL:        stripe.String(frontendURL + "/payment/success?session_id={CHECKOUT_SESSION_ID}&pending_id=" + pending.ID.String()),
+				CancelURL:         stripe.String(frontendURL + "/register/verify?token=" + pending.Token),
+				ClientReferenceID: stripe.String(pending.ID.String()),
+				SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
+					Metadata: map[string]string{
+						"pending_id": pending.ID.String(),
+						"plan_id":    plan.ID.String(),
+					},
+				},
 				Metadata: map[string]string{
 					"pending_id": pending.ID.String(),
 					"plan_id":    plan.ID.String(),
 				},
-				AutomaticPaymentMethods: &stripe.PaymentIntentAutomaticPaymentMethodsParams{
-					Enabled: stripe.Bool(true),
-				},
 			}
-			pi, err := paymentintent.New(params)
+			sess, err := session.New(params)
 			if err != nil {
-				msg := "não foi possível criar o pagamento — tente novamente em alguns instantes"
+				msg := "não foi possível criar a sessão de pagamento — tente novamente"
 				if se, ok := err.(*stripe.Error); ok {
 					switch se.Code {
 					case stripe.ErrorCodeResourceMissing:
-						msg = "recurso Stripe não encontrado — verifique se a chave/price está no modo certo (test/live)"
+						msg = "Price ID '" + plan.StripePriceID + "' não existe na conta Stripe configurada (verifique modo test/live)"
+					case "url_invalid":
+						msg = "URL de retorno inválida — FRONTEND_URL precisa começar com https://"
 					case stripe.ErrorCode("api_key_expired"):
 						msg = "chave Stripe expirada — admin precisa rotacionar em /admin/providers"
-					case stripe.ErrorCode("amount_too_small"):
-						msg = "valor do plano abaixo do mínimo aceito pela Stripe"
 					}
 				}
-				return SafeErr(c, fiber.StatusBadGateway, "stripe_payment_intent_failed", msg, err)
+				return SafeErr(c, fiber.StatusBadGateway, "stripe_session_failed", msg, err)
 			}
-			h.db.Model(&pending).Update("stripe_pi_id", pi.ID)
+			h.db.Model(&pending).Update("stripe_session_id", sess.ID)
 			return c.JSON(fiber.Map{
-				"checkout_type":     "transparent",
-				"client_secret":     pi.ClientSecret,
-				"payment_intent_id": pi.ID,
-				"plan_name":         plan.Name,
-				"plan_price":        plan.Price,
-				"amount":            pi.Amount,
-				"pending_id":        pending.ID.String(),
+				"checkout_type": "redirect",
+				"url":           sess.URL,
+				"pending_id":    pending.ID.String(),
 			})
 		}
-
-		params := &stripe.CheckoutSessionParams{
-			Customer: stripe.String(sc.ID),
-			Mode:     stripe.String(string(stripe.CheckoutSessionModeSubscription)),
-			LineItems: []*stripe.CheckoutSessionLineItemParams{
-				{Price: stripe.String(plan.StripePriceID), Quantity: stripe.Int64(1)},
-			},
-			SuccessURL:        stripe.String(frontendURL + "/payment/success?session_id={CHECKOUT_SESSION_ID}&pending_id=" + pending.ID.String()),
-			CancelURL:         stripe.String(frontendURL + "/register/verify?token=" + pending.Token),
-			ClientReferenceID: stripe.String(pending.ID.String()),
-			SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
-				Metadata: map[string]string{
-					"pending_id": pending.ID.String(),
-					"plan_id":    plan.ID.String(),
-				},
-			},
-			Metadata: map[string]string{
-				"pending_id": pending.ID.String(),
-				"plan_id":    plan.ID.String(),
-			},
-		}
-		sess, err := session.New(params)
-		if err != nil {
-			// Stripe devolve *stripe.Error com Code útil (resource_missing,
-			// authentication_required, api_key_expired). Surfaceia o code +
-			// price_id no log/response pra admin diagnosticar sem ter que
-			// olhar logs do container.
-			msg := "não foi possível criar a sessão de pagamento — tente novamente"
-			if se, ok := err.(*stripe.Error); ok {
-				switch se.Code {
-				case stripe.ErrorCodeResourceMissing:
-					msg = "Price ID '" + plan.StripePriceID + "' não existe na conta Stripe configurada (verifique modo test/live)"
-				case "url_invalid":
-					msg = "URL de retorno inválida — FRONTEND_URL precisa começar com https://"
-				case stripe.ErrorCode("api_key_expired"):
-					msg = "chave Stripe expirada — admin precisa rotacionar em /admin/providers"
-				}
-			}
-			return SafeErr(c, fiber.StatusBadGateway, "stripe_session_failed", msg, err)
-		}
-		h.db.Model(&pending).Update("stripe_session_id", sess.ID)
-		return c.JSON(fiber.Map{
-			"checkout_type": "redirect",
-			"url":           sess.URL,
-			"pending_id":    pending.ID.String(),
-		})
 	}
 
 	// ────────────────────────────────────────────────────────────────
@@ -1547,6 +1595,7 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 	user := models.User{
 		Name:     req.Name,
 		Email:    pending.Email,
+		Phone:    req.Phone,
 		Role:     models.RoleCustomer,
 		IsActive: true,
 	}

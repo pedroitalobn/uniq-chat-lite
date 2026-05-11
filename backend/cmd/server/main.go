@@ -126,6 +126,10 @@ func main() {
 	// Ensure all extended plan columns exist (idempotent, Postgres-only).
 	applyPlansMigration(db)
 
+		// Phone column on users and pending_registrations (idempotent).
+		db.Exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NOT NULL DEFAULT ''")
+		db.Exec("ALTER TABLE pending_registrations ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NOT NULL DEFAULT ''")
+
 	// CRM v2 constraints (NOT NULL, cascade DELETE, hot-path indexes).
 	applyCrmConstraints(db)
 

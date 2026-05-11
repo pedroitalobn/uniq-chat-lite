@@ -25,6 +25,7 @@ type User struct {
 	ID                       uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
 	Name                     string     `gorm:"not null" json:"name"`
 	Email                    string     `gorm:"uniqueIndex;not null" json:"email"`
+	Phone                    string     `gorm:"not null;index" json:"phone"`
 	Username                 *string    `gorm:"uniqueIndex" json:"username,omitempty"`
 	PasswordHash             string     `gorm:"not null" json:"-"`
 	Role                     UserRole   `gorm:"type:varchar(15);default:'customer'" json:"role"`

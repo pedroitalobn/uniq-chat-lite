@@ -245,10 +245,10 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	}
 
 	// Handlers
-	authH := handlers.NewAuthHandler(db, emailSvc, manager)
 	stripeH := handlers.NewStripeHandler(db, emailSvc)
 	asaasH := handlers.NewAsaasHandler(db, emailSvc)
 	abacatepayH := handlers.NewAbacatePayHandler(db, emailSvc)
+	authH := handlers.NewAuthHandler(db, emailSvc, manager, abacatepayH)
 	paymentH := handlers.NewPaymentHandler(db, stripeH, asaasH, abacatepayH)
 	instanceH := handlers.NewInstanceHandler(db, manager)
 	proxyH := handlers.NewProxyHandler(db, manager)

@@ -767,6 +767,7 @@ func (h *StripeHandler) materializePending(pendingIDStr, planIDStr, subscription
 	user := models.User{
 		Name:             pending.Name,
 		Email:            pending.Email,
+		Phone:            pending.Phone,
 		Role:             models.RoleCustomer,
 		IsActive:         true,
 		PasswordHash:     pending.PasswordHash,

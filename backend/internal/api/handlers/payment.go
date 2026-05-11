@@ -222,6 +222,7 @@ func (h *PaymentHandler) materializeFromPending(p *models.PendingRegistration) (
 	user := models.User{
 		Name:         p.Name,
 		Email:        p.Email,
+		Phone:        p.Phone,
 		Role:         models.RoleCustomer,
 		IsActive:     true,
 		PasswordHash: p.PasswordHash,
