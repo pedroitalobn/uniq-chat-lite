@@ -1,24 +1,26 @@
 "use client";
 
 // AudioHoldButton — botão estilo WhatsApp: pressionar e segurar para gravar,
-// soltar para enviar, deslizar para cima/lado pra cancelar. Diferente do
+// soltar para enviar, arrastar para cima até o cadeado para travar. Diferente do
 // AudioRecorderButton (toque-pra-gravar), esse é otimizado pra mobile.
 //
 // UX:
 //   • touchstart      → pede permissão + começa gravar (vibra)
-//   • touchend        → para, entrega o File (a menos que cancelado)
-//   • touchmove ↑↑    → entra em modo "soltar pra cancelar" (>80px pra cima)
+//   • touchend        → para e entrega o File (a menos que cancelado/travado)
+//   • touchmove ←     → entra em modo "soltar pra cancelar" (>80px à esquerda)
+//   • touchmove ↑     → trava no cadeado (>80px pra cima), segue gravando
 //   • duração mínima  → 600ms; toques rápidos são ignorados (toast: "segure")
 //
 // Quando gravando, o componente expande pra ocupar a largura toda da row do
-// composer com timer + indicador "← deslize pra cancelar".
+// composer com timer + indicador "← cancelar / ↑ travar".
 
 import { useEffect, useRef, useState } from "react";
-import { Mic, Trash2 } from "lucide-react";
+import { Lock, Mic, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { haptic } from "@/lib/haptics";
 
-const CANCEL_THRESHOLD = 80; // px pra cima/esquerda = cancela
+const CANCEL_THRESHOLD = 80; // px à esquerda = cancela
+const LOCK_THRESHOLD = 80; // px pra cima = trava
 const MIN_DURATION_MS = 600;
 const MAX_DURATION_S = 300;
 
@@ -35,12 +37,14 @@ export function AudioHoldButton({
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [willCancel, setWillCancel] = useState(false);
+  const [locked, setLocked] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const tickRef = useRef<NodeJS.Timeout | null>(null);
   const startedAtRef = useRef<number>(0);
   const cancelRef = useRef(false);
+  const lockedRef = useRef(false);
   const startTouchRef = useRef<{ x: number; y: number } | null>(null);
   const mimeRef = useRef<string>("");
 
@@ -75,6 +79,8 @@ export function AudioHoldButton({
       streamRef.current = stream;
       chunksRef.current = [];
       cancelRef.current = false;
+      lockedRef.current = false;
+      setLocked(false);
       const mime = pickMimeType();
       mimeRef.current = mime;
       const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
@@ -99,6 +105,7 @@ export function AudioHoldButton({
       startedAtRef.current = Date.now();
       setSeconds(0);
       setWillCancel(false);
+      setLocked(false);
       setRecording(true);
       haptic.success();
       tickRef.current = setInterval(() => {
@@ -131,6 +138,8 @@ export function AudioHoldButton({
     }
     setRecording(false);
     setWillCancel(false);
+    setLocked(false);
+    lockedRef.current = false;
     if (cancelled) haptic.warning();
     else haptic.tap();
     recorderRef.current?.stop();
@@ -139,12 +148,19 @@ export function AudioHoldButton({
   }
 
   function onMove(x: number, y: number) {
+    if (lockedRef.current) return;
     if (!startTouchRef.current) return;
     const dx = startTouchRef.current.x - x;
     const dy = startTouchRef.current.y - y;
-    // Dedo subiu OU foi pra esquerda mais que threshold → vai cancelar.
-    const cancelDist = Math.max(dy, dx);
-    setWillCancel(cancelDist > CANCEL_THRESHOLD);
+    if (dy > LOCK_THRESHOLD && dx < CANCEL_THRESHOLD) {
+      lockedRef.current = true;
+      setLocked(true);
+      setWillCancel(false);
+      haptic.success();
+      return;
+    }
+    // Dedo foi pra esquerda mais que threshold → soltar cancela.
+    setWillCancel(dx > CANCEL_THRESHOLD && dy < LOCK_THRESHOLD);
   }
 
   function fmt(s: number) {
@@ -159,13 +175,21 @@ export function AudioHoldButton({
         className="flex items-center gap-2 rounded-full px-3 flex-1"
         style={{
           height: size,
-          background: willCancel ? "rgba(239,68,68,0.18)" : "rgba(239,68,68,0.10)",
-          border: `1px solid ${willCancel ? "rgba(239,68,68,0.55)" : "rgba(239,68,68,0.30)"}`,
+          background: willCancel
+            ? "rgba(239,68,68,0.18)"
+            : locked ? "rgba(0,212,106,0.12)" : "rgba(239,68,68,0.10)",
+          border: `1px solid ${
+            willCancel
+              ? "rgba(239,68,68,0.55)"
+              : locked ? "rgba(0,212,106,0.35)" : "rgba(239,68,68,0.30)"
+          }`,
         }}
         // touchmove/end aqui também — em alguns devices o touchend dispara no
         // elemento atual mesmo se o dedo se moveu.
         onTouchMove={(e) => onMove(e.touches[0].clientX, e.touches[0].clientY)}
-        onTouchEnd={() => stop(willCancel)}
+        onTouchEnd={() => {
+          if (!lockedRef.current) stop(willCancel);
+        }}
         onTouchCancel={() => stop(true)}
       >
         <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
@@ -175,10 +199,38 @@ export function AudioHoldButton({
         <span className="text-sm font-mono tabular-nums flex-shrink-0" style={{ color: "#ef4444" }}>
           {fmt(seconds)}
         </span>
-        <span className="flex-1 text-xs truncate text-right" style={{ color: willCancel ? "#ef4444" : "var(--text-3)" }}>
-          {willCancel ? "Solte para cancelar" : "← deslize para cancelar"}
+        <span
+          className="flex-1 text-xs truncate text-right"
+          style={{ color: willCancel ? "#ef4444" : locked ? "#00d46a" : "var(--text-3)" }}
+        >
+          {willCancel ? "Solte para cancelar" : locked ? "Gravando livre" : "← cancelar · ↑ travar"}
         </span>
         {willCancel && <Trash2 className="h-4 w-4 flex-shrink-0" style={{ color: "#ef4444" }} />}
+        {!willCancel && !locked && (
+          <Lock className="h-4 w-4 flex-shrink-0" style={{ color: "var(--text-3)" }} />
+        )}
+        {locked && (
+          <>
+            <button
+              type="button"
+              onClick={() => stop(true)}
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full"
+              style={{ background: "rgba(239,68,68,0.14)", color: "#ef4444" }}
+              aria-label="Cancelar gravação"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => stop(false)}
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full"
+              style={{ background: "var(--green)", color: "var(--green-fg, #03170a)" }}
+              aria-label="Enviar áudio"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </>
+        )}
       </div>
     );
   }

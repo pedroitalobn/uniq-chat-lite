@@ -2169,7 +2169,7 @@ function MediaBody({
     const audioURL = mediaKey ? buildMediaURL(mediaKey) : url;
     if (audioURL) {
       return (
-        <div className="flex flex-col gap-1.5">
+        <div className={`flex flex-col gap-1.5 ${isOut ? "items-end" : "items-start"}`}>
           <AudioPlayer url={audioURL} variant={isOut ? "out" : "in"} />
           <TranscriptionBlock text={transcription} status={transcriptionStatus} isOut={isOut} conversationId={conversationId} messageId={messageId} />
           {error && <ErrorLine text={error} />}
@@ -2177,7 +2177,7 @@ function MediaBody({
       );
     }
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className={`flex flex-col gap-1.5 ${isOut ? "items-end" : "items-start"}`}>
         <IconFallback icon={<Mic className="h-4 w-4" />} label={body || "Áudio"} />
         <TranscriptionBlock text={transcription} status={transcriptionStatus} isOut={isOut} />
         {error && <ErrorLine text={error} />}
@@ -4187,7 +4187,7 @@ function Composer({
 
         {/* ───── Composer mobile (estilo WhatsApp) ─────
              Single-row: [+ attach] [textarea round] [mic-or-send round].
-             Hold-to-record no mic, slide-up cancela.
+             Hold-to-record no mic, slide-up trava no cadeado.
              O "+" abre BottomSheet com Foto, Documento, Emoji, Nota interna.
              Em modo nota, borda âmbar no input + chip de modo. */}
         {isMobile && mode === "note" && (

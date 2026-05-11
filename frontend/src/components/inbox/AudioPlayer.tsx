@@ -189,7 +189,7 @@ export function AudioPlayer({ url, className, variant = "in" }: Props) {
   return (
     <div
       className={`flex items-center gap-3 rounded-2xl px-3 py-2 ${className || ""}`}
-      style={{ background: colors.bg, maxWidth: 320 }}
+      style={{ background: colors.bg, width: 320, maxWidth: "100%" }}
     >
       <audio ref={audioRef} src={url} preload="metadata" />
       <button
