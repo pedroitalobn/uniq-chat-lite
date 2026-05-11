@@ -8,19 +8,21 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"github.com/uniq-chat/backend/internal/api/middleware"
+	"github.com/uniq-chat/backend/internal/email"
 	"github.com/uniq-chat/backend/internal/models"
 	"gorm.io/gorm"
 )
 
 type PaymentHandler struct {
 	db          *gorm.DB
+	emailSvc    *email.Service
 	stripeH     *StripeHandler
 	asaasH      *AsaasHandler
 	abacatepayH *AbacatePayHandler
 }
 
-func NewPaymentHandler(db *gorm.DB, stripeH *StripeHandler, asaasH *AsaasHandler, abacatepayH *AbacatePayHandler) *PaymentHandler {
-	return &PaymentHandler{db: db, stripeH: stripeH, asaasH: asaasH, abacatepayH: abacatepayH}
+func NewPaymentHandler(db *gorm.DB, emailSvc *email.Service, stripeH *StripeHandler, asaasH *AsaasHandler, abacatepayH *AbacatePayHandler) *PaymentHandler {
+	return &PaymentHandler{db: db, emailSvc: emailSvc, stripeH: stripeH, asaasH: asaasH, abacatepayH: abacatepayH}
 }
 
 // getActiveProvider returns the active provider saved in the DB, defaulting to stripe
@@ -269,7 +271,23 @@ func (h *PaymentHandler) materializeFromPending(p *models.PendingRegistration) (
 		h.db.Create(&changeLog)
 	}
 
+	h.sendWelcomeAsync(user.Email, user.Name)
+
 	return &user, nil
+}
+
+func (h *PaymentHandler) sendWelcomeAsync(to, name string) {
+	if h.emailSvc == nil {
+		return
+	}
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error().Interface("panic", r).Str("to", to).Msg("payment email: SendWelcome panic")
+			}
+		}()
+		h.emailSvc.SendWelcome(to, name)
+	}()
 }
 
 // respondWithSession devolve access_token + refresh_token (cookie) +
