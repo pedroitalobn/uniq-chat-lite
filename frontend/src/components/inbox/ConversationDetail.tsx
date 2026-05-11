@@ -1190,13 +1190,6 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               )}
               {canUpdate && conv && (
                 <ActionRow
-                  onClick={() => bot.mutate(!conv.is_bot_active)}
-                  icon={conv.is_bot_active ? <BotOff className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
-                  label={conv.is_bot_active ? "Desligar bot" : "Ligar bot"}
-                />
-              )}
-              {canUpdate && conv && (
-                <ActionRow
                   onClick={() => patchConv.mutate({ is_pinned: !conv.is_pinned })}
                   icon={<Pin className="h-3.5 w-3.5" style={{ color: conv.is_pinned ? "#00d46a" : undefined }} />}
                   label={conv.is_pinned ? "Desfixar" : "Fixar"}
