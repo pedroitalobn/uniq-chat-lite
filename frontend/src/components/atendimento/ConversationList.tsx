@@ -24,6 +24,9 @@ export interface ConversationRow {
   subject?: string;
   push_name?: string;
   avatar_url?: string;
+  is_archived?: boolean;
+  is_pinned?: boolean;
+  is_muted?: boolean;
   last_message_preview?: string;
   last_message_at?: string;
   last_message_type?: string;
@@ -668,6 +671,15 @@ function LongPressRow({
         }
       }}
       onTouchCancel={longPress.onTouchCancel}
+      onMouseDown={longPress.onMouseDown}
+      onMouseMove={longPress.onMouseMove}
+      onMouseUp={longPress.onMouseUp}
+      onMouseLeave={longPress.onMouseLeave}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onTrigger(e.clientX, e.clientY);
+      }}
       onClickCapture={(e) => {
         // Mesmo no desktop (mouseup), previne click se o press foi longo.
         if (longPress.wasTriggered()) {

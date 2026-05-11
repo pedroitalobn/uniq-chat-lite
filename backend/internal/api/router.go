@@ -1275,6 +1275,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	conversations.Get("/:id/shop-context", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.ShopContext)
 	api.Get("/contacts/:id/orders", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.ContactOrders)
 	conversations.Patch("/:id", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.Patch)
+	conversations.Delete("/:id", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.Delete)
 	conversations.Post("/:id/messages", middleware.RequireWorkspacePermission(db, models.PermInboxSend), conversationH.SendMessage)
 	conversations.Patch("/:id/messages/:msgId", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.PatchMessage)
 	conversations.Delete("/:id/messages/:msgId", middleware.RequireWorkspacePermission(db, models.PermInboxSend), conversationH.RevokeMessage)

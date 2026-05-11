@@ -1751,6 +1751,8 @@ export const conversationsApi = {
     funnel_id?: string | null;
     stage_id?: string | null;
   }) => api.patch(`/v1/conversations/${id}`, data, { headers: wsHeaders(workspaceId) }),
+  delete: (workspaceId: string, id: string) =>
+    api.delete(`/v1/conversations/${id}`, { headers: wsHeaders(workspaceId) }),
   markRead: (workspaceId: string, id: string) =>
     api.post(`/v1/conversations/${id}/read`, {}, { headers: wsHeaders(workspaceId) }),
   sendMessage: (

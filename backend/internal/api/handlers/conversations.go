@@ -203,7 +203,8 @@ func (h *ConversationHandler) Health(c *fiber.Ctx) error {
 
 // List GET /v1/conversations
 // Query: status, channel, queue_id, assigned_user_id=me|<uuid>, contact_id,
-//        priority, is_archived, q (search in subject/preview), cursor, limit
+//
+//	priority, is_archived, q (search in subject/preview), cursor, limit
 func (h *ConversationHandler) List(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
 	userID := middleware.GetCurrentUserID(c)
@@ -287,6 +288,8 @@ func (h *ConversationHandler) List(c *fiber.Ctx) error {
 	}
 	if arc := c.Query("is_archived"); arc != "" {
 		q = q.Where("is_archived = ?", arc == "true")
+	} else {
+		q = q.Where("is_archived = ?", false)
 	}
 	if search := strings.TrimSpace(c.Query("q")); search != "" {
 		pattern := "%" + search + "%"
@@ -521,6 +524,39 @@ func (h *ConversationHandler) Patch(c *fiber.Ctx) error {
 	h.db.Where("id = ?", id).First(&conv)
 	h.broadcast(&conv, "conversation.updated", nil)
 	return c.JSON(conv)
+}
+
+// Delete DELETE /v1/conversations/:id
+// Remove a conversa do inbox. Mantemos os MessageLogs no banco para auditoria,
+// mas fechamos/arquivamos antes do soft delete para não bloquear a criação de
+// uma nova conversa live para o mesmo contato/canal.
+func (h *ConversationHandler) Delete(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+
+	var conv models.Conversation
+	if err := h.db.Where("id = ? AND workspace_id = ?", id, ws).First(&conv).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
+	}
+
+	now := time.Now()
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&conv).Updates(map[string]any{
+			"status":      models.ConversationStatusClosed,
+			"is_archived": true,
+			"closed_at":   now,
+		}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&conv).Error
+	}); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"ok": true, "id": id})
 }
 
 // SendMessage POST /v1/conversations/:id/messages
@@ -856,20 +892,20 @@ func (h *ConversationHandler) SendConstraints(c *fiber.Ctx) error {
 	}
 
 	type cons struct {
-		Channel          string   `json:"channel"`
-		WindowOpen       bool     `json:"window_open"`
+		Channel    string `json:"channel"`
+		WindowOpen bool   `json:"window_open"`
 		// WindowExpiresAt — timestamp em que a janela 24h fecha. Só
 		// preenchido pra canais que têm essa restrição (WABA, Instagram).
 		// Frontend usa pra mostrar countdown no header da conversa e
 		// piscar quando estiver perto do fim.
 		WindowExpiresAt  *time.Time `json:"window_expires_at,omitempty"`
-		AllowsTemplate   bool     `json:"allows_template"`
-		SupportsReply    bool     `json:"supports_reply"`
-		SupportsReaction bool     `json:"supports_reaction"`
-		SupportsEdit     bool     `json:"supports_edit"`
-		SupportsRevoke   bool     `json:"supports_revoke"`
-		AllowedTypes     []string `json:"allowed_types"`
-		MaxBodyChars     int      `json:"max_body_chars"`
+		AllowsTemplate   bool       `json:"allows_template"`
+		SupportsReply    bool       `json:"supports_reply"`
+		SupportsReaction bool       `json:"supports_reaction"`
+		SupportsEdit     bool       `json:"supports_edit"`
+		SupportsRevoke   bool       `json:"supports_revoke"`
+		AllowedTypes     []string   `json:"allowed_types"`
+		MaxBodyChars     int        `json:"max_body_chars"`
 	}
 	out := cons{
 		Channel:    string(inst.Channel),
@@ -1167,9 +1203,9 @@ func (h *ConversationHandler) RevokeMessage(c *fiber.Ctx) error {
 	h.db.First(&updated, "id = ?", msgID)
 	h.broadcast(conv, "conversation.message_updated", map[string]any{"message": updated})
 	return c.JSON(fiber.Map{
-		"message":            updated,
-		"channel_revoked":    channelRevoked,
-		"channel":            inst.Channel,
+		"message":         updated,
+		"channel_revoked": channelRevoked,
+		"channel":         inst.Channel,
 	})
 }
 
@@ -1539,9 +1575,10 @@ func (h *ConversationHandler) Take(c *fiber.Ctx) error {
 
 // Bulk POST /v1/conversations/bulk
 // Body: { ids: [uuid...], action: "resolve"|"close"|"reopen"|"snooze"|"unsnooze"|
-//                                 "read"|"unread"|"assign"|"unassign"|"transfer"|
-//                                 "archive"|"unarchive"|"pin"|"unpin"|"mute"|"unmute",
-//         user_id?, queue_id?, team_id?, department_id?, until?, reason?, note? }
+//
+//	                        "read"|"unread"|"assign"|"unassign"|"transfer"|
+//	                        "archive"|"unarchive"|"pin"|"unpin"|"mute"|"unmute",
+//	user_id?, queue_id?, team_id?, department_id?, until?, reason?, note? }
 //
 // Aplica a mesma ação em N conversas. Cada item processado independentemente —
 // retorna lista de { id, ok, error? }.
@@ -2245,16 +2282,16 @@ func (h *ConversationHandler) Backfill(c *fiber.Ctx) error {
 		Count(&unassignedOpen)
 
 	return c.JSON(fiber.Map{
-		"processed":         processed,
-		"inbound":           inbound,
-		"outbound":          outbound,
-		"batches":           batches + obBatches,
-		"remaining":         remaining,
-		"total_conversations":     totalConvs,
-		"open_conversations":      openConvs,
-		"pending_conversations":   pendingConvs,
-		"unassigned_open":         unassignedOpen,
-		"elapsed_ms":        time.Since(start).Milliseconds(),
+		"processed":             processed,
+		"inbound":               inbound,
+		"outbound":              outbound,
+		"batches":               batches + obBatches,
+		"remaining":             remaining,
+		"total_conversations":   totalConvs,
+		"open_conversations":    openConvs,
+		"pending_conversations": pendingConvs,
+		"unassigned_open":       unassignedOpen,
+		"elapsed_ms":            time.Since(start).Milliseconds(),
 	})
 }
 
@@ -2297,7 +2334,9 @@ func (h *ConversationHandler) AddTag(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "atendimento não encontrado"})
 	}
-	var body struct{ TagID string `json:"tag_id"` }
+	var body struct {
+		TagID string `json:"tag_id"`
+	}
 	c.BodyParser(&body)
 	tagID, err := uuid.Parse(body.TagID)
 	if err != nil {
@@ -2934,9 +2973,9 @@ func (h *ConversationHandler) SetAgentState(c *fiber.Ctx) error {
 	}
 
 	var body struct {
-		Mode           string  `json:"mode"`
-		AgentID        *string `json:"agent_id"`
-		HandoffReason  string  `json:"handoff_reason"`
+		Mode          string  `json:"mode"`
+		AgentID       *string `json:"agent_id"`
+		HandoffReason string  `json:"handoff_reason"`
 	}
 	if err := c.BodyParser(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
@@ -3107,10 +3146,10 @@ func (h *ConversationHandler) SuggestAgentReply(c *fiber.Ctx) error {
 		})
 	} else {
 		state = models.ConversationAgentState{
-			ConversationID:  id,
-			Mode:            models.AgentModeObserving,
-			LastSuggestion:  suggestion,
-			SuggestionAt:    &now,
+			ConversationID: id,
+			Mode:           models.AgentModeObserving,
+			LastSuggestion: suggestion,
+			SuggestionAt:   &now,
 		}
 		h.db.Create(&state)
 	}
@@ -3222,9 +3261,10 @@ func (h *ConversationHandler) SetWindowKeeper(c *fiber.Ctx) error {
 //   - Status = "pending" travado (sem evento WS após N minutos)
 //
 // Resposta:
-//   200 — agendado, status="pending" (frontend deve aguardar WS)
-//   409 — provider não configurado: status="unsupported", retorne 409
-//   404 — message não encontrada / não é áudio
+//
+//	200 — agendado, status="pending" (frontend deve aguardar WS)
+//	409 — provider não configurado: status="unsupported", retorne 409
+//	404 — message não encontrada / não é áudio
 func (h *ConversationHandler) RetryTranscription(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
 	convID, err := uuid.Parse(c.Params("id"))

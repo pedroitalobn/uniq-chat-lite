@@ -11,7 +11,7 @@ import {
   Lock, Search, ChevronDown, User as UserIcon, MessageSquare,
   Layers, Smartphone, Radio, RefreshCw, Check, BarChart3,
   MoreVertical, Users, Building2, Zap, Bell, BellOff, X, Phone, PhoneMissed, Sparkles,
-  Filter, UserCircle2, Megaphone, Plus,
+  Filter, UserCircle2, Megaphone, Plus, Archive, Pin, PinOff, Trash2,
 } from "lucide-react";
 import { usePreferences } from "@/lib/preferences";
 import {
@@ -27,6 +27,7 @@ import { NewConversationModal } from "@/components/inbox/NewConversationModal";
 import { useConversationWS } from "@/hooks/useConversationWS";
 import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
 import { useIsMobile } from "@/hooks/useMediaQuery";
+import { showConfirm } from "@/lib/confirm";
 import type { ChannelInfo, Instance } from "@/types";
 
 // Consolidated inbox:
@@ -177,6 +178,7 @@ function InboxPage() {
   const canView = hasPerm(PERM.inboxView);
   const canViewAll = hasPerm(PERM.ticketsViewAll) || hasPerm(PERM.ticketsViewTeam) || isOwner;
   const canAssign = hasPerm(PERM.ticketsAssign);
+  const canUpdate = hasPerm(PERM.ticketsUpdate);
 
   // Resize da coluna da lista — largura persistida em localStorage entre
   // sessões. Clamp em [260, 560] pra não ficar minúsculo nem maior que
@@ -480,14 +482,44 @@ function InboxPage() {
     },
   });
   // Swipe-to-archive (esquerda) e swipe-to-read (direita) — gestos
-  // mobile aplicados em cada row da ConversationList. Resolve = arquiva
-  // pra UX mobile (segue padrão Telegram/iOS Mail "swipe to delete/archive").
+  // mobile aplicados em cada row da ConversationList.
   const archiveMut = useMutation({
-    mutationFn: (id: string) => conversationsApi.resolve(wsId as string, id),
+    mutationFn: (id: string) => conversationsApi.patch(wsId as string, id, { is_archived: true }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conversations", wsId, "unified"] });
+      qc.invalidateQueries({ queryKey: ["conversations-count", wsId] });
+      toast.success("Conversa arquivada");
     },
     onError: () => toast.error("Falha ao arquivar"),
+  });
+  const pinMut = useMutation({
+    mutationFn: ({ id, pinned }: { id: string; pinned: boolean }) =>
+      conversationsApi.patch(wsId as string, id, { is_pinned: pinned }),
+    onSuccess: (_res, vars) => {
+      qc.invalidateQueries({ queryKey: ["conversations", wsId, "unified"] });
+      toast.success(vars.pinned ? "Conversa fixada" : "Conversa desafixada");
+    },
+    onError: () => toast.error("Falha ao fixar conversa"),
+  });
+  const muteMut = useMutation({
+    mutationFn: ({ id, muted }: { id: string; muted: boolean }) =>
+      conversationsApi.patch(wsId as string, id, { is_muted: muted }),
+    onSuccess: (_res, vars) => {
+      qc.invalidateQueries({ queryKey: ["conversations", wsId, "unified"] });
+      toast.success(vars.muted ? "Conversa silenciada" : "Notificações reativadas");
+    },
+    onError: () => toast.error("Falha ao atualizar notificações"),
+  });
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => conversationsApi.delete(wsId as string, id),
+    onSuccess: (_res, id) => {
+      qc.invalidateQueries({ queryKey: ["conversations", wsId, "unified"] });
+      qc.invalidateQueries({ queryKey: ["conversations-count", wsId] });
+      qc.invalidateQueries({ queryKey: ["inbox-stats", wsId] });
+      if (selectedId === id) router.push("/inbox");
+      toast.success("Conversa deletada");
+    },
+    onError: () => toast.error("Falha ao deletar conversa"),
   });
   const markReadMut = useMutation({
     mutationFn: (id: string) => conversationsApi.markRead(wsId as string, id),
@@ -1089,11 +1121,15 @@ function InboxPage() {
                 onArchive={isMobile ? (conv) => archiveMut.mutate(conv.id) : undefined}
                 onMarkRead={isMobile ? (conv) => markReadMut.mutate(conv.id) : undefined}
                 scrollParent={listScroller}
-                onLongPressActions={isMobile ? (conv) => {
-                  // Menu rápido estilo iOS — mesmas ações do swipe + abrir
-                  // contato e copiar telefone. Atalho pra quem prefere
-                  // pressionar e segurar ao invés de arrastar.
+                onLongPressActions={(conv) => {
+                  // Mobile: long press. Desktop: botão direito.
                   const actions = [];
+                  actions.push({
+                    id: "open",
+                    label: "Abrir conversa",
+                    icon: MessageSquare,
+                    onSelect: () => router.push(`/inbox?c=${conv.id}`),
+                  });
                   if (conv.agent_unread_count > 0) {
                     actions.push({
                       id: "read",
@@ -1110,6 +1146,26 @@ function InboxPage() {
                       onSelect: () => router.push(`/crm/contacts/${conv.contact!.id}`),
                     });
                   }
+                  if (canUpdate) {
+                    actions.push({
+                      id: conv.is_pinned ? "unpin" : "pin",
+                      label: conv.is_pinned ? "Desafixar conversa" : "Fixar conversa",
+                      icon: conv.is_pinned ? PinOff : Pin,
+                      onSelect: () => pinMut.mutate({ id: conv.id, pinned: !conv.is_pinned }),
+                    });
+                    actions.push({
+                      id: conv.is_muted ? "unmute" : "mute",
+                      label: conv.is_muted ? "Reativar notificações" : "Silenciar conversa",
+                      icon: conv.is_muted ? Bell : BellOff,
+                      onSelect: () => muteMut.mutate({ id: conv.id, muted: !conv.is_muted }),
+                    });
+                    actions.push({
+                      id: "archive",
+                      label: "Arquivar conversa",
+                      icon: Archive,
+                      onSelect: () => archiveMut.mutate(conv.id),
+                    });
+                  }
                   const phone = conv.contact?.phone;
                   if (phone) {
                     actions.push({
@@ -1123,15 +1179,26 @@ function InboxPage() {
                       },
                     });
                   }
-                  actions.push({
-                    id: "archive",
-                    label: "Arquivar conversa",
-                    icon: X,
-                    destructive: true,
-                    onSelect: () => archiveMut.mutate(conv.id),
-                  });
+                  if (canUpdate) {
+                    actions.push({
+                      id: "delete",
+                      label: "Deletar conversa",
+                      hint: "Remove do inbox, mantendo auditoria",
+                      icon: Trash2,
+                      destructive: true,
+                      onSelect: async () => {
+                        const name = conv.contact?.name || conv.push_name || conv.subject || "esta conversa";
+                        if (!await showConfirm(`Deletar "${name}"?`, {
+                          title: "Deletar conversa",
+                          confirmLabel: "Deletar",
+                          danger: true,
+                        })) return;
+                        deleteMut.mutate(conv.id);
+                      },
+                    });
+                  }
                   return actions;
-                } : undefined}
+                }}
               />
             )}
           </PullToRefresh>
