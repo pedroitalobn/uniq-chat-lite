@@ -46,6 +46,14 @@ type ViewKind = "all" | "messages" | "groups" | "contacts" | "channels" | "statu
 // Filtros persistidos por workspace — sobrevivem a F5 e troca de janela.
 // Chave inclui wsId pra cada workspace ter sua própria configuração de inbox.
 const FILTERS_KEY_PREFIX = "inbox:filters:v1:";
+const inboxGlass = {
+  headerBg: "linear-gradient(135deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.018) 58%, rgba(0,212,106,0.025) 100%)",
+  controlBg: "rgba(255,255,255,0.06)",
+  controlBgHover: "rgba(255,255,255,0.10)",
+  controlBorder: "rgba(255,255,255,0.10)",
+  controlBorderHover: "rgba(255,255,255,0.15)",
+  searchBg: "rgba(255,255,255,0.05)",
+};
 type PersistedFilters = {
   agentScope: string;
   queueScope: string;
@@ -723,7 +731,7 @@ function InboxPage() {
         className="border-b px-4 sm:px-6 py-3 sm:py-4"
         style={{
           borderColor: "var(--border-subtle)",
-          background: "linear-gradient(135deg, var(--input) 0%, rgba(255,255,255,0.01) 100%)",
+          background: inboxGlass.headerBg,
           backdropFilter: "blur(16px) saturate(180%)",
           WebkitBackdropFilter: "blur(16px) saturate(180%)",
           // Em mobile, quando uma conversa está aberta, escondemos o
@@ -924,9 +932,9 @@ function InboxPage() {
                 placeholder="Buscar…"
                 className="w-44 rounded-lg py-1.5 pl-8 pr-3 text-xs outline-none"
                 style={{
-                  background: "var(--input)",
+                  background: inboxGlass.searchBg,
                   backdropFilter: "blur(8px)",
-                  border: "1px solid var(--border-default)",
+                  border: `1px solid ${inboxGlass.controlBorder}`,
                   color: "var(--text-1)",
                   transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                 }}
@@ -1222,10 +1230,10 @@ function AgentDropdown({
   // "all" é o default do agente (visão geral). Qualquer outro valor é
   // considerado filtro ativo e ganha a cor verde.
   const isActive = agentScope !== "all";
-  const bg = isActive ? "rgba(0,212,106,0.12)" : "var(--border-subtle)";
-  const bgHover = isActive ? "rgba(0,212,106,0.18)" : "var(--border-default)";
-  const border = isActive ? "rgba(0,212,106,0.25)" : "var(--border-default)";
-  const borderHover = isActive ? "rgba(0,212,106,0.35)" : "var(--border-strong)";
+  const bg = isActive ? "rgba(0,212,106,0.12)" : inboxGlass.controlBg;
+  const bgHover = isActive ? "rgba(0,212,106,0.18)" : inboxGlass.controlBgHover;
+  const border = isActive ? "rgba(0,212,106,0.25)" : inboxGlass.controlBorder;
+  const borderHover = isActive ? "rgba(0,212,106,0.35)" : inboxGlass.controlBorderHover;
   const fg = isActive ? "#00d46a" : "var(--text-1)";
   return (
     <Dropdown
@@ -1311,10 +1319,10 @@ function SingleSelectDropdown({
 }) {
   const [open, setOpen] = useState(false);
   // Cores conforme estado (active = filtro divergindo do default).
-  const triggerBg = active ? "rgba(0,212,106,0.12)" : "var(--border-subtle)";
-  const triggerBgHover = active ? "rgba(0,212,106,0.18)" : "var(--border-default)";
-  const triggerBorder = active ? "rgba(0,212,106,0.25)" : "var(--border-default)";
-  const triggerBorderHover = active ? "rgba(0,212,106,0.35)" : "var(--border-strong)";
+  const triggerBg = active ? "rgba(0,212,106,0.12)" : inboxGlass.controlBg;
+  const triggerBgHover = active ? "rgba(0,212,106,0.18)" : inboxGlass.controlBgHover;
+  const triggerBorder = active ? "rgba(0,212,106,0.25)" : inboxGlass.controlBorder;
+  const triggerBorderHover = active ? "rgba(0,212,106,0.35)" : inboxGlass.controlBorderHover;
   const triggerColor = active ? "#00d46a" : "var(--text-1)";
   const iconColor = active ? "#00d46a" : "hsl(240 8% 48%)";
   return (
@@ -1389,22 +1397,22 @@ function MultiSelectDropdown({
           className="flex items-center gap-1.5 rounded-lg px-2 sm:px-3 py-1.5 text-xs font-medium"
           title={label}
           style={{
-            background: selected.length > 0 ? "rgba(0,212,106,0.12)" : "var(--border-subtle)",
+            background: selected.length > 0 ? "rgba(0,212,106,0.12)" : inboxGlass.controlBg,
             backdropFilter: "blur(8px)",
-            border: `1px solid ${selected.length > 0 ? "rgba(0,212,106,0.25)" : "var(--border-default)"}`,
+            border: `1px solid ${selected.length > 0 ? "rgba(0,212,106,0.25)" : inboxGlass.controlBorder}`,
             boxShadow: selected.length > 0 ? "0 0 12px rgba(0,212,106,0.10)" : "none",
             color: selected.length > 0 ? "#00d46a" : "var(--text-1)",
             transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
           }}
           onMouseEnter={e => {
             const active = selected.length > 0;
-            e.currentTarget.style.background = active ? "rgba(0,212,106,0.18)" : "var(--border-default)";
-            e.currentTarget.style.borderColor = active ? "rgba(0,212,106,0.35)" : "var(--border-strong)";
+            e.currentTarget.style.background = active ? "rgba(0,212,106,0.18)" : inboxGlass.controlBgHover;
+            e.currentTarget.style.borderColor = active ? "rgba(0,212,106,0.35)" : inboxGlass.controlBorderHover;
           }}
           onMouseLeave={e => {
             const active = selected.length > 0;
-            e.currentTarget.style.background = active ? "rgba(0,212,106,0.12)" : "var(--border-subtle)";
-            e.currentTarget.style.borderColor = active ? "rgba(0,212,106,0.25)" : "var(--border-default)";
+            e.currentTarget.style.background = active ? "rgba(0,212,106,0.12)" : inboxGlass.controlBg;
+            e.currentTarget.style.borderColor = active ? "rgba(0,212,106,0.25)" : inboxGlass.controlBorder;
           }}
         >
           <span style={{ color: selected.length > 0 ? "#00d46a" : "hsl(240 8% 48%)", display: "inline-flex" }}>{icon}</span>
@@ -1628,7 +1636,7 @@ function EmptyState({ agentScope, statusTab }: { agentScope: string; statusTab: 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-12 text-center">
       <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
-        background: "var(--input)", border: "1px solid var(--border-subtle)",
+        background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-subtle)",
       }}>
         <MessageSquare className="h-5 w-5" style={{ color: "var(--text-3)", opacity: 0.5 }} />
       </div>
@@ -1811,9 +1819,9 @@ function InboxMenu({
           onClick={() => setOpen((o) => !o)}
           className="flex items-center justify-center rounded-lg p-1.5"
           style={{
-            background: open ? "rgba(0,212,106,0.12)" : "var(--border-subtle)",
+            background: open ? "rgba(0,212,106,0.12)" : inboxGlass.controlBg,
             backdropFilter: "blur(8px)",
-            border: open ? "1px solid rgba(0,212,106,0.25)" : "1px solid var(--border-default)",
+            border: open ? "1px solid rgba(0,212,106,0.25)" : `1px solid ${inboxGlass.controlBorder}`,
             color: open ? "#00d46a" : "var(--text-3)",
             transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
           }}
@@ -1930,8 +1938,8 @@ function NotificationsButton({
       ? muted ? "Reativar som e notificações" : "Silenciar notificações"
       : "Ativar notificações desktop e som de mensagens";
   // Verde quando ativas (perm granted + não-muted). Cinza quando off/denied.
-  const bg = showOff ? "var(--border-subtle)" : "rgba(0,212,106,0.10)";
-  const border = showOff ? "var(--border-default)" : "rgba(0,212,106,0.22)";
+  const bg = showOff ? inboxGlass.controlBg : "rgba(0,212,106,0.10)";
+  const border = showOff ? inboxGlass.controlBorder : "rgba(0,212,106,0.22)";
   const fg = showOff ? "var(--text-3)" : "#00d46a";
   return (
     <button

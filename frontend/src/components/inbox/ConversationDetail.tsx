@@ -848,7 +848,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           {/* Mode selector: Humano / IA / Observando */}
           {conv && (
             <div className="flex items-center rounded-lg overflow-hidden border flex-shrink-0"
-              style={{ border: "1px solid var(--border-default)", background: "var(--input)" }}>
+              style={{ border: "1px solid var(--border-default)", background: "rgba(255,255,255,0.03)" }}>
               {([
                 { id: "human",     label: "Humano", icon: UserCheck },
                 { id: "ai",        label: "IA",     icon: Bot },
@@ -873,7 +873,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                   title={label}
                   aria-label={label}
                   style={{
-                    background: convMode === id ? (id === "ai" ? "rgba(167,139,250,0.2)" : id === "human" ? "rgba(0,212,106,0.15)" : "var(--border-default)") : "transparent",
+                    background: convMode === id ? (id === "ai" ? "rgba(167,139,250,0.2)" : id === "human" ? "rgba(0,212,106,0.15)" : "rgba(255,255,255,0.08)") : "transparent",
                     color: convMode === id ? (id === "ai" ? "#c4b5fd" : id === "human" ? "#00d46a" : "hsl(240 15% 80%)") : "var(--text-3)",
                   }}>
                   <Icon className="h-3 w-3" />
@@ -909,7 +909,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               }}
               disabled={timelineQ.isFetching || convQ.isFetching}
               className="flex items-center justify-center rounded-lg flex-shrink-0 transition-colors disabled:opacity-50"
-              style={{ width: 30, height: 30, background: "var(--input)", border: "1px solid var(--border-subtle)", color: "var(--text-3)" }}
+              style={{ width: 30, height: 30, background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-subtle)", color: "var(--text-3)" }}
               title="Atualizar mensagens"
               aria-label="Atualizar mensagens"
             >
@@ -922,7 +922,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             <button
               onClick={() => setMobileActionsOpen((v) => !v)}
               className="flex items-center justify-center rounded-lg"
-              style={{ width: 30, height: 30, background: "var(--input)", border: "1px solid var(--border-subtle)", color: "var(--text-3)" }}
+              style={{ width: 30, height: 30, background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-subtle)", color: "var(--text-3)" }}
               title="Mais ações"
               aria-label="Mais ações"
             >
