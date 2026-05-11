@@ -166,7 +166,7 @@ function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
       className="flex flex-wrap items-center gap-0.5 px-2 py-2"
       style={{
         background: "rgba(0,0,0,0.20)",
-        borderBottom: "1px solid rgba(255,255,255,0.08)",
+        borderBottom: "1px solid var(--border-subtle)",
       }}
     >
       <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive("heading", { level: 1 })} title="Heading 1">

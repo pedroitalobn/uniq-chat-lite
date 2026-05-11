@@ -12,10 +12,10 @@ import { CrmHeader, CrmHeaderButton } from "@/components/crm/CrmHeader";
 import { showConfirm } from "@/lib/confirm";
 
 const STATUS_FILTERS: { id: "all" | CrmMeeting["status"]; label: string; color: string }[] = [
-  { id: "all",       label: "Todas",       color: "hsl(240 8% 60%)" },
+  { id: "all",       label: "Todas",       color: "var(--text-3)" },
   { id: "scheduled", label: "Agendadas",   color: "#60a5fa" },
   { id: "completed", label: "Realizadas",  color: "#00d46a" },
-  { id: "cancelled", label: "Canceladas",  color: "hsl(240 8% 50%)" },
+  { id: "cancelled", label: "Canceladas",  color: "var(--text-3)" },
   { id: "no_show",   label: "No-show",     color: "#fbbf24" },
 ];
 

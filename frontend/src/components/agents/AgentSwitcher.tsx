@@ -188,7 +188,7 @@ function CreateAgentModal({
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.6)" }}
+      style={{ background: "var(--surface-overlay)" }}
       onClick={onClose}
     >
       <div

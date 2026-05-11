@@ -191,7 +191,7 @@ export function PlatformVoicePanel() {
           puxar mais 1 dep no admin. Mesma vibe do PlatformAIPanel. */}
       {form && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4"
-          style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)" }}
+          style={{ background: "var(--surface-overlay)", backdropFilter: "blur(8px)" }}
           onClick={() => setForm(null)}>
           <div className="w-full max-w-md rounded-2xl p-5 space-y-4"
             style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}

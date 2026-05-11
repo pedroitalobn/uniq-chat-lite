@@ -226,7 +226,7 @@ function EditPanel({
     <div style={{
       position: "fixed", inset: 0, zIndex: 50,
       display: "flex", alignItems: "center", justifyContent: "center",
-      background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
+      background: "var(--surface-overlay)", backdropFilter: "blur(4px)",
     }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >

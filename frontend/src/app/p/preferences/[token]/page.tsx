@@ -70,14 +70,14 @@ export default function PreferencesPage({ params }: { params: Promise<{ token: s
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "hsl(240 20% 4%)" }}>
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "var(--surface-solid)" }}>
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-6">
           <Logo height={36} />
         </div>
         <div className="rounded-2xl p-6"
           style={{
-            background: "hsl(240 18% 6%)",
+            background: "var(--surface-solid)",
             boxShadow: "0 0 0 1px hsl(240 12% 13%), 0 24px 64px rgba(0,0,0,0.5)",
           }}>
           <div className="flex items-center gap-2 mb-1">

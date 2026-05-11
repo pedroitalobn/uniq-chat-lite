@@ -178,12 +178,12 @@ function WebhookCard({ wh, instanceId, onDelete }: { wh: Webhook; instanceId: st
   const labelStyle = { color: "hsl(240 8% 48%)" };
 
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: "hsl(240 18% 5.5%)", border: "1px solid hsl(240 12% 13%)" }}>
+    <div className="rounded-2xl overflow-hidden" style={{ background: "hsl(240 18% 5.5%)", border: "1px solid var(--border)" }}>
       {/* Header */}
       <div className="flex items-start gap-3 p-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            {wh.name && <span className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>{wh.name}</span>}
+            {wh.name && <span className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{wh.name}</span>}
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider"
               style={{ background: "rgba(96,165,250,0.08)", color: "#60a5fa" }}>HTTP</span>
             {wh.rabbitmq_enabled && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase" style={{ background: "rgba(249,115,22,0.08)", color: "#fb923c" }}>RMQ</span>}
@@ -194,10 +194,10 @@ function WebhookCard({ wh, instanceId, onDelete }: { wh: Webhook; instanceId: st
           <div className="flex flex-wrap gap-1 mt-1.5">
             {evList.slice(0, 5).map(ev => (
               <span key={ev} className="text-[9px] px-1.5 py-0.5 rounded font-mono"
-                style={{ background: "var(--surface-2)", color: "hsl(240 8% 38%)" }}>{ev}</span>
+                style={{ background: "var(--surface-2)", color: "var(--text-4)" }}>{ev}</span>
             ))}
             {evList.length > 5 && <span className="text-[9px] px-1.5 py-0.5 rounded font-mono"
-              style={{ background: "var(--surface-2)", color: "hsl(240 8% 38%)" }}>+{evList.length - 5}</span>}
+              style={{ background: "var(--surface-2)", color: "var(--text-4)" }}>+{evList.length - 5}</span>}
           </div>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -210,7 +210,7 @@ function WebhookCard({ wh, instanceId, onDelete }: { wh: Webhook; instanceId: st
           <button
             onClick={() => setShowingLogs(true)}
             className="p-2 rounded-lg transition-colors hover:bg-white/5"
-            style={{ color: "hsl(240 8% 50%)" }}
+            style={{ color: "var(--text-3)" }}
             title="Logs de entrega"
           >
             <Activity className="w-4 h-4" />
@@ -222,11 +222,11 @@ function WebhookCard({ wh, instanceId, onDelete }: { wh: Webhook; instanceId: st
               style={{ transform: wh.is_active ? "translateX(0.875rem)" : "translateX(0)" }} />
           </button>
           <button onClick={() => setExpanded(e => !e)} className="p-1.5 rounded-lg"
-            style={{ color: "hsl(240 8% 38%)" }}>
+            style={{ color: "var(--text-4)" }}>
             {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
           <button onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}
-            className="p-1.5 rounded-lg transition-colors" style={{ color: "hsl(240 8% 38%)" }}
+            className="p-1.5 rounded-lg transition-colors" style={{ color: "var(--text-4)" }}
             onMouseEnter={e => (e.currentTarget.style.color = "#ef4444")}
             onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}>
             <Trash2 className="w-3.5 h-3.5" />
@@ -383,7 +383,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
   };
 
   const labelStyle = { color: "hsl(240 8% 52%)" };
-  const cardStyle = { background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 15%)" };
+  const cardStyle = { background: "var(--surface-solid)", border: "1px solid var(--border)" };
 
   if (isLoading) return <div className="skeleton h-40 rounded-2xl" />;
 
@@ -394,8 +394,8 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
       <div>
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 85%)" }}>Webhooks da Instância</h3>
-            <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 40%)" }}>
+            <h3 className="text-sm font-medium" style={{ color: "var(--text-2)" }}>Webhooks da Instância</h3>
+            <p className="text-xs mt-0.5" style={{ color: "var(--text-4)" }}>
               Receba eventos específicos desta instância (mensagens, status, conexões)
             </p>
           </div>
@@ -424,7 +424,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
         {creating && (
           <div className="rounded-2xl p-5 space-y-4 mb-3 animate-fade-in-up" style={cardStyle}>
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-medium" style={{ color: "hsl(240 15% 90%)" }}>Novo Webhook</h4>
+              <h4 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Novo Webhook</h4>
               <button onClick={() => setCreating(false)} style={{ color: "hsl(240 8% 42%)" }}>
                 <X className="w-4 h-4" />
               </button>
@@ -475,7 +475,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
                               className="text-[11px] py-1.5 rounded-lg font-mono transition-all"
                               style={isSelected
                                 ? { background: "var(--green)", border: "1px solid var(--green)", color: "#03170a" }
-                                : { background: "hsl(240 12% 10%)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 8% 48)" }}>
+                                : { background: "hsl(240 12% 10%)", border: "1px solid var(--border)", color: "hsl(240 8% 48)" }}>
                               {ev}
                             </button>
                           );
@@ -505,7 +505,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
         {webhooks.length === 0 && !creating ? (
           <div className="rounded-2xl p-8 text-center" style={{ background: "hsl(240 18% 5.5%)", border: "1px dashed hsl(240 12% 14%)" }}>
             <WebhookIcon className="w-6 h-6 mx-auto mb-2" style={{ color: "hsl(240 8% 28%)" }} />
-            <p className="text-xs" style={{ color: "hsl(240 8% 40%)" }}>Nenhum webhook. Clique em Novo para criar.</p>
+            <p className="text-xs" style={{ color: "var(--text-4)" }}>Nenhum webhook. Clique em Novo para criar.</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -520,10 +520,10 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
       {/* ── MCP section ── */}
       <div>
         <div className="flex items-center gap-2 mb-3">
-          <Bot className="w-4 h-4" style={{ color: "hsl(240 8% 50%)" }} />
+          <Bot className="w-4 h-4" style={{ color: "var(--text-3)" }} />
           <div className="flex-1">
-            <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 85%)" }}>MCP para IA</h3>
-            <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 40%)" }}>
+            <h3 className="text-sm font-medium" style={{ color: "var(--text-2)" }}>MCP para IA</h3>
+            <p className="text-xs mt-0.5" style={{ color: "var(--text-4)" }}>
               Conecte IAs (Claude, GPT, etc.) ao WhatsApp via Model Context Protocol
             </p>
           </div>
@@ -541,14 +541,14 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
           <div className="rounded-2xl p-4 space-y-4" style={cardStyle}>
             {/* SSE Endpoint */}
             <div>
-              <label className="text-[10px] font-medium uppercase tracking-wider block mb-1.5" style={{ color: "hsl(240 8% 40%)" }}>
+              <label className="text-[10px] font-medium uppercase tracking-wider block mb-1.5" style={{ color: "var(--text-4)" }}>
                 Endpoint SSE
               </label>
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 14%)" }}>
+                style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
                 <code className="text-[10px] flex-1 truncate font-mono" style={{ color: "#60a5fa" }}>{mcpSSEUrl}</code>
                 <button onClick={() => { navigator.clipboard.writeText(mcpSSEUrl); setCopiedMCP(true); setTimeout(() => setCopiedMCP(false), 2000); }}>
-                  {copiedMCP ? <Check className="w-3.5 h-3.5" style={{ color: "var(--green)" }} /> : <Copy className="w-3.5 h-3.5" style={{ color: "hsl(240 8% 40%)" }} />}
+                  {copiedMCP ? <Check className="w-3.5 h-3.5" style={{ color: "var(--green)" }} /> : <Copy className="w-3.5 h-3.5" style={{ color: "var(--text-4)" }} />}
                 </button>
               </div>
               <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 34%)" }}>
@@ -559,7 +559,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
             {/* Tools list */}
             {tools && (tools.tools as Array<{ name: string; description: string }>).length > 0 && (
               <div>
-                <label className="text-[10px] font-medium uppercase tracking-wider block mb-2" style={{ color: "hsl(240 8% 40%)" }}>
+                <label className="text-[10px] font-medium uppercase tracking-wider block mb-2" style={{ color: "var(--text-4)" }}>
                   Ferramentas disponíveis
                 </label>
                 <div className="space-y-1.5">
@@ -576,7 +576,7 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
 
             {/* Claude Desktop config */}
             <div>
-              <label className="text-[10px] font-medium uppercase tracking-wider block mb-1.5" style={{ color: "hsl(240 8% 40%)" }}>
+              <label className="text-[10px] font-medium uppercase tracking-wider block mb-1.5" style={{ color: "var(--text-4)" }}>
                 Config Claude Desktop / claude_desktop_config.json
               </label>
               <pre className="text-[9px] p-3 rounded-xl overflow-x-auto font-mono"
@@ -608,7 +608,7 @@ function LogsTab({ instanceId }: { instanceId: string }) {
       {messages.length === 0 ? (
         <div
           className="rounded-2xl p-10 text-center"
-          style={{ background: "hsl(240 18% 6%)", border: "1px dashed hsl(240 12% 16%)" }}
+          style={{ background: "var(--surface-solid)", border: "1px dashed hsl(240 12% 16%)" }}
         >
           <Activity className="w-7 h-7 mx-auto mb-3" style={{ color: "hsl(240 8% 30%)" }} />
           <p className="text-sm" style={{ color: "hsl(240 8% 42%)" }}>Nenhuma mensagem registrada</p>
@@ -618,7 +618,7 @@ function LogsTab({ instanceId }: { instanceId: string }) {
           <div
             key={msg.id}
             className="rounded-xl p-4 flex items-start gap-3"
-            style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}
+            style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}
           >
             <div
               className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
@@ -638,11 +638,11 @@ function LogsTab({ instanceId }: { instanceId: string }) {
                   {msg.direction === "in" ? "Recebida" : "Enviada"}
                 </span>
                 <span style={{ color: "hsl(240 8% 25%)" }}>·</span>
-                <span className="text-xs font-mono" style={{ color: "hsl(240 8% 38%)" }}>{msg.to_jid}</span>
+                <span className="text-xs font-mono" style={{ color: "var(--text-4)" }}>{msg.to_jid}</span>
               </div>
               <p className="text-sm truncate" style={{ color: "hsl(240 15% 80%)" }}>{msg.content}</p>
             </div>
-            <div className="text-xs flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }}>
+            <div className="text-xs flex-shrink-0" style={{ color: "var(--text-4)" }}>
               {new Date(msg.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
             </div>
           </div>
@@ -1267,8 +1267,8 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
   });
 
   const cardStyle = {
-    background: "hsl(240 18% 6%)",
-    border: "1px solid hsl(240 12% 13%)",
+    background: "var(--surface-solid)",
+    border: "1px solid var(--border)",
   };
 
   const labelStyle = { color: "hsl(240 8% 42%)" };
@@ -1305,7 +1305,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                `@${instance.name}`}
             </p>
             {profile?.conversations !== undefined && isWhatsApp && (
-              <p className="text-xs mt-1" style={{ color: "hsl(240 8% 40%)" }}>
+              <p className="text-xs mt-1" style={{ color: "var(--text-4)" }}>
                 {profile.conversations} conversa{profile.conversations !== 1 ? "s" : ""}
               </p>
             )}
@@ -1367,7 +1367,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
               <code className="text-xs flex-1 font-mono truncate" style={{ color: serverSlug ? "hsl(240 8% 55%)" : "hsl(240 8% 36%)" }}>
                 {v1Url}
               </code>
-              <button onClick={copyUrl} className="transition-colors flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }}
+              <button onClick={copyUrl} className="transition-colors flex-shrink-0" style={{ color: "var(--text-4)" }}
                 onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
                 onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}>
                 {copiedUrl ? <Check className="w-3.5 h-3.5" style={{ color: "var(--green)" }} /> : <Copy className="w-3.5 h-3.5" />}
@@ -1386,7 +1386,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
             <div className="flex items-center gap-2 rounded-xl px-3 py-2"
               style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}>
               <code className="text-xs flex-1 font-mono" style={{ color: "#a78bfa" }}>{instance.slug || "—"}</code>
-              <button onClick={copyId} className="transition-colors flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }}
+              <button onClick={copyId} className="transition-colors flex-shrink-0" style={{ color: "var(--text-4)" }}
                 onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
                 onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}>
                 {copiedId ? <Check className="w-3.5 h-3.5" style={{ color: "var(--green)" }} /> : <Copy className="w-3.5 h-3.5" />}
@@ -1413,13 +1413,13 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
             </div>
             <div className="flex items-center gap-2 rounded-xl px-3 py-2"
               style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}>
-              <code className="text-xs flex-1 font-mono truncate" style={{ color: "hsl(240 8% 55%)" }}>
+              <code className="text-xs flex-1 font-mono truncate" style={{ color: "var(--text-3)" }}>
                 {instance.token
                   ? (tokenVisible ? instance.token : instance.token.slice(0, 8) + "••••••••••••••••••••••••••••••••••••••••••••••••••••••••")
                   : "—"}
               </code>
               <button onClick={() => setTokenVisible(v => !v)} className="transition-colors flex-shrink-0"
-                style={{ color: "hsl(240 8% 38%)" }}
+                style={{ color: "var(--text-4)" }}
                 onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
                 onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}>
                 {tokenVisible
@@ -1427,7 +1427,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                   : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 }
               </button>
-              <button onClick={copyToken} className="transition-colors flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }}
+              <button onClick={copyToken} className="transition-colors flex-shrink-0" style={{ color: "var(--text-4)" }}
                 onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
                 onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}>
                 {copiedToken ? <Check className="w-3.5 h-3.5" style={{ color: "var(--green)" }} /> : <Copy className="w-3.5 h-3.5" />}
@@ -1489,7 +1489,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                   {contactAvatarMutation.isPending ? "Buscando..." : "Buscar avatar"}
                 </button>
               </div>
-              <p className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>
+              <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
                 Valide número ou JID canônico, nome exibido e avatar vistos pela instância conectada.
               </p>
 
@@ -1499,12 +1499,12 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                     <img src={contactLookup.avatar_url} alt="Avatar do contato" className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
                   ) : (
                     <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "var(--surface-2)" }}>
-                      <User className="w-5 h-5" style={{ color: "hsl(240 8% 45%)" }} />
+                      <User className="w-5 h-5" style={{ color: "var(--text-3)" }} />
                     </div>
                   )}
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-medium" style={{ color: "hsl(240 15% 88%)" }}>
+                      <span className="text-xs font-medium" style={{ color: "var(--text-1)" }}>
                         {contactLookup.push_name || contactLookup.name || "Contato sem nome disponível"}
                       </span>
                       <span
@@ -1530,7 +1530,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                       </p>
                     )}
                     {!contactLookup.avatar_url && contactLookup.exists && (
-                      <p className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>
+                      <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
                         Nenhum avatar disponível para este contato no momento.
                       </p>
                     )}
@@ -1732,7 +1732,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                 placeholder="Pergunta da enquete" className="input-field w-full" />
               <textarea value={pollOptions} onChange={e => setPollOptions(e.target.value)}
                 rows={4} placeholder={"Opção 1\nOpção 2\nOpção 3"} className="input-field w-full resize-none" />
-              <p className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>Uma opção por linha</p>
+              <p className="text-[10px]" style={{ color: "var(--text-4)" }}>Uma opção por linha</p>
             </div>
           )}
           {msgType === "buttons" && (
@@ -1851,7 +1851,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
             style={{ borderBottom: "1px solid hsl(240 12% 10%)" }}>
             <div>
               <p className="text-sm font-medium" style={{ color: "hsl(240 15% 80%)" }}>{label}</p>
-              <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>{desc}</p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--text-4)" }}>{desc}</p>
             </div>
             <button
               role="switch"
@@ -1889,13 +1889,13 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={() => setShowIgLogin(false)} />
           <div className="relative w-full max-w-sm rounded-2xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto"
-            style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+            style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
             {/* Header com ícone Instagram */}
             <div className="flex flex-col items-center mb-5">
               <button 
                 onClick={() => setShowIgLogin(false)} 
                 className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-white/5 transition-colors"
-                style={{ color: "hsl(240 8% 40%)" }}
+                style={{ color: "var(--text-4)" }}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1912,7 +1912,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
             <div className="space-y-4">
               {/* Credentials inputs */}
               <div>
-                <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>Usuário</label>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>Usuário</label>
                 <div className="relative">
                   <input
                     type="text"
@@ -1921,13 +1921,13 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                     placeholder="seu_usuario"
                     autoComplete="username"
                     className="w-full text-sm rounded-xl px-3 py-2.5 pl-10 outline-none"
-                    style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
+                    style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-1)" }}
                   />
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "hsl(240 8% 40%)" }} />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-4)" }} />
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>Senha</label>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>Senha</label>
                 <div className="relative">
                   <input
                     type={igPasswordVisible ? "text" : "password"}
@@ -1936,14 +1936,14 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                     placeholder="••••••••"
                     autoComplete="current-password"
                     className="w-full text-sm rounded-xl px-3 py-2.5 pl-10 pr-10 outline-none"
-                    style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
+                    style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-1)" }}
                   />
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "hsl(240 8% 40%)" }} />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--text-4)" }} />
                   <button
                     type="button"
                     onClick={() => setIgPasswordVisible(!igPasswordVisible)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-1"
-                    style={{ color: "hsl(240 8% 40%)" }}
+                    style={{ color: "var(--text-4)" }}
                   >
                     {igPasswordVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -2003,8 +2003,8 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                   {/* External verification - no code input, just instructions */}
                   {igChallenge.external_verification ? (
                     <>
-                      <div className="rounded-xl p-3 space-y-2" style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)" }}>
-                        <p className="text-xs font-medium" style={{ color: "hsl(240 15% 85%)" }}>
+                      <div className="rounded-xl p-3 space-y-2" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                        <p className="text-xs font-medium" style={{ color: "var(--text-2)" }}>
                           📱 Como verificar sua conta:
                         </p>
                         <ol className="text-xs space-y-1.5 list-decimal list-inside" style={{ color: "hsl(240 8% 58%)" }}>
@@ -2018,7 +2018,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                         type="button"
                         onClick={() => { setIgChallenge(null); setIgChallengeCode(""); }}
                         className="w-full text-sm font-medium py-2.5 rounded-xl transition-all flex items-center justify-center gap-2"
-                        style={{ background: "var(--surface-3)", color: "hsl(240 15% 90%)" }}
+                        style={{ background: "var(--surface-3)", color: "var(--text-1)" }}
                       >
                         <RotateCcw className="w-4 h-4" />
                         Tentar novamente
@@ -2030,7 +2030,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                       {/* Method selector if multiple options */}
                       {igChallenge.options && igChallenge.options.length > 1 && (
                         <div>
-                          <label className="text-xs font-medium block mb-2" style={{ color: "hsl(240 8% 55%)" }}>
+                          <label className="text-xs font-medium block mb-2" style={{ color: "var(--text-3)" }}>
                             Enviar código por:
                           </label>
                           <div className="flex gap-2">
@@ -2077,7 +2077,7 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
 
                       {/* Code input field */}
                       <div>
-                        <label className="text-xs font-medium block mb-2" style={{ color: "hsl(240 8% 55%)" }}>
+                        <label className="text-xs font-medium block mb-2" style={{ color: "var(--text-3)" }}>
                           Código de verificação
                         </label>
                         <input
@@ -2094,15 +2094,15 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
                           className="w-full text-sm rounded-xl px-3 py-3 outline-none"
                           style={{
                             background: "var(--surface-2)",
-                            border: "1px solid hsl(240 12% 16%)",
-                            color: "hsl(240 15% 90%)",
+                            border: "1px solid var(--border)",
+                            color: "var(--text-1)",
                             letterSpacing: "0.4em",
                             textAlign: "center" as React.CSSProperties["textAlign"],
                             fontSize: "1.25rem",
                           }}
                           maxLength={6}
                         />
-                        <p className="text-xs mt-1.5 text-center" style={{ color: "hsl(240 8% 45%)" }}>
+                        <p className="text-xs mt-1.5 text-center" style={{ color: "var(--text-3)" }}>
                           Digite os 6 dígitos recebidos
                         </p>
                       </div>
@@ -2211,9 +2211,9 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
   const hasSnapshot = snapshotAt && snapshotAt.getFullYear() > 2000;
   const currentSchedule = data?.schedule ?? "";
 
-  const cardStyle = { background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" };
+  const cardStyle = { background: "var(--surface-solid)", border: "1px solid var(--border)" };
   const dimText = { color: "hsl(240 8% 42%)" };
-  const valText = { color: "hsl(240 15% 88%)" };
+  const valText = { color: "var(--text-1)" };
 
   const scheduleOptions: { value: "" | "daily" | "weekly"; label: string; desc: string }[] = [
     { value: "",       label: "Manual",  desc: "Apenas quando você solicitar" },
@@ -2604,7 +2604,7 @@ export default function InstanceDetailPage() {
       {/* Tabs */}
       <div
         className="flex gap-0.5 p-1 rounded-xl w-fit"
-        style={{ background: "hsl(240 18% 5%)", border: "1px solid hsl(240 12% 11%)" }}
+        style={{ background: "hsl(240 18% 5%)", border: "1px solid var(--border)" }}
       >
         {tabs.map((tab) => {
           const active = activeTab === tab.id;
@@ -2675,18 +2675,18 @@ function DMTab({ instance }: { instance: Instance }) {
   };
 
   return (
-    <div className="rounded-2xl p-5 space-y-5" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+    <div className="rounded-2xl p-5 space-y-5" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
       <h3 className="text-sm font-medium flex items-center gap-2" style={{ color: "hsl(240 15% 93%)" }}>
         <MessageSquareText className="w-4 h-4" style={{ color: channel === "instagram" ? "#e1306c" : "#ff0050" }} />
         Enviar DM
       </h3>
       <div className="space-y-3">
         <div>
-          <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>Usuário destino</label>
+          <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>Usuário destino</label>
           <input type="text" value={target} onChange={e => setTarget(e.target.value)} placeholder="username" className="input-field w-full" />
         </div>
         <div>
-          <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>Mensagem</label>
+          <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>Mensagem</label>
           <textarea value={message} onChange={e => setMessage(e.target.value)} rows={3} placeholder="Digite sua mensagem..." className="input-field w-full resize-none" />
         </div>
         <button onClick={sendDM} disabled={sending || !target.trim() || !message.trim()}
@@ -2733,14 +2733,14 @@ function ActionsTab({ instance }: { instance: Instance }) {
   };
 
   return (
-    <div className="rounded-2xl p-5 space-y-5" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+    <div className="rounded-2xl p-5 space-y-5" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
       <h3 className="text-sm font-medium flex items-center gap-2" style={{ color: "hsl(240 15% 93%)" }}>
         <Users className="w-4 h-4" style={{ color: channel === "instagram" ? "#e1306c" : "#ff0050" }} />
         Ações de Seguimento
       </h3>
       <div className="space-y-3">
         <div>
-          <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>Usuário destino</label>
+          <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>Usuário destino</label>
           <input type="text" value={target} onChange={e => setTarget(e.target.value)} placeholder="username" className="input-field w-full" />
         </div>
         <div className="flex gap-2">
@@ -2805,14 +2805,14 @@ function ScrapingTab({ instance }: { instance: Instance }) {
   };
 
   return (
-    <div className="rounded-2xl p-5 space-y-5" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+    <div className="rounded-2xl p-5 space-y-5" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
       <h3 className="text-sm font-medium flex items-center gap-2" style={{ color: "hsl(240 15% 93%)" }}>
         <Download className="w-4 h-4" style={{ color: channel === "instagram" ? "#e1306c" : "#ff0050" }} />
         Scraping de Perfis
       </h3>
       <div className="space-y-3">
         <div>
-          <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>Fonte</label>
+          <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>Fonte</label>
           <div className="flex gap-2">
             {[
               { id: "followers", label: "Seguidores" },
@@ -2823,7 +2823,7 @@ function ScrapingTab({ instance }: { instance: Instance }) {
                 className="flex-1 py-2 text-xs font-medium rounded-lg transition-colors"
                 style={source === s.id
                   ? { background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.2)", color: "#00d46a" }
-                  : { background: "hsl(240 12% 10%)", border: "1px solid hsl(240 12% 15%)", color: "hsl(240 8% 50%)" }
+                  : { background: "hsl(240 12% 10%)", border: "1px solid var(--border)", color: "var(--text-3)" }
                 }>
                 {s.label}
               </button>
@@ -2831,7 +2831,7 @@ function ScrapingTab({ instance }: { instance: Instance }) {
           </div>
         </div>
         <div>
-          <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>
+          <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>
             {source === "followers" ? "Nome de usuário" : source === "hashtag" ? "Hashtag (sem #)" : "URL do post"}
           </label>
           <input type="text" value={target} onChange={e => setTarget(e.target.value)}
@@ -2839,7 +2839,7 @@ function ScrapingTab({ instance }: { instance: Instance }) {
             className="input-field w-full" />
         </div>
         <div>
-          <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>Limite</label>
+          <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>Limite</label>
           <input type="number" value={limit} onChange={e => setLimit(Number(e.target.value))} min={1} max={500}
             className="input-field w-full" />
         </div>
@@ -2852,7 +2852,7 @@ function ScrapingTab({ instance }: { instance: Instance }) {
 
       {results.length > 0 && (
         <div className="border-t pt-4" style={{ borderColor: "hsl(240 12% 13%)" }}>
-          <p className="text-xs font-medium mb-2" style={{ color: "hsl(240 8% 55%)" }}>
+          <p className="text-xs font-medium mb-2" style={{ color: "var(--text-3)" }}>
             Resultados ({results.length})
           </p>
           <div className="max-h-48 overflow-y-auto space-y-1">
@@ -2861,7 +2861,7 @@ function ScrapingTab({ instance }: { instance: Instance }) {
                 style={{ background: "hsl(240 12% 10%)" }}>
                 <span style={{ color: "hsl(240 15% 80%)" }}>{u.username}</span>
                 {u.followers > 0 && (
-                  <span style={{ color: "hsl(240 8% 40%)" }}>{u.followers} seguidores</span>
+                  <span style={{ color: "var(--text-4)" }}>{u.followers} seguidores</span>
                 )}
               </div>
             ))}
@@ -2903,13 +2903,13 @@ function PostsTab({ instance }: { instance: Instance }) {
         Publique fotos/vídeos no Instagram da conta conectada.
       </p>
       <div>
-        <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>URL da imagem/vídeo</label>
+        <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>URL da imagem/vídeo</label>
         <input type="text" value={mediaUrl} onChange={e => setMediaUrl(e.target.value)}
           placeholder="https://exemplo.com/imagem.jpg"
           className="input-field w-full" />
       </div>
       <div>
-        <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>Legenda</label>
+        <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>Legenda</label>
         <textarea value={caption} onChange={e => setCaption(e.target.value)}
           placeholder="Sua legenda..."
           rows={3}
@@ -2960,13 +2960,13 @@ function StoriesTab({ instance }: { instance: Instance }) {
         Publique stories (foto/vídeo) que desaparecem em 24h.
       </p>
       <div>
-        <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>URL da mídia</label>
+        <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>URL da mídia</label>
         <input type="text" value={mediaUrl} onChange={e => setMediaUrl(e.target.value)}
           placeholder="https://exemplo.com/video.mp4"
           className="input-field w-full" />
       </div>
       <div>
-        <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 55%)" }}>Texto (opcional)</label>
+        <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>Texto (opcional)</label>
         <input type="text" value={caption} onChange={e => setCaption(e.target.value)}
           placeholder="Texto sobre a imagem..."
           className="input-field w-full" />

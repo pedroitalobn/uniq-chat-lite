@@ -51,7 +51,7 @@ export function BottomNav() {
           background: "rgba(10,10,20,0.75)",
           backdropFilter: "blur(24px) saturate(180%)",
           WebkitBackdropFilter: "blur(24px) saturate(180%)",
-          borderTop: "1px solid rgba(255,255,255,0.10)",
+          borderTop: "1px solid var(--border-default)",
           boxShadow: "0 -8px 32px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.08)",
         }}
       >
@@ -155,13 +155,13 @@ export function BottomNav() {
           background: "rgba(10,10,20,0.85)",
           backdropFilter: "blur(24px) saturate(180%)",
           WebkitBackdropFilter: "blur(24px) saturate(180%)",
-          borderTop: "1px solid rgba(255,255,255,0.10)",
+          borderTop: "1px solid var(--border-default)",
           boxShadow: "0 -8px 32px rgba(0,0,0,0.50), inset 0 1px 0 rgba(255,255,255,0.08)",
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
         }}
       >
         <div className="flex items-center justify-between px-4 py-3"
-          style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          style={{ borderBottom: "1px solid var(--border-subtle)" }}>
           <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Mais opções</p>
           <button
             onClick={() => setSheetOpen(false)}

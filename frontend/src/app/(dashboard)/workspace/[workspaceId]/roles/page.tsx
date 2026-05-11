@@ -126,8 +126,8 @@ export default function RolesPage() {
   };
 
   const cardStyle = {
-    background: "hsl(240 18% 6%)",
-    border: "1px solid hsl(240 12% 13%)",
+    background: "var(--surface-solid)",
+    border: "1px solid var(--border)",
   };
 
   const getCategoryLabel = (cat: string) => {
@@ -198,7 +198,7 @@ export default function RolesPage() {
           <button
             onClick={() => router.push(`/workspace/${workspaceId}/team`)}
             className="p-2 rounded-lg transition-colors"
-            style={{ color: "hsl(240 8% 50%)" }}
+            style={{ color: "var(--text-3)" }}
             onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-2)")}
             onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
           >
@@ -233,14 +233,14 @@ export default function RolesPage() {
               >
                 <Shield className="w-3.5 h-3.5" style={{ color: "#fb923c" }} />
               </div>
-              <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>
+              <h2 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
                 {editingRole ? "Editar Função" : "Criar Nova Função"}
               </h2>
             </div>
             <button
               onClick={resetForm}
               className="p-1 rounded"
-              style={{ color: "hsl(240 8% 40%)" }}
+              style={{ color: "var(--text-4)" }}
             >
               <X className="w-4 h-4" />
             </button>
@@ -248,7 +248,7 @@ export default function RolesPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="text-xs mb-1.5 block" style={{ color: "hsl(240 8% 50%)" }}>Nome</label>
+              <label className="text-xs mb-1.5 block" style={{ color: "var(--text-3)" }}>Nome</label>
               <input
                 type="text"
                 value={createName}
@@ -258,7 +258,7 @@ export default function RolesPage() {
               />
             </div>
             <div>
-              <label className="text-xs mb-1.5 block" style={{ color: "hsl(240 8% 50%)" }}>Descrição (opcional)</label>
+              <label className="text-xs mb-1.5 block" style={{ color: "var(--text-3)" }}>Descrição (opcional)</label>
               <input
                 type="text"
                 value={createDesc}
@@ -271,7 +271,7 @@ export default function RolesPage() {
 
           {/* Permissions grid */}
           <div>
-            <label className="text-xs mb-3 block" style={{ color: "hsl(240 8% 50%)" }}>Permissões</label>
+            <label className="text-xs mb-3 block" style={{ color: "var(--text-3)" }}>Permissões</label>
             <div className="space-y-4">
               {Object.entries(groupedPerms).map(([category, perms]) => {
                 const permIds = perms.map((p) => p.id);
@@ -295,10 +295,10 @@ export default function RolesPage() {
                         className="w-2 h-2 rounded-full"
                         style={{ background: getCategoryColor(category) }}
                       />
-                      <span className="text-xs font-medium" style={{ color: "hsl(240 8% 60%)" }}>
+                      <span className="text-xs font-medium" style={{ color: "var(--text-3)" }}>
                         {getCategoryLabel(category)}
                       </span>
-                      <span className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>
+                      <span className="text-[10px]" style={{ color: "var(--text-4)" }}>
                         {selectedInCat}/{perms.length}
                       </span>
                     </div>
@@ -367,7 +367,7 @@ export default function RolesPage() {
           </div>
 
           <div className="flex items-center justify-between pt-2">
-            <span className="text-xs" style={{ color: "hsl(240 8% 40%)" }}>
+            <span className="text-xs" style={{ color: "var(--text-4)" }}>
               {selectedPerms.length} permissão{selectedPerms.length !== 1 ? "s" : ""} selecionada{selectedPerms.length !== 1 ? "s" : ""}
             </span>
             <div className="flex gap-3">
@@ -389,7 +389,7 @@ export default function RolesPage() {
 
       {/* Roles list */}
       <div className="rounded-2xl overflow-hidden animate-fade-in-up" style={cardStyle}>
-        <div className="px-5 py-4" style={{ borderBottom: "1px solid hsl(240 12% 11%)" }}>
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border)" }}>
           <h2 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
             {roles.length} função{roles.length !== 1 ? "s" : ""}
           </h2>
@@ -423,21 +423,21 @@ export default function RolesPage() {
                       {role.is_default && (
                         <span
                           className="text-xs px-2 py-0.5 rounded-full"
-                          style={{ background: "var(--surface-2)", color: "hsl(240 8% 50%)" }}
+                          style={{ background: "var(--surface-2)", color: "var(--text-3)" }}
                         >
                           Padrão
                         </span>
                       )}
                     </div>
                     {role.description && (
-                      <p className="text-xs mb-2" style={{ color: "hsl(240 8% 38%)" }}>{role.description}</p>
+                      <p className="text-xs mb-2" style={{ color: "var(--text-4)" }}>{role.description}</p>
                     )}
                     <div className="flex flex-wrap gap-1.5">
                       {(role.permissions ?? []).slice(0, 6).map((perm) => (
                         <span
                           key={perm.id}
                           className="text-xs px-2 py-0.5 rounded"
-                          style={{ background: "var(--surface-2)", color: "hsl(240 8% 55%)" }}
+                          style={{ background: "var(--surface-2)", color: "var(--text-3)" }}
                         >
                           {perm.name}
                         </span>
@@ -445,7 +445,7 @@ export default function RolesPage() {
                       {(role.permissions ?? []).length > 6 && (
                         <span
                           className="text-xs px-2 py-0.5 rounded"
-                          style={{ background: "var(--surface-2)", color: "hsl(240 8% 40%)" }}
+                          style={{ background: "var(--surface-2)", color: "var(--text-4)" }}
                         >
                           +{(role.permissions ?? []).length - 6} mais
                         </span>
@@ -489,10 +489,10 @@ export default function RolesPage() {
         className="rounded-2xl p-5 space-y-3 animate-fade-in-up"
         style={{ ...cardStyle, animationDelay: "100ms", animationFillMode: "both" }}
       >
-        <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 85%)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--text-2)" }}>
           Sobre Funções e Permissões
         </h3>
-        <p className="text-sm" style={{ color: "hsl(240 8% 50%)" }}>
+        <p className="text-sm" style={{ color: "var(--text-3)" }}>
           Funções permitem controlar o acesso dos membros às diferentes áreas do workspace. 
           A função Admin (padrão) tem acesso total. Você pode criar funções customizadas 
           para diferentes necessidades do seu time.

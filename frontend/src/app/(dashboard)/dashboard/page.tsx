@@ -157,7 +157,7 @@ function StatCard({
       style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
       <div className="w-8 h-8 rounded-xl mb-3" style={{ background: "rgba(255,255,255,0.07)" }} />
       <div className="h-6 w-14 rounded-lg mb-2" style={{ background: "rgba(255,255,255,0.07)" }} />
-      <div className="h-3 w-20 rounded" style={{ background: "rgba(255,255,255,0.05)" }} />
+      <div className="h-3 w-20 rounded" style={{ background: "var(--input)" }} />
     </div>
   );
 
@@ -483,11 +483,11 @@ export default function DashboardPage() {
             </div>
             <div className="space-y-0.5">
               <MetricRow icon={MessageSquare} label="Abertas" value={conv.open ?? 0} color="#00d46a" />
-              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+              <div className="h-px" style={{ background: "var(--input)" }} />
               <MetricRow icon={Clock} label="Pendentes" value={conv.pending ?? 0} color="#fbbf24" />
-              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+              <div className="h-px" style={{ background: "var(--input)" }} />
               <MetricRow icon={AlertCircle} label="Sem atribuição" value={conv.unassigned_open ?? 0} color="#60a5fa" />
-              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+              <div className="h-px" style={{ background: "var(--input)" }} />
               <MetricRow icon={CheckCircle2} label="Resolvidas" value={conv.resolved ?? 0} color="#4ade80" />
             </div>
             <Link href="/inbox" className="flex items-center gap-1 text-xs mt-4 font-medium"
@@ -576,7 +576,7 @@ export default function DashboardPage() {
                 ))}
                 {wonDeals.length > 0 && (
                   <div className="mt-2 pt-2 border-t flex items-center justify-between px-2"
-                    style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+                    style={{ borderColor: "var(--border-subtle)" }}>
                     <span className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-3)" }}>
                       <Rocket className="w-3 h-3" style={{ color: "var(--green)" }} />
                       Ganhos
@@ -608,11 +608,11 @@ export default function DashboardPage() {
             </div>
             <div className="space-y-0.5">
               <MetricRow icon={Bot} label="Agentes ativos" value={agentStats.active_agents ?? 0} color="#a78bfa" />
-              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+              <div className="h-px" style={{ background: "var(--input)" }} />
               <MetricRow icon={MessageSquare} label="Conversas tratadas" value={agentStats.handled_conversations ?? agentStats.conversations_handled ?? 0} color="#60a5fa" />
-              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+              <div className="h-px" style={{ background: "var(--input)" }} />
               <MetricRow icon={Sparkles} label="Mensagens IA" value={agentStats.ai_messages ?? 0} color="#f472b6" />
-              <div className="h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+              <div className="h-px" style={{ background: "var(--input)" }} />
               <MetricRow icon={BarChart2} label="Taxa resolução"
                 value={agentStats.resolution_rate != null ? `${Math.round(agentStats.resolution_rate * 100)}%` : "—"}
                 color="#00d46a" />

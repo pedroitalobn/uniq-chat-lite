@@ -314,10 +314,10 @@ export default function PaymentSettingsPage() {
       {/* Seleção de Provedor */}
       <div
         className="rounded-2xl p-6"
-        style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}
+        style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center gap-3 mb-4">
-          <CreditCard className="w-5 h-5" style={{ color: "hsl(240 8% 60%)" }} />
+          <CreditCard className="w-5 h-5" style={{ color: "var(--text-3)" }} />
           <h2 className="font-medium" style={{ color: "hsl(240 15% 93%)" }}>
             Selecione o Provedor
           </h2>
@@ -395,7 +395,7 @@ export default function PaymentSettingsPage() {
       {displayProvider === "stripe" && (
         <div
           className="rounded-2xl p-6 space-y-4"
-          style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}
+          style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -439,7 +439,7 @@ export default function PaymentSettingsPage() {
                   ✓ Configurado ({maskKey(settings?.stripe_secret_key || "")})
                 </p>
               )}
-              <p className="text-[10px] mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>Deixe vazio para manter o atual</p>
+              <p className="text-[10px] mt-0.5" style={{ color: "var(--text-4)" }}>Deixe vazio para manter o atual</p>
             </div>
             <div>
               <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Webhook Secret</label>
@@ -494,7 +494,7 @@ export default function PaymentSettingsPage() {
           <div className="border-t pt-4" style={{ borderColor: "hsl(240 12% 15%)" }}>
             <label className="text-xs block mb-2" style={{ color: "hsl(240 8% 46%)" }}>URL do Webhook (para configurar no Stripe)</label>
             <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 12% 10%)", color: "hsl(240 8% 60%)" }}>
+              <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 12% 10%)", color: "var(--text-3)" }}>
                 {settings?.stripe_webhook_url || `${process.env.NEXT_PUBLIC_API_URL?.replace('/v1', '') || 'https://api.uniq.chat'}/stripe/webhook`}
               </code>
               <button
@@ -509,7 +509,7 @@ export default function PaymentSettingsPage() {
                 <Copy className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 38%)" }}>
+            <p className="text-[10px] mt-1" style={{ color: "var(--text-4)" }}>
               Configure esta URL no painel do Stripe em: webhook settings → Add endpoint
             </p>
           </div>
@@ -520,7 +520,7 @@ export default function PaymentSettingsPage() {
       {displayProvider === "asaas" && (
         <div
           className="rounded-2xl p-6 space-y-4"
-          style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}
+          style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -589,7 +589,7 @@ export default function PaymentSettingsPage() {
                   ✓ Configurado ({maskKey(settings?.asaas_api_key || "")})
                 </p>
               )}
-              <p className="text-[10px] mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>Deixe vazio para manter o atual</p>
+              <p className="text-[10px] mt-0.5" style={{ color: "var(--text-4)" }}>Deixe vazio para manter o atual</p>
             </div>
           </div>
 
@@ -631,7 +631,7 @@ export default function PaymentSettingsPage() {
           <div className="border-t pt-4" style={{ borderColor: "hsl(240 12% 15%)" }}>
             <label className="text-xs block mb-2" style={{ color: "hsl(240 8% 46%)" }}>URL do Webhook (para configurar no Asaas)</label>
             <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 12% 10%)", color: "hsl(240 8% 60%)" }}>
+              <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 12% 10%)", color: "var(--text-3)" }}>
                 {settings?.asaas_webhook_url || `${process.env.NEXT_PUBLIC_API_URL?.replace('/v1', '') || 'https://api.uniq.chat'}/asaas/webhook`}
               </code>
               <button
@@ -646,7 +646,7 @@ export default function PaymentSettingsPage() {
                 <Copy className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 38%)" }}>
+            <p className="text-[10px] mt-1" style={{ color: "var(--text-4)" }}>
               Configure esta URL no painel do Asaas em: Configurações → Webhooks
             </p>
           </div>
@@ -657,7 +657,7 @@ export default function PaymentSettingsPage() {
       {displayProvider === "abacatepay" && (
         <div
           className="rounded-2xl p-6 space-y-4"
-          style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}
+          style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -742,7 +742,7 @@ export default function PaymentSettingsPage() {
                   ✓ Configurado ({maskKey(settings?.abacatepay_api_key || "")})
                 </p>
               )}
-              <p className="text-[10px] mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>Deixe vazio para manter o atual</p>
+              <p className="text-[10px] mt-0.5" style={{ color: "var(--text-4)" }}>Deixe vazio para manter o atual</p>
             </div>
           </div>
 
@@ -784,7 +784,7 @@ export default function PaymentSettingsPage() {
           <div className="border-t pt-4" style={{ borderColor: "hsl(240 12% 15%)" }}>
             <label className="text-xs block mb-2" style={{ color: "hsl(240 8% 46%)" }}>URL do Webhook (para configurar no AbacatePay)</label>
             <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 12% 10%)", color: "hsl(240 8% 60%)" }}>
+              <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 12% 10%)", color: "var(--text-3)" }}>
                 {(() => {
                   const base = settings?.abacatepay_webhook_url || `${process.env.NEXT_PUBLIC_API_URL?.replace('/v1', '') || 'https://api.uniq.chat'}/abacatepay/webhook`;
                   const secret = form.abacatepay_webhook_secret || settings?.abacatepay_webhook_secret;
@@ -847,7 +847,7 @@ export default function PaymentSettingsPage() {
                   {settings.abacatepay_test_status === "ok" ? "✓ Conectado" : "✕ Falhou"}
                 </span>
                 {settings.abacatepay_tested_at && (
-                  <span className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>
+                  <span className="text-[10px]" style={{ color: "var(--text-4)" }}>
                     {new Date(settings.abacatepay_tested_at).toLocaleString("pt-BR")}
                   </span>
                 )}

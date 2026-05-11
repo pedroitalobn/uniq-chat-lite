@@ -236,16 +236,16 @@ export function TemplatePicker({
       />
       <div
         className="relative flex h-[640px] w-full max-w-3xl overflow-hidden rounded-2xl shadow-2xl uniq-scale-in"
-        style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}
+        style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}
       >
         {/* List */}
         <aside
           className="flex w-80 flex-shrink-0 flex-col"
-          style={{ borderRight: "1px solid hsl(240 12% 16%)" }}
+          style={{ borderRight: "1px solid var(--border)" }}
         >
           <div
             className="flex items-center gap-2 px-4 py-3"
-            style={{ borderBottom: "1px solid hsl(240 12% 16%)" }}
+            style={{ borderBottom: "1px solid var(--border)" }}
           >
             <Sparkles className="h-4 w-4" style={{ color: "#00d46a" }} />
             <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>
@@ -256,7 +256,7 @@ export function TemplatePicker({
             <div className="relative">
               <Search
                 className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5"
-                style={{ color: "hsl(240 8% 38%)" }}
+                style={{ color: "var(--text-4)" }}
               />
               <input
                 value={q}
@@ -265,8 +265,8 @@ export function TemplatePicker({
                 className="w-full rounded-md py-1.5 pl-8 pr-3 text-xs outline-none"
                 style={{
                   background: "var(--surface-2)",
-                  border: "1px solid hsl(240 12% 16%)",
-                  color: "hsl(240 15% 90%)",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-1)",
                 }}
               />
             </div>
@@ -326,7 +326,7 @@ export function TemplatePicker({
                       )}
                     </div>
                     {tpl.category && (
-                      <div className="mt-0.5 text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>
+                      <div className="mt-0.5 text-[10px]" style={{ color: "var(--text-4)" }}>
                         {tpl.category}
                       </div>
                     )}
@@ -347,7 +347,7 @@ export function TemplatePicker({
         <main className="flex flex-1 flex-col">
           <div
             className="flex items-center justify-between px-4 py-3"
-            style={{ borderBottom: "1px solid hsl(240 12% 16%)" }}
+            style={{ borderBottom: "1px solid var(--border)" }}
           >
             <div className="min-w-0">
               <h3 className="truncate text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>
@@ -442,7 +442,7 @@ export function TemplatePicker({
                     className="mt-4 rounded-xl p-4"
                     style={{
                       background: "var(--surface-2)",
-                      border: "1px solid hsl(240 12% 16%)",
+                      border: "1px solid var(--border)",
                     }}
                   >
                     <h4
@@ -469,8 +469,8 @@ export function TemplatePicker({
                             className="w-full rounded-md px-3 py-2 text-xs outline-none"
                             style={{
                               background: "var(--surface-2)",
-                              border: "1px solid hsl(240 12% 16%)",
-                              color: "hsl(240 15% 90%)",
+                              border: "1px solid var(--border)",
+                              color: "var(--text-1)",
                             }}
                           />
                         </label>
@@ -484,14 +484,14 @@ export function TemplatePicker({
 
           <div
             className="flex items-center justify-end gap-2 px-4 py-3"
-            style={{ borderTop: "1px solid hsl(240 12% 16%)" }}
+            style={{ borderTop: "1px solid var(--border)" }}
           >
             <button
               onClick={onClose}
               className="rounded-md px-3 py-1.5 text-xs"
               style={{
                 background: "var(--surface-2)",
-                border: "1px solid hsl(240 12% 16%)",
+                border: "1px solid var(--border)",
                 color: "hsl(240 8% 62%)",
               }}
             >
@@ -593,8 +593,8 @@ function MediaHeaderInputs({
           className="flex-1 rounded-md px-3 py-2 text-xs outline-none"
           style={{
             background: "var(--surface-2)",
-            border: "1px solid hsl(240 12% 16%)",
-            color: "hsl(240 15% 90%)",
+            border: "1px solid var(--border)",
+            color: "var(--text-1)",
           }}
         />
         <TemplateMediaUpload
@@ -613,7 +613,7 @@ function MediaHeaderInputs({
             URL padrão carregada — ajuste se precisar.
           </span>
         )}
-        <span className="ml-1" style={{ color: "hsl(240 8% 50%)" }}>
+        <span className="ml-1" style={{ color: "var(--text-3)" }}>
           Sem URL? Clique em <b>Subir arquivo</b> que a Uniq hospeda pra você.
         </span>
       </p>
@@ -625,8 +625,8 @@ function MediaHeaderInputs({
           className="w-full rounded-md px-3 py-2 text-xs outline-none"
           style={{
             background: "var(--surface-2)",
-            border: "1px solid hsl(240 12% 16%)",
-            color: "hsl(240 15% 90%)",
+            border: "1px solid var(--border)",
+            color: "var(--text-1)",
           }}
         />
       )}
@@ -698,8 +698,8 @@ function LocationHeaderInputs({
           className="w-full rounded-md px-3 py-2 text-xs outline-none"
           style={{
             background: "var(--surface-2)",
-            border: "1px solid hsl(240 12% 16%)",
-            color: "hsl(240 15% 90%)",
+            border: "1px solid var(--border)",
+            color: "var(--text-1)",
           }}
         />
         <input
@@ -709,8 +709,8 @@ function LocationHeaderInputs({
           className="w-full rounded-md px-3 py-2 text-xs outline-none"
           style={{
             background: "var(--surface-2)",
-            border: "1px solid hsl(240 12% 16%)",
-            color: "hsl(240 15% 90%)",
+            border: "1px solid var(--border)",
+            color: "var(--text-1)",
           }}
         />
       </div>
@@ -721,8 +721,8 @@ function LocationHeaderInputs({
         className="w-full rounded-md px-3 py-2 text-xs outline-none"
         style={{
           background: "var(--surface-2)",
-          border: "1px solid hsl(240 12% 16%)",
-          color: "hsl(240 15% 90%)",
+          border: "1px solid var(--border)",
+          color: "var(--text-1)",
         }}
       />
       <input
@@ -732,8 +732,8 @@ function LocationHeaderInputs({
         className="w-full rounded-md px-3 py-2 text-xs outline-none"
         style={{
           background: "var(--surface-2)",
-          border: "1px solid hsl(240 12% 16%)",
-          color: "hsl(240 15% 90%)",
+          border: "1px solid var(--border)",
+          color: "var(--text-1)",
         }}
       />
     </div>
@@ -765,14 +765,14 @@ function TemplatePreview({
         background: "var(--surface-2)",
         border: "1px solid var(--border-default)",
         borderBottomLeftRadius: 6,
-        color: "hsl(240 15% 92%)",
+        color: "var(--text-1)",
       }}
     >
       {/* Preview do header de mídia */}
       {headerFormat === "IMAGE" && (
         <div
           className="mb-2 overflow-hidden rounded-lg"
-          style={{ background: "rgba(255,255,255,0.04)", aspectRatio: "16/9" }}
+          style={{ background: "var(--input)", aspectRatio: "16/9" }}
         >
           {media.url ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -795,9 +795,9 @@ function TemplatePreview({
       {headerFormat === "DOCUMENT" && (
         <div
           className="mb-2 flex items-center gap-2 rounded-lg p-2"
-          style={{ background: "rgba(255,255,255,0.05)" }}
+          style={{ background: "var(--input)" }}
         >
-          <FileText className="h-5 w-5" style={{ color: "hsl(240 8% 60%)" }} />
+          <FileText className="h-5 w-5" style={{ color: "var(--text-3)" }} />
           <span className="text-[11px]" style={{ color: "hsl(240 15% 80%)" }}>
             {media.filename || "documento.pdf"}
           </span>

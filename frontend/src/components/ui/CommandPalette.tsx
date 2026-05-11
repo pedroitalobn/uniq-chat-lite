@@ -204,7 +204,7 @@ export function CommandPalette() {
                   background: "rgba(255,255,255,0.06)",
                   backdropFilter: "blur(8px)",
                   border: "none",
-                  borderBottom: "1px solid rgba(255,255,255,0.10)",
+                  borderBottom: "1px solid var(--border-default)",
                   color: "var(--text-1)",
                   fontSize: "16px",
                   padding: "18px 20px 18px 52px",
@@ -341,7 +341,7 @@ export function CommandPalette() {
                 gap: "12px",
                 padding: "8px 16px",
                 fontSize: "10px",
-                borderTop: "1px solid rgba(255,255,255,0.08)",
+                borderTop: "1px solid var(--border-subtle)",
                 color: "var(--text-4)",
                 flexShrink: 0,
               }}

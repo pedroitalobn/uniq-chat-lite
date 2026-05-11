@@ -109,11 +109,11 @@ export function ConfirmDialog({
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+              <div className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
                 {title}
               </div>
               {body && (
-                <div className="mt-1 text-xs" style={{ color: "hsl(240 8% 65%)" }}>
+                <div className="mt-1 text-xs" style={{ color: "var(--text-2)" }}>
                   {body}
                 </div>
               )}
@@ -122,7 +122,7 @@ export function ConfirmDialog({
               type="button"
               onClick={onCancel}
               className="rounded-md p-1 hover:bg-white/10"
-              style={{ color: "hsl(240 8% 60%)" }}
+              style={{ color: "var(--text-3)" }}
             >
               <X className="h-4 w-4" />
             </button>
@@ -130,7 +130,7 @@ export function ConfirmDialog({
 
           <div
             className="flex items-center justify-end gap-2 px-5 py-3"
-            style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}
+            style={{ borderTop: "1px solid var(--border-subtle)" }}
           >
             <button
               type="button"

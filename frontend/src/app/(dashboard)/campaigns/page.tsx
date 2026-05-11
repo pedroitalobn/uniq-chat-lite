@@ -561,7 +561,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-lg rounded-2xl shadow-2xl animate-fade-in-up"
-        style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+        style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b" style={{ borderColor: "hsl(240 12% 12%)" }}>
@@ -572,12 +572,12 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
             </div>
             <div>
               <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>Nova Campanha</h2>
-              <p className="text-[11px]" style={{ color: "hsl(240 8% 40%)" }}>
+              <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
                 Passo {step} de {totalSteps} — {stepLabels[step - 1]}
               </p>
             </div>
           </div>
-          <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }} className="hover:opacity-70 transition-opacity">
+          <button onClick={onClose} style={{ color: "var(--text-4)" }} className="hover:opacity-70 transition-opacity">
             <X className="w-4.5 h-4.5" />
           </button>
         </div>
@@ -593,7 +593,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
           {/* ── Step 1: Nome ─────────────────────────────────────────────────── */}
           {step === 1 && (
             <div>
-              <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>Nome da campanha *</label>
+              <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>Nome da campanha *</label>
               <input value={name} onChange={(e) => setName(e.target.value)}
                 placeholder="Ex: Black Friday 2025" className="input-field w-full" autoFocus />
             </div>
@@ -648,7 +648,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
               {/* Instance selector (if multiple) */}
               {channel && channelInstances(channel).length > 1 && (
                 <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>
                     Selecione a instância *
                   </label>
                   <select value={instanceId} onChange={(e) => setInstanceId(e.target.value)}
@@ -720,7 +720,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                     style={audienceTab === id
                       ? { background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.25)", color: "var(--green)" }
-                      : { background: "var(--surface-2)", border: "1px solid hsl(240 12% 14%)", color: "hsl(240 8% 48%)" }}>
+                      : { background: "var(--surface-2)", border: "1px solid var(--border)", color: "hsl(240 8% 48%)" }}>
                     <Icon className="w-3.5 h-3.5" />
                     {label}
                   </button>
@@ -766,7 +766,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>Funil</label>
+                      <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>Funil</label>
                       <select value={crmFilter.funnel || ""} onChange={(e) => setCrmFilter({ ...crmFilter, funnel: e.target.value || undefined })}
                         className="input-field w-full text-xs">
                         <option value="">Qualquer</option>
@@ -774,7 +774,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>Estágio</label>
+                      <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>Estágio</label>
                       <select value={crmFilter.stage || ""} onChange={(e) => setCrmFilter({ ...crmFilter, stage: e.target.value || undefined })}
                         className="input-field w-full text-xs">
                         <option value="">Qualquer</option>
@@ -782,7 +782,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>Jornada</label>
+                      <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>Jornada</label>
                       <select value={crmFilter.journey || ""} onChange={(e) => setCrmFilter({ ...crmFilter, journey: e.target.value || undefined })}
                         className="input-field w-full text-xs">
                         <option value="">Qualquer</option>
@@ -793,7 +793,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
 
                   {/* Tags */}
                   <div>
-                    <label className="text-xs font-medium block mb-2" style={{ color: "hsl(240 8% 50%)" }}>Tags</label>
+                    <label className="text-xs font-medium block mb-2" style={{ color: "var(--text-3)" }}>Tags</label>
                     <div className="flex flex-wrap gap-1.5">
                       {(segmentOptions?.tags || []).length === 0
                         ? <p className="text-[11px]" style={{ color: "hsl(240 8% 36%)" }}>Nenhuma tag criada</p>
@@ -816,21 +816,21 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                   {/* Purchase filters */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>Comprou nos últimos N dias</label>
+                      <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>Comprou nos últimos N dias</label>
                       <input type="number" min="0" placeholder="ex: 30"
                         value={crmFilter.purchased_since_days || ""}
                         onChange={(e) => setCrmFilter({ ...crmFilter, purchased_since_days: parseInt(e.target.value) || undefined })}
                         className="input-field w-full text-xs" />
                     </div>
                     <div>
-                      <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>Compras totais ≥ R$</label>
+                      <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>Compras totais ≥ R$</label>
                       <input type="number" min="0" step="0.01" placeholder="ex: 100"
                         value={crmFilter.purchased_min_total || ""}
                         onChange={(e) => setCrmFilter({ ...crmFilter, purchased_min_total: parseFloat(e.target.value) || undefined })}
                         className="input-field w-full text-xs" />
                     </div>
                     <div className="col-span-2">
-                      <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: "hsl(240 8% 50%)" }}>
+                      <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: "var(--text-3)" }}>
                         <input type="checkbox" checked={!!crmFilter.never_purchased}
                           onChange={(e) => setCrmFilter({ ...crmFilter, never_purchased: e.target.checked || undefined })} />
                         Apenas contatos que <strong>nunca compraram</strong>
@@ -840,7 +840,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
 
                   {/* Inbox behavior filters */}
                   <div>
-                    <p className="text-xs font-medium mb-2" style={{ color: "hsl(240 8% 50%)" }}>Comportamento no Inbox</p>
+                    <p className="text-xs font-medium mb-2" style={{ color: "var(--text-3)" }}>Comportamento no Inbox</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs block mb-1" style={{ color: "hsl(240 8% 42%)" }}>Atendido pelo atendente (ID)</label>
@@ -896,7 +896,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
 
                   {/* Campaign participation */}
                   <div>
-                    <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>Participou da campanha (ID)</label>
+                    <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>Participou da campanha (ID)</label>
                     <input type="text" placeholder="UUID da campanha"
                       value={crmFilter.participated_campaign_id || ""}
                       onChange={(e) => setCrmFilter({ ...crmFilter, participated_campaign_id: e.target.value || undefined })}
@@ -915,7 +915,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                       {segmentPreview.sample?.length > 0 && (
                         <div className="mt-2 space-y-1">
                           {segmentPreview.sample.slice(0, 3).map((c: { id: string; name: string; phone: string }) => (
-                            <p key={c.id} className="text-[10px]" style={{ color: "hsl(240 8% 50%)" }}>{c.name} · {c.phone}</p>
+                            <p key={c.id} className="text-[10px]" style={{ color: "var(--text-3)" }}>{c.name} · {c.phone}</p>
                           ))}
                         </div>
                       )}
@@ -974,14 +974,14 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                     {csvFile ? (
                       <>
                         <CheckCircle2 className="w-6 h-6" style={{ color: "var(--green)" }} />
-                        <p className="text-xs font-medium" style={{ color: "hsl(240 15% 85%)" }}>{csvFile.name}</p>
+                        <p className="text-xs font-medium" style={{ color: "var(--text-2)" }}>{csvFile.name}</p>
                         <p className="text-[11px]" style={{ color: "var(--green)" }}>{csvRecipients.length} contatos carregados</p>
                       </>
                     ) : (
                       <>
                         <Upload className="w-6 h-6" style={{ color: "hsl(240 8% 36%)" }} />
                         <p className="text-xs" style={{ color: "hsl(240 8% 48%)" }}>Clique ou arraste o arquivo CSV</p>
-                        <p className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>
+                        <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
                           Não tem o arquivo? <button type="button"
                             onClick={(e) => { e.stopPropagation(); downloadCsvTemplate(); }}
                             className="underline" style={{ color: "#60a5fa" }}>baixe o template</button> e preencha.
@@ -1011,7 +1011,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                     <div className="flex items-stretch gap-2">
                       <div className="relative flex-1 min-w-0">
                         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                          style={{ color: "hsl(240 8% 40%)" }} />
+                          style={{ color: "var(--text-4)" }} />
                         <input
                           value={groupSearch}
                           onChange={(e) => setGroupSearch(e.target.value)}
@@ -1045,7 +1045,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                       </div>
                     </div>
                     {groupsLoading ? (
-                      <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin" style={{ color: "hsl(240 8% 40%)" }} /></div>
+                      <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--text-4)" }} /></div>
                     ) : groupsErrorMsg ? (
                       <div className="rounded-xl py-4 px-3 text-center space-y-2" style={{ border: "1px dashed rgba(248,113,113,0.3)", background: "rgba(248,113,113,0.04)" }}>
                         <p className="text-xs" style={{ color: "#fca5a5" }}>{groupsErrorMsg}</p>
@@ -1055,7 +1055,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                       </div>
                     ) : filtered.length === 0 ? (
                       <div className="rounded-xl py-6 px-4 text-center space-y-2" style={{ border: "1px dashed hsl(240 12% 16%)" }}>
-                        <p className="text-xs" style={{ color: "hsl(240 8% 40%)" }}>
+                        <p className="text-xs" style={{ color: "var(--text-4)" }}>
                           {groups.length === 0
                             ? (groupsHint || "Esta instância não está em nenhum grupo. Adicione o número aos grupos antes de criar a campanha.")
                             : "Nenhum grupo bate com o filtro atual."}
@@ -1093,11 +1093,11 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                                 {sel && <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="var(--green)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium truncate" style={{ color: "hsl(240 15% 85%)" }}>{g.name}</p>
+                                <p className="text-xs font-medium truncate" style={{ color: "var(--text-2)" }}>{g.name}</p>
                                 <p className="text-[10px] font-mono truncate" style={{ color: "hsl(240 8% 36%)" }}>{g.jid}</p>
                               </div>
                               {g.participant_count != null && (
-                                <span className="text-[10px] font-mono flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }}>
+                                <span className="text-[10px] font-mono flex-shrink-0" style={{ color: "var(--text-4)" }}>
                                   {g.participant_count}
                                 </span>
                               )}
@@ -1121,11 +1121,11 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                     </p>
                   </div>
                   <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>
                       Username do perfil * (sem @)
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: "hsl(240 8% 40%)" }}>@</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--text-4)" }}>@</span>
                       <input value={igUsername} onChange={(e) => setIgUsername(e.target.value.replace("@", ""))}
                         placeholder="meu_perfil" className="input-field w-full pl-7 text-xs font-mono" />
                     </div>
@@ -1144,7 +1144,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                     <strong style={{ color: "#0088ff" }}>WhatsApp API:</strong> mensagens devem usar template aprovado pela Meta.
                   </div>
                   <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>Template *</label>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>Template *</label>
                     <select value={tplKey} onChange={(e) => { setTplKey(e.target.value); setTplVars({}); }}
                       className="input-field w-full">
                       <option value="">— Selecione um template aprovado —</option>
@@ -1161,8 +1161,8 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                     )}
                   </div>
                   {selectedTpl && tplBodyText && (
-                    <div className="rounded-lg p-3" style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 14%)" }}>
-                      <p className="text-[10px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 50%)" }}>Body</p>
+                    <div className="rounded-lg p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                      <p className="text-[10px] uppercase tracking-widest mb-1" style={{ color: "var(--text-3)" }}>Body</p>
                       <p className="text-xs whitespace-pre-wrap" style={{ color: "hsl(240 15% 80%)" }}>{tplBodyText}</p>
                     </div>
                   )}
@@ -1183,7 +1183,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                           />
                         </div>
                       ))}
-                      <p className="text-[10px]" style={{ color: "hsl(240 8% 45%)" }}>
+                      <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
                         Dica: clique no <b>+</b> ao lado pra inserir uma variável (CRM, CSV, data).
                         Você pode misturar texto fixo com {`{{ ... }}`}.
                       </p>
@@ -1191,7 +1191,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                   )}
                   {tplHasMediaHeader && (
                     <div>
-                      <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>URL da mídia do header *</label>
+                      <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>URL da mídia do header *</label>
                       <div className="flex items-center gap-2 flex-wrap">
                         <input value={tplHeaderURL} onChange={(e) => setTplHeaderURL(e.target.value)}
                           placeholder="https://... ou {{ csv.image_url }}" className="input-field flex-1 text-xs font-mono" />
@@ -1209,7 +1209,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                         />
                         <VariableMenu onPick={(expr) => setTplHeaderURL((p) => (p + expr).trim())} />
                       </div>
-                      <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 45%)" }}>
+                      <p className="text-[10px] mt-1" style={{ color: "var(--text-3)" }}>
                         Sem URL? Clique em <b>Subir arquivo</b> e a Uniq hospeda. Ou cole link público direto, ou use uma variável dinâmica (ex: <code>{`{{ csv.image_url }}`}</code>).
                       </p>
                     </div>
@@ -1218,7 +1218,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
               ) : (
                 <>
                   <div>
-                    <label className="text-xs font-medium block mb-2" style={{ color: "hsl(240 8% 50%)" }}>Tipo</label>
+                    <label className="text-xs font-medium block mb-2" style={{ color: "var(--text-3)" }}>Tipo</label>
                     <div className="grid grid-cols-4 gap-2">
                       {MSG_TYPES.map(({ value, label, icon: Icon }) => (
                         <button key={value} type="button" onClick={() => { setMsgType(value); setMediaFile(null); }}
@@ -1236,7 +1236,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                   {msgType === "text" && (
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
-                        <label className="text-xs font-medium" style={{ color: "hsl(240 8% 50%)" }}>Mensagem *</label>
+                        <label className="text-xs font-medium" style={{ color: "var(--text-3)" }}>Mensagem *</label>
                         <VariableInsertButton textareaRef={msgTextRef} value={msgText} onChange={setMsgText} />
                       </div>
                       <textarea ref={msgTextRef} value={msgText} onChange={(e) => setMsgText(e.target.value)}
@@ -1247,7 +1247,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
 
                   {msgType === "audio" && (
                     <div>
-                      <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>
+                      <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>
                         Áudio *
                       </label>
                       <AudioInput file={mediaFile} onChange={setMediaFile} />
@@ -1256,7 +1256,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
 
                   {(msgType === "image" || msgType === "video" || msgType === "document") && (
                     <div>
-                      <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>
+                      <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>
                         {msgType === "image" ? "Imagem *" : msgType === "video" ? "Vídeo *" : "Documento *"}
                       </label>
                       <div
@@ -1284,7 +1284,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                               : <File className="w-5 h-5" style={{ color: "hsl(240 8% 36%)" }} />}
                             <p className="text-xs" style={{ color: "hsl(240 8% 42%)" }}>Clique ou arraste</p>
                             {msgType === "video" && (
-                              <p className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>
+                              <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
                                 MP4 recomendado · até ~16MB pra WhatsApp
                               </p>
                             )}
@@ -1300,7 +1300,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                   {(msgType === "image" || msgType === "video") && (
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
-                        <label className="text-xs font-medium" style={{ color: "hsl(240 8% 50%)" }}>Legenda (opcional)</label>
+                        <label className="text-xs font-medium" style={{ color: "var(--text-3)" }}>Legenda (opcional)</label>
                         <VariableInsertButton textareaRef={captionRef} value={caption} onChange={setCaption} />
                       </div>
                       <textarea ref={captionRef} value={caption} onChange={(e) => setCaption(e.target.value)}
@@ -1317,23 +1317,23 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
             <>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>Data de início</label>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>Data de início</label>
                   <input type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="input-field w-full text-xs" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>Data de fim</label>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>Data de fim</label>
                   <input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="input-field w-full text-xs" />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>Ações totais / destinatário</label>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>Ações totais / destinatário</label>
                   <input type="number" min={1} max={999} value={timesTotal}
                     onChange={(e) => setTimesTotal(Math.max(1, Number(e.target.value)))} className="input-field w-full" />
                 </div>
                 <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>Ações por dia</label>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>Ações por dia</label>
                   <input type="number" min={1} max={99} value={timesPerDay}
                     onChange={(e) => setTimesPerDay(Math.max(1, Number(e.target.value)))} className="input-field w-full" />
                 </div>
@@ -1352,24 +1352,24 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>Delay mínimo (seg)</label>
+                    <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>Delay mínimo (seg)</label>
                     <input type="number" min={1} max={3600} value={delayMin}
                       onChange={(e) => { const v = Math.max(1, Number(e.target.value)); setDelayMin(v); if (delayMax < v) setDelayMax(v + 5); }}
                       className="input-field w-full" />
                   </div>
                   <div>
-                    <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>Delay máximo (seg)</label>
+                    <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>Delay máximo (seg)</label>
                     <input type="number" min={delayMin} max={3600} value={delayMax}
                       onChange={(e) => setDelayMax(Math.max(delayMin, Number(e.target.value)))}
                       className="input-field w-full" />
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-[10px]" style={{ color: "hsl(240 8% 40%)" }}>
+                <div className="flex items-center gap-2 text-[10px]" style={{ color: "var(--text-4)" }}>
                   <Shuffle className="w-3 h-3" />
                   Delay aleatório entre {delayMin}s e {delayMax}s por ação
                 </div>
                 <div>
-                  <label className="text-xs font-medium block mb-1" style={{ color: "hsl(240 8% 50%)" }}>
+                  <label className="text-xs font-medium block mb-1" style={{ color: "var(--text-3)" }}>
                     Limite diário por conta <span className="font-normal" style={{ color: "hsl(240 8% 36%)" }}>(0 = ilimitado)</span>
                   </label>
                   <input type="number" min={0} max={9999} value={dailyLimit}
@@ -1384,7 +1384,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                   horário. Avaliado no fuso do workspace, não em UTC. */}
               <div>
                 <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                  <label className="text-xs font-medium" style={{ color: "hsl(240 8% 50%)" }}>
+                  <label className="text-xs font-medium" style={{ color: "var(--text-3)" }}>
                     Janelas de envio
                     {scheduleWindows.length > 0 && (
                       <span className="ml-1.5" style={{ color: "var(--green)" }}>
@@ -1414,17 +1414,17 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                 <div className="space-y-1.5">
                   {scheduleWindows.map((w, i) => (
                     <div key={i} className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg"
-                      style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 13%)" }}>
-                      <span className="text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>de</span>
+                      style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                      <span className="text-[11px]" style={{ color: "var(--text-3)" }}>de</span>
                       <input type="time" value={w.from}
                         onChange={(e) => updateWindow(i, "from", e.target.value)}
                         className="text-[11px] font-mono px-2 py-1 rounded outline-none"
-                        style={{ background: "var(--surface-3)", border: "1px solid hsl(240 12% 16%)", color: "var(--text-1)" }} />
-                      <span className="text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>até</span>
+                        style={{ background: "var(--surface-3)", border: "1px solid var(--border)", color: "var(--text-1)" }} />
+                      <span className="text-[11px]" style={{ color: "var(--text-3)" }}>até</span>
                       <input type="time" value={w.to}
                         onChange={(e) => updateWindow(i, "to", e.target.value)}
                         className="text-[11px] font-mono px-2 py-1 rounded outline-none"
-                        style={{ background: "var(--surface-3)", border: "1px solid hsl(240 12% 16%)", color: "var(--text-1)" }} />
+                        style={{ background: "var(--surface-3)", border: "1px solid var(--border)", color: "var(--text-1)" }} />
                       <button type="button" onClick={() => removeWindow(i)}
                         className="ml-auto p-1 rounded"
                         style={{ color: "#f87171", background: "rgba(248,113,113,0.08)" }}>
@@ -1448,7 +1448,7 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                   pra disparar pra outro fuso ("9h em Orlando" enquanto
                   o user está em São Paulo). Vazio = usa o do workspace. */}
               <div>
-                <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 50%)" }}>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>
                   Fuso horário do disparo
                   <span className="ml-1.5 text-[10px]" style={{ color: "hsl(240 8% 42%)" }}>
                     (opcional · padrão = workspace)
@@ -1695,7 +1695,7 @@ function VariableMenu({ onPick }: { onPick: (expr: string) => void }) {
             className="absolute right-0 top-full mt-1 z-[101] w-72 max-h-80 overflow-y-auto rounded-lg shadow-2xl"
             style={{
               background: "hsl(240 18% 7%)",
-              border: "1px solid hsl(240 12% 16%)",
+              border: "1px solid var(--border)",
             }}
           >
             {VARIABLE_GROUPS.map((g) => (
@@ -1703,7 +1703,7 @@ function VariableMenu({ onPick }: { onPick: (expr: string) => void }) {
                 <div
                   className="px-3 py-1.5 text-[9px] uppercase tracking-widest"
                   style={{
-                    color: "hsl(240 8% 45%)",
+                    color: "var(--text-3)",
                     background: "hsl(240 14% 10%)",
                     borderBottom: "1px solid hsl(240 12% 14%)",
                   }}
@@ -1726,7 +1726,7 @@ function VariableMenu({ onPick }: { onPick: (expr: string) => void }) {
                     >
                       {v.expr}
                     </code>
-                    <span className="text-[10px]" style={{ color: "hsl(240 8% 50%)" }}>
+                    <span className="text-[10px]" style={{ color: "var(--text-3)" }}>
                       {v.hint}
                     </span>
                   </button>
@@ -1824,11 +1824,11 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
                 <ChIcon className="w-3 h-3" />
                 {chMeta.label}
               </span>
-              <span className="flex items-center gap-1 text-[10px]" style={{ color: "hsl(240 8% 40%)" }}>
+              <span className="flex items-center gap-1 text-[10px]" style={{ color: "var(--text-4)" }}>
                 <MsgIcon className="w-3 h-3" />
                 {actionLabels[campaign.action_type as string] ?? campaign.message_type}
               </span>
-              <span className="flex items-center gap-1 text-[10px]" style={{ color: "hsl(240 8% 40%)" }}>
+              <span className="flex items-center gap-1 text-[10px]" style={{ color: "var(--text-4)" }}>
                 {campaign.recipient_type === "groups" ? <Users2 className="w-3 h-3" /> : <Users className="w-3 h-3" />}
                 {campaign.recipient_type}
               </span>
@@ -1844,12 +1844,12 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
         {(campaign.start_date || campaign.end_date || campaign.times_total > 1) && (
           <div className="flex flex-wrap gap-1.5 mb-3">
             {campaign.start_date && (
-              <span className="text-[10px] px-2 py-0.5 rounded font-mono" style={{ background: "var(--surface-2)", color: "hsl(240 8% 40%)" }}>
+              <span className="text-[10px] px-2 py-0.5 rounded font-mono" style={{ background: "var(--surface-2)", color: "var(--text-4)" }}>
                 {fmtDate(campaign.start_date)}
               </span>
             )}
             {campaign.end_date && (
-              <span className="text-[10px] px-2 py-0.5 rounded font-mono" style={{ background: "var(--surface-2)", color: "hsl(240 8% 40%)" }}>
+              <span className="text-[10px] px-2 py-0.5 rounded font-mono" style={{ background: "var(--surface-2)", color: "var(--text-4)" }}>
                 até {fmtDate(campaign.end_date)}
               </span>
             )}
@@ -1868,7 +1868,7 @@ function CampaignCard({ campaign, onAction }: { campaign: Campaign; onAction: ()
 
         <div className="mb-3">
           <div className="flex justify-between text-[11px] mb-1.5">
-            <span className="flex items-center gap-1" style={{ color: "hsl(240 8% 50%)" }}>
+            <span className="flex items-center gap-1" style={{ color: "var(--text-3)" }}>
               <Users className="w-3 h-3" /> {campaign.total_count.toLocaleString("pt-BR")} destinatários
             </span>
             <span className="flex items-center gap-2">
@@ -2090,7 +2090,7 @@ function CampaignTemplateCards({ onSelect }: { onSelect: (t: typeof CAMPAIGN_TEM
         {/* Desktop: toggle ver todos. */}
         <button onClick={() => setShowAll(v => !v)}
           className="hidden sm:inline-flex text-xs px-2.5 py-1.5 rounded-lg transition"
-          style={{ color: "hsl(240 8% 50%)", background: "var(--surface-2)", border: "1px solid hsl(240 12% 13%)" }}>
+          style={{ color: "var(--text-3)", background: "var(--surface-2)", border: "1px solid var(--border)" }}>
           {showAll ? "Ver menos" : `Ver todos (${CAMPAIGN_TEMPLATES.length})`}
         </button>
       </div>
@@ -2115,7 +2115,7 @@ function CampaignTemplateCards({ onSelect }: { onSelect: (t: typeof CAMPAIGN_TEM
               background: "rgba(10,10,20,0.94)",
               backdropFilter: "blur(28px) saturate(200%)",
               WebkitBackdropFilter: "blur(28px) saturate(200%)",
-              borderTop: "1px solid rgba(255,255,255,0.10)",
+              borderTop: "1px solid var(--border-default)",
               maxHeight: "85vh",
               paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
             }}
@@ -2124,14 +2124,14 @@ function CampaignTemplateCards({ onSelect }: { onSelect: (t: typeof CAMPAIGN_TEM
               <div className="w-10 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }} />
             </div>
             <div className="flex items-center justify-between px-5 pb-3"
-              style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-              <p className="text-base font-semibold" style={{ color: "hsl(240 15% 92%)" }}>
+              style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+              <p className="text-base font-semibold" style={{ color: "var(--text-1)" }}>
                 Templates ({CAMPAIGN_TEMPLATES.length})
               </p>
               <button
                 onClick={() => setMobileSheetOpen(false)}
                 className="w-8 h-8 rounded-full flex items-center justify-center"
-                style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 8% 60%)" }}
+                style={{ background: "rgba(255,255,255,0.06)", color: "var(--text-3)" }}
                 aria-label="Fechar"
               >
                 ✕
@@ -2171,7 +2171,7 @@ function TemplateCard({ tpl, onSelect }: {
         </span>
       </div>
       <div>
-        <p className="text-sm font-semibold leading-tight" style={{ color: "hsl(240 15% 90%)" }}>{tpl.name}</p>
+        <p className="text-sm font-semibold leading-tight" style={{ color: "var(--text-1)" }}>{tpl.name}</p>
         <p className="text-xs mt-0.5 leading-snug" style={{ color: "hsl(240 8% 48%)" }}>{tpl.description}</p>
       </div>
       <button

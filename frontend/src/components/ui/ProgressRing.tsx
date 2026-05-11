@@ -63,14 +63,14 @@ export function ProgressRing({
         </svg>
         {label && (
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-sm font-bold" style={{ color: "hsl(240 15% 92%)" }}>
+            <span className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
               {label}
             </span>
           </div>
         )}
       </div>
       {sublabel && (
-        <span className="text-xs text-center" style={{ color: "hsl(240 8% 50%)" }}>
+        <span className="text-xs text-center" style={{ color: "var(--text-3)" }}>
           {sublabel}
         </span>
       )}

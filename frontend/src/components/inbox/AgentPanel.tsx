@@ -212,7 +212,7 @@ export function AgentPanel({ workspaceId, conversationId, onSendSuggestion }: Pr
             </div>
 
             {/* Response text */}
-            <div className="rounded-lg p-2.5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <div className="rounded-lg p-2.5" style={{ background: "var(--input)", border: "1px solid var(--border-subtle)" }}>
               <p className="text-xs leading-relaxed" style={{ color: "var(--text-2)" }}>
                 {suggestion}
               </p>

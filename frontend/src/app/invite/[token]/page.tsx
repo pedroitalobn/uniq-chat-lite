@@ -117,7 +117,7 @@ export default function InviteAcceptPage({
   const renderShell = (inner: React.ReactNode) => (
     <div
       className="flex min-h-screen items-center justify-center px-4 py-12"
-      style={{ background: "hsl(240 20% 4%)" }}
+      style={{ background: "var(--surface-solid)" }}
     >
       {/* Ambient glow */}
       <div
@@ -131,7 +131,7 @@ export default function InviteAcceptPage({
         <div
           className="rounded-2xl p-7 space-y-5"
           style={{
-            background: "hsl(240 18% 6%)",
+            background: "var(--surface-solid)",
             boxShadow: "0 0 0 1px hsl(240 12% 13%), 0 24px 64px rgba(0,0,0,0.5)",
           }}
         >
@@ -146,7 +146,7 @@ export default function InviteAcceptPage({
     return renderShell(
       <div className="flex flex-col items-center text-center space-y-3 py-4">
         <Loader2 className="h-6 w-6 animate-spin" style={{ color: "#00d46a" }} />
-        <p className="text-sm" style={{ color: "hsl(240 8% 55%)" }}>Carregando convite…</p>
+        <p className="text-sm" style={{ color: "var(--text-3)" }}>Carregando convite…</p>
       </div>,
     );
   }
@@ -161,10 +161,10 @@ export default function InviteAcceptPage({
         >
           <X className="h-7 w-7" style={{ color: "#f87171" }} />
         </div>
-        <h1 className="text-lg font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+        <h1 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>
           Convite indisponível
         </h1>
-        <p className="text-sm" style={{ color: "hsl(240 8% 55%)" }}>
+        <p className="text-sm" style={{ color: "var(--text-3)" }}>
           {previewError}
         </p>
         <button
@@ -190,12 +190,12 @@ export default function InviteAcceptPage({
     >
       <div className="flex items-center gap-2">
         <Building2 className="h-4 w-4" style={{ color: "#00d46a" }} />
-        <span className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+        <span className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
           {preview.workspace_name}
         </span>
       </div>
-      <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 60%)" }}>
-        <strong style={{ color: "hsl(240 15% 82%)" }}>{preview.inviter_name}</strong> convidou
+      <p className="text-xs leading-relaxed" style={{ color: "var(--text-3)" }}>
+        <strong style={{ color: "var(--text-2)" }}>{preview.inviter_name}</strong> convidou
         você como{" "}
         <span
           className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
@@ -228,7 +228,7 @@ export default function InviteAcceptPage({
               <LogIn className="h-5 w-5" style={{ color: "#a5b4fc" }} />
             )}
           </div>
-          <p className="text-sm" style={{ color: "hsl(240 8% 60%)" }}>
+          <p className="text-sm" style={{ color: "var(--text-3)" }}>
             {isRegister ? "Redirecionando para o cadastro…" : "Redirecionando para o login…"}
           </p>
         </div>
@@ -243,7 +243,7 @@ export default function InviteAcceptPage({
         {inviteBanner}
         <div className="flex flex-col items-center text-center space-y-3 pt-2">
           <Loader2 className="h-6 w-6 animate-spin" style={{ color: "#00d46a" }} />
-          <p className="text-sm" style={{ color: "hsl(240 8% 60%)" }}>Processando convite…</p>
+          <p className="text-sm" style={{ color: "var(--text-3)" }}>Processando convite…</p>
         </div>
       </>,
     );
@@ -261,10 +261,10 @@ export default function InviteAcceptPage({
           >
             <Check className="h-7 w-7" style={{ color: "#00d46a" }} />
           </div>
-          <h1 className="text-lg font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+          <h1 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>
             Você faz parte de {preview.workspace_name}
           </h1>
-          <p className="text-sm" style={{ color: "hsl(240 8% 55%)" }}>
+          <p className="text-sm" style={{ color: "var(--text-3)" }}>
             Bora começar a trabalhar.
           </p>
           <button
@@ -291,14 +291,14 @@ export default function InviteAcceptPage({
           >
             <Mail className="h-7 w-7" style={{ color: "#fb923c" }} />
           </div>
-          <h1 className="text-lg font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+          <h1 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>
             Este convite é para outro email
           </h1>
-          <p className="text-sm" style={{ color: "hsl(240 8% 55%)" }}>
+          <p className="text-sm" style={{ color: "var(--text-3)" }}>
             Você está logado como{" "}
-            <strong style={{ color: "hsl(240 15% 82%)" }}>{session?.user?.email}</strong>, mas o
+            <strong style={{ color: "var(--text-2)" }}>{session?.user?.email}</strong>, mas o
             convite é para{" "}
-            <strong style={{ color: "hsl(240 15% 82%)" }}>{preview.email}</strong>.
+            <strong style={{ color: "var(--text-2)" }}>{preview.email}</strong>.
           </p>
           <button
             onClick={() => router.replace(`/login?callbackUrl=${encodeURIComponent(`/invite/${token}`)}`)}
@@ -328,10 +328,10 @@ export default function InviteAcceptPage({
         >
           <X className="h-7 w-7" style={{ color: "#f87171" }} />
         </div>
-        <h1 className="text-lg font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+        <h1 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>
           Não foi possível aceitar
         </h1>
-        <p className="text-sm" style={{ color: "hsl(240 8% 55%)" }}>{errorMsg}</p>
+        <p className="text-sm" style={{ color: "var(--text-3)" }}>{errorMsg}</p>
         <button
           onClick={() => router.replace("/inbox")}
           className="text-sm px-5 py-2.5 mt-2 rounded-xl transition-colors"

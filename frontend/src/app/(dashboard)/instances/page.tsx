@@ -340,7 +340,7 @@ function InstanceCard({
                 </code>
                 {idCopied
                   ? <Check className="w-3 h-3 flex-shrink-0" style={{ color: "#00d46a" }} />
-                  : <Copy className="w-3 h-3 flex-shrink-0 opacity-0 group-hover/id:opacity-100 transition-opacity" style={{ color: "hsl(240 8% 40%)" }} />
+                  : <Copy className="w-3 h-3 flex-shrink-0 opacity-0 group-hover/id:opacity-100 transition-opacity" style={{ color: "var(--text-4)" }} />
                 }
               </button>
             </div>
@@ -370,7 +370,7 @@ function InstanceCard({
               </span>
             </div>
             {profile?.conversations != null && (
-              <span className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>
+              <span className="text-[10px]" style={{ color: "var(--text-4)" }}>
                 · {profile.conversations} convs
               </span>
             )}
@@ -590,7 +590,7 @@ function FleetHealthBar({ instances, reconnectingIds }: {
           </div>
         </div>
         <div>
-          <p className="text-xs font-semibold" style={{ color: "hsl(240 15% 88%)" }}>Fleet Health</p>
+          <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>Fleet Health</p>
           <p className="text-[11px] mt-0.5" style={{ color: "hsl(240 8% 46%)" }}>
             {connected} online de {total}
           </p>
@@ -774,7 +774,7 @@ function InstancesContent() {
                   background: "rgba(255,255,255,0.04)",
                   backdropFilter: "blur(8px)",
                   WebkitBackdropFilter: "blur(8px)",
-                  color: "hsl(240 8% 50%)",
+                  color: "var(--text-3)",
                   border: "1px solid rgba(255,255,255,0.08)",
                   borderRadius: "10px",
                 }}
@@ -842,7 +842,7 @@ function InstancesContent() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl p-14 text-center animate-fade-in-up"
-          style={{ background: "hsl(240 18% 6%)", border: "1px dashed hsl(240 12% 16%)" }}>
+          style={{ background: "var(--surface-solid)", border: "1px dashed hsl(240 12% 16%)" }}>
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
             style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
             <Smartphone className="w-6 h-6" style={{ color: "hsl(240 8% 35%)" }} />

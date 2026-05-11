@@ -51,17 +51,17 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     },
     ghost: {
       background: "transparent",
-      color: "hsl(240 15% 85%)",
+      color: "var(--text-2)",
       border: "1px solid transparent",
     },
     soft: {
       background: "var(--surface-2)",
-      color: "hsl(240 15% 88%)",
-      border: "1px solid hsl(240 12% 16%)",
+      color: "var(--text-1)",
+      border: "1px solid var(--border)",
     },
     outline: {
       background: "transparent",
-      color: "hsl(240 15% 85%)",
+      color: "var(--text-2)",
       border: "1px solid hsl(240 12% 22%)",
     },
     danger: {

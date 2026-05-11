@@ -105,7 +105,7 @@ function ConversationsDrawer({
             {/* Top shimmer */}
             <div style={{ position: "absolute", top: 0, left: "10%", right: "10%", height: "1px", background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent)" }} />
 
-            <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+            <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: "var(--border-subtle)" }}>
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 flex-shrink-0" style={{ color: "var(--green)" }} />
                 <span className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Conversas</span>
@@ -195,7 +195,7 @@ function ActivityDrawer({ open, onClose, events }: { open: boolean; onClose: () 
           >
             <div style={{ position: "absolute", top: 0, left: "10%", right: "10%", height: "1px", background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent)" }} />
 
-            <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+            <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: "var(--border-subtle)" }}>
               <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4 flex-shrink-0" style={{ color: "var(--green)" }} />
                 <span className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Atividade</span>
@@ -358,7 +358,7 @@ export default function UniqAIPage() {
           style={{
             ...glassStyle,
             color: "var(--text-2)",
-            borderColor: "rgba(255,255,255,0.09)",
+            borderColor: "var(--border-default)",
           }}
           title="Conversas"
         >

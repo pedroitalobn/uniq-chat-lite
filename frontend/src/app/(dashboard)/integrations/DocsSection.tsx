@@ -1174,7 +1174,7 @@ function EndpointCard({
   const curl = buildCurl(endpoint, fullUrl, apiKey, exampleBody);
 
   return (
-    <div className="rounded-xl overflow-hidden" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+    <div className="rounded-xl overflow-hidden" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
       <div className="p-3">
         <div className="flex items-start gap-2">
           <span
@@ -1191,7 +1191,7 @@ function EndpointCard({
               <CopyBtn value={fullUrl} label="URL" size="xs" />
               <CopyBtn value={curl} label="cURL" size="xs" />
             </div>
-            <p className="text-xs mt-1" style={{ color: "hsl(240 8% 55%)" }}>{endpoint.summary}</p>
+            <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>{endpoint.summary}</p>
           </div>
         </div>
 
@@ -1202,7 +1202,7 @@ function EndpointCard({
                 type="button"
                 onClick={() => setParamsOpen((o) => !o)}
                 className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest transition-colors"
-                style={{ color: "hsl(240 8% 50%)" }}
+                style={{ color: "var(--text-3)" }}
               >
                 {paramsOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                 Parâmetros ({Object.keys(endpoint.body).length})
@@ -1252,7 +1252,7 @@ function EndpointCard({
                         obrigatório
                       </span>
                     )}
-                    <span className="flex-1 min-w-0" style={{ color: "hsl(240 8% 55%)" }}>{v.description || "—"}</span>
+                    <span className="flex-1 min-w-0" style={{ color: "var(--text-3)" }}>{v.description || "—"}</span>
                     {v.example !== undefined && (
                       <CopyBtn value={String(v.example)} label="" size="xs" />
                     )}
@@ -1276,7 +1276,7 @@ function EndpointCard({
               <div className="mt-2 relative group">
                 <pre
                   className="text-[11px] font-mono rounded-lg px-3 py-2.5 overflow-x-auto"
-                  style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)", color: "hsl(240 15% 85%)" }}
+                  style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)", color: "var(--text-2)" }}
                 >
                   {exampleBody || "// nenhum exemplo disponível"}
                 </pre>
@@ -1293,14 +1293,14 @@ function EndpointCard({
         {endpoint.response && (
           <div className="mt-3" style={{ borderTop: "1px solid hsl(240 12% 11%)", paddingTop: 10 }}>
             <div className="flex items-center justify-between gap-2 mb-1.5">
-              <span className="text-[10px] font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
+              <span className="text-[10px] font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
                 Resposta de exemplo
               </span>
               <CopyBtn value={endpoint.response} label="" size="xs" />
             </div>
             <pre
               className="text-[11px] font-mono rounded-lg px-3 py-2 overflow-x-auto"
-              style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)", color: "hsl(240 15% 85%)" }}
+              style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)", color: "var(--text-2)" }}
             >
               {endpoint.response}
             </pre>
@@ -1327,7 +1327,7 @@ export function DocsSection() {
     <div className="space-y-4">
       {/* API Key + Instance selector */}
       <div className="rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
-        style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+        style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
         <div>
           <label className="text-[10px] font-medium uppercase tracking-widest block mb-1.5" style={{ color: "hsl(240 8% 42%)" }}>
             API Key para Playground
@@ -1370,10 +1370,10 @@ export function DocsSection() {
                 activeSection === s.id ? "text-white" : "text-slate-500 hover:text-slate-300")}
               style={activeSection === s.id ? { background: "var(--surface-2)", boxShadow: "inset 1px 0 0 0 var(--green)" } : undefined}
             >
-              <span style={activeSection === s.id ? { color: "var(--green)" } : { color: "hsl(240 8% 40%)" }}>{s.icon}</span>
+              <span style={activeSection === s.id ? { color: "var(--green)" } : { color: "var(--text-4)" }}>{s.icon}</span>
               {s.label}
               <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-lg"
-                style={{ background: "var(--surface-2)", color: "hsl(240 8% 38%)" }}>
+                style={{ background: "var(--surface-2)", color: "var(--text-4)" }}>
                 {s.endpoints.length}
               </span>
             </button>
@@ -1383,7 +1383,7 @@ export function DocsSection() {
               activeSection === "webhook-events" ? "text-white" : "text-slate-500 hover:text-slate-300")}
             style={activeSection === "webhook-events" ? { background: "var(--surface-2)", boxShadow: "inset 1px 0 0 0 var(--green)" } : undefined}
           >
-            <BookOpen className="w-3.5 h-3.5" style={activeSection === "webhook-events" ? { color: "var(--green)" } : { color: "hsl(240 8% 40%)" }} />
+            <BookOpen className="w-3.5 h-3.5" style={activeSection === "webhook-events" ? { color: "var(--green)" } : { color: "var(--text-4)" }} />
             Eventos
           </button>
         </div>
@@ -1392,14 +1392,14 @@ export function DocsSection() {
         <div className="min-w-0 space-y-3">
           {activeSection === "webhook-events" ? (
             <>
-              <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>Eventos de Webhook</h2>
+              <h2 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Eventos de Webhook</h2>
               <div className="space-y-2">
                 {WEBHOOK_EVENTS.map((ev) => (
                   <div key={ev.event} className="flex items-start gap-3 rounded-xl px-4 py-3"
-                    style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+                    style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
                     <code className="text-xs font-mono px-2 py-1 rounded-lg flex-shrink-0"
                       style={{ background: "rgba(96,165,250,0.08)", color: "#60a5fa" }}>{ev.event}</code>
-                    <p className="text-xs pt-0.5" style={{ color: "hsl(240 8% 55%)" }}>{ev.description}</p>
+                    <p className="text-xs pt-0.5" style={{ color: "var(--text-3)" }}>{ev.description}</p>
                   </div>
                 ))}
               </div>
@@ -1408,7 +1408,7 @@ export function DocsSection() {
             <>
               <div className="flex items-center gap-2">
                 <span style={{ color: "var(--green)" }}>{section.icon}</span>
-                <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>{section.label}</h2>
+                <h2 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{section.label}</h2>
                 <span className="text-xs" style={{ color: "hsl(240 8% 42%)" }}>({section.endpoints.length} endpoints)</span>
               </div>
               <div className="space-y-2">

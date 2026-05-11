@@ -274,8 +274,8 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
       <div
         className="relative w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-fade-in-up"
         style={{
-          background: "hsl(240 18% 6%)",
-          border: "1px solid hsl(240 12% 14%)",
+          background: "var(--surface-solid)",
+          border: "1px solid var(--border)",
           boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 32px 80px rgba(0,0,0,0.6)",
         }}
       >
@@ -295,7 +295,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
           <button
             onClick={onClose}
             className="transition-colors"
-            style={{ color: "hsl(240 8% 38%)" }}
+            style={{ color: "var(--text-4)" }}
             onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
             onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}
           >
@@ -312,8 +312,8 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
                 onClick={() => setMode(m)}
                 className="flex-1 text-xs font-medium py-1.5 rounded-lg transition-all"
                 style={mode === m
-                  ? { background: "hsl(240 12% 18%)", color: "hsl(240 15% 90%)" }
-                  : { color: "hsl(240 8% 40%)" }
+                  ? { background: "hsl(240 12% 18%)", color: "var(--text-1)" }
+                  : { color: "var(--text-4)" }
                 }
               >
                 {m === "qr" ? "QR Code" : "Código de Pareamento"}
@@ -344,7 +344,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
                   className="w-56 h-56 rounded-2xl flex items-center justify-center"
                   style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}
                 >
-                  <RefreshCw className="w-7 h-7 animate-spin" style={{ color: "hsl(240 8% 38%)" }} />
+                  <RefreshCw className="w-7 h-7 animate-spin" style={{ color: "var(--text-4)" }} />
                 </div>
                 <p className="text-xs" style={{ color: "hsl(240 8% 42%)" }}>Gerando QR Code...</p>
               </div>
@@ -396,7 +396,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
                 <button
                   onClick={refreshQR}
                   className="flex items-center gap-1.5 text-xs transition-colors"
-                  style={{ color: "hsl(240 8% 38%)" }}
+                  style={{ color: "var(--text-4)" }}
                   onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
                   onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}
                 >
@@ -410,7 +410,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
                 <button
                   onClick={refreshQR}
                   className="flex items-center gap-1.5 text-xs transition-colors"
-                  style={{ color: "hsl(240 8% 38%)" }}
+                  style={{ color: "var(--text-4)" }}
                 >
                   <RefreshCw className="w-3 h-3 animate-spin" style={{ animationDuration: "2s" }} />
                   Tentar novamente
@@ -435,15 +435,15 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
                   Número (com DDI, sem + ou espaços)
                 </label>
                 <div className="flex items-center gap-2 rounded-xl px-3 py-2"
-                  style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)" }}>
-                  <Smartphone className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }} />
+                  style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                  <Smartphone className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "var(--text-4)" }} />
                   <input
                     type="tel"
                     value={phone}
                     onChange={e => setPhone(e.target.value.replace(/\D/g, ""))}
                     placeholder="5511999999999"
                     className="flex-1 bg-transparent text-sm outline-none"
-                    style={{ color: "hsl(240 15% 90%)" }}
+                    style={{ color: "var(--text-1)" }}
                     onKeyDown={e => e.key === "Enter" && requestPairingCode()}
                   />
                 </div>
@@ -457,7 +457,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
                     <p className="text-3xl font-semibold font-mono tracking-[0.2em]" style={{ color: "var(--green)" }}>
                       {pairingCode}
                     </p>
-                    <p className="text-[10px] mt-2" style={{ color: "hsl(240 8% 38%)" }}>
+                    <p className="text-[10px] mt-2" style={{ color: "var(--text-4)" }}>
                       Digite este código no WhatsApp → Dispositivos Vinculados
                     </p>
                   </div>
@@ -473,7 +473,7 @@ export function QRCodeModal({ instanceId, onClose, onConnected }: Props) {
                     <button
                       onClick={() => { setPairingCode(""); requestPairingCode(); }}
                       className="flex-1 text-xs py-2 rounded-xl transition-all"
-                      style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 15%)", color: "hsl(240 8% 46%)" }}
+                      style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "hsl(240 8% 46%)" }}
                     >
                       Novo código
                     </button>

@@ -1015,7 +1015,7 @@ export function MentionPicker({
       {picker.open && (
         <div
           className="absolute left-6 right-6 bottom-full mb-2 rounded-xl overflow-hidden shadow-2xl z-20"
-          style={{ background: "hsl(240 18% 8%)", border: "1px solid hsl(240 12% 16%)" }}
+          style={{ background: "hsl(240 18% 8%)", border: "1px solid var(--border)" }}
           onMouseDown={(e) => { e.preventDefault(); /* evita blur do editor */ }}
         >
           {/* Header com label + search */}
@@ -1046,7 +1046,7 @@ export function MentionPicker({
                   <button
                     onClick={closePicker}
                     className="ml-auto text-[10px] normal-case tracking-normal underline"
-                    style={{ color: "hsl(240 8% 60%)" }}>
+                    style={{ color: "var(--text-3)" }}>
                     cancelar
                   </button>
                 </>
@@ -1059,7 +1059,7 @@ export function MentionPicker({
                   <button
                     onClick={() => { setPicker((p) => ({ ...p, mode: "category", category: null, query: "" })); }}
                     className="ml-auto text-[10px] normal-case tracking-normal underline"
-                    style={{ color: "hsl(240 8% 60%)" }}>
+                    style={{ color: "var(--text-3)" }}>
                     ← trocar
                   </button>
                 </>
@@ -1069,7 +1069,7 @@ export function MentionPicker({
             </div>
             {(picker.mode === "search" || picker.mode === "followUp") && (
               <div className="flex items-center gap-2 rounded-lg px-2 py-1.5"
-                style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 14%)" }}>
+                style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
                 {/* Operador dropdown aparece antes do input quando o
                     follow-up tem operatorOptions (caso atual: /palavra). */}
                 {picker.mode === "followUp" && picker.followUp?.operatorOptions && (
@@ -1079,7 +1079,7 @@ export function MentionPicker({
                       ? { ...p, followUp: { ...p.followUp, op: e.target.value } }
                       : p)}
                     className="text-[10px] bg-transparent outline-none cursor-pointer"
-                    style={{ color: "hsl(240 15% 85%)", maxWidth: 130 }}
+                    style={{ color: "var(--text-2)", maxWidth: 130 }}
                     title="Operador de match"
                   >
                     {picker.followUp.operatorOptions.map((op) => (
@@ -1090,7 +1090,7 @@ export function MentionPicker({
                   </select>
                 )}
                 {picker.mode === "followUp" && picker.followUp?.operatorOptions && (
-                  <span style={{ color: "hsl(240 8% 38%)", fontSize: 11 }}>·</span>
+                  <span style={{ color: "var(--text-4)", fontSize: 11 }}>·</span>
                 )}
                 <SearchIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 46%)" }} />
                 <input
@@ -1107,7 +1107,7 @@ export function MentionPicker({
                         : "Buscar em todos os tipos…"
                   }
                   className="flex-1 bg-transparent outline-none text-xs"
-                  style={{ color: "hsl(240 15% 90%)" }}
+                  style={{ color: "var(--text-1)" }}
                 />
                 {picker.query && picker.mode !== "followUp" && (
                   <button
@@ -1128,7 +1128,7 @@ export function MentionPicker({
 
           {/* Lista — em follow-up só mostra um hint de ajuda, sem sugestões */}
           {picker.mode === "followUp" ? (
-            <div className="px-4 py-4 text-xs space-y-1" style={{ color: "hsl(240 8% 60%)" }}>
+            <div className="px-4 py-4 text-xs space-y-1" style={{ color: "var(--text-3)" }}>
               <p>Digite o valor e pressione <b>Enter</b> para inserir.</p>
               {picker.followUp?.allowEmpty && (
                 <p className="text-[10px]" style={{ color: "hsl(240 8% 46%)" }}>
@@ -1159,7 +1159,7 @@ export function MentionPicker({
                         <Icon className="w-3 h-3" style={{ color: s.color }} />
                       </span>
                       <div className="flex-1 min-w-0 flex flex-col">
-                        <span className="text-sm truncate" style={{ color: "hsl(240 15% 90%)" }}>{s.label}</span>
+                        <span className="text-sm truncate" style={{ color: "var(--text-1)" }}>{s.label}</span>
                         {s.sublabel && (
                           <span className="text-[10px] truncate" style={{ color: "hsl(240 8% 48%)" }}>
                             {s.sublabel}

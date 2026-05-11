@@ -269,7 +269,7 @@ export default function ShopsPage() {
                   placeholder="Minha loja"
                   className="w-full px-3 py-2 rounded-lg text-sm outline-none"
                   style={{
-                    background: "rgba(255,255,255,0.05)",
+                    background: "var(--input)",
                     backdropFilter: "blur(8px)",
                     color: "var(--text-1)",
                     border: "1px solid rgba(255,255,255,0.10)",
@@ -287,7 +287,7 @@ export default function ShopsPage() {
                   rows={2}
                   className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none"
                   style={{
-                    background: "rgba(255,255,255,0.05)",
+                    background: "var(--input)",
                     backdropFilter: "blur(8px)",
                     color: "var(--text-1)",
                     border: "1px solid rgba(255,255,255,0.10)",
@@ -304,7 +304,7 @@ export default function ShopsPage() {
                   onChange={(e) => setForm({ ...form, currency: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg text-sm outline-none"
                   style={{
-                    background: "rgba(255,255,255,0.05)",
+                    background: "var(--input)",
                     backdropFilter: "blur(8px)",
                     color: "var(--text-1)",
                     border: "1px solid rgba(255,255,255,0.10)",
@@ -322,7 +322,7 @@ export default function ShopsPage() {
                 onClick={() => setCreating(false)}
                 className="flex-1 py-2.5 rounded-lg text-sm font-medium"
                 style={{
-                  background: "rgba(255,255,255,0.05)",
+                  background: "var(--input)",
                   backdropFilter: "blur(8px)",
                   border: "1px solid rgba(255,255,255,0.09)",
                   color: "var(--text-2)",

@@ -226,7 +226,7 @@ export function BillingLinkModal({ user, onClose }: { user: User; onClose: () =>
   return (
     <div
       className="fixed inset-0 z-[120] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.6)" }}
+      style={{ background: "var(--surface-overlay)" }}
       onClick={onClose}
     >
       <div

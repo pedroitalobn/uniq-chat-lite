@@ -150,7 +150,7 @@ function PlanCard({ plan, onSelect, loading, disabled }: {
           {meta.icon}
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: "hsl(240 15% 92%)" }}>{plan.name}</h3>
+          <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: "var(--text-1)" }}>{plan.name}</h3>
           {description && (
             <p className="text-[10px] sm:text-[11px] mt-0.5 leading-snug line-clamp-2" style={{ color: "hsl(240 8% 46%)" }}>{description}</p>
           )}
@@ -161,13 +161,13 @@ function PlanCard({ plan, onSelect, loading, disabled }: {
       <div className="mb-3 sm:mb-5">
         {isFree ? (
           <div className="flex items-baseline gap-1 flex-wrap">
-            <span className="text-2xl sm:text-3xl font-extrabold" style={{ color: "hsl(240 15% 92%)" }}>Grátis</span>
+            <span className="text-2xl sm:text-3xl font-extrabold" style={{ color: "var(--text-1)" }}>Grátis</span>
             <span className="text-[10px] sm:text-sm" style={{ color: "hsl(240 8% 42%)" }}>para sempre</span>
           </div>
         ) : (
           <div className="flex items-baseline gap-0.5 sm:gap-1 flex-wrap">
             <span className="text-[10px] sm:text-xs font-medium" style={{ color: "hsl(240 8% 46%)" }}>R$</span>
-            <span className="text-2xl sm:text-3xl font-extrabold" style={{ color: "hsl(240 15% 92%)" }}>{plan.price}</span>
+            <span className="text-2xl sm:text-3xl font-extrabold" style={{ color: "var(--text-1)" }}>{plan.price}</span>
             <span className="text-[10px] sm:text-sm" style={{ color: "hsl(240 8% 42%)" }}>/mês</span>
           </div>
         )}
@@ -176,7 +176,7 @@ function PlanCard({ plan, onSelect, loading, disabled }: {
       {/* Features */}
       <ul className="space-y-1 sm:space-y-1.5 flex-1 mb-3 sm:mb-5">
         {highlights.slice(0, 8).map((item) => (
-          <li key={item} className="flex items-center gap-1.5 text-[10px] sm:text-[11px] truncate" style={{ color: "hsl(240 8% 65%)" }}>
+          <li key={item} className="flex items-center gap-1.5 text-[10px] sm:text-[11px] truncate" style={{ color: "var(--text-2)" }}>
             <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 flex-shrink-0" style={{ color: meta.color }} />
             <span className="truncate">{item}</span>
           </li>
@@ -263,7 +263,7 @@ function PlansContent() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-start p-4 sm:p-6 pt-10 sm:pt-12"
-      style={{ background: "hsl(240 20% 4%)" }}>
+      style={{ background: "var(--surface-solid)" }}>
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px]"
           style={{ background: "radial-gradient(ellipse at top, rgba(0,212,106,0.06) 0%, transparent 65%)" }} />
@@ -287,7 +287,7 @@ function PlansContent() {
             style={{ color: "hsl(240 15% 94%)" }}>
             Escolha seu plano
           </h1>
-          <p className="text-sm max-w-md mx-auto" style={{ color: "hsl(240 8% 50%)" }}>
+          <p className="text-sm max-w-md mx-auto" style={{ color: "var(--text-3)" }}>
             {inviteEnabled
               ? "Insira seu código de convite para liberar os planos e começar."
               : "Comece grátis e escale conforme o seu negócio cresce. Cancele quando quiser, sem fidelidade."}
@@ -311,17 +311,17 @@ function PlansContent() {
                   inviteValid === false ? "ring-1 ring-red-500/30" : "focus:ring-1 focus:ring-white/10"
                 )}
                 style={{
-                  background: "hsl(240 12% 8%)",
+                  background: "var(--surface-solid)",
                   border: inviteValid === false
                     ? "1px solid rgba(239,68,68,0.35)"
                     : inviteValid === true
                     ? "1px solid rgba(0,212,106,0.4)"
                     : "1px solid hsl(240 12% 13%)",
-                  color: "hsl(240 15% 90%)",
+                  color: "var(--text-1)",
                 }}
               />
               <span className="absolute right-3.5 top-1/2 -translate-y-1/2">
-                {checkingInvite && <Loader2 className="w-4 h-4 animate-spin" style={{ color: "hsl(240 8% 40%)" }} />}
+                {checkingInvite && <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--text-4)" }} />}
                 {!checkingInvite && inviteValid === true && (
                   <span className="text-xs font-medium text-green-400">Válido</span>
                 )}
@@ -341,7 +341,7 @@ function PlansContent() {
 
         {isLoading ? (
           <div className="flex justify-center py-16">
-            <Loader2 className="w-6 h-6 animate-spin" style={{ color: "hsl(240 8% 40%)" }} />
+            <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--text-4)" }} />
           </div>
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-10 pb-6 pt-2 items-stretch">
@@ -361,7 +361,7 @@ function PlansContent() {
             { icon: <Users className="w-3.5 h-3.5" />, label: "+10.000 usuários ativos" },
           ].map(({ icon, label }) => (
             <div key={label} className="flex items-center gap-2 text-[11px]"
-              style={{ color: "hsl(240 8% 38%)" }}>
+              style={{ color: "var(--text-4)" }}>
               <span style={{ color: "hsl(240 8% 30%)" }}>{icon}</span>
               {label}
             </div>

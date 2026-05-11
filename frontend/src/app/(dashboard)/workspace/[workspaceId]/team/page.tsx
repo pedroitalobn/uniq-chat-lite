@@ -160,8 +160,8 @@ export default function TeamPage() {
   const canManageRoles = true;
 
   const cardStyle = {
-    background: "hsl(240 18% 6%)",
-    border: "1px solid hsl(240 12% 13%)",
+    background: "var(--surface-solid)",
+    border: "1px solid var(--border)",
   };
 
   const getStatusColor = (status: string) => {
@@ -170,7 +170,7 @@ export default function TeamPage() {
       case "accepted": return { bg: "rgba(0,212,106,0.1)", color: "#4ade80" };
       case "expired": return { bg: "rgba(251,146,60,0.1)", color: "#fb923c" };
       case "revoked": return { bg: "rgba(239,68,68,0.1)", color: "#f87171" };
-      default: return { bg: "var(--surface-2)", color: "hsl(240 8% 50%)" };
+      default: return { bg: "var(--surface-2)", color: "var(--text-3)" };
     }
   };
 
@@ -182,7 +182,7 @@ export default function TeamPage() {
           <button
             onClick={() => router.push("/workspace")}
             className="p-2 rounded-lg transition-colors"
-            style={{ color: "hsl(240 8% 50%)" }}
+            style={{ color: "var(--text-3)" }}
             onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-2)")}
             onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
           >
@@ -220,12 +220,12 @@ export default function TeamPage() {
               >
                 <Mail className="w-3.5 h-3.5" style={{ color: "#60a5fa" }} />
               </div>
-              <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>Convidar membro</h2>
+              <h2 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Convidar membro</h2>
             </div>
             <button
               onClick={() => { setShowInvite(false); setInviteEmail(""); setInviteRoleId(""); }}
               className="p-1 rounded"
-              style={{ color: "hsl(240 8% 40%)" }}
+              style={{ color: "var(--text-4)" }}
             >
               <X className="w-4 h-4" />
             </button>
@@ -337,7 +337,7 @@ export default function TeamPage() {
 
       {/* Members */}
       <div className="rounded-2xl overflow-hidden animate-fade-in-up" style={cardStyle}>
-        <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid hsl(240 12% 11%)" }}>
+        <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border)" }}>
           <h2 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
             {members.length} membro{members.length !== 1 ? "s" : ""}
           </h2>
@@ -385,7 +385,7 @@ export default function TeamPage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--text-4)" }}>
                     {member.user?.email}
                   </p>
                 </div>
@@ -447,7 +447,7 @@ export default function TeamPage() {
 
       {/* Pending invites */}
       <div className="rounded-2xl overflow-hidden animate-fade-in-up" style={{ ...cardStyle, animationDelay: "50ms", animationFillMode: "both" }}>
-        <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid hsl(240 12% 11%)" }}>
+        <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border)" }}>
           <h2 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>
             {invites.filter(i => i.status === "pending").length} convite{invites.filter(i => i.status === "pending").length !== 1 ? "s" : ""} pendente{invites.filter(i => i.status === "pending").length !== 1 ? "s" : ""}
           </h2>
@@ -486,7 +486,7 @@ export default function TeamPage() {
                     <p className="text-sm" style={{ color: "hsl(240 15% 80%)" }}>{invite.email}</p>
                     <div className="flex items-center gap-2 mt-1">
                       {invite.role && (
-                        <span className="text-xs" style={{ color: "hsl(240 8% 38%)" }}>{invite.role.name}</span>
+                        <span className="text-xs" style={{ color: "var(--text-4)" }}>{invite.role.name}</span>
                       )}
                       <span className="text-xs" style={{ color: "hsl(240 8% 28%)" }}>
                         Enviado {new Date(invite.created_at).toLocaleDateString("pt-BR")}
@@ -564,7 +564,7 @@ export default function TeamPage() {
         <button
           onClick={() => router.push(`/workspace/${workspaceId}/roles`)}
           className="flex items-center gap-2 text-sm px-4 py-2 rounded-xl transition-colors"
-          style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)", color: "hsl(240 8% 60%)" }}
+          style={{ background: "var(--surface-solid)", border: "1px solid var(--border)", color: "var(--text-3)" }}
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "hsl(240 12% 20%)"; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "hsl(240 12% 13%)"; }}
         >

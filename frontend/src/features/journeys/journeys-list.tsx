@@ -318,7 +318,7 @@ export function JourneysList() {
       <div
         className="flex flex-col gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b flex-shrink-0"
         style={{
-          borderColor: "rgba(255,255,255,0.07)",
+          borderColor: "var(--border-subtle)",
           background: "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)",
           backdropFilter: "blur(20px) saturate(180%)",
           WebkitBackdropFilter: "blur(20px) saturate(180%)",
@@ -587,7 +587,7 @@ export function JourneysList() {
                 <div
                   className="p-3 sm:p-4 border-t"
                   style={{
-                    borderColor: "rgba(255,255,255,0.07)",
+                    borderColor: "var(--border-subtle)",
                     background: "rgba(255,255,255,0.03)",
                   }}
                 >
@@ -658,7 +658,7 @@ export function JourneysList() {
           />
           <motion.div
             className="relative w-full max-w-sm rounded-2xl p-5 sm:p-6 shadow-2xl"
-            style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}
+            style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
@@ -672,14 +672,14 @@ export function JourneysList() {
                 <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 46%)" }}>Esta ação não pode ser desfeita</p>
               </div>
             </div>
-            <p className="text-sm mb-6" style={{ color: "hsl(240 8% 60%)" }}>
+            <p className="text-sm mb-6" style={{ color: "var(--text-3)" }}>
               Tem certeza que deseja excluir a jornada <span className="font-medium" style={{ color: "hsl(240 15% 93%)" }}>"{deleteConfirm.name}"</span>?
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteConfirm(null)}
                 className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
-                style={{ background: "hsl(240 12% 10%)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 8% 60%)" }}
+                style={{ background: "hsl(240 12% 10%)", border: "1px solid var(--border)", color: "var(--text-3)" }}
               >
                 Cancelar
               </button>

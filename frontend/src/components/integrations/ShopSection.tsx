@@ -161,7 +161,7 @@ function ConnectModal({ provider, shops, wsId, onClose }: ConnectModalProps) {
     // Overlay
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.6)" }}
+      style={{ background: "var(--surface-overlay)" }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -322,7 +322,7 @@ function ConnectModal({ provider, shops, wsId, onClose }: ConnectModalProps) {
                       }
                       className="w-full px-3 py-2 rounded-lg text-sm outline-none transition-all"
                       style={{
-                        background: "rgba(255,255,255,0.05)",
+                        background: "var(--input)",
                         border: "1px solid rgba(255,255,255,0.1)",
                         color: "var(--text-1)",
                       }}

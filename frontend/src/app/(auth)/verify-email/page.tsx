@@ -147,14 +147,14 @@ function VerifyEmailForm() {
 
 export default function VerifyEmailPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "hsl(240 20% 4%)" }}>
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "var(--surface-solid)" }}>
       <div className="w-full max-w-sm relative animate-fade-in-up">
         <div className="flex flex-col items-center mb-6">
           <Logo height={40} className="mb-3" />
         </div>
         <div className="rounded-2xl overflow-hidden"
           style={{
-            background: "hsl(240 18% 6%)",
+            background: "var(--surface-solid)",
             boxShadow: "0 0 0 1px hsl(240 12% 13%), 0 24px 64px rgba(0,0,0,0.5)",
           }}>
           <Suspense fallback={

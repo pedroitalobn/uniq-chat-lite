@@ -589,8 +589,8 @@ function VerifyContent() {
         <div
           className="rounded-2xl p-7"
           style={{
-            background: "hsl(240 18% 6%)",
-            border: "1px solid hsl(240 12% 11%)",
+            background: "var(--surface-solid)",
+            border: "1px solid var(--border)",
             boxShadow: "0 32px 64px rgba(0,0,0,0.5)",
           }}
         >

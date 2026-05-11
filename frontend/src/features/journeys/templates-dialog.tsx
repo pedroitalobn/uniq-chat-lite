@@ -943,7 +943,7 @@ export function TemplatesDialog({ onClose, instanceId }: TemplatesDialogProps) {
         {/* Header */}
         <div
           className="flex items-start justify-between px-5 pt-5 pb-4"
-          style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+          style={{ borderBottom: "1px solid var(--border-subtle)" }}
         >
           <div>
             <h2 className="text-base font-semibold" style={{ color: "rgba(255,255,255,0.92)" }}>
@@ -967,7 +967,7 @@ export function TemplatesDialog({ onClose, instanceId }: TemplatesDialogProps) {
         {/* Search + filters */}
         <div
           className="px-5 py-3 flex flex-col sm:flex-row gap-3 items-start sm:items-center"
-          style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+          style={{ borderBottom: "1px solid var(--border-subtle)" }}
         >
           {/* Search */}
           <div className="relative flex-1 w-full sm:max-w-xs">

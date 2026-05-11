@@ -116,7 +116,7 @@ export function QuickActionMenu({
             {preview && (
               <div
                 className="px-4 py-3"
-                style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+                style={{ borderBottom: "1px solid var(--border-subtle)" }}
               >
                 {preview}
               </div>

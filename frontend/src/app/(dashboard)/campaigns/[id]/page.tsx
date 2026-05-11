@@ -46,10 +46,10 @@ const MSG_ICON: Record<string, React.ElementType> = {
 
 function StatCard({ label, value, sub, color }: { label: string; value: number; sub?: string; color?: string }) {
   return (
-    <div className="rounded-xl p-4" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+    <div className="rounded-xl p-4" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
       <p className="text-xs mb-1" style={{ color: "hsl(240 8% 46%)" }}>{label}</p>
       <p className="text-2xl font-semibold" style={{ color: color || "hsl(240 15% 93%)" }}>{value}</p>
-      {sub && <p className="text-[11px] mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>{sub}</p>}
+      {sub && <p className="text-[11px] mt-0.5" style={{ color: "var(--text-4)" }}>{sub}</p>}
     </div>
   );
 }
@@ -232,9 +232,9 @@ export default function CampaignDetailPage() {
       </div>
 
       {/* Progress bar */}
-      <div className="rounded-2xl p-5" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+      <div className="rounded-2xl p-5" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
         <div className="flex justify-between items-center mb-3">
-          <p className="text-sm font-medium" style={{ color: "hsl(240 15% 90%)" }}>Progresso</p>
+          <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Progresso</p>
           <span className="text-sm font-semibold" style={{ color: "var(--green)" }}>{progress}%</span>
         </div>
         <div className="h-2 rounded-full overflow-hidden" style={{ background: "hsl(240 12% 12%)" }}>
@@ -250,7 +250,7 @@ export default function CampaignDetailPage() {
         {/* Message + schedule info */}
         <div className="mt-4 pt-4 border-t space-y-3" style={{ borderColor: "hsl(240 12% 11%)" }}>
           <div className="flex items-start gap-3">
-            {(() => { const MsgIcon = MSG_ICON[campaign.message_type] ?? MessageSquare; return <MsgIcon className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "hsl(240 8% 38%)" }} />; })()}
+            {(() => { const MsgIcon = MSG_ICON[campaign.message_type] ?? MessageSquare; return <MsgIcon className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "var(--text-4)" }} />; })()}
             <div className="flex-1 min-w-0">
               <p className="text-xs mb-1" style={{ color: "hsl(240 8% 46%)" }}>
                 Mensagem · {campaign.message_type}
@@ -268,18 +268,18 @@ export default function CampaignDetailPage() {
 
           <div className="flex flex-wrap gap-4">
             <div className="flex items-center gap-1.5">
-              <Timer className="w-3.5 h-3.5" style={{ color: "hsl(240 8% 38%)" }} />
+              <Timer className="w-3.5 h-3.5" style={{ color: "var(--text-4)" }} />
               <span className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>Intervalo: {campaign.delay_seconds}s</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <RefreshCw className="w-3.5 h-3.5" style={{ color: "hsl(240 8% 38%)" }} />
+              <RefreshCw className="w-3.5 h-3.5" style={{ color: "var(--text-4)" }} />
               <span className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>
                 {campaign.times_total}× total · {campaign.times_per_day}×/dia
               </span>
             </div>
             {campaign.start_date && (
               <div className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5" style={{ color: "hsl(240 8% 38%)" }} />
+                <Calendar className="w-3.5 h-3.5" style={{ color: "var(--text-4)" }} />
                 <span className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>
                   {fmtDate(campaign.start_date)}
                   {campaign.end_date && ` → ${fmtDate(campaign.end_date)}`}
@@ -312,13 +312,13 @@ export default function CampaignDetailPage() {
 
       {/* Recipients table */}
       <div>
-        <h2 className="text-sm font-medium mb-3" style={{ color: "hsl(240 15% 90%)" }}>
+        <h2 className="text-sm font-medium mb-3" style={{ color: "var(--text-1)" }}>
           Destinatários ({recipients.length})
         </h2>
-        <div className="rounded-2xl overflow-hidden" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+        <div className="rounded-2xl overflow-hidden" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
           {/* Header */}
           <div className="grid grid-cols-[1fr_80px_60px_auto] gap-4 px-5 py-2.5 text-[11px] font-medium uppercase tracking-widest"
-            style={{ background: "var(--surface-2)", borderBottom: "1px solid hsl(240 12% 11%)", color: "hsl(240 8% 40%)" }}>
+            style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--border)", color: "var(--text-4)" }}>
             <span>Destinatário</span>
             <span>Status</span>
             <span>Envios</span>
@@ -326,7 +326,7 @@ export default function CampaignDetailPage() {
           </div>
 
           {recipients.length === 0 ? (
-            <p className="text-center py-8 text-sm" style={{ color: "hsl(240 8% 38%)" }}>
+            <p className="text-center py-8 text-sm" style={{ color: "var(--text-4)" }}>
               Nenhum destinatário
             </p>
           ) : (
@@ -349,14 +349,14 @@ export default function CampaignDetailPage() {
                     style={{ borderTop: i > 0 ? "1px solid hsl(240 12% 10%)" : undefined }}
                   >
                     <div className="min-w-0">
-                      <p className="text-xs font-medium truncate flex items-center gap-1.5" style={{ color: "hsl(240 15% 88%)" }}>
+                      <p className="text-xs font-medium truncate flex items-center gap-1.5" style={{ color: "var(--text-1)" }}>
                         {isJID && r.phone.endsWith("@g.us") && (
                           <Users className="w-3 h-3 flex-shrink-0" style={{ color: "#a78bfa" }} />
                         )}
                         {primary}
                       </p>
                       {secondary && (
-                        <p className="text-[10px] font-mono mt-0.5 truncate" style={{ color: "hsl(240 8% 38%)" }}>
+                        <p className="text-[10px] font-mono mt-0.5 truncate" style={{ color: "var(--text-4)" }}>
                           {secondary}
                         </p>
                       )}
@@ -371,7 +371,7 @@ export default function CampaignDetailPage() {
                     <span className="text-xs self-center font-mono" style={{ color: "hsl(240 8% 46%)" }}>
                       {r.send_count ?? 0}
                     </span>
-                    <span className="text-xs self-center" style={{ color: "hsl(240 8% 38%)" }}>
+                    <span className="text-xs self-center" style={{ color: "var(--text-4)" }}>
                       {r.sent_at ? fmtDateTime(r.sent_at) : "—"}
                     </span>
                   </div>

@@ -722,7 +722,7 @@ function InboxPage() {
       <header
         className="border-b px-4 sm:px-6 py-3 sm:py-4"
         style={{
-          borderColor: "rgba(255,255,255,0.06)",
+          borderColor: "var(--border-subtle)",
           background: "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)",
           backdropFilter: "blur(16px) saturate(180%)",
           WebkitBackdropFilter: "blur(16px) saturate(180%)",
@@ -916,7 +916,7 @@ function InboxPage() {
             <div className="relative ml-auto hidden md:block">
               <Search
                 className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5"
-                style={{ color: "hsl(240 8% 38%)" }}
+                style={{ color: "var(--text-4)" }}
               />
               <input
                 value={q}
@@ -924,10 +924,10 @@ function InboxPage() {
                 placeholder="Buscar…"
                 className="w-44 rounded-lg py-1.5 pl-8 pr-3 text-xs outline-none"
                 style={{
-                  background: "rgba(255,255,255,0.05)",
+                  background: "var(--input)",
                   backdropFilter: "blur(8px)",
-                  border: "1px solid rgba(255,255,255,0.10)",
-                  color: "hsl(240 15% 90%)",
+                  border: "1px solid var(--border-default)",
+                  color: "var(--text-1)",
                   transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                 }}
               />
@@ -950,7 +950,7 @@ function InboxPage() {
             width: isMobile ? "100%" : listWidth,
             display: isMobile && selectedId ? "none" : "flex",
             background: "var(--surface-1)",
-            borderRight: isMobile ? "none" : "1px solid rgba(255,255,255,0.06)",
+            borderRight: isMobile ? "none" : "1px solid var(--border-subtle)",
           }}
         >
           {/* Search bar dedicada (mobile) — fica no topo da coluna de chats,
@@ -962,13 +962,13 @@ function InboxPage() {
               className="flex items-center gap-2 px-3 py-2.5 flex-shrink-0"
               style={{
                 background: "rgba(0,0,0,0.20)",
-                borderBottom: "1px solid rgba(255,255,255,0.06)",
+                borderBottom: "1px solid var(--border-subtle)",
               }}
             >
               <div className="relative flex-1">
                 <Search
                   className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4"
-                  style={{ color: "hsl(240 8% 50%)" }}
+                  style={{ color: "var(--text-3)" }}
                 />
                 <input
                   value={q}
@@ -979,7 +979,7 @@ function InboxPage() {
                   style={{
                     background: "var(--surface-2)",
                     border: "1px solid var(--border-default)",
-                    color: "hsl(240 15% 92%)",
+                    color: "var(--text-1)",
                   }}
                 />
                 {q && (
@@ -988,7 +988,7 @@ function InboxPage() {
                     onClick={() => setQ("")}
                     aria-label="Limpar busca"
                     className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full"
-                    style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 8% 65%)" }}
+                    style={{ background: "var(--input)", color: "var(--text-2)" }}
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -1012,7 +1012,7 @@ function InboxPage() {
             if (urgent === 0 && waiting === 0) return null;
             return (
               <div className="flex items-center gap-2 px-3 py-2 flex-shrink-0"
-                style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(0,0,0,0.20)" }}>
+                style={{ borderBottom: "1px solid var(--border-subtle)", background: "rgba(0,0,0,0.20)" }}>
                 {urgent > 0 && (
                   <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
                     style={{ background: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.20)" }}>
@@ -1353,7 +1353,7 @@ function SingleSelectDropdown({
           onClick={() => { onChange(it.id); setOpen(false); }}
         >
           <span className="truncate">{it.label}</span>
-          {it.hint && <span className="ml-auto text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>{it.hint}</span>}
+          {it.hint && <span className="ml-auto text-[10px]" style={{ color: "var(--text-4)" }}>{it.hint}</span>}
         </DropdownItem>
       ))}
       {footer}
@@ -1439,7 +1439,7 @@ function MultiSelectDropdown({
             key={it.id}
             onClick={() => toggle(it.id)}
             className="flex w-full items-start gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-white/5"
-            style={{ color: "hsl(240 15% 90%)" }}
+            style={{ color: "var(--text-1)" }}
           >
             <span
               className="mt-0.5 flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded"
@@ -1453,7 +1453,7 @@ function MultiSelectDropdown({
             <span className="min-w-0 flex-1">
               <span className="block truncate">{it.label}</span>
               {(it.hint || it.sub) && (
-                <span className="block truncate text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>
+                <span className="block truncate text-[10px]" style={{ color: "var(--text-4)" }}>
                   {it.sub && <span className="mr-1">{it.sub}</span>}
                   {it.hint}
                 </span>
@@ -1521,8 +1521,8 @@ function Dropdown({
               background: "linear-gradient(135deg, rgba(18,18,30,0.97) 0%, rgba(10,10,20,0.99) 100%)",
               backdropFilter: "blur(20px) saturate(180%)",
               WebkitBackdropFilter: "blur(20px) saturate(180%)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              boxShadow: "0 16px 40px rgba(0,0,0,0.60), inset 0 1px 0 rgba(255,255,255,0.07)",
+              border: "1px solid var(--border-subtle)",
+              boxShadow: "0 16px 40px var(--surface-overlay)",
               maxHeight: "60vh",
             }}
           >
@@ -1567,7 +1567,7 @@ function DropdownDivider({ label }: { label?: string }) {
   return (
     <div
       className="px-3 pb-1 pt-3 text-[9px] font-medium uppercase tracking-widest"
-      style={{ color: "hsl(240 8% 38%)" }}
+      style={{ color: "var(--text-4)" }}
     >
       {label ?? ""}
     </div>
@@ -1593,7 +1593,7 @@ function BackfillEmptyState({ stats, running, onBackfill }: {
           Primeira sincronização
         </h2>
         <p className="mt-2 text-sm" style={{ color: "hsl(240 8% 52%)" }}>
-          Seu workspace tem <b style={{ color: "hsl(240 15% 90%)" }}>{stats.message_logs.toLocaleString("pt-BR")}</b> mensagens
+          Seu workspace tem <b style={{ color: "var(--text-1)" }}>{stats.message_logs.toLocaleString("pt-BR")}</b> mensagens
           históricas mas nenhum atendimento ainda. Vamos converter as conversas em tickets pra
           você operar daqui em diante.
         </p>
@@ -1605,7 +1605,7 @@ function BackfillEmptyState({ stats, running, onBackfill }: {
         >
           {running ? "Sincronizando…" : "Iniciar sincronização"}
         </button>
-        <p className="mt-4 text-[11px]" style={{ color: "hsl(240 8% 38%)" }}>
+        <p className="mt-4 text-[11px]" style={{ color: "var(--text-4)" }}>
           Processa em lotes de até 10k mensagens por clique. Se tiver
           histórico extenso, pode precisar de mais de uma rodada.
           <br />
@@ -1628,7 +1628,7 @@ function EmptyState({ agentScope, statusTab }: { agentScope: string; statusTab: 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-12 text-center">
       <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
-        background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)",
+        background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-subtle)",
       }}>
         <MessageSquare className="h-5 w-5" style={{ color: "var(--text-3)", opacity: 0.5 }} />
       </div>
@@ -1711,8 +1711,8 @@ function ErrorState({ error, probe, onRetry }: { error: unknown; probe?: HealthP
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-12 text-center">
-      <MessageSquare className="h-10 w-10" style={{ color: "hsl(240 8% 38%)" }} />
-      <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 90%)" }}>
+      <MessageSquare className="h-10 w-10" style={{ color: "var(--text-4)" }} />
+      <h2 className="text-base font-medium" style={{ color: "var(--text-1)" }}>
         {title}
       </h2>
       <p className="max-w-md text-sm" style={{ color: "hsl(240 8% 52%)" }}>
@@ -1725,14 +1725,14 @@ function ErrorState({ error, probe, onRetry }: { error: unknown; probe?: HealthP
           className="mt-1 w-full max-w-md rounded-lg p-3 text-left text-[11px]"
           style={{
             background: "var(--surface-2)",
-            border: "1px solid hsl(240 12% 16%)",
+            border: "1px solid var(--border)",
             color: "hsl(240 8% 48%)",
           }}
         >
           <summary className="cursor-pointer select-none">Detalhes técnicos</summary>
           <div className="mt-2 space-y-2 font-mono">
             <div>
-              <div className="font-medium" style={{ color: "hsl(240 8% 60%)" }}>
+              <div className="font-medium" style={{ color: "var(--text-3)" }}>
                 GET /v1/conversations
               </div>
               {status ? <div>status: {status}</div> : <div>sem resposta HTTP</div>}
@@ -1741,7 +1741,7 @@ function ErrorState({ error, probe, onRetry }: { error: unknown; probe?: HealthP
             </div>
             {probe && (
               <div>
-                <div className="font-medium" style={{ color: "hsl(240 8% 60%)" }}>
+                <div className="font-medium" style={{ color: "var(--text-3)" }}>
                   GET /v1/conversations/health (probe)
                 </div>
                 {probe.ok === true ? (
@@ -1813,7 +1813,7 @@ function InboxMenu({
           style={{
             background: open ? "rgba(0,212,106,0.12)" : "rgba(255,255,255,0.06)",
             backdropFilter: "blur(8px)",
-            border: open ? "1px solid rgba(0,212,106,0.25)" : "1px solid rgba(255,255,255,0.10)",
+            border: open ? "1px solid rgba(0,212,106,0.25)" : "1px solid var(--border-default)",
             color: open ? "#00d46a" : "hsl(240 8% 60%)",
             transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
           }}
@@ -1895,7 +1895,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div
       className="px-3 py-2 text-[10px] font-medium uppercase tracking-widest"
-      style={{ color: "hsl(240 8% 42%)", borderBottom: "1px solid hsl(240 12% 11%)" }}
+      style={{ color: "hsl(240 8% 42%)", borderBottom: "1px solid var(--border)" }}
     >
       {children}
     </div>
@@ -2002,14 +2002,14 @@ function Forbidden() {
 function PageSkeleton() {
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b px-4 py-3 space-y-2" style={{ borderColor: "rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}>
-        <div className="h-6 w-28 animate-pulse rounded-lg" style={{ background: "rgba(255,255,255,0.06)" }} />
-        <div className="h-3 w-56 animate-pulse rounded" style={{ background: "rgba(255,255,255,0.04)" }} />
+      <div className="border-b px-4 py-3 space-y-2" style={{ borderColor: "var(--border-subtle)", background: "rgba(255,255,255,0.02)" }}>
+        <div className="h-6 w-28 animate-pulse rounded-lg" style={{ background: "var(--input)" }} />
+        <div className="h-3 w-56 animate-pulse rounded" style={{ background: "var(--input)" }} />
       </div>
       <div className="flex flex-1 min-h-0">
-        <div className="w-80 border-r p-3 space-y-2" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+        <div className="w-80 border-r p-3 space-y-2" style={{ borderColor: "var(--border-subtle)" }}>
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-16 w-full animate-pulse rounded-xl" style={{ background: "rgba(255,255,255,0.04)" }} />
+            <div key={i} className="h-16 w-full animate-pulse rounded-xl" style={{ background: "var(--input)" }} />
           ))}
         </div>
       </div>
@@ -2078,19 +2078,19 @@ function GlobalSearchButton({ wsId }: { wsId?: string }) {
         className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium"
         style={{
           background: "var(--surface-2)",
-          border: "1px solid hsl(240 12% 16%)",
-          color: "hsl(240 8% 65%)",
+          border: "1px solid var(--border)",
+          color: "var(--text-2)",
         }}
       >
         <Search className="h-3 w-3" />
         Buscar
-        <kbd className="ml-1 rounded px-1 py-0.5 text-[9px]" style={{ background: "var(--surface-2)", color: "hsl(240 8% 50%)" }}>⌘K</kbd>
+        <kbd className="ml-1 rounded px-1 py-0.5 text-[9px]" style={{ background: "var(--surface-2)", color: "var(--text-3)" }}>⌘K</kbd>
       </button>
       {open && (
         <div className="fixed inset-0 z-[150] flex items-start justify-center pt-24" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }} onClick={() => setOpen(false)}>
-          <div className="w-full max-w-xl rounded-2xl shadow-2xl" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-xl rounded-2xl shadow-2xl" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
-              <Search className="h-4 w-4 flex-shrink-0" style={{ color: "hsl(240 8% 50%)" }} />
+              <Search className="h-4 w-4 flex-shrink-0" style={{ color: "var(--text-3)" }} />
               <input
                 autoFocus
                 type="text"
@@ -2098,19 +2098,19 @@ function GlobalSearchButton({ wsId }: { wsId?: string }) {
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Buscar em todas as mensagens…"
                 className="flex-1 bg-transparent text-sm outline-none"
-                style={{ color: "hsl(240 15% 92%)" }}
+                style={{ color: "var(--text-1)" }}
               />
-              <span className="text-[10px]" style={{ color: "hsl(240 8% 50%)" }}>Esc fecha</span>
+              <span className="text-[10px]" style={{ color: "var(--text-3)" }}>Esc fecha</span>
             </div>
             <div className="max-h-[60vh] overflow-y-auto">
               {debouncedQ.length < 2 ? (
-                <div className="p-6 text-center text-xs" style={{ color: "hsl(240 8% 55%)" }}>
+                <div className="p-6 text-center text-xs" style={{ color: "var(--text-3)" }}>
                   Digite ao menos 2 caracteres
                 </div>
               ) : hitsQ.isLoading ? (
-                <div className="p-6 text-center text-xs" style={{ color: "hsl(240 8% 55%)" }}>Buscando…</div>
+                <div className="p-6 text-center text-xs" style={{ color: "var(--text-3)" }}>Buscando…</div>
               ) : !hitsQ.data?.hits || hitsQ.data.hits.length === 0 ? (
-                <div className="p-6 text-center text-xs" style={{ color: "hsl(240 8% 55%)" }}>Nenhum resultado</div>
+                <div className="p-6 text-center text-xs" style={{ color: "var(--text-3)" }}>Nenhum resultado</div>
               ) : (
                 <ul className="py-1">
                   {hitsQ.data.hits.map((h) => (
@@ -2121,14 +2121,14 @@ function GlobalSearchButton({ wsId }: { wsId?: string }) {
                         className="flex w-full items-start gap-3 px-4 py-2.5 text-left hover:bg-white/5"
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 text-[11px]" style={{ color: "hsl(240 8% 60%)" }}>
+                          <div className="flex items-center gap-2 text-[11px]" style={{ color: "var(--text-3)" }}>
                             <span className="font-medium" style={{ color: h.direction === "out" ? "#00d46a" : "hsl(240 15% 88%)" }}>
                               {h.contact_name || h.sender_name || h.channel_key}
                             </span>
                             <span>·</span>
                             <span>{new Date(h.created_at).toLocaleString("pt-BR")}</span>
                           </div>
-                          <div className="mt-0.5 text-xs truncate" style={{ color: "hsl(240 15% 88%)" }}>
+                          <div className="mt-0.5 text-xs truncate" style={{ color: "var(--text-1)" }}>
                             {highlightMatch(h.snippet, debouncedQ)}
                           </div>
                         </div>

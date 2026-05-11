@@ -24,7 +24,7 @@ export function InboxSettingsHeader({
         className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors"
         style={{
           background: "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.08)",
+          border: "1px solid var(--border-subtle)",
           color: "var(--text-3)",
           width: "fit-content",
         }}

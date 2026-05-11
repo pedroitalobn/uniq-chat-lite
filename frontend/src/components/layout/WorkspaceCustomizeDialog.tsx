@@ -113,7 +113,7 @@ export function WorkspaceCustomizeDialog({
           background: `radial-gradient(circle, ${color}26 0%, transparent 70%)`,
           filter: "blur(35px)", pointerEvents: "none",
         }} />
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--border-subtle)" }}>
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}22`, border: `1px solid ${color}44` }}>
               <PreviewIcon className="w-5 h-5" style={{ color }} />
@@ -216,7 +216,7 @@ export function WorkspaceCustomizeDialog({
           )}
         </div>
 
-        <div className="px-5 py-4 border-t flex gap-2 justify-end" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+        <div className="px-5 py-4 border-t flex gap-2 justify-end" style={{ borderColor: "var(--border-subtle)" }}>
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-lg text-sm font-medium"

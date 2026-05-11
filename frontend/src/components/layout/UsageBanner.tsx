@@ -65,7 +65,7 @@ export function UsageBanner({ collapsed }: { collapsed: boolean }) {
           border: "1px solid rgba(255,255,255,0.05)",
         }}>
         <div className="h-3 w-16 rounded mb-2" style={{ background: "rgba(255,255,255,0.06)" }} />
-        <div className="h-1.5 w-full rounded" style={{ background: "rgba(255,255,255,0.05)" }} />
+        <div className="h-1.5 w-full rounded" style={{ background: "var(--input)" }} />
       </div>
     );
   }
@@ -176,7 +176,7 @@ export function UsageBanner({ collapsed }: { collapsed: boolean }) {
                 </span>
               </div>
               <div className="h-1 rounded-full overflow-hidden"
-                style={{ background: "rgba(255,255,255,0.05)" }}>
+                style={{ background: "var(--input)" }}>
                 <div
                   className="h-full transition-[width] duration-700 ease-out"
                   style={{

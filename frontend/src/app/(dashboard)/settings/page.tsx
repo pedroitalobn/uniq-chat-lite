@@ -187,7 +187,7 @@ function BillingSection({ session }: { session: ReturnType<typeof useSession>["d
           </div>
 
           {currentPlan && (
-            <div className="flex items-center gap-6 mt-5 pt-5" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+            <div className="flex items-center gap-6 mt-5 pt-5" style={{ borderTop: "1px solid var(--border-subtle)" }}>
               {[
                 { label: "Instâncias", value: currentPlan.max_instances === -1 ? "∞" : currentPlan.max_instances },
                 { label: "Msgs/dia", value: currentPlan.max_messages_per_day === -1 ? "∞" : currentPlan.max_messages_per_day.toLocaleString("pt-BR") },
@@ -329,7 +329,7 @@ function ProfileSection({ session, update, t }: {
             </div>
           </div>
 
-          <div className="space-y-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "20px" }}>
+          <div className="space-y-4" style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: "20px" }}>
             <Field label="Nome completo">
               <input type="text" value={name} onChange={(e) => setName(e.target.value)}
                 className="input-field w-full" placeholder="Seu nome" />
@@ -737,7 +737,7 @@ function AccountSection({ session }: { session: ReturnType<typeof useSession>["d
   return (
     <SectionWrap title="Conta" description="Informações da sua conta.">
       <Card>
-        <div className="divide-y" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+        <div className="divide-y" style={{ borderColor: "var(--border-subtle)" }}>
           {rows.map(({ label, value }) => (
             <div key={label} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
               <span className="text-xs" style={{ color: "var(--text-3)" }}>{label}</span>
@@ -962,7 +962,7 @@ export default function SettingsPage() {
                     i < SECTIONS.length - 1 ? "border-b" : ""
                   )}
                   style={{
-                    borderColor: "rgba(255,255,255,0.06)",
+                    borderColor: "var(--border-subtle)",
                     background: isActive ? "rgba(0,212,106,0.10)" : "transparent",
                     transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                   }}

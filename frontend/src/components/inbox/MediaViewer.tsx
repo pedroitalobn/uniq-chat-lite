@@ -148,12 +148,12 @@ export function MediaViewer({
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {source.filename && (
-            <span className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 92%)" }}>
+            <span className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>
               {source.filename}
             </span>
           )}
           {source.mimeType && (
-            <span className="text-[10px] flex-shrink-0" style={{ color: "hsl(240 8% 50%)" }}>
+            <span className="text-[10px] flex-shrink-0" style={{ color: "var(--text-3)" }}>
               {source.mimeType}
             </span>
           )}
@@ -164,7 +164,7 @@ export function MediaViewer({
               <ToolBtn onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))} title="Zoom out (−)">
                 <ZoomOut className="h-4 w-4" />
               </ToolBtn>
-              <span className="text-xs tabular-nums px-2" style={{ color: "hsl(240 8% 65%)" }}>
+              <span className="text-xs tabular-nums px-2" style={{ color: "var(--text-2)" }}>
                 {Math.round(zoom * 100)}%
               </span>
               <ToolBtn onClick={() => setZoom((z) => Math.min(5, z + 0.25))} title="Zoom in (+)">
@@ -236,8 +236,8 @@ export function MediaViewer({
           <div
             className="flex flex-col items-center gap-4 rounded-2xl px-8 py-10"
             style={{
-              background: "hsl(240 18% 6%)",
-              border: "1px solid hsl(240 12% 14%)",
+              background: "var(--surface-solid)",
+              border: "1px solid var(--border)",
               minWidth: 360,
             }}
             onClick={(e) => e.stopPropagation()}
@@ -254,11 +254,11 @@ export function MediaViewer({
               </svg>
             </div>
             <div className="text-center">
-              <div className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+              <div className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
                 {source.filename || "Mensagem de voz"}
               </div>
               {source.mimeType && (
-                <div className="text-[11px] mt-0.5" style={{ color: "hsl(240 8% 50%)" }}>
+                <div className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
                   {source.mimeType}
                 </div>
               )}
@@ -281,8 +281,8 @@ export function MediaViewer({
               <div
                 className="flex flex-col items-center gap-4 rounded-2xl px-10 py-12"
                 style={{
-                  background: "hsl(240 18% 6%)",
-                  border: "1px solid hsl(240 12% 14%)",
+                  background: "var(--surface-solid)",
+                  border: "1px solid var(--border)",
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -297,10 +297,10 @@ export function MediaViewer({
                   <FileText className="h-8 w-8" />
                 </div>
                 <div className="text-center">
-                  <div className="text-base font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+                  <div className="text-base font-medium" style={{ color: "var(--text-1)" }}>
                     {source.filename || "Documento"}
                   </div>
-                  <div className="text-xs mt-1" style={{ color: "hsl(240 8% 55%)" }}>
+                  <div className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
                     Pré-visualização não disponível
                   </div>
                 </div>

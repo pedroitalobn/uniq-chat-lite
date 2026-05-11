@@ -199,9 +199,9 @@ function ProxyModal({
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div className="relative w-full max-w-lg rounded-2xl p-6 space-y-4 animate-fade-in-up"
-        style={{ background: "hsl(240 18% 6.5%)", border: "1px solid hsl(240 12% 13%)" }}>
+        style={{ background: "hsl(240 18% 6.5%)", border: "1px solid var(--border)" }}>
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+          <h3 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>
             {proxy?.id ? "Editar Proxy" : "Novo Proxy"}
           </h3>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5">
@@ -280,7 +280,7 @@ function ProxyModal({
         <div className="flex gap-2 pt-2">
           <button onClick={handleTest} disabled={testing || !form.host || !form.port}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium"
-            style={{ background: "hsl(240 12% 12%)", color: "hsl(240 15% 85%)", opacity: (testing || !form.host || !form.port) ? 0.5 : 1 }}>
+            style={{ background: "hsl(240 12% 12%)", color: "var(--text-2)", opacity: (testing || !form.host || !form.port) ? 0.5 : 1 }}>
             {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <TestTube2 className="w-4 h-4" />}
             Testar
           </button>
@@ -316,8 +316,8 @@ function SetDefaultModal({
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl p-6 space-y-4 animate-fade-in-up"
-        style={{ background: "hsl(240 18% 6.5%)", border: "1px solid hsl(240 12% 13%)" }}>
-        <h3 className="text-lg font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+        style={{ background: "hsl(240 18% 6.5%)", border: "1px solid var(--border)" }}>
+        <h3 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>
           Definir Proxy Padrão
         </h3>
         <p className="text-sm" style={{ color: "hsl(240 8% 58%)" }}>
@@ -366,8 +366,8 @@ function DeleteModal({
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl p-6 space-y-4 animate-fade-in-up"
-        style={{ background: "hsl(240 18% 6.5%)", border: "1px solid hsl(240 12% 13%)" }}>
-        <h3 className="text-lg font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+        style={{ background: "hsl(240 18% 6.5%)", border: "1px solid var(--border)" }}>
+        <h3 className="text-lg font-medium" style={{ color: "var(--text-1)" }}>
           Excluir Proxy
         </h3>
         <p className="text-sm" style={{ color: "hsl(240 8% 58%)" }}>
@@ -547,24 +547,24 @@ export default function AdminProxyPage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {cards.map((c) => (
-          <div key={c.label} className="rounded-xl p-4" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+          <div key={c.label} className="rounded-xl p-4" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
             <div className="flex items-center gap-2 mb-2">
-              <c.icon className="w-4 h-4" style={{ color: "hsl(240 8% 60%)" }} />
+              <c.icon className="w-4 h-4" style={{ color: "var(--text-3)" }} />
               <span className="text-[11px]" style={{ color: "hsl(240 8% 48%)" }}>{c.label}</span>
             </div>
-            <div className="text-xl font-semibold" style={{ color: "hsl(240 15% 92%)" }}>{c.value}</div>
+            <div className="text-xl font-semibold" style={{ color: "var(--text-1)" }}>{c.value}</div>
           </div>
         ))}
       </div>
 
       {/* Proxy List */}
-      <div className="rounded-2xl p-6" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+      <div className="rounded-2xl p-6" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+          <h2 className="text-base font-medium" style={{ color: "var(--text-1)" }}>
             Proxies Configurados
           </h2>
           <div className="flex items-center gap-2">
-            <span className="text-xs px-2 py-1 rounded-lg" style={{ background: "hsl(240 12% 15%)", color: "hsl(240 8% 60%)" }}>
+            <span className="text-xs px-2 py-1 rounded-lg" style={{ background: "hsl(240 12% 15%)", color: "var(--text-3)" }}>
               {configs.length} proxy{configs.length !== 1 ? "s" : ""}
             </span>
             {configs.length > 0 && (
@@ -572,7 +572,7 @@ export default function AdminProxyPage() {
                 onClick={() => testAllProxies(configs)}
                 disabled={Object.values(proxyStatuses).some(s => s.status === "testing")}
                 className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg hover:bg-white/5 transition-colors disabled:opacity-50"
-                style={{ color: "hsl(240 8% 60%)", border: "1px solid hsl(240 12% 15%)" }}
+                style={{ color: "var(--text-3)", border: "1px solid var(--border)" }}
               >
                 <RefreshCw className="w-3 h-3" />
                 Testar todos
@@ -609,14 +609,14 @@ export default function AdminProxyPage() {
                     </span>
                   </div>
                   <div>
-                    <p className="text-sm font-medium" style={{ color: "hsl(240 15% 90%)" }}>
+                    <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
                       {proxy.name || "Proxy"}
                       {proxy.is_default && (
                         <span className="ml-2 px-1.5 py-0.5 rounded text-[10px]" style={{ background: "var(--green)", color: "#04200f" }}>
                         Padrão
                         </span>
                       )}
-                      <span className="ml-2 px-1.5 py-0.5 rounded text-[10px]" style={{ background: "hsl(240 12% 15%)", color: "hsl(240 8% 60%)" }}>
+                      <span className="ml-2 px-1.5 py-0.5 rounded text-[10px]" style={{ background: "hsl(240 12% 15%)", color: "var(--text-3)" }}>
                         {country.flag} {country.label}
                       </span>
                     </p>
@@ -688,14 +688,14 @@ export default function AdminProxyPage() {
 
       {/* Users Using Global Proxy */}
       {stats?.users?.length > 0 && (
-        <div className="rounded-2xl p-6" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-          <h2 className="text-base font-medium mb-3" style={{ color: "hsl(240 15% 92%)" }}>Usuários usando proxy global</h2>
+        <div className="rounded-2xl p-6" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
+          <h2 className="text-base font-medium mb-3" style={{ color: "var(--text-1)" }}>Usuários usando proxy global</h2>
           <div className="space-y-2">
             {stats.users.map((u) => (
               <div key={u.user_id} className="rounded-lg p-3 flex items-center justify-between"
                 style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
                 <div>
-                  <p className="text-sm font-medium" style={{ color: "hsl(240 15% 90%)" }}>
+                  <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
                     {u.name} <span style={{ color: "hsl(240 8% 46%)" }}>({u.plan_name})</span>
                   </p>
                   <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>{u.email}</p>

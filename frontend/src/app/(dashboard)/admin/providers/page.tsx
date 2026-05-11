@@ -87,11 +87,11 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-lg font-semibold mb-4" style={{ color: "hsl(240 15% 92%)" }}>{children}</h2>;
+  return <h2 className="text-lg font-semibold mb-4" style={{ color: "var(--text-1)" }}>{children}</h2>;
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>{children}</label>;
+  return <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>{children}</label>;
 }
 
 function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
@@ -99,7 +99,7 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
     <input
       {...props}
       className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none focus:border-[#00d46a] transition-colors"
-      style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)", color: "hsl(240 15% 90%)" }}
+      style={{ background: "var(--surface-solid)", border: "1px solid var(--border)", color: "var(--text-1)" }}
     />
   );
 }
@@ -109,7 +109,7 @@ function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
     <select
       {...props}
       className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none focus:border-[#00d46a] transition-colors"
-      style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)", color: "hsl(240 15% 90%)" }}
+      style={{ background: "var(--surface-solid)", border: "1px solid var(--border)", color: "var(--text-1)" }}
     />
   );
 }
@@ -161,7 +161,7 @@ function TestConnectionButton({ provider, disabled }: { provider: "stripe" | "as
       disabled={disabled || testMut.isPending}
       className="text-[10px] px-2.5 py-1 rounded-md font-medium disabled:opacity-50"
       style={{
-        background: "rgba(255,255,255,0.05)",
+        background: "var(--input)",
         border: "1px solid rgba(255,255,255,0.10)",
         color: "hsl(240 15% 80%)",
       }}
@@ -209,7 +209,7 @@ function PaymentProviderBadge({
   }
   return (
     <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-      style={{ background: "rgba(255,255,255,0.07)", color: "hsl(240 8% 55%)" }}>
+      style={{ background: "rgba(255,255,255,0.07)", color: "var(--text-3)" }}>
       Não testado
     </span>
   );
@@ -292,8 +292,8 @@ function CountryRoutingCard({
     <Card>
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
-          <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Roteamento por país</h3>
-          <p className="text-xs mt-1" style={{ color: "hsl(240 8% 50%)" }}>
+          <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Roteamento por país</h3>
+          <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
             País sem regra usa o provider ativo acima. Ex: Stripe para EUA e AbacatePay para Brasil.
           </p>
         </div>
@@ -303,15 +303,15 @@ function CountryRoutingCard({
           const selected = providerOf(country.code);
           return (
             <div key={country.code} className="flex items-center gap-2 rounded-xl p-2"
-              style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-              <span className="w-24 text-xs" style={{ color: "hsl(240 15% 82%)" }}>
+              style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
+              <span className="w-24 text-xs" style={{ color: "var(--text-2)" }}>
                 {country.flag} {country.code}
               </span>
               <select
                 value={selected}
                 onChange={(e) => assign(country.code, e.target.value as CountryProvider | "")}
                 className="flex-1 px-2.5 py-2 rounded-lg text-xs outline-none"
-                style={{ background: "hsl(240 18% 5%)", border: "1px solid hsl(240 12% 13%)", color: "hsl(240 15% 90%)" }}
+                style={{ background: "hsl(240 18% 5%)", border: "1px solid var(--border)", color: "var(--text-1)" }}
               >
                 <option value="">Provider ativo</option>
                 <option value="stripe">Stripe</option>
@@ -370,7 +370,7 @@ function PaymentTab() {
 
   const copyUrl = (url: string) => { navigator.clipboard.writeText(url); toast.success("URL copiada!"); };
 
-  if (isLoading) return <div className="flex items-center gap-2 py-8"><Loader2 className="w-4 h-4 animate-spin text-[#00d46a]" /><span className="text-sm" style={{ color: "hsl(240 8% 55%)" }}>Carregando...</span></div>;
+  if (isLoading) return <div className="flex items-center gap-2 py-8"><Loader2 className="w-4 h-4 animate-spin text-[#00d46a]" /><span className="text-sm" style={{ color: "var(--text-3)" }}>Carregando...</span></div>;
 
   // apiBase pra montar a URL de webhook que vai colar no Stripe/Asaas.
   // Estratégia: derivar SEMPRE do hostname público quando disponível —
@@ -422,7 +422,7 @@ function PaymentTab() {
 
       {/* Provider cards */}
       <Card>
-        <p className="text-xs font-medium mb-3" style={{ color: "hsl(240 8% 55%)" }}>PROVEDOR ATIVO</p>
+        <p className="text-xs font-medium mb-3" style={{ color: "var(--text-3)" }}>PROVEDOR ATIVO</p>
         <div className="grid grid-cols-3 gap-3">
           {PROVIDERS.map((p) => {
             const isActive = p.id === activeProvider;
@@ -480,7 +480,7 @@ function PaymentTab() {
       {displayProvider === "stripe" && (
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Stripe</h3>
+            <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Stripe</h3>
             <div className="flex items-center gap-2">
               <PaymentProviderBadge configured={!!settings?.stripe_configured} testStatus={settings?.stripe_test_status} />
               <TestConnectionButton provider="stripe" disabled={!settings?.stripe_configured} />
@@ -503,7 +503,7 @@ function PaymentTab() {
               {settings?.stripe_secret_key_preview && (
                 <div className="flex items-center gap-2 mt-1.5">
                   <code className="text-[11px] font-mono px-1.5 py-0.5 rounded"
-                    style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 65%)" }}>
+                    style={{ background: "hsl(240 18% 5%)", color: "var(--text-2)" }}>
                     {settings.stripe_secret_key_preview}
                   </code>
                   {settings.stripe_secret_key_env === "live" && (
@@ -520,7 +520,7 @@ function PaymentTab() {
                   )}
                 </div>
               )}
-              <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 40%)" }}>Deixe vazio para manter o atual</p>
+              <p className="text-[10px] mt-1" style={{ color: "var(--text-4)" }}>Deixe vazio para manter o atual</p>
             </div>
             <div>
               <Label>Webhook Secret</Label>
@@ -529,7 +529,7 @@ function PaymentTab() {
                 placeholder={settings?.stripe_webhook_secret_preview || "whsec_..."} />
               {settings?.stripe_webhook_secret_preview && (
                 <code className="inline-block mt-1.5 text-[11px] font-mono px-1.5 py-0.5 rounded"
-                  style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 65%)" }}>
+                  style={{ background: "hsl(240 18% 5%)", color: "var(--text-2)" }}>
                   {settings.stripe_webhook_secret_preview}
                 </code>
               )}
@@ -551,11 +551,11 @@ function PaymentTab() {
           <div className="mt-4 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
             <Label>URL do Webhook</Label>
             <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 60%)" }}>
+              <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 18% 5%)", color: "var(--text-3)" }}>
                 {stripeWebhookURL}
               </code>
               <button onClick={() => copyUrl(stripeWebhookURL)} className="p-2 rounded hover:bg-white/5" title="Copiar URL">
-                <Key className="w-4 h-4" style={{ color: "hsl(240 8% 55%)" }} />
+                <Key className="w-4 h-4" style={{ color: "var(--text-3)" }} />
               </button>
             </div>
 
@@ -598,7 +598,7 @@ function PaymentTab() {
                   Após criar, copie o <span className="font-semibold">Signing secret</span> (<span className="font-mono">whsec_...</span>) e cole no campo <span className="font-semibold">Webhook Secret</span> abaixo.
                 </li>
               </ol>
-              <div className="text-[10px] pt-1.5" style={{ color: "hsl(240 8% 50%)", borderTop: "1px solid rgba(99,91,255,0.12)" }}>
+              <div className="text-[10px] pt-1.5" style={{ color: "var(--text-3)", borderTop: "1px solid rgba(99,91,255,0.12)" }}>
                 <p className="mt-1.5">
                   Aliases aceitos pelo backend (escolha qualquer um — todos vão pro mesmo handler):
                 </p>
@@ -617,7 +617,7 @@ function PaymentTab() {
       {displayProvider === "asaas" && (
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Asaas</h3>
+            <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Asaas</h3>
             <div className="flex items-center gap-2">
               <PaymentProviderBadge configured={!!settings?.asaas_configured} testStatus={settings?.asaas_test_status} />
               <TestConnectionButton provider="asaas" disabled={!settings?.asaas_configured} />
@@ -638,7 +638,7 @@ function PaymentTab() {
               {settings?.asaas_api_key_preview && (
                 <div className="flex items-center gap-2 mt-1.5">
                   <code className="text-[11px] font-mono px-1.5 py-0.5 rounded"
-                    style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 65%)" }}>
+                    style={{ background: "hsl(240 18% 5%)", color: "var(--text-2)" }}>
                     {settings.asaas_api_key_preview}
                   </code>
                   {settings?.asaas_environment === "production" && (
@@ -655,7 +655,7 @@ function PaymentTab() {
                   )}
                 </div>
               )}
-              <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 40%)" }}>Deixe vazio para manter o atual</p>
+              <p className="text-[10px] mt-1" style={{ color: "var(--text-4)" }}>Deixe vazio para manter o atual</p>
             </div>
             <div>
               <Label>Ambiente</Label>
@@ -671,7 +671,7 @@ function PaymentTab() {
                 placeholder={settings?.asaas_webhook_secret_preview || "whsec_..."} />
               {settings?.asaas_webhook_secret_preview && (
                 <code className="inline-block mt-1.5 text-[11px] font-mono px-1.5 py-0.5 rounded"
-                  style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 65%)" }}>
+                  style={{ background: "hsl(240 18% 5%)", color: "var(--text-2)" }}>
                   {settings.asaas_webhook_secret_preview}
                 </code>
               )}
@@ -680,11 +680,11 @@ function PaymentTab() {
           <div className="mt-4 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
             <Label>URL do Webhook</Label>
             <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 60%)" }}>
+              <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 18% 5%)", color: "var(--text-3)" }}>
                 {asaasWebhookURL}
               </code>
               <button onClick={() => copyUrl(asaasWebhookURL)} className="p-2 rounded hover:bg-white/5" title="Copiar URL">
-                <Key className="w-4 h-4" style={{ color: "hsl(240 8% 55%)" }} />
+                <Key className="w-4 h-4" style={{ color: "var(--text-3)" }} />
               </button>
             </div>
             <div className="mt-3 rounded-lg p-3 space-y-2.5"
@@ -715,7 +715,7 @@ function PaymentTab() {
       {displayProvider === "abacatepay" && (
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>AbacatePay</h3>
+            <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>AbacatePay</h3>
             <div className="flex items-center gap-2">
               <PaymentProviderBadge configured={!!settings?.abacatepay_configured} testStatus={settings?.abacatepay_test_status} />
               <TestConnectionButton provider="abacatepay" disabled={!settings?.abacatepay_configured} />
@@ -736,7 +736,7 @@ function PaymentTab() {
               {settings?.abacatepay_api_key_preview && (
                 <div className="flex items-center gap-2 mt-1.5">
                   <code className="text-[11px] font-mono px-1.5 py-0.5 rounded"
-                    style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 65%)" }}>
+                    style={{ background: "hsl(240 18% 5%)", color: "var(--text-2)" }}>
                     {settings.abacatepay_api_key_preview}
                   </code>
                   {settings?.abacatepay_environment === "production" && (
@@ -753,7 +753,7 @@ function PaymentTab() {
                   )}
                 </div>
               )}
-              <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 40%)" }}>Deixe vazio para manter o atual</p>
+              <p className="text-[10px] mt-1" style={{ color: "var(--text-4)" }}>Deixe vazio para manter o atual</p>
             </div>
             <div>
               <Label>Ambiente</Label>
@@ -785,7 +785,7 @@ function PaymentTab() {
               </div>
               {settings?.abacatepay_webhook_secret_preview && (
                 <code className="inline-block mt-1.5 text-[11px] font-mono px-1.5 py-0.5 rounded"
-                  style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 65%)" }}>
+                  style={{ background: "hsl(240 18% 5%)", color: "var(--text-2)" }}>
                   {settings.abacatepay_webhook_secret_preview}
                 </code>
               )}
@@ -807,7 +807,7 @@ function PaymentTab() {
           <div className="mt-4 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
             <Label>URL do Webhook</Label>
             <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 18% 5%)", color: "hsl(240 8% 60%)" }}>
+              <code className="flex-1 text-xs p-2 rounded font-mono break-all" style={{ background: "hsl(240 18% 5%)", color: "var(--text-3)" }}>
                 {(() => {
                   const secret = form.abacatepay_webhook_secret || settings?.abacatepay_webhook_secret_preview;
                   return secret ? `${abacatepayWebhookURL}?webhookSecret=${secret}` : abacatepayWebhookURL;
@@ -818,7 +818,7 @@ function PaymentTab() {
                 const url = secret ? `${abacatepayWebhookURL}?webhookSecret=${secret}` : abacatepayWebhookURL;
                 copyUrl(url);
               }} className="p-2 rounded hover:bg-white/5" title="Copiar URL">
-                <Key className="w-4 h-4" style={{ color: "hsl(240 8% 55%)" }} />
+                <Key className="w-4 h-4" style={{ color: "var(--text-3)" }} />
               </button>
             </div>
             <div className="mt-3 rounded-lg p-3 space-y-2.5"
@@ -895,7 +895,7 @@ function EmailSection() {
 
   return (
     <Card>
-      <h3 className="text-sm font-semibold mb-4" style={{ color: "hsl(240 15% 92%)" }}>Email (Maileroo)</h3>
+      <h3 className="text-sm font-semibold mb-4" style={{ color: "var(--text-1)" }}>Email (Maileroo)</h3>
       <div className="space-y-3">
         <div>
           <Label>API Key</Label>
@@ -954,8 +954,8 @@ function TemplateModal({ template, onClose }: { template: EmailTemplate; onClose
       <div className="w-full max-w-2xl rounded-2xl p-6 space-y-4"
         style={{ background: "hsl(240 18% 8%)", border: "1px solid rgba(255,255,255,0.1)" }}>
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold" style={{ color: "hsl(240 15% 92%)" }}>{template.name}</h3>
-          <button onClick={onClose} className="hover:opacity-70"><X className="w-4 h-4" style={{ color: "hsl(240 8% 55%)" }} /></button>
+          <h3 className="font-semibold" style={{ color: "var(--text-1)" }}>{template.name}</h3>
+          <button onClick={onClose} className="hover:opacity-70"><X className="w-4 h-4" style={{ color: "var(--text-3)" }} /></button>
         </div>
         <div>
           <Label>Assunto</Label>
@@ -965,10 +965,10 @@ function TemplateModal({ template, onClose }: { template: EmailTemplate; onClose
           <Label>HTML</Label>
           <textarea value={html} onChange={e => setHtml(e.target.value)} rows={12}
             className="w-full px-3.5 py-2.5 rounded-xl text-xs outline-none focus:border-[#00d46a] font-mono resize-y"
-            style={{ background: "hsl(240 18% 5%)", border: "1px solid hsl(240 12% 13%)", color: "hsl(240 15% 80%)" }} />
+            style={{ background: "hsl(240 18% 5%)", border: "1px solid var(--border)", color: "hsl(240 15% 80%)" }} />
         </div>
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm" style={{ background: "rgba(255,255,255,0.05)", color: "hsl(240 8% 55%)" }}>Cancelar</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm" style={{ background: "var(--input)", color: "var(--text-3)" }}>Cancelar</button>
           <SaveBtn loading={saveMut.isPending} onClick={() => saveMut.mutate()} />
         </div>
       </div>
@@ -986,19 +986,19 @@ function TemplatesSection() {
 
   return (
     <Card>
-      <h3 className="text-sm font-semibold mb-4" style={{ color: "hsl(240 15% 92%)" }}>Templates de Email</h3>
+      <h3 className="text-sm font-semibold mb-4" style={{ color: "var(--text-1)" }}>Templates de Email</h3>
       {isLoading ? (
         <Loader2 className="w-4 h-4 animate-spin text-[#00d46a]" />
       ) : templates.length === 0 ? (
-        <p className="text-sm" style={{ color: "hsl(240 8% 55%)" }}>Nenhum template encontrado.</p>
+        <p className="text-sm" style={{ color: "var(--text-3)" }}>Nenhum template encontrado.</p>
       ) : (
         <div className="space-y-2">
           {templates.map(t => (
             <div key={t.id} className="flex items-center justify-between p-3 rounded-xl"
               style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>{t.name}</p>
-                <p className="text-xs font-mono" style={{ color: "hsl(240 8% 55%)" }}>{t.slug}</p>
+                <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{t.name}</p>
+                <p className="text-xs font-mono" style={{ color: "var(--text-3)" }}>{t.slug}</p>
               </div>
               <div className="flex items-center gap-2">
                 <StatusBadge ok={t.is_active} label={t.is_active ? "Ativo" : "Inativo"} />
@@ -1050,7 +1050,7 @@ function OtpSection() {
 
   return (
     <Card>
-      <h3 className="text-sm font-semibold mb-4" style={{ color: "hsl(240 15% 92%)" }}>OTP & Mensagens</h3>
+      <h3 className="text-sm font-semibold mb-4" style={{ color: "var(--text-1)" }}>OTP & Mensagens</h3>
       <div className="space-y-5">
         {/* OTP Provider */}
         <div>
@@ -1178,22 +1178,22 @@ function ServerTab() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr style={{ color: "hsl(240 8% 55%)" }}>
+                <tr style={{ color: "var(--text-3)" }}>
                   {["Nome", "Endereço", "Porta", "Status", "Owner"].map(h => (
                     <th key={h} className="text-left pb-3 pr-4 font-medium">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+              <tbody className="divide-y" style={{ borderColor: "var(--border-subtle)" }}>
                 {servers.length === 0 ? (
-                  <tr><td colSpan={5} className="py-4" style={{ color: "hsl(240 8% 55%)" }}>Nenhum servidor encontrado.</td></tr>
+                  <tr><td colSpan={5} className="py-4" style={{ color: "var(--text-3)" }}>Nenhum servidor encontrado.</td></tr>
                 ) : servers.map((s, i) => (
                   <tr key={i}>
-                    <td className="py-3 pr-4 font-medium" style={{ color: "hsl(240 15% 88%)" }}>{s.name}</td>
-                    <td className="py-3 pr-4 font-mono" style={{ color: "hsl(240 8% 65%)" }}>{s.address}</td>
-                    <td className="py-3 pr-4 font-mono" style={{ color: "hsl(240 8% 65%)" }}>{s.port}</td>
+                    <td className="py-3 pr-4 font-medium" style={{ color: "var(--text-1)" }}>{s.name}</td>
+                    <td className="py-3 pr-4 font-mono" style={{ color: "var(--text-2)" }}>{s.address}</td>
+                    <td className="py-3 pr-4 font-mono" style={{ color: "var(--text-2)" }}>{s.port}</td>
                     <td className="py-3 pr-4"><StatusBadge ok={s.status === "active" || s.status === "connected"} label={s.status} /></td>
-                    <td className="py-3" style={{ color: "hsl(240 8% 55%)" }}>{s.owner_email || "—"}</td>
+                    <td className="py-3" style={{ color: "var(--text-3)" }}>{s.owner_email || "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1203,22 +1203,22 @@ function ServerTab() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr style={{ color: "hsl(240 8% 55%)" }}>
+                <tr style={{ color: "var(--text-3)" }}>
                   {["Nome", "Canal", "Status", "Owner", "Servidor"].map(h => (
                     <th key={h} className="text-left pb-3 pr-4 font-medium">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+              <tbody className="divide-y" style={{ borderColor: "var(--border-subtle)" }}>
                 {instances.length === 0 ? (
-                  <tr><td colSpan={5} className="py-4" style={{ color: "hsl(240 8% 55%)" }}>Nenhuma instância encontrada.</td></tr>
+                  <tr><td colSpan={5} className="py-4" style={{ color: "var(--text-3)" }}>Nenhuma instância encontrada.</td></tr>
                 ) : instances.map((inst, i) => (
                   <tr key={i}>
-                    <td className="py-3 pr-4 font-medium" style={{ color: "hsl(240 15% 88%)" }}>{inst.name}</td>
-                    <td className="py-3 pr-4 capitalize" style={{ color: "hsl(240 8% 65%)" }}>{inst.type || inst.channel || "—"}</td>
+                    <td className="py-3 pr-4 font-medium" style={{ color: "var(--text-1)" }}>{inst.name}</td>
+                    <td className="py-3 pr-4 capitalize" style={{ color: "var(--text-2)" }}>{inst.type || inst.channel || "—"}</td>
                     <td className="py-3 pr-4"><StatusBadge ok={inst.status === "active" || inst.status === "connected"} label={inst.status} /></td>
-                    <td className="py-3 pr-4" style={{ color: "hsl(240 8% 55%)" }}>{inst.owner_email || "—"}</td>
-                    <td className="py-3" style={{ color: "hsl(240 8% 55%)" }}>{inst.server || "—"}</td>
+                    <td className="py-3 pr-4" style={{ color: "var(--text-3)" }}>{inst.owner_email || "—"}</td>
+                    <td className="py-3" style={{ color: "var(--text-3)" }}>{inst.server || "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1244,8 +1244,8 @@ function ProxiesTab() {
       <Card>
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-sm font-semibold mb-1" style={{ color: "hsl(240 15% 92%)" }}>Gerenciamento completo de proxies</h3>
-            <p className="text-sm" style={{ color: "hsl(240 8% 55%)" }}>
+            <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--text-1)" }}>Gerenciamento completo de proxies</h3>
+            <p className="text-sm" style={{ color: "var(--text-3)" }}>
               Configure, teste e gerencie proxies para suas instâncias. Acesse o painel completo para adicionar ou remover entradas.
             </p>
             {!isLoading && (
@@ -1292,7 +1292,7 @@ function ProvidersPageInner() {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <Shield className="w-10 h-10" style={{ color: "hsl(240 8% 35%)" }} />
-        <p className="text-sm font-medium" style={{ color: "hsl(240 8% 55%)" }}>Acesso restrito a super administradores.</p>
+        <p className="text-sm font-medium" style={{ color: "var(--text-3)" }}>Acesso restrito a super administradores.</p>
       </div>
     );
   }
@@ -1300,8 +1300,8 @@ function ProvidersPageInner() {
   return (
     <div className="max-w-5xl mx-auto">
       <div className="mb-6 sm:mb-8">
-        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "hsl(240 15% 92%)" }}>Providers</h1>
-        <p className="text-sm mt-1 hidden sm:block" style={{ color: "hsl(240 8% 55%)" }}>
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: "var(--text-1)" }}>Providers</h1>
+        <p className="text-sm mt-1 hidden sm:block" style={{ color: "var(--text-3)" }}>
           Configure provedores de pagamento, comunicação, servidores e proxies.
         </p>
       </div>
@@ -1317,7 +1317,7 @@ function ProvidersPageInner() {
               return (
                 <button key={tab.id} onClick={() => handleTabClick(tab.id)}
                   className={`w-full flex items-center gap-3 px-3 lg:px-4 py-3 lg:py-3.5 text-left relative${i < TABS.length - 1 ? " border-b" : ""}`}
-                  style={{ borderColor: "rgba(255,255,255,0.06)", background: isActive ? "rgba(0,212,106,0.10)" : "transparent", transition: "background 0.2s" }}
+                  style={{ borderColor: "var(--border-subtle)", background: isActive ? "rgba(0,212,106,0.10)" : "transparent", transition: "background 0.2s" }}
                   onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
                   onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}>
                   {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r" style={{ background: "#00d46a" }} />}
@@ -1327,7 +1327,7 @@ function ProvidersPageInner() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium truncate" style={{ color: isActive ? "#00d46a" : "hsl(240 15% 88%)" }}>{tab.label}</p>
-                    <p className="text-[10px] truncate mt-0.5 hidden lg:block" style={{ color: "hsl(240 8% 45%)" }}>{tab.desc}</p>
+                    <p className="text-[10px] truncate mt-0.5 hidden lg:block" style={{ color: "var(--text-3)" }}>{tab.desc}</p>
                   </div>
                 </button>
               );

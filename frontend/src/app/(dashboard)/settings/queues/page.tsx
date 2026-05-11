@@ -272,7 +272,7 @@ export default function QueuesPage() {
       {confirmDel && (
         <ConfirmDialog
           title="Excluir fila"
-          body={<>A fila <span style={{ color: "hsl(240 15% 92%)" }}>&quot;{confirmDel.name}&quot;</span> será removida. Atendimentos em curso permanecem mas não recebem novos.</>}
+          body={<>A fila <span style={{ color: "var(--text-1)" }}>&quot;{confirmDel.name}&quot;</span> será removida. Atendimentos em curso permanecem mas não recebem novos.</>}
           confirmLabel="Excluir"
           variant="danger"
           onConfirm={() => {

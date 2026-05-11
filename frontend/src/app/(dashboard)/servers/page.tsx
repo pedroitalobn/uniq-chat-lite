@@ -33,7 +33,7 @@ function ActionsMenu({ serverId, onAction }: { serverId: string; onAction: () =>
   return (
     <div className="relative">
       <button onClick={() => setOpen(!open)} className="p-1.5 rounded-lg transition-colors"
-        style={{ color: "hsl(240 8% 38%)" }}
+        style={{ color: "var(--text-4)" }}
         onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 15% 75%)")}
         onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}>
         <Activity className="w-3.5 h-3.5" />
@@ -42,40 +42,40 @@ function ActionsMenu({ serverId, onAction }: { serverId: string; onAction: () =>
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-xl py-1 animate-fade-in-up"
-            style={{ background: "hsl(240 18% 8%)", border: "1px solid hsl(240 12% 14%)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
+            style={{ background: "hsl(240 18% 8%)", border: "1px solid var(--border)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
             <button onClick={() => handleAction("pause")} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
-              style={{ color: "hsl(240 8% 65%)" }}
+              style={{ color: "var(--text-2)" }}
               onMouseEnter={e => (e.currentTarget.style.background = "hsl(240 12% 12%)")}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
               <Pause className="w-3.5 h-3.5" /> Pausar todas
             </button>
             <button onClick={() => handleAction("resume")} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
-              style={{ color: "hsl(240 8% 65%)" }}
+              style={{ color: "var(--text-2)" }}
               onMouseEnter={e => (e.currentTarget.style.background = "hsl(240 12% 12%)")}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
               <Play className="w-3.5 h-3.5" /> Retomar todas
             </button>
             <button onClick={() => handleAction("reconnect")} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
-              style={{ color: "hsl(240 8% 65%)" }}
+              style={{ color: "var(--text-2)" }}
               onMouseEnter={e => (e.currentTarget.style.background = "hsl(240 12% 12%)")}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
               <RefreshCw className="w-3.5 h-3.5" /> Reconectar todas
             </button>
             <button onClick={() => handleAction("disconnect")} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
-              style={{ color: "hsl(240 8% 65%)" }}
+              style={{ color: "var(--text-2)" }}
               onMouseEnter={e => (e.currentTarget.style.background = "hsl(240 12% 12%)")}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
               <LogOut className="w-3.5 h-3.5" /> Desconectar todas
             </button>
             <div className="my-1" style={{ borderTop: "1px solid hsl(240 12% 12%)" }} />
             <button onClick={() => handleAction("apply_proxy")} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
-              style={{ color: "hsl(240 8% 65%)" }}
+              style={{ color: "var(--text-2)" }}
               onMouseEnter={e => (e.currentTarget.style.background = "hsl(240 12% 12%)")}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
               <Link2 className="w-3.5 h-3.5" /> Aplicar proxy
             </button>
             <button onClick={() => handleAction("rotate_proxy")} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
-              style={{ color: "hsl(240 8% 65%)" }}
+              style={{ color: "var(--text-2)" }}
               onMouseEnter={e => (e.currentTarget.style.background = "hsl(240 12% 12%)")}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
               <RotateCw className="w-3.5 h-3.5" /> Rotacionar proxy
@@ -150,7 +150,7 @@ function ServerModal({
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-md rounded-2xl p-6 animate-fade-in-up max-h-[90vh] overflow-y-auto"
-        style={{ background: "hsl(240 18% 6%)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 32px 80px rgba(0,0,0,0.6)" }}>
+        style={{ background: "var(--surface-solid)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 32px 80px rgba(0,0,0,0.6)" }}>
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center"
@@ -161,7 +161,7 @@ function ServerModal({
               {isEdit ? "Editar server" : "Novo server"}
             </h2>
           </div>
-          <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }}
+          <button onClick={onClose} style={{ color: "var(--text-4)" }}
             onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
             onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}>
             <X className="w-5 h-5" />
@@ -177,7 +177,7 @@ function ServerModal({
 
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+            <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>
               Nome do server *
             </label>
             <input value={name} onChange={e => handleNameChange(e.target.value)}
@@ -186,19 +186,19 @@ function ServerModal({
 
           {!isEdit && (
             <div>
-              <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+              <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>
                 Slug (subdomínio único)
               </label>
               <div className="flex items-center gap-0 rounded-xl overflow-hidden"
-                style={{ border: "1px solid hsl(240 12% 14%)", background: "hsl(240 12% 8%)" }}>
+                style={{ border: "1px solid var(--border)", background: "var(--surface-solid)" }}>
                 <span className="px-3 py-2.5 text-sm font-mono flex-shrink-0"
-                  style={{ color: "hsl(240 8% 38%)", borderRight: "1px solid hsl(240 12% 14%)" }}>
+                  style={{ color: "var(--text-4)", borderRight: "1px solid hsl(240 12% 14%)" }}>
                   uniq.chat/
                 </span>
                 <input value={slug} onFocus={() => setSlugTouched(true)}
                   onChange={e => setSlug(autoSlug(e.target.value))}
                   placeholder="acme-corp" className="flex-1 bg-transparent px-3 py-2.5 text-sm outline-none font-mono"
-                  style={{ color: "hsl(240 15% 85%)" }} />
+                  style={{ color: "var(--text-2)" }} />
               </div>
               <p className="text-[10px] mt-1.5" style={{ color: "hsl(240 8% 34%)" }}>
                 Gerado automaticamente · único em todo o sistema
@@ -207,7 +207,7 @@ function ServerModal({
           )}
 
           <div>
-            <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+            <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>
               Descrição (opcional)
             </label>
             <textarea value={description} onChange={e => setDesc(e.target.value)}
@@ -218,20 +218,20 @@ function ServerModal({
           {isEdit && (
             <>
               <div>
-                <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>
                   Webhook Padrão
                 </label>
                 <input value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)}
                   placeholder="https://seu-webhook.com.br/webhook" className="input-field w-full" />
               </div>
 
-              <label className="flex items-center gap-2 text-xs" style={{ color: "hsl(240 8% 55%)" }}>
+              <label className="flex items-center gap-2 text-xs" style={{ color: "var(--text-3)" }}>
                 <input type="checkbox" checked={applyWebhook} onChange={e => setApplyWebhook(e.target.checked)}
                   className="rounded" />
                 Aplicar webhook a todas as instâncias
               </label>
 
-              <p className="text-[11px] mt-1" style={{ color: "hsl(240 8% 40%)" }}>
+              <p className="text-[11px] mt-1" style={{ color: "var(--text-4)" }}>
                 Proxy: use o botão <Shield className="w-3 h-3 inline" /> no card do server.
               </p>
             </>
@@ -322,8 +322,8 @@ function CreateProxyInline({ onCreated, onCancel }: { onCreated: (proxyId: strin
   const valid = form.name.trim() && form.host.trim() && form.port > 0;
 
   return (
-    <div className="p-3 rounded-xl space-y-3" style={{ background: "hsl(240 12% 8%)", border: "1px solid hsl(240 12% 14%)" }}>
-      <div className="text-xs font-medium" style={{ color: "hsl(240 15% 85%)" }}>Criar proxy novo</div>
+    <div className="p-3 rounded-xl space-y-3" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
+      <div className="text-xs font-medium" style={{ color: "var(--text-2)" }}>Criar proxy novo</div>
       <input className="input-field w-full text-xs" placeholder="Nome (ex: Brightdata BR)"
         value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
       <div className="grid grid-cols-3 gap-2">
@@ -423,7 +423,7 @@ function ServerProxyModal({
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <div className="absolute inset-0 backdrop-blur-sm" style={{ background: "var(--surface-overlay)" }} onClick={onClose} />
       <div className="relative w-full max-w-lg rounded-2xl p-6 animate-fade-in-up max-h-[90vh] overflow-y-auto"
-        style={{ background: "hsl(240 18% 6%)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 32px 80px rgba(0,0,0,0.6)" }}>
+        style={{ background: "var(--surface-solid)", boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 32px 80px rgba(0,0,0,0.6)" }}>
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center"
@@ -432,10 +432,10 @@ function ServerProxyModal({
             </div>
             <div>
               <h2 className="text-base font-medium" style={{ color: "hsl(240 15% 93%)" }}>Proxy do Server</h2>
-              <p className="text-xs" style={{ color: "hsl(240 8% 50%)" }}>{server.name}</p>
+              <p className="text-xs" style={{ color: "var(--text-3)" }}>{server.name}</p>
             </div>
           </div>
-          <button onClick={onClose} style={{ color: "hsl(240 8% 38%)" }}>
+          <button onClick={onClose} style={{ color: "var(--text-4)" }}>
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -446,7 +446,7 @@ function ServerProxyModal({
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
+            <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
               Todas as instâncias deste server compartilham o proxy selecionado.
             </p>
 
@@ -458,7 +458,7 @@ function ServerProxyModal({
               }}>
               <input type="radio" className="mt-1" checked={selectedId === "none"} onChange={() => setSelectedId("none")} />
               <div>
-                <div className="text-xs font-medium" style={{ color: "hsl(240 15% 85%)" }}>Sem proxy</div>
+                <div className="text-xs font-medium" style={{ color: "var(--text-2)" }}>Sem proxy</div>
                 <div className="text-[11px] opacity-60">Conexão direta do server</div>
               </div>
             </label>
@@ -477,9 +477,9 @@ function ServerProxyModal({
                     <input type="radio" className="mt-1" checked={selectedId === p.id} onChange={() => setSelectedId(p.id)} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-medium" style={{ color: "hsl(240 15% 85%)" }}>{p.name}</span>
+                        <span className="text-xs font-medium" style={{ color: "var(--text-2)" }}>{p.name}</span>
                         {p.country && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "hsl(240 12% 14%)", color: "hsl(240 8% 65%)" }}>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "hsl(240 12% 14%)", color: "var(--text-2)" }}>
                             {COUNTRY_FLAGS[p.country] || "🌐"} {p.country.toUpperCase()}
                           </span>
                         )}
@@ -506,7 +506,7 @@ function ServerProxyModal({
             {!showCreate ? (
               <button onClick={() => setShowCreate(true)}
                 className="w-full py-2.5 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition-all"
-                style={{ background: "hsl(240 12% 8%)", color: "hsl(240 8% 70%)", border: "1px dashed hsl(240 12% 20%)" }}>
+                style={{ background: "var(--surface-solid)", color: "hsl(240 8% 70%)", border: "1px dashed hsl(240 12% 20%)" }}>
                 <Plus className="w-3.5 h-3.5" /> Criar novo proxy
               </button>
             ) : (
@@ -625,7 +625,7 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
             <ServerIcon className="w-4.5 h-4.5" style={{ color: "var(--green)" }} />
           </div>
           <div className="min-w-0">
-            <p className="font-medium text-sm truncate" style={{ color: "hsl(240 15% 90%)" }}>{server.name}</p>
+            <p className="font-medium text-sm truncate" style={{ color: "var(--text-1)" }}>{server.name}</p>
             {server.description && (
               <p className="text-xs truncate mt-0.5" style={{ color: "hsl(240 8% 44%)" }}>{server.description}</p>
             )}
@@ -636,21 +636,21 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
           <button onClick={() => setShowProxyModal(true)}
             title="Configurar proxy do server"
             className="p-1.5 rounded-lg transition-colors"
-            style={{ color: "hsl(240 8% 38%)" }}
+            style={{ color: "var(--text-4)" }}
             onMouseEnter={e => (e.currentTarget.style.color = "#818cf8")}
             onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}>
             <Shield className="w-3.5 h-3.5" />
           </button>
           <button onClick={onEdit}
             className="p-1.5 rounded-lg transition-colors"
-            style={{ color: "hsl(240 8% 38%)" }}
+            style={{ color: "var(--text-4)" }}
             onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 15% 75%)")}
             onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}>
             <Pencil className="w-3.5 h-3.5" />
           </button>
           <button onClick={onDelete}
             className="p-1.5 rounded-lg transition-colors"
-            style={{ color: "hsl(240 8% 38%)" }}
+            style={{ color: "var(--text-4)" }}
             onMouseEnter={e => (e.currentTarget.style.color = "#f87171")}
             onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}>
             <Trash2 className="w-3.5 h-3.5" />
@@ -660,9 +660,9 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
 
       {/* Slug row */}
       <div className="flex items-center gap-2 rounded-xl px-3 py-2"
-        style={{ background: "hsl(240 20% 4%)", border: "1px solid hsl(240 12% 10%)" }}>
+        style={{ background: "var(--surface-solid)", border: "1px solid hsl(240 12% 10%)" }}>
         <Globe className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(240 8% 36%)" }} />
-        <code className="text-xs font-mono flex-1 truncate" style={{ color: "hsl(240 8% 55%)" }}>
+        <code className="text-xs font-mono flex-1 truncate" style={{ color: "var(--text-3)" }}>
           uniq.chat/<span style={{ color: "hsl(240 15% 75%)" }}>{server.slug}</span>
         </code>
         <button onClick={copySlug} className="transition-colors flex-shrink-0"
@@ -686,7 +686,7 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
           }}
         >
           <Smartphone className="w-3 h-3" style={{ color: "hsl(240 8% 46%)" }} />
-          <span style={{ color: "hsl(240 8% 65%)" }}>{totalCount}</span>
+          <span style={{ color: "var(--text-2)" }}>{totalCount}</span>
         </div>
         <div
           className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs"
@@ -724,7 +724,7 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
               {server.proxy.name || "Proxy"}
             </span>
             {!server.proxy.is_active && (
-              <span style={{ color: "hsl(240 8% 50%)" }}>· inativo</span>
+              <span style={{ color: "var(--text-3)" }}>· inativo</span>
             )}
           </div>
         )}
@@ -752,7 +752,7 @@ function ServerCard({ server, onEdit, onDelete, onAction }: {
         </div>
         <a href={`/instances?server=${server.id}`}
           className="flex items-center gap-1 text-xs transition-colors"
-          style={{ color: "hsl(240 8% 38%)" }}
+          style={{ color: "var(--text-4)" }}
           onMouseEnter={e => (e.currentTarget.style.color = "var(--green)")}
           onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}>
           Ver instâncias <ExternalLink className="w-3 h-3" />
@@ -843,7 +843,7 @@ export default function ServersPage() {
         }}
       >
         <p className="text-xs font-medium mb-1" style={{ color: "#60a5fa" }}>Como funcionam os Servers</p>
-        <p className="text-xs" style={{ color: "hsl(240 8% 50%)" }}>
+        <p className="text-xs" style={{ color: "var(--text-3)" }}>
           Cada server tem um slug único que funciona como subdomínio. Agrupe instâncias WhatsApp por empresa, cliente ou projeto —
           ideal para agências e empresas com múltiplas operações.
         </p>
@@ -887,7 +887,7 @@ export default function ServersPage() {
         </div>
       ) : servers.length === 0 ? (
         <div className="rounded-2xl p-16 text-center animate-fade-in-up"
-          style={{ background: "hsl(240 18% 6%)", border: "1px dashed hsl(240 12% 16%)" }}>
+          style={{ background: "var(--surface-solid)", border: "1px dashed hsl(240 12% 16%)" }}>
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
             style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
             <ServerIcon className="w-5 h-5" style={{ color: "hsl(240 8% 30%)" }} />

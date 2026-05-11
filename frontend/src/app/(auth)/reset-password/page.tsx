@@ -58,10 +58,10 @@ function ResetPasswordForm() {
         >
           <Check className="h-7 w-7" style={{ color: "#00d46a" }} />
         </div>
-        <h1 className="text-base font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
+        <h1 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>
           Senha redefinida
         </h1>
-        <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 55%)" }}>
+        <p className="text-xs leading-relaxed" style={{ color: "var(--text-3)" }}>
           Já pode entrar com sua nova senha.
         </p>
         <button
@@ -85,10 +85,10 @@ function ResetPasswordForm() {
         >
           <X className="h-7 w-7" style={{ color: "#f87171" }} />
         </div>
-        <h1 className="text-base font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
+        <h1 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>
           Link inválido
         </h1>
-        <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 55%)" }}>
+        <p className="text-xs leading-relaxed" style={{ color: "var(--text-3)" }}>
           Este link não tem o token de recuperação. Solicite um novo.
         </p>
         <button
@@ -109,7 +109,7 @@ function ResetPasswordForm() {
   return (
     <>
       <div className="px-5 pt-5 pb-1">
-        <h1 className="text-base font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
+        <h1 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>
           Criar nova senha
         </h1>
         <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 44%)" }}>
@@ -205,16 +205,16 @@ function PasswordField({
           autoComplete="new-password"
           className="w-full rounded-xl py-2.5 pl-9 pr-10 text-sm outline-none focus:ring-1 focus:ring-white/10"
           style={{
-            background: "hsl(240 12% 8%)",
-            border: "1px solid hsl(240 12% 13%)",
-            color: "hsl(240 15% 90%)",
+            background: "var(--surface-solid)",
+            border: "1px solid var(--border)",
+            color: "var(--text-1)",
           }}
         />
         <button
           type="button"
           onClick={onToggle}
           className="absolute right-3 top-1/2 -translate-y-1/2"
-          style={{ color: "hsl(240 8% 38%)" }}
+          style={{ color: "var(--text-4)" }}
         >
           {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </button>
@@ -226,7 +226,7 @@ function PasswordField({
 export default function ResetPasswordPage() {
   const router = useRouter();
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "hsl(240 20% 4%)" }}>
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "var(--surface-solid)" }}>
       <div
         className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] pointer-events-none"
         style={{ background: "radial-gradient(ellipse at bottom, rgba(0,212,106,0.05) 0%, transparent 70%)" }}
@@ -251,7 +251,7 @@ export default function ResetPasswordPage() {
         <div
           className="rounded-2xl overflow-hidden"
           style={{
-            background: "hsl(240 18% 6%)",
+            background: "var(--surface-solid)",
             boxShadow: "0 0 0 1px hsl(240 12% 13%), 0 24px 64px rgba(0,0,0,0.5)",
           }}
         >

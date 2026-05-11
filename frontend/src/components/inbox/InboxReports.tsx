@@ -33,7 +33,7 @@ interface SLAReport {
 }
 
 const CARD_BG = "hsl(240 18% 6%)";
-const CARD_BORDER = "1px solid hsl(240 12% 13%)";
+const CARD_BORDER = "1px solid var(--border)";
 
 export function InboxReports({ workspaceId }: { workspaceId: string }) {
   const { hasPerm, hasAnyPerm, isLoading: permsLoading, isOwner } = useWorkspacePermissions();
@@ -100,7 +100,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
     return (
       <div
         className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center"
-        style={{ background: "hsl(240 20% 4%)" }}
+        style={{ background: "var(--surface-solid)" }}
       >
         <div
           className="flex h-16 w-16 items-center justify-center rounded-2xl"
@@ -109,14 +109,14 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
           <Lock className="h-7 w-7" style={{ color: "#fb923c" }} />
         </div>
         <div className="space-y-1.5 max-w-sm">
-          <h3 className="text-base font-medium" style={{ color: "hsl(240 15% 90%)" }}>
+          <h3 className="text-base font-medium" style={{ color: "var(--text-1)" }}>
             Sem acesso aos relatórios
           </h3>
-          <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 55%)" }}>
+          <p className="text-xs leading-relaxed" style={{ color: "var(--text-3)" }}>
             Peça pro administrador do workspace marcar a permissão{" "}
             <code
               className="rounded px-1.5 py-0.5 text-[11px]"
-              style={{ background: "var(--surface-2)", color: "hsl(240 15% 85%)" }}
+              style={{ background: "var(--surface-2)", color: "var(--text-2)" }}
             >
               reports:view
             </code>{" "}
@@ -150,10 +150,10 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
               <AlertCircle className="h-6 w-6" style={{ color: "#f87171" }} />
             </div>
             <div className="space-y-1">
-              <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>
+              <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
                 Não foi possível carregar os relatórios
               </h3>
-              <p className="text-xs" style={{ color: "hsl(240 8% 55%)" }}>
+              <p className="text-xs" style={{ color: "var(--text-3)" }}>
                 {status === 403
                   ? "Permissão insuficiente — fale com o admin do workspace."
                   : status === 401
@@ -199,10 +199,10 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
 
         <Card>
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
+            <h3 className="text-xs font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
               Criados × Resolvidos por dia
             </h3>
-            <div className="flex gap-3 text-xs" style={{ color: "hsl(240 8% 55%)" }}>
+            <div className="flex gap-3 text-xs" style={{ color: "var(--text-3)" }}>
               <span className="flex items-center gap-1.5">
                 <span className="inline-block h-2 w-2 rounded" style={{ background: "#60a5fa" }} />
                 Criados
@@ -214,7 +214,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
             </div>
           </div>
           {!overview.data?.series?.length ? (
-            <div className="py-8 text-center text-xs" style={{ color: "hsl(240 8% 40%)" }}>
+            <div className="py-8 text-center text-xs" style={{ color: "var(--text-4)" }}>
               Sem dados para o período.
             </div>
           ) : (
@@ -241,7 +241,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
                       title={`${d.resolved} resolvidos`}
                     />
                   </div>
-                  <span className="text-[9px]" style={{ color: "hsl(240 8% 40%)" }}>
+                  <span className="text-[9px]" style={{ color: "var(--text-4)" }}>
                     {d.day.slice(5)}
                   </span>
                 </div>
@@ -281,7 +281,7 @@ export function InboxReports({ workspaceId }: { workspaceId: string }) {
               <Row key={u.user_id} left={u.name || u.email}>
                 <span>{u.assigned} atribuídos</span>
                 <span style={{ color: "#00d46a" }}>{u.resolved} resolvidos</span>
-                <span style={{ color: "hsl(240 8% 50%)" }}>{formatSec(u.avg_first_response_sec)} 1ª resp.</span>
+                <span style={{ color: "var(--text-3)" }}>{formatSec(u.avg_first_response_sec)} 1ª resp.</span>
               </Row>
             ))}
           </TableCard>
@@ -310,17 +310,17 @@ function ReportsHeader({
           <Inbox className="h-4 w-4" style={{ color: "#00d46a" }} />
         </div>
         <div>
-          <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+          <h2 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
             Relatórios do atendimento
           </h2>
-          <p className="text-xs" style={{ color: "hsl(240 8% 50%)" }}>
+          <p className="text-xs" style={{ color: "var(--text-3)" }}>
             Volume, SLA, CSAT e desempenho por fila/agente.
           </p>
         </div>
       </div>
       <div
         className="flex items-center gap-1 rounded-xl p-1 text-xs"
-        style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)" }}
+        style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
       >
         {(["7d", "30d", "90d"] as const).map((r) => (
           <button
@@ -408,7 +408,7 @@ function InboxReportsSkeleton({
               className="rounded-2xl overflow-hidden"
               style={{ background: CARD_BG, border: CARD_BORDER }}
             >
-              <div className="px-4 py-3" style={{ borderBottom: "1px solid hsl(240 12% 11%)" }}>
+              <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
                 <div className="h-3 w-20 rounded" style={{ background: "var(--surface-2)" }} />
               </div>
               {Array.from({ length: 3 }).map((_, j) => (
@@ -465,7 +465,7 @@ function KPI({
     >
       <div
         className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest"
-        style={{ color: "hsl(240 8% 45%)" }}
+        style={{ color: "var(--text-3)" }}
       >
         {icon}
         <span>{label}</span>
@@ -493,12 +493,12 @@ function SLAPanel({
     <Card>
       <div
         className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest"
-        style={{ color: "hsl(240 8% 50%)" }}
+        style={{ color: "var(--text-3)" }}
       >
         <AlertTriangle className="h-3.5 w-3.5" /> SLA
       </div>
       {error ? (
-        <div className="py-6 text-center text-xs" style={{ color: "hsl(240 8% 40%)" }}>
+        <div className="py-6 text-center text-xs" style={{ color: "var(--text-4)" }}>
           Falha ao carregar SLA.
         </div>
       ) : (
@@ -507,7 +507,7 @@ function SLAPanel({
             <div className="text-2xl font-medium tabular-nums" style={{ color: "#f87171" }}>
               {sla?.first_response_breaches ?? 0}
             </div>
-            <div className="mt-0.5 text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
+            <div className="mt-0.5 text-[11px]" style={{ color: "var(--text-3)" }}>
               1ª resposta rompida
             </div>
           </div>
@@ -515,7 +515,7 @@ function SLAPanel({
             <div className="text-2xl font-medium tabular-nums" style={{ color: "#f87171" }}>
               {sla?.resolution_breaches ?? 0}
             </div>
-            <div className="mt-0.5 text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
+            <div className="mt-0.5 text-[11px]" style={{ color: "var(--text-3)" }}>
               Resolução rompida
             </div>
           </div>
@@ -539,12 +539,12 @@ function CSATPanel({
     <Card>
       <div
         className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest"
-        style={{ color: "hsl(240 8% 50%)" }}
+        style={{ color: "var(--text-3)" }}
       >
         <Star className="h-3.5 w-3.5" /> CSAT
       </div>
       {error ? (
-        <div className="py-6 text-center text-xs" style={{ color: "hsl(240 8% 40%)" }}>
+        <div className="py-6 text-center text-xs" style={{ color: "var(--text-4)" }}>
           Falha ao carregar CSAT.
         </div>
       ) : (
@@ -553,7 +553,7 @@ function CSATPanel({
             <div className="text-2xl font-medium tabular-nums" style={{ color: "#fbbf24" }}>
               {(csat?.avg_rating ?? 0).toFixed(2)}
             </div>
-            <div className="mt-0.5 text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
+            <div className="mt-0.5 text-[11px]" style={{ color: "var(--text-3)" }}>
               nota média · {(((csat?.response_rate ?? 0) * 100) | 0)}% respondeu
             </div>
           </div>
@@ -561,7 +561,7 @@ function CSATPanel({
             {[1, 2, 3, 4, 5].map((r) => {
               const count = csat?.distribution?.find((d) => d.rating === r)?.count ?? 0;
               return (
-                <div key={r} className="flex items-center gap-2 text-[10px]" style={{ color: "hsl(240 8% 50%)" }}>
+                <div key={r} className="flex items-center gap-2 text-[10px]" style={{ color: "var(--text-3)" }}>
                   <span className="w-3">{r}</span>
                   <div className="h-1.5 flex-1 rounded" style={{ background: "var(--surface-2)" }}>
                     <div
@@ -603,13 +603,13 @@ function TableCard({
     >
       <div
         className="flex items-center gap-2 px-4 py-3 text-xs font-medium uppercase tracking-widest"
-        style={{ color: "hsl(240 8% 50%)", borderBottom: "1px solid hsl(240 12% 11%)" }}
+        style={{ color: "var(--text-3)", borderBottom: "1px solid var(--border)" }}
       >
         {icon}
         {title}
       </div>
       {error ? (
-        <div className="p-4 text-xs" style={{ color: "hsl(240 8% 45%)" }}>
+        <div className="p-4 text-xs" style={{ color: "var(--text-3)" }}>
           Falha ao carregar.
         </div>
       ) : loading ? (
@@ -621,7 +621,7 @@ function TableCard({
       ) : hasChildren ? (
         <ul>{children}</ul>
       ) : (
-        <div className="p-4 text-xs" style={{ color: "hsl(240 8% 40%)" }}>
+        <div className="p-4 text-xs" style={{ color: "var(--text-4)" }}>
           {empty}
         </div>
       )}
@@ -635,7 +635,7 @@ function Row({ left, children }: { left: string; children: React.ReactNode }) {
       className="flex items-center justify-between gap-3 px-4 py-2.5"
       style={{ borderTop: "1px solid var(--border-subtle)" }}
     >
-      <span className="truncate text-sm font-medium" style={{ color: "hsl(240 15% 82%)" }}>
+      <span className="truncate text-sm font-medium" style={{ color: "var(--text-2)" }}>
         {left}
       </span>
       <div className="flex flex-shrink-0 gap-3 text-xs">{children}</div>

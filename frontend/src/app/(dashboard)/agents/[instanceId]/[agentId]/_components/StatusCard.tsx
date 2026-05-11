@@ -82,7 +82,7 @@ export function StatusCard({ form }: { form: AgentForm }) {
             {readyCount}/{readyTotal}
           </span>
         </div>
-        <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.05)" }}>
+        <div className="h-1 rounded-full overflow-hidden" style={{ background: "var(--input)" }}>
           <div
             className="h-full transition-[width] duration-700"
             style={{

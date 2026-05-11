@@ -91,7 +91,7 @@ export function BottomSheet({
               background: "rgba(10,10,20,0.94)",
               backdropFilter: "blur(28px) saturate(200%)",
               WebkitBackdropFilter: "blur(28px) saturate(200%)",
-              borderTop: "1px solid rgba(255,255,255,0.10)",
+              borderTop: "1px solid var(--border-default)",
               boxShadow: "0 -16px 48px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08)",
               maxHeight,
               paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
@@ -116,7 +116,7 @@ export function BottomSheet({
             {title && (
               <div
                 className="flex items-center justify-between px-5 pb-3 pt-1"
-                style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+                style={{ borderBottom: "1px solid var(--border-subtle)" }}
               >
                 <p className="text-base font-semibold" style={{ color: "var(--text-1)" }}>{title}</p>
                 <button

@@ -592,7 +592,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                   Dica: Utilize <strong className="font-mono px-1 py-0.5 rounded" style={{ background: "rgba(251,191,36,0.2)" }}>-1</strong> para configurar limites infinitos (ilimitado), <strong className="font-mono px-1 py-0.5 rounded" style={{ background: "rgba(251,191,36,0.2)" }}>0</strong> para bloquear.
                 </div>
 
-                <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: "hsl(240 8% 50%)" }}>Globais</p>
+                <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: "var(--text-3)" }}>Globais</p>
                 <div className="grid grid-cols-2 gap-3">
                   <NumField label="Max. Workspaces" value={form.max_workspaces} onChange={(v) => setForm({ ...form, max_workspaces: v })} />
                   <NumField label="Max. Usuários" value={form.max_users} onChange={(v) => setForm({ ...form, max_users: v })} />
@@ -604,7 +604,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                     plan zero em tudo = PAYG puro (user só usa AI/Voice
                     se comprar topup). overage_allowed_default vira o
                     default da quota; user pode mudar pelo painel /usage. */}
-                <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "hsl(240 8% 50%)" }}>
+                <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "var(--text-3)" }}>
                   Uniq Credits (allowance mensal — 0 = PAYG)
                 </p>
                 <div className="grid grid-cols-2 gap-3">
@@ -628,7 +628,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                     mas é melhor o admin escolher explícito (-1 ilimitado, N>0
                     cap, ou desligar a feature). hint passa pra NumField que
                     realça em âmbar e mostra texto guia. */}
-                <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "hsl(240 8% 50%)" }}>Por módulo</p>
+                <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "var(--text-3)" }}>Por módulo</p>
                 <div className="grid grid-cols-2 gap-3">
                   <NumField label="Max. Agentes IA" value={form.max_agents} onChange={(v) => setForm({ ...form, max_agents: v })}
                     mismatchHint={maxMismatchHint("Uniq AI / Agentes", form.allow_ai, form.max_agents)} />
@@ -645,7 +645,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                     mismatchHint={maxMismatchHint("CRM", form.allow_crm, form.max_deals)} />
                 </div>
 
-                <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "hsl(240 8% 50%)" }}>Shop</p>
+                <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "var(--text-3)" }}>Shop</p>
                 <div className="grid grid-cols-2 gap-3">
                   <NumField label="Max. Lojas" value={form.max_shops} onChange={(v) => setForm({ ...form, max_shops: v })}
                     mismatchHint={maxMismatchHint("Shop", form.allow_shop, form.max_shops)} />
@@ -655,7 +655,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                     mismatchHint={maxMismatchHint("Shop", form.allow_shop, form.max_shop_integrations)} />
                 </div>
 
-                <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "hsl(240 8% 50%)" }}>Proxy</p>
+                <p className="text-[10px] uppercase tracking-wider font-medium pt-3" style={{ color: "var(--text-3)" }}>Proxy</p>
                 <div className="grid grid-cols-2 gap-3">
                   <NumField label="Instâncias por proxy" value={form.max_instances_per_proxy} onChange={(v) => setForm({ ...form, max_instances_per_proxy: v })}
                     mismatchHint={maxMismatchHint("Proxy", form.allow_proxy, form.max_instances_per_proxy)} />
@@ -746,7 +746,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                     placeholder="price_xxxxxxxxxxxxxxxxx"
                     className="input-field w-full font-mono text-xs"
                   />
-                  <p className="text-[10px] mt-1.5" style={{ color: "hsl(240 8% 38%)" }}>Copie o ID da precificação do produto no painel do Stripe.</p>
+                  <p className="text-[10px] mt-1.5" style={{ color: "var(--text-4)" }}>Copie o ID da precificação do produto no painel do Stripe.</p>
                 </div>
                 <div>
                   <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>Asaas Product ID (se aplicável)</label>
@@ -757,7 +757,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                     placeholder="prod_xxxxxxxxxxxxxxxxx"
                     className="input-field w-full font-mono text-xs"
                   />
-                  <p className="text-[10px] mt-1.5" style={{ color: "hsl(240 8% 38%)" }}>Mapeado apenas em integrações compatíveis no Asaas.</p>
+                  <p className="text-[10px] mt-1.5" style={{ color: "var(--text-4)" }}>Mapeado apenas em integrações compatíveis no Asaas.</p>
                 </div>
                 <div>
                   <label className="text-xs block mb-1.5" style={{ color: "hsl(240 8% 46%)" }}>AbacatePay Product ID</label>
@@ -768,7 +768,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                     placeholder="prod_xxxxxxxxxxxxxxxxx"
                     className="input-field w-full font-mono text-xs"
                   />
-                  <p className="text-[10px] mt-1.5" style={{ color: "hsl(240 8% 38%)" }}>ID do produto no painel da AbacatePay para checkout PIX recorrente.</p>
+                  <p className="text-[10px] mt-1.5" style={{ color: "var(--text-4)" }}>ID do produto no painel da AbacatePay para checkout PIX recorrente.</p>
                 </div>
               </div>
             )}
@@ -787,7 +787,7 @@ function PlanDrawer({ plan, onClose }: { plan: Plan | "new"; onClose: () => void
                     highlights={form.highlights}
                   />
                 </div>
-                <div className="border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }} />
+                <div className="border-t" style={{ borderColor: "var(--border-subtle)" }} />
                 <HighlightsEditor highlights={form.highlights} onChange={(h) => setForm({ ...form, highlights: h })} />
                 <p className="text-[10px]" style={{ color: "hsl(240 8% 36%)" }}>
                   Os textos foram pré-preenchidos com o que está exibido ao vivo em /plans. Edite conforme necessário — qualquer alteração substitui os valores automáticos.
@@ -893,20 +893,20 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
         {/* Middle: Limits Wrapper */}
         <div className="flex-1 flex flex-wrap gap-2 w-full lg:pr-10 min-w-[200px]">
            <div className="flex-1 min-w-[90px] rounded-xl p-3 flex flex-col justify-center" style={{ background: "rgba(0,0,0,0.2)" }}>
-              <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 38%)" }}>Workspaces</p>
-              <p className="text-lg font-semibold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_workspaces === -1 ? "∞" : plan.max_workspaces}</p>
+              <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "var(--text-4)" }}>Workspaces</p>
+              <p className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>{plan.max_workspaces === -1 ? "∞" : plan.max_workspaces}</p>
            </div>
            <div className="flex-1 min-w-[90px] rounded-xl p-3 flex flex-col justify-center" style={{ background: "rgba(0,0,0,0.2)" }}>
-              <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 38%)" }}>Instâncias</p>
-              <p className="text-lg font-semibold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_instances === -1 ? "∞" : plan.max_instances}</p>
+              <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "var(--text-4)" }}>Instâncias</p>
+              <p className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>{plan.max_instances === -1 ? "∞" : plan.max_instances}</p>
            </div>
            <div className="flex-1 min-w-[90px] rounded-xl p-3 flex flex-col justify-center" style={{ background: "rgba(0,0,0,0.2)" }}>
-              <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 38%)" }}>Usuários</p>
-              <p className="text-lg font-semibold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_users === -1 ? "∞" : plan.max_users}</p>
+              <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "var(--text-4)" }}>Usuários</p>
+              <p className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>{plan.max_users === -1 ? "∞" : plan.max_users}</p>
            </div>
            <div className="flex-1 min-w-[90px] rounded-xl p-3 flex flex-col justify-center" style={{ background: "rgba(0,0,0,0.2)" }}>
-              <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 38%)" }}>Msgs/dia</p>
-              <p className="text-lg font-semibold" style={{ color: "hsl(240 15% 88%)" }}>{plan.max_messages_per_day === -1 ? "∞" : plan.max_messages_per_day.toLocaleString("pt-BR")}</p>
+              <p className="text-[9px] uppercase tracking-widest mb-1" style={{ color: "var(--text-4)" }}>Msgs/dia</p>
+              <p className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>{plan.max_messages_per_day === -1 ? "∞" : plan.max_messages_per_day.toLocaleString("pt-BR")}</p>
            </div>
            
            <div className="flex-[1.5] min-w-[110px] rounded-xl p-3 flex items-center justify-center gap-2" style={{ background: plan.allow_proxy ? "rgba(96,165,250,0.06)" : "rgba(0,0,0,0.15)", border: plan.allow_proxy ? "1px solid rgba(96,165,250,0.12)" : "1px solid transparent" }}>
@@ -923,7 +923,7 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
         {/* Tags */}
         <div className="flex flex-wrap gap-2 flex-1">
           {enabledFeatures.map(({ key, label, icon }) => (
-            <span key={key} className="flex items-center gap-1.5 text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 65%)" }}>
+            <span key={key} className="flex items-center gap-1.5 text-[9px] px-2 py-0.5 rounded-full font-medium" style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "var(--text-2)" }}>
               {icon} {label}
             </span>
           ))}
@@ -960,8 +960,8 @@ export default function AdminPlansPage() {
   });
 
   const cardStyle = {
-    background: "hsl(240 18% 6%)",
-    border: "1px solid hsl(240 12% 13%)",
+    background: "var(--surface-solid)",
+    border: "1px solid var(--border)",
   };
 
   return (
@@ -1023,9 +1023,9 @@ export default function AdminPlansPage() {
         </h3>
         <ul className="space-y-2">
           {[
-            <>Use <code className="text-xs px-1.5 py-0.5 rounded-md" style={{ background: "var(--surface-2)", color: "hsl(240 15% 88%)" }}>-1</code> em limites numéricos para definir como ilimitado.</>,
+            <>Use <code className="text-xs px-1.5 py-0.5 rounded-md" style={{ background: "var(--surface-2)", color: "var(--text-1)" }}>-1</code> em limites numéricos para definir como ilimitado.</>,
             "Alterar o status de comercialização para 'Inativo' remove o plano da tela de aquisição, mas não interrompe subscrições em andamento.",
-            <>O campo <strong style={{ color: "hsl(240 15% 88%)" }}>Stripe Price ID</strong> dita o produto faturado no checkout dinâmico da plataforma.</>,
+            <>O campo <strong style={{ color: "var(--text-1)" }}>Stripe Price ID</strong> dita o produto faturado no checkout dinâmico da plataforma.</>,
           ].map((note, i) => (
             <li key={i} className="flex items-start gap-2 text-sm" style={{ color: "hsl(240 8% 46%)" }}>
               <span className="mt-1.5 w-1 h-1 rounded-full flex-shrink-0" style={{ background: "hsl(240 8% 28%)" }} />
@@ -1057,7 +1057,7 @@ function PlanCardPreview({ name, price, description, highlights }: {
 
   return (
     <div style={{
-      background: "hsl(240 18% 6%)",
+      background: "var(--surface-solid)",
       border: `1px solid ${meta.color}33`,
       borderRadius: 16,
       padding: "14px 16px",
@@ -1074,7 +1074,7 @@ function PlanCardPreview({ name, price, description, highlights }: {
           <span style={{ fontSize: 13, color: meta.color }}>★</span>
         </div>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "hsl(240 15% 92%)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name || "Plano"}</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name || "Plano"}</div>
           {description && <div style={{ fontSize: 9, color: "hsl(240 8% 46%)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{description}</div>}
         </div>
       </div>
@@ -1082,11 +1082,11 @@ function PlanCardPreview({ name, price, description, highlights }: {
       {/* Price */}
       <div style={{ marginBottom: 10 }}>
         {isFree ? (
-          <span style={{ fontSize: 18, fontWeight: 800, color: "hsl(240 15% 92%)" }}>Grátis</span>
+          <span style={{ fontSize: 18, fontWeight: 800, color: "var(--text-1)" }}>Grátis</span>
         ) : (
           <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
             <span style={{ fontSize: 10, color: "hsl(240 8% 46%)" }}>R$</span>
-            <span style={{ fontSize: 20, fontWeight: 800, color: "hsl(240 15% 92%)" }}>{price}</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: "var(--text-1)" }}>{price}</span>
             <span style={{ fontSize: 10, color: "hsl(240 8% 42%)" }}>/mês</span>
           </div>
         )}
@@ -1095,7 +1095,7 @@ function PlanCardPreview({ name, price, description, highlights }: {
       {/* Highlights */}
       <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 10 }}>
         {(highlights.length > 0 ? highlights : ["(usando valores dos limites)"]).slice(0, 6).map((item, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 9.5, color: "hsl(240 8% 65%)" }}>
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 9.5, color: "var(--text-2)" }}>
             <span style={{ width: 10, height: 10, color: meta.color, flexShrink: 0 }}>✓</span>
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item}</span>
           </div>
@@ -1186,7 +1186,7 @@ function FeatureGroup({ title, hint, children }: {
       <div className="flex items-baseline justify-between mb-2">
         <p className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: "hsl(240 15% 70%)" }}>{title}</p>
       </div>
-      {hint && <p className="text-[11px] mb-2" style={{ color: "hsl(240 8% 50%)" }}>{hint}</p>}
+      {hint && <p className="text-[11px] mb-2" style={{ color: "var(--text-3)" }}>{hint}</p>}
       <div className="space-y-0">{children}</div>
     </div>
   );

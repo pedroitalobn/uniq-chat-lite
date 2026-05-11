@@ -77,7 +77,7 @@ export default function AdminInspectPage() {
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold tracking-tight flex items-center gap-3" style={{ color: "hsl(240 15% 93%)" }}>
-            <Search className="w-5 h-5" style={{ color: "hsl(240 8% 60%)" }} />
+            <Search className="w-5 h-5" style={{ color: "var(--text-3)" }} />
             <span className="hidden sm:inline">Inspect</span>
             <span className="sm:hidden">Suporte</span>
           </h1>
@@ -88,7 +88,7 @@ export default function AdminInspectPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 rounded-xl" style={{ background: "hsl(240 12% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+      <div className="flex gap-1 p-1 rounded-xl" style={{ background: "hsl(240 12% 6%)", border: "1px solid var(--border)" }}>
         <button onClick={() => setTab("servers")} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
           style={{ background: tab === "servers" ? "hsl(240 12% 13%)" : "transparent", color: tab === "servers" ? "hsl(240 15% 93%)" : "hsl(240 8% 46%)" }}>
           <Server className="w-4 h-4" />
@@ -115,7 +115,7 @@ export default function AdminInspectPage() {
       {/* List */}
       <AnimatedTabContent tabKey={tab}>
       {tab === "servers" && (
-        <div className="rounded-2xl overflow-hidden" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+        <div className="rounded-2xl overflow-hidden" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
           <div className="grid grid-cols-[1fr_1fr_100px_80px_60px] gap-3 px-4 py-2.5 text-[10px] font-medium uppercase tracking-widest"
             style={{ color: "hsl(240 8% 36%)", borderBottom: "1px solid hsl(240 12% 10%)" }}>
             <span>Servidor</span>
@@ -147,7 +147,7 @@ export default function AdminInspectPage() {
       )}
 
       {tab === "instances" && (
-        <div className="rounded-2xl overflow-hidden" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+        <div className="rounded-2xl overflow-hidden" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
           <div className="grid grid-cols-[1fr_1fr_100px_80px_80px] gap-3 px-4 py-2.5 text-[10px] font-medium uppercase tracking-widest"
             style={{ color: "hsl(240 8% 36%)", borderBottom: "1px solid hsl(240 12% 10%)" }}>
             <span>Instância</span>
@@ -200,16 +200,16 @@ function ServerRow({ server, isLast }: { server: ServerExt; isLast: boolean }) {
       onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}>
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "hsl(240 12% 10%)" }}>
-          <Server className="w-4 h-4" style={{ color: "hsl(240 8% 50%)" }} />
+          <Server className="w-4 h-4" style={{ color: "var(--text-3)" }} />
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 90%)" }}>{server.name}</p>
+          <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{server.name}</p>
           <p className="text-xs font-mono truncate" style={{ color: "hsl(240 8% 46%)" }}>{server.address}</p>
         </div>
       </div>
 
       <div className="min-w-0">
-        <p className="text-xs truncate" style={{ color: "hsl(240 15% 90%)" }}>{server.user?.name || server.user_id}</p>
+        <p className="text-xs truncate" style={{ color: "var(--text-1)" }}>{server.user?.name || server.user_id}</p>
         <p className="text-[10px] truncate" style={{ color: "hsl(240 8% 46%)" }}>{server.user?.email}</p>
       </div>
 
@@ -218,7 +218,7 @@ function ServerRow({ server, isLast }: { server: ServerExt; isLast: boolean }) {
       </div>
 
       <div className="text-center">
-        <span className="text-xs font-mono" style={{ color: "hsl(240 8% 60%)" }}>{server.port}</span>
+        <span className="text-xs font-mono" style={{ color: "var(--text-3)" }}>{server.port}</span>
       </div>
 
       <div className="flex items-center justify-end gap-1">
@@ -265,13 +265,13 @@ function InstanceRow({ instance, isLast }: { instance: Instance; isLast: boolean
           <Smartphone className="w-4 h-4" style={{ color: channelColor }} />
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 90%)" }}>{instance.name}</p>
+          <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{instance.name}</p>
           <p className="text-[10px] truncate" style={{ color: "hsl(240 8% 46%)" }}>{instance.id}</p>
         </div>
       </div>
 
       <div className="min-w-0">
-        <p className="text-xs truncate" style={{ color: "hsl(240 15% 90%)" }}>{(instance as any).user?.name || instance.user_id}</p>
+        <p className="text-xs truncate" style={{ color: "var(--text-1)" }}>{(instance as any).user?.name || instance.user_id}</p>
         <p className="text-[10px] truncate" style={{ color: "hsl(240 8% 46%)" }}>{(instance as any).workspace?.name}</p>
       </div>
 

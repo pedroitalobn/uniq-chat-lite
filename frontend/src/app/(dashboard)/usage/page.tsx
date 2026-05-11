@@ -319,7 +319,7 @@ function CategoryCard({ category, data }: { category: string; data: UsageCategor
             / {isPayg ? "PAYG" : fmtCredits(total)}
           </span>
         </div>
-        <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.05)" }}>
+        <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--input)" }}>
           <div
             className="h-full transition-all duration-500"
             style={{
@@ -615,7 +615,7 @@ function TopupModal({ onClose }: { onClose: () => void }) {
   return (
     <div
       className="fixed inset-0 z-[150] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)" }}
+      style={{ background: "var(--surface-overlay)", backdropFilter: "blur(8px)" }}
       onClick={onClose}
     >
       <div

@@ -89,7 +89,7 @@ function channelChipStyle(channel?: string): { label: string; bg: string; color:
     case "linkedin":  return { label: "LinkedIn",  bg: "rgba(10,102,194,0.08)", color: "#0a66c2", border: "rgba(10,102,194,0.2)" };
     case "tiktok":    return { label: "TikTok",    bg: "rgba(255,0,80,0.08)",   color: "#ff0050", border: "rgba(255,0,80,0.2)" };
     case "kwai":      return { label: "Kwai",      bg: "rgba(255,102,0,0.08)",  color: "#ff6600", border: "rgba(255,102,0,0.2)" };
-    default:          return { label: channel || "Canal", bg: "var(--surface-2)", color: "hsl(240 8% 60%)", border: "var(--border-default)" };
+    default:          return { label: channel || "Canal", bg: "var(--surface-2)", color: "var(--text-3)", border: "var(--border-default)" };
   }
 }
 
@@ -203,6 +203,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
 
   const [transferOpen, setTransferOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [showResetMemoryModal, setShowResetMemoryModal] = useState(false);
   // Menu "..." mobile do header: agrupa briefcase/call/refresh quando o
   // header não cabe horizontalmente em telas pequenas.
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
@@ -700,7 +701,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
       {/* Main pane: header + timeline + composer */}
       <section className="flex flex-1 min-w-0 flex-col">
         <header className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-2.5 border-b flex-shrink-0"
-          style={{ borderColor: "rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.02)" }}>
+          style={{ borderColor: "var(--border-subtle)", background: "rgba(255,255,255,0.02)" }}>
           {/* Back button */}
           {onClose ? (
             <button
@@ -793,7 +794,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] flex-wrap" style={{ color: "hsl(240 8% 50%)" }}>
+            <div className="flex items-center gap-1.5 text-[11px] flex-wrap" style={{ color: "var(--text-3)" }}>
               <PresenceLabel presence={presence} />
               {/* Chip do canal só em sm+ — em mobile o ícone ao lado do nome
                   já indica a origem; ganha-se uma linha de espaço. */}
@@ -839,7 +840,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               {conv?.assigned_user?.name ? (
                 <span className="truncate">{conv.assigned_user.name}</span>
               ) : (
-                <span style={{ color: "hsl(240 8% 38%)" }}>sem responsável</span>
+                <span style={{ color: "var(--text-4)" }}>sem responsável</span>
               )}
             </div>
           </div>
@@ -847,7 +848,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           {/* Mode selector: Humano / IA / Observando */}
           {conv && (
             <div className="flex items-center rounded-lg overflow-hidden border flex-shrink-0"
-              style={{ border: "1px solid rgba(255,255,255,0.09)", background: "rgba(255,255,255,0.03)" }}>
+              style={{ border: "1px solid var(--border-default)", background: "rgba(255,255,255,0.03)" }}>
               {([
                 { id: "human",     label: "Humano", icon: UserCheck },
                 { id: "ai",        label: "IA",     icon: Bot },
@@ -908,7 +909,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               }}
               disabled={timelineQ.isFetching || convQ.isFetching}
               className="flex items-center justify-center rounded-lg flex-shrink-0 transition-colors disabled:opacity-50"
-              style={{ width: 30, height: 30, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 8% 60%)" }}
+              style={{ width: 30, height: 30, background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-subtle)", color: "var(--text-3)" }}
               title="Atualizar mensagens"
               aria-label="Atualizar mensagens"
             >
@@ -921,7 +922,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             <button
               onClick={() => setMobileActionsOpen((v) => !v)}
               className="flex items-center justify-center rounded-lg"
-              style={{ width: 30, height: 30, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "hsl(240 8% 60%)" }}
+              style={{ width: 30, height: 30, background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-subtle)", color: "var(--text-3)" }}
               title="Mais ações"
               aria-label="Mais ações"
             >
@@ -1008,7 +1009,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               {!timelineQ.hasNextPage && timeline.length >= TIMELINE_PAGE && (
                 <div
                   className="mx-auto my-1 text-[10px]"
-                  style={{ color: "hsl(240 8% 38%)" }}
+                  style={{ color: "var(--text-4)" }}
                 >
                   Início da conversa
                 </div>
@@ -1260,11 +1261,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           <div className="mt-3 rounded-xl p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
             <div className="font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--text-4)", fontSize: 9 }}>Ações</div>
             <button
-              onClick={() => {
-                if (confirm('Resetar memória do agente para esta conversa? O agente vai "esquecer" tudo sobre este contato.')) {
-                  resetAgentMemoryMut.mutate();
-                }
-              }}
+              onClick={() => setShowResetMemoryModal(true)}
               disabled={resetAgentMemoryMut.isPending}
               className="w-full text-left text-[11px] rounded-lg px-2.5 py-1.5 font-medium transition"
               style={{
@@ -1423,12 +1420,12 @@ function CreateDealModal({
           style={{
             background: "linear-gradient(135deg, rgba(20,20,35,0.97) 0%, rgba(10,10,20,0.99) 100%)",
             backdropFilter: "blur(24px)",
-            border: "1px solid rgba(255,255,255,0.10)",
-            boxShadow: "0 24px 48px rgba(0,0,0,0.6)",
+            border: "1px solid var(--border-default)",
+            boxShadow: "0 24px 48px var(--surface-overlay)",
           }}>
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-base font-semibold" style={{ color: "hsl(240 15% 93%)" }}>Nova Negociação</h3>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5" style={{ color: "hsl(240 8% 50%)" }}>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5" style={{ color: "var(--text-3)" }}>
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -1595,14 +1592,14 @@ function TransferDialog({
           background: "linear-gradient(135deg, rgba(20,22,34,0.92) 0%, rgba(10,12,22,0.96) 100%)",
           backdropFilter: "blur(24px) saturate(180%)",
           WebkitBackdropFilter: "blur(24px) saturate(180%)",
-          border: "1px solid rgba(255,255,255,0.10)",
-          boxShadow: "0 24px 60px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)",
+          border: "1px solid var(--border-default)",
+          boxShadow: "0 24px 60px var(--surface-overlay)",
           color: "var(--text-1)",
         }}
       >
         <div
           className="flex items-center justify-between px-5 py-4"
-          style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+          style={{ borderBottom: "1px solid var(--border-subtle)" }}
         >
           <div className="flex items-center gap-2.5">
             <div
@@ -1636,7 +1633,7 @@ function TransferDialog({
         {/* Tabs com 4 opções: Fila · Departamento · Equipe · Agente.
             Departamento foi adicionado nesse refactor — backend já aceitava
             department_id, só faltava expor na UI. */}
-        <div className="flex" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+        <div className="flex" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
           {(["queue", "department", "team", "user"] as const).map((t) => {
             const active = tab === t;
             const label =
@@ -1722,7 +1719,7 @@ function TransferDialog({
           </AnimatedTabContent>
         </div>
 
-        <div className="px-5 pt-4 pb-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+        <div className="px-5 pt-4 pb-4" style={{ borderTop: "1px solid var(--border-subtle)" }}>
           <label className="block text-[11px] font-medium uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
             Motivo (opcional)
           </label>
@@ -1734,7 +1731,7 @@ function TransferDialog({
             placeholder="Contexto para quem receber…"
             style={{
               background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.10)",
+              border: "1px solid var(--border-default)",
               color: "var(--text-1)",
             }}
             onFocus={(e) => {
@@ -1751,8 +1748,8 @@ function TransferDialog({
               onClick={onClose}
               className="rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors"
               style={{
-                background: "rgba(255,255,255,0.05)",
-                border: "1px solid rgba(255,255,255,0.10)",
+                background: "var(--input)",
+                border: "1px solid var(--border-default)",
                 color: "var(--text-2)",
               }}
               onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
@@ -1895,7 +1892,7 @@ function MessageBubble({
           {/* Sender name (grupo) + timestamp em rodapé compacto */}
           <div
             className="flex items-center justify-between gap-2 mt-1.5 px-1 text-[10px]"
-            style={{ color: "hsl(240 8% 50%)" }}
+            style={{ color: "var(--text-3)" }}
           >
             {!isOut && m.sender_name ? (
               <span style={{ color: "#00d46a", fontWeight: 500 }}>{m.sender_name}</span>
@@ -1941,13 +1938,13 @@ function MessageBubble({
             ? {
                 background: "rgba(0,212,106,0.12)",
                 border: `1px solid ${m.is_pinned ? "#00d46a" : "rgba(0,212,106,0.25)"}`,
-                color: "hsl(240 15% 92%)",
+                color: "var(--text-1)",
                 borderBottomRightRadius: 6,
               }
             : {
                 background: "var(--surface-2)",
                 border: `1px solid ${m.is_pinned ? "#00d46a" : "var(--border-default)"}`,
-                color: "hsl(240 15% 90%)",
+                color: "var(--text-1)",
                 borderBottomLeftRadius: 6,
               }
         }
@@ -2215,7 +2212,7 @@ function MediaBody({
               />
             </button>
             {filename && (
-              <span className="text-[10px] truncate" style={{ color: "hsl(240 8% 50%)" }}>
+              <span className="text-[10px] truncate" style={{ color: "var(--text-3)" }}>
                 📎 {filename}
               </span>
             )}
@@ -2244,7 +2241,7 @@ function MediaBody({
               </span>
             </button>
             {filename && (
-              <span className="text-[10px] truncate" style={{ color: "hsl(240 8% 50%)" }}>
+              <span className="text-[10px] truncate" style={{ color: "var(--text-3)" }}>
                 📎 {filename}
               </span>
             )}
@@ -2257,7 +2254,7 @@ function MediaBody({
           <div className="flex flex-col gap-1.5">
             <AudioPlayer url={url} variant={isOut ? "out" : "in"} />
             {filename && (
-              <span className="text-[10px] truncate" style={{ color: "hsl(240 8% 50%)" }}>
+              <span className="text-[10px] truncate" style={{ color: "var(--text-3)" }}>
                 📎 {filename}
               </span>
             )}
@@ -2277,7 +2274,7 @@ function MediaBody({
         >
           <FileText className="h-5 w-5 flex-shrink-0" style={{ color: "hsl(240 8% 70%)" }} />
           <span className="truncate text-xs flex-1">{filename || "Documento"}</span>
-          <Maximize2Icon className="h-3 w-3 flex-shrink-0" style={{ color: "hsl(240 8% 50%)" }} />
+          <Maximize2Icon className="h-3 w-3 flex-shrink-0" style={{ color: "var(--text-3)" }} />
         </button>
       );
     }
@@ -2343,16 +2340,16 @@ function MediaBody({
                   </div>
                 )}
                 {parsed.name && (
-                  <div className="text-xs font-medium truncate" style={{ color: "hsl(240 15% 90%)" }}>
+                  <div className="text-xs font-medium truncate" style={{ color: "var(--text-1)" }}>
                     {parsed.name}
                   </div>
                 )}
                 {parsed.address && (
-                  <div className="text-[10px] truncate" style={{ color: "hsl(240 8% 60%)" }}>
+                  <div className="text-[10px] truncate" style={{ color: "var(--text-3)" }}>
                     {parsed.address}
                   </div>
                 )}
-                <div className="text-[10px] tabular-nums" style={{ color: "hsl(240 8% 50%)" }}>
+                <div className="text-[10px] tabular-nums" style={{ color: "var(--text-3)" }}>
                   {latitude.toFixed(5)}, {longitude.toFixed(5)}
                 </div>
               </div>
@@ -2377,14 +2374,14 @@ function MediaBody({
         className="flex flex-col gap-1.5 rounded-lg p-3 max-w-[300px]"
         style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}
       >
-        <div className="text-[10px] font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
+        <div className="text-[10px] font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
           {list.length} contatos
         </div>
         {list.map((c, i) => (
-          <div key={i} className="text-xs flex items-center justify-between gap-2 py-0.5" style={{ color: "hsl(240 15% 88%)" }}>
+          <div key={i} className="text-xs flex items-center justify-between gap-2 py-0.5" style={{ color: "var(--text-1)" }}>
             <span className="truncate">{c.display_name || "Sem nome"}</span>
             {c.phones && c.phones[0] && (
-              <span className="font-mono text-[10px] flex-shrink-0" style={{ color: "hsl(240 8% 60%)" }}>
+              <span className="font-mono text-[10px] flex-shrink-0" style={{ color: "var(--text-3)" }}>
                 {c.phones[0].number}
               </span>
             )}
@@ -2401,11 +2398,11 @@ function MediaBody({
         className="flex flex-col gap-2 rounded-lg p-3 max-w-[300px]"
         style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}
       >
-        <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 50%)" }}>
+        <div className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
           📊 Enquete{parsed.multi ? " · múltipla escolha" : ""}
         </div>
         {parsed.question && (
-          <div className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+          <div className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
             {parsed.question}
           </div>
         )}
@@ -2418,7 +2415,7 @@ function MediaBody({
                 style={{
                   background: "var(--surface-2)",
                   border: "1px solid var(--border-default)",
-                  color: "hsl(240 15% 88%)",
+                  color: "var(--text-1)",
                 }}
               >
                 <span
@@ -2446,7 +2443,7 @@ function MediaBody({
     return (
       <div className="flex flex-col gap-2 max-w-[320px]">
         {header && (
-          <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "hsl(240 8% 60%)" }}>
+          <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
             {header}
           </div>
         )}
@@ -2489,7 +2486,7 @@ function MediaBody({
           </div>
         )}
         {footer && (
-          <div className="text-[10px]" style={{ color: "hsl(240 8% 55%)" }}>
+          <div className="text-[10px]" style={{ color: "var(--text-3)" }}>
             {footer}
           </div>
         )}
@@ -2501,12 +2498,12 @@ function MediaBody({
     return (
       <div className="flex flex-col gap-2 max-w-[320px]">
         {parsed.listHeader && (
-          <div className="text-[11px] font-medium uppercase tracking-wider" style={{ color: "hsl(240 8% 60%)" }}>
+          <div className="text-[11px] font-medium uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
             {parsed.listHeader}
           </div>
         )}
         {parsed.listTitle && (
-          <div className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+          <div className="text-sm font-medium" style={{ color: "var(--text-1)" }}>
             {parsed.listTitle}
           </div>
         )}
@@ -2516,7 +2513,7 @@ function MediaBody({
             {parsed.listSections.map((sec, i) => (
               <div key={i}>
                 {sec.title && (
-                  <div className="text-[10px] font-medium uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 50%)" }}>
+                  <div className="text-[10px] font-medium uppercase tracking-widest mb-1" style={{ color: "var(--text-3)" }}>
                     {sec.title}
                   </div>
                 )}
@@ -2528,12 +2525,12 @@ function MediaBody({
                       style={{
                         background: "var(--surface-2)",
                         border: "1px solid var(--border-default)",
-                        color: "hsl(240 15% 88%)",
+                        color: "var(--text-1)",
                       }}
                     >
                       <div className="font-medium">{r.title}</div>
                       {r.description && (
-                        <div className="text-[10px] mt-0.5" style={{ color: "hsl(240 8% 60%)" }}>
+                        <div className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>
                           {r.description}
                         </div>
                       )}
@@ -2557,7 +2554,7 @@ function MediaBody({
           </div>
         )}
         {parsed.listFooter && (
-          <div className="text-[10px]" style={{ color: "hsl(240 8% 55%)" }}>
+          <div className="text-[10px]" style={{ color: "var(--text-3)" }}>
             {parsed.listFooter}
           </div>
         )}
@@ -2571,7 +2568,7 @@ function MediaBody({
 
   if (type === "revoke") {
     return (
-      <span className="italic" style={{ color: "hsl(240 8% 50%)" }}>
+      <span className="italic" style={{ color: "var(--text-3)" }}>
         Mensagem apagada
       </span>
     );
@@ -2629,10 +2626,10 @@ function CallCard({ parsed, isOut }: { parsed: ParsedContent; isOut: boolean }) 
         <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-xs font-medium" style={{ color: "hsl(240 15% 92%)" }}>
+        <div className="text-xs font-medium" style={{ color: "var(--text-1)" }}>
           {label}
         </div>
-        <div className="text-[10px]" style={{ color: "hsl(240 8% 60%)" }}>
+        <div className="text-[10px]" style={{ color: "var(--text-3)" }}>
           {isOut ? "Saída" : "Recebida"}
           {isVideo && " · vídeo"}
           {dur ? ` · ${fmtDur(dur)}` : ""}
@@ -2761,11 +2758,11 @@ function ContactCard({
           {name.split(/\s+/).slice(0, 2).map(p => p[0] || "").join("").toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium truncate" style={{ color: "hsl(240 15% 92%)" }}>
+          <div className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>
             {name}
           </div>
           {phones.length > 0 && (
-            <div className="text-[10px]" style={{ color: "hsl(240 8% 55%)" }}>
+            <div className="text-[10px]" style={{ color: "var(--text-3)" }}>
               {phones.length} {phones.length === 1 ? "telefone" : "telefones"}
             </div>
           )}
@@ -2777,7 +2774,7 @@ function ContactCard({
             <div
               key={i}
               className="flex items-center justify-between gap-2 rounded px-2 py-1 text-xs"
-              style={{ color: "hsl(240 15% 88%)", background: "var(--surface-2)" }}
+              style={{ color: "var(--text-1)", background: "var(--surface-2)" }}
             >
               <span className="font-mono truncate">{p.number}</span>
               {p.type && (
@@ -2855,7 +2852,7 @@ function PresenceLabel({ presence }: { presence: { online?: boolean; lastSeen?: 
     if (diffMin > 60 * 24) label = `visto em ${d.toLocaleDateString("pt-BR")}`;
     else if (diffMin > 60) label = `visto há ${Math.floor(diffMin / 60)}h`;
     else if (diffMin > 1) label = `visto há ${diffMin} min`;
-    return <span className="text-[11px]" style={{ color: "hsl(240 8% 55%)" }}>{label}</span>;
+    return <span className="text-[11px]" style={{ color: "var(--text-3)" }}>{label}</span>;
   }
   return null;
 }
@@ -2886,7 +2883,7 @@ function DaySeparator({ at }: { at: string }) {
         style={{
           background: "var(--surface-2)",
           border: "1px solid var(--border-default)",
-          color: "hsl(240 8% 60%)",
+          color: "var(--text-3)",
         }}
       >
         {label}
@@ -2939,7 +2936,7 @@ function ReactionChips({ reactions, isOut }: { reactions?: ReactionEntry[]; isOu
           style={{
             background: "hsl(240 18% 8%)",
             border: "1px solid hsl(240 12% 18%)",
-            color: "hsl(240 15% 90%)",
+            color: "var(--text-1)",
           }}
         >
           <span className="text-[12px] leading-none">{emoji}</span>
@@ -2974,8 +2971,8 @@ function MessageActionsToolbar({
         isOut ? "right-2" : "left-2"
       }`}
       style={{
-        background: "hsl(240 18% 6%)",
-        border: "1px solid hsl(240 12% 16%)",
+        background: "var(--surface-solid)",
+        border: "1px solid var(--border)",
       }}
     >
       {onReact && (
@@ -3242,7 +3239,7 @@ function LinkPreviewCard({ url }: { url: string }) {
         <img src={image_url} alt="" className="h-32 w-full object-cover" loading="lazy" />
       )}
       <div className="px-2.5 py-2">
-        <div className="flex items-center gap-1.5 text-[10px]" style={{ color: "hsl(240 8% 60%)" }}>
+        <div className="flex items-center gap-1.5 text-[10px]" style={{ color: "var(--text-3)" }}>
           {favicon_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={favicon_url} alt="" className="h-3 w-3" />
@@ -3250,12 +3247,12 @@ function LinkPreviewCard({ url }: { url: string }) {
           <span className="truncate">{site_name || new URL(url).host}</span>
         </div>
         {title && (
-          <div className="mt-0.5 text-xs font-medium line-clamp-2" style={{ color: "hsl(240 15% 92%)" }}>
+          <div className="mt-0.5 text-xs font-medium line-clamp-2" style={{ color: "var(--text-1)" }}>
             {title}
           </div>
         )}
         {description && (
-          <div className="mt-0.5 text-[11px] line-clamp-2" style={{ color: "hsl(240 8% 65%)" }}>
+          <div className="mt-0.5 text-[11px] line-clamp-2" style={{ color: "var(--text-2)" }}>
             {description}
           </div>
         )}
@@ -3320,7 +3317,7 @@ function TranscriptionBlock({
         style={{
           color: isOut ? "rgba(255,255,255,0.55)" : "var(--text-3)",
           background: isOut ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.05)",
+          border: "1px solid var(--border-subtle)",
           width: "fit-content",
           maxWidth: "100%",
         }}
@@ -3360,7 +3357,7 @@ function TranscriptionBlock({
         style={{
           color: isOut ? "rgba(255,255,255,0.65)" : "var(--text-3)",
           background: isOut ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.05)",
+          border: "1px solid var(--border-subtle)",
           width: "fit-content",
           maxWidth: "100%",
         }}
@@ -3382,7 +3379,7 @@ function TranscriptionBlock({
       style={{
         color: isOut ? "rgba(255,255,255,0.78)" : "var(--text-2)",
         background: isOut ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        border: "1px solid var(--border-subtle)",
         whiteSpace: "pre-wrap",
         wordBreak: "break-word",
       }}
@@ -3923,7 +3920,7 @@ function Composer({
       className="p-3 relative uniq-keyboard-aware-bottom"
       style={{
         background: composerBg,
-        borderTop: "1px solid hsl(240 12% 16%)",
+        borderTop: "1px solid var(--border)",
       }}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
@@ -3981,7 +3978,7 @@ function Composer({
         </button>
         {/* Hint só em desktop — em mobile não tem teclado físico, "Enter
             envia · Shift+Enter" é confuso e ocupa linha grande do composer. */}
-        <span className="hidden sm:inline ml-auto text-[11px]" style={{ color: "hsl(240 8% 38%)" }}>
+        <span className="hidden sm:inline ml-auto text-[11px]" style={{ color: "var(--text-4)" }}>
           {mode === "message"
             ? "Enter envia · Shift+Enter quebra linha · / resposta rápida"
             : "Nota visível só para a equipe"}
@@ -3999,7 +3996,7 @@ function Composer({
           }}
         >
           <div className="flex items-center justify-between gap-2 mb-2 px-1">
-            <span className="text-[10px] font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 55%)" }}>
+            <span className="text-[10px] font-medium uppercase tracking-widest" style={{ color: "var(--text-3)" }}>
               {pending.length} anexo{pending.length > 1 ? "s" : ""}
             </span>
             <div className="flex items-center gap-2">
@@ -4017,7 +4014,7 @@ function Composer({
                 onClick={clearPending}
                 disabled={uploading}
                 className="text-[10px] hover:underline disabled:opacity-40"
-                style={{ color: "hsl(240 8% 60%)" }}
+                style={{ color: "var(--text-3)" }}
               >
                 Limpar tudo
               </button>
@@ -4066,10 +4063,10 @@ function Composer({
                   </div>
                 )}
                 <div className="px-1.5 py-1">
-                  <div className="truncate text-[10px]" style={{ color: "hsl(240 15% 88%)" }} title={att.file.name}>
+                  <div className="truncate text-[10px]" style={{ color: "var(--text-1)" }} title={att.file.name}>
                     {att.file.name}
                   </div>
-                  <div className="text-[9px]" style={{ color: "hsl(240 8% 50%)" }}>
+                  <div className="text-[9px]" style={{ color: "var(--text-3)" }}>
                     {humanSize(att.file.size)}
                   </div>
                 </div>
@@ -4084,8 +4081,8 @@ function Composer({
           <div
             className="absolute bottom-full left-0 right-20 mb-2 max-h-60 overflow-auto rounded-lg shadow-xl"
             style={{
-              background: "hsl(240 18% 6%)",
-              border: "1px solid hsl(240 12% 14%)",
+              background: "var(--surface-solid)",
+              border: "1px solid var(--border)",
             }}
           >
             <div
@@ -4113,14 +4110,14 @@ function Composer({
                       className="mt-0.5 rounded px-1.5 py-0.5 font-mono text-[10px]"
                       style={{
                         background: "var(--surface-2)",
-                        color: "hsl(240 15% 85%)",
+                        color: "var(--text-2)",
                       }}
                     >
                       {qr.shortcut || "—"}
                     </span>
                     <span className="min-w-0 flex-1">
                       {qr.title && (
-                        <div className="text-xs font-medium" style={{ color: "hsl(240 15% 90%)" }}>
+                        <div className="text-xs font-medium" style={{ color: "var(--text-1)" }}>
                           {qr.title}
                         </div>
                       )}
@@ -4158,7 +4155,7 @@ function Composer({
                 onClick={onClearReply}
                 className="rounded-full p-0.5 hover:bg-white/10"
                 title="Cancelar resposta"
-                style={{ color: "hsl(240 8% 60%)" }}
+                style={{ color: "var(--text-3)" }}
               >
                 <X className="h-3 w-3" />
               </button>
@@ -4173,7 +4170,7 @@ function Composer({
             style={{
               background: "rgba(245,158,11,0.08)",
               borderLeft: "3px solid #f59e0b",
-              color: "hsl(240 15% 88%)",
+              color: "var(--text-1)",
             }}
           >
             <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" style={{ color: "#f59e0b" }} />
@@ -4181,7 +4178,7 @@ function Composer({
               <div className="font-medium" style={{ color: "#f59e0b" }}>
                 Janela de 24h fechada
               </div>
-              <div style={{ color: "hsl(240 8% 65%)" }}>
+              <div style={{ color: "var(--text-2)" }}>
                 {constraints?.allows_template
                   ? "Para iniciar conversa, use um template aprovado."
                   : "Aguarde o cliente responder pra reabrir o canal."}
@@ -4208,7 +4205,7 @@ function Composer({
               type="button"
               onClick={() => setMode("message")}
               className="text-[11px]"
-              style={{ color: "hsl(240 8% 60%)" }}
+              style={{ color: "var(--text-3)" }}
             >
               voltar pra mensagem
             </button>
@@ -4238,7 +4235,7 @@ function Composer({
               style={{
                 background: "var(--surface-2)",
                 border: `1px solid ${mode === "note" ? "rgba(245,158,11,0.45)" : "hsl(240 12% 16%)"}`,
-                color: "hsl(240 15% 92%)",
+                color: "var(--text-1)",
                 minHeight: 44,
                 maxHeight: 140,
                 lineHeight: 1.35,
@@ -4408,7 +4405,7 @@ function Composer({
             style={{
               background: "var(--surface-2)",
               border: `1px solid ${mode === "note" ? "rgba(245,158,11,0.35)" : "hsl(240 12% 16%)"}`,
-              color: "hsl(240 15% 90%)",
+              color: "var(--text-1)",
             }}
             placeholder={mode === "message"
               ? (hasAttachment ? "Legenda do anexo (opcional)…" : "Digite sua mensagem… (/ para respostas rápidas)")
@@ -4588,8 +4585,8 @@ function ActionRow({
         className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors"
         style={{
           background: "transparent",
-          color: "hsl(240 15% 88%)",
-          border: "1px solid hsl(240 12% 16%)",
+          color: "var(--text-1)",
+          border: "1px solid var(--border)",
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.background = "rgba(0,212,106,0.06)";
@@ -4665,29 +4662,29 @@ function ForwardDialog({
   };
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}>
-      <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+      <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
-          <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>Encaminhar mensagem</h3>
-          <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "hsl(240 8% 60%)" }}>
+          <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Encaminhar mensagem</h3>
+          <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "var(--text-3)" }}>
             <X className="h-4 w-4" />
           </button>
         </div>
         <div className="px-4 py-3">
           <div className="mb-2 rounded-md px-3 py-2 text-[11px]" style={{ background: "var(--surface-2)", borderLeft: "3px solid #00d46a" }}>
-            <div className="font-medium" style={{ color: "hsl(240 15% 90%)" }}>
+            <div className="font-medium" style={{ color: "var(--text-1)" }}>
               {msg.sender_name || (msg.direction === "out" ? "Você" : "Cliente")}
             </div>
-            <div className="truncate" style={{ color: "hsl(240 8% 60%)" }}>
+            <div className="truncate" style={{ color: "var(--text-3)" }}>
               {replyPreviewText(msg)}
             </div>
           </div>
           <div className="relative mb-2">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "hsl(240 8% 50%)" }} />
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar contato ou conversa…" className="w-full rounded-md py-2 pl-9 pr-3 text-sm outline-none" style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} />
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-3)" }} />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar contato ou conversa…" className="w-full rounded-md py-2 pl-9 pr-3 text-sm outline-none" style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-1)" }} />
           </div>
           <div className="max-h-72 overflow-y-auto rounded-md" style={{ background: "var(--surface-2)" }}>
             {items.length === 0 ? (
-              <div className="p-4 text-center text-xs" style={{ color: "hsl(240 8% 55%)" }}>
+              <div className="p-4 text-center text-xs" style={{ color: "var(--text-3)" }}>
                 {listQ.isLoading ? "Carregando…" : "Nenhuma conversa encontrada"}
               </div>
             ) : (
@@ -4696,7 +4693,7 @@ function ForwardDialog({
                   const isSel = selected.has(c.id);
                   return (
                     <li key={c.id}>
-                      <button type="button" onClick={() => toggle(c.id)} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-white/5" style={{ color: "hsl(240 15% 88%)" }}>
+                      <button type="button" onClick={() => toggle(c.id)} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-white/5" style={{ color: "var(--text-1)" }}>
                         <span className="min-w-0 flex-1 truncate">{c.contact?.name || c.subject || c.channel_key}</span>
                         {isSel ? (
                           <Check className="h-4 w-4 flex-shrink-0" style={{ color: "#00d46a" }} />
@@ -4734,16 +4731,16 @@ function EditMessageDialog({
   const [text, setText] = useState(initial);
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}>
-      <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+      <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
-          <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>Editar mensagem</h3>
-          <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "hsl(240 8% 60%)" }}>
+          <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Editar mensagem</h3>
+          <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "var(--text-3)" }}>
             <X className="h-4 w-4" />
           </button>
         </div>
         <div className="px-4 py-3">
-          <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={4} className="w-full rounded-md px-3 py-2 text-sm outline-none" style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }} />
-          <p className="mt-1 text-[10px]" style={{ color: "hsl(240 8% 50%)" }}>WhatsApp aceita edição em até 15 minutos do envio.</p>
+          <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={4} className="w-full rounded-md px-3 py-2 text-sm outline-none" style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-1)" }} />
+          <p className="mt-1 text-[10px]" style={{ color: "var(--text-3)" }}>WhatsApp aceita edição em até 15 minutos do envio.</p>
         </div>
         <div className="flex items-center justify-end gap-2 border-t px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
           <button type="button" onClick={onClose} className="rounded-md px-3 py-1.5 text-xs" style={{ color: "hsl(240 8% 70%)" }}>Cancelar</button>
@@ -4783,17 +4780,17 @@ function MessageInfoDialog({
   const phone = (jid: string) => jid.split("@")[0];
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}>
-      <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+      <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
-          <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>Informações da mensagem</h3>
-          <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "hsl(240 8% 60%)" }}>
+          <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Informações da mensagem</h3>
+          <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "var(--text-3)" }}>
             <X className="h-4 w-4" />
           </button>
         </div>
         <div className="px-4 py-3">
           <div className="mb-3 rounded-md px-3 py-2 text-[11px]" style={{ background: "var(--surface-2)" }}>
-            <div className="font-medium" style={{ color: "hsl(240 15% 90%)" }}>{replyPreviewText(msg)}</div>
-            <div className="mt-0.5 text-[10px]" style={{ color: "hsl(240 8% 55%)" }}>Enviada {fmt(msg.created_at)}</div>
+            <div className="font-medium" style={{ color: "var(--text-1)" }}>{replyPreviewText(msg)}</div>
+            <div className="mt-0.5 text-[10px]" style={{ color: "var(--text-3)" }}>Enviada {fmt(msg.created_at)}</div>
           </div>
           <div className="mb-3 grid grid-cols-2 gap-2">
             <StatusCard label="Entregue" when={msg.delivered_at || data?.delivered_at} icon={<CheckCheck className="h-3 w-3" />} color="hsl(240 8% 65%)" />
@@ -4808,9 +4805,9 @@ function MessageInfoDialog({
                   </div>
                   <ul className="space-y-1">
                     {data.read.map((r, i) => (
-                      <li key={i} className="flex items-center justify-between text-xs" style={{ color: "hsl(240 15% 88%)" }}>
+                      <li key={i} className="flex items-center justify-between text-xs" style={{ color: "var(--text-1)" }}>
                         <span className="font-mono">{phone(r.participant_jid)}</span>
-                        <span className="text-[10px]" style={{ color: "hsl(240 8% 60%)" }}>{fmt(r.timestamp)}</span>
+                        <span className="text-[10px]" style={{ color: "var(--text-3)" }}>{fmt(r.timestamp)}</span>
                       </li>
                     ))}
                   </ul>
@@ -4818,14 +4815,14 @@ function MessageInfoDialog({
               )}
               {data && data.delivered.length > 0 && (
                 <div>
-                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 65%)" }}>
+                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest" style={{ color: "var(--text-2)" }}>
                     <CheckCheck className="h-3 w-3" /> Entregue a · {data.delivered.length}
                   </div>
                   <ul className="space-y-1">
                     {data.delivered.map((r, i) => (
-                      <li key={i} className="flex items-center justify-between text-xs" style={{ color: "hsl(240 15% 88%)" }}>
+                      <li key={i} className="flex items-center justify-between text-xs" style={{ color: "var(--text-1)" }}>
                         <span className="font-mono">{phone(r.participant_jid)}</span>
-                        <span className="text-[10px]" style={{ color: "hsl(240 8% 60%)" }}>{fmt(r.timestamp)}</span>
+                        <span className="text-[10px]" style={{ color: "var(--text-3)" }}>{fmt(r.timestamp)}</span>
                       </li>
                     ))}
                   </ul>
@@ -4834,7 +4831,7 @@ function MessageInfoDialog({
             </div>
           ) : null}
           {q.isLoading && (
-            <div className="text-center text-xs py-2" style={{ color: "hsl(240 8% 55%)" }}>Carregando…</div>
+            <div className="text-center text-xs py-2" style={{ color: "var(--text-3)" }}>Carregando…</div>
           )}
         </div>
       </div>
@@ -4851,7 +4848,7 @@ function StatusCard({
   color: string;
 }) {
   return (
-    <div className="rounded-md px-3 py-2" style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 14%)" }}>
+    <div className="rounded-md px-3 py-2" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
       <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest" style={{ color }}>
         {icon} {label}
       </div>
@@ -4909,7 +4906,7 @@ function EmojiPickerPanel({ onPick, onClose }: { onPick: (e: string) => void; on
       className="absolute bottom-full mb-2 left-0 z-50 w-72 rounded-lg shadow-2xl"
       style={{
         background: "hsl(240 18% 7%)",
-        border: "1px solid hsl(240 12% 16%)",
+        border: "1px solid var(--border)",
         maxHeight: 360,
       }}
     >
@@ -4921,7 +4918,7 @@ function EmojiPickerPanel({ onPick, onClose }: { onPick: (e: string) => void; on
           placeholder="Buscar emoji..."
           autoFocus
           className="w-full rounded px-2 py-1 text-xs outline-none"
-          style={{ background: "var(--surface-2)", color: "hsl(240 15% 90%)", border: "1px solid hsl(240 12% 16%)" }}
+          style={{ background: "var(--surface-2)", color: "var(--text-1)", border: "1px solid var(--border)" }}
         />
       </div>
       <div className="overflow-y-auto" style={{ maxHeight: 300 }}>
@@ -4959,7 +4956,7 @@ function EmojiPickerPanel({ onPick, onClose }: { onPick: (e: string) => void; on
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="px-2 py-1.5">
-      <div className="text-[9px] font-medium uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 50%)" }}>
+      <div className="text-[9px] font-medium uppercase tracking-widest mb-1" style={{ color: "var(--text-3)" }}>
         {title}
       </div>
       <div className="grid grid-cols-8 gap-0.5">
@@ -5054,10 +5051,10 @@ function SnoozeDialog({
   };
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center uniq-fade-in" style={{ background: "var(--surface-overlay)", backdropFilter: "blur(4px)" }}>
-      <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 14%)" }}>
+      <div className="w-full max-w-md rounded-2xl shadow-2xl uniq-scale-in" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
         <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
-          <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 92%)" }}>Colocar em soneca</h3>
-          <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "hsl(240 8% 60%)" }}>
+          <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Colocar em soneca</h3>
+          <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-white/10" style={{ color: "var(--text-3)" }}>
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -5068,19 +5065,19 @@ function SnoozeDialog({
               type="button"
               onClick={() => submit(p.h)}
               className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition-colors hover:bg-white/5"
-              style={{ color: "hsl(240 15% 88%)", border: "1px solid hsl(240 12% 16%)" }}
+              style={{ color: "var(--text-1)", border: "1px solid var(--border)" }}
             >
               <span className="flex items-center gap-2">
-                <Clock3 className="h-3.5 w-3.5" style={{ color: "hsl(240 8% 55%)" }} />
+                <Clock3 className="h-3.5 w-3.5" style={{ color: "var(--text-3)" }} />
                 {p.label}
               </span>
-              <span className="text-[10px]" style={{ color: "hsl(240 8% 50%)" }}>
+              <span className="text-[10px]" style={{ color: "var(--text-3)" }}>
                 até {new Date(Date.now() + p.h * 3600_000).toLocaleString("pt-BR", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
               </span>
             </button>
           ))}
           <div className="border-t pt-3 mt-3" style={{ borderColor: "hsl(240 12% 14%)" }}>
-            <div className="text-[10px] font-medium uppercase tracking-widest mb-1" style={{ color: "hsl(240 8% 55%)" }}>
+            <div className="text-[10px] font-medium uppercase tracking-widest mb-1" style={{ color: "var(--text-3)" }}>
               Personalizar
             </div>
             <div className="flex items-center gap-2">
@@ -5091,9 +5088,9 @@ function SnoozeDialog({
                 value={hours}
                 onChange={(e) => setHours(parseInt(e.target.value) || 0)}
                 className="w-20 rounded-md px-2 py-1.5 text-sm outline-none"
-                style={{ background: "var(--surface-2)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 90%)" }}
+                style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-1)" }}
               />
-              <span className="text-xs" style={{ color: "hsl(240 8% 60%)" }}>horas</span>
+              <span className="text-xs" style={{ color: "var(--text-3)" }}>horas</span>
               <button
                 type="button"
                 onClick={() => submit(hours)}

@@ -35,8 +35,8 @@ export function NewConversationModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }}>
-      <div className="w-full max-w-md rounded-xl border p-5" style={{ background: "hsl(240 12% 8%)", borderColor: "rgba(255,255,255,0.08)" }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "var(--surface-overlay)" }}>
+      <div className="w-full max-w-md rounded-xl border p-5" style={{ background: "var(--surface-solid)", borderColor: "var(--border-subtle)" }}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Nova conversa</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/5">
@@ -50,7 +50,7 @@ export function NewConversationModal({
               value={instanceId}
               onChange={(e) => setInstanceId(e.target.value)}
               className="w-full rounded-lg px-3 py-2 text-xs outline-none"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)", color: "hsl(240 15% 90%)" }}
+              style={{ background: "var(--input)", border: "1px solid var(--border-default)", color: "var(--text-1)" }}
             >
               <option value="">Selecione uma instância</option>
               {instances.map((inst) => (
@@ -67,7 +67,7 @@ export function NewConversationModal({
               onChange={(e) => setTo(e.target.value)}
               placeholder="5511999999999 ou ID do contato"
               className="w-full rounded-lg px-3 py-2 text-xs outline-none"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)", color: "hsl(240 15% 90%)" }}
+              style={{ background: "var(--input)", border: "1px solid var(--border-default)", color: "var(--text-1)" }}
             />
           </div>
           <div>
@@ -78,14 +78,14 @@ export function NewConversationModal({
               rows={3}
               placeholder="Digite a mensagem…"
               className="w-full rounded-lg px-3 py-2 text-xs outline-none resize-none"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)", color: "hsl(240 15% 90%)" }}
+              style={{ background: "var(--input)", border: "1px solid var(--border-default)", color: "var(--text-1)" }}
             />
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <button
               onClick={onClose}
               className="rounded-lg px-3 py-2 text-xs font-medium"
-              style={{ background: "rgba(255,255,255,0.06)", color: "var(--text-2)" }}
+              style={{ background: "var(--input)", color: "var(--text-2)" }}
             >
               Cancelar
             </button>

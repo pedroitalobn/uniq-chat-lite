@@ -144,7 +144,7 @@ export function AudioRecorderButton({ onRecorded, disabled, title = "Gravar áud
           onClick={cancel}
           title="Cancelar"
           className="rounded p-1 hover:bg-white/5"
-          style={{ color: "hsl(240 8% 60%)" }}>
+          style={{ color: "var(--text-3)" }}>
           <X className="h-3.5 w-3.5" />
         </button>
         <button

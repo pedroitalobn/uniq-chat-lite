@@ -416,7 +416,7 @@ function KnowledgeHero({
       <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           {/* Título "Base de conhecimento" + ícone agora no ModuleHeader. */}
-          <p className="text-sm" style={{ color: "hsl(240 8% 50%)" }}>
+          <p className="text-sm" style={{ color: "var(--text-3)" }}>
             Artigos, tutoriais e FAQs para sua equipe e clientes
           </p>
         </div>
@@ -446,9 +446,9 @@ function KnowledgeHero({
           placeholder="Buscar artigos, tutoriais, FAQs..."
           className="w-full rounded-2xl text-sm transition-all"
           style={{
-            background: "rgba(255,255,255,0.05)",
+            background: "var(--input)",
             border: "1px solid rgba(255,255,255,0.10)",
-            color: "hsl(240 15% 90%)",
+            color: "var(--text-1)",
             padding: "14px 48px 14px 48px",
             outline: "none",
             backdropFilter: "blur(8px)",
@@ -463,13 +463,13 @@ function KnowledgeHero({
           }}
         />
         <kbd className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-mono px-1.5 py-0.5 rounded hidden sm:block"
-          style={{ background: "rgba(255,255,255,0.06)", color: "hsl(240 8% 40%)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          style={{ background: "rgba(255,255,255,0.06)", color: "var(--text-4)", border: "1px solid rgba(255,255,255,0.08)" }}>
           ⌘K
         </kbd>
         {search && (
           <button onClick={() => onSearch("")}
             className="absolute right-10 top-1/2 -translate-y-1/2 sm:right-14 p-0.5 rounded-full"
-            style={{ color: "hsl(240 8% 40%)" }}>
+            style={{ color: "var(--text-4)" }}>
             <X className="w-3.5 h-3.5" />
           </button>
         )}
@@ -484,7 +484,7 @@ function KnowledgeHero({
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="flex items-center gap-2">
             <Icon className="w-3.5 h-3.5" style={{ color }} />
-            <span className="text-sm font-semibold" style={{ color: "hsl(240 15% 88%)" }}>{value}</span>
+            <span className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>{value}</span>
             <span className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>{label}</span>
           </div>
         ))}
@@ -611,7 +611,7 @@ function CategoryPills({
             {cat.name}
             {cat.article_count !== undefined && (
               <span className="text-[10px] px-1 rounded-full ml-0.5"
-                style={{ background: "rgba(255,255,255,0.08)", color: "hsl(240 8% 40%)" }}>
+                style={{ background: "rgba(255,255,255,0.08)", color: "var(--text-4)" }}>
                 {cat.article_count}
               </span>
             )}
@@ -628,7 +628,7 @@ function CategoryPills({
       <button
         onClick={onNew}
         className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl transition-all duration-150"
-        style={{ color: "hsl(240 8% 40%)", border: "1px dashed rgba(255,255,255,0.10)", borderRadius: 10 }}>
+        style={{ color: "var(--text-4)", border: "1px dashed rgba(255,255,255,0.10)", borderRadius: 10 }}>
         <Plus className="w-3 h-3" />
         Nova
       </button>

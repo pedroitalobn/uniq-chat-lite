@@ -181,7 +181,7 @@ export default function IntegrationsPage() {
                       i < sections.length - 1 ? "border-b" : ""
                     )}
                     style={{
-                      borderColor: "rgba(255,255,255,0.06)",
+                      borderColor: "var(--border-subtle)",
                       background: isActive ? "rgba(0,212,106,0.10)" : "transparent",
                     }}
                     onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--surface-3)"; }}
@@ -448,12 +448,12 @@ function APIKeysSection() {
   return (
     <div className="space-y-5">
       {/* Create key */}
-      <div className="rounded-2xl p-5 space-y-4" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+      <div className="rounded-2xl p-5 space-y-4" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
         <div className="flex items-center gap-3 mb-1">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.15)" }}>
             <Key className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
           </div>
-          <h2 className="text-sm font-medium" style={{ color: "hsl(240 15% 88%)" }}>Criar nova chave</h2>
+          <h2 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Criar nova chave</h2>
         </div>
 
         <div className="flex gap-3">
@@ -470,7 +470,7 @@ function APIKeysSection() {
               <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: "var(--green)" }} />
               <p className="text-sm font-medium" style={{ color: "#86efac" }}>Chave <strong>{createdKey.name}</strong> criada! Copie agora — não será exibida novamente.</p>
             </div>
-            <div className="flex items-center gap-2 rounded-xl px-3 py-2.5" style={{ background: "hsl(240 18% 4%)", border: "1px solid hsl(240 12% 11%)" }}>
+            <div className="flex items-center gap-2 rounded-xl px-3 py-2.5" style={{ background: "hsl(240 18% 4%)", border: "1px solid var(--border)" }}>
               <code className="flex-1 text-sm font-mono truncate" style={{ color: "hsl(240 15% 80%)" }}>
                 {showKey ? createdKey.key : createdKey.key.replace(/(?<=^.{12}).+(?=.{4}$)/, "•".repeat(24))}
               </code>
@@ -487,8 +487,8 @@ function APIKeysSection() {
       </div>
 
       {/* Keys list */}
-      <div className="rounded-2xl overflow-hidden" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
-        <div className="px-5 py-4" style={{ borderBottom: "1px solid hsl(240 12% 11%)" }}>
+      <div className="rounded-2xl overflow-hidden" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border)" }}>
           <h2 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>{data?.length || 0} chave{(data?.length || 0) !== 1 ? "s" : ""} ativa{(data?.length || 0) !== 1 ? "s" : ""}</h2>
         </div>
         {isLoading ? (
@@ -500,7 +500,7 @@ function APIKeysSection() {
             <div key={k.id} className="px-5 py-4 flex items-center gap-4 transition-colors" style={{ borderBottom: i < data.length - 1 ? "1px solid var(--border-default)" : undefined }}
               onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-2)")} onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
               <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}><Key className="w-3.5 h-3.5" style={{ color: "hsl(240 8% 42%)" }} /></div>
-              <div className="flex-1 min-w-0"><p className="text-sm font-medium" style={{ color: "hsl(240 15% 80%)" }}>{k.name}</p><p className="text-xs font-mono mt-0.5" style={{ color: "hsl(240 8% 38%)" }}>{k.masked_key}</p></div>
+              <div className="flex-1 min-w-0"><p className="text-sm font-medium" style={{ color: "hsl(240 15% 80%)" }}>{k.name}</p><p className="text-xs font-mono mt-0.5" style={{ color: "var(--text-4)" }}>{k.masked_key}</p></div>
               <div className="text-right flex-shrink-0 hidden sm:block">{k.last_used_at ? <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>Usado {new Date(k.last_used_at).toLocaleDateString("pt-BR")}</p> : <p className="text-xs" style={{ color: "hsl(240 8% 30%)" }}>Nunca usada</p>}<p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 30%)" }}>Criada {new Date(k.created_at).toLocaleDateString("pt-BR")}</p></div>
               <button onClick={() => del.mutate(k.id)} className="p-2 rounded-lg transition-colors flex-shrink-0" style={{ color: "hsl(240 8% 32%)" }} onMouseEnter={e => (e.currentTarget.style.color = "#ef4444")} onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 32%)")}><Trash2 className="w-4 h-4" /></button>
             </div>
@@ -509,7 +509,7 @@ function APIKeysSection() {
       </div>
 
       {/* Usage docs */}
-      <div className="rounded-2xl p-5 space-y-4" style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+      <div className="rounded-2xl p-5 space-y-4" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
         <h2 className="text-xs font-medium uppercase tracking-widest" style={{ color: "hsl(240 8% 42%)" }}>Como usar</h2>
         <div className="space-y-4">
           <div><p className="text-xs mb-2" style={{ color: "hsl(240 8% 42%)" }}>Header de autenticação</p><div className="rounded-xl px-4 py-3" style={{ background: "hsl(240 20% 3.5%)", border: "1px solid hsl(240 12% 10%)" }}><code className="text-xs font-mono" style={{ color: "var(--green)" }}>Authorization: Bearer sc_...</code></div></div>

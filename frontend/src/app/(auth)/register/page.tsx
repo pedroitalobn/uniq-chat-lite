@@ -269,7 +269,7 @@ function StepCheckEmail({ email, onBack, planID }: { email: string; onBack: () =
             target="_blank"
             rel="noopener noreferrer"
             className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all duration-150"
-            style={{ background: "hsl(240 12% 8%)", border: "1px solid hsl(240 12% 14%)", color: "hsl(240 15% 72%)" }}
+            style={{ background: "var(--surface-solid)", border: "1px solid var(--border)", color: "var(--text-2)" }}
           >
             <ExternalLink className="w-3.5 h-3.5" />
             Abrir {gmailLink ? "Gmail" : "Outlook"}
@@ -277,7 +277,7 @@ function StepCheckEmail({ email, onBack, planID }: { email: string; onBack: () =
         ) : (
           <div
             className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm"
-            style={{ background: "hsl(240 12% 8%)", border: "1px solid hsl(240 12% 14%)", color: "hsl(240 8% 45%)" }}
+            style={{ background: "var(--surface-solid)", border: "1px solid var(--border)", color: "var(--text-3)" }}
           >
             <Mail className="w-3.5 h-3.5" />
             Verifique sua caixa de entrada
@@ -385,8 +385,8 @@ function RegisterContent() {
         <div
           className="rounded-2xl p-7 overflow-hidden"
           style={{
-            background: "hsl(240 18% 6%)",
-            border: "1px solid hsl(240 12% 11%)",
+            background: "var(--surface-solid)",
+            border: "1px solid var(--border)",
             boxShadow: "0 32px 64px rgba(0,0,0,0.5)",
           }}
         >

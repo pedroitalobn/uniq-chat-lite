@@ -28,8 +28,8 @@ export function CRMTabs({ className }: { className?: string }) {
         "flex items-center gap-0.5 rounded-2xl p-1 " + (className ?? "")
       }
       style={{
-        background: "hsl(240 18% 6%)",
-        border: "1px solid hsl(240 12% 13%)",
+        background: "var(--surface-solid)",
+        border: "1px solid var(--border)",
       }}
     >
       {TABS.map((t) => {
@@ -48,7 +48,7 @@ export function CRMTabs({ className }: { className?: string }) {
                   }
                 : {
                     background: "transparent",
-                    color: "hsl(240 8% 55%)",
+                    color: "var(--text-3)",
                     border: "1px solid transparent",
                   }
             }

@@ -145,7 +145,7 @@ export default function DepartmentsPage() {
       {confirmDel && (
         <ConfirmDialog
           title="Excluir departamento"
-          body={<>O departamento <span style={{ color: "hsl(240 15% 92%)" }}>&quot;{confirmDel.name}&quot;</span> será removido. Times e filas vinculados ficarão sem departamento.</>}
+          body={<>O departamento <span style={{ color: "var(--text-1)" }}>&quot;{confirmDel.name}&quot;</span> será removido. Times e filas vinculados ficarão sem departamento.</>}
           confirmLabel="Excluir"
           variant="danger"
           onConfirm={() => {

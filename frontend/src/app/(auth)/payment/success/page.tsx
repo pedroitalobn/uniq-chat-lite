@@ -103,7 +103,7 @@ function SuccessContent() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6"
-      style={{ background: "hsl(240 20% 4%)" }}>
+      style={{ background: "var(--surface-solid)" }}>
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px]"
@@ -127,7 +127,7 @@ function SuccessContent() {
         <h1 className="text-2xl font-extrabold mb-2" style={{ color: "hsl(240 15% 94%)" }}>
           {finalizing ? "Ativando sua conta..." : finalizeError ? "Pagamento recebido — ainda confirmando" : "Pagamento confirmado!"}
         </h1>
-        <p className="text-sm mb-2" style={{ color: "hsl(240 8% 55%)" }}>
+        <p className="text-sm mb-2" style={{ color: "var(--text-3)" }}>
           {finalizing
             ? "Estamos conferindo seu pagamento. Isso leva alguns segundos."
             : finalizeError
@@ -137,13 +137,13 @@ function SuccessContent() {
 
         {sessionId && (
           <p className="text-[11px] font-mono mb-6 px-3 py-1.5 rounded-lg inline-block"
-            style={{ background: "var(--surface-2)", color: "hsl(240 8% 38%)", border: "1px solid hsl(240 12% 12%)" }}>
+            style={{ background: "var(--surface-2)", color: "var(--text-4)", border: "1px solid hsl(240 12% 12%)" }}>
             Ref: {sessionId.slice(0, 24)}...
           </p>
         )}
 
         <div className="rounded-2xl p-5 mb-6 space-y-3"
-          style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+          style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
           <p className="text-xs font-medium" style={{ color: "hsl(240 15% 75%)" }}>
             O que acontece agora?
           </p>
@@ -154,7 +154,7 @@ function SuccessContent() {
             "Acesse webhooks, automações e muito mais",
           ].map((item) => (
             <div key={item} className="flex items-center gap-2.5 text-xs"
-              style={{ color: "hsl(240 8% 55%)" }}>
+              style={{ color: "var(--text-3)" }}>
               <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#00d46a" }} />
               {item}
             </div>
@@ -181,7 +181,7 @@ function SuccessContent() {
 export default function PaymentSuccessPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "hsl(240 20% 4%)" }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--surface-solid)" }}>
         <Loader2 className="w-6 h-6 animate-spin" style={{ color: "#00d46a" }} />
       </div>
     }>

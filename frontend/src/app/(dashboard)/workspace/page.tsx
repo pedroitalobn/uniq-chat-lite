@@ -211,7 +211,7 @@ export default function WorkspacePage() {
         className="rounded-2xl p-5 space-y-3 animate-fade-in-up"
         style={{ ...cardStyle, animationDelay: "100ms", animationFillMode: "both" }}
       >
-        <h3 className="text-sm font-medium" style={{ color: "hsl(240 15% 85%)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--text-2)" }}>
           O que é um Workspace?
         </h3>
         <p className="text-sm" style={{ color: "var(--text-3)" }}>

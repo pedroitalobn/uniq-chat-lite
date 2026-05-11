@@ -183,7 +183,7 @@ export default function TeamsPage() {
       {confirmDel && (
         <ConfirmDialog
           title="Excluir equipe"
-          body={<>A equipe <span style={{ color: "hsl(240 15% 92%)" }}>&quot;{confirmDel.name}&quot;</span> será removida. Membros mantém seus tickets em curso.</>}
+          body={<>A equipe <span style={{ color: "var(--text-1)" }}>&quot;{confirmDel.name}&quot;</span> será removida. Membros mantém seus tickets em curso.</>}
           confirmLabel="Excluir"
           variant="danger"
           onConfirm={() => {

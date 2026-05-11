@@ -241,7 +241,7 @@ function FilterDropdown({
                 )}
                 <span className="flex-1 truncate">{opt.label}</span>
                 {opt.sub && (
-                  <span className="text-[10px]" style={{ color: "hsl(240 8% 38%)" }}>{opt.sub}</span>
+                  <span className="text-[10px]" style={{ color: "var(--text-4)" }}>{opt.sub}</span>
                 )}
                 {isSelected && <Check className="h-3 w-3" />}
               </button>

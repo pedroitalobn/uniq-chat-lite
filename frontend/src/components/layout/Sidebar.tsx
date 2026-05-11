@@ -235,7 +235,7 @@ export function Sidebar() {
 
       {/* Logo + collapse toggle */}
       <div className="relative flex items-center justify-between px-3 h-14 flex-shrink-0"
-        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        style={{ borderBottom: "1px solid var(--border-subtle)" }}>
         {!collapsed && <Logo height={36} />}
         <button
           onClick={() => setCollapsed((c) => !c)}
@@ -410,7 +410,7 @@ export function Sidebar() {
                         transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
                       }
                     : {
-                        background: "rgba(255,255,255,0.05)",
+                        background: "var(--input)",
                         border: "1px solid rgba(255,255,255,0.07)",
                         color: "inherit",
                         transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",

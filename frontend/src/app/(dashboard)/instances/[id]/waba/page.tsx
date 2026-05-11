@@ -1084,10 +1084,10 @@ function CreateTemplateModal({ instanceId, onClose, onCreated }: {
                   </p>
                 )}
                 {buttons.length > 0 && (
-                  <div className="mt-2 -mx-3 -mb-3 border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+                  <div className="mt-2 -mx-3 -mb-3 border-t" style={{ borderColor: "var(--border-subtle)" }}>
                     {buttons.map((b) => (
                       <div key={b.id} className="px-3 py-2 text-center text-[13px] font-medium border-b last:border-b-0"
-                        style={{ color: "#53bdeb", borderColor: "rgba(255,255,255,0.06)" }}>
+                        style={{ color: "#53bdeb", borderColor: "var(--border-subtle)" }}>
                         {b.type === "PHONE_NUMBER" && "📞 "}
                         {b.type === "URL" && "🔗 "}
                         {b.type === "COPY_CODE" && "📋 "}

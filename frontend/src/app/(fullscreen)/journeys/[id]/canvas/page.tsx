@@ -431,7 +431,7 @@ function StepLibrary({ onAdd }: { onAdd: (type: StepType) => void }) {
       {/* Header */}
       <div style={{
         padding: "12px 12px 8px",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        borderBottom: "1px solid var(--border-subtle)",
         background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)",
       }}>
         <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", opacity: 0.5, marginBottom: 8 }}>

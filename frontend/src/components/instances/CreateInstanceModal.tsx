@@ -308,8 +308,8 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
       <div
         className="relative w-full max-w-md rounded-2xl shadow-2xl animate-fade-in-up overflow-y-auto max-h-[90vh]"
         style={{
-          background: "hsl(240 18% 6%)",
-          border: "1px solid hsl(240 12% 14%)",
+          background: "var(--surface-solid)",
+          border: "1px solid var(--border)",
           boxShadow: "0 0 0 1px hsl(240 12% 14%), 0 32px 80px rgba(0,0,0,0.6)",
         }}
       >
@@ -323,7 +323,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
               {step === "channel" ? "Escolha o canal de mensagens" : `Canal: ${ch?.label}`}
             </p>
           </div>
-          <button onClick={handleClose} style={{ color: "hsl(240 8% 38%)" }}
+          <button onClick={handleClose} style={{ color: "var(--text-4)" }}
             onMouseEnter={e => (e.currentTarget.style.color = "hsl(240 8% 62%)")}
             onMouseLeave={e => (e.currentTarget.style.color = "hsl(240 8% 38%)")}>
             <X className="w-5 h-5" />
@@ -359,7 +359,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
                   style={{ background: `${channel.color}15`, color: channel.color }}>
                   {CHANNEL_ICONS[channel.id]}
                 </div>
-                <span className="text-xs font-medium text-center leading-tight" style={{ color: "hsl(240 15% 90%)" }}>
+                <span className="text-xs font-medium text-center leading-tight" style={{ color: "var(--text-1)" }}>
                   {channel.label}
                 </span>
                 {(channel.id === "instagram" || channel.id === "tiktok") && channel.available && (
@@ -370,7 +370,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
                 )}
                 {!channel.available && (
                   <span className="absolute top-1.5 right-1.5 text-[9px] font-medium px-1.5 py-0.5 rounded-full"
-                    style={{ background: "var(--surface-3)", color: "hsl(240 8% 60%)" }}>
+                    style={{ background: "var(--surface-3)", color: "var(--text-3)" }}>
                     Em breve
                   </span>
                 )}
@@ -399,7 +399,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
 
             {/* Name */}
             <div>
-              <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+              <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>
                 Nome da instância
               </label>
               <input
@@ -420,14 +420,14 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
                   <p className="text-xs font-medium mb-2" style={{ color: "#e1306c" }}>
                     Verificação do Instagram ({challenge.challenge_type || "código"})
                   </p>
-                  <p className="text-[11px]" style={{ color: "hsl(240 8% 50%)" }}>
+                  <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
                     Digite o código recebido para concluir a criação da instância.
                   </p>
                 </div>
                 {challenge.api_path ? (
                   <>
                     <div>
-                      <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+                      <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>
                         Código de verificação
                       </label>
                       <input
@@ -487,7 +487,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
                   </p>
                 </div>
                 <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>
                     Username
                   </label>
                   <div className="relative">
@@ -503,7 +503,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>
                     Senha
                   </label>
                   <div className="relative">
@@ -518,7 +518,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
                     />
                     <button type="button" onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2"
-                      style={{ color: "hsl(240 8% 40%)" }}>
+                      style={{ color: "var(--text-4)" }}>
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
@@ -529,11 +529,11 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
             {/* Server — obrigatório para todos exceto WABA/instagram_api (APIs oficiais Meta) */}
             {requiresServer && (
               <div>
-                <label className="text-xs font-medium flex items-center gap-1.5 mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+                <label className="text-xs font-medium flex items-center gap-1.5 mb-1.5" style={{ color: "var(--text-3)" }}>
                   <Server className="w-3 h-3" /> Server <span className="text-red-400">*</span>
                 </label>
                 {servers.length === 0 ? (
-                  <div className="rounded-xl p-3 text-xs" style={{ background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)", color: "hsl(240 8% 60%)" }}>
+                  <div className="rounded-xl p-3 text-xs" style={{ background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)", color: "var(--text-3)" }}>
                     Nenhum server disponível neste workspace.{" "}
                     <a href="/servers" target="_blank" rel="noopener" className="underline" style={{ color: "#f87171" }}>
                       Crie um server
@@ -554,7 +554,7 @@ export function CreateInstanceModal({ open, onClose, onCreated, workspaceId }: P
             {/* Custom token (optional) — não aplicável para WABA (token vem do OAuth) */}
             {!isWABA && (
               <div>
-                <label className="text-xs font-medium flex items-center gap-1.5 mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>
+                <label className="text-xs font-medium flex items-center gap-1.5 mb-1.5" style={{ color: "var(--text-3)" }}>
                   <Key className="w-3 h-3" /> Token personalizado (opcional)
                 </label>
                 <input

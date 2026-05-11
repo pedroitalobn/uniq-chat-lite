@@ -226,14 +226,14 @@ export default function DealsPage() {
           <div className="flex flex-wrap items-center gap-2">
             <div
               className="flex items-center gap-0.5 rounded-xl p-0.5"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}
+              style={{ background: "var(--input)", border: "1px solid rgba(255,255,255,0.09)" }}
             >
               <ViewToggle active={viewMode === "kanban"} onClick={() => setViewMode("kanban")} label="Kanban" icon={<LayoutGrid className="h-3.5 w-3.5" />} />
               <ViewToggle active={viewMode === "list"} onClick={() => setViewMode("list")} label="Lista" icon={<List className="h-3.5 w-3.5" />} />
             </div>
             <div
               className="flex items-center gap-0.5 rounded-xl p-0.5"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}
+              style={{ background: "var(--input)", border: "1px solid rgba(255,255,255,0.09)" }}
             >
               <ViewToggle active={ownerFilter === "all"} onClick={() => setOwnerFilter("all")} label="Todos" />
               <ViewToggle active={ownerFilter === "me"} onClick={() => setOwnerFilter("me")} label="Meus" />
@@ -467,7 +467,7 @@ function DealsList({ deals, stages, currency, isLoading }: {
     <div className="overflow-auto p-3">
       <table className="w-full text-sm" style={{ color: uniq.textPrimary }}>
         <thead>
-          <tr className="text-left text-xs" style={{ color: uniq.textFaint, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          <tr className="text-left text-xs" style={{ color: uniq.textFaint, borderBottom: "1px solid var(--border-subtle)" }}>
             <Th>Título</Th>
             <Th>Contato</Th>
             <Th>Estágio</Th>

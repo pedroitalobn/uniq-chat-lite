@@ -153,7 +153,7 @@ export default function AdminUsagePage() {
               <span className="text-xs font-medium w-32 flex-shrink-0" style={{ color: "var(--text-1)" }}>
                 {CATEGORY_LABEL[c.category] ?? c.category}
               </span>
-              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.05)" }}>
+              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "var(--input)" }}>
                 <div className="h-full"
                   style={{
                     width: `${Math.min(100, (c.credits / Math.max(1, data.totals.total_credits)) * 100)}%`,

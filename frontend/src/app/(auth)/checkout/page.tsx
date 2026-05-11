@@ -221,7 +221,7 @@ function CheckoutContent() {
           className="w-full max-w-md rounded-2xl p-8 text-center relative overflow-hidden"
           style={{
             background: "hsl(240 18% 8%)",
-            border: "1px solid hsl(240 12% 13%)",
+            border: "1px solid var(--border)",
           }}
         >
           <div className="absolute inset-0 pointer-events-none"
@@ -286,7 +286,7 @@ function CheckoutContent() {
         className="w-full max-w-md rounded-2xl overflow-hidden relative"
         style={{
           background: "hsl(240 18% 8% / 0.85)",
-          border: "1px solid hsl(240 12% 15%)",
+          border: "1px solid var(--border)",
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
         }}
@@ -294,7 +294,7 @@ function CheckoutContent() {
         {/* Header */}
         <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: "hsl(240 12% 15%)" }}>
           {step === "checkout" && !hasBrCode && (
-            <button onClick={() => setStep("plan")} className="flex items-center gap-1 text-sm hover:opacity-80 transition-opacity" style={{ color: "hsl(240 8% 60%)" }}>
+            <button onClick={() => setStep("plan")} className="flex items-center gap-1 text-sm hover:opacity-80 transition-opacity" style={{ color: "var(--text-3)" }}>
               <ArrowLeft className="w-4 h-4" /> Voltar
             </button>
           )}
@@ -335,12 +335,12 @@ function CheckoutContent() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs" style={{ color: "hsl(240 8% 46%)" }}>/mês</p>
-                      <p className="text-[10px] mt-1" style={{ color: "hsl(240 8% 38%)" }}>Cobrança mensal</p>
+                      <p className="text-[10px] mt-1" style={{ color: "var(--text-4)" }}>Cobrança mensal</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-2 text-sm" style={{ color: "hsl(240 8% 60%)" }}>
+                <div className="space-y-2 text-sm" style={{ color: "var(--text-3)" }}>
                   <div className="flex justify-between"><span>Acesso a todas funcionalidades</span><Check className="w-4 h-4" style={{ color: "var(--green)" }} /></div>
                   <div className="flex justify-between"><span>Suporte prioritário</span><Check className="w-4 h-4" style={{ color: "var(--green)" }} /></div>
                   <div className="flex justify-between"><span>Cancelamento livre</span><Check className="w-4 h-4" style={{ color: "var(--green)" }} /></div>
@@ -404,8 +404,8 @@ function CheckoutContent() {
                 </div>
 
                 {/* PIX code copy */}
-                <div className="p-4 rounded-xl" style={{ background: "hsl(240 12% 8%)", border: "1px solid hsl(240 12% 15%)" }}>
-                  <p className="text-[11px] font-mono break-all mb-3 select-all" style={{ color: "hsl(240 8% 60%)" }}>
+                <div className="p-4 rounded-xl" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
+                  <p className="text-[11px] font-mono break-all mb-3 select-all" style={{ color: "var(--text-3)" }}>
                     {checkoutData.br_code}
                   </p>
                   <motion.button
@@ -433,7 +433,7 @@ function CheckoutContent() {
 
                 {/* Total */}
                 <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: "rgba(0,212,106,0.08)" }}>
-                  <span className="text-sm" style={{ color: "hsl(240 8% 60%)" }}>Total a pagar</span>
+                  <span className="text-sm" style={{ color: "var(--text-3)" }}>Total a pagar</span>
                   <span className="text-lg font-semibold" style={{ color: "var(--green)" }}>
                     R$ {checkoutData?.plan_price?.toFixed(2) || "99,00"}
                   </span>
@@ -466,7 +466,7 @@ function CheckoutContent() {
                   </motion.div>
                 )}
 
-                <p className="text-[10px] text-center" style={{ color: "hsl(240 8% 38%)" }}>
+                <p className="text-[10px] text-center" style={{ color: "var(--text-4)" }}>
                   Abra o app do seu banco e escaneie o QR Code para concluir o pagamento
                 </p>
               </motion.div>
@@ -508,7 +508,7 @@ function CheckoutContent() {
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl" style={{ background: "hsl(240 12% 8%)", border: "1px solid hsl(240 12% 15%)" }}>
+                <div className="p-4 rounded-xl" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
                   <AnimatePresence mode="wait">
                     {paymentMethod === "pix" && (
                       <motion.div key="pix" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-center">
@@ -555,7 +555,7 @@ function CheckoutContent() {
                 </div>
 
                 <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: "rgba(0,212,106,0.08)" }}>
-                  <span className="text-sm" style={{ color: "hsl(240 8% 60%)" }}>Total a pagar</span>
+                  <span className="text-sm" style={{ color: "var(--text-3)" }}>Total a pagar</span>
                   <span className="text-lg font-semibold" style={{ color: "var(--green)" }}>
                     R$ {checkoutData?.plan_price?.toFixed(2) || "99,00"}
                   </span>
@@ -593,7 +593,7 @@ function CheckoutContent() {
                   )}
                 </motion.button>
 
-                <p className="text-[10px] text-center" style={{ color: "hsl(240 8% 38%)" }}>
+                <p className="text-[10px] text-center" style={{ color: "var(--text-4)" }}>
                   Ao confirmar, você concorda com os termos de uso. O pagamento será processado de forma segura.
                 </p>
               </motion.div>

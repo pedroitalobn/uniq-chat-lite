@@ -23,7 +23,7 @@ export function WorkspaceTabs({ workspaceId, className }: {
   return (
     <div
       className={"flex items-center gap-0.5 rounded-2xl p-1 overflow-x-auto " + (className ?? "")}
-      style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}
+      style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}
     >
       {tabs.map((t) => {
         const active = pathname.startsWith(t.href);
@@ -35,7 +35,7 @@ export function WorkspaceTabs({ workspaceId, className }: {
             style={
               active
                 ? { background: "rgba(0,212,106,0.12)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.25)" }
-                : { background: "transparent", color: "hsl(240 8% 55%)", border: "1px solid transparent" }
+                : { background: "transparent", color: "var(--text-3)", border: "1px solid transparent" }
             }
           >
             <t.icon className="w-3.5 h-3.5" />

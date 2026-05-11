@@ -22,11 +22,11 @@ const TYPE_META: Record<CrmTask["type"], { label: string; icon: React.ElementTyp
 };
 
 const STATUS_FILTERS: { id: "all" | CrmTask["status"]; label: string; color: string }[] = [
-  { id: "all",         label: "Todas",          color: "hsl(240 8% 60%)" },
+  { id: "all",         label: "Todas",          color: "var(--text-3)" },
   { id: "pending",     label: "Pendentes",      color: "#fbbf24" },
   { id: "in_progress", label: "Em andamento",   color: "#60a5fa" },
   { id: "completed",   label: "Concluídas",     color: "#00d46a" },
-  { id: "cancelled",   label: "Canceladas",     color: "hsl(240 8% 50%)" },
+  { id: "cancelled",   label: "Canceladas",     color: "var(--text-3)" },
 ];
 
 export default function TasksPage() {

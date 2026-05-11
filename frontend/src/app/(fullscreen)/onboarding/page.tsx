@@ -580,7 +580,7 @@ export default function OnboardingPage() {
                 transition={{ type: "spring", stiffness: 300, damping: 26 }}
                 className="flex justify-start pl-9"
               >
-                <div className="rounded-2xl p-4 flex flex-col items-center gap-3" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                <div className="rounded-2xl p-4 flex flex-col items-center gap-3" style={{ background: "var(--input)", border: "1px solid rgba(255,255,255,0.1)" }}>
                   {qrCode ? (
                     <div className="w-44 h-44 bg-white rounded-xl flex items-center justify-center overflow-hidden p-2">
                       {/* O backend devolve o texto cru do QR do WhatsApp (formato
@@ -698,7 +698,7 @@ export default function OnboardingPage() {
                     transition={{ delay: i * 0.06 }}
                     onClick={() => handleNicheSelect(niche)}
                     className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-all duration-200"
-                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.75)" }}
+                    style={{ background: "var(--input)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.75)" }}
                     whileHover={{ scale: 1.04, background: "rgba(52,211,153,0.1)", borderColor: "rgba(52,211,153,0.35)", color: "rgba(255,255,255,0.95)" } as any}
                     whileTap={{ scale: 0.97 }}
                   >
@@ -712,7 +712,7 @@ export default function OnboardingPage() {
             {/* Step 1: business name input */}
             {step === 1 && (
               <motion.div key="biz-name" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ type: "spring", stiffness: 320, damping: 28 }}>
-                <div className="flex items-center gap-2 rounded-2xl px-4 py-3" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)" }}>
+                <div className="flex items-center gap-2 rounded-2xl px-4 py-3" style={{ background: "var(--input)", border: "1px solid rgba(255,255,255,0.12)" }}>
                   <input
                     autoFocus
                     type="text"
@@ -746,7 +746,7 @@ export default function OnboardingPage() {
                     onClick={() => handleChannelSelect(ch)}
                     disabled={ch.disabled}
                     className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-left transition-all duration-200 disabled:opacity-40"
-                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+                    style={{ background: "var(--input)", border: "1px solid rgba(255,255,255,0.1)" }}
                     whileHover={!ch.disabled ? { background: "rgba(52,211,153,0.08)", borderColor: "rgba(52,211,153,0.25)" } as any : undefined}
                     whileTap={!ch.disabled ? { scale: 0.98 } : undefined}
                   >

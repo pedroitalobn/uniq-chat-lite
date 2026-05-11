@@ -338,7 +338,7 @@ function ProductCard({ product, onEdit, onDelete }: {
         )}
         {product.external_provider && (
           <span className="absolute top-2 right-2 text-[10px] px-1.5 py-0.5 rounded font-medium"
-            style={{ background: "rgba(0,0,0,0.6)", color: "white" }}>
+            style={{ background: "var(--surface-overlay)", color: "white" }}>
             {product.external_provider}
           </span>
         )}

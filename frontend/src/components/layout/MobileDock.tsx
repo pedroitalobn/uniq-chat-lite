@@ -159,7 +159,7 @@ export function MobileDock() {
                 background: "rgba(10,10,20,0.92)",
                 backdropFilter: "blur(28px) saturate(200%)",
                 WebkitBackdropFilter: "blur(28px) saturate(200%)",
-                borderTop: "1px solid rgba(255,255,255,0.10)",
+                borderTop: "1px solid var(--border-default)",
                 boxShadow: "0 -16px 48px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08)",
                 paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
               }}
@@ -174,7 +174,7 @@ export function MobileDock() {
               </div>
               <div
                 className="flex items-center justify-between px-5 pt-2 pb-3"
-                style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+                style={{ borderBottom: "1px solid var(--border-subtle)" }}
               >
                 <p className="text-base font-semibold" style={{ color: "var(--text-1)" }}>Módulos</p>
                 <button
@@ -209,7 +209,7 @@ export function MobileDock() {
                                 boxShadow: "0 0 18px rgba(0,212,106,0.18)",
                               }
                             : {
-                                background: "rgba(255,255,255,0.05)",
+                                background: "var(--input)",
                                 border: "1px solid rgba(255,255,255,0.08)",
                                 color: "var(--text-1)",
                               }

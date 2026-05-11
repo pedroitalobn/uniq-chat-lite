@@ -65,7 +65,7 @@ function Field({
         {isPassword && (
           <button type="button" onClick={() => setShow(s => !s)}
             className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
-            style={{ color: "hsl(240 8% 38%)" }}>
+            style={{ color: "var(--text-4)" }}>
             {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
         )}
@@ -90,7 +90,7 @@ function SocialBtn({ icon, label, onClick }: { icon: React.ReactNode; label: str
       style={{
         background: hover ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.025)",
         border: `1px solid ${hover ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.06)"}`,
-        color: "hsl(240 15% 72%)",
+        color: "var(--text-2)",
       }}>
       {icon}
       <span>{label}</span>

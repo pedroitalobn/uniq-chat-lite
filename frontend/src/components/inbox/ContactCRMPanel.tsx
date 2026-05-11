@@ -132,7 +132,7 @@ export function ContactCRMPanel({ workspaceId, contactId }: { workspaceId: strin
                 key={d.id}
                 href={`/crm/deals/${d.id}`}
                 className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5"
-                style={{ background: "rgba(255,255,255,0.02)" }}
+                style={{ background: "var(--input)" }}
               >
                 <Briefcase className="w-3 h-3 flex-shrink-0" style={{ color: dealStatusColor(d.status) }} />
                 <span className="text-[11px] truncate flex-1" style={{ color: "var(--text-1)" }}>{d.title}</span>

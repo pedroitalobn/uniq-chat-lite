@@ -41,7 +41,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "hsl(240 20% 4%)" }}>
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "var(--surface-solid)" }}>
       {/* Ambient glow */}
       <div
         className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] pointer-events-none"
@@ -67,7 +67,7 @@ export default function ForgotPasswordPage() {
         <div
           className="rounded-2xl overflow-hidden"
           style={{
-            background: "hsl(240 18% 6%)",
+            background: "var(--surface-solid)",
             boxShadow: "0 0 0 1px hsl(240 12% 13%), 0 24px 64px rgba(0,0,0,0.5)",
           }}
         >
@@ -79,14 +79,14 @@ export default function ForgotPasswordPage() {
               >
                 <Check className="h-7 w-7" style={{ color: "#00d46a" }} />
               </div>
-              <h1 className="text-base font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
+              <h1 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>
                 Verifique seu email
               </h1>
-              <p className="text-xs leading-relaxed" style={{ color: "hsl(240 8% 55%)" }}>
-                Se <strong style={{ color: "hsl(240 15% 82%)" }}>{email}</strong> estiver cadastrado,
+              <p className="text-xs leading-relaxed" style={{ color: "var(--text-3)" }}>
+                Se <strong style={{ color: "var(--text-2)" }}>{email}</strong> estiver cadastrado,
                 enviamos um link pra redefinir sua senha. O link expira em 1 hora.
               </p>
-              <p className="text-[11px]" style={{ color: "hsl(240 8% 40%)" }}>
+              <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
                 Não achou o email? Confira a caixa de spam.
               </p>
               <button
@@ -104,7 +104,7 @@ export default function ForgotPasswordPage() {
           ) : (
             <>
               <div className="px-5 pt-5 pb-1">
-                <h1 className="text-base font-semibold" style={{ color: "hsl(240 15% 90%)" }}>
+                <h1 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>
                   Esqueceu sua senha?
                 </h1>
                 <p className="text-xs mt-0.5" style={{ color: "hsl(240 8% 44%)" }}>
@@ -145,9 +145,9 @@ export default function ForgotPasswordPage() {
                       autoComplete="email"
                       className="w-full rounded-xl py-2.5 pl-9 pr-3.5 text-sm outline-none focus:ring-1 focus:ring-white/10"
                       style={{
-                        background: "hsl(240 12% 8%)",
-                        border: "1px solid hsl(240 12% 13%)",
-                        color: "hsl(240 15% 90%)",
+                        background: "var(--surface-solid)",
+                        border: "1px solid var(--border)",
+                        color: "var(--text-1)",
                       }}
                     />
                   </div>
@@ -177,7 +177,7 @@ export default function ForgotPasswordPage() {
           Lembrou a senha?{" "}
           <span
             className="underline cursor-pointer"
-            style={{ color: "hsl(240 8% 50%)" }}
+            style={{ color: "var(--text-3)" }}
             onClick={() => router.push("/login")}
           >
             Entrar

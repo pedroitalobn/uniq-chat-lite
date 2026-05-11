@@ -103,7 +103,7 @@ export function CrmHeaderToggleGroup({ children }: { children: ReactNode }) {
     <div
       className="flex items-center gap-0.5 rounded-xl p-0.5"
       style={{
-        background: "rgba(255,255,255,0.05)",
+        background: "var(--input)",
         border: "1px solid rgba(255,255,255,0.09)",
       }}
     >

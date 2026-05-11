@@ -93,7 +93,7 @@ function CreateUserModal({ plans, onClose, onCreated }: {
           </div>
           <LabelInput label="Email *" value={form.email} onChange={f("email")} placeholder="joao@empresa.com" type="email" />
           <div>
-            <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>Senha *</label>
+            <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>Senha *</label>
             <div className="relative">
               <input value={form.password} onChange={e => f("password")(e.target.value)}
                 type={showPass ? "text" : "password"} placeholder="Mínimo 8 caracteres"
@@ -106,7 +106,7 @@ function CreateUserModal({ plans, onClose, onCreated }: {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>Role</label>
+              <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>Role</label>
               <select value={form.role} onChange={e => f("role")(e.target.value)} className="input-field w-full">
                 <option value="customer">Customer</option>
                 <option value="lead">Lead</option>
@@ -115,7 +115,7 @@ function CreateUserModal({ plans, onClose, onCreated }: {
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>Plano</label>
+              <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>Plano</label>
               <select value={form.plan_id} onChange={e => f("plan_id")(e.target.value)} className="input-field w-full">
                 <option value="">Auto (Free)</option>
                 {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -238,7 +238,7 @@ function BlockModal({ user, onClose, onConfirm }: {
                 {type === t && <div className="w-2 h-2 rounded-full bg-red-400" />}
               </div>
               <div>
-                <p className="text-xs font-medium" style={{ color: "hsl(240 15% 82%)" }}>
+                <p className="text-xs font-medium" style={{ color: "var(--text-2)" }}>
                   {t === "temp" ? "Bloqueio temporário" : "Bloquear permanentemente"}
                 </p>
                 <p className="text-[10px]" style={{ color: "hsl(240 8% 42%)" }}>
@@ -249,7 +249,7 @@ function BlockModal({ user, onClose, onConfirm }: {
           ))}
           {type === "temp" && (
             <div className="flex items-center gap-2 px-1">
-              <label className="text-xs" style={{ color: "hsl(240 8% 55%)" }}>Duração:</label>
+              <label className="text-xs" style={{ color: "var(--text-3)" }}>Duração:</label>
               <select value={days} onChange={e => setDays(e.target.value)} className="input-field text-xs py-1.5">
                 <option value="1">1 dia</option>
                 <option value="3">3 dias</option>
@@ -280,7 +280,7 @@ function LabelInput({ label, value, onChange, placeholder, type = "text" }: {
 }) {
   return (
     <div>
-      <label className="text-xs font-medium block mb-1.5" style={{ color: "hsl(240 8% 55%)" }}>{label}</label>
+      <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>{label}</label>
       <input type={type} value={value} onChange={e => onChange(e.target.value)}
         placeholder={placeholder} className="input-field w-full" />
     </div>
@@ -668,7 +668,7 @@ export default function AdminUsersPage() {
                         onChange={e => handlePlanChange(user, e.target.value)}
                         onClick={e => e.stopPropagation()}
                         className="text-xs rounded-lg px-2.5 py-1.5 outline-none"
-                        style={{ background: "hsl(240 12% 9%)", border: "1px solid hsl(240 12% 16%)", color: "hsl(240 15% 72%)" }}>
+                        style={{ background: "hsl(240 12% 9%)", border: "1px solid var(--border)", color: "var(--text-2)" }}>
                         <option value="">Sem plano</option>
                         {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
@@ -686,7 +686,7 @@ export default function AdminUsersPage() {
                         className="text-xs rounded-lg px-2.5 py-1.5 outline-none"
                         style={{
                           background: "hsl(240 12% 9%)",
-                          border: "1px solid hsl(240 12% 16%)",
+                          border: "1px solid var(--border)",
                           color:
                             user.role === "super_admin"
                               ? "#fbbf24"

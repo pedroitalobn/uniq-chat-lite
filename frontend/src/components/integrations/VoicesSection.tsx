@@ -344,7 +344,7 @@ function AddProviderModal({ onClose, workspaceId }: { onClose: () => void; works
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.6)" }}
+      style={{ background: "var(--surface-overlay)" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="w-full max-w-md rounded-2xl p-6 space-y-5"
         style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}>

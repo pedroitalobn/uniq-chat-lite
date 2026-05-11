@@ -401,8 +401,8 @@ function ResponseStyleSection({
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }}>
-          <div className="w-full max-w-lg rounded-xl border p-5 max-h-[90vh] overflow-auto" style={{ background: "hsl(240 12% 8%)", borderColor: "rgba(255,255,255,0.08)" }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "var(--surface-overlay)" }}>
+          <div className="w-full max-w-lg rounded-xl border p-5 max-h-[90vh] overflow-auto" style={{ background: "var(--surface-solid)", borderColor: "var(--border-subtle)" }}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Ajustes finos — {PACE_OPTIONS.find(p => p.id === style.pace)?.title}</h3>
               <button onClick={() => setShowModal(false)} className="p-1 rounded-lg hover:bg-white/5">
@@ -459,7 +459,7 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
         value={value}
         onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)}
         className="w-full rounded-lg px-2.5 py-1.5 text-xs outline-none"
-        style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)", color: "hsl(240 15% 90%)" }}
+        style={{ background: "var(--input)", border: "1px solid var(--border-default)", color: "var(--text-1)" }}
       />
     </div>
   );

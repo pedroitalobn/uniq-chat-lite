@@ -159,7 +159,7 @@ export function AmbientAIPanel() {
             {/* Header */}
             <div
               className="flex items-center gap-3 px-4 py-3 flex-shrink-0"
-              style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+              style={{ borderBottom: "1px solid var(--border-subtle)" }}
             >
               <div
                 className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"

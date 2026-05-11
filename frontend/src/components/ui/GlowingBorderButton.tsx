@@ -46,7 +46,7 @@ export function GlowingBorderButton({
       `}</style>
       <span
         className="relative flex items-center justify-center gap-2 w-full h-full rounded-[11px] z-10"
-        style={{ background: "hsl(240 18% 6%)", color: glowColor, padding: "10px 20px" }}
+        style={{ background: "var(--surface-solid)", color: glowColor, padding: "10px 20px" }}
       >
         {children}
       </span>
