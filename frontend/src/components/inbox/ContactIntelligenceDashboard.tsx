@@ -211,22 +211,132 @@ function SectionTitle({ icon: Icon, title, subtitle }: { icon: React.ElementType
   );
 }
 
+// ─── Avatar Helper ───────────────────────────────────────────────────────────
+
+function hashHue(text: string): number {
+  let h = 0;
+  for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0;
+  return Math.abs(h) % 360;
+}
+
+function initialsOf(name?: string): string {
+  const source = (name || "?").trim();
+  const parts = source.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return "?";
+}
+
+function DashboardAvatar({ src, name, size = 48 }: { src?: string | null; name?: string; size?: number }) {
+  const [err, setErr] = useState(false);
+  const hue = useMemo(() => hashHue(name || "?"), [name]);
+  if (src && !err) {
+    return (
+      <img
+        src={src}
+        alt={name || ""}
+        className="rounded-full object-cover flex-shrink-0"
+        style={{ width: size, height: size, background: "var(--surface-2)" }}
+        onError={() => setErr(true)}
+      />
+    );
+  }
+  return (
+    <div
+      className="flex items-center justify-center rounded-full font-semibold flex-shrink-0"
+      style={{
+        width: size, height: size,
+        background: `hsl(${hue} 50% 22%)`,
+        color: `hsl(${hue} 70% 75%)`,
+        fontSize: size * 0.38,
+      }}
+    >
+      {initialsOf(name)}
+    </div>
+  );
+}
+
 // ─── Contact Hero Card ───────────────────────────────────────────────────────
 
-function ContactHeroCard({ conv, presence }: { conv: Conversation | undefined; presence: Presence }) {
+function ContactHeroCard({
+  conv, presence, convMode, onModeChange,
+  canAssign, canClose, canReopen, canSnooze, canUpdate,
+  onClaim, onUnassign, onResolve, onClose, onReopen, onSnooze, onPin, onMute,
+}: {
+  conv: Conversation | undefined; presence: Presence;
+  convMode: "human" | "ai" | "observing";
+  onModeChange: (mode: "human" | "ai" | "observing") => void;
+  canAssign: boolean; canClose: boolean; canReopen: boolean; canSnooze: boolean; canUpdate: boolean;
+  onClaim: () => void; onUnassign: () => void; onResolve: () => void; onClose: () => void;
+  onReopen: () => void; onSnooze: () => void; onPin: () => void; onMute: () => void;
+}) {
   if (!conv) return null;
   const name = conv.contact?.name || conv.push_name || conv.subject || "Atendimento";
+  const avatarUrl = conv.contact?.avatar_url || conv.avatar_url;
+
+  const actions = [
+    !conv.assigned_user_id && canAssign && { icon: UserCheck, label: "Atender", onClick: onClaim, color: "#00d46a" },
+    conv.assigned_user_id && canAssign && { icon: UserX, label: "Remover", onClick: onUnassign, color: "#f59e0b" },
+    conv.status !== "resolved" && conv.status !== "closed" && canClose && { icon: CheckCircle2, label: "Resolver", onClick: onResolve, color: "#38bdf8" },
+    conv.status === "resolved" && canClose && { icon: CheckCircle2, label: "Encerrar", onClick: onClose, color: "#64748b" },
+    (conv.status === "resolved" || conv.status === "closed") && canReopen && { icon: RotateCcw, label: "Reabrir", onClick: onReopen, color: "#f59e0b" },
+    conv.status === "open" && canSnooze && { icon: Clock3, label: "Soneca", onClick: onSnooze, color: "#94a3b8" },
+    canUpdate && { icon: Pin, label: conv.is_pinned ? "Desfixar" : "Fixar", onClick: onPin, color: conv.is_pinned ? "#00d46a" : "var(--text-3)" },
+    canUpdate && { icon: conv.is_muted ? BellOff : Bell, label: conv.is_muted ? "Reativar" : "Silenciar", onClick: onMute, color: "var(--text-3)" },
+  ].filter(Boolean) as Array<{ icon: React.ElementType; label: string; onClick: () => void; color: string }>;
 
   return (
-    <div className="flex items-center justify-between px-1 py-1">
-      <div className="min-w-0">
-        <h2 className="text-sm font-semibold truncate" style={{ color: "var(--text-1)" }}>{name}</h2>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <span className={`w-1.5 h-1.5 rounded-full ${presence.online ? "bg-emerald-500 animate-pulse" : "bg-zinc-500"}`} />
-          <span className="text-[10px]" style={{ color: "var(--text-4)" }}>
-            {presence.online ? "Online" : presence.lastSeen ? `Visto ${relativeTime(presence.lastSeen)}` : "Offline"}
-          </span>
+    <div className="space-y-3">
+      {/* Row: avatar + name/status + mode + actions */}
+      <div className="flex items-center gap-3">
+        <DashboardAvatar src={avatarUrl} name={name} size={52} />
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold truncate" style={{ color: "var(--text-1)" }}>{name}</h2>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${presence.online ? "bg-emerald-500 animate-pulse" : "bg-zinc-500"}`} />
+            <span className="text-[10px]" style={{ color: "var(--text-4)" }}>
+              {presence.online ? "Online" : presence.lastSeen ? `Visto ${relativeTime(presence.lastSeen)}` : "Offline"}
+            </span>
+          </div>
         </div>
+
+        {/* Mode selector */}
+        <div className="flex-shrink-0">
+          <div className="flex items-center rounded-lg overflow-hidden border"
+            style={{ border: "1px solid var(--border-default)", background: "rgba(255,255,255,0.03)" }}>
+            {([
+              { id: "human" as const, label: "Humano", icon: UserCheck },
+              { id: "ai" as const, label: "IA", icon: Bot },
+              { id: "observing" as const, label: "Obs", icon: Eye },
+            ]).map(({ id, label, icon: Icon }) => (
+              <button key={id}
+                onClick={() => onModeChange(id)}
+                className="px-2 py-1.5 text-[10px] font-medium flex items-center gap-1 transition-all"
+                style={{
+                  background: convMode === id ? (id === "ai" ? "rgba(167,139,250,0.2)" : id === "human" ? "rgba(0,212,106,0.15)" : "rgba(255,255,255,0.08)") : "transparent",
+                  color: convMode === id ? (id === "ai" ? "#c4b5fd" : id === "human" ? "#00d46a" : "hsl(240 15% 80%)") : "var(--text-3)",
+                }}>
+                <Icon className="h-3 w-3" />
+                <span className="hidden sm:inline">{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Quick actions row */}
+      <div className="flex flex-wrap gap-2">
+        {actions.map((action) => (
+          <button
+            key={action.label}
+            onClick={action.onClick}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all hover:brightness-110"
+            style={{ background: `${action.color}10`, border: `1px solid ${action.color}25`, color: action.color }}
+          >
+            <action.icon className="w-3 h-3" />
+            {action.label}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -525,92 +635,6 @@ function AgentQueryPanel({ workspaceId, conversationId }: { workspaceId: string;
   );
 }
 
-// ─── Quick Actions ───────────────────────────────────────────────────────────
-
-function QuickActionsWithMode({
-  conv, canAssign, canClose, canReopen, canSnooze, canUpdate,
-  convMode, onModeChange,
-  onClaim, onUnassign, onResolve, onClose, onReopen, onSnooze, onPin, onMute,
-}: {
-  conv: Conversation | undefined;
-  canAssign: boolean;
-  canClose: boolean;
-  canReopen: boolean;
-  canSnooze: boolean;
-  canUpdate: boolean;
-  convMode: "human" | "ai" | "observing";
-  onModeChange: (mode: "human" | "ai" | "observing") => void;
-  onClaim: () => void;
-  onUnassign: () => void;
-  onResolve: () => void;
-  onClose: () => void;
-  onReopen: () => void;
-  onSnooze: () => void;
-  onPin: () => void;
-  onMute: () => void;
-}) {
-  if (!conv) return null;
-
-  const actions = [
-    !conv.assigned_user_id && canAssign && { icon: UserCheck, label: "Atender", onClick: onClaim, color: "#00d46a" },
-    conv.assigned_user_id && canAssign && { icon: UserX, label: "Remover", onClick: onUnassign, color: "#f59e0b" },
-    conv.status !== "resolved" && conv.status !== "closed" && canClose && { icon: CheckCircle2, label: "Resolver", onClick: onResolve, color: "#38bdf8" },
-    conv.status === "resolved" && canClose && { icon: CheckCircle2, label: "Encerrar", onClick: onClose, color: "#64748b" },
-    (conv.status === "resolved" || conv.status === "closed") && canReopen && { icon: RotateCcw, label: "Reabrir", onClick: onReopen, color: "#f59e0b" },
-    conv.status === "open" && canSnooze && { icon: Clock3, label: "Soneca", onClick: onSnooze, color: "#94a3b8" },
-    canUpdate && { icon: Pin, label: conv.is_pinned ? "Desfixar" : "Fixar", onClick: onPin, color: conv.is_pinned ? "#00d46a" : "var(--text-3)" },
-    canUpdate && { icon: conv.is_muted ? BellOff : Bell, label: conv.is_muted ? "Reativar" : "Silenciar", onClick: onMute, color: "var(--text-3)" },
-  ].filter(Boolean) as Array<{ icon: React.ElementType; label: string; onClick: () => void; color: string }>;
-
-  return (
-    <GlassCard className="p-4">
-      <div className="flex flex-col sm:flex-row gap-4">
-        {/* Mode selector */}
-        <div className="flex-shrink-0">
-          <label className="text-[10px] font-medium uppercase tracking-wider mb-1.5 block" style={{ color: "var(--text-4)" }}>Modo</label>
-          <div className="flex items-center rounded-lg overflow-hidden border"
-            style={{ border: "1px solid var(--border-default)", background: "rgba(255,255,255,0.03)" }}>
-            {([
-              { id: "human" as const, label: "Humano", icon: UserCheck },
-              { id: "ai" as const, label: "IA", icon: Bot },
-              { id: "observing" as const, label: "Obs", icon: Eye },
-            ]).map(({ id, label, icon: Icon }) => (
-              <button key={id}
-                onClick={() => onModeChange(id)}
-                className="px-2.5 py-1.5 text-[10px] font-medium flex items-center gap-1 transition-all"
-                style={{
-                  background: convMode === id ? (id === "ai" ? "rgba(167,139,250,0.2)" : id === "human" ? "rgba(0,212,106,0.15)" : "rgba(255,255,255,0.08)") : "transparent",
-                  color: convMode === id ? (id === "ai" ? "#c4b5fd" : id === "human" ? "#00d46a" : "hsl(240 15% 80%)") : "var(--text-3)",
-                }}>
-                <Icon className="h-3 w-3" />
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex-1 min-w-0">
-          <label className="text-[10px] font-medium uppercase tracking-wider mb-1.5 block" style={{ color: "var(--text-4)" }}>Ações rápidas</label>
-          <div className="flex flex-wrap gap-2">
-            {actions.map((action) => (
-              <button
-                key={action.label}
-                onClick={action.onClick}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all hover:brightness-110"
-                style={{ background: `${action.color}10`, border: `1px solid ${action.color}25`, color: action.color }}
-              >
-                <action.icon className="w-3 h-3" />
-                {action.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </GlassCard>
-  );
-}
-
 // ─── Conversation Metrics ────────────────────────────────────────────────────
 
 function ConversationMetrics({ conv }: { conv: Conversation | undefined }) {
@@ -689,18 +713,17 @@ export function ContactIntelligenceDashboard({
     <div className="flex flex-col h-full min-h-0">
       {/* Scrollable dashboard content */}
       <div className="flex-1 overflow-auto p-4 space-y-3 custom-scrollbar">
-        {/* Header: nome + modo + ações rápidas */}
-        <ContactHeroCard conv={conversation} presence={presence} />
-
-        <QuickActionsWithMode
+        {/* Header: avatar + nome + modo + ações rápidas */}
+        <ContactHeroCard
           conv={conversation}
+          presence={presence}
+          convMode={convMode}
+          onModeChange={onModeChange || (() => {})}
           canAssign={canAssign}
           canClose={canClose}
           canReopen={canReopen}
           canSnooze={canSnooze}
           canUpdate={canUpdate}
-          convMode={convMode}
-          onModeChange={onModeChange || (() => {})}
           onClaim={onClaim}
           onUnassign={onUnassign}
           onResolve={onResolve}

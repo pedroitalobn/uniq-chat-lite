@@ -127,17 +127,15 @@ function Avatar({
   isGroup?: boolean;
   size?: number;
 }) {
-  if (src) {
+  const [imgError, setImgError] = useState(false);
+  if (src && !imgError) {
     return (
       <img
         src={src}
         alt={name || "avatar"}
         className="rounded-full object-cover flex-shrink-0"
         style={{ width: size, height: size, background: "var(--surface-2)" }}
-        onError={(e) => {
-          // Fallback se imagem 404 — esconde e deixa o sibling render
-          (e.target as HTMLImageElement).style.display = "none";
-        }}
+        onError={() => setImgError(true)}
       />
     );
   }

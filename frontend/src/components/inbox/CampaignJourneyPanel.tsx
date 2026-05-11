@@ -33,7 +33,7 @@ function GlassCard({ children, className = "" }: { children: React.ReactNode; cl
 export default function CampaignJourneyPanel({ contactId }: CampaignJourneyPanelProps) {
   const { currentWorkspace } = useWorkspace();
   const wsId = currentWorkspace?.id ?? "";
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
 
   const campaignsQ = useQuery({
     queryKey: ["campaigns", wsId],

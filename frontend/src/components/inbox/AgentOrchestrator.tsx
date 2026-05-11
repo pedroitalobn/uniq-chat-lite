@@ -52,7 +52,7 @@ export default function AgentOrchestrator({
   const wsId = currentWorkspace?.id ?? "";
   const qc = useQueryClient();
 
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [customContext, setCustomContext] = useState("");
   const [command, setCommand] = useState("");
   const [chatMessages, setChatMessages] = useState<CommandMsg[]>([]);

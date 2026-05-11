@@ -475,7 +475,7 @@ function MeetingCreateModal({ open, onClose, contactId, wsId }: { open: boolean;
 export default function CRMQuickActions({ contactId }: CRMQuickActionsProps) {
   const { currentWorkspace } = useWorkspace();
   const wsId = currentWorkspace?.id ?? "";
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [modal, setModal] = useState<"deal" | "contact" | "tags" | "tasks" | "meetings" | null>(null);
 
   const contactQ = useQuery({
