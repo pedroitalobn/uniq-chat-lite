@@ -26,7 +26,7 @@ func NewPaymentHandler(db *gorm.DB, stripeH *StripeHandler, asaasH *AsaasHandler
 // getActiveProvider returns the active provider saved in the DB, defaulting to stripe
 func (h *PaymentHandler) getActiveProvider() string {
 	var settings models.PaymentSettings
-	if err := h.db.First(&settings).Error; err == nil && settings.ActiveProvider != "" {
+	if err := h.db.Where("id = ?", "default").First(&settings).Error; err == nil && settings.ActiveProvider != "" {
 		return string(settings.ActiveProvider)
 	}
 	return string(models.PaymentProviderStripe) // default
