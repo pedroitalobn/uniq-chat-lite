@@ -725,207 +725,65 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
 
       {/* Chat Panel */}
       <section className="flex flex-col overflow-hidden border-l" style={{ borderColor: "var(--border-subtle)" }}>
-        <header className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-2.5 border-b flex-shrink-0"
+        <header className="flex flex-col border-b flex-shrink-0"
           style={{ borderColor: "var(--border-subtle)", background: "rgba(255,255,255,0.02)" }}>
-          {/* Back button */}
-          {onClose ? (
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-md p-1.5 hover:bg-white/5 lg:hidden flex-shrink-0"
-              style={{ color: "hsl(240 8% 48%)" }}
-              aria-label="Voltar"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </button>
-          ) : (
-            <Link
-              href="/inbox"
-              className="rounded-md p-1.5 hover:bg-white/5 flex-shrink-0"
-              style={{ color: "hsl(240 8% 48%)" }}
-              aria-label="Voltar"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          )}
-
-          {/* Avatar */}
-          {(() => {
-            const isGroup = (conv?.channel_key || "").toLowerCase().endsWith("@g.us");
-            const avatarUrl = conv?.contact?.avatar_url || conv?.avatar_url;
-            const name = conv?.contact?.name || conv?.push_name || conv?.subject || conv?.channel_key || "?";
-            if (avatarUrl) {
-              return (
-                <button
-                  type="button"
-                  onClick={() => setViewerSource({ type: "image", url: avatarUrl, filename: `${name}.jpg` })}
-                  title="Ver foto de perfil"
-                  className="h-8 w-8 rounded-full overflow-hidden flex-shrink-0 transition-opacity hover:opacity-80"
-                  style={{ background: "var(--surface-2)" }}
-                >
-                  <img src={avatarUrl} alt={name} className="h-8 w-8 object-cover" />
-                </button>
-              );
-            }
-            if (isGroup) {
-              return (
-                <div
-                  className="flex h-8 w-8 items-center justify-center rounded-full flex-shrink-0"
-                  style={{ background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.25)", color: "#c4b5fd" }}
-                >
-                  <UsersIcon className="h-4 w-4" />
-                </div>
-              );
-            }
-            const text = name;
-            let hash = 0;
-            for (let i = 0; i < text.length; i++) hash = (hash * 31 + text.charCodeAt(i)) | 0;
-            const hue = Math.abs(hash) % 360;
-            const initials = (text.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0] || "").join("") || "?").toUpperCase();
-            return (
-              <div
-                className="flex h-8 w-8 items-center justify-center rounded-full font-medium flex-shrink-0"
-                style={{ background: `hsl(${hue} 50% 22%)`, color: `hsl(${hue} 70% 75%)`, fontSize: 13 }}
+          {/* Top row: back + mode selector + refresh */}
+          <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-1.5">
+            {/* Back button */}
+            {onClose ? (
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-md p-1.5 hover:bg-white/5 lg:hidden flex-shrink-0"
+                style={{ color: "hsl(240 8% 48%)" }}
+                aria-label="Voltar"
               >
-                {initials}
-              </div>
-            );
-          })()}
-
-          {/* Info section */}
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {(conv?.channel_key || "").toLowerCase().endsWith("@g.us") && (
-                <UsersIcon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#a78bfa" }} aria-label="Grupo" />
-              )}
-              <h1 className="truncate text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>
-                {conv?.contact?.name || conv?.push_name || conv?.subject || "Atendimento"}
-              </h1>
-              {status && (
-                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${status.cls}`}>
-                  {status.label}
-                </span>
-              )}
-              {/* Badges secundárias somem em mobile pra liberar espaço pro
-                  nome do contato. SLA fica visível em qualquer tela. */}
-              {conv?.reopen_count ? (
-                <span className="hidden sm:inline-flex rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-400">
-                  reaberto {conv.reopen_count}×
-                </span>
-              ) : null}
-              {slaBreached && (
-                <span className="flex items-center gap-1 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:text-red-400">
-                  <AlertTriangle className="h-3 w-3" /> SLA
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5 text-[11px] flex-wrap" style={{ color: "var(--text-3)" }}>
-              <PresenceLabel presence={presence} />
-              {/* Chip do canal só em sm+ — em mobile o ícone ao lado do nome
-                  já indica a origem; ganha-se uma linha de espaço. */}
-              <span
-                className="hidden sm:inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
-                style={{
-                  background: channelChipStyle(conv?.channel_type).bg,
-                  color: channelChipStyle(conv?.channel_type).color,
-                  border: `1px solid ${channelChipStyle(conv?.channel_type).border}`,
-                }}
-              >
-                {channelChipStyle(conv?.channel_type).label}
-              </span>
-              {conv?.channel_type === "instagram" && igFolderLabel(conv?.thread_key) && (() => {
-                const f = igFolderLabel(conv?.thread_key)!;
-                return (
-                  <span
-                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
-                    style={{ background: `${f.color}14`, color: f.color, border: `1px solid ${f.color}33` }}
-                    title={`Pasta do Instagram: ${f.label}`}
-                  >
-                    {f.label}
-                  </span>
-                );
-              })()}
-              {conv?.instance?.name && (
-                <span
-                  className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium truncate max-w-[120px]"
-                  style={{ background: "rgba(0,212,106,0.06)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.18)" }}
-                  title={`Instância: ${conv.instance.name}`}
-                >
-                  {conv.instance.name}
-                </span>
-              )}
-              {/* Cronômetro da janela 24h da Cloud API (WABA + IG).
-                 Pisca quando faltam <1h, vermelho quando fechada,
-                 amarelo entre 1-6h, neutro >6h. */}
-              <WABAWindowTimer
-                channel={conv?.channel_type || conv?.instance?.channel}
-                expiresAt={constraints?.window_expires_at}
-                windowOpen={!!constraints?.window_open}
-              />
-              {conv?.assigned_user?.name ? (
-                <span className="truncate">{conv.assigned_user.name}</span>
-              ) : (
-                <span style={{ color: "var(--text-4)" }}>sem responsável</span>
-              )}
-            </div>
-          </div>
-
-          {/* Mode selector: Humano / IA / Observando */}
-          {conv && (
-            <div className="flex items-center rounded-lg overflow-hidden border flex-shrink-0"
-              style={{ border: "1px solid var(--border-default)", background: "rgba(255,255,255,0.03)" }}>
-              {([
-                { id: "human",     label: "Humano", icon: UserCheck },
-                { id: "ai",        label: "IA",     icon: Bot },
-                { id: "observing", label: "Obs",    icon: Eye },
-              ] as const).map(({ id, label, icon: Icon }) => (
-                <button key={id}
-                  onClick={() => {
-                    setConvMode(id);
-                    // Mapeia UI mode → DB mode:
-                    //   "human"     → disabled (agente não age nem observa)
-                    //   "ai"        → active   (agente responde automaticamente)
-                    //   "observing" → observing (agente sugere mas não envia)
-                    const dbMode = id === "ai" ? "active" : id === "observing" ? "observing" : "disabled";
-                    agentStateMut.mutate(dbMode);
-                    // Mantém compat com is_bot_active legado: enableBot
-                    // pra "ai", disableBot pra "human"/"observing". O
-                    // AgentRuntime usa Mode como fonte da verdade nova,
-                    // mas outros code paths antigos ainda olham is_bot_active.
-                    bot.mutate(id === "ai");
-                  }}
-                  className="px-2 sm:px-2.5 py-1.5 text-[10px] font-medium flex items-center gap-1 transition-all"
-                  title={label}
-                  aria-label={label}
-                  style={{
-                    background: convMode === id ? (id === "ai" ? "rgba(167,139,250,0.2)" : id === "human" ? "rgba(0,212,106,0.15)" : "rgba(255,255,255,0.08)") : "transparent",
-                    color: convMode === id ? (id === "ai" ? "#c4b5fd" : id === "human" ? "#00d46a" : "hsl(240 15% 80%)") : "var(--text-3)",
-                  }}>
-                  <Icon className="h-3 w-3" />
-                  {/* Em mobile o ícone fala por si — esconde label pra
-                      caber back+nome+badges+pills+ações na largura. */}
-                  <span className="hidden sm:inline">{label}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Ações secundárias — em sm+ ficam visíveis lado a lado;
-              em mobile colapsam em um menu "..." pra evitar overflow do
-              header (era o sintoma principal: badges/buttons sobrepostos
-              no iPhone). */}
-          <div className="hidden sm:flex items-center gap-2">
-            {conv?.contact_id && (
-              <button onClick={() => setDealModalOpen(true)}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium flex-shrink-0"
-                style={{ background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.2)", color: "#fbbf24" }}>
-                <Briefcase className="h-3 w-3" />
-                <span>Negociação</span>
+                <ArrowLeft className="h-4 w-4" />
               </button>
+            ) : (
+              <Link
+                href="/inbox"
+                className="rounded-md p-1.5 hover:bg-white/5 flex-shrink-0"
+                style={{ color: "hsl(240 8% 48%)" }}
+                aria-label="Voltar"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
             )}
-            {(conv?.channel_type === "whatsapp") && conv?.instance_id && conv?.channel_key && (
-              <CallButton instanceId={conv.instance_id} jid={conv.channel_key} />
+
+            {/* Mode selector: Humano / IA / Observando — movido pro topo */}
+            {conv && (
+              <div className="flex items-center rounded-lg overflow-hidden border flex-shrink-0"
+                style={{ border: "1px solid var(--border-default)", background: "rgba(255,255,255,0.03)" }}>
+                {([
+                  { id: "human",     label: "Humano", icon: UserCheck },
+                  { id: "ai",        label: "IA",     icon: Bot },
+                  { id: "observing", label: "Obs",    icon: Eye },
+                ] as const).map(({ id, label, icon: Icon }) => (
+                  <button key={id}
+                    onClick={() => {
+                      setConvMode(id);
+                      const dbMode = id === "ai" ? "active" : id === "observing" ? "observing" : "disabled";
+                      agentStateMut.mutate(dbMode);
+                      bot.mutate(id === "ai");
+                    }}
+                    className="px-2 sm:px-2.5 py-1.5 text-[10px] font-medium flex items-center gap-1 transition-all"
+                    title={label}
+                    aria-label={label}
+                    style={{
+                      background: convMode === id ? (id === "ai" ? "rgba(167,139,250,0.2)" : id === "human" ? "rgba(0,212,106,0.15)" : "rgba(255,255,255,0.08)") : "transparent",
+                      color: convMode === id ? (id === "ai" ? "#c4b5fd" : id === "human" ? "#00d46a" : "hsl(240 15% 80%)") : "var(--text-3)",
+                    }}>
+                    <Icon className="h-3 w-3" />
+                    <span className="hidden sm:inline">{label}</span>
+                  </button>
+                ))}
+              </div>
             )}
+
+            <div className="flex-1" />
+
+            {/* Refresh button — canto direito */}
             <button
               onClick={() => {
                 convQ.refetch();
@@ -940,66 +798,203 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             >
               <RotateCcw className={`h-3.5 w-3.5 ${timelineQ.isFetching || convQ.isFetching ? "animate-spin" : ""}`} />
             </button>
+
+            {/* Mobile: botão "..." */}
+            <div className="sm:hidden flex-shrink-0 relative">
+              <button
+                onClick={() => setMobileActionsOpen((v) => !v)}
+                className="flex items-center justify-center rounded-lg"
+                style={{ width: 30, height: 30, background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-subtle)", color: "var(--text-3)" }}
+                title="Mais ações"
+                aria-label="Mais ações"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+              {mobileActionsOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setMobileActionsOpen(false)}
+                  />
+                  <div
+                    className="absolute right-0 top-full mt-1 z-50 rounded-lg overflow-hidden min-w-[180px]"
+                    style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}
+                  >
+                    {conv?.contact_id && (
+                      <button
+                        onClick={() => { setDealModalOpen(true); setMobileActionsOpen(false); }}
+                        className="w-full text-left flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-white/5"
+                        style={{ color: "#fbbf24" }}
+                      >
+                        <Briefcase className="h-3.5 w-3.5" />
+                        Criar negociação
+                      </button>
+                    )}
+                    {(conv?.channel_type === "whatsapp") && conv?.instance_id && conv?.channel_key && (
+                      <button
+                        onClick={() => setMobileActionsOpen(false)}
+                        className="w-full text-left flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-white/5"
+                        style={{ color: "#00d46a" }}
+                      >
+                        <Phone className="h-3.5 w-3.5" />
+                        <span>Ligar</span>
+                        <span className="ml-auto"><CallButton instanceId={conv.instance_id} jid={conv.channel_key} /></span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        convQ.refetch();
+                        timelineQ.refetch();
+                        qc.invalidateQueries({ queryKey: ["conversations", wsId] });
+                        setMobileActionsOpen(false);
+                      }}
+                      className="w-full text-left flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-white/5"
+                      style={{ color: "hsl(240 8% 75%)" }}
+                    >
+                      <RotateCcw className={`h-3.5 w-3.5 ${timelineQ.isFetching || convQ.isFetching ? "animate-spin" : ""}`} />
+                      Atualizar mensagens
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
-          {/* Mobile: botão "..." que abre menu com as 3 ações secundárias. */}
-          <div className="sm:hidden flex-shrink-0 relative">
-            <button
-              onClick={() => setMobileActionsOpen((v) => !v)}
-              className="flex items-center justify-center rounded-lg"
-              style={{ width: 30, height: 30, background: "rgba(255,255,255,0.04)", border: "1px solid var(--border-subtle)", color: "var(--text-3)" }}
-              title="Mais ações"
-              aria-label="Mais ações"
-            >
-              <MoreVertical className="h-4 w-4" />
-            </button>
-            {mobileActionsOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setMobileActionsOpen(false)}
-                />
-                <div
-                  className="absolute right-0 top-full mt-1 z-50 rounded-lg overflow-hidden min-w-[180px]"
-                  style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}
-                >
-                  {conv?.contact_id && (
-                    <button
-                      onClick={() => { setDealModalOpen(true); setMobileActionsOpen(false); }}
-                      className="w-full text-left flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-white/5"
-                      style={{ color: "#fbbf24" }}
-                    >
-                      <Briefcase className="h-3.5 w-3.5" />
-                      Criar negociação
-                    </button>
-                  )}
-                  {(conv?.channel_type === "whatsapp") && conv?.instance_id && conv?.channel_key && (
-                    <button
-                      onClick={() => setMobileActionsOpen(false)}
-                      className="w-full text-left flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-white/5"
-                      style={{ color: "#00d46a" }}
-                    >
-                      <Phone className="h-3.5 w-3.5" />
-                      <span>Ligar</span>
-                      <span className="ml-auto"><CallButton instanceId={conv.instance_id} jid={conv.channel_key} /></span>
-                    </button>
-                  )}
+          {/* Bottom row: avatar + contact info + pills */}
+          <div className="flex items-center gap-2 px-2 sm:px-4 pb-2">
+            {/* Avatar */}
+            {(() => {
+              const isGroup = (conv?.channel_key || "").toLowerCase().endsWith("@g.us");
+              const avatarUrl = conv?.contact?.avatar_url || conv?.avatar_url;
+              const name = conv?.contact?.name || conv?.push_name || conv?.subject || conv?.channel_key || "?";
+              if (avatarUrl) {
+                return (
                   <button
-                    onClick={() => {
-                      convQ.refetch();
-                      timelineQ.refetch();
-                      qc.invalidateQueries({ queryKey: ["conversations", wsId] });
-                      setMobileActionsOpen(false);
-                    }}
-                    className="w-full text-left flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-white/5"
-                    style={{ color: "hsl(240 8% 75%)" }}
+                    type="button"
+                    onClick={() => setViewerSource({ type: "image", url: avatarUrl, filename: `${name}.jpg` })}
+                    title="Ver foto de perfil"
+                    className="h-9 w-9 rounded-full overflow-hidden flex-shrink-0 transition-opacity hover:opacity-80"
+                    style={{ background: "var(--surface-2)" }}
                   >
-                    <RotateCcw className={`h-3.5 w-3.5 ${timelineQ.isFetching || convQ.isFetching ? "animate-spin" : ""}`} />
-                    Atualizar mensagens
+                    <img src={avatarUrl} alt={name} className="h-9 w-9 object-cover" />
                   </button>
+                );
+              }
+              if (isGroup) {
+                return (
+                  <div
+                    className="flex h-9 w-9 items-center justify-center rounded-full flex-shrink-0"
+                    style={{ background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.25)", color: "#c4b5fd" }}
+                  >
+                    <UsersIcon className="h-4 w-4" />
+                  </div>
+                );
+              }
+              const text = name;
+              let hash = 0;
+              for (let i = 0; i < text.length; i++) hash = (hash * 31 + text.charCodeAt(i)) | 0;
+              const hue = Math.abs(hash) % 360;
+              const initials = (text.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0] || "").join("") || "?").toUpperCase();
+              return (
+                <div
+                  className="flex h-9 w-9 items-center justify-center rounded-full font-medium flex-shrink-0"
+                  style={{ background: `hsl(${hue} 50% 22%)`, color: `hsl(${hue} 70% 75%)`, fontSize: 13 }}
+                >
+                  {initials}
                 </div>
-              </>
-            )}
+              );
+            })()}
+
+            {/* Info section */}
+            <div className="min-w-0 flex-1">
+              {/* Nome + status */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {(conv?.channel_key || "").toLowerCase().endsWith("@g.us") && (
+                  <UsersIcon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#a78bfa" }} aria-label="Grupo" />
+                )}
+                <h1 className="truncate text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>
+                  {conv?.contact?.name || conv?.push_name || conv?.subject || "Atendimento"}
+                </h1>
+                {status && (
+                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${status.cls}`}>
+                    {status.label}
+                  </span>
+                )}
+                {conv?.reopen_count ? (
+                  <span className="hidden sm:inline-flex rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-400">
+                    reaberto {conv.reopen_count}×
+                  </span>
+                ) : null}
+                {slaBreached && (
+                  <span className="flex items-center gap-1 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:text-red-400">
+                    <AlertTriangle className="h-3 w-3" /> SLA
+                  </span>
+                )}
+              </div>
+              {/* Número + pills */}
+              <div className="flex items-center gap-1.5 text-[11px] flex-wrap" style={{ color: "var(--text-3)" }}>
+                <PresenceLabel presence={presence} />
+                <span className="truncate" style={{ color: "var(--text-2)" }}>
+                  {conv?.contact?.phone || conv?.channel_key || ""}
+                </span>
+                <span
+                  className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                  style={{
+                    background: channelChipStyle(conv?.channel_type).bg,
+                    color: channelChipStyle(conv?.channel_type).color,
+                    border: `1px solid ${channelChipStyle(conv?.channel_type).border}`,
+                  }}
+                >
+                  {channelChipStyle(conv?.channel_type).label}
+                </span>
+                {conv?.channel_type === "instagram" && igFolderLabel(conv?.thread_key) && (() => {
+                  const f = igFolderLabel(conv?.thread_key)!;
+                  return (
+                    <span
+                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                      style={{ background: `${f.color}14`, color: f.color, border: `1px solid ${f.color}33` }}
+                      title={`Pasta do Instagram: ${f.label}`}
+                    >
+                      {f.label}
+                    </span>
+                  );
+                })()}
+                {conv?.instance?.name && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium truncate max-w-[120px]"
+                    style={{ background: "rgba(0,212,106,0.06)", color: "#00d46a", border: "1px solid rgba(0,212,106,0.18)" }}
+                    title={`Instância: ${conv.instance.name}`}
+                  >
+                    {conv.instance.name}
+                  </span>
+                )}
+                <WABAWindowTimer
+                  channel={conv?.channel_type || conv?.instance?.channel}
+                  expiresAt={constraints?.window_expires_at}
+                  windowOpen={!!constraints?.window_open}
+                />
+                {conv?.assigned_user?.name ? (
+                  <span className="truncate">{conv.assigned_user.name}</span>
+                ) : (
+                  <span style={{ color: "var(--text-4)" }}>sem responsável</span>
+                )}
+              </div>
+            </div>
+
+            {/* Ações secundárias desktop */}
+            <div className="hidden sm:flex items-center gap-2">
+              {conv?.contact_id && (
+                <button onClick={() => setDealModalOpen(true)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium flex-shrink-0"
+                  style={{ background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.2)", color: "#fbbf24" }}>
+                  <Briefcase className="h-3 w-3" />
+                  <span>Negociação</span>
+                </button>
+              )}
+              {(conv?.channel_type === "whatsapp") && conv?.instance_id && conv?.channel_key && (
+                <CallButton instanceId={conv.instance_id} jid={conv.channel_key} />
+              )}
+            </div>
           </div>
         </header>
 
@@ -4277,12 +4272,13 @@ function Composer({
                     : disabled || isSending || isNoting
                 )
               }
-              className="flex h-11 min-w-[116px] items-center justify-center gap-1.5 rounded-md px-4 text-sm font-medium disabled:opacity-50"
-              style={{ background: accentBg, color: accentFg }}
+              className="flex h-10 w-10 items-center justify-center rounded-full disabled:opacity-50 flex-shrink-0"
+              style={{ background: accentBg, color: accentFg, boxShadow: `0 2px 8px ${accentBg}40` }}
               type="button"
+              title={mode === "note" ? "Adicionar nota" : "Enviar"}
+              aria-label={mode === "note" ? "Adicionar nota" : "Enviar"}
             >
               {mode === "note" ? <StickyNote className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-              {hasAttachment ? (uploading ? "Enviando…" : "Enviar") : (mode === "note" ? "Adicionar" : "Enviar")}
             </button>
           </div>
         </div>
