@@ -306,6 +306,7 @@ function CompleteForm({
           workspace_name: company.trim() || undefined,
           password,
           phone: fullPhoneDigits(),
+          country_code: phoneCountry,
           tax_id: taxIDValue(taxId),
           plan_id: selectedPlanID || undefined,
         }),

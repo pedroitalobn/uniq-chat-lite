@@ -870,6 +870,7 @@ func (h *AbacatePayHandler) materializePendingRegistration(pendingIDStr, planIDS
 		Name:         pending.Name,
 		Email:        pending.Email,
 		Phone:        pending.Phone,
+		CountryCode:  pending.CountryCode,
 		TaxID:        pending.TaxID,
 		Role:         models.RoleCustomer,
 		IsActive:     true,

@@ -93,27 +93,30 @@ func (h *AdminHandler) GetPaymentSettings(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"id":                   settings.ID,
-		"active_provider":      activeProvider,
-		"stripe_checkout_type": settings.StripeCheckoutType,
-		"asaas_environment":    settings.AsaasEnvironment,
-		"asaas_checkout_type":  settings.AsaasCheckoutType,
-		"abacatepay_environment":  settings.AbacatepayEnvironment,
+		"id":                       settings.ID,
+		"active_provider":          activeProvider,
+		"stripe_checkout_type":     settings.StripeCheckoutType,
+		"stripe_country_codes":     normalizeCountryList(settings.StripeCountryCodes),
+		"asaas_environment":        settings.AsaasEnvironment,
+		"asaas_checkout_type":      settings.AsaasCheckoutType,
+		"asaas_country_codes":      normalizeCountryList(settings.AsaasCountryCodes),
+		"abacatepay_environment":   settings.AbacatepayEnvironment,
 		"abacatepay_checkout_type": settings.AbacatepayCheckoutType,
+		"abacatepay_country_codes": normalizeCountryList(settings.AbacatepayCountryCodes),
 		// Previews mascarados — UI mostra os primeiros/últimos 4
 		// chars pra admin saber qual chave/ambiente está salvo
 		// (ex.: sk_live_*** vs sk_test_***) sem expor o segredo.
 		// Não retornamos a key crua na resposta.
-		"stripe_secret_key_preview":      maskCredential(settings.StripeSecretKey),
-		"stripe_secret_key_env":          detectStripeEnv(settings.StripeSecretKey),
-		"stripe_webhook_secret_preview":  maskCredential(settings.StripeWebhookSecret),
-		"asaas_api_key_preview":          maskCredential(settings.AsaasAPIKey),
-		"asaas_webhook_secret_preview":   maskCredential(settings.AsaasWebhookSecret),
-		"abacatepay_api_key_preview":     maskCredential(settings.AbacatepayAPIKey),
+		"stripe_secret_key_preview":         maskCredential(settings.StripeSecretKey),
+		"stripe_secret_key_env":             detectStripeEnv(settings.StripeSecretKey),
+		"stripe_webhook_secret_preview":     maskCredential(settings.StripeWebhookSecret),
+		"asaas_api_key_preview":             maskCredential(settings.AsaasAPIKey),
+		"asaas_webhook_secret_preview":      maskCredential(settings.AsaasWebhookSecret),
+		"abacatepay_api_key_preview":        maskCredential(settings.AbacatepayAPIKey),
 		"abacatepay_webhook_secret_preview": maskCredential(settings.AbacatepayWebhookSecret),
 		// Status de configuração: existe credencial salva (estado fraco).
-		"stripe_configured":    stripeConfigured,
-		"asaas_configured":     asaasConfigured,
+		"stripe_configured":     stripeConfigured,
+		"asaas_configured":      asaasConfigured,
 		"abacatepay_configured": abacatepayConfigured,
 		// Status real de conectividade — populado por Test/auto-test.
 		// UI deve mostrar isso como "Conectado/Falhou/Não testado" e
@@ -274,18 +277,21 @@ func detectStripeEnv(s string) string {
 // PUT /admin/payment-settings
 func (h *AdminHandler) UpdatePaymentSettings(c *fiber.Ctx) error {
 	var req struct {
-		ActiveProvider         string `json:"active_provider"`
-		StripeSecretKey        string `json:"stripe_secret_key"`
-		StripeWebhookSecret    string `json:"stripe_webhook_secret"`
-		StripeCheckoutType     string `json:"stripe_checkout_type"`
-		AsaasAPIKey            string `json:"asaas_api_key"`
-		AsaasEnvironment       string `json:"asaas_environment"`
-		AsaasWebhookSecret     string `json:"asaas_webhook_secret"`
-		AsaasCheckoutType      string `json:"asaas_checkout_type"`
-		AbacatepayAPIKey       string `json:"abacatepay_api_key"`
-		AbacatepayWebhookSecret string `json:"abacatepay_webhook_secret"`
-		AbacatepayEnvironment   string `json:"abacatepay_environment"`
-		AbacatepayCheckoutType  string `json:"abacatepay_checkout_type"`
+		ActiveProvider          string    `json:"active_provider"`
+		StripeSecretKey         string    `json:"stripe_secret_key"`
+		StripeWebhookSecret     string    `json:"stripe_webhook_secret"`
+		StripeCheckoutType      string    `json:"stripe_checkout_type"`
+		StripeCountryCodes      *[]string `json:"stripe_country_codes"`
+		AsaasAPIKey             string    `json:"asaas_api_key"`
+		AsaasEnvironment        string    `json:"asaas_environment"`
+		AsaasWebhookSecret      string    `json:"asaas_webhook_secret"`
+		AsaasCheckoutType       string    `json:"asaas_checkout_type"`
+		AsaasCountryCodes       *[]string `json:"asaas_country_codes"`
+		AbacatepayAPIKey        string    `json:"abacatepay_api_key"`
+		AbacatepayWebhookSecret string    `json:"abacatepay_webhook_secret"`
+		AbacatepayEnvironment   string    `json:"abacatepay_environment"`
+		AbacatepayCheckoutType  string    `json:"abacatepay_checkout_type"`
+		AbacatepayCountryCodes  *[]string `json:"abacatepay_country_codes"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -317,6 +323,9 @@ func (h *AdminHandler) UpdatePaymentSettings(c *fiber.Ctx) error {
 	if req.StripeCheckoutType != "" {
 		updates["stripe_checkout_type"] = req.StripeCheckoutType
 	}
+	if req.StripeCountryCodes != nil {
+		updates["stripe_country_codes"] = encodeCountryCodes(*req.StripeCountryCodes)
+	}
 	if req.AsaasAPIKey != "" {
 		updates["asaas_api_key"] = req.AsaasAPIKey
 	}
@@ -329,6 +338,9 @@ func (h *AdminHandler) UpdatePaymentSettings(c *fiber.Ctx) error {
 	if req.AsaasCheckoutType != "" {
 		updates["asaas_checkout_type"] = req.AsaasCheckoutType
 	}
+	if req.AsaasCountryCodes != nil {
+		updates["asaas_country_codes"] = encodeCountryCodes(*req.AsaasCountryCodes)
+	}
 	if req.AbacatepayAPIKey != "" {
 		updates["abacatepay_api_key"] = req.AbacatepayAPIKey
 	}
@@ -340,6 +352,9 @@ func (h *AdminHandler) UpdatePaymentSettings(c *fiber.Ctx) error {
 	}
 	if req.AbacatepayCheckoutType != "" {
 		updates["abacatepay_checkout_type"] = req.AbacatepayCheckoutType
+	}
+	if req.AbacatepayCountryCodes != nil {
+		updates["abacatepay_country_codes"] = encodeCountryCodes(*req.AbacatepayCountryCodes)
 	}
 
 	if len(updates) > 0 {
@@ -389,29 +404,32 @@ func (h *AdminHandler) UpdatePaymentSettings(c *fiber.Ctx) error {
 	h.db.First(&settings, "id = ?", "default")
 
 	return c.JSON(fiber.Map{
-		"id":                                  settings.ID,
-		"active_provider":                     string(settings.ActiveProvider),
-		"stripe_checkout_type":                settings.StripeCheckoutType,
-		"stripe_test_status":                  settings.StripeTestStatus,
-		"stripe_tested_at":                    settings.StripeTestedAt,
-		"stripe_test_error":                   settings.StripeTestError,
-		"asaas_environment":                   settings.AsaasEnvironment,
-		"asaas_checkout_type":                 settings.AsaasCheckoutType,
-		"asaas_test_status":                   settings.AsaasTestStatus,
-		"asaas_tested_at":                     settings.AsaasTestedAt,
-		"asaas_test_error":                    settings.AsaasTestError,
-		"abacatepay_environment":              settings.AbacatepayEnvironment,
-		"abacatepay_checkout_type":            settings.AbacatepayCheckoutType,
-		"abacatepay_test_status":              settings.AbacatepayTestStatus,
-		"abacatepay_tested_at":                settings.AbacatepayTestedAt,
-		"abacatepay_test_error":               settings.AbacatepayTestError,
-		"stripe_secret_key_preview":           maskCredential(settings.StripeSecretKey),
-		"stripe_secret_key_env":               detectStripeEnv(settings.StripeSecretKey),
-		"stripe_webhook_secret_preview":       maskCredential(settings.StripeWebhookSecret),
-		"asaas_api_key_preview":               maskCredential(settings.AsaasAPIKey),
-		"asaas_webhook_secret_preview":        maskCredential(settings.AsaasWebhookSecret),
-		"abacatepay_api_key_preview":          maskCredential(settings.AbacatepayAPIKey),
-		"abacatepay_webhook_secret_preview":   maskCredential(settings.AbacatepayWebhookSecret),
+		"id":                                settings.ID,
+		"active_provider":                   string(settings.ActiveProvider),
+		"stripe_checkout_type":              settings.StripeCheckoutType,
+		"stripe_country_codes":              normalizeCountryList(settings.StripeCountryCodes),
+		"stripe_test_status":                settings.StripeTestStatus,
+		"stripe_tested_at":                  settings.StripeTestedAt,
+		"stripe_test_error":                 settings.StripeTestError,
+		"asaas_environment":                 settings.AsaasEnvironment,
+		"asaas_checkout_type":               settings.AsaasCheckoutType,
+		"asaas_country_codes":               normalizeCountryList(settings.AsaasCountryCodes),
+		"asaas_test_status":                 settings.AsaasTestStatus,
+		"asaas_tested_at":                   settings.AsaasTestedAt,
+		"asaas_test_error":                  settings.AsaasTestError,
+		"abacatepay_environment":            settings.AbacatepayEnvironment,
+		"abacatepay_checkout_type":          settings.AbacatepayCheckoutType,
+		"abacatepay_country_codes":          normalizeCountryList(settings.AbacatepayCountryCodes),
+		"abacatepay_test_status":            settings.AbacatepayTestStatus,
+		"abacatepay_tested_at":              settings.AbacatepayTestedAt,
+		"abacatepay_test_error":             settings.AbacatepayTestError,
+		"stripe_secret_key_preview":         maskCredential(settings.StripeSecretKey),
+		"stripe_secret_key_env":             detectStripeEnv(settings.StripeSecretKey),
+		"stripe_webhook_secret_preview":     maskCredential(settings.StripeWebhookSecret),
+		"asaas_api_key_preview":             maskCredential(settings.AsaasAPIKey),
+		"asaas_webhook_secret_preview":      maskCredential(settings.AsaasWebhookSecret),
+		"abacatepay_api_key_preview":        maskCredential(settings.AbacatepayAPIKey),
+		"abacatepay_webhook_secret_preview": maskCredential(settings.AbacatepayWebhookSecret),
 	})
 }
 
@@ -880,9 +898,9 @@ func (h *AdminHandler) UserDeleteDiagnose(c *fiber.Ctx) error {
 	collectCounts("users", "id", []string{userID.String()}, "user")
 
 	return c.JSON(fiber.Map{
-		"user_id":     userID,
-		"workspaces":  wsIDs,
-		"dependents":  result,
+		"user_id":    userID,
+		"workspaces": wsIDs,
+		"dependents": result,
 	})
 }
 
@@ -1025,44 +1043,44 @@ func (h *AdminHandler) ListPlans(c *fiber.Ctx) error {
 // POST /admin/plans
 func (h *AdminHandler) CreatePlan(c *fiber.Ctx) error {
 	var req struct {
-		Name              string  `json:"name"`
-		Price             float64 `json:"price"`
-		MaxInstances      int     `json:"max_instances"`
-		MaxMessagesPerDay int     `json:"max_messages_per_day"`
-		MaxUsers          int     `json:"max_users"`
-		MaxWorkspaces     int     `json:"max_workspaces"`
-		MaxAgents         int     `json:"max_agents"`
-		MaxJourneys       int     `json:"max_journeys"`
-		MaxCampaigns      int     `json:"max_campaigns"`
-		MaxTriggers       int     `json:"max_triggers"`
-		MaxWebhooks       int     `json:"max_webhooks"`
-		MaxContacts       int     `json:"max_contacts"`
-		MaxDeals          int     `json:"max_deals"`
-		MaxShops          int     `json:"max_shops"`
-		MaxProducts       int     `json:"max_products"`
-		MaxShopIntegrations int   `json:"max_shop_integrations"`
-		MaxInstancesPerProxy int  `json:"max_instances_per_proxy"`
-		MaxProxyPool      int     `json:"max_proxy_pool"`
-		Features          string  `json:"features"`
-		AllowAI           bool    `json:"allow_ai"`
-		AllowJourneys     bool    `json:"allow_journeys"`
-		AllowCRM          bool    `json:"allow_crm"`
-		AllowInbox        bool    `json:"allow_inbox"`
-		AllowCampaigns    bool    `json:"allow_campaigns"`
-		AllowTriggers     bool    `json:"allow_triggers"`
-		AllowWarmup       bool    `json:"allow_warmup"`
-		AllowNewsletters  bool    `json:"allow_newsletters"`
-		AllowCommunities  bool    `json:"allow_communities"`
-		AllowInstagram    bool    `json:"allow_instagram"`
-		AllowTikTok       bool    `json:"allow_tiktok"`
-		AllowAPIAccess    bool    `json:"allow_api_access"`
-		AllowGlobalWebhook bool   `json:"allow_global_webhook"`
-		AllowShop         bool    `json:"allow_shop"`
-		AllowProxy        bool    `json:"allow_proxy"`
-		AllowProxyResidencial bool `json:"allow_proxy_residencial"`
-		StripePriceID     string  `json:"stripe_price_id"`
-		AsaasProductID    string  `json:"asaas_product_id"`
-		AbacatepayProductID string `json:"abacatepay_product_id"`
+		Name                  string  `json:"name"`
+		Price                 float64 `json:"price"`
+		MaxInstances          int     `json:"max_instances"`
+		MaxMessagesPerDay     int     `json:"max_messages_per_day"`
+		MaxUsers              int     `json:"max_users"`
+		MaxWorkspaces         int     `json:"max_workspaces"`
+		MaxAgents             int     `json:"max_agents"`
+		MaxJourneys           int     `json:"max_journeys"`
+		MaxCampaigns          int     `json:"max_campaigns"`
+		MaxTriggers           int     `json:"max_triggers"`
+		MaxWebhooks           int     `json:"max_webhooks"`
+		MaxContacts           int     `json:"max_contacts"`
+		MaxDeals              int     `json:"max_deals"`
+		MaxShops              int     `json:"max_shops"`
+		MaxProducts           int     `json:"max_products"`
+		MaxShopIntegrations   int     `json:"max_shop_integrations"`
+		MaxInstancesPerProxy  int     `json:"max_instances_per_proxy"`
+		MaxProxyPool          int     `json:"max_proxy_pool"`
+		Features              string  `json:"features"`
+		AllowAI               bool    `json:"allow_ai"`
+		AllowJourneys         bool    `json:"allow_journeys"`
+		AllowCRM              bool    `json:"allow_crm"`
+		AllowInbox            bool    `json:"allow_inbox"`
+		AllowCampaigns        bool    `json:"allow_campaigns"`
+		AllowTriggers         bool    `json:"allow_triggers"`
+		AllowWarmup           bool    `json:"allow_warmup"`
+		AllowNewsletters      bool    `json:"allow_newsletters"`
+		AllowCommunities      bool    `json:"allow_communities"`
+		AllowInstagram        bool    `json:"allow_instagram"`
+		AllowTikTok           bool    `json:"allow_tiktok"`
+		AllowAPIAccess        bool    `json:"allow_api_access"`
+		AllowGlobalWebhook    bool    `json:"allow_global_webhook"`
+		AllowShop             bool    `json:"allow_shop"`
+		AllowProxy            bool    `json:"allow_proxy"`
+		AllowProxyResidencial bool    `json:"allow_proxy_residencial"`
+		StripePriceID         string  `json:"stripe_price_id"`
+		AsaasProductID        string  `json:"asaas_product_id"`
+		AbacatepayProductID   string  `json:"abacatepay_product_id"`
 	}
 	if err := c.BodyParser(&req); err != nil || req.Name == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "campo 'name' é obrigatório"})
@@ -1074,45 +1092,45 @@ func (h *AdminHandler) CreatePlan(c *fiber.Ctx) error {
 	}
 
 	plan := models.Plan{
-		Name:              req.Name,
-		Price:             req.Price,
-		MaxInstances:      req.MaxInstances,
-		MaxMessagesPerDay: req.MaxMessagesPerDay,
-		MaxUsers:          req.MaxUsers,
-		MaxWorkspaces:     req.MaxWorkspaces,
-		MaxAgents:         req.MaxAgents,
-		MaxJourneys:       req.MaxJourneys,
-		MaxCampaigns:      req.MaxCampaigns,
-		MaxTriggers:       req.MaxTriggers,
-		MaxWebhooks:       req.MaxWebhooks,
-		MaxContacts:       req.MaxContacts,
-		MaxDeals:          req.MaxDeals,
-		MaxShops:          req.MaxShops,
-		MaxProducts:       req.MaxProducts,
-		MaxShopIntegrations: req.MaxShopIntegrations,
-		MaxInstancesPerProxy: req.MaxInstancesPerProxy,
-		MaxProxyPool:      req.MaxProxyPool,
-		Features:          features,
-		AllowAI:           req.AllowAI,
-		AllowJourneys:     req.AllowJourneys,
-		AllowCRM:          req.AllowCRM,
-		AllowInbox:        req.AllowInbox,
-		AllowCampaigns:    req.AllowCampaigns,
-		AllowTriggers:     req.AllowTriggers,
-		AllowWarmup:       req.AllowWarmup,
-		AllowNewsletters:  req.AllowNewsletters,
-		AllowCommunities:  req.AllowCommunities,
-		AllowInstagram:    req.AllowInstagram,
-		AllowTikTok:       req.AllowTikTok,
-		AllowAPIAccess:    req.AllowAPIAccess,
-		AllowGlobalWebhook: req.AllowGlobalWebhook,
-		AllowShop:         req.AllowShop,
-		AllowProxy:        req.AllowProxy,
+		Name:                  req.Name,
+		Price:                 req.Price,
+		MaxInstances:          req.MaxInstances,
+		MaxMessagesPerDay:     req.MaxMessagesPerDay,
+		MaxUsers:              req.MaxUsers,
+		MaxWorkspaces:         req.MaxWorkspaces,
+		MaxAgents:             req.MaxAgents,
+		MaxJourneys:           req.MaxJourneys,
+		MaxCampaigns:          req.MaxCampaigns,
+		MaxTriggers:           req.MaxTriggers,
+		MaxWebhooks:           req.MaxWebhooks,
+		MaxContacts:           req.MaxContacts,
+		MaxDeals:              req.MaxDeals,
+		MaxShops:              req.MaxShops,
+		MaxProducts:           req.MaxProducts,
+		MaxShopIntegrations:   req.MaxShopIntegrations,
+		MaxInstancesPerProxy:  req.MaxInstancesPerProxy,
+		MaxProxyPool:          req.MaxProxyPool,
+		Features:              features,
+		AllowAI:               req.AllowAI,
+		AllowJourneys:         req.AllowJourneys,
+		AllowCRM:              req.AllowCRM,
+		AllowInbox:            req.AllowInbox,
+		AllowCampaigns:        req.AllowCampaigns,
+		AllowTriggers:         req.AllowTriggers,
+		AllowWarmup:           req.AllowWarmup,
+		AllowNewsletters:      req.AllowNewsletters,
+		AllowCommunities:      req.AllowCommunities,
+		AllowInstagram:        req.AllowInstagram,
+		AllowTikTok:           req.AllowTikTok,
+		AllowAPIAccess:        req.AllowAPIAccess,
+		AllowGlobalWebhook:    req.AllowGlobalWebhook,
+		AllowShop:             req.AllowShop,
+		AllowProxy:            req.AllowProxy,
 		AllowProxyResidencial: req.AllowProxyResidencial,
-		StripePriceID:     req.StripePriceID,
-		AsaasProductID:    req.AsaasProductID,
-		AbacatepayProductID: req.AbacatepayProductID,
-		IsActive:          true,
+		StripePriceID:         req.StripePriceID,
+		AsaasProductID:        req.AsaasProductID,
+		AbacatepayProductID:   req.AbacatepayProductID,
+		IsActive:              true,
 	}
 
 	if err := h.db.Create(&plan).Error; err != nil {
@@ -1159,36 +1177,36 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 		MessageCreditsIncludedPerCycle *int64 `json:"message_credits_included_per_cycle"`
 		OverageAllowedDefault          *bool  `json:"overage_allowed_default"`
 		OverageMillicentsPerCredit     *int64 `json:"overage_millicents_per_credit"`
-		AllowAI           *bool    `json:"allow_ai"`
-		AllowVoice        *bool    `json:"allow_voice"`
-		AllowJourneys     *bool    `json:"allow_journeys"`
-		AllowCRM          *bool    `json:"allow_crm"`
-		AllowInbox        *bool    `json:"allow_inbox"`
-		AllowCampaigns    *bool    `json:"allow_campaigns"`
-		AllowTriggers     *bool    `json:"allow_triggers"`
-		AllowWarmup       *bool    `json:"allow_warmup"`
-		AllowNewsletters  *bool    `json:"allow_newsletters"`
-		AllowCommunities  *bool    `json:"allow_communities"`
-		AllowWhatsAppQR   *bool    `json:"allow_whatsapp_qr"`
-		AllowWABA         *bool    `json:"allow_waba"`
-		AllowInstagram    *bool    `json:"allow_instagram"`
-		AllowTikTok       *bool    `json:"allow_tiktok"`
-		AllowAPIAccess    *bool    `json:"allow_api_access"`
-		AllowGlobalWebhook *bool   `json:"allow_global_webhook"`
-		AllowHelpDesk     *bool    `json:"allow_helpdesk"`
-		AllowWebChat      *bool    `json:"allow_webchat"`
-		AllowProxy        *bool    `json:"allow_proxy"`
-		AllowProxyResidencial *bool `json:"allow_proxy_residencial"`
-		AllowShop         *bool    `json:"allow_shop"`
-		MaxShops          *int     `json:"max_shops"`
-		MaxProducts       *int     `json:"max_products"`
-		MaxShopIntegrations *int   `json:"max_shop_integrations"`
-		MaxInstancesPerProxy *int  `json:"max_instances_per_proxy"`
-		MaxProxyPool      *int     `json:"max_proxy_pool"`
-		IsActive          *bool    `json:"is_active"`
-		StripePriceID     string   `json:"stripe_price_id"`
-		AsaasProductID    string   `json:"asaas_product_id"`
-		AbacatepayProductID string `json:"abacatepay_product_id"`
+		AllowAI                        *bool  `json:"allow_ai"`
+		AllowVoice                     *bool  `json:"allow_voice"`
+		AllowJourneys                  *bool  `json:"allow_journeys"`
+		AllowCRM                       *bool  `json:"allow_crm"`
+		AllowInbox                     *bool  `json:"allow_inbox"`
+		AllowCampaigns                 *bool  `json:"allow_campaigns"`
+		AllowTriggers                  *bool  `json:"allow_triggers"`
+		AllowWarmup                    *bool  `json:"allow_warmup"`
+		AllowNewsletters               *bool  `json:"allow_newsletters"`
+		AllowCommunities               *bool  `json:"allow_communities"`
+		AllowWhatsAppQR                *bool  `json:"allow_whatsapp_qr"`
+		AllowWABA                      *bool  `json:"allow_waba"`
+		AllowInstagram                 *bool  `json:"allow_instagram"`
+		AllowTikTok                    *bool  `json:"allow_tiktok"`
+		AllowAPIAccess                 *bool  `json:"allow_api_access"`
+		AllowGlobalWebhook             *bool  `json:"allow_global_webhook"`
+		AllowHelpDesk                  *bool  `json:"allow_helpdesk"`
+		AllowWebChat                   *bool  `json:"allow_webchat"`
+		AllowProxy                     *bool  `json:"allow_proxy"`
+		AllowProxyResidencial          *bool  `json:"allow_proxy_residencial"`
+		AllowShop                      *bool  `json:"allow_shop"`
+		MaxShops                       *int   `json:"max_shops"`
+		MaxProducts                    *int   `json:"max_products"`
+		MaxShopIntegrations            *int   `json:"max_shop_integrations"`
+		MaxInstancesPerProxy           *int   `json:"max_instances_per_proxy"`
+		MaxProxyPool                   *int   `json:"max_proxy_pool"`
+		IsActive                       *bool  `json:"is_active"`
+		StripePriceID                  string `json:"stripe_price_id"`
+		AsaasProductID                 string `json:"asaas_product_id"`
+		AbacatepayProductID            string `json:"abacatepay_product_id"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
@@ -1769,7 +1787,6 @@ func (h *AdminHandler) GetGlobalProxyStats(c *fiber.Ctx) error {
 	})
 }
 
-
 // Stats godoc
 // GET /admin/stats
 func (h *AdminHandler) Stats(c *fiber.Ctx) error {
@@ -1833,9 +1850,9 @@ func (h *AdminHandler) GetEmailSettings(c *fiber.Ctx) error {
 		"api_key":         "",
 		"api_key_preview": maskCredential(settings.APIKey),
 		"sender_email":    settings.SenderEmail,
-		"sender_name":  settings.SenderName,
-		"is_enabled":   settings.IsEnabled,
-		"has_api_key":  settings.APIKey != "",
+		"sender_name":     settings.SenderName,
+		"is_enabled":      settings.IsEnabled,
+		"has_api_key":     settings.APIKey != "",
 	})
 }
 

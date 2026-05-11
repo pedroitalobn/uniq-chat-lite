@@ -30,6 +30,7 @@ type PendingRegistration struct {
 	// passou.
 	Name             string `gorm:"type:varchar(255)" json:"-"`
 	Phone            string `gorm:"type:varchar(30)" json:"-"`
+	CountryCode      string `gorm:"type:varchar(2)" json:"-"`
 	TaxID            string `gorm:"type:varchar(64)" json:"-"`
 	Username         string `gorm:"type:varchar(60)" json:"-"`
 	WorkspaceName    string `gorm:"type:varchar(120)" json:"-"`

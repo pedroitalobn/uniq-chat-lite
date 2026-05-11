@@ -768,6 +768,7 @@ func (h *StripeHandler) materializePending(pendingIDStr, planIDStr, subscription
 		Name:             pending.Name,
 		Email:            pending.Email,
 		Phone:            pending.Phone,
+		CountryCode:      pending.CountryCode,
 		TaxID:            pending.TaxID,
 		Role:             models.RoleCustomer,
 		IsActive:         true,

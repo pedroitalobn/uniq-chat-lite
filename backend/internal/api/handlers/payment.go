@@ -34,6 +34,14 @@ func (h *PaymentHandler) getActiveProvider() string {
 	return string(models.PaymentProviderStripe) // default
 }
 
+func (h *PaymentHandler) getProviderForCountry(country string) string {
+	var settings models.PaymentSettings
+	if err := h.db.Where("id = ?", "default").First(&settings).Error; err == nil {
+		return string(resolvePaymentProviderForCountry(settings, country))
+	}
+	return string(models.PaymentProviderStripe)
+}
+
 // ListPlans proxy
 func (h *PaymentHandler) ListPlans(c *fiber.Ctx) error {
 	provider := h.getActiveProvider()
@@ -49,6 +57,9 @@ func (h *PaymentHandler) ListPlans(c *fiber.Ctx) error {
 // CreateCheckout proxy
 func (h *PaymentHandler) CreateCheckout(c *fiber.Ctx) error {
 	provider := h.getActiveProvider()
+	if user := middleware.GetCurrentUser(c); user != nil {
+		provider = h.getProviderForCountry(user.CountryCode)
+	}
 	switch provider {
 	case string(models.PaymentProviderAsaas):
 		return h.asaasH.CreateCheckout(c)
@@ -225,6 +236,7 @@ func (h *PaymentHandler) materializeFromPending(p *models.PendingRegistration) (
 		Name:         p.Name,
 		Email:        p.Email,
 		Phone:        p.Phone,
+		CountryCode:  p.CountryCode,
 		TaxID:        p.TaxID,
 		Role:         models.RoleCustomer,
 		IsActive:     true,

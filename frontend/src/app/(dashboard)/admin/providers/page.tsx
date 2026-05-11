@@ -33,6 +33,7 @@ interface PaymentSettings {
   stripe_test_status?: string;
   stripe_tested_at?: string | null;
   stripe_test_error?: string;
+  stripe_country_codes?: string[];
   asaas_environment?: string;
   asaas_configured?: boolean;
   asaas_webhook_url?: string;
@@ -41,6 +42,7 @@ interface PaymentSettings {
   asaas_test_status?: string;
   asaas_tested_at?: string | null;
   asaas_test_error?: string;
+  asaas_country_codes?: string[];
   abacatepay_environment?: string;
   abacatepay_configured?: boolean;
   abacatepay_checkout_type?: string;
@@ -50,6 +52,7 @@ interface PaymentSettings {
   abacatepay_test_status?: string;
   abacatepay_tested_at?: string | null;
   abacatepay_test_error?: string;
+  abacatepay_country_codes?: string[];
 }
 
 interface EmailSettings {
@@ -239,6 +242,90 @@ const PROVIDERS: { id: string; label: string; icon: string; color: string; disab
   { id: "abacatepay", label: "AbacatePay", icon: "🥑", color: "#0ea5e9" },
 ];
 
+const PAYMENT_COUNTRIES = [
+  { code: "BR", label: "Brasil", flag: "🇧🇷" },
+  { code: "US", label: "Estados Unidos", flag: "🇺🇸" },
+  { code: "CA", label: "Canadá", flag: "🇨🇦" },
+  { code: "PT", label: "Portugal", flag: "🇵🇹" },
+  { code: "GB", label: "Reino Unido", flag: "🇬🇧" },
+  { code: "MX", label: "México", flag: "🇲🇽" },
+  { code: "AR", label: "Argentina", flag: "🇦🇷" },
+  { code: "CL", label: "Chile", flag: "🇨🇱" },
+  { code: "CO", label: "Colômbia", flag: "🇨🇴" },
+  { code: "ES", label: "Espanha", flag: "🇪🇸" },
+];
+
+type CountryProvider = "stripe" | "asaas" | "abacatepay";
+
+function CountryRoutingCard({
+  form,
+  setForm,
+}: {
+  form: {
+    stripe_country_codes: string[];
+    asaas_country_codes: string[];
+    abacatepay_country_codes: string[];
+  };
+  setForm: React.Dispatch<React.SetStateAction<any>>;
+}) {
+  const providerOf = (code: string): CountryProvider | "" => {
+    if (form.stripe_country_codes.includes(code)) return "stripe";
+    if (form.asaas_country_codes.includes(code)) return "asaas";
+    if (form.abacatepay_country_codes.includes(code)) return "abacatepay";
+    return "";
+  };
+  const assign = (code: string, provider: CountryProvider | "") => {
+    setForm((f: any) => ({
+      ...f,
+      stripe_country_codes: provider === "stripe"
+        ? Array.from(new Set([...f.stripe_country_codes, code]))
+        : f.stripe_country_codes.filter((c: string) => c !== code),
+      asaas_country_codes: provider === "asaas"
+        ? Array.from(new Set([...f.asaas_country_codes, code]))
+        : f.asaas_country_codes.filter((c: string) => c !== code),
+      abacatepay_country_codes: provider === "abacatepay"
+        ? Array.from(new Set([...f.abacatepay_country_codes, code]))
+        : f.abacatepay_country_codes.filter((c: string) => c !== code),
+    }));
+  };
+  return (
+    <Card>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h3 className="text-sm font-semibold" style={{ color: "hsl(240 15% 92%)" }}>Roteamento por país</h3>
+          <p className="text-xs mt-1" style={{ color: "hsl(240 8% 50%)" }}>
+            País sem regra usa o provider ativo acima. Ex: Stripe para EUA e AbacatePay para Brasil.
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {PAYMENT_COUNTRIES.map((country) => {
+          const selected = providerOf(country.code);
+          return (
+            <div key={country.code} className="flex items-center gap-2 rounded-xl p-2"
+              style={{ background: "hsl(240 18% 6%)", border: "1px solid hsl(240 12% 13%)" }}>
+              <span className="w-24 text-xs" style={{ color: "hsl(240 15% 82%)" }}>
+                {country.flag} {country.code}
+              </span>
+              <select
+                value={selected}
+                onChange={(e) => assign(country.code, e.target.value as CountryProvider | "")}
+                className="flex-1 px-2.5 py-2 rounded-lg text-xs outline-none"
+                style={{ background: "hsl(240 18% 5%)", border: "1px solid hsl(240 12% 13%)", color: "hsl(240 15% 90%)" }}
+              >
+                <option value="">Provider ativo</option>
+                <option value="stripe">Stripe</option>
+                <option value="asaas">Asaas</option>
+                <option value="abacatepay">AbacatePay</option>
+              </select>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
 function PaymentTab() {
   const queryClient = useQueryClient();
   const { data: settings, isLoading } = useQuery<PaymentSettings>({
@@ -253,6 +340,9 @@ function PaymentTab() {
     stripe_secret_key: "", stripe_webhook_secret: "", stripe_checkout_type: "redirect",
     asaas_api_key: "", asaas_webhook_secret: "", asaas_environment: "sandbox",
     abacatepay_api_key: "", abacatepay_webhook_secret: "", abacatepay_environment: "sandbox", abacatepay_checkout_type: "redirect",
+    stripe_country_codes: [] as string[],
+    asaas_country_codes: [] as string[],
+    abacatepay_country_codes: [] as string[],
   });
 
   useEffect(() => {
@@ -262,9 +352,12 @@ function PaymentTab() {
       setForm(f => ({
         ...f,
         stripe_checkout_type: settings.stripe_checkout_type || "redirect",
+        stripe_country_codes: settings.stripe_country_codes || [],
         asaas_environment: settings.asaas_environment || "sandbox",
+        asaas_country_codes: settings.asaas_country_codes || [],
         abacatepay_environment: settings.abacatepay_environment || "sandbox",
         abacatepay_checkout_type: settings.abacatepay_checkout_type || "redirect",
+        abacatepay_country_codes: settings.abacatepay_country_codes || [],
       }));
     }
   }, [settings]);
@@ -380,6 +473,8 @@ function PaymentTab() {
           })}
         </div>
       </Card>
+
+      <CountryRoutingCard form={form} setForm={setForm} />
 
       {/* Stripe config */}
       {displayProvider === "stripe" && (

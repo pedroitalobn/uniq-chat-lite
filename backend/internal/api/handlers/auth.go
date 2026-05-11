@@ -1358,6 +1358,7 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		WorkspaceName         string `json:"workspace_name"`
 		Password              string `json:"password"`
 		Phone                 string `json:"phone"`
+		CountryCode           string `json:"country_code"`
 		TaxID                 string `json:"tax_id"`
 		PlanID                string `json:"plan_id"` // override plan if different from start
 	}
@@ -1369,6 +1370,10 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 	req.WorkspaceName = strings.TrimSpace(req.WorkspaceName)
 	req.Password = strings.TrimSpace(req.Password)
 	req.Phone = normalizeSignupPhone(req.Phone)
+	req.CountryCode = normalizeCountryCode(req.CountryCode)
+	if req.CountryCode == "" {
+		req.CountryCode = inferCountryFromPhone(req.Phone)
+	}
 	req.TaxID = normalizeTaxID(req.TaxID)
 
 	if req.PendingRegistrationID == "" {
@@ -1473,6 +1478,7 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 			"password_hash":  hashed,
 			"plan_id":        plan.ID,
 			"phone":          req.Phone,
+			"country_code":   req.CountryCode,
 			"tax_id":         req.TaxID,
 		}
 		pending.Name = req.Name
@@ -1481,13 +1487,14 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		pending.PasswordHash = hashed
 		pending.PlanID = &plan.ID
 		pending.Phone = req.Phone
+		pending.CountryCode = req.CountryCode
 		pending.TaxID = req.TaxID
 
 		// Lê provider ativo do DB pra decidir qual gateway usar.
 		var settings models.PaymentSettings
 		activeProvider := models.PaymentProviderStripe
-		if h.db.Where("id = ?", "default").First(&settings).Error == nil && settings.ActiveProvider != "" {
-			activeProvider = settings.ActiveProvider
+		if h.db.Where("id = ?", "default").First(&settings).Error == nil {
+			activeProvider = resolvePaymentProviderForCountry(settings, req.CountryCode)
 		}
 
 		switch activeProvider {
@@ -1662,12 +1669,13 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 	var freePlan models.Plan
 	h.db.First(&freePlan, "name = 'Free'")
 	user := models.User{
-		Name:     req.Name,
-		Email:    pending.Email,
-		Phone:    req.Phone,
-		TaxID:    req.TaxID,
-		Role:     models.RoleCustomer,
-		IsActive: true,
+		Name:        req.Name,
+		Email:       pending.Email,
+		Phone:       req.Phone,
+		CountryCode: req.CountryCode,
+		TaxID:       req.TaxID,
+		Role:        models.RoleCustomer,
+		IsActive:    true,
 	}
 	if freePlan.ID != uuid.Nil {
 		user.PlanID = &freePlan.ID
