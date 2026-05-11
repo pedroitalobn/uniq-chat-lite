@@ -134,6 +134,9 @@ func main() {
 	// Ensure all extended plan columns exist (idempotent, Postgres-only).
 	applyPlansMigration(db)
 
+	// Apply explicit migration for processed_webhook_events table so
+	// it exists even if AutoMigrate is skipped or fails. Idempotent.
+	applyWebhookEventsMigration(db)
 
 	// CRM v2 constraints (NOT NULL, cascade DELETE, hot-path indexes).
 	applyCrmConstraints(db)
@@ -368,6 +371,12 @@ func main() {
 			recoveryH.RunScheduledSnapshots()
 		}
 	}()
+
+	// Load payment settings from DB into AppConfig (env vars are fallback).
+	// Must run after DB connect + AutoMigrate, before router/servers start.
+	if err := config.LoadPaymentSettings(db); err != nil {
+		log.Warn().Err(err).Msg("config: failed to load payment settings from DB")
+	}
 
 	// Router
 	app := api.SetupRouter(db, manager, agentRuntime)
@@ -922,6 +931,33 @@ func applyPlansMigration(db *gorm.DB) {
 		}
 	}
 	log.Info().Msg("plans extended columns applied")
+}
+
+// applyWebhookEventsMigration ensures the processed_webhook_events table
+// exists with the right composite primary key and index. Although
+// AutoMigrate covers it, this explicit migration guarantees the table
+// is present even if AutoMigrate is disabled or skipped on existing DBs.
+func applyWebhookEventsMigration(db *gorm.DB) {
+	if db.Dialector.Name() != "postgres" {
+		return
+	}
+	stmts := []string{
+		`CREATE TABLE IF NOT EXISTS processed_webhook_events (
+			event_id  varchar(190) NOT NULL,
+			provider  varchar(20)  NOT NULL,
+			processed_at timestamptz NOT NULL DEFAULT now(),
+			PRIMARY KEY (event_id, provider)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_processed_webhook_events_provider
+			ON processed_webhook_events (provider, processed_at DESC)`,
+	}
+	for _, s := range stmts {
+		if err := db.Exec(s).Error; err != nil {
+			log.Warn().Err(err).Str("stmt", s[:min(80, len(s))]).
+				Msg("webhook events migration: failed (non-fatal)")
+		}
+	}
+	log.Info().Msg("webhook events migration applied")
 }
 
 // backfillAdminRolePermissions picks up any permission keys added after a

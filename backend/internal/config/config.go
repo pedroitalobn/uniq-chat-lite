@@ -41,6 +41,7 @@ type Config struct {
 	// AbacatePay — PIX payment provider (loaded from DB with env fallback)
 	AbacatepayAPIKey        string
 	AbacatepayWebhookSecret string
+	AbacatepayEnvironment   string // "sandbox" ou "production"
 
 	// Resend — transactional email (legacy)
 	ResendAPIKey string

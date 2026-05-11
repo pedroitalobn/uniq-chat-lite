@@ -1,17 +1,21 @@
 package handlers
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"image/png"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/boombuler/barcode"
+	"github.com/boombuler/barcode/qr"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
@@ -38,6 +42,10 @@ func NewAbacatePayHandler(db *gorm.DB, emailSvc *email.Service) *AbacatePayHandl
 const abacatepayPublicKey = "t9dXRhHHo3yDEj5pVDYz0frf7q6bMKyMRmxxCPIPp3RCplBfXRxqlC6ZpiWmOqj4L63qEaeUOtrCI8P0VMUgo6iIga2ri9ogaHFs0WIIywSMg0q7RmBfybe1E5XJcfC4IW3alNqym0tXoAKkzvfEjZxV6bE0oG2zJrNNYmUCKZyV0KZ3JS8Votf9EAWWYdiDkMkpbMdPggfh1EqHlVkMiTady6jOR3hyzGEHrIz2Ret0xHKMbiqkr9HS1JhNHDX9"
 
 func (h *AbacatePayHandler) abacatepayClient() string {
+	var settings models.PaymentSettings
+	if h.db.Where("id = ?", "default").First(&settings).Error == nil && settings.AbacatepayEnvironment == "sandbox" {
+		return "https://api-sandbox.abacatepay.com"
+	}
 	return "https://api.abacatepay.com"
 }
 
@@ -79,7 +87,7 @@ func (h *AbacatePayHandler) CheckoutMode() string {
 func (h *AbacatePayHandler) apiRequest(method, path string, body []byte) ([]byte, error) {
 	baseURL := h.abacatepayClient()
 	url := baseURL + "/v2" + path
-	req, err := http.NewRequest(method, url, io.NopCloser(strings.NewReader(string(body))))
+	req, err := http.NewRequest(method, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("erro ao criar request: %w", err)
 	}
@@ -298,7 +306,7 @@ func (h *AbacatePayHandler) CreateCheckoutForPending(pending *models.PendingRegi
 	mode := h.CheckoutMode()
 	amount := int64(plan.Price * 100)
 
-	result, err := h.createCheckout(plan, pending.ID.String(), map[string]string{
+	result, err := h.createCheckout(*plan, pending.ID.String(), map[string]string{
 		"pending_id": pending.ID.String(),
 		"plan_id":    plan.ID.String(),
 		"plan_name":  plan.Name,
@@ -934,5 +942,21 @@ func (h *AbacatePayHandler) TestConnection(c *fiber.Ctx) error {
 }
 
 func generateQRBase64(brCode string) string {
-	return ""
+	matrix, err := qr.Encode(brCode, qr.M, qr.Auto)
+	if err != nil {
+		log.Error().Err(err).Str("brCode", brCode).Msg("falha ao gerar QR code PIX")
+		return ""
+	}
+	// Scale para tamanho legível (quiet zone de 4 módulos já incluída pelo encoder)
+	matrix, err = barcode.Scale(matrix, 256, 256)
+	if err != nil {
+		log.Error().Err(err).Msg("falha ao escalar QR code PIX")
+		return ""
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, matrix); err != nil {
+		log.Error().Err(err).Msg("falha ao codificar PNG do QR code PIX")
+		return ""
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(buf.Bytes())
 }
