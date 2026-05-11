@@ -59,14 +59,14 @@
     --surface-border: var(--border-default);
 
     /* Borders — alpha sobre branco (warm-ish) */
-    --border-subtle: var(--border-subtle);
-    --border-default: var(--border-default);
-    --border-strong: var(--border-strong);
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-default: rgba(255, 255, 255, 0.10);
+    --border-strong: rgba(255, 255, 255, 0.16);
 
     /* Text levels — evita pure white pra reduzir contraste agressivo. */
-    --text-1: var(--text-1);  /* primary (titles, labels emphasis) */
+    --text-1: hsl(240 15% 90%);  /* primary (titles, labels emphasis) */
     --text-2: hsl(240 8% 68%);   /* body */
-    --text-3: var(--text-3);   /* secondary / hint */
+    --text-3: hsl(240 8% 50%);   /* secondary / hint */
     --text-4: hsl(240 8% 38%);   /* tertiary / placeholder */
 
     /* Semantic */
@@ -201,6 +201,7 @@
 
   body {
     background: transparent;
+    color: var(--text-2);
     /* Inter:
        - cv11 ativa o 'l' single-storey (mais legível em UI densa)
        - ss01 desliga ligaduras de seta/pontuação que destoam em interface
