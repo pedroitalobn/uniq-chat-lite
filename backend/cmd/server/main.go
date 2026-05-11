@@ -85,6 +85,14 @@ func main() {
 			END $$;`).Error
 	}
 
+
+		// Phone column — precisa rodar ANTES do AutoMigrate porque o
+		// GORM lê a tag `gorm:"not null"` do model e gera ALTER TABLE
+		// sem DEFAULT, quebrando em tabelas com dados existentes.
+		// ADD COLUMN IF NOT EXISTS com DEFAULT '' resolve na frente.
+		db.Exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NOT NULL DEFAULT ''")
+		db.Exec("ALTER TABLE pending_registrations ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NOT NULL DEFAULT ''")
+
 	// Auto-migrate. Em prod uma migration ruim (ex: default JSONB
 	// inválido, FK pendente) derrubava o boot inteiro — o que
 	// disfarçava como "500 generic" do reverse proxy. Logamos como
@@ -126,9 +134,6 @@ func main() {
 	// Ensure all extended plan columns exist (idempotent, Postgres-only).
 	applyPlansMigration(db)
 
-		// Phone column on users and pending_registrations (idempotent).
-		db.Exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NOT NULL DEFAULT ''")
-		db.Exec("ALTER TABLE pending_registrations ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NOT NULL DEFAULT ''")
 
 	// CRM v2 constraints (NOT NULL, cascade DELETE, hot-path indexes).
 	applyCrmConstraints(db)

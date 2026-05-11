@@ -99,7 +99,17 @@ func (h *AbacatePayHandler) apiRequest(method, path string, body []byte) ([]byte
 		return nil, fmt.Errorf("erro de rede: %w", err)
 	}
 	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao ler resposta: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("abacatepay HTTP %d: %s", resp.StatusCode, truncErr(string(respBytes), 300))
+	}
+
+	return respBytes, nil
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -318,6 +328,10 @@ func (h *AbacatePayHandler) CreateCheckoutForPending(pending *models.PendingRegi
 	var checkoutResp abacatepayCheckoutResponse
 	if err := json.Unmarshal(respBytes, &checkoutResp); err != nil {
 		return nil, fmt.Errorf("resposta inválida do AbacatePay: %w", err)
+	}
+
+	if checkoutResp.ID == "" {
+		return nil, fmt.Errorf("abacatepay checkout response sem ID — possivelmente API key inválida ou resposta inesperada: %s", truncErr(string(respBytes), 300))
 	}
 
 	// Guarda o checkout ID no pending pra webhook/fallback identificar.

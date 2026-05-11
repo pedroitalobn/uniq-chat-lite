@@ -219,8 +219,12 @@ function CompleteForm({
       }
 
       // Paid plan, redirect checkout (Stripe hosted / AbacatePay redirect)
-      if (data.checkout_type === "redirect" && data.url) {
-        window.location.href = data.url;
+      if (data.checkout_type === "redirect") {
+        if (data.url) {
+          window.location.href = data.url;
+          return;
+        }
+        setErrors({ global: data.message || "Erro ao gerar link de pagamento. Verifique se o gateway está configurado." });
         return;
       }
       // Paid plan, transparent PIX (AbacatePay)
