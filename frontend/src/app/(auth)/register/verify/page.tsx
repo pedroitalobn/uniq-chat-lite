@@ -1,12 +1,13 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User, Building2, AtSign, Lock, Eye, EyeOff,
   ArrowRight, Loader2, AlertCircle, CheckCircle2, XCircle, FileText,
+  Search, ChevronDown,
 } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { Logo } from "@/components/Logo";
@@ -17,23 +18,102 @@ const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 const inputCls =
   "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-150 bg-[hsl(240_18%_5%)] border text-[hsl(240_15%_92%)] placeholder:text-[hsl(240_8%_38%)]";
 
-const PHONE_COUNTRIES = [
-  { code: "BR", name: "Brasil", dial: "55", flag: "🇧🇷" },
-  { code: "US", name: "Estados Unidos", dial: "1", flag: "🇺🇸" },
+type PhoneCountry = {
+  code: string;
+  name: string;
+  dial: string;
+  flag: string;
+  aliases?: string[];
+};
+
+const PHONE_COUNTRIES: PhoneCountry[] = [
+  { code: "BR", name: "Brasil", dial: "55", flag: "🇧🇷", aliases: ["Brazil"] },
+  { code: "US", name: "Estados Unidos", dial: "1", flag: "🇺🇸", aliases: ["United States", "USA", "EUA", "America"] },
+  { code: "CA", name: "Canadá", dial: "1", flag: "🇨🇦", aliases: ["Canada"] },
   { code: "PT", name: "Portugal", dial: "351", flag: "🇵🇹" },
-  { code: "GB", name: "Reino Unido", dial: "44", flag: "🇬🇧" },
-  { code: "CA", name: "Canadá", dial: "1", flag: "🇨🇦" },
-  { code: "MX", name: "México", dial: "52", flag: "🇲🇽" },
+  { code: "GB", name: "Reino Unido", dial: "44", flag: "🇬🇧", aliases: ["United Kingdom", "UK", "Great Britain", "Inglaterra"] },
+  { code: "MX", name: "México", dial: "52", flag: "🇲🇽", aliases: ["Mexico"] },
   { code: "AR", name: "Argentina", dial: "54", flag: "🇦🇷" },
   { code: "CL", name: "Chile", dial: "56", flag: "🇨🇱" },
-  { code: "CO", name: "Colômbia", dial: "57", flag: "🇨🇴" },
-  { code: "ES", name: "Espanha", dial: "34", flag: "🇪🇸" },
-  { code: "FR", name: "França", dial: "33", flag: "🇫🇷" },
-  { code: "DE", name: "Alemanha", dial: "49", flag: "🇩🇪" },
-  { code: "IT", name: "Itália", dial: "39", flag: "🇮🇹" },
-  { code: "AU", name: "Austrália", dial: "61", flag: "🇦🇺" },
-  { code: "JP", name: "Japão", dial: "81", flag: "🇯🇵" },
+  { code: "CO", name: "Colômbia", dial: "57", flag: "🇨🇴", aliases: ["Colombia"] },
+  { code: "ES", name: "Espanha", dial: "34", flag: "🇪🇸", aliases: ["Spain"] },
+  { code: "FR", name: "França", dial: "33", flag: "🇫🇷", aliases: ["France"] },
+  { code: "DE", name: "Alemanha", dial: "49", flag: "🇩🇪", aliases: ["Germany", "Deutschland"] },
+  { code: "IT", name: "Itália", dial: "39", flag: "🇮🇹", aliases: ["Italy"] },
+  { code: "AU", name: "Austrália", dial: "61", flag: "🇦🇺", aliases: ["Australia"] },
+  { code: "JP", name: "Japão", dial: "81", flag: "🇯🇵", aliases: ["Japan"] },
+  { code: "AF", name: "Afeganistão", dial: "93", flag: "🇦🇫", aliases: ["Afghanistan"] },
+  { code: "AO", name: "Angola", dial: "244", flag: "🇦🇴" },
+  { code: "BE", name: "Bélgica", dial: "32", flag: "🇧🇪", aliases: ["Belgium"] },
+  { code: "BO", name: "Bolívia", dial: "591", flag: "🇧🇴", aliases: ["Bolivia"] },
+  { code: "CH", name: "Suíça", dial: "41", flag: "🇨🇭", aliases: ["Switzerland", "Suisse", "Schweiz"] },
+  { code: "CN", name: "China", dial: "86", flag: "🇨🇳" },
+  { code: "CR", name: "Costa Rica", dial: "506", flag: "🇨🇷" },
+  { code: "CU", name: "Cuba", dial: "53", flag: "🇨🇺" },
+  { code: "DO", name: "República Dominicana", dial: "1", flag: "🇩🇴", aliases: ["Dominican Republic"] },
+  { code: "EC", name: "Equador", dial: "593", flag: "🇪🇨", aliases: ["Ecuador"] },
+  { code: "EG", name: "Egito", dial: "20", flag: "🇪🇬", aliases: ["Egypt"] },
+  { code: "GT", name: "Guatemala", dial: "502", flag: "🇬🇹" },
+  { code: "HN", name: "Honduras", dial: "504", flag: "🇭🇳" },
+  { code: "IE", name: "Irlanda", dial: "353", flag: "🇮🇪", aliases: ["Ireland"] },
+  { code: "IN", name: "Índia", dial: "91", flag: "🇮🇳", aliases: ["India"] },
+  { code: "IL", name: "Israel", dial: "972", flag: "🇮🇱" },
+  { code: "KR", name: "Coreia do Sul", dial: "82", flag: "🇰🇷", aliases: ["South Korea", "Korea"] },
+  { code: "MA", name: "Marrocos", dial: "212", flag: "🇲🇦", aliases: ["Morocco"] },
+  { code: "MZ", name: "Moçambique", dial: "258", flag: "🇲🇿", aliases: ["Mozambique"] },
+  { code: "NI", name: "Nicarágua", dial: "505", flag: "🇳🇮", aliases: ["Nicaragua"] },
+  { code: "NL", name: "Países Baixos", dial: "31", flag: "🇳🇱", aliases: ["Netherlands", "Holland", "Holanda"] },
+  { code: "PA", name: "Panamá", dial: "507", flag: "🇵🇦", aliases: ["Panama"] },
+  { code: "PE", name: "Peru", dial: "51", flag: "🇵🇪" },
+  { code: "PY", name: "Paraguai", dial: "595", flag: "🇵🇾", aliases: ["Paraguay"] },
+  { code: "RO", name: "Romênia", dial: "40", flag: "🇷🇴", aliases: ["Romania"] },
+  { code: "RU", name: "Rússia", dial: "7", flag: "🇷🇺", aliases: ["Russia"] },
+  { code: "SV", name: "El Salvador", dial: "503", flag: "🇸🇻" },
+  { code: "TR", name: "Turquia", dial: "90", flag: "🇹🇷", aliases: ["Turkey"] },
+  { code: "UA", name: "Ucrânia", dial: "380", flag: "🇺🇦", aliases: ["Ukraine"] },
+  { code: "UY", name: "Uruguai", dial: "598", flag: "🇺🇾", aliases: ["Uruguay"] },
+  { code: "VE", name: "Venezuela", dial: "58", flag: "🇻🇪" },
+  { code: "ZA", name: "África do Sul", dial: "27", flag: "🇿🇦", aliases: ["South Africa"] },
+  { code: "AE", name: "Emirados Árabes Unidos", dial: "971", flag: "🇦🇪", aliases: ["United Arab Emirates", "UAE"] },
+  { code: "AT", name: "Áustria", dial: "43", flag: "🇦🇹", aliases: ["Austria"] },
+  { code: "BG", name: "Bulgária", dial: "359", flag: "🇧🇬", aliases: ["Bulgaria"] },
+  { code: "CZ", name: "Tchéquia", dial: "420", flag: "🇨🇿", aliases: ["Czechia", "Czech Republic"] },
+  { code: "DK", name: "Dinamarca", dial: "45", flag: "🇩🇰", aliases: ["Denmark"] },
+  { code: "FI", name: "Finlândia", dial: "358", flag: "🇫🇮", aliases: ["Finland"] },
+  { code: "GR", name: "Grécia", dial: "30", flag: "🇬🇷", aliases: ["Greece"] },
+  { code: "HR", name: "Croácia", dial: "385", flag: "🇭🇷", aliases: ["Croatia"] },
+  { code: "HU", name: "Hungria", dial: "36", flag: "🇭🇺", aliases: ["Hungary"] },
+  { code: "ID", name: "Indonésia", dial: "62", flag: "🇮🇩", aliases: ["Indonesia"] },
+  { code: "MY", name: "Malásia", dial: "60", flag: "🇲🇾", aliases: ["Malaysia"] },
+  { code: "NO", name: "Noruega", dial: "47", flag: "🇳🇴", aliases: ["Norway"] },
+  { code: "NZ", name: "Nova Zelândia", dial: "64", flag: "🇳🇿", aliases: ["New Zealand"] },
+  { code: "PH", name: "Filipinas", dial: "63", flag: "🇵🇭", aliases: ["Philippines"] },
+  { code: "PL", name: "Polônia", dial: "48", flag: "🇵🇱", aliases: ["Poland"] },
+  { code: "PR", name: "Porto Rico", dial: "1", flag: "🇵🇷", aliases: ["Puerto Rico"] },
+  { code: "SA", name: "Arábia Saudita", dial: "966", flag: "🇸🇦", aliases: ["Saudi Arabia"] },
+  { code: "SE", name: "Suécia", dial: "46", flag: "🇸🇪", aliases: ["Sweden"] },
+  { code: "SG", name: "Singapura", dial: "65", flag: "🇸🇬", aliases: ["Singapore"] },
+  { code: "TH", name: "Tailândia", dial: "66", flag: "🇹🇭", aliases: ["Thailand"] },
+  { code: "VN", name: "Vietnã", dial: "84", flag: "🇻🇳", aliases: ["Vietnam"] },
 ];
+
+function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9+]/g, "")
+    .toLowerCase();
+}
+
+function countrySearchHaystack(country: PhoneCountry) {
+  return normalizeSearchText([
+    country.code,
+    country.name,
+    country.dial,
+    `+${country.dial}`,
+    ...(country.aliases ?? []),
+  ].join(" "));
+}
 
 function Field({
   label, type = "text", value, onChange, placeholder, icon, hint, error, autoFocus,
@@ -91,44 +171,112 @@ function PhoneField({
   error?: string;
 }) {
   const [focused, setFocused] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [countryQuery, setCountryQuery] = useState("");
   const selected = PHONE_COUNTRIES.find((c) => c.code === countryCode) ?? PHONE_COUNTRIES[0];
+  const filteredCountries = useMemo(() => {
+    const query = normalizeSearchText(countryQuery);
+    if (!query) return PHONE_COUNTRIES;
+    return PHONE_COUNTRIES.filter((country) => countrySearchHaystack(country).includes(query));
+  }, [countryQuery]);
+
+  function chooseCountry(country: PhoneCountry) {
+    onCountryChange(country.code);
+    setCountryQuery("");
+    setOpen(false);
+  }
+
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-xs font-medium text-[hsl(240_15%_65%)]">Celular</label>
       <div
-        className="grid grid-cols-[minmax(112px,132px)_1fr] rounded-xl border overflow-hidden transition-all duration-150 bg-[hsl(240_18%_5%)]"
+        className="grid grid-cols-[minmax(124px,150px)_1fr] rounded-xl border transition-all duration-150 bg-[hsl(240_18%_5%)]"
         style={{
           borderColor: error ? "rgba(239,68,68,0.5)" : focused ? "#00d46a" : "var(--border-default)",
           boxShadow: error
             ? "0 0 0 3px rgba(239,68,68,0.08)"
             : focused ? "0 0 0 3px rgba(0,212,106,0.10)" : "none",
         }}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+            setFocused(false);
+            setOpen(false);
+          }
+        }}
       >
         <div className="relative border-r border-[hsl(240_12%_13%)]">
-          <select
+          <button
+            type="button"
             aria-label="País do celular"
-            value={countryCode}
-            onChange={(e) => onCountryChange(e.target.value)}
+            aria-expanded={open}
+            onClick={() => {
+              setFocused(true);
+              setOpen((v) => !v);
+            }}
             onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            className="w-full h-full min-h-[46px] appearance-none bg-transparent pl-3 pr-7 text-sm outline-none text-[hsl(240_15%_92%)]"
+            className="flex h-full min-h-[46px] w-full items-center justify-between gap-2 bg-transparent pl-3 pr-2 text-left text-sm outline-none text-[hsl(240_15%_92%)]"
           >
-            {PHONE_COUNTRIES.map((country) => (
-              <option key={country.code} value={country.code}>
-                {country.flag} +{country.dial}
-              </option>
-            ))}
-          </select>
-          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[hsl(240_8%_45%)]">
-            ▾
-          </span>
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span>{selected.flag}</span>
+              <span className="truncate">+{selected.dial}</span>
+            </span>
+            <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-[hsl(240_8%_45%)] transition-transform ${open ? "rotate-180" : ""}`} />
+          </button>
+          {open && (
+            <div
+              className="absolute left-0 top-[calc(100%+6px)] z-30 w-[min(330px,calc(100vw-48px))] rounded-xl border bg-[hsl(240_18%_5%)] shadow-2xl"
+              style={{ borderColor: "var(--border-default)" }}
+            >
+              <div className="relative border-b border-[hsl(240_12%_13%)] p-2">
+                <Search className="pointer-events-none absolute left-5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[hsl(240_8%_45%)]" />
+                <input
+                  autoFocus
+                  value={countryQuery}
+                  onChange={(e) => setCountryQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      setOpen(false);
+                    }
+                    if (e.key === "Enter" && filteredCountries[0]) {
+                      e.preventDefault();
+                      chooseCountry(filteredCountries[0]);
+                    }
+                  }}
+                  placeholder="Buscar país, sigla ou DDI"
+                  className="w-full rounded-lg border border-[hsl(240_12%_13%)] bg-[hsl(240_16%_8%)] py-2 pl-9 pr-3 text-sm outline-none text-[hsl(240_15%_92%)] placeholder:text-[hsl(240_8%_38%)]"
+                />
+              </div>
+              <div className="max-h-64 overflow-y-auto p-1">
+                {filteredCountries.length > 0 ? (
+                  filteredCountries.map((country) => (
+                    <button
+                      key={country.code}
+                      type="button"
+                      onClick={() => chooseCountry(country)}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-[hsl(240_14%_10%)]"
+                      style={{ color: country.code === countryCode ? "#00d46a" : "hsl(240 15% 92%)" }}
+                    >
+                      <span className="text-base">{country.flag}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">{country.name}</span>
+                        <span className="block text-xs text-[hsl(240_8%_45%)]">{country.code} · +{country.dial}</span>
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="px-3 py-6 text-center text-xs text-[hsl(240_8%_45%)]">
+                    Nenhum país encontrado
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
         <input
           type="tel"
           value={localPhone}
           onChange={(e) => onLocalPhoneChange(e.target.value.replace(/[^\d\s().-]/g, "").slice(0, 22))}
           onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
           placeholder={selected.code === "US" ? "(415) 555-0199" : "11 99999-8888"}
           className="w-full min-w-0 px-4 py-3 text-sm outline-none bg-transparent text-[hsl(240_15%_92%)] placeholder:text-[hsl(240_8%_38%)]"
         />
