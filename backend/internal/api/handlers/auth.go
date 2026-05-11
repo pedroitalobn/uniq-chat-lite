@@ -1436,7 +1436,7 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 			patch["aba_cust_id"] = checkout.ID
 			h.db.Model(&pending).Updates(patch)
 
-			mode := h.abacatepayH.checkoutMode()
+			mode := h.abacatepayH.CheckoutMode()
 			out := fiber.Map{
 				"checkout_type": mode,
 				"checkout_id":   checkout.ID,
@@ -1452,9 +1452,9 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 				out["payment_method"] = "pix"
 				out["message"] = "QR Code PIX gerado — escaneie com seu banco"
 			} else {
-				out["payment_link"] = checkout.PaymentLink
+				out["payment_link"] = checkout.URL
 				out["payment_method"] = "redirect"
-				out["url"] = checkout.PaymentLink
+				out["url"] = checkout.URL
 				out["message"] = "Redirecione o usuário para o link de pagamento"
 			}
 			return c.JSON(out)

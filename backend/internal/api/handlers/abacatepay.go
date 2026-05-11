@@ -3,9 +3,9 @@ package handlers
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
-	"crypto/subtle"
 	"fmt"
 	"io"
 	"net/http"
@@ -35,17 +35,12 @@ func NewAbacatePayHandler(db *gorm.DB, emailSvc *email.Service) *AbacatePayHandl
 }
 
 // AbacatePay public key for webhook HMAC signature verification.
-// This is a public key, not a secret — same for all accounts.
 const abacatepayPublicKey = "t9dXRhHHo3yDEj5pVDYz0frf7q6bMKyMRmxxCPIPp3RCplBfXRxqlC6ZpiWmOqj4L63qEaeUOtrCI8P0VMUgo6iIga2ri9ogaHFs0WIIywSMg0q7RmBfybe1E5XJcfC4IW3alNqym0tXoAKkzvfEjZxV6bE0oG2zJrNNYmUCKZyV0KZ3JS8Votf9EAWWYdiDkMkpbMdPggfh1EqHlVkMiTady6jOR3hyzGEHrIz2Ret0xHKMbiqkr9HS1JhNHDX9"
 
-// abacatepayClient retorna o base URL da API AbacatePay.
-// A AbacatePay usa URL única — o ambiente (sandbox/production) é
-// determinado pela API key, não pela URL.
 func (h *AbacatePayHandler) abacatepayClient() string {
 	return "https://api.abacatepay.com"
 }
 
-// getAPIKey retorna a API key configurada (DB > env).
 func (h *AbacatePayHandler) getAPIKey() string {
 	var settings models.PaymentSettings
 	if h.db.Where("id = ?", "default").First(&settings).Error == nil && settings.AbacatepayAPIKey != "" {
@@ -54,7 +49,6 @@ func (h *AbacatePayHandler) getAPIKey() string {
 	return config.AppConfig.AbacatepayAPIKey
 }
 
-// getWebhookSecret retorna o secret configurado para validar HMAC dos webhooks.
 func (h *AbacatePayHandler) getWebhookSecret() string {
 	var settings models.PaymentSettings
 	if h.db.Where("id = ?", "default").First(&settings).Error == nil && settings.AbacatepayWebhookSecret != "" {
@@ -63,7 +57,6 @@ func (h *AbacatePayHandler) getWebhookSecret() string {
 	return config.AppConfig.AbacatepayWebhookSecret
 }
 
-// webhookURL monta a URL de callback com o secret como query param.
 func (h *AbacatePayHandler) webhookURL(baseURL string) string {
 	u := baseURL + "/v1/abacatepay/webhook"
 	secret := h.getWebhookSecret()
@@ -73,8 +66,8 @@ func (h *AbacatePayHandler) webhookURL(baseURL string) string {
 	return u
 }
 
-// checkoutMode retorna "transparent" ou "redirect" conforme configuração.
-func (h *AbacatePayHandler) checkoutMode() string {
+// CheckoutMode retorna "transparent" ou "redirect" conforme configuração.
+func (h *AbacatePayHandler) CheckoutMode() string {
 	var settings models.PaymentSettings
 	if h.db.Where("id = ?", "default").First(&settings).Error == nil && settings.AbacatepayCheckoutType != "" {
 		return settings.AbacatepayCheckoutType
@@ -112,72 +105,134 @@ func (h *AbacatePayHandler) apiRequest(method, path string, body []byte) ([]byte
 	return respBytes, nil
 }
 
+// apiRequestV2 chama apiRequest e desembrulha o envelope v2 {data, error, success}.
+func (h *AbacatePayHandler) apiRequestV2(method, path string, body []byte, target interface{}) error {
+	respBytes, err := h.apiRequest(method, path, body)
+	if err != nil {
+		return err
+	}
+
+	var envelope struct {
+		Data    json.RawMessage `json:"data"`
+		Error   *string         `json:"error"`
+		Success bool            `json:"success"`
+	}
+	if err := json.Unmarshal(respBytes, &envelope); err != nil {
+		return fmt.Errorf("erro ao decodificar envelope v2: %w", err)
+	}
+
+	if envelope.Error != nil && *envelope.Error != "" {
+		return fmt.Errorf("abacatepay: %s", *envelope.Error)
+	}
+
+	if target != nil && envelope.Data != nil {
+		if err := json.Unmarshal(envelope.Data, target); err != nil {
+			return fmt.Errorf("erro ao decodificar data v2: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type abacatepayCheckoutRequest struct {
-	ExternalReference string              `json:"external_reference,omitempty"`
-	Amount            int64               `json:"amount"`                        // em centavos
-	Currency          string              `json:"currency,omitempty"`           // "BRL"
-	Description       string              `json:"description"`
-	PaymentMethods    []string            `json:"payment_methods,omitempty"`    // ["pix"]
-	Metadata          map[string]string   `json:"metadata,omitempty"`
-	CallbackURL       string              `json:"callback_url,omitempty"`
+// AbacatePayCheckoutResult é o retorno unificado de criação de checkout,
+// independente do modo (redirect vs transparent).
+type AbacatePayCheckoutResult struct {
+	ID     string
+	URL    string // link de pagamento hospedado (redirect)
+	BrCode string // PIX EMV payload (transparent)
+	Status string
+	Amount int64 // centavos
 }
 
-type abacatepayCheckoutResponse struct {
-	ID                string `json:"id"`
-	ExternalReference string `json:"external_reference"`
-	Amount            int64  `json:"amount"`
-	Currency          string `json:"currency"`
-	Status            string `json:"status"`       // pending, paid, cancelled, expired, partially_refunded, refunded
-	PaymentLink       string `json:"payment_link"` // checkout hospedado URL
-	BrCode            string `json:"br_code"`      // PIX EMV payload (transparente)
-	BrCodeBase64      string `json:"-"`            // calculado localmente
-	CreatedAt         string `json:"created_at"`
-	UpdatedAt         string `json:"updated_at"`
+type abacatepayItem struct {
+	ID       string `json:"id"`
+	Quantity int    `json:"quantity"`
 }
 
-type abacatepayQRRequest struct {
-	Amount      int64  `json:"amount"`
-	Description string `json:"description"`
+// ─── v2 request types
+
+type abacatepayCheckoutCreateRequest struct {
+	Items         []abacatepayItem  `json:"items"`
+	Methods       []string          `json:"methods"`
+	ExternalID    string            `json:"externalId"`
+	CompletionURL string            `json:"completionUrl"`
+	ReturnURL     string            `json:"returnUrl,omitempty"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
 }
 
-type abacatepaySubscriptionRequest struct {
-	PlanID       string `json:"plan_id"`       // ID do produto no AbacatePay
-	ExternalID   string `json:"external_id"`   // user_id do uniq
-	CallbackURL  string `json:"callback_url"`
+type abacatepayCheckoutCreateResponse struct {
+	ID        string `json:"id"`
+	URL       string `json:"url"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"createdAt"`
+}
+
+type abacatepayTransparentRequest struct {
+	Method string                    `json:"method"`
+	Data   abacatepayTransparentData `json:"data"`
+}
+
+type abacatepayTransparentData struct {
+	Amount      int64             `json:"amount"`
+	Description string            `json:"description"`
+	ExternalID  string            `json:"externalId"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
+	ExpiresIn   int               `json:"expiresIn,omitempty"`
+}
+
+type abacatepayTransparentResponse struct {
+	ID        string `json:"id"`
+	BrCode    string `json:"brCode"`
+	Status    string `json:"status"`
+	Amount    int64  `json:"amount"`
+	CreatedAt string `json:"createdAt"`
+}
+
+type abacatepaySubscriptionCreateRequest struct {
+	Items         []abacatepayItem `json:"items"`
+	CustomerID    string           `json:"customerId,omitempty"`
+	ExternalID    string           `json:"externalId"`
+	CompletionURL string           `json:"completionUrl"`
+	Methods       []string         `json:"methods,omitempty"`
 }
 
 type abacatepaySubscriptionResponse struct {
-	ID         string `json:"id"`
-	PlanID     string `json:"plan_id"`
-	ExternalID string `json:"external_id"`
-	Status     string `json:"status"` // pending, active, cancelled, past_due
-	PaymentLink string `json:"payment_link"`
-	BrCode     string `json:"br_code"`
+	ID        string `json:"id"`
+	Status    string `json:"status"`
+	URL       string `json:"url,omitempty"`
+	BrCode    string `json:"brCode,omitempty"`
+	CreatedAt string `json:"createdAt"`
 }
 
 // ─── Webhook ────────────────────────────────────────────────────────────────
 
-// abacatepayWebhookPayload representa o payload v2 de webhook da AbacatePay.
-// Estrutura: {"id":"log_...", "event":"checkout.completed", "apiVersion":2, "devMode":false, "data":{...}}
 type abacatepayWebhookPayload struct {
-	ID         string             `json:"id"`
-	Event      string             `json:"event"`
-	APIVersion int                `json:"apiVersion"`
-	DevMode    bool               `json:"devMode"`
+	ID         string              `json:"id"`
+	Event      string              `json:"event"`
+	APIVersion int                 `json:"apiVersion"`
+	DevMode    bool                `json:"devMode"`
 	Data       checkoutWebhookData `json:"data"`
 }
 
 type checkoutWebhookData struct {
 	ID                string `json:"id"`
 	ExternalReference string `json:"external_reference"`
+	ExternalID        string `json:"externalId"`
 	Amount            int64  `json:"amount"`
 	Currency          string `json:"currency"`
 	Status            string `json:"status"`
-	PaymentMethod     string `json:"payment_method"` // pix, credit_card, etc.
+	PaymentMethod     string `json:"payment_method"`
 	PaidAt            string `json:"paid_at"`
 	Metadata          string `json:"metadata"`
+}
+
+func (d *checkoutWebhookData) refID() string {
+	if d.ExternalReference != "" {
+		return d.ExternalReference
+	}
+	return d.ExternalID
 }
 
 // ─── Endpoints ──────────────────────────────────────────────────────────────
@@ -212,43 +267,12 @@ func (h *AbacatePayHandler) CreateCheckout(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "use este endpoint apenas para planos pagos"})
 	}
 
-	amount := int64(plan.Price * 100) // centavos
-	mode := h.checkoutMode()
-
-	// Monta request para AbacatePay.
-	// O campo external_reference é o user_id para que o webhook possa
-	// identificar quem pagou.
-	paymentMethods := []string{"pix"}
-	if c.Query("payment_method") != "" {
-		pm := strings.ToLower(c.Query("payment_method"))
-		switch pm {
-		case "pix":
-			paymentMethods = []string{"pix"}
-		case "boleto":
-			paymentMethods = []string{"boleto"}
-		case "credit_card", "card":
-			paymentMethods = []string{"credit_card"}
-		default:
-			paymentMethods = []string{pm}
-		}
-	}
-
-	checkoutReq := abacatepayCheckoutRequest{
-		ExternalReference: user.ID.String(),
-		Amount:            amount,
-		Currency:          "BRL",
-		Description:       fmt.Sprintf("Assinatura %s — Uniq Chat", plan.Name),
-		PaymentMethods:    paymentMethods,
-		Metadata: map[string]string{
-			"user_id":   user.ID.String(),
-			"plan_id":   plan.ID.String(),
-			"plan_name": plan.Name,
-		},
-		CallbackURL: h.webhookURL(c.BaseURL()),
-	}
-
-	body, _ := json.Marshal(checkoutReq)
-	respBytes, err := h.apiRequest("POST", "/checkout", body)
+	mode := h.CheckoutMode()
+	result, err := h.createCheckout(plan, user.ID.String(), map[string]string{
+		"user_id":   user.ID.String(),
+		"plan_id":   plan.ID.String(),
+		"plan_name": plan.Name,
+	}, c.BaseURL(), mode)
 	if err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
 			"error":   "abacatepay_checkout_failed",
@@ -256,92 +280,149 @@ func (h *AbacatePayHandler) CreateCheckout(c *fiber.Ctx) error {
 		})
 	}
 
-	var checkoutResp abacatepayCheckoutResponse
-	if err := json.Unmarshal(respBytes, &checkoutResp); err != nil {
-		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
-			"error":   "abacatepay_invalid_response",
-			"message": "Resposta inválida do AbacatePay",
-		})
-	}
-
-	// Guarda referência no user para webhook confirmar.
 	h.db.Model(user).Updates(map[string]any{
-		"abacatepay_checkout_id": checkoutResp.ID,
+		"abacatepay_checkout_id": result.ID,
 	})
 
-	out := fiber.Map{
-		"checkout_type":     mode,
-		"checkout_id":       checkoutResp.ID,
-		"plan_name":         plan.Name,
-		"plan_price":        plan.Price,
-		"amount_cents":      amount,
-		"status":            checkoutResp.Status,
-	}
-
-	if mode == "transparent" && checkoutResp.BrCode != "" {
-		out["br_code"] = checkoutResp.BrCode
-		out["br_code_base64"] = generateQRBase64(checkoutResp.BrCode)
-		out["payment_method"] = "pix"
-		out["message"] = "QR Code PIX gerado — escaneie com seu banco"
-	} else {
-		out["payment_link"] = checkoutResp.PaymentLink
-		out["payment_method"] = "redirect"
-		out["message"] = "Redirecione o usuário para o link de pagamento"
-	}
-
-	return c.JSON(out)
+	return c.JSON(h.buildCheckoutResponse(result, plan, mode))
 }
 
 // CreateCheckoutForPending cria um checkout AbacatePay para uma
-// PendingRegistration, sem requerer usuário autenticado. Usado pelo
-// fluxo de register/complete quando active_provider = abacatepay.
-// Guarda o checkout ID no pending e devolve a resposta da API.
-func (h *AbacatePayHandler) CreateCheckoutForPending(pending *models.PendingRegistration, plan *models.Plan, baseURL string) (*abacatepayCheckoutResponse, error) {
+// PendingRegistration, sem requerer usuário autenticado.
+func (h *AbacatePayHandler) CreateCheckoutForPending(pending *models.PendingRegistration, plan *models.Plan, baseURL string) (*AbacatePayCheckoutResult, error) {
 	apiKey := h.getAPIKey()
 	if apiKey == "" {
 		return nil, fmt.Errorf("abacatepay não configurado")
 	}
 
-	amount := int64(plan.Price * 100) // centavos
+	mode := h.CheckoutMode()
+	amount := int64(plan.Price * 100)
 
-	checkoutReq := abacatepayCheckoutRequest{
-		ExternalReference: pending.ID.String(),
-		Amount:            amount,
-		Currency:          "BRL",
-		Description:       fmt.Sprintf("Assinatura %s — Uniq Chat", plan.Name),
-		PaymentMethods:    []string{"pix"},
-		Metadata: map[string]string{
-			"pending_id": pending.ID.String(),
-			"plan_id":    plan.ID.String(),
-			"plan_name":  plan.Name,
-			"email":      pending.Email,
-		},
-		CallbackURL: h.webhookURL(baseURL),
-	}
-
-	body, _ := json.Marshal(checkoutReq)
-	respBytes, err := h.apiRequest("POST", "/checkout", body)
+	result, err := h.createCheckout(plan, pending.ID.String(), map[string]string{
+		"pending_id": pending.ID.String(),
+		"plan_id":    plan.ID.String(),
+		"plan_name":  plan.Name,
+		"email":      pending.Email,
+	}, baseURL, mode)
 	if err != nil {
-		return nil, fmt.Errorf("erro ao criar checkout: %w", err)
-	}
-
-	var checkoutResp abacatepayCheckoutResponse
-	if err := json.Unmarshal(respBytes, &checkoutResp); err != nil {
-		return nil, fmt.Errorf("resposta inválida do AbacatePay: %w", err)
-	}
-
-	if checkoutResp.ID == "" {
-		return nil, fmt.Errorf("abacatepay checkout response sem ID — possivelmente API key inválida ou resposta inesperada: %s", truncErr(string(respBytes), 300))
+		return nil, err
 	}
 
 	// Guarda o checkout ID no pending pra webhook/fallback identificar.
-	pending.AbaCustID = checkoutResp.ID
-	h.db.Model(pending).Update("aba_cust_id", checkoutResp.ID)
+	pending.AbaCustID = result.ID
+	h.db.Model(pending).Update("aba_cust_id", result.ID)
 
-	return &checkoutResp, nil
+	result.Amount = amount
+	return result, nil
 }
 
-// POST /abacatepay/subscription — create recurring PIX subscription (protected)
+// createCheckout é o método interno que chama a API v2 correta conforme o modo.
+func (h *AbacatePayHandler) createCheckout(plan models.Plan, externalID string, metadata map[string]string, baseURL string, mode string) (*AbacatePayCheckoutResult, error) {
+	switch mode {
+	case "transparent":
+		return h.createTransparentCheckout(plan, externalID, metadata)
+	default:
+		return h.createRedirectCheckout(plan, externalID, metadata, baseURL)
+	}
+}
+
+func (h *AbacatePayHandler) createRedirectCheckout(plan models.Plan, externalID string, metadata map[string]string, baseURL string) (*AbacatePayCheckoutResult, error) {
+	productID := plan.AbacatepayProductID
+	if productID == "" {
+		return nil, fmt.Errorf("plano não tem abacatepay_product_id configurado — necessário para checkout redirect")
+	}
+
+	req := abacatepayCheckoutCreateRequest{
+		Items: []abacatepayItem{
+			{ID: productID, Quantity: 1},
+		},
+		Methods:       []string{"PIX"},
+		ExternalID:    externalID,
+		CompletionURL: h.webhookURL(baseURL),
+		ReturnURL:     baseURL + "/dashboard",
+		Metadata:      metadata,
+	}
+
+	body, _ := json.Marshal(req)
+	var resp abacatepayCheckoutCreateResponse
+	if err := h.apiRequestV2("POST", "/checkouts/create", body, &resp); err != nil {
+		return nil, fmt.Errorf("erro ao criar checkout: %w", err)
+	}
+
+	if resp.ID == "" {
+		return nil, fmt.Errorf("checkout response sem ID — possivelmente API key inválida")
+	}
+
+	return &AbacatePayCheckoutResult{
+		ID:     resp.ID,
+		URL:    resp.URL,
+		Status: resp.Status,
+	}, nil
+}
+
+func (h *AbacatePayHandler) createTransparentCheckout(plan models.Plan, externalID string, metadata map[string]string) (*AbacatePayCheckoutResult, error) {
+	amount := int64(plan.Price * 100)
+
+	req := abacatepayTransparentRequest{
+		Method: "PIX",
+		Data: abacatepayTransparentData{
+			Amount:      amount,
+			Description: fmt.Sprintf("Assinatura %s — Uniq Chat", plan.Name),
+			ExternalID:  externalID,
+			Metadata:    metadata,
+			ExpiresIn:   3600,
+		},
+	}
+
+	body, _ := json.Marshal(req)
+	var resp abacatepayTransparentResponse
+	if err := h.apiRequestV2("POST", "/transparents/create", body, &resp); err != nil {
+		return nil, fmt.Errorf("erro ao criar PIX: %w", err)
+	}
+
+	if resp.ID == "" {
+		return nil, fmt.Errorf("transparent response sem ID — possivelmente API key inválida")
+	}
+
+	return &AbacatePayCheckoutResult{
+		ID:     resp.ID,
+		BrCode: resp.BrCode,
+		Status: resp.Status,
+		Amount: resp.Amount,
+	}, nil
+}
+
+func (h *AbacatePayHandler) buildCheckoutResponse(result *AbacatePayCheckoutResult, plan models.Plan, mode string) fiber.Map {
+	amount := result.Amount
+	if amount == 0 {
+		amount = int64(plan.Price * 100)
+	}
+
+	out := fiber.Map{
+		"checkout_type": mode,
+		"checkout_id":   result.ID,
+		"plan_name":     plan.Name,
+		"plan_price":    plan.Price,
+		"amount_cents":  amount,
+		"status":        result.Status,
+	}
+
+	if mode == "transparent" && result.BrCode != "" {
+		out["br_code"] = result.BrCode
+		out["br_code_base64"] = generateQRBase64(result.BrCode)
+		out["payment_method"] = "pix"
+		out["message"] = "QR Code PIX gerado — escaneie com seu banco"
+	} else {
+		out["url"] = result.URL
+		out["payment_link"] = result.URL
+		out["payment_method"] = "redirect"
+		out["message"] = "Redirecione o usuário para o link de pagamento"
+	}
+
+	return out
+}
+
+// POST /abacatepay/subscription — create recurring subscription (protected)
 func (h *AbacatePayHandler) CreateSubscriptionCheckout(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 	if user == nil {
@@ -376,61 +457,54 @@ func (h *AbacatePayHandler) CreateSubscriptionCheckout(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":   "no_abacatepay_product",
 			"message": "Plano não tem um produto AbacatePay vinculado. Admin deve configurar abacatepay_product_id.",
-			"hint":    "Sete abacatepay_product_id no plano ou configure ABACATEPAY_PRODUCT_* no env.",
 		})
 	}
 
-	subReq := abacatepaySubscriptionRequest{
-		PlanID:     productID,
-		ExternalID: user.ID.String(),
-		CallbackURL: h.webhookURL(c.BaseURL()),
-		}
+	subReq := abacatepaySubscriptionCreateRequest{
+		Items: []abacatepayItem{
+			{ID: productID, Quantity: 1},
+		},
+		ExternalID:    user.ID.String(),
+		CompletionURL: h.webhookURL(c.BaseURL()),
+		Methods:       []string{"CARD"},
+	}
 
-		body, _ := json.Marshal(subReq)
-		respBytes, err := h.apiRequest("POST", "/subscriptions", body)
-	if err != nil {
+	body, _ := json.Marshal(subReq)
+	var subResp abacatepaySubscriptionResponse
+	if err := h.apiRequestV2("POST", "/subscriptions/create", body, &subResp); err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
 			"error":   "abacatepay_subscription_failed",
 			"message": "Erro ao criar assinatura: " + err.Error(),
 		})
 	}
 
-	var subResp abacatepaySubscriptionResponse
-	if err := json.Unmarshal(respBytes, &subResp); err != nil {
-		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
-			"error":   "abacatepay_invalid_response",
-			"message": "Resposta inválida do AbacatePay",
-		})
-	}
-
-	// Marca pendente — webhook vai ativar quando confirmar pagamento
 	h.db.Model(user).Updates(map[string]any{
 		"abacatepay_subscription_id":     subResp.ID,
 		"abacatepay_subscription_status": "PENDING_PAYMENT",
 	})
 
 	out := fiber.Map{
-		"subscription_id":  subResp.ID,
-		"plan_name":        plan.Name,
-		"plan_price":       plan.Price,
-		"status":           subResp.Status,
-		"payment_method":   "pix",
-		"recurrence":       "MONTHLY",
-		"message":          "Assinatura PIX recorrente criada. Pague a primeira fatura pra ativar.",
+		"subscription_id": subResp.ID,
+		"plan_name":       plan.Name,
+		"plan_price":      plan.Price,
+		"status":          subResp.Status,
+		"payment_method":  "pix",
+		"recurrence":      "MONTHLY",
+		"message":         "Assinatura criada. Pague a primeira fatura pra ativar.",
 	}
 
 	if subResp.BrCode != "" {
 		out["br_code"] = subResp.BrCode
 		out["br_code_base64"] = generateQRBase64(subResp.BrCode)
 	}
-	if subResp.PaymentLink != "" {
-		out["payment_link"] = subResp.PaymentLink
+	if subResp.URL != "" {
+		out["payment_link"] = subResp.URL
 	}
 
 	return c.JSON(out)
 }
 
-// POST /abacatepay/qr — gera QR code PIX imediato (payment avulso, sem subscription)
+// POST /abacatepay/qr — gera QR code PIX avulso (sem subscription)
 func (h *AbacatePayHandler) CreateQRCode(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 	if user == nil {
@@ -458,49 +532,37 @@ func (h *AbacatePayHandler) CreateQRCode(c *fiber.Ctx) error {
 
 	amountCents := int64(req.Amount * 100)
 
-	qrReq := abacatepayQRRequest{
-		Amount:      amountCents,
-		Description: req.Description,
+	qrReq := abacatepayTransparentRequest{
+		Method: "PIX",
+		Data: abacatepayTransparentData{
+			Amount:      amountCents,
+			Description: req.Description,
+			ExternalID:  user.ID.String(),
+		},
 	}
 
 	body, _ := json.Marshal(qrReq)
-	respBytes, err := h.apiRequest("POST", "/qrcode", body)
-	if err != nil {
+	var qrResp abacatepayTransparentResponse
+	if err := h.apiRequestV2("POST", "/transparents/create", body, &qrResp); err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
 			"error":   "abacatepay_qr_failed",
 			"message": "Erro ao gerar QR Code: " + err.Error(),
 		})
 	}
 
-	var qrResp struct {
-		ID        string `json:"id"`
-		BrCode    string `json:"br_code"`
-		Amount    int64  `json:"amount"`
-		Status    string `json:"status"`
-		CreatedAt string `json:"created_at"`
-	}
-	if err := json.Unmarshal(respBytes, &qrResp); err != nil {
-		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
-			"error":   "abacatepay_invalid_response",
-			"message": "Resposta inválida do AbacatePay",
-		})
-	}
-
 	return c.JSON(fiber.Map{
-		"id":            qrResp.ID,
-		"br_code":       qrResp.BrCode,
+		"id":             qrResp.ID,
+		"br_code":        qrResp.BrCode,
 		"br_code_base64": generateQRBase64(qrResp.BrCode),
-		"amount_cents":  qrResp.Amount,
-		"amount":        req.Amount,
-		"status":        qrResp.Status,
+		"amount_cents":   qrResp.Amount,
+		"amount":         req.Amount,
+		"status":         qrResp.Status,
 	})
 }
 
-// POST /abacatepay/webhook — handle AbacatePay webhook events (public)
-// URL esperada: /v1/abacatepay/webhook?webhookSecret=SEU_SECRET
-// Segurança em 2 camadas: query param webhookSecret + HMAC-SHA256 (base64) com chave pública.
+// ─── Webhook ────────────────────────────────────────────────────────────────
+
 func (h *AbacatePayHandler) HandleWebhook(c *fiber.Ctx) error {
-	// Camada 1: valida query param webhookSecret
 	querySecret := c.Query("webhookSecret")
 	webhookSecret := h.getWebhookSecret()
 
@@ -516,7 +578,6 @@ func (h *AbacatePayHandler) HandleWebhook(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "secret inválido"})
 	}
 
-	// Camada 2: valida HMAC-SHA256 (base64) com chave pública da AbacatePay
 	payload := c.Body()
 	sigHeader := c.Get("X-Webhook-Signature")
 	if sigHeader == "" {
@@ -537,7 +598,6 @@ func (h *AbacatePayHandler) HandleWebhook(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "corpo inválido"})
 	}
 
-	// Idempotência via event.id (log_abc123xyz)
 	if event.ID != "" {
 		res := h.db.Exec(
 			"INSERT INTO processed_webhook_events (event_id, provider, processed_at) VALUES (?, 'abacatepay', ?) ON CONFLICT DO NOTHING",
@@ -565,12 +625,9 @@ func (h *AbacatePayHandler) HandleWebhook(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"received": true})
 }
 
-// handleCheckoutPaid processa checkout pago.
-// Suporta dois fluxos:
-//  1. Registro novo (metadata.pending_id) → materializa User+Workspace
-//  2. Upgrade de user existente (metadata.user_id) → ativa novo plano
 func (h *AbacatePayHandler) handleCheckoutPaid(data *checkoutWebhookData) {
-	if data.ExternalReference == "" {
+	ref := data.refID()
+	if ref == "" {
 		return
 	}
 
@@ -579,14 +636,12 @@ func (h *AbacatePayHandler) handleCheckoutPaid(data *checkoutWebhookData) {
 		json.Unmarshal([]byte(data.Metadata), &meta)
 	}
 
-	// Fluxo 1: registro novo — externalReference = pending_id
 	if meta != nil && meta["pending_id"] != "" {
 		h.materializePendingRegistration(meta["pending_id"], meta["plan_id"])
 		return
 	}
 
-	// Fluxo 2: upgrade de user existente
-	userID := data.ExternalReference
+	userID := ref
 	var user models.User
 	if h.db.First(&user, "id = ?", userID).Error != nil {
 		log.Warn().Str("user_id", userID).Msg("abacatepay webhook: user não encontrado")
@@ -599,9 +654,9 @@ func (h *AbacatePayHandler) handleCheckoutPaid(data *checkoutWebhookData) {
 		if h.db.First(&plan, "id = ?", planIDStr).Error == nil {
 			oldPlanID := user.PlanID
 			h.db.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
-				"plan_id":      plan.ID,
-				"is_active":    true,
-				"role":         models.RoleCustomer,
+				"plan_id":   plan.ID,
+				"is_active": true,
+				"role":      models.RoleCustomer,
 			})
 			h.db.Create(&models.PlanChangeLog{
 				UserID:       user.ID,
@@ -616,8 +671,6 @@ func (h *AbacatePayHandler) handleCheckoutPaid(data *checkoutWebhookData) {
 	}
 }
 
-// materializePendingRegistration cria User+Workspace a partir do snapshot
-// no PendingRegistration quando o webhook da AbacatePay confirma pagamento.
 func (h *AbacatePayHandler) materializePendingRegistration(pendingIDStr, planIDStr string) {
 	pendingID, err := uuid.Parse(pendingIDStr)
 	if err != nil {
@@ -631,7 +684,6 @@ func (h *AbacatePayHandler) materializePendingRegistration(pendingIDStr, planIDS
 		return
 	}
 
-	// Claim atômico — evita duplicação se webhook for reentregue.
 	now := time.Now()
 	res := h.db.Model(&models.PendingRegistration{}).
 		Where("id = ? AND completed_at IS NULL", pendingID).
@@ -701,22 +753,22 @@ func (h *AbacatePayHandler) materializePendingRegistration(pendingIDStr, planIDS
 }
 
 func (h *AbacatePayHandler) handleCheckoutCancelled(data *checkoutWebhookData) {
-	if data.ExternalReference == "" {
+	if data.refID() == "" {
 		return
 	}
-	log.Info().Str("checkout_id", data.ID).Str("user_id", data.ExternalReference).
+	log.Info().Str("checkout_id", data.ID).Str("ref", data.refID()).
 		Msg("abacatepay checkout cancelled/expired")
 }
 
 func (h *AbacatePayHandler) handleSubscriptionActivated(data *checkoutWebhookData) {
-	if data.ExternalReference == "" {
+	ref := data.refID()
+	if ref == "" {
 		return
 	}
 
-	userID := data.ExternalReference
+	userID := ref
 	var plan models.Plan
 
-	// Tenta buscar plano pelo metadata
 	if data.Metadata != "" {
 		var meta map[string]string
 		if json.Unmarshal([]byte(data.Metadata), &meta) == nil {
@@ -731,8 +783,8 @@ func (h *AbacatePayHandler) handleSubscriptionActivated(data *checkoutWebhookDat
 
 	updates := map[string]interface{}{
 		"abacatepay_subscription_status": "active",
-		"is_active": true,
-		"role":      models.RoleCustomer,
+		"is_active":                      true,
+		"role":                           models.RoleCustomer,
 	}
 
 	oldPlanID := user.PlanID
@@ -755,19 +807,20 @@ func (h *AbacatePayHandler) handleSubscriptionActivated(data *checkoutWebhookDat
 }
 
 func (h *AbacatePayHandler) handleSubscriptionRenewed(data *checkoutWebhookData) {
-	if data.ExternalReference == "" {
+	if data.refID() == "" {
 		return
 	}
-	log.Info().Str("subscription_id", data.ID).Str("user_id", data.ExternalReference).
+	log.Info().Str("subscription_id", data.ID).Str("ref", data.refID()).
 		Msg("abacatepay subscription renewed")
 }
 
 func (h *AbacatePayHandler) handleSubscriptionCancelled(data *checkoutWebhookData) {
-	if data.ExternalReference == "" {
+	ref := data.refID()
+	if ref == "" {
 		return
 	}
 
-	userID := data.ExternalReference
+	userID := ref
 	var freePlan models.Plan
 
 	if h.db.First(&freePlan, "name = 'Free'").Error == nil {
@@ -793,7 +846,8 @@ func (h *AbacatePayHandler) handleSubscriptionCancelled(data *checkoutWebhookDat
 	}
 }
 
-// GET /abacatepay/plans — list plans with AbacatePay info (public)
+// ─── Read endpoints ─────────────────────────────────────────────────────────
+
 func (h *AbacatePayHandler) ListPlans(c *fiber.Ctx) error {
 	var plans []models.Plan
 	if err := h.db.Where("is_active = true").Order("price ASC").Find(&plans).Error; err != nil {
@@ -802,7 +856,6 @@ func (h *AbacatePayHandler) ListPlans(c *fiber.Ctx) error {
 	return c.JSON(plans)
 }
 
-// GET /abacatepay/subscription — get subscription status (protected)
 func (h *AbacatePayHandler) GetSubscription(c *fiber.Ctx) error {
 	user := middleware.GetCurrentUser(c)
 	if user == nil {
@@ -811,30 +864,20 @@ func (h *AbacatePayHandler) GetSubscription(c *fiber.Ctx) error {
 
 	if user.AbacatepaySubscriptionID == "" {
 		return c.JSON(fiber.Map{
-			"provider": "abacatepay",
+			"provider":        "abacatepay",
 			"has_subscription": false,
-			"message": "Nenhuma assinatura AbacatePay encontrada",
-		})
-	}
-
-	respBytes, err := h.apiRequest("GET", "/subscriptions/"+user.AbacatepaySubscriptionID, nil)
-	if err != nil {
-		return c.JSON(fiber.Map{
-			"provider":           "abacatepay",
-			"subscription_id":    user.AbacatepaySubscriptionID,
-			"status":             user.AbacatepaySubscriptionStatus,
-			"cached":             true,
-			"message":            "Status via cache (API indisponível)",
+			"message":         "Nenhuma assinatura AbacatePay encontrada",
 		})
 	}
 
 	var subResp abacatepaySubscriptionResponse
-	if err := json.Unmarshal(respBytes, &subResp); err != nil {
+	if err := h.apiRequestV2("GET", "/subscriptions/"+user.AbacatepaySubscriptionID, nil, &subResp); err != nil {
 		return c.JSON(fiber.Map{
 			"provider":        "abacatepay",
 			"subscription_id": user.AbacatepaySubscriptionID,
 			"status":          user.AbacatepaySubscriptionStatus,
 			"cached":          true,
+			"message":         "Status via cache (API indisponível)",
 		})
 	}
 
@@ -842,33 +885,23 @@ func (h *AbacatePayHandler) GetSubscription(c *fiber.Ctx) error {
 		"provider":        "abacatepay",
 		"subscription_id": subResp.ID,
 		"status":          subResp.Status,
-		"plan_id":         subResp.PlanID,
 		"br_code":         subResp.BrCode,
-		"payment_link":    subResp.PaymentLink,
+		"payment_link":    subResp.URL,
 	})
 }
 
-// GetCheckoutStatus consulta o status de um checkout na API AbacatePay.
-// Retorna status ("pending", "paid", "cancelled", "expired") e se está pago.
-// Usado como fallback quando o webhook não chega (ex.: finalize-registration).
 func (h *AbacatePayHandler) GetCheckoutStatus(checkoutID string) (status string, paid bool, err error) {
-	respBytes, err := h.apiRequest("GET", "/checkout/"+checkoutID, nil)
-	if err != nil {
-		return "", false, fmt.Errorf("erro ao consultar checkout: %w", err)
-	}
-
-	var checkout struct {
+	var resp struct {
 		ID     string `json:"id"`
 		Status string `json:"status"`
 	}
-	if err := json.Unmarshal(respBytes, &checkout); err != nil {
-		return "", false, fmt.Errorf("resposta inválida: %w", err)
+	if err := h.apiRequestV2("GET", "/checkouts/"+checkoutID, nil, &resp); err != nil {
+		return "", false, fmt.Errorf("erro ao consultar checkout: %w", err)
 	}
 
-	return checkout.Status, checkout.Status == "paid", nil
+	return resp.Status, resp.Status == "paid", nil
 }
 
-// GET /abacatepay/test — testa conectividade com a API (protegido, admin)
 func (h *AbacatePayHandler) TestConnection(c *fiber.Ctx) error {
 	apiKey := h.getAPIKey()
 	if apiKey == "" {
@@ -900,11 +933,6 @@ func (h *AbacatePayHandler) TestConnection(c *fiber.Ctx) error {
 	})
 }
 
-// generateQRBase64 gera imagem PNG do QR code a partir do EMV payload.
-// Usa uma lib leve de QR code para não adicionar dependência pesada.
 func generateQRBase64(brCode string) string {
-	// TODO: implementar geração real de QR code PNG e retornar base64.
-	// Para MVP, retorna string vazia — o front pode renderizar o brCode
-	// como texto copiável e usar uma lib JS (ex: qrcode.js) pra desenhar.
 	return ""
 }
