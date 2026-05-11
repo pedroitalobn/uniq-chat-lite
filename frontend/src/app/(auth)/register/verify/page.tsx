@@ -6,7 +6,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User, Building2, AtSign, Lock, Eye, EyeOff,
-  ArrowRight, Loader2, AlertCircle, CheckCircle2, XCircle, Phone, FileText,
+  ArrowRight, Loader2, AlertCircle, CheckCircle2, XCircle, FileText,
 } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { Logo } from "@/components/Logo";
@@ -16,6 +16,24 @@ const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 // ── shared input ──────────────────────────────────────────────────────────────
 const inputCls =
   "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-150 bg-[hsl(240_18%_5%)] border text-[hsl(240_15%_92%)] placeholder:text-[hsl(240_8%_38%)]";
+
+const PHONE_COUNTRIES = [
+  { code: "BR", name: "Brasil", dial: "55", flag: "🇧🇷" },
+  { code: "US", name: "Estados Unidos", dial: "1", flag: "🇺🇸" },
+  { code: "PT", name: "Portugal", dial: "351", flag: "🇵🇹" },
+  { code: "GB", name: "Reino Unido", dial: "44", flag: "🇬🇧" },
+  { code: "CA", name: "Canadá", dial: "1", flag: "🇨🇦" },
+  { code: "MX", name: "México", dial: "52", flag: "🇲🇽" },
+  { code: "AR", name: "Argentina", dial: "54", flag: "🇦🇷" },
+  { code: "CL", name: "Chile", dial: "56", flag: "🇨🇱" },
+  { code: "CO", name: "Colômbia", dial: "57", flag: "🇨🇴" },
+  { code: "ES", name: "Espanha", dial: "34", flag: "🇪🇸" },
+  { code: "FR", name: "França", dial: "33", flag: "🇫🇷" },
+  { code: "DE", name: "Alemanha", dial: "49", flag: "🇩🇪" },
+  { code: "IT", name: "Itália", dial: "39", flag: "🇮🇹" },
+  { code: "AU", name: "Austrália", dial: "61", flag: "🇦🇺" },
+  { code: "JP", name: "Japão", dial: "81", flag: "🇯🇵" },
+];
 
 function Field({
   label, type = "text", value, onChange, placeholder, icon, hint, error, autoFocus,
@@ -58,6 +76,68 @@ function Field({
         )}
       </div>
       {hint && !error && <p className="text-xs text-[hsl(240_8%_38%)] pl-0.5">{hint}</p>}
+      {error && <p className="text-xs text-red-400 pl-0.5">{error}</p>}
+    </div>
+  );
+}
+
+function PhoneField({
+  countryCode, onCountryChange, localPhone, onLocalPhoneChange, error,
+}: {
+  countryCode: string;
+  onCountryChange: (v: string) => void;
+  localPhone: string;
+  onLocalPhoneChange: (v: string) => void;
+  error?: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  const selected = PHONE_COUNTRIES.find((c) => c.code === countryCode) ?? PHONE_COUNTRIES[0];
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-xs font-medium text-[hsl(240_15%_65%)]">Celular</label>
+      <div
+        className="grid grid-cols-[minmax(112px,132px)_1fr] rounded-xl border overflow-hidden transition-all duration-150 bg-[hsl(240_18%_5%)]"
+        style={{
+          borderColor: error ? "rgba(239,68,68,0.5)" : focused ? "#00d46a" : "hsl(240 12% 13%)",
+          boxShadow: error
+            ? "0 0 0 3px rgba(239,68,68,0.08)"
+            : focused ? "0 0 0 3px rgba(0,212,106,0.10)" : "none",
+        }}
+      >
+        <div className="relative border-r border-[hsl(240_12%_13%)]">
+          <select
+            aria-label="País do celular"
+            value={countryCode}
+            onChange={(e) => onCountryChange(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            className="w-full h-full min-h-[46px] appearance-none bg-transparent pl-3 pr-7 text-sm outline-none text-[hsl(240_15%_92%)]"
+          >
+            {PHONE_COUNTRIES.map((country) => (
+              <option key={country.code} value={country.code}>
+                {country.flag} +{country.dial}
+              </option>
+            ))}
+          </select>
+          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[hsl(240_8%_45%)]">
+            ▾
+          </span>
+        </div>
+        <input
+          type="tel"
+          value={localPhone}
+          onChange={(e) => onLocalPhoneChange(e.target.value.replace(/[^\d\s().-]/g, "").slice(0, 22))}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder={selected.code === "US" ? "(415) 555-0199" : "11 99999-8888"}
+          className="w-full min-w-0 px-4 py-3 text-sm outline-none bg-transparent text-[hsl(240_15%_92%)] placeholder:text-[hsl(240_8%_38%)]"
+        />
+      </div>
+      {!error && (
+        <p className="text-xs text-[hsl(240_8%_38%)] pl-0.5">
+          {selected.name} (+{selected.dial})
+        </p>
+      )}
       {error && <p className="text-xs text-red-400 pl-0.5">{error}</p>}
     </div>
   );
@@ -126,7 +206,8 @@ function CompleteForm({
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [company, setCompany] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phoneCountry, setPhoneCountry] = useState("BR");
+  const [localPhone, setLocalPhone] = useState("");
   const [taxId, setTaxId] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -172,14 +253,13 @@ function CompleteForm({
   const planLabel = hasPrefilledPlan ? prefilledPlanName : selectedPlan?.name;
   const planPriceVal = hasPrefilledPlan ? prefilledPlanPrice : selectedPlan?.price;
 
-  function normalizePhoneInput(v: string) {
-    let out = v.replace(/[^\d+\s().-]/g, "");
-    out = out.replace(/(?!^)\+/g, "");
-    return out.slice(0, 24);
-  }
-
   function phoneDigits(v: string) {
     return v.replace(/\D/g, "");
+  }
+
+  function fullPhoneDigits() {
+    const country = PHONE_COUNTRIES.find((c) => c.code === phoneCountry) ?? PHONE_COUNTRIES[0];
+    return country.dial + phoneDigits(localPhone);
   }
 
   function normalizeTaxIDInput(v: string) {
@@ -197,9 +277,10 @@ function CompleteForm({
   function validate() {
     const e: Record<string, string> = {};
     if (!name.trim()) e.name = "Nome é obrigatório";
-    const rawPhone = phoneDigits(phone);
-    if (!rawPhone) e.phone = "Telefone é obrigatório";
-    else if (rawPhone.length < 8 || rawPhone.length > 15) e.phone = "Telefone inválido — use DDI + número, ex: +55 11 99999-8888";
+    const localDigits = phoneDigits(localPhone);
+    const rawPhone = fullPhoneDigits();
+    if (!localDigits) e.phone = "Celular é obrigatório";
+    else if (rawPhone.length < 8 || rawPhone.length > 15) e.phone = "Celular inválido para o país selecionado";
     const rawTaxID = taxIDValue(taxId);
     const taxLen = taxIDLength(rawTaxID);
     if (!rawTaxID) e.taxId = "CPF, CNPJ ou Tax ID é obrigatório";
@@ -224,7 +305,7 @@ function CompleteForm({
           username: username.trim().toLowerCase() || undefined,
           workspace_name: company.trim() || undefined,
           password,
-          phone: phoneDigits(phone),
+          phone: fullPhoneDigits(),
           tax_id: taxIDValue(taxId),
           plan_id: selectedPlanID || undefined,
         }),
@@ -316,9 +397,13 @@ function CompleteForm({
       <Field label="Seu nome" value={name} onChange={setName} placeholder="João Silva"
         autoFocus icon={<User className="w-4 h-4" />} error={errors.name} />
 
-      <Field label="Telefone" value={phone} onChange={v => setPhone(normalizePhoneInput(v))}
-        placeholder="+55 11 99999-8888" icon={<Phone className="w-4 h-4" />}
-        hint="Inclua o DDI do país. Ex: +55, +1, +351" error={errors.phone} />
+      <PhoneField
+        countryCode={phoneCountry}
+        onCountryChange={setPhoneCountry}
+        localPhone={localPhone}
+        onLocalPhoneChange={setLocalPhone}
+        error={errors.phone}
+      />
 
       <Field label="CPF, CNPJ ou Tax ID" value={taxId} onChange={v => setTaxId(normalizeTaxIDInput(v))}
         placeholder="CPF, CNPJ, SSN, ITIN ou EIN" icon={<FileText className="w-4 h-4" />}

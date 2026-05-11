@@ -184,6 +184,11 @@ type abacatepayCustomerResponse struct {
 	ID string `json:"id"`
 }
 
+type abacatepayCustomerCreateRequest struct {
+	Data     abacatepayCustomer `json:"data"`
+	Metadata map[string]string  `json:"metadata,omitempty"`
+}
+
 type abacatepayCheckoutCreateResponse struct {
 	ID        string `json:"id"`
 	URL       string `json:"url"`
@@ -267,7 +272,7 @@ func (h *AbacatePayHandler) abacatepayCustomerFromPending(p *models.PendingRegis
 		Name:      strings.TrimSpace(p.Name),
 		Cellphone: formatAbacatePayCellphone(p.Phone),
 		Email:     strings.TrimSpace(p.Email),
-		TaxID:     strings.TrimSpace(p.TaxID),
+		TaxID:     formatAbacatePayTaxID(p.TaxID),
 		Metadata:  metadata,
 	}
 }
@@ -280,7 +285,7 @@ func (h *AbacatePayHandler) abacatepayCustomerFromUser(u *models.User, metadata 
 		Name:      strings.TrimSpace(u.Name),
 		Cellphone: formatAbacatePayCellphone(u.Phone),
 		Email:     strings.TrimSpace(u.Email),
-		TaxID:     strings.TrimSpace(u.TaxID),
+		TaxID:     formatAbacatePayTaxID(u.TaxID),
 		Metadata:  metadata,
 	}
 }
@@ -306,11 +311,37 @@ func formatAbacatePayCellphone(phone string) string {
 	return "+" + digits
 }
 
+func formatAbacatePayTaxID(taxID string) string {
+	var b strings.Builder
+	for _, r := range taxID {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	digits := b.String()
+	// AbacatePay valida taxId como CPF/CNPJ. Para IDs internacionais
+	// (SSN/EIN/ITIN etc), mantemos no nosso cadastro mas não enviamos ao
+	// provider brasileiro para não rejeitar o checkout.
+	if len(digits) == 11 || len(digits) == 14 {
+		return digits
+	}
+	return ""
+}
+
 func (h *AbacatePayHandler) ensureAbacatePayCustomer(customer *abacatepayCustomer) (string, error) {
 	if customer == nil || strings.TrimSpace(customer.Email) == "" {
 		return "", nil
 	}
-	body, _ := json.Marshal(customer)
+	req := abacatepayCustomerCreateRequest{
+		Data: abacatepayCustomer{
+			Name:      customer.Name,
+			Cellphone: customer.Cellphone,
+			Email:     customer.Email,
+			TaxID:     customer.TaxID,
+		},
+		Metadata: customer.Metadata,
+	}
+	body, _ := json.Marshal(req)
 	var resp abacatepayCustomerResponse
 	if err := h.apiRequestV2("POST", "/customers/create", body, &resp); err != nil {
 		return "", err

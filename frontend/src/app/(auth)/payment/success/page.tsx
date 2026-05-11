@@ -114,13 +114,13 @@ function SuccessContent() {
         <Logo height={36} className="mx-auto mb-8" />
 
         {/* Success icon */}
-        <div className="relative inline-flex mb-6">
-          <div className="w-20 h-20 rounded-full flex items-center justify-center"
-            style={{ background: "rgba(0,212,106,0.12)", border: "2px solid rgba(0,212,106,0.3)" }}>
-            <CheckCircle className="w-10 h-10" style={{ color: "#00d46a" }} />
+        <div className="relative inline-flex mb-5">
+          <div className="w-14 h-14 rounded-full flex items-center justify-center"
+            style={{ background: "rgba(0,212,106,0.10)", border: "1px solid rgba(0,212,106,0.28)" }}>
+            <CheckCircle className="w-7 h-7" style={{ color: "#00d46a" }} />
           </div>
           <div className="absolute -top-1 -right-1">
-            <Sparkles className="w-5 h-5" style={{ color: "#fbbf24" }} />
+            <Sparkles className="w-3.5 h-3.5" style={{ color: "#fbbf24" }} />
           </div>
         </div>
 
