@@ -165,10 +165,23 @@ type abacatepayItem struct {
 type abacatepayCheckoutCreateRequest struct {
 	Items         []abacatepayItem  `json:"items"`
 	Methods       []string          `json:"methods"`
+	CustomerID    string            `json:"customerId,omitempty"`
 	ExternalID    string            `json:"externalId"`
 	CompletionURL string            `json:"completionUrl"`
 	ReturnURL     string            `json:"returnUrl,omitempty"`
 	Metadata      map[string]string `json:"metadata,omitempty"`
+}
+
+type abacatepayCustomer struct {
+	Name      string            `json:"name,omitempty"`
+	Cellphone string            `json:"cellphone,omitempty"`
+	Email     string            `json:"email"`
+	TaxID     string            `json:"taxId,omitempty"`
+	Metadata  map[string]string `json:"metadata,omitempty"`
+}
+
+type abacatepayCustomerResponse struct {
+	ID string `json:"id"`
 }
 
 type abacatepayCheckoutCreateResponse struct {
@@ -184,11 +197,12 @@ type abacatepayTransparentRequest struct {
 }
 
 type abacatepayTransparentData struct {
-	Amount      int64             `json:"amount"`
-	Description string            `json:"description"`
-	ExternalID  string            `json:"externalId"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
-	ExpiresIn   int               `json:"expiresIn,omitempty"`
+	Amount      int64               `json:"amount"`
+	Description string              `json:"description"`
+	ExternalID  string              `json:"externalId"`
+	Customer    *abacatepayCustomer `json:"customer,omitempty"`
+	Metadata    map[string]string   `json:"metadata,omitempty"`
+	ExpiresIn   int                 `json:"expiresIn,omitempty"`
 }
 
 type abacatepayTransparentResponse struct {
@@ -244,6 +258,65 @@ func (d *checkoutWebhookData) refID() string {
 	return d.ExternalID
 }
 
+func (h *AbacatePayHandler) abacatepayCustomerFromPending(p *models.PendingRegistration, metadata map[string]string) *abacatepayCustomer {
+	if p == nil || strings.TrimSpace(p.Email) == "" {
+		return nil
+	}
+	return &abacatepayCustomer{
+		Name:      strings.TrimSpace(p.Name),
+		Cellphone: formatAbacatePayCellphone(p.Phone),
+		Email:     strings.TrimSpace(p.Email),
+		TaxID:     strings.TrimSpace(p.TaxID),
+		Metadata:  metadata,
+	}
+}
+
+func (h *AbacatePayHandler) abacatepayCustomerFromUser(u *models.User, metadata map[string]string) *abacatepayCustomer {
+	if u == nil || strings.TrimSpace(u.Email) == "" {
+		return nil
+	}
+	return &abacatepayCustomer{
+		Name:      strings.TrimSpace(u.Name),
+		Cellphone: formatAbacatePayCellphone(u.Phone),
+		Email:     strings.TrimSpace(u.Email),
+		TaxID:     strings.TrimSpace(u.TaxID),
+		Metadata:  metadata,
+	}
+}
+
+func formatAbacatePayCellphone(phone string) string {
+	phone = strings.TrimSpace(phone)
+	if phone == "" {
+		return ""
+	}
+	if strings.HasPrefix(phone, "+") {
+		return phone
+	}
+	var b strings.Builder
+	for _, r := range phone {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	digits := b.String()
+	if digits == "" {
+		return ""
+	}
+	return "+" + digits
+}
+
+func (h *AbacatePayHandler) ensureAbacatePayCustomer(customer *abacatepayCustomer) (string, error) {
+	if customer == nil || strings.TrimSpace(customer.Email) == "" {
+		return "", nil
+	}
+	body, _ := json.Marshal(customer)
+	var resp abacatepayCustomerResponse
+	if err := h.apiRequestV2("POST", "/customers/create", body, &resp); err != nil {
+		return "", err
+	}
+	return resp.ID, nil
+}
+
 // ─── Endpoints ──────────────────────────────────────────────────────────────
 
 // POST /abacatepay/checkout — create hosted / transparent checkout (protected)
@@ -277,11 +350,20 @@ func (h *AbacatePayHandler) CreateCheckout(c *fiber.Ctx) error {
 	}
 
 	mode := h.CheckoutMode()
+	customer := h.abacatepayCustomerFromUser(user, map[string]string{
+		"user_id": user.ID.String(),
+		"plan_id": plan.ID.String(),
+	})
+
 	result, err := h.createCheckout(plan, user.ID.String(), map[string]string{
 		"user_id":   user.ID.String(),
 		"plan_id":   plan.ID.String(),
 		"plan_name": plan.Name,
-	}, c.BaseURL(), mode)
+		"email":     user.Email,
+		"name":      user.Name,
+		"phone":     user.Phone,
+		"tax_id":    user.TaxID,
+	}, customer, c.BaseURL(), mode)
 	if err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
 			"error":   "abacatepay_checkout_failed",
@@ -307,12 +389,20 @@ func (h *AbacatePayHandler) CreateCheckoutForPending(pending *models.PendingRegi
 	mode := h.CheckoutMode()
 	amount := int64(plan.Price * 100)
 
+	customer := h.abacatepayCustomerFromPending(pending, map[string]string{
+		"pending_id": pending.ID.String(),
+		"plan_id":    plan.ID.String(),
+	})
+
 	result, err := h.createCheckout(*plan, pending.ID.String(), map[string]string{
 		"pending_id": pending.ID.String(),
 		"plan_id":    plan.ID.String(),
 		"plan_name":  plan.Name,
 		"email":      pending.Email,
-	}, baseURL, mode)
+		"name":       pending.Name,
+		"phone":      pending.Phone,
+		"tax_id":     pending.TaxID,
+	}, customer, baseURL, mode)
 	if err != nil {
 		return nil, err
 	}
@@ -326,19 +416,24 @@ func (h *AbacatePayHandler) CreateCheckoutForPending(pending *models.PendingRegi
 }
 
 // createCheckout é o método interno que chama a API v2 correta conforme o modo.
-func (h *AbacatePayHandler) createCheckout(plan models.Plan, externalID string, metadata map[string]string, baseURL string, mode string) (*AbacatePayCheckoutResult, error) {
+func (h *AbacatePayHandler) createCheckout(plan models.Plan, externalID string, metadata map[string]string, customer *abacatepayCustomer, baseURL string, mode string) (*AbacatePayCheckoutResult, error) {
 	switch mode {
 	case "transparent":
-		return h.createTransparentCheckout(plan, externalID, metadata)
+		return h.createTransparentCheckout(plan, externalID, metadata, customer)
 	default:
-		return h.createRedirectCheckout(plan, externalID, metadata, baseURL)
+		return h.createRedirectCheckout(plan, externalID, metadata, customer, baseURL)
 	}
 }
 
-func (h *AbacatePayHandler) createRedirectCheckout(plan models.Plan, externalID string, metadata map[string]string, baseURL string) (*AbacatePayCheckoutResult, error) {
+func (h *AbacatePayHandler) createRedirectCheckout(plan models.Plan, externalID string, metadata map[string]string, customer *abacatepayCustomer, baseURL string) (*AbacatePayCheckoutResult, error) {
 	productID := plan.AbacatepayProductID
 	if productID == "" {
 		return nil, fmt.Errorf("plano não tem abacatepay_product_id configurado — necessário para checkout redirect")
+	}
+
+	customerID, err := h.ensureAbacatePayCustomer(customer)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao criar cliente: %w", err)
 	}
 
 	req := abacatepayCheckoutCreateRequest{
@@ -346,6 +441,7 @@ func (h *AbacatePayHandler) createRedirectCheckout(plan models.Plan, externalID 
 			{ID: productID, Quantity: 1},
 		},
 		Methods:       []string{"CARD"},
+		CustomerID:    customerID,
 		ExternalID:    externalID,
 		CompletionURL: h.webhookURL(baseURL),
 		ReturnURL:     baseURL + "/dashboard",
@@ -369,7 +465,7 @@ func (h *AbacatePayHandler) createRedirectCheckout(plan models.Plan, externalID 
 	}, nil
 }
 
-func (h *AbacatePayHandler) createTransparentCheckout(plan models.Plan, externalID string, metadata map[string]string) (*AbacatePayCheckoutResult, error) {
+func (h *AbacatePayHandler) createTransparentCheckout(plan models.Plan, externalID string, metadata map[string]string, customer *abacatepayCustomer) (*AbacatePayCheckoutResult, error) {
 	amount := int64(plan.Price * 100)
 
 	req := abacatepayTransparentRequest{
@@ -378,6 +474,7 @@ func (h *AbacatePayHandler) createTransparentCheckout(plan models.Plan, external
 			Amount:      amount,
 			Description: fmt.Sprintf("Assinatura %s — Uniq Chat", plan.Name),
 			ExternalID:  externalID,
+			Customer:    customer,
 			Metadata:    metadata,
 			ExpiresIn:   3600,
 		},
@@ -715,6 +812,7 @@ func (h *AbacatePayHandler) materializePendingRegistration(pendingIDStr, planIDS
 		Name:         pending.Name,
 		Email:        pending.Email,
 		Phone:        pending.Phone,
+		TaxID:        pending.TaxID,
 		Role:         models.RoleCustomer,
 		IsActive:     true,
 		PasswordHash: pending.PasswordHash,

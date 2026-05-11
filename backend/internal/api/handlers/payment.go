@@ -13,9 +13,9 @@ import (
 )
 
 type PaymentHandler struct {
-	db         *gorm.DB
-	stripeH    *StripeHandler
-	asaasH     *AsaasHandler
+	db          *gorm.DB
+	stripeH     *StripeHandler
+	asaasH      *AsaasHandler
 	abacatepayH *AbacatePayHandler
 }
 
@@ -223,6 +223,7 @@ func (h *PaymentHandler) materializeFromPending(p *models.PendingRegistration) (
 		Name:         p.Name,
 		Email:        p.Email,
 		Phone:        p.Phone,
+		TaxID:        p.TaxID,
 		Role:         models.RoleCustomer,
 		IsActive:     true,
 		PasswordHash: p.PasswordHash,
@@ -259,11 +260,11 @@ func (h *PaymentHandler) materializeFromPending(p *models.PendingRegistration) (
 	// PlanChangeLog de signup
 	if hasPlan {
 		changeLog := models.PlanChangeLog{
-			UserID:       user.ID,
-			ToPlanID:     &plan.ID,
-			ToPlanName:   plan.Name,
-			Source:       models.PlanChangeSourceSignup,
-			Notes:        "materializado via fallback de provider",
+			UserID:     user.ID,
+			ToPlanID:   &plan.ID,
+			ToPlanName: plan.Name,
+			Source:     models.PlanChangeSourceSignup,
+			Notes:      "materializado via fallback de provider",
 		}
 		h.db.Create(&changeLog)
 	}

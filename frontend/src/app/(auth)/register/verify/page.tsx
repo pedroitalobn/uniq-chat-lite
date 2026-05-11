@@ -6,7 +6,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User, Building2, AtSign, Lock, Eye, EyeOff,
-  ArrowRight, Loader2, AlertCircle, CheckCircle2, XCircle, Phone,
+  ArrowRight, Loader2, AlertCircle, CheckCircle2, XCircle, Phone, FileText,
 } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { Logo } from "@/components/Logo";
@@ -127,6 +127,7 @@ function CompleteForm({
   const [username, setUsername] = useState("");
   const [company, setCompany] = useState("");
   const [phone, setPhone] = useState("");
+  const [taxId, setTaxId] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -181,12 +182,28 @@ function CompleteForm({
     return v.replace(/\D/g, "");
   }
 
+  function normalizeTaxIDInput(v: string) {
+    return v.replace(/[^a-zA-Z0-9.\-/\s]/g, "").toUpperCase().slice(0, 64);
+  }
+
+  function taxIDValue(v: string) {
+    return normalizeTaxIDInput(v).trim();
+  }
+
+  function taxIDLength(v: string) {
+    return v.replace(/[^a-zA-Z0-9]/g, "").length;
+  }
+
   function validate() {
     const e: Record<string, string> = {};
     if (!name.trim()) e.name = "Nome é obrigatório";
     const rawPhone = phoneDigits(phone);
     if (!rawPhone) e.phone = "Telefone é obrigatório";
     else if (rawPhone.length < 8 || rawPhone.length > 15) e.phone = "Telefone inválido — use DDI + número, ex: +55 11 99999-8888";
+    const rawTaxID = taxIDValue(taxId);
+    const taxLen = taxIDLength(rawTaxID);
+    if (!rawTaxID) e.taxId = "CPF, CNPJ ou Tax ID é obrigatório";
+    else if (taxLen < 4 || taxLen > 32) e.taxId = "Identificador fiscal inválido";
     if (password.length < 8) e.password = "Mínimo 8 caracteres";
     if (confirmPassword !== password) e.confirmPassword = "Senhas não coincidem";
     setErrors(e);
@@ -208,6 +225,7 @@ function CompleteForm({
           workspace_name: company.trim() || undefined,
           password,
           phone: phoneDigits(phone),
+          tax_id: taxIDValue(taxId),
           plan_id: selectedPlanID || undefined,
         }),
       });
@@ -301,6 +319,10 @@ function CompleteForm({
       <Field label="Telefone" value={phone} onChange={v => setPhone(normalizePhoneInput(v))}
         placeholder="+55 11 99999-8888" icon={<Phone className="w-4 h-4" />}
         hint="Inclua o DDI do país. Ex: +55, +1, +351" error={errors.phone} />
+
+      <Field label="CPF, CNPJ ou Tax ID" value={taxId} onChange={v => setTaxId(normalizeTaxIDInput(v))}
+        placeholder="CPF, CNPJ, SSN, ITIN ou EIN" icon={<FileText className="w-4 h-4" />}
+        hint="Brasil: CPF/CNPJ. EUA: SSN/ITIN/EIN. Outros países: ID fiscal local." error={errors.taxId} />
 
       <Field label="Username (opcional)" value={username} onChange={setUsername}
         placeholder="@joaosilva" icon={<AtSign className="w-4 h-4" />}

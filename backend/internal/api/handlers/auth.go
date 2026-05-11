@@ -69,6 +69,37 @@ func validSignupPhone(phone string) bool {
 	return n >= 8 && n <= 15
 }
 
+func normalizeTaxID(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	var b strings.Builder
+	for _, r := range raw {
+		switch {
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r - 'a' + 'A')
+		case r >= 'A' && r <= 'Z':
+			b.WriteRune(r)
+		case r == '.' || r == '-' || r == '/' || r == ' ':
+			b.WriteRune(r)
+		}
+	}
+	return strings.TrimSpace(b.String())
+}
+
+func validTaxID(taxID string) bool {
+	var n int
+	for _, r := range taxID {
+		if (r >= '0' && r <= '9') || (r >= 'A' && r <= 'Z') {
+			n++
+		}
+	}
+	return n >= 4 && n <= 32 && len(taxID) <= 64
+}
+
 func loadStripeConfigFromDB(db *gorm.DB) {
 	var settings models.PaymentSettings
 	if db.Where("id = ?", "default").First(&settings).Error == nil {
@@ -1327,6 +1358,7 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		WorkspaceName         string `json:"workspace_name"`
 		Password              string `json:"password"`
 		Phone                 string `json:"phone"`
+		TaxID                 string `json:"tax_id"`
 		PlanID                string `json:"plan_id"` // override plan if different from start
 	}
 	if err := c.BodyParser(&req); err != nil {
@@ -1337,6 +1369,7 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 	req.WorkspaceName = strings.TrimSpace(req.WorkspaceName)
 	req.Password = strings.TrimSpace(req.Password)
 	req.Phone = normalizeSignupPhone(req.Phone)
+	req.TaxID = normalizeTaxID(req.TaxID)
 
 	if req.PendingRegistrationID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "pending_registration_id é obrigatório"})
@@ -1352,6 +1385,12 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 	}
 	if !validSignupPhone(req.Phone) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "telefone inválido — informe DDI + número, ex: +5511999998888"})
+	}
+	if req.TaxID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "identificador fiscal é obrigatório (CPF/CNPJ/Tax ID)"})
+	}
+	if !validTaxID(req.TaxID) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "identificador fiscal inválido — informe CPF, CNPJ, SSN, ITIN, EIN ou Tax ID local"})
 	}
 
 	prID, err := uuid.Parse(req.PendingRegistrationID)
@@ -1434,7 +1473,15 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 			"password_hash":  hashed,
 			"plan_id":        plan.ID,
 			"phone":          req.Phone,
+			"tax_id":         req.TaxID,
 		}
+		pending.Name = req.Name
+		pending.Username = req.Username
+		pending.WorkspaceName = req.WorkspaceName
+		pending.PasswordHash = hashed
+		pending.PlanID = &plan.ID
+		pending.Phone = req.Phone
+		pending.TaxID = req.TaxID
 
 		// Lê provider ativo do DB pra decidir qual gateway usar.
 		var settings models.PaymentSettings
@@ -1618,6 +1665,7 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		Name:     req.Name,
 		Email:    pending.Email,
 		Phone:    req.Phone,
+		TaxID:    req.TaxID,
 		Role:     models.RoleCustomer,
 		IsActive: true,
 	}
