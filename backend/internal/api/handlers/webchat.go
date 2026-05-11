@@ -26,6 +26,25 @@ func NewWebChatHandler(db *gorm.DB, llm *services.LLMService) *WebChatHandler {
 	return &WebChatHandler{db: db, llm: llm}
 }
 
+// resolveDestinationPhone retorna o número normalizado (apenas dígitos) da
+// instância destino para wa.me/ links.
+func (h *WebChatHandler) resolveDestinationPhone(instanceID *uuid.UUID) string {
+	if instanceID == nil {
+		return ""
+	}
+	var inst models.Instance
+	if err := h.db.Select("phone_number").Where("id = ?", instanceID).First(&inst).Error; err != nil {
+		return ""
+	}
+	clean := strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, inst.PhoneNumber)
+	return clean
+}
+
 // GetConfig GET /v1/instances/:id/webchat
 func (h *WebChatHandler) GetConfig(c *fiber.Ctx) error {
 	inst, ok := c.Locals("instance").(*models.Instance)
@@ -143,26 +162,46 @@ func (h *WebChatHandler) PublicGetConfig(c *fiber.Ctx) error {
 		if err == gorm.ErrRecordNotFound {
 			// Return defaults.
 			return c.JSON(fiber.Map{
-				"display_name":  inst.Name,
-				"primary_color": "#00d46a",
-				"position":      "bottom-right",
-				"greeting":      "Olá! Como posso ajudar?",
-				"instance_id":   inst.ID,
+				"display_name":     inst.Name,
+				"primary_color":    "#00d46a",
+				"position":         "bottom-right",
+				"greeting":         "Olá! Como posso ajudar?",
+				"instance_id":      inst.ID,
+				"destination_type": "inbox",
+				"badge_style":      "bubble",
+				"badge_icon":       "",
+				"badge_color":      "#00d46a",
+				"offset_x":         20,
+				"offset_y":         20,
+				"border_radius":    9999,
+				"shadow_intensity": "medium",
 			})
 		}
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
-	// Safe config — no sensitive fields.
-	return c.JSON(fiber.Map{
-		"display_name":     cfg.DisplayName,
-		"greeting":         cfg.Greeting,
-		"primary_color":    cfg.PrimaryColor,
-		"position":         cfg.Position,
-		"avatar_url":       cfg.AvatarURL,
+	resp := fiber.Map{
+		"display_name":      cfg.DisplayName,
+		"greeting":          cfg.Greeting,
+		"primary_color":     cfg.PrimaryColor,
+		"position":          cfg.Position,
+		"avatar_url":        cfg.AvatarURL,
 		"help_desk_enabled": cfg.HelpDeskEnabled,
-		"instance_id":      cfg.InstanceID,
-	})
+		"instance_id":       cfg.InstanceID,
+		"destination_type":  cfg.DestinationType,
+		// badge appearance
+		"badge_style":       cfg.BadgeStyle,
+		"badge_icon":        cfg.BadgeIcon,
+		"badge_color":       firstNonEmpty(cfg.BadgeColor, cfg.PrimaryColor),
+		"offset_x":          cfg.OffsetX,
+		"offset_y":          cfg.OffsetY,
+		"border_radius":     cfg.BorderRadius,
+		"shadow_intensity":  cfg.ShadowIntensity,
+	}
+	if cfg.DestinationType == "redirect_instance" && cfg.DestinationInstanceID != nil {
+		resp["destination_phone"] = h.resolveDestinationPhone(cfg.DestinationInstanceID)
+	}
+	return c.JSON(resp)
 }
 
 // PublicMessage POST /v1/public/webchat/:token/message

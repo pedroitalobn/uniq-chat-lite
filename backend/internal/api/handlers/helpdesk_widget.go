@@ -180,18 +180,26 @@ func (h *HelpDeskHandler) GetWidget(c *fiber.Ctx) error {
 	}
 
 	resp := fiber.Map{
-		"enabled":            cfg.WidgetEnabled,
-		"token":              inst.Token,
-		"instance_id":        inst.ID,
-		"display_name":       wcc.DisplayName,
-		"greeting":           wcc.Greeting,
-		"primary_color":      wcc.PrimaryColor,
-		"position":           wcc.Position,
-		"avatar_url":         wcc.AvatarURL,
-		"destination_type":   firstNonEmpty(wcc.DestinationType, "inbox"),
+		"enabled":                 cfg.WidgetEnabled,
+		"token":                   inst.Token,
+		"instance_id":             inst.ID,
+		"display_name":            wcc.DisplayName,
+		"greeting":                wcc.Greeting,
+		"primary_color":           wcc.PrimaryColor,
+		"position":                wcc.Position,
+		"avatar_url":              wcc.AvatarURL,
+		"destination_type":        firstNonEmpty(wcc.DestinationType, "inbox"),
 		"destination_instance_id": wcc.DestinationInstanceID,
-		"help_desk_enabled":  wcc.HelpDeskEnabled,
-		"snippet":            widgetSnippet(inst.Token),
+		"help_desk_enabled":       wcc.HelpDeskEnabled,
+		"snippet":                 widgetSnippet(inst.Token),
+		// badge appearance
+		"badge_style":       wcc.BadgeStyle,
+		"badge_icon":        wcc.BadgeIcon,
+		"badge_color":       firstNonEmpty(wcc.BadgeColor, wcc.PrimaryColor),
+		"offset_x":          wcc.OffsetX,
+		"offset_y":          wcc.OffsetY,
+		"border_radius":     wcc.BorderRadius,
+		"shadow_intensity":  wcc.ShadowIntensity,
 	}
 	if wcc.DestinationInstanceID != nil {
 		resp["destination_phone"] = h.resolveDestinationPhone(wcc.DestinationInstanceID)
@@ -227,6 +235,14 @@ func (h *HelpDeskHandler) UpdateWidget(c *fiber.Ctx) error {
 		DestinationType       *string    `json:"destination_type,omitempty"`
 		DestinationInstanceID *uuid.UUID `json:"destination_instance_id,omitempty"`
 		HelpDeskEnabled       *bool      `json:"help_desk_enabled,omitempty"`
+		// badge appearance
+		BadgeStyle      *string `json:"badge_style,omitempty"`
+		BadgeIcon       *string `json:"badge_icon,omitempty"`
+		BadgeColor      *string `json:"badge_color,omitempty"`
+		OffsetX         *int    `json:"offset_x,omitempty"`
+		OffsetY         *int    `json:"offset_y,omitempty"`
+		BorderRadius    *int    `json:"border_radius,omitempty"`
+		ShadowIntensity *string `json:"shadow_intensity,omitempty"`
 	}
 	if err := c.BodyParser(&body); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, err.Error())
@@ -285,6 +301,28 @@ func (h *HelpDeskHandler) UpdateWidget(c *fiber.Ctx) error {
 	if body.HelpDeskEnabled != nil {
 		updates["help_desk_enabled"] = *body.HelpDeskEnabled
 	}
+	// badge appearance
+	if body.BadgeStyle != nil {
+		updates["badge_style"] = *body.BadgeStyle
+	}
+	if body.BadgeIcon != nil {
+		updates["badge_icon"] = *body.BadgeIcon
+	}
+	if body.BadgeColor != nil {
+		updates["badge_color"] = *body.BadgeColor
+	}
+	if body.OffsetX != nil {
+		updates["offset_x"] = *body.OffsetX
+	}
+	if body.OffsetY != nil {
+		updates["offset_y"] = *body.OffsetY
+	}
+	if body.BorderRadius != nil {
+		updates["border_radius"] = *body.BorderRadius
+	}
+	if body.ShadowIntensity != nil {
+		updates["shadow_intensity"] = *body.ShadowIntensity
+	}
 
 	// Limpa destination_instance_id se voltou pra inbox — evita estado
 	// confuso (config diz "inbox" mas tem instance_id de relay sobrando).
@@ -322,6 +360,20 @@ func (h *HelpDeskHandler) UpdateWidget(c *fiber.Ctx) error {
 					}
 				case "help_desk_enabled":
 					newCfg.HelpDeskEnabled = v.(bool)
+				case "badge_style":
+					newCfg.BadgeStyle = v.(string)
+				case "badge_icon":
+					newCfg.BadgeIcon = v.(string)
+				case "badge_color":
+					newCfg.BadgeColor = v.(string)
+				case "offset_x":
+					newCfg.OffsetX = v.(int)
+				case "offset_y":
+					newCfg.OffsetY = v.(int)
+				case "border_radius":
+					newCfg.BorderRadius = v.(int)
+				case "shadow_intensity":
+					newCfg.ShadowIntensity = v.(string)
 				}
 			}
 			h.db.Create(&newCfg)

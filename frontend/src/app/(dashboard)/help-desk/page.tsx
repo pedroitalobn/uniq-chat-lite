@@ -5,14 +5,16 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  BookOpen, Check, ChevronRight, Clock, Code2, Copy, ExternalLink, FolderOpen,
-  Globe, Loader2, Plus, Search, Settings, Sparkles, Tag, Trash2, TrendingUp, X, Zap,
+  BookOpen, Check, ChevronRight, Clock, Code2, Copy, ExternalLink, Eye, FolderOpen,
+  Globe, Layout, Loader2, Plus, Search, Settings, Shield, Sparkles, Tag, Trash2, TrendingUp, X, Zap,
 } from "lucide-react";
+import WidgetBuilder from "@/components/helpdesk/WidgetBuilder";
 import { toast } from "sonner";
 import { helpDeskApi, type HelpDeskArticle, type HelpDeskCategory, type HelpDeskConfig } from "@/lib/helpdesk-api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 type PageTab = "articles" | "settings";
+type SettingsSubTab = "identity" | "widget" | "access";
 
 // ─── Style helpers ─────────────────────────────────────────────────────────
 
@@ -206,6 +208,41 @@ function NewCategoryDialog({ workspaceId, onClose }: { workspaceId: string; onCl
 // ─── Help Center Settings ────────────────────────────────────────────────────
 
 function HelpCenterSettings({ workspaceId }: { workspaceId: string }) {
+  const [subTab, setSubTab] = useState<SettingsSubTab>("identity");
+
+  return (
+    <div className="space-y-4">
+      {/* Sub-tabs */}
+      <div className="flex gap-1 p-1 rounded-xl w-fit"
+        style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)" }}>
+        {([
+          { id: "identity" as const, label: "Identidade", icon: Globe },
+          { id: "widget" as const, label: "Widget", icon: Layout },
+          { id: "access" as const, label: "Acesso", icon: Shield },
+        ] as const).map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setSubTab(id)}
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-medium transition-all"
+            style={{
+              background: subTab === id ? "var(--surface-2)" : "transparent",
+              color: subTab === id ? "var(--text-1)" : "var(--text-3)",
+              border: subTab === id ? "1px solid var(--surface-border)" : "1px solid transparent",
+            }}>
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {subTab === "identity" && <IdentitySettings workspaceId={workspaceId} />}
+      {subTab === "widget" && <WidgetBuilder />}
+      {subTab === "access" && <AccessSettings workspaceId={workspaceId} />}
+    </div>
+  );
+}
+
+function IdentitySettings({ workspaceId }: { workspaceId: string }) {
   const qc = useQueryClient();
   const [copied, setCopied] = useState(false);
   const [snippetCopied, setSnippetCopied] = useState(false);
@@ -374,6 +411,101 @@ function HelpCenterSettings({ workspaceId }: { workspaceId: string }) {
             </div>
             <p className="text-xs text-center px-4" style={{ color: "rgba(255,255,255,0.3)" }}>Botão flutuante no canto inferior direito</p>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AccessSettings({ workspaceId }: { workspaceId: string }) {
+  const qc = useQueryClient();
+  const configQuery = useQuery({
+    queryKey: ["helpdesk-config", workspaceId],
+    queryFn: async () => (await helpDeskApi.getConfig(workspaceId)).data,
+    enabled: !!workspaceId,
+  });
+  const cfg = configQuery.data?.config;
+  const [visibility, setVisibility] = useState<string>("public");
+  const [password, setPassword] = useState("");
+
+  useEffect(() => {
+    if (cfg) setVisibility(cfg.visibility || "public");
+  }, [cfg]);
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      helpDeskApi.updateConfig(
+        { visibility: visibility as any, access_password: password || undefined },
+        workspaceId,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["helpdesk-config", workspaceId] });
+      toast.success("Controle de acesso salvo.");
+      setPassword("");
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || "Falha ao salvar."),
+  });
+
+  if (configQuery.isLoading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--text-3)" }} /></div>;
+
+  return (
+    <div className="max-w-xl space-y-5">
+      <div className="rounded-2xl p-5 space-y-4" style={glassCard}>
+        <div className="flex items-center gap-2 mb-1">
+          <Shield className="w-4 h-4" style={{ color: "#00d46a" }} />
+          <h3 className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Visibilidade da central</h3>
+        </div>
+
+        <div className="space-y-2">
+          {([
+            { id: "public", label: "Público", desc: "Qualquer pessoa pode acessar a central de ajuda." },
+            { id: "workspace_users", label: "Membros da workspace", desc: "Apenas usuários logados da workspace têm acesso." },
+            { id: "password", label: "Protegido por senha", desc: "Acesso público, mas exige uma senha para entrar." },
+          ] as const).map((opt) => (
+            <label
+              key={opt.id}
+              className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all"
+              style={{
+                background: visibility === opt.id ? "rgba(0,212,106,0.08)" : "var(--surface-3)",
+                border: `1px solid ${visibility === opt.id ? "rgba(0,212,106,0.25)" : "var(--surface-border)"}`,
+              }}
+            >
+              <input
+                type="radio"
+                name="visibility"
+                value={opt.id}
+                checked={visibility === opt.id}
+                onChange={() => setVisibility(opt.id)}
+                className="mt-0.5"
+              />
+              <div>
+                <p className="text-sm font-medium" style={{ color: visibility === opt.id ? "#00d46a" : "var(--text-1)" }}>{opt.label}</p>
+                <p className="text-xs" style={{ color: "var(--text-3)" }}>{opt.desc}</p>
+              </div>
+            </label>
+          ))}
+        </div>
+
+        {visibility === "password" && (
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium" style={{ color: "var(--text-2)" }}>Senha de acesso</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={cfg?.access_password ? "•••••••• (deixe em branco para manter)" : "Digite uma senha..."}
+              style={inp}
+            />
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all"
+            style={{ background: "linear-gradient(135deg, rgba(0,212,106,0.20), rgba(0,212,106,0.08))", color: "#00d46a", border: "1px solid rgba(0,212,106,0.30)", opacity: saveMutation.isPending ? 0.7 : 1 }}>
+            {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            Salvar
+          </button>
         </div>
       </div>
     </div>

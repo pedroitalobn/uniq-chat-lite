@@ -12,6 +12,8 @@ interface WebChatPublicConfig {
   avatar_url: string;
   whatsapp_redirect_number?: string;
   help_desk_enabled?: boolean;
+  destination_type?: string;
+  destination_phone?: string;
 }
 
 interface ChatMessage {
@@ -256,6 +258,117 @@ export default function EmbedChatPage() {
         <p style={{ color: "#9ca3af", fontSize: 13, marginTop: 6 }}>
           Este widget não está configurado corretamente.
         </p>
+      </div>
+    );
+  }
+
+  // Redirect instance — show WhatsApp CTA instead of chat input
+  if (config?.destination_type === "redirect_instance") {
+    const phone = config.destination_phone || config.whatsapp_redirect_number || "";
+    const waLink = phone ? `https://wa.me/${phone.replace(/\D/g, "")}` : "#";
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100vh",
+          background: "var(--text-1)",
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+          overflow: "hidden",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            background: primaryColor,
+            padding: "14px 16px",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexShrink: 0,
+            boxShadow: `0 2px 12px ${primaryColor}60`,
+          }}
+        >
+          <div
+            style={{
+              width: 36, height: 36, borderRadius: "50%",
+              background: "rgba(255,255,255,0.25)",
+              border: "2px solid var(--text-3)",
+              overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            }}
+          >
+            {config?.avatar_url ? (
+              <img src={config.avatar_url} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+            ) : (
+              <span style={{ color: "var(--text-1)", fontSize: 16 }}>💬</span>
+            )}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ color: "var(--text-1)", fontWeight: 700, fontSize: 15, margin: 0, lineHeight: 1.3 }}>{displayName}</p>
+            <p style={{ color: "var(--text-2)", fontSize: 11, margin: 0, lineHeight: 1.2 }}>Online</p>
+          </div>
+        </div>
+
+        {/* CTA Body */}
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            gap: 16,
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              width: 64, height: 64, borderRadius: "50%",
+              background: `${primaryColor}18`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 28,
+            }}
+          >
+            {config?.avatar_url ? (
+              <img src={config.avatar_url} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+            ) : (
+              <span>💬</span>
+            )}
+          </div>
+          <div>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1f2937" }}>{displayName}</p>
+            <p style={{ margin: "6px 0 0", fontSize: 14, color: "#6b7280", lineHeight: 1.5 }}>
+              {config?.greeting || "Olá! Como posso ajudar?"}
+            </p>
+          </div>
+          {phone ? (
+            <a
+              href={waLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
+                padding: "12px 24px", borderRadius: 14,
+                background: "#25d366", color: "#fff",
+                fontSize: 14, fontWeight: 700, textDecoration: "none",
+                boxShadow: "0 4px 16px rgba(37,211,102,0.35)",
+                transition: "transform 0.15s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.04)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            >
+              <span style={{ fontSize: 18 }}>📱</span>
+              Continuar no WhatsApp
+            </a>
+          ) : (
+            <p style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>
+              Nenhum número de telefone configurado para redirecionamento.
+            </p>
+          )}
+        </div>
       </div>
     );
   }

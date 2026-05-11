@@ -112,8 +112,14 @@ type HelpDeskConfig struct {
 	LayoutStyle string `gorm:"type:varchar(20);default:'glass'" json:"layout_style"`
 	// HideUniqBranding: esconde "Powered by Uniq Chat" no footer
 	HideUniqBranding bool `gorm:"default:false" json:"hide_uniq_branding"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+
+	// ── Access control ──────────────────────────────────────────────────
+	// Visibility: "public" | "workspace_users" | "password"
+	Visibility     string `gorm:"type:varchar(20);default:'public'" json:"visibility"`
+	AccessPassword string `gorm:"type:varchar(255)" json:"-"` // bcrypt hash, never exposed in JSON
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 func (h *HelpDeskConfig) BeforeCreate(tx *gorm.DB) error {
@@ -125,6 +131,9 @@ func (h *HelpDeskConfig) BeforeCreate(tx *gorm.DB) error {
 	}
 	if h.Title == "" {
 		h.Title = "Central de Ajuda"
+	}
+	if h.Visibility == "" {
+		h.Visibility = "public"
 	}
 	return nil
 }

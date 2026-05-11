@@ -14,6 +14,7 @@ import (
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/services"
 	"github.com/uniq-chat/backend/internal/storage"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -559,6 +560,18 @@ func (h *HelpDeskHandler) UpdateConfig(c *fiber.Ctx) error {
 		}
 	}
 
+	// Hash access_password if provided
+	if pw, ok := body["access_password"].(string); ok && pw != "" {
+		hash, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
+		if err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, "falha ao hash da senha")
+		}
+		body["access_password"] = string(hash)
+	} else if pw, ok := body["access_password"].(string); ok && pw == "" {
+		// Clear password when explicitly sent as empty string
+		body["access_password"] = ""
+	}
+
 	if err := h.db.Model(&cfg).Updates(body).Error; err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
@@ -623,6 +636,7 @@ func (h *HelpDeskHandler) PublicGetConfig(c *fiber.Ctx) error {
 			"custom_domain":      "",
 			"layout_style":       "glass",
 			"hide_uniq_branding": false,
+			"visibility":         "public",
 		})
 	}
 
@@ -645,6 +659,7 @@ func (h *HelpDeskHandler) PublicGetConfig(c *fiber.Ctx) error {
 		"custom_domain":      cfg.CustomDomain,
 		"layout_style":       cfg.LayoutStyle,
 		"hide_uniq_branding": cfg.HideUniqBranding,
+		"visibility":         cfg.Visibility,
 	}
 
 	// Resolve webchat token so the public page can embed the floating widget
@@ -653,9 +668,58 @@ func (h *HelpDeskHandler) PublicGetConfig(c *fiber.Ctx) error {
 		if err := h.db.Select("token").Where("id = ?", cfg.WebchatInstanceID).First(&inst).Error; err == nil {
 			resp["webchat_token"] = inst.Token
 		}
+		// Load WebChatConfig for badge appearance
+		var wc models.WebChatConfig
+		if err := h.db.Where("instance_id = ?", cfg.WebchatInstanceID).First(&wc).Error; err == nil {
+			resp["badge_style"] = wc.BadgeStyle
+			resp["badge_icon"] = wc.BadgeIcon
+			resp["badge_color"] = wc.BadgeColor
+			resp["position"] = wc.Position
+			resp["offset_x"] = wc.OffsetX
+			resp["offset_y"] = wc.OffsetY
+			resp["border_radius"] = wc.BorderRadius
+			resp["shadow_intensity"] = wc.ShadowIntensity
+			resp["display_name"] = wc.DisplayName
+		}
 	}
 
 	return c.JSON(resp)
+}
+
+// PublicVerifyAccess POST /v1/public/helpdesk/:workspace_slug/verify-access
+// Validates access password for password-protected help centers.
+func (h *HelpDeskHandler) PublicVerifyAccess(c *fiber.Ctx) error {
+	slug := c.Params("workspace_slug")
+	ws, err := h.lookupWorkspaceBySlug(slug)
+	if err != nil {
+		return h.publicNotFound(c, slug, "verify-access")
+	}
+
+	var cfg models.HelpDeskConfig
+	if err := h.db.Where("workspace_id = ?", ws.ID).First(&cfg).Error; err != nil {
+		return c.JSON(fiber.Map{"valid": false})
+	}
+
+	if cfg.Visibility != "password" {
+		return c.JSON(fiber.Map{"valid": true, "reason": "not_password_protected"})
+	}
+
+	var body struct {
+		Password string `json:"password"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+
+	if cfg.AccessPassword == "" {
+		return c.JSON(fiber.Map{"valid": false})
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(cfg.AccessPassword), []byte(body.Password)); err != nil {
+		return c.JSON(fiber.Map{"valid": false})
+	}
+
+	return c.JSON(fiber.Map{"valid": true})
 }
 
 // PublicListCategories GET /v1/public/helpdesk/:workspace_slug/categories
@@ -874,6 +938,96 @@ Artigos disponíveis:
 	sources := make([]source, len(articles))
 	for i, a := range articles {
 		sources[i] = source{ID: a.ID, Title: a.Title, Slug: a.Slug}
+	}
+
+	return c.JSON(fiber.Map{
+		"answer":  answer,
+		"sources": sources,
+	})
+}
+
+// PublicAskArticle POST /v1/public/helpdesk/:workspace_slug/articles/:article_slug/ask
+// Responde perguntas usando o conteúdo do artigo específico como contexto principal,
+// complementado por artigos relacionados (RAG leve).
+func (h *HelpDeskHandler) PublicAskArticle(c *fiber.Ctx) error {
+	slug := c.Params("workspace_slug")
+	ws, err := h.lookupWorkspaceBySlug(slug)
+	if err != nil {
+		return h.publicNotFound(c, slug, "ask-article")
+	}
+
+	articleSlug := c.Params("article_slug")
+	if articleSlug == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "article_slug é obrigatório")
+	}
+
+	var body struct {
+		Question string `json:"question"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+	if body.Question == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "question é obrigatória")
+	}
+
+	// 1. Load the specific article.
+	var article models.HelpDeskArticle
+	if err := h.db.Where("workspace_id = ? AND slug = ? AND status = ?", ws.ID, articleSlug, models.ArticlePublished).First(&article).Error; err != nil {
+		return fiber.NewError(fiber.StatusNotFound, "artigo não encontrado")
+	}
+
+	// 2. Find related articles (same category or title/content similarity).
+	var related []models.HelpDeskArticle
+	like := "%" + body.Question + "%"
+	q := h.db.Where("workspace_id = ? AND status = ? AND id != ?", ws.ID, models.ArticlePublished, article.ID)
+	if article.CategoryID != nil {
+		q = q.Where("category_id = ? OR title ILIKE ? OR content ILIKE ?", article.CategoryID, like, like)
+	} else {
+		q = q.Where("title ILIKE ? OR content ILIKE ?", like, like)
+	}
+	q.Limit(3).Find(&related)
+
+	// 3. Build context.
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("ARTIGO PRINCIPAL:\n# %s\n%s\n\n", article.Title, article.Content))
+	for _, a := range related {
+		sb.WriteString(fmt.Sprintf("ARTIGO RELACIONADO:\n# %s\n%s\n\n", a.Title, a.Content))
+	}
+	ctx := sb.String()
+	if len(ctx) > 12000 {
+		ctx = ctx[:12000]
+	}
+
+	// 4. Find active LLM integration.
+	var integration models.UserIntegration
+	err = h.db.
+		Joins("JOIN user_workspaces uw ON uw.user_id = user_integrations.user_id").
+		Where("uw.workspace_id = ? AND user_integrations.is_active = true", ws.ID).
+		First(&integration).Error
+
+	var answer string
+	if err != nil {
+		answer = "Não foi possível processar sua pergunta no momento (integração de IA não disponível)."
+	} else {
+		system := `Você é um assistente especializado no conteúdo deste artigo. Use APENAS as informações dos artigos fornecidos abaixo para responder à pergunta do usuário de forma clara, direta e concisa. Se a resposta não estiver nos artigos, diga que não encontrou informações suficientes.
+
+` + ctx
+		answer, err = h.llm.CallChatWithSystem(context.Background(), &integration, system, body.Question, false)
+		if err != nil {
+			answer = "Não foi possível processar sua pergunta no momento."
+		}
+	}
+
+	type source struct {
+		ID    uuid.UUID `json:"id"`
+		Title string    `json:"title"`
+		Slug  string    `json:"slug"`
+	}
+	sources := make([]source, 0, len(related)+1)
+	sources = append(sources, source{ID: article.ID, Title: article.Title, Slug: article.Slug})
+	for _, a := range related {
+		sources = append(sources, source{ID: a.ID, Title: a.Title, Slug: a.Slug})
 	}
 
 	return c.JSON(fiber.Map{

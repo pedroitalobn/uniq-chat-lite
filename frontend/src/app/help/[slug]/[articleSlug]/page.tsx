@@ -49,6 +49,135 @@ const FONT_STACKS: Record<string, string> = {
   jetbrains: "'JetBrains Mono', monospace",
 };
 
+function ArticleAgentChat({
+  slug, articleSlug, apiBase, color, t,
+}: {
+  slug: string;
+  articleSlug: string;
+  apiBase: string;
+  color: string;
+  t: { bg: string; surface: string; border: string; text: string; text2: string; text3: string };
+}) {
+  const [open, setOpen] = useState(false);
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  const ask = async () => {
+    if (!question.trim()) return;
+    setLoading(true);
+    setError(false);
+    setAnswer("");
+    try {
+      const res = await fetch(`${apiBase}/v1/public/helpdesk/${slug}/articles/${articleSlug}/ask`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: question.trim() }),
+      });
+      const data = await res.json();
+      if (data.answer) {
+        setAnswer(data.answer);
+      } else {
+        setError(true);
+      }
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ marginTop: 40, maxWidth: 720, marginLeft: "auto", marginRight: "auto", padding: "0 24px" }}>
+      {!open ? (
+        <button
+          onClick={() => setOpen(true)}
+          style={{
+            width: "100%",
+            padding: "14px 20px",
+            borderRadius: 14,
+            border: `1px solid ${t.border}`,
+            background: t.surface,
+            color: t.text2,
+            fontSize: 14,
+            fontWeight: 500,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            transition: "all 0.2s",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = color; e.currentTarget.style.color = color; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.text2; }}
+        >
+          <span style={{ fontSize: 16 }}>🤖</span>
+          Perguntar sobre este artigo
+        </button>
+      ) : (
+        <div style={{ borderRadius: 16, border: `1px solid ${t.border}`, background: t.surface, overflow: "hidden" }}>
+          <div style={{ padding: "16px 20px", borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 16 }}>🤖</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: t.text }}>Assistente do artigo</span>
+            </div>
+            <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", color: t.text3, cursor: "pointer", fontSize: 18 }}>×</button>
+          </div>
+
+          <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="text"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") ask(); }}
+                placeholder="Qual a sua dúvida sobre este artigo?"
+                style={{
+                  flex: 1,
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  border: `1px solid ${t.border}`,
+                  background: t.bg,
+                  color: t.text,
+                  fontSize: 14,
+                  outline: "none",
+                }}
+              />
+              <button
+                onClick={ask}
+                disabled={loading || !question.trim()}
+                style={{
+                  padding: "10px 18px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: color,
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: loading || !question.trim() ? "not-allowed" : "pointer",
+                  opacity: loading || !question.trim() ? 0.7 : 1,
+                }}
+              >
+                {loading ? "..." : "Perguntar"}
+              </button>
+            </div>
+
+            {answer && (
+              <div style={{ padding: 14, borderRadius: 10, background: t.bg, border: `1px solid ${t.border}`, fontSize: 14, lineHeight: 1.6, color: t.text2 }}>
+                {answer}
+              </div>
+            )}
+            {error && (
+              <p style={{ margin: 0, fontSize: 13, color: "#ef4444" }}>Não foi possível obter uma resposta. Tente novamente.</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ArticlePage({
   params,
 }: {
@@ -396,6 +525,17 @@ export default function ArticlePage({
           </article>
         )}
       </main>
+
+      {/* Article Agent */}
+      {article && (
+        <ArticleAgentChat
+          slug={slug}
+          articleSlug={articleSlug}
+          apiBase={API}
+          color={color}
+          t={{ bg: t.bg, surface: t.surface, border: t.border, text: t.text, text2: t.text2, text3: t.text3 }}
+        />
+      )}
 
       {/* Footer */}
       {!hideBranding && (

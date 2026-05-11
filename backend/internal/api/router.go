@@ -505,10 +505,12 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 
 	// Public Help Desk endpoints (no auth — accessed by public knowledge base)
 	app.Get("/v1/public/helpdesk/:workspace_slug/config", helpDeskH.PublicGetConfig)
+	app.Post("/v1/public/helpdesk/:workspace_slug/verify-access", helpDeskH.PublicVerifyAccess)
 	app.Get("/v1/public/helpdesk/:workspace_slug/categories", helpDeskH.PublicListCategories)
 	app.Get("/v1/public/helpdesk/:workspace_slug/articles", helpDeskH.PublicListArticles)
 	app.Get("/v1/public/helpdesk/:workspace_slug/articles/:slug", helpDeskH.PublicGetArticle)
 	app.Post("/v1/public/helpdesk/:workspace_slug/ask", middleware.RateLimit(20), helpDeskH.PublicAsk)
+	app.Post("/v1/public/helpdesk/:workspace_slug/articles/:article_slug/ask", middleware.RateLimit(20), helpDeskH.PublicAskArticle)
 
 	// CSAT public endpoints (no auth — customer answers via tokenized link)
 	app.Get("/csat/:token", csatH.GetPublic)

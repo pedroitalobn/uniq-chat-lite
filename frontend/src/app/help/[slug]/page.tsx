@@ -33,6 +33,16 @@ interface Config {
   custom_domain: string;
   layout_style: string;
   hide_uniq_branding: boolean;
+  visibility?: string;
+  badge_style?: string;
+  badge_icon?: string;
+  badge_color?: string;
+  position?: string;
+  offset_x?: number;
+  offset_y?: number;
+  border_radius?: number;
+  shadow_intensity?: string;
+  display_name?: string;
 }
 
 interface Category {
@@ -73,6 +83,107 @@ const FONT_STACKS: Record<string, string> = {
   manrope: "'Manrope', system-ui, -apple-system, sans-serif",
   jetbrains: "'JetBrains Mono', monospace",
 };
+
+// ─── Floating Widget ────────────────────────────────────────────────────────────
+
+function FloatingWidget({ token, config }: { token: string; config: Config }) {
+  const [chatOpen, setChatOpen] = useState(false);
+  const color = config.badge_color || config.primary_color || "#00d46a";
+  const pos = config.position || "bottom-right";
+  const isTop = pos.startsWith("top");
+  const isLeft = pos.endsWith("left");
+
+  const shadowMap: Record<string, string> = {
+    none: "none",
+    soft: `0 2px 12px ${color}30`,
+    medium: `0 4px 24px ${color}44`,
+    strong: `0 8px 40px ${color}60`,
+  };
+
+  const badgeStyle = config.badge_style || "bubble";
+  const badgeSize =
+    badgeStyle === "pill" ? { w: 120, h: 48 } :
+    badgeStyle === "square" ? { w: 56, h: 56 } :
+    badgeStyle === "minimal" ? { w: 40, h: 40 } :
+    { w: 56, h: 56 };
+
+  const borderR =
+    badgeStyle === "bubble" ? "50%" :
+    badgeStyle === "pill" ? 9999 :
+    badgeStyle === "square" ? 14 :
+    (config.border_radius ?? 9999);
+
+  const offsetX = config.offset_x ?? 20;
+  const offsetY = config.offset_y ?? 20;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        [isTop ? "top" : "bottom"]: offsetY,
+        [isLeft ? "left" : "right"]: offsetX,
+        zIndex: 9999,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: isLeft ? "flex-start" : "flex-end",
+        gap: 12,
+      }}
+    >
+      {chatOpen && (
+        <iframe
+          src={`/embed/chat/${token}`}
+          style={{
+            width: 380,
+            height: 560,
+            border: "none",
+            borderRadius: 20,
+            boxShadow: `0 12px 48px rgba(0,0,0,0.30), 0 0 0 1px var(--border-default)`,
+            background: "var(--text-1)",
+            animation: "hc-fade-up 0.25s ease",
+          }}
+          allow="microphone"
+          title="Chat"
+        />
+      )}
+      <button
+        onClick={() => setChatOpen((v) => !v)}
+        style={{
+          width: badgeSize.w,
+          height: badgeSize.h,
+          borderRadius: borderR,
+          border: "none",
+          background: color,
+          color: "#fff",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: shadowMap[config.shadow_intensity ?? "medium"],
+          transition: "transform 0.2s ease",
+          fontSize: badgeStyle === "pill" ? 13 : 20,
+          fontWeight: 700,
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.06)")}
+        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+        aria-label={chatOpen ? "Fechar chat" : "Abrir chat"}
+      >
+        {chatOpen ? (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        ) : badgeStyle === "pill" ? (
+          <span className="flex items-center gap-1.5">
+            <span>{config.badge_icon || "💬"}</span>
+            <span>{config.display_name || "Chat"}</span>
+          </span>
+        ) : (
+          <span>{config.badge_icon || "💬"}</span>
+        )}
+      </button>
+    </div>
+  );
+}
 
 // ─── Article Card ───────────────────────────────────────────────────────────────
 
@@ -206,8 +317,11 @@ export default function HelpCenterPage({
     available?: string[];
     hint?: string;
   } | null>(null);
-  const [chatOpen, setChatOpen] = useState(false);
   const [fontLoaded, setFontLoaded] = useState(false);
+  const [accessGranted, setAccessGranted] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState(false);
+  const [checkingPassword, setCheckingPassword] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ─── Load data ───────────────────────────────────────────────────────────—
@@ -235,6 +349,16 @@ export default function HelpCenterPage({
         const cfgData: Config = await cfgRes.json();
         setConfig(cfgData);
 
+        // Access control
+        if (cfgData.visibility === "public") {
+          setAccessGranted(true);
+        } else if (cfgData.visibility === "password") {
+          const unlocked = sessionStorage.getItem(`hc_unlock_${slug}`) === "1";
+          setAccessGranted(unlocked);
+        } else if (cfgData.visibility === "workspace_users") {
+          setAccessGranted(false); // requires login — handled in UI
+        }
+
         if (catsRes.ok) {
           setCategories((await catsRes.json()) as Category[]);
         }
@@ -245,6 +369,30 @@ export default function HelpCenterPage({
     }
     load();
   }, [slug, API]);
+
+  const verifyPassword = async () => {
+    if (!passwordInput.trim()) return;
+    setCheckingPassword(true);
+    setPasswordError(false);
+    try {
+      const res = await fetch(`${API}/v1/public/helpdesk/${slug}/verify-access`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: passwordInput }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        sessionStorage.setItem(`hc_unlock_${slug}`, "1");
+        setAccessGranted(true);
+      } else {
+        setPasswordError(true);
+      }
+    } catch {
+      setPasswordError(true);
+    } finally {
+      setCheckingPassword(false);
+    }
+  };
 
   // ─── Load font ───────────────────────────────────────────────────────────—
 
@@ -422,6 +570,94 @@ export default function HelpCenterPage({
             animation: "hc-spin 0.7s linear infinite",
           }}
         />
+      </div>
+    );
+  }
+
+  // ─── Access gate ──────────────────────────────────────────────────────────
+
+  if (!accessGranted && config) {
+    const isPassword = config.visibility === "password";
+    const isWorkspace = config.visibility === "workspace_users";
+    return (
+      <div style={{ minHeight: "100vh", background: t.bg, fontFamily, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div style={{ maxWidth: 380, width: "100%", textAlign: "center", display: "flex", flexDirection: "column", gap: 20 }}>
+          <div style={{ width: 64, height: 64, borderRadius: "50%", background: `${color}18`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, margin: "0 auto" }}>
+            {isPassword ? "🔒" : "🛡️"}
+          </div>
+          <div>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: t.text }}>
+              {isPassword ? "Acesso protegido" : "Acesso restrito"}
+            </h1>
+            <p style={{ margin: "8px 0 0", fontSize: 14, color: t.text3, lineHeight: 1.5 }}>
+              {isPassword
+                ? "Esta central de ajuda requer uma senha para acessar."
+                : "Apenas membros da workspace têm acesso a esta central."}
+            </p>
+          </div>
+          {isPassword && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(false); }}
+                onKeyDown={(e) => { if (e.key === "Enter") verifyPassword(); }}
+                placeholder="Digite a senha..."
+                style={{
+                  width: "100%",
+                  padding: "12px 16px",
+                  borderRadius: 12,
+                  border: `1px solid ${passwordError ? "#ef4444" : t.border}`,
+                  background: t.surface,
+                  color: t.text,
+                  fontSize: 14,
+                  outline: "none",
+                }}
+              />
+              {passwordError && (
+                <p style={{ margin: 0, fontSize: 12, color: "#ef4444" }}>Senha incorreta. Tente novamente.</p>
+              )}
+              <button
+                onClick={verifyPassword}
+                disabled={checkingPassword || !passwordInput.trim()}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  borderRadius: 12,
+                  border: "none",
+                  background: color,
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: checkingPassword || !passwordInput.trim() ? "not-allowed" : "pointer",
+                  opacity: checkingPassword || !passwordInput.trim() ? 0.7 : 1,
+                }}
+              >
+                {checkingPassword ? "Verificando..." : "Entrar"}
+              </button>
+            </div>
+          )}
+          {isWorkspace && (
+            <a
+              href="/login"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                padding: "12px 24px",
+                borderRadius: 12,
+                background: color,
+                color: "#fff",
+                fontSize: 14,
+                fontWeight: 700,
+                textDecoration: "none",
+              }}
+            >
+              Fazer login
+            </a>
+          )}
+        </div>
       </div>
     );
   }
@@ -853,66 +1089,10 @@ export default function HelpCenterPage({
 
       {/* ── Floating chat widget ──────────────────────────────────────────── */}
       {config.widget_enabled && config.webchat_token && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 20,
-            right: 20,
-            zIndex: 9999,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-end",
-            gap: 12,
-          }}
-        >
-          {chatOpen && (
-            <iframe
-              src={`/embed/chat/${config.webchat_token}`}
-              style={{
-                width: 380,
-                height: 560,
-                border: "none",
-                borderRadius: 20,
-                boxShadow: `0 12px 48px rgba(0,0,0,0.30), 0 0 0 1px ${t.border}`,
-                background: "var(--text-1)",
-                animation: "hc-fade-up 0.25s ease",
-              }}
-              allow="microphone"
-              title="Chat"
-            />
-          )}
-          <button
-            onClick={() => setChatOpen((v) => !v)}
-            style={{
-              width: 50,
-              height: 50,
-              borderRadius: "50%",
-              border: "none",
-              background: `linear-gradient(135deg, ${color}, ${color}dd)`,
-              color: "var(--text-1)",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: `0 4px 20px ${color}40`,
-              transition: "transform 0.2s ease",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.06)")}
-            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-            aria-label={chatOpen ? "Fechar chat" : "Abrir chat"}
-          >
-            {chatOpen ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            ) : (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-            )}
-          </button>
-        </div>
+        <FloatingWidget
+          token={config.webchat_token}
+          config={config}
+        />
       )}
     </div>
   );

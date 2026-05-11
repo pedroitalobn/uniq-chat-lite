@@ -39,12 +39,20 @@ export interface WebChatConfig {
   display_name: string;
   greeting: string;
   primary_color: string;
-  position: "bottom-right" | "bottom-left";
+  position: "bottom-right" | "bottom-left" | "top-right" | "top-left";
   avatar_url: string;
   whatsapp_redirect_number: string;
   help_desk_enabled: boolean;
   created_at: string;
   updated_at: string;
+  // badge appearance
+  badge_style: "bubble" | "pill" | "square" | "minimal";
+  badge_icon: string;
+  badge_color: string;
+  offset_x: number;
+  offset_y: number;
+  border_radius: number;
+  shadow_intensity: "none" | "soft" | "medium" | "strong";
 }
 
 function wsHeader(workspaceId?: string) {
@@ -63,6 +71,9 @@ export interface HelpDeskConfig {
   widget_enabled: boolean;
   created_at: string;
   updated_at: string;
+  // access control
+  visibility: "public" | "workspace_users" | "password";
+  access_password?: string;
 }
 
 export interface HelpDeskConfigResponse {
@@ -120,6 +131,8 @@ export const helpDeskApi = {
     api.get<HelpDeskConfigResponse>("/v1/helpdesk/config", { headers: wsHeader(workspaceId) }),
   updateConfig: (data: Partial<HelpDeskConfig>, workspaceId?: string) =>
     api.put<HelpDeskConfig>("/v1/helpdesk/config", data, { headers: wsHeader(workspaceId) }),
+  verifyAccess: (slug: string, password: string) =>
+    api.post<{ valid: boolean; reason?: string }>(`/v1/public/helpdesk/${slug}/verify-access`, { password }),
   uploadHeroImage: (file: File, workspaceId?: string) => {
     const fd = new FormData();
     fd.append("file", file);
@@ -138,4 +151,11 @@ export const webChatApi = {
     api.put<WebChatConfig>(`/v1/instances/${instanceId}/webchat`, data),
   getSnippet: (instanceId: string) =>
     api.get<{ snippet: string }>(`/v1/instances/${instanceId}/webchat/snippet`),
+};
+
+export const widgetApi = {
+  getWidget: (workspaceId?: string) =>
+    api.get<Record<string, any>>("/v1/helpdesk/widget", { headers: wsHeader(workspaceId) }),
+  updateWidget: (data: Record<string, any>, workspaceId?: string) =>
+    api.put<Record<string, any>>("/v1/helpdesk/widget", data, { headers: wsHeader(workspaceId) }),
 };
