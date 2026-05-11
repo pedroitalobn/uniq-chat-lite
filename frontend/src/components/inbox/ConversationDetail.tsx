@@ -47,6 +47,8 @@ interface Conversation {
   status: string;
   priority: string;
   subject?: string;
+  push_name?: string;
+  avatar_url?: string;
   queue_id?: string | null;
   department_id?: string | null;
   team_id?: string | null;
@@ -727,8 +729,8 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           {/* Avatar */}
           {(() => {
             const isGroup = (conv?.channel_key || "").toLowerCase().endsWith("@g.us");
-            const avatarUrl = conv?.contact?.avatar_url;
-            const name = conv?.contact?.name || conv?.subject || conv?.channel_key || "?";
+            const avatarUrl = conv?.contact?.avatar_url || conv?.avatar_url;
+            const name = conv?.contact?.name || conv?.push_name || conv?.subject || conv?.channel_key || "?";
             if (avatarUrl) {
               return (
                 <button
@@ -774,7 +776,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                 <UsersIcon className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#a78bfa" }} aria-label="Grupo" />
               )}
               <h1 className="truncate text-sm font-medium" style={{ color: "hsl(240 15% 93%)" }}>
-                {conv?.contact?.name || conv?.subject || "Atendimento"}
+                {conv?.contact?.name || conv?.push_name || conv?.subject || "Atendimento"}
               </h1>
               {status && (
                 <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${status.cls}`}>
@@ -1076,8 +1078,8 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           </p>
           {(() => {
             const isGroup = (conv?.channel_key || "").toLowerCase().endsWith("@g.us");
-            const avatarUrl = conv?.contact?.avatar_url;
-            const name = conv?.contact?.name || conv?.subject || conv?.channel_key || "?";
+            const avatarUrl = conv?.contact?.avatar_url || conv?.avatar_url;
+            const name = conv?.contact?.name || conv?.push_name || conv?.subject || conv?.channel_key || "?";
             let hash = 0;
             for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
             const hue = Math.abs(hash) % 360;
@@ -4703,7 +4705,7 @@ function ForwardDialog({
                   return (
                     <li key={c.id}>
                       <button type="button" onClick={() => toggle(c.id)} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-white/5" style={{ color: "var(--text-1)" }}>
-                        <span className="min-w-0 flex-1 truncate">{c.contact?.name || c.subject || c.channel_key}</span>
+                        <span className="min-w-0 flex-1 truncate">{c.contact?.name || c.push_name || c.subject || c.channel_key}</span>
                         {isSel ? (
                           <Check className="h-4 w-4 flex-shrink-0" style={{ color: "#00d46a" }} />
                         ) : (

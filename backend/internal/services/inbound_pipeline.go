@@ -331,12 +331,14 @@ func (p *InboundPipeline) resolveContact(ctx context.Context, in InboundMessage)
 		return nil, nil
 	}
 	phone := extractPhone(in.ChannelKey)
+	inboundName := cleanInboundContactName(in.FromName, phone, in.ChannelKey)
 
 	var c models.Contact
 	query := p.db.WithContext(ctx).Where("workspace_id = ?", in.WorkspaceID)
 
 	// Prefer an exact external_id match (normalized channel_key)
 	if err := query.Where("external_id = ?", in.ChannelKey).First(&c).Error; err == nil {
+		p.hydrateContactIdentity(ctx, &c, inboundName, in.FromAvatar, phone, in.ChannelKey)
 		return &c, nil
 	}
 	// Fallback: match by phone for WhatsApp-like channels
@@ -345,8 +347,13 @@ func (p *InboundPipeline) resolveContact(ctx context.Context, in InboundMessage)
 			Where("workspace_id = ? AND phone = ?", in.WorkspaceID, phone).
 			First(&c).Error; err == nil {
 			// Populate external_id if missing
-			if c.ExternalID == "" {
-				p.db.WithContext(ctx).Model(&c).Update("external_id", in.ChannelKey)
+			updates := p.contactIdentityUpdates(&c, inboundName, in.FromAvatar, phone, in.ChannelKey)
+			if c.ExternalID == "" && in.ChannelKey != "" {
+				updates["external_id"] = in.ChannelKey
+				c.ExternalID = in.ChannelKey
+			}
+			if len(updates) > 0 {
+				p.db.WithContext(ctx).Model(&c).Updates(updates)
 			}
 			return &c, nil
 		}
@@ -356,18 +363,6 @@ func (p *InboundPipeline) resolveContact(ctx context.Context, in InboundMessage)
 	var inst models.Instance
 	p.db.WithContext(ctx).First(&inst, "id = ?", in.InstanceID)
 
-	// Nome do contato: NUNCA usar phone como nome — antes contatos
-	// novos entravam com phone no campo `name`, poluindo a UI ("Olá +55…")
-	// e quebrando segmentos por nome. Se WhatsApp não devolveu push_name,
-	// deixa o campo VAZIO — UI exibe placeholder ("Sem nome") e CRM pode
-	// ser editado depois manualmente.
-	name := strings.TrimSpace(in.FromName)
-	// Se push_name acabou sendo igual ao phone (whatsmeow às vezes faz isso
-	// quando contato não tem nome no celular do remetente), descarta também.
-	if name == phone || name == in.ChannelKey {
-		name = ""
-	}
-
 	src := models.ContactSource(in.ChannelType)
 	if _, ok := models.ContactSourceMeta[src]; !ok {
 		src = models.SourceManual
@@ -376,7 +371,7 @@ func (p *InboundPipeline) resolveContact(ctx context.Context, in InboundMessage)
 	newContact := models.Contact{
 		UserID:      inst.UserID,
 		WorkspaceID: &in.WorkspaceID,
-		Name:        name,
+		Name:        inboundName,
 		Phone:       phone,
 		AvatarURL:   in.FromAvatar,
 		Source:      src,
@@ -389,7 +384,30 @@ func (p *InboundPipeline) resolveContact(ctx context.Context, in InboundMessage)
 	return &newContact, nil
 }
 
+func (p *InboundPipeline) hydrateContactIdentity(ctx context.Context, contact *models.Contact, inboundName, inboundAvatar, phone, channelKey string) {
+	updates := p.contactIdentityUpdates(contact, inboundName, inboundAvatar, phone, channelKey)
+	if len(updates) == 0 {
+		return
+	}
+	p.db.WithContext(ctx).Model(contact).Updates(updates)
+}
+
+func (p *InboundPipeline) contactIdentityUpdates(contact *models.Contact, inboundName, inboundAvatar, phone, channelKey string) map[string]any {
+	updates := map[string]any{}
+	if inboundName != "" && shouldPromoteContactName(contact.Name, phone, channelKey) {
+		updates["name"] = inboundName
+		contact.Name = inboundName
+	}
+	if inboundAvatar != "" && strings.TrimSpace(contact.AvatarURL) == "" {
+		updates["avatar_url"] = inboundAvatar
+		contact.AvatarURL = inboundAvatar
+	}
+	return updates
+}
+
 func (p *InboundPipeline) resolveOrCreateConversation(ctx context.Context, in InboundMessage, contact *models.Contact) (conv *models.Conversation, created bool, reopened bool, err error) {
+	phone := extractPhone(in.ChannelKey)
+	pushName := cleanInboundContactName(in.FromName, phone, in.ChannelKey)
 	var existing models.Conversation
 	q := p.db.WithContext(ctx).
 		Where("workspace_id = ? AND instance_id = ? AND channel_key = ?", in.WorkspaceID, in.InstanceID, in.ChannelKey).
@@ -401,10 +419,18 @@ func (p *InboundPipeline) resolveOrCreateConversation(ctx context.Context, in In
 		Order("updated_at DESC")
 	if err := q.First(&existing).Error; err == nil {
 		// Conversation is live — unsnooze if necessary
+		updates := conversationIdentityUpdates(&existing, contact, pushName, in.FromAvatar, phone, in.ChannelKey)
+		wasSnoozed := existing.Status == models.ConversationStatusSnoozed
 		if existing.Status == models.ConversationStatusSnoozed {
+			updates["status"] = models.ConversationStatusOpen
+			updates["snoozed_until"] = nil
 			existing.Status = models.ConversationStatusOpen
 			existing.SnoozedUntil = nil
-			p.db.WithContext(ctx).Save(&existing)
+		}
+		if len(updates) > 0 {
+			p.db.WithContext(ctx).Model(&existing).Updates(updates)
+		}
+		if wasSnoozed {
 			p.appendEvent(ctx, &existing, models.ConvEventUnsnoozed, models.ActorSystem, nil, nil, map[string]any{"trigger": "inbound"})
 		}
 		return &existing, false, false, nil
@@ -430,6 +456,7 @@ func (p *InboundPipeline) resolveOrCreateConversation(ctx context.Context, in In
 		if contact != nil {
 			recent.ContactID = &contact.ID
 		}
+		_ = conversationIdentityUpdates(&recent, contact, pushName, in.FromAvatar, phone, in.ChannelKey)
 		if err := p.db.WithContext(ctx).Save(&recent).Error; err != nil {
 			return nil, false, false, err
 		}
@@ -450,6 +477,8 @@ func (p *InboundPipeline) resolveOrCreateConversation(ctx context.Context, in In
 		Status:      models.ConversationStatusOpen,
 		Priority:    models.ConversationPriorityNormal,
 		IsBotActive: true,
+		PushName:    pushName,
+		AvatarURL:   in.FromAvatar,
 	}
 	if contact != nil {
 		newConv.ContactID = &contact.ID
@@ -572,6 +601,60 @@ func extractPhone(channelKey string) string {
 		return channelKey[:i]
 	}
 	return channelKey
+}
+
+func cleanInboundContactName(name, phone, channelKey string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ""
+	}
+	if name == phone || name == "+"+phone || name == channelKey {
+		return ""
+	}
+	if strings.Contains(name, "@s.whatsapp.net") || strings.Contains(name, "@lid") || strings.Contains(name, "@g.us") {
+		return ""
+	}
+	if phone != "" && strings.TrimPrefix(name, "+") == phone {
+		return ""
+	}
+	return name
+}
+
+func shouldPromoteContactName(current, phone, channelKey string) bool {
+	current = strings.TrimSpace(current)
+	if current == "" {
+		return true
+	}
+	if current == phone || current == "+"+phone || current == channelKey {
+		return true
+	}
+	if phone != "" && strings.TrimPrefix(current, "+") == phone {
+		return true
+	}
+	if strings.HasPrefix(current, phone) ||
+		strings.Contains(current, "@s.whatsapp.net") ||
+		strings.Contains(current, "@lid") ||
+		strings.Contains(current, "@g.us") {
+		return true
+	}
+	return false
+}
+
+func conversationIdentityUpdates(conv *models.Conversation, contact *models.Contact, pushName, avatarURL, phone, channelKey string) map[string]any {
+	updates := map[string]any{}
+	if contact != nil && conv.ContactID == nil {
+		updates["contact_id"] = contact.ID
+		conv.ContactID = &contact.ID
+	}
+	if pushName != "" && shouldPromoteContactName(conv.PushName, phone, channelKey) {
+		updates["push_name"] = pushName
+		conv.PushName = pushName
+	}
+	if avatarURL != "" && strings.TrimSpace(conv.AvatarURL) == "" {
+		updates["avatar_url"] = avatarURL
+		conv.AvatarURL = avatarURL
+	}
+	return updates
 }
 
 // buildPreview generates a short preview string for the Inbox list. For text

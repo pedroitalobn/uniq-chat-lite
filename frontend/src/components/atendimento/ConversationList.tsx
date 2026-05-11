@@ -23,6 +23,7 @@ export interface ConversationRow {
   instance_id?: string;
   subject?: string;
   push_name?: string;
+  avatar_url?: string;
   last_message_preview?: string;
   last_message_at?: string;
   last_message_type?: string;
@@ -389,6 +390,8 @@ export function ConversationList({
           : baseName;
         const canEditName = !!conv.contact?.id && !!onRenameContact;
         const hasUnread = conv.agent_unread_count > 0;
+        const avatarUrl = conv.contact?.avatar_url || conv.avatar_url;
+        const avatarName = contactName || pushName || subject || displayName;
         const rowInner = (
           <div
             className={`flex items-start gap-3 transition ${pad}`}
@@ -407,8 +410,8 @@ export function ConversationList({
             {/* Avatar + priority dot sobreposto */}
             <div className="relative flex-shrink-0">
               <Avatar
-                src={conv.contact?.avatar_url}
-                name={conv.contact?.name}
+                src={avatarUrl}
+                name={avatarName}
                 channelKey={conv.channel_key}
                 isGroup={isGroup}
                 size={avatarSize}
