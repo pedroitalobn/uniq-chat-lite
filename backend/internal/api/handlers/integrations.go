@@ -647,11 +647,14 @@ func (h *IntegrationHandler) GetAgent(c *fiber.Ctx) error {
 //     do workspace antes de chegar aqui)
 //  4. AccessRestricted + papel do user em EditorRoleIDs → pode
 //  5. Caso contrário → não pode
-func canEditAgent(db *gorm.DB, user *models.User, agent *models.InstanceAgent, workspaceID uuid.UUID) bool {
+func canEditAgent(db *gorm.DB, user *models.User, agent *models.InstanceAgent, workspaceID uuid.UUID, instanceOwnerID uuid.UUID) bool {
 	if user == nil {
 		return false
 	}
 	if user.Role == models.RoleSuperAdmin {
+		return true
+	}
+	if instanceOwnerID != uuid.Nil && user.ID == instanceOwnerID {
 		return true
 	}
 	var membership models.UserWorkspace
@@ -912,7 +915,7 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 	if inst.WorkspaceID != nil {
 		wsID = *inst.WorkspaceID
 	}
-	if !canEditAgent(h.db, user, &agent, wsID) {
+	if !canEditAgent(h.db, user, &agent, wsID, inst.UserID) {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 			"error": "agente_restrito",
 			"hint":  "este agente está com edição restrita a papéis específicos do workspace",
