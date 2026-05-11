@@ -642,26 +642,26 @@ function InboxPage() {
 
   const agentLabel = (() => {
     if (agentScope === "me") return t("inbox_my");
-    if (agentScope === "all") return t("inbox_all_agents");
+    if (agentScope === "all") return "Agentes";
     const m = membersQ.data?.find((x) => x.user_id === agentScope);
     return m?.user?.name || m?.user?.email || "Agente";
   })();
 
   const queueLabel =
-    queueScope === "all" ? t("inbox_all_queues")
+    queueScope === "all" ? "Fila"
     : queueScope === "none" ? "Sem fila"
     : queuesQ.data?.items.find((q) => q.id === queueScope)?.name ?? "Fila";
 
   const availableChannels = (channelsQ.data ?? []).filter((c) => c.available);
   const channelLabel =
-    channelFilter.length === 0 ? t("inbox_all_channels")
+    channelFilter.length === 0 ? "Canais"
     : channelFilter.length === 1
       ? availableChannels.find((c) => c.id === channelFilter[0])?.label ?? channelFilter[0]
       : `${channelFilter.length} canais`;
 
   const connectedInstances = instancesQ.data ?? [];
   const instanceLabel =
-    instanceFilter.length === 0 ? t("inbox_all_instances")
+    instanceFilter.length === 0 ? "Instâncias"
     : instanceFilter.length === 1
       ? connectedInstances.find((i) => i.id === instanceFilter[0])?.name ?? "Instância"
       : `${instanceFilter.length} instâncias`;
@@ -675,7 +675,7 @@ function InboxPage() {
       case "contacts": return "Contatos";
       case "channels": return "Canais";
       case "status": return "Status";
-      default: return "Todos os tipos";
+      default: return "Tipos";
     }
   })();
 
@@ -796,6 +796,27 @@ function InboxPage() {
         {/* Linha 2: filtros em row próprio, abaixo dos sinalizadores. */}
         {viewMode === "conversations" && (
           <div className="mt-3 flex flex-wrap items-center gap-1.5 sm:gap-2">
+            {/* Search — primeiro campo da sequência para reduzir varredura visual. */}
+            <div className="relative order-first w-full sm:w-64 md:w-72 lg:w-80">
+              <Search
+                className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5"
+                style={{ color: "var(--text-4)" }}
+              />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Buscar contatos…"
+                className="w-full rounded-lg py-1.5 pl-8 pr-3 text-xs outline-none"
+                style={{
+                  background: inboxGlass.searchBg,
+                  backdropFilter: "blur(8px)",
+                  border: `1px solid ${inboxGlass.controlBorder}`,
+                  color: "var(--text-1)",
+                  transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
+                }}
+              />
+            </div>
+
             {/* Atendimentos — status filter dropdown */}
             <SingleSelectDropdown
               icon={<MessageSquare className="h-3.5 w-3.5" />}
@@ -820,7 +841,7 @@ function InboxPage() {
               label={viewKindLabel}
               active={viewKind !== "all"}
               items={[
-                { id: "all", label: "Todos os tipos" },
+                { id: "all", label: "Tipos" },
                 { id: "messages", label: "Mensagens" },
                 { id: "groups", label: "Grupos" },
                 { id: "contacts", label: "Contatos" },
@@ -876,7 +897,7 @@ function InboxPage() {
               label={queueLabel}
               active={queueScope !== "all"}
               items={[
-                { id: "all", label: t("inbox_all_queues") },
+                { id: "all", label: "Fila" },
                 { id: "none", label: "Sem fila" },
                 ...(queuesQ.data?.items.map((q) => ({ id: q.id, label: q.name })) ?? []),
               ]}
@@ -918,28 +939,6 @@ function InboxPage() {
               </button>
             )}
 
-            {/* Search — em desktop fica no header com os filtros; em mobile
-                escondemos aqui e renderizamos como barra de busca dedicada
-                no topo da coluna de conversas (logo abaixo do heat strip). */}
-            <div className="relative ml-auto hidden md:block">
-              <Search
-                className="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5"
-                style={{ color: "var(--text-4)" }}
-              />
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Buscar…"
-                className="w-44 rounded-lg py-1.5 pl-8 pr-3 text-xs outline-none"
-                style={{
-                  background: inboxGlass.searchBg,
-                  backdropFilter: "blur(8px)",
-                  border: `1px solid ${inboxGlass.controlBorder}`,
-                  color: "var(--text-1)",
-                  transition: "all 0.25s cubic-bezier(0.16,1,0.3,1)",
-                }}
-              />
-            </div>
           </div>
         )}
 
@@ -1274,7 +1273,7 @@ function AgentDropdown({
           active={agentScope === "all"}
           onClick={() => { setAgentScope("all"); setOpen(false); }}
         >
-          {t("inbox_all_agents")}
+          Agentes
         </DropdownItem>
       )}
       {canViewAll && members.length > 0 && (
@@ -1618,7 +1617,7 @@ function BackfillEmptyState({ stats, running, onBackfill }: {
           histórico extenso, pode precisar de mais de uma rodada.
           <br />
           Os atendimentos criados ficam <b>sem atribuição</b> até você
-          configurar uma fila — eles aparecem em “Todos os agentes” ou na
+          configurar uma fila — eles aparecem em “Agentes” ou na
           aba <b>“Sem atribuição”</b>.
         </p>
       </div>

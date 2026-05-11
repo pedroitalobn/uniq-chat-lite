@@ -1070,8 +1070,8 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
       <aside className="hidden w-72 flex-col border-l lg:flex"
         style={{ background: "var(--surface-1)", borderColor: "var(--surface-border)" }}>
         {/* Contact profile header */}
-        <div className="px-4 py-5 flex-shrink-0 border-b" style={{ borderColor: "var(--surface-border)" }}>
-          <p className="text-[10px] font-semibold uppercase tracking-widest mb-4" style={{ color: "var(--text-4)" }}>
+        <div className="px-3 py-3 flex-shrink-0 border-b" style={{ borderColor: "var(--surface-border)" }}>
+          <p className="text-[9px] font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--text-4)" }}>
             Perfil
           </p>
           {(() => {
@@ -1088,20 +1088,20 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                 type="button"
                 onClick={() => setViewerSource({ type: "image", url: avatarUrl, filename: `${name}.jpg` })}
                 title="Ver foto de perfil"
-                className="h-16 w-16 rounded-2xl overflow-hidden flex-shrink-0 transition-all hover:scale-105 hover:shadow-lg ring-2 ring-transparent hover:ring-green-500/20"
+                className="h-10 w-10 rounded-xl overflow-hidden flex-shrink-0 transition-all hover:scale-105 hover:shadow-lg ring-2 ring-transparent hover:ring-green-500/20"
                 style={{ background: "var(--surface-2)" }}
               >
-                <img src={avatarUrl} alt={name} className="h-16 w-16 object-cover" />
+                <img src={avatarUrl} alt={name} className="h-10 w-10 object-cover" />
               </button>
             ) : isGroup ? (
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl flex-shrink-0"
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl flex-shrink-0"
                 style={{ background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.25)", color: "#c4b5fd" }}>
-                <UsersIcon className="h-6 w-6" />
+                <UsersIcon className="h-4 w-4" />
               </div>
             ) : (
               <div
-                className="flex h-16 w-16 items-center justify-center rounded-2xl font-semibold flex-shrink-0"
-                style={{ background: `hsl(${hue} 55% 18%)`, color: `hsl(${hue} 70% 72%)`, fontSize: 20, border: `1px solid hsl(${hue} 55% 28%)` }}
+                className="flex h-10 w-10 items-center justify-center rounded-xl font-semibold flex-shrink-0"
+                style={{ background: `hsl(${hue} 55% 18%)`, color: `hsl(${hue} 70% 72%)`, fontSize: 13, border: `1px solid hsl(${hue} 55% 28%)` }}
               >
                 {initials}
               </div>
@@ -1111,24 +1111,27 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
             const lastSeen = lastMsgAt ? relativeTime(lastMsgAt) : null;
 
             return (
-              <div className="flex flex-col items-center text-center gap-2">
+              <div className="flex items-center gap-2.5">
                 {avatar}
-                <div className="w-full min-w-0">
-                  <p className="font-semibold text-sm truncate" style={{ color: "var(--text-1)" }}>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-[13px] truncate" style={{ color: "var(--text-1)" }}>
                     {name}
                   </p>
-                  {lastSeen && (
-                    <p className="text-[11px] mt-0.5" style={{ color: "var(--text-4)" }}>
-                      Última mensagem: {lastSeen}
-                    </p>
-                  )}
+                  <div className="mt-0.5 flex min-w-0 flex-col gap-0.5">
+                    {lastSeen && (
+                      <p className="text-[10px] leading-tight truncate" style={{ color: "var(--text-4)" }}>
+                        Última mensagem: {lastSeen}
+                      </p>
+                    )}
+                    <PresenceLabel presence={presence} />
+                  </div>
                   {(conv?.contact?.phone || conv?.channel_key) && (
-                    <p className="text-[11px] mt-1 font-mono truncate" style={{ color: "var(--text-3)" }}>
+                    <p className="text-[10px] mt-0.5 font-mono truncate" style={{ color: "var(--text-3)" }}>
                       {conv?.contact?.phone || conv?.channel_key}
                     </p>
                   )}
                   {conv?.contact?.email && (
-                    <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--text-3)" }}>
+                    <p className="text-[10px] mt-0.5 truncate" style={{ color: "var(--text-3)" }}>
                       {conv.contact.email}
                     </p>
                   )}
@@ -1138,76 +1141,78 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           })()}
         </div>
 
-        <div className="space-y-0.5 border-b p-2.5" style={{ borderColor: "var(--surface-border)" }}>
-          {!conv?.assigned_user_id && canAssign && (
-            <ActionRow onClick={() => claim.mutate()} icon={<UserCheck className="h-4 w-4" />} label="Atender" tone="primary" />
-          )}
-          {conv?.assigned_user_id && canAssign && (
-            <ActionRow onClick={() => unassign.mutate()} icon={<UserX className="h-4 w-4" />} label="Remover atribuição" />
-          )}
-          {canTransfer && (
-            <ActionRow
-              onClick={() => setTransferOpen(true)}
-              icon={<ArrowRightLeft className="h-4 w-4" />}
-              label="Transferir…"
-            />
-          )}
-          {canSend && conv?.channel_type === "waba" && conv?.instance_id && (
-            <ActionRow
-              onClick={() => setTemplateOpen(true)}
-              icon={<Sparkles className="h-4 w-4" />}
-              label="Enviar template aprovado"
-            />
-          )}
-          {canClose && conv?.status === "resolved" && (
-            <ActionRow
-              onClick={() => csatApi.send(wsId as string, conversationId).then(() => toast.success("CSAT enviado"))}
-              icon={<Star className="h-4 w-4" />}
-              label="Enviar pesquisa CSAT"
-            />
-          )}
-          {conv?.status !== "resolved" && conv?.status !== "closed" && canClose && (
-            <ActionRow onClick={() => resolve.mutate()} icon={<CheckCircle2 className="h-4 w-4" />} label="Marcar como resolvido" />
-          )}
-          {conv?.status === "resolved" && canClose && (
-            <ActionRow onClick={() => close.mutate()} icon={<CheckCircle2 className="h-4 w-4" />} label="Encerrar definitivamente" />
-          )}
-          {(conv?.status === "resolved" || conv?.status === "closed") && canReopen && (
-            <ActionRow onClick={() => reopen.mutate()} icon={<RotateCcw className="h-4 w-4" />} label="Reabrir" />
-          )}
-          {conv?.status === "open" && canSnooze && (
-            <ActionRow
-              onClick={openSnoozePrompt}
-              icon={<Clock3 className="h-4 w-4" />}
-              label="Soneca"
-            />
-          )}
-          {canUpdate && conv && (
-            <ActionRow
-              onClick={() => bot.mutate(!conv.is_bot_active)}
-              icon={conv.is_bot_active ? <BotOff className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-              label={conv.is_bot_active ? "Desligar bot nesta conversa" : "Ligar bot nesta conversa"}
-            />
-          )}
-          {canUpdate && conv && (
-            <ActionRow
-              onClick={() => patchConv.mutate({ is_pinned: !conv.is_pinned })}
-              icon={<Pin className="h-4 w-4" style={{ color: conv.is_pinned ? "#00d46a" : undefined }} />}
-              label={conv.is_pinned ? "Desfixar conversa" : "Fixar conversa no topo"}
-            />
-          )}
-          {canUpdate && conv && (
-            <ActionRow
-              onClick={() => patchConv.mutate({ is_muted: !conv.is_muted })}
-              icon={conv.is_muted ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
-              label={conv.is_muted ? "Reativar notificações" : "Silenciar notificações"}
-            />
-          )}
-        </div>
-
-        <div className="flex-1 overflow-auto p-3 text-xs custom-scrollbar" style={{ color: "var(--text-3)" }}>
+        <div className="flex-1 overflow-auto p-2.5 text-[11px] custom-scrollbar" style={{ color: "var(--text-3)" }}>
+          <div className="mb-2 rounded-xl p-2" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+            <div className="mb-1.5 text-[8px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-4)" }}>Ferramentas</div>
+            <div className="space-y-0.5">
+              {!conv?.assigned_user_id && canAssign && (
+                <ActionRow onClick={() => claim.mutate()} icon={<UserCheck className="h-3.5 w-3.5" />} label="Atender" tone="primary" />
+              )}
+              {conv?.assigned_user_id && canAssign && (
+                <ActionRow onClick={() => unassign.mutate()} icon={<UserX className="h-3.5 w-3.5" />} label="Remover atribuição" />
+              )}
+              {canTransfer && (
+                <ActionRow
+                  onClick={() => setTransferOpen(true)}
+                  icon={<ArrowRightLeft className="h-3.5 w-3.5" />}
+                  label="Transferir"
+                />
+              )}
+              {canSend && conv?.channel_type === "waba" && conv?.instance_id && (
+                <ActionRow
+                  onClick={() => setTemplateOpen(true)}
+                  icon={<Sparkles className="h-3.5 w-3.5" />}
+                  label="Template aprovado"
+                />
+              )}
+              {canClose && conv?.status === "resolved" && (
+                <ActionRow
+                  onClick={() => csatApi.send(wsId as string, conversationId).then(() => toast.success("CSAT enviado"))}
+                  icon={<Star className="h-3.5 w-3.5" />}
+                  label="Enviar CSAT"
+                />
+              )}
+              {conv?.status !== "resolved" && conv?.status !== "closed" && canClose && (
+                <ActionRow onClick={() => resolve.mutate()} icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="Resolver" />
+              )}
+              {conv?.status === "resolved" && canClose && (
+                <ActionRow onClick={() => close.mutate()} icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="Encerrar" />
+              )}
+              {(conv?.status === "resolved" || conv?.status === "closed") && canReopen && (
+                <ActionRow onClick={() => reopen.mutate()} icon={<RotateCcw className="h-3.5 w-3.5" />} label="Reabrir" />
+              )}
+              {conv?.status === "open" && canSnooze && (
+                <ActionRow
+                  onClick={openSnoozePrompt}
+                  icon={<Clock3 className="h-3.5 w-3.5" />}
+                  label="Soneca"
+                />
+              )}
+              {canUpdate && conv && (
+                <ActionRow
+                  onClick={() => bot.mutate(!conv.is_bot_active)}
+                  icon={conv.is_bot_active ? <BotOff className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+                  label={conv.is_bot_active ? "Desligar bot" : "Ligar bot"}
+                />
+              )}
+              {canUpdate && conv && (
+                <ActionRow
+                  onClick={() => patchConv.mutate({ is_pinned: !conv.is_pinned })}
+                  icon={<Pin className="h-3.5 w-3.5" style={{ color: conv.is_pinned ? "#00d46a" : undefined }} />}
+                  label={conv.is_pinned ? "Desfixar" : "Fixar"}
+                />
+              )}
+              {canUpdate && conv && (
+                <ActionRow
+                  onClick={() => patchConv.mutate({ is_muted: !conv.is_muted })}
+                  icon={conv.is_muted ? <BellOff className="h-3.5 w-3.5" /> : <Bell className="h-3.5 w-3.5" />}
+                  label={conv.is_muted ? "Reativar notificações" : "Silenciar"}
+                />
+              )}
+            </div>
+          </div>
           {wsId && conversationId && (
-            <div className="mb-4 space-y-3">
+            <div className="mb-2 space-y-2">
               <AgentPanel
                 workspaceId={wsId as string}
                 conversationId={conversationId}
@@ -1228,7 +1233,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           {/* CRM context — funil/estágio/jornada, deals do contato e tags
               editáveis. Aparece quando temos contact_id resolvido. */}
           {wsId && conv?.contact?.id && (
-            <div className="mb-3">
+            <div className="mb-2">
               <ContactCRMPanel workspaceId={wsId as string} contactId={conv.contact.id} />
             </div>
           )}
@@ -4582,7 +4587,7 @@ function ActionRow({
       <button
         onClick={onClick}
         type="button"
-        className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors"
+        className="group flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-colors"
         style={{
           background: "transparent",
           color: "var(--text-1)",
@@ -4605,7 +4610,7 @@ function ActionRow({
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-all"
+      className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] transition-all"
       type="button"
       style={{ color: "var(--text-2)" }}
       onMouseEnter={e => { e.currentTarget.style.background = "var(--input)"; }}

@@ -84,16 +84,16 @@ export function ContactCRMPanel({ workspaceId, contactId }: { workspaceId: strin
 
   return (
     <div
-      className="rounded-xl p-3 space-y-3"
+      className="rounded-xl p-2.5 space-y-2"
       style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}
     >
       <div className="flex items-center justify-between">
-        <p className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-4)" }}>
+        <p className="text-[8px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-4)" }}>
           CRM
         </p>
         <Link
           href={`/crm/contacts/${contactId}`}
-          className="text-[10px] underline"
+          className="text-[9px] underline"
           style={{ color: "var(--text-3)" }}
         >
           Abrir contato
@@ -102,13 +102,13 @@ export function ContactCRMPanel({ workspaceId, contactId }: { workspaceId: strin
 
       {/* Funnel/Stage/Journey resumo */}
       {(contact?.funnel || contact?.stage || contact?.journey) && (
-        <div className="grid grid-cols-1 gap-1.5 text-[11px]">
+        <div className="grid grid-cols-1 gap-1 text-[10px]">
           {contact?.funnel && <KV label="Funil" value={contact.funnel} />}
           {contact?.stage && <KV label="Estágio" value={contact.stage} />}
           {contact?.journey && (
             <KV label="Jornada" value={
               <span className="inline-flex items-center gap-1">
-                <Route className="w-3 h-3" /> {contact.journey}
+                <Route className="w-2.5 h-2.5" /> {contact.journey}
               </span>
             } />
           )}
@@ -117,26 +117,26 @@ export function ContactCRMPanel({ workspaceId, contactId }: { workspaceId: strin
 
       {/* Deals */}
       <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-4)" }}>
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[8px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-4)" }}>
             Deals
           </span>
-          <span className="text-[10px]" style={{ color: "var(--text-3)" }}>{deals.length}</span>
+          <span className="text-[9px]" style={{ color: "var(--text-3)" }}>{deals.length}</span>
         </div>
         {deals.length === 0 ? (
-          <p className="text-[11px]" style={{ color: "var(--text-3)" }}>Nenhum deal vinculado.</p>
+          <p className="text-[10px]" style={{ color: "var(--text-3)" }}>Nenhum deal vinculado.</p>
         ) : (
           <div className="space-y-1">
             {deals.map((d) => (
               <Link
                 key={d.id}
                 href={`/crm/deals/${d.id}`}
-                className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5"
+                className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-white/5"
                 style={{ background: "var(--input)" }}
               >
-                <Briefcase className="w-3 h-3 flex-shrink-0" style={{ color: dealStatusColor(d.status) }} />
-                <span className="text-[11px] truncate flex-1" style={{ color: "var(--text-1)" }}>{d.title}</span>
-                <span className="text-[10px] flex-shrink-0" style={{ color: "var(--text-3)" }}>
+                <Briefcase className="w-2.5 h-2.5 flex-shrink-0" style={{ color: dealStatusColor(d.status) }} />
+                <span className="text-[10px] truncate flex-1" style={{ color: "var(--text-1)" }}>{d.title}</span>
+                <span className="text-[9px] flex-shrink-0" style={{ color: "var(--text-3)" }}>
                   {formatMoney(d.value, d.currency)}
                 </span>
               </Link>
@@ -147,14 +147,14 @@ export function ContactCRMPanel({ workspaceId, contactId }: { workspaceId: strin
 
       {/* Tags */}
       <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-4)" }}>
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[8px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-4)" }}>
             Tags
           </span>
           <button
             type="button"
             onClick={() => setShowTagPicker((v) => !v)}
-            className="text-[10px] inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
+            className="text-[9px] inline-flex items-center gap-1 px-1.5 py-0.5 rounded"
             style={{ color: "var(--green)", background: "rgba(0,212,106,0.08)" }}
           >
             {showTagPicker ? <><X className="w-2.5 h-2.5" /> Fechar</> : <><Plus className="w-2.5 h-2.5" /> Editar</>}
@@ -162,12 +162,12 @@ export function ContactCRMPanel({ workspaceId, contactId }: { workspaceId: strin
         </div>
         <div className="flex flex-wrap gap-1">
           {(contact?.tags ?? []).length === 0 && !showTagPicker && (
-            <p className="text-[11px]" style={{ color: "var(--text-3)" }}>Sem tags.</p>
+            <p className="text-[10px]" style={{ color: "var(--text-3)" }}>Sem tags.</p>
           )}
           {(contact?.tags ?? []).map((t) => (
             <span
               key={t.id}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px]"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px]"
               style={{ background: t.color + "22", color: t.color, border: `1px solid ${t.color}44` }}
             >
               <TagIcon className="w-2.5 h-2.5" />
@@ -178,7 +178,7 @@ export function ContactCRMPanel({ workspaceId, contactId }: { workspaceId: strin
         {showTagPicker && (
           <div className="mt-2 flex flex-wrap gap-1">
             {allTags.length === 0 && (
-              <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+              <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
                 Sem tags criadas. Crie em <Link href="/crm/properties" className="underline">Propriedades</Link>.
               </p>
             )}
@@ -189,7 +189,7 @@ export function ContactCRMPanel({ workspaceId, contactId }: { workspaceId: strin
                   key={t.id}
                   type="button"
                   onClick={() => toggleTag(t.id)}
-                  className="px-2 py-0.5 rounded-full text-[10px] transition-colors"
+                  className="px-1.5 py-0.5 rounded-full text-[9px] transition-colors"
                   style={{
                     background: on ? t.color + "22" : "var(--input)",
                     color: on ? t.color : "var(--text-3)",
