@@ -25,6 +25,7 @@ import { useIsMobile } from "@/hooks/useMediaQuery";
 import { MediaViewer, type MediaViewerSource } from "@/components/inbox/MediaViewer";
 import { AgentPanel } from "@/components/inbox/AgentPanel";
 import { WindowKeeperToggle } from "@/components/inbox/WindowKeeperToggle";
+import { ContactIntelligenceDashboard } from "@/components/inbox/ContactIntelligenceDashboard";
 import { conversationsApi, queuesApi, quickRepliesApi, teamsApi, workspacesApi, csatApi, mediaUploadApi, crmContactsApi, linkPreviewApi, dealsApi, crmApi, callsApi, departmentsApi } from "@/lib/api";
 import { WABAWindowTimer } from "./WABAWindowTimer";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -699,9 +700,31 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   }, [timeline]);
 
   return (
-    <div className="flex h-full min-h-0">
-      {/* Main pane: header + timeline + composer */}
-      <section className="flex flex-1 min-w-0 flex-col">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_440px] h-full min-h-0">
+      {/* Contact Intelligence Dashboard */}
+      <div className="hidden lg:flex flex-col overflow-hidden">
+        <ContactIntelligenceDashboard
+          conversation={convQ.data}
+          presence={presence}
+          canAssign={canAssign}
+          canClose={canClose}
+          canReopen={canReopen}
+          canSnooze={canSnooze}
+          canUpdate={canUpdate}
+          onClaim={() => claim.mutate()}
+          onUnassign={() => unassign.mutate()}
+          onResolve={() => resolve.mutate()}
+          onClose={() => close.mutate()}
+          onReopen={() => reopen.mutate()}
+          onSnooze={openSnoozePrompt}
+          onPin={() => patchConv.mutate({ is_pinned: !convQ.data?.is_pinned })}
+          onMute={() => patchConv.mutate({ is_muted: !convQ.data?.is_muted })}
+          onAvatarClick={(url, name) => setViewerSource({ type: "image", url, filename: `${name}.jpg` })}
+        />
+      </div>
+
+      {/* Chat Panel */}
+      <section className="flex flex-col overflow-hidden border-l" style={{ borderColor: "var(--border-subtle)" }}>
         <header className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-2.5 border-b flex-shrink-0"
           style={{ borderColor: "var(--border-subtle)", background: "rgba(255,255,255,0.02)" }}>
           {/* Back button */}
@@ -1067,214 +1090,6 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           onClearReply={() => setReplyTo(null)}
         />
       </section>
-
-      {/* Sidepanel with actions + contact */}
-      <aside className="hidden w-72 flex-col border-l lg:flex"
-        style={{ background: "var(--surface-1)", borderColor: "var(--surface-border)" }}>
-        {/* Contact profile header */}
-        <div className="px-3 py-3 flex-shrink-0 border-b" style={{ borderColor: "var(--surface-border)" }}>
-          <p className="text-[9px] font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--text-4)" }}>
-            Perfil
-          </p>
-          {(() => {
-            const isGroup = (conv?.channel_key || "").toLowerCase().endsWith("@g.us");
-            const avatarUrl = conv?.contact?.avatar_url || conv?.avatar_url;
-            const name = conv?.contact?.name || conv?.push_name || conv?.subject || conv?.channel_key || "?";
-            let hash = 0;
-            for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
-            const hue = Math.abs(hash) % 360;
-            const initials = (name.split(/\s+/).filter(Boolean).slice(0, 2).map((s) => s[0] || "").join("") || "?").toUpperCase();
-
-            const avatar = avatarUrl ? (
-              <button
-                type="button"
-                onClick={() => setViewerSource({ type: "image", url: avatarUrl, filename: `${name}.jpg` })}
-                title="Ver foto de perfil"
-                className="h-10 w-10 rounded-xl overflow-hidden flex-shrink-0 transition-all hover:scale-105 hover:shadow-lg ring-2 ring-transparent hover:ring-green-500/20"
-                style={{ background: "var(--surface-2)" }}
-              >
-                <img src={avatarUrl} alt={name} className="h-10 w-10 object-cover" />
-              </button>
-            ) : isGroup ? (
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl flex-shrink-0"
-                style={{ background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.25)", color: "#c4b5fd" }}>
-                <UsersIcon className="h-4 w-4" />
-              </div>
-            ) : (
-              <div
-                className="flex h-10 w-10 items-center justify-center rounded-xl font-semibold flex-shrink-0"
-                style={{ background: `hsl(${hue} 55% 18%)`, color: `hsl(${hue} 70% 72%)`, fontSize: 13, border: `1px solid hsl(${hue} 55% 28%)` }}
-              >
-                {initials}
-              </div>
-            );
-
-            const lastMsgAt = conv?.last_message_at;
-            const lastSeen = lastMsgAt ? relativeTime(lastMsgAt) : null;
-
-            return (
-              <div className="flex items-center gap-2.5">
-                {avatar}
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-[13px] truncate" style={{ color: "var(--text-1)" }}>
-                    {name}
-                  </p>
-                  <div className="mt-0.5 flex min-w-0 flex-col gap-0.5">
-                    {lastSeen && (
-                      <p className="text-[10px] leading-tight truncate" style={{ color: "var(--text-4)" }}>
-                        Última mensagem: {lastSeen}
-                      </p>
-                    )}
-                    <PresenceLabel presence={presence} />
-                  </div>
-                  {(conv?.contact?.phone || conv?.channel_key) && (
-                    <p className="text-[10px] mt-0.5 font-mono truncate" style={{ color: "var(--text-3)" }}>
-                      {conv?.contact?.phone || conv?.channel_key}
-                    </p>
-                  )}
-                  {conv?.contact?.email && (
-                    <p className="text-[10px] mt-0.5 truncate" style={{ color: "var(--text-3)" }}>
-                      {conv.contact.email}
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-
-        <div className="flex-1 overflow-auto p-2.5 text-[11px] custom-scrollbar" style={{ color: "var(--text-3)" }}>
-          <div className="mb-2 rounded-xl p-2" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
-            <div className="mb-1.5 text-[8px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-4)" }}>Ferramentas</div>
-            <div className="space-y-0.5">
-              {!conv?.assigned_user_id && canAssign && (
-                <ActionRow onClick={() => claim.mutate()} icon={<UserCheck className="h-3.5 w-3.5" />} label="Atender" tone="primary" />
-              )}
-              {conv?.assigned_user_id && canAssign && (
-                <ActionRow onClick={() => unassign.mutate()} icon={<UserX className="h-3.5 w-3.5" />} label="Remover atribuição" />
-              )}
-              {canTransfer && (
-                <ActionRow
-                  onClick={() => setTransferOpen(true)}
-                  icon={<ArrowRightLeft className="h-3.5 w-3.5" />}
-                  label="Transferir"
-                />
-              )}
-              {canSend && conv?.channel_type === "waba" && conv?.instance_id && (
-                <ActionRow
-                  onClick={() => setTemplateOpen(true)}
-                  icon={<Sparkles className="h-3.5 w-3.5" />}
-                  label="Template aprovado"
-                />
-              )}
-              {canClose && conv?.status === "resolved" && (
-                <ActionRow
-                  onClick={() => csatApi.send(wsId as string, conversationId).then(() => toast.success("CSAT enviado"))}
-                  icon={<Star className="h-3.5 w-3.5" />}
-                  label="Enviar CSAT"
-                />
-              )}
-              {conv?.status !== "resolved" && conv?.status !== "closed" && canClose && (
-                <ActionRow onClick={() => resolve.mutate()} icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="Resolver" />
-              )}
-              {conv?.status === "resolved" && canClose && (
-                <ActionRow onClick={() => close.mutate()} icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="Encerrar" />
-              )}
-              {(conv?.status === "resolved" || conv?.status === "closed") && canReopen && (
-                <ActionRow onClick={() => reopen.mutate()} icon={<RotateCcw className="h-3.5 w-3.5" />} label="Reabrir" />
-              )}
-              {conv?.status === "open" && canSnooze && (
-                <ActionRow
-                  onClick={openSnoozePrompt}
-                  icon={<Clock3 className="h-3.5 w-3.5" />}
-                  label="Soneca"
-                />
-              )}
-              {canUpdate && conv && (
-                <ActionRow
-                  onClick={() => patchConv.mutate({ is_pinned: !conv.is_pinned })}
-                  icon={<Pin className="h-3.5 w-3.5" style={{ color: conv.is_pinned ? "#00d46a" : undefined }} />}
-                  label={conv.is_pinned ? "Desfixar" : "Fixar"}
-                />
-              )}
-              {canUpdate && conv && (
-                <ActionRow
-                  onClick={() => patchConv.mutate({ is_muted: !conv.is_muted })}
-                  icon={conv.is_muted ? <BellOff className="h-3.5 w-3.5" /> : <Bell className="h-3.5 w-3.5" />}
-                  label={conv.is_muted ? "Reativar notificações" : "Silenciar"}
-                />
-              )}
-            </div>
-          </div>
-          {wsId && conversationId && (
-            <div className="mb-2 space-y-2">
-              <AgentPanel
-                workspaceId={wsId as string}
-                conversationId={conversationId}
-                onSendSuggestion={(text) => {
-                  window.dispatchEvent(new CustomEvent("uniq:inject-reply", { detail: { text } }));
-                }}
-              />
-              {conv?.channel_type === "waba" && (
-                <WindowKeeperToggle
-                  wsId={wsId as string}
-                  conversationId={conversationId}
-                  enabled={conv.window_keeper_enabled ?? false}
-                  message={conv.window_keeper_message ?? ""}
-                />
-              )}
-            </div>
-          )}
-          {/* CRM context — funil/estágio/jornada, deals do contato e tags
-              editáveis. Aparece quando temos contact_id resolvido. */}
-          {wsId && conv?.contact?.id && (
-            <div className="mb-2">
-              <ContactCRMPanel workspaceId={wsId as string} contactId={conv.contact.id} />
-            </div>
-          )}
-          <div className="mb-2 text-[9px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-4)" }}>Detalhes</div>
-          <dl className="space-y-1.5 rounded-xl p-3 mb-3"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
-            <DRow label="Aberto em" value={conv?.created_at && relativeTime(conv.created_at)} />
-            <DRow label="Última mensagem" value={conv?.last_message_at && relativeTime(conv.last_message_at)} />
-            <DRow label="Prioridade" value={conv?.priority} />
-            <DRow label="Canal" value={conv?.channel_type} />
-            <DRow label="Fila" value={queuesQ.data?.items.find((q) => q.id === conv?.queue_id)?.name ?? "—"} />
-          </dl>
-          <div className="mt-3 rounded-xl p-3 text-[11px]"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
-            <div className="font-semibold uppercase tracking-widest mb-1.5" style={{ color: "var(--text-4)", fontSize: 9 }}>Atalhos</div>
-            <dl className="space-y-1" style={{ color: "var(--text-3)" }}>
-              {[["Atender","A"],["Transferir","T"],["Soneca","S"],["Resolver","E"],["Resp. rápida","/"]].map(([label, key]) => (
-                <div key={key} className="flex justify-between items-center">
-                  <span>{label}</span>
-                  <kbd className="rounded-md px-1.5 py-0.5 text-[10px] font-mono"
-                    style={{ background: "var(--surface-3)", border: "1px solid var(--surface-border)", color: "var(--text-3)" }}>
-                    {key}
-                  </kbd>
-                </div>
-              ))}
-            </dl>
-          </div>
-
-          {/* Resetar memória do agente nesta conversa */}
-          <div className="mt-3 rounded-xl p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
-            <div className="font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--text-4)", fontSize: 9 }}>Ações</div>
-            <button
-              onClick={() => setShowResetMemoryModal(true)}
-              disabled={resetAgentMemoryMut.isPending}
-              className="w-full text-left text-[11px] rounded-lg px-2.5 py-1.5 font-medium transition"
-              style={{
-                background: "rgba(248,113,113,0.08)",
-                border: "1px solid rgba(248,113,113,0.18)",
-                color: "#f87171",
-              }}
-            >
-              {resetAgentMemoryMut.isPending ? "Resetando…" : "Resetar memória do agente"}
-            </button>
-          </div>
-        </div>
-      </aside>
 
       {transferOpen && wsId && (
         <TransferDialog
