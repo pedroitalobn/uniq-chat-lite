@@ -729,7 +729,7 @@ func (h *AbacatePayHandler) TestConnection(c *fiber.Ctx) error {
 
 	baseURL := h.abacatepayClient()
 	client := &http.Client{Timeout: 10 * time.Second}
-	req, _ := http.NewRequest("GET", baseURL+"/v2/ping", nil)
+	req, _ := http.NewRequest("GET", baseURL+"/v2/checkout?limit=1", nil)
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	resp, err := client.Do(req)

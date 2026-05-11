@@ -208,13 +208,10 @@ func (h *AdminHandler) testPaymentProvider(provider string, settings *models.Pay
 		if key == "" {
 			return false, "api_key vazia"
 		}
-		// AbacatePay: GET /v2/ping pra verificar credencial.
-		// Base URL: https://api.abacatepay.com/v2
+		// AbacatePay usa URL única — o ambiente (dev/production) é
+		// determinado pela API key, não pela URL. O endpoint /v2/checkout?limit=1
 		baseURL := "https://api.abacatepay.com"
-		if settings.AbacatepayEnvironment == "sandbox" {
-			baseURL = "https://sandbox.abacatepay.com"
-		}
-		req, _ := http.NewRequest("GET", baseURL+"/v2/ping", nil)
+		req, _ := http.NewRequest("GET", baseURL+"/v2/checkout?limit=1", nil)
 		req.Header.Set("Authorization", "Bearer "+key)
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := client.Do(req)
