@@ -25,6 +25,7 @@ type ResponseLength = "concise" | "balanced" | "detailed";
 type TriggerConfig = {
   mode: TriggerMode;
   keywords: string[];
+  message_types: string[];
   webhook_slug: string;        // read-only, gerado pelo backend ao ativar webhook mode
   webhook_secret: string;
 };
@@ -346,6 +347,18 @@ const TRIGGER_PRESETS: Array<{ id: TriggerMode; title: string; desc: string; ico
   { id: "webhook", title: "Por webhook (integração)",     desc: "Não responde mensagens normais. Inicia conversa ao receber POST no endpoint dedicado.",     icon: Webhook },
 ];
 
+const MESSAGE_TYPE_OPTIONS: Array<{ id: string; label: string; desc: string }> = [
+  { id: "text", label: "Texto", desc: "Mensagens comuns e respostas digitadas." },
+  { id: "image", label: "Imagem", desc: "Fotos com ou sem legenda." },
+  { id: "video", label: "Vídeo", desc: "Vídeos recebidos pelo WhatsApp." },
+  { id: "audio", label: "Áudio", desc: "Áudios e voice notes." },
+  { id: "document", label: "Documento", desc: "PDFs, arquivos e anexos." },
+  { id: "sticker", label: "Sticker", desc: "Figurinhas." },
+  { id: "location", label: "Localização", desc: "Localização fixa." },
+  { id: "contact", label: "Contato", desc: "Cartões de contato/vCard." },
+  { id: "poll", label: "Enquete", desc: "Votações e polls." },
+];
+
 function TriggerSection({
   trigger, onChange, apiBase,
 }: {
@@ -370,6 +383,17 @@ function TriggerSection({
   };
   const removeKeyword = (i: number) =>
     onChange({ ...trigger, keywords: trigger.keywords.filter((_, idx) => idx !== i) });
+  const selectedTypes = trigger.message_types.length ? trigger.message_types : ["text"];
+  const toggleType = (id: string) => {
+    const current = new Set(selectedTypes);
+    if (current.has(id)) {
+      current.delete(id);
+    } else {
+      current.add(id);
+    }
+    const next = MESSAGE_TYPE_OPTIONS.map((o) => o.id).filter((type) => current.has(type));
+    onChange({ ...trigger, message_types: next.length ? next : ["text"] });
+  };
 
   const copyURL = async () => {
     if (!fullWebhookURL) return;
@@ -414,6 +438,40 @@ function TriggerSection({
           );
         })}
       </div>
+
+      {trigger.mode !== "webhook" && (
+        <div className="rounded-2xl p-4 space-y-3" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Tipos de mensagem que o agente atende</h3>
+            <span className="text-[11px] whitespace-nowrap" style={{ color: "var(--text-3)" }}>
+              {selectedTypes.length} ativo{selectedTypes.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {MESSAGE_TYPE_OPTIONS.map((option) => {
+              const active = selectedTypes.includes(option.id);
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => toggleType(option.id)}
+                  className="text-left rounded-lg p-3 transition"
+                  style={{
+                    background: active ? "rgba(0,212,106,0.07)" : "var(--surface-3)",
+                    border: `1px solid ${active ? "rgba(0,212,106,0.28)" : "var(--surface-border)"}`,
+                  }}
+                >
+                  <p className="text-xs font-medium" style={{ color: "var(--text-1)" }}>{option.label}</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>{option.desc}</p>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
+            Status do WhatsApp nunca dispara agente. Se nada for selecionado, o backend mantém Texto como padrão.
+          </p>
+        </div>
+      )}
 
       {/* ── Keyword config ── */}
       {trigger.mode === "keyword" && (

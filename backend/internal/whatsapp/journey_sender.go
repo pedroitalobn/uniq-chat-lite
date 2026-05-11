@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
+	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/senders"
 )
 
@@ -43,7 +44,17 @@ func (s *ManagerMessageSender) SendText(instanceID, jid, text string) error {
 		return fmt.Errorf("instance %s not running", instanceID)
 	}
 	jid = s.normalizeRecipient(c, jid)
-	_, err := c.SendTextMessage(jid, text)
+	msgID, err := c.SendTextMessage(jid, text)
+	if err == nil {
+		_ = s.m.SaveMessageEx(SaveMessageInput{
+			InstanceID:        instanceID,
+			ToJID:             jid,
+			Content:           text,
+			Direction:         models.DirectionOut,
+			Type:              "text",
+			ExternalMessageID: msgID,
+		})
+	}
 	return err
 }
 
@@ -57,7 +68,17 @@ func (s *ManagerMessageSender) SendButtons(instanceID, jid, text string, buttons
 	for _, b := range buttons {
 		items = append(items, ButtonItem{ID: b.ID, Text: b.Text})
 	}
-	_, err := c.SendButtonsMessage(jid, text, "", items)
+	msgID, err := c.SendButtonsMessage(jid, text, "", items)
+	if err == nil {
+		_ = s.m.SaveMessageEx(SaveMessageInput{
+			InstanceID:        instanceID,
+			ToJID:             jid,
+			Content:           text,
+			Direction:         models.DirectionOut,
+			Type:              "buttons",
+			ExternalMessageID: msgID,
+		})
+	}
 	return err
 }
 
@@ -75,7 +96,17 @@ func (s *ManagerMessageSender) SendList(instanceID, jid, text, buttonText string
 		}
 		listSections = append(listSections, ListSection{Title: sec.Title, Rows: rows})
 	}
-	_, err := c.SendListMessage(jid, text, "", buttonText, "", listSections)
+	msgID, err := c.SendListMessage(jid, text, "", buttonText, "", listSections)
+	if err == nil {
+		_ = s.m.SaveMessageEx(SaveMessageInput{
+			InstanceID:        instanceID,
+			ToJID:             jid,
+			Content:           text,
+			Direction:         models.DirectionOut,
+			Type:              "list",
+			ExternalMessageID: msgID,
+		})
+	}
 	return err
 }
 
@@ -87,6 +118,17 @@ func (s *ManagerMessageSender) SendMedia(instanceID, jid, mediaType, url, captio
 	jid = s.normalizeRecipient(c, jid)
 	// URL-based media send — fallback = texto com link enquanto o canal de mídia
 	// completo não está disponível diretamente no InstanceClient.
-	_, err := c.SendTextMessage(jid, fmt.Sprintf("%s\n%s", caption, url))
+	body := fmt.Sprintf("%s\n%s", caption, url)
+	msgID, err := c.SendTextMessage(jid, body)
+	if err == nil {
+		_ = s.m.SaveMessageEx(SaveMessageInput{
+			InstanceID:        instanceID,
+			ToJID:             jid,
+			Content:           body,
+			Direction:         models.DirectionOut,
+			Type:              mediaType,
+			ExternalMessageID: msgID,
+		})
+	}
 	return err
 }

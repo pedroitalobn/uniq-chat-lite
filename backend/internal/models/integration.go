@@ -50,20 +50,20 @@ type UserIntegration struct {
 	APIKey    string   `gorm:"type:text" json:"-"`            // never exposed in JSON
 	MaskedKey string   `gorm:"-" json:"masked_key,omitempty"` // computed on read
 	// OAuth tokens (criptografados no runtime; json:"-" para nunca sair na API)
-	OAuthAccessToken  string     `gorm:"type:text" json:"-"`
-	OAuthRefreshToken string     `gorm:"type:text" json:"-"`
-	OAuthExpiresAt    *time.Time `json:"oauth_expires_at,omitempty"`
-	OAuthAccount      string     `gorm:"type:varchar(255)" json:"oauth_account,omitempty"` // email/ID legível
-	OAuthScope        string     `gorm:"type:varchar(512)" json:"oauth_scope,omitempty"`
-	BaseURL           string     `gorm:"type:varchar(255)" json:"base_url,omitempty"`
-	Models            string     `gorm:"type:text" json:"models,omitempty"`              // JSON array of model names, e.g. ["gpt-4o","gpt-4o-mini"]
-	Config            string     `gorm:"type:text;default:'{}'" json:"config,omitempty"` // JSON extra config
-	IsActive          bool       `gorm:"default:true" json:"is_active"`
-	LastTestedAt      *time.Time `json:"last_tested_at,omitempty"`
-	TestStatus        string     `gorm:"type:varchar(20)" json:"test_status,omitempty"` // "ok" | "failed" | ""
-	CreatedAt         time.Time  `json:"created_at"`
-	UpdatedAt         time.Time  `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	OAuthAccessToken  string         `gorm:"type:text" json:"-"`
+	OAuthRefreshToken string         `gorm:"type:text" json:"-"`
+	OAuthExpiresAt    *time.Time     `json:"oauth_expires_at,omitempty"`
+	OAuthAccount      string         `gorm:"type:varchar(255)" json:"oauth_account,omitempty"` // email/ID legível
+	OAuthScope        string         `gorm:"type:varchar(512)" json:"oauth_scope,omitempty"`
+	BaseURL           string         `gorm:"type:varchar(255)" json:"base_url,omitempty"`
+	Models            string         `gorm:"type:text" json:"models,omitempty"`              // JSON array of model names, e.g. ["gpt-4o","gpt-4o-mini"]
+	Config            string         `gorm:"type:text;default:'{}'" json:"config,omitempty"` // JSON extra config
+	IsActive          bool           `gorm:"default:true" json:"is_active"`
+	LastTestedAt      *time.Time     `json:"last_tested_at,omitempty"`
+	TestStatus        string         `gorm:"type:varchar(20)" json:"test_status,omitempty"` // "ok" | "failed" | ""
+	CreatedAt         time.Time      `json:"created_at"`
+	UpdatedAt         time.Time      `json:"updated_at"`
+	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // HasOAuth retorna true se a integração tem tokens OAuth válidos.
@@ -145,9 +145,9 @@ type InstanceAgent struct {
 	// Multi-agente — Role classifica a função (atendimento/fechamento/pós-venda),
 	// Priority desempata quando múltiplos podem responder, IsPrimary marca o
 	// fallback quando a conversa ainda não tem agente pinado.
-	Role        string `gorm:"type:varchar(40);default:'primary'" json:"role,omitempty"`
-	Priority    int    `gorm:"default:100" json:"priority,omitempty"`
-	IsPrimary   bool   `gorm:"default:false;index" json:"is_primary"`
+	Role      string `gorm:"type:varchar(40);default:'primary'" json:"role,omitempty"`
+	Priority  int    `gorm:"default:100" json:"priority,omitempty"`
+	IsPrimary bool   `gorm:"default:false;index" json:"is_primary"`
 	// HandoffSkills — lista JSON de "skills" que outros agentes podem invocar
 	// pra transferir a conversa pra este agente (ex: ["fechamento", "vendas"]).
 	HandoffSkills string `gorm:"type:text;default:'[]'" json:"handoff_skills,omitempty"`
@@ -192,6 +192,11 @@ type InstanceAgent struct {
 	// TriggerKeywords — JSON array de strings minúsculas. Match por
 	// substring (case-insensitive) na última mensagem inbound.
 	TriggerKeywords string `gorm:"type:text;default:'[]'" json:"trigger_keywords,omitempty"`
+	// TriggerMessageTypes — JSON array com os tipos de mensagem inbound que
+	// podem acionar o agente. Default efetivo quando vazio: ["text"].
+	// Exemplos: text, image, video, audio, document, sticker, location,
+	// contact, poll, gif. Isso evita agente reagir a status/mídia qualquer.
+	TriggerMessageTypes string `gorm:"type:text;default:'[\"text\"]'" json:"trigger_message_types,omitempty"`
 	// TriggerWebhookSlug — identificador único do webhook deste agente.
 	// Path final: POST /v1/webhooks/agent-trigger/<slug>. Auto-gerado
 	// quando agent.TriggerMode = "webhook" e ainda vazio.
@@ -222,8 +227,8 @@ type InstanceAgent struct {
 	// agents:manage no workspace pode editar (comportamento legado).
 	// Quando AccessRestricted=true, edição fica limitada aos papéis
 	// listados em EditorRoleIDs (+ dono do workspace + super-admin).
-	AccessRestricted bool   `gorm:"default:false" json:"access_restricted"`
-	EditorRoleIDs    string `gorm:"type:text;default:'[]'" json:"editor_role_ids,omitempty"`
+	AccessRestricted bool         `gorm:"default:false" json:"access_restricted"`
+	EditorRoleIDs    string       `gorm:"type:text;default:'[]'" json:"editor_role_ids,omitempty"`
 	Assets           []AgentAsset `gorm:"foreignKey:InstanceAgentID" json:"assets,omitempty"`
 	CreatedAt        time.Time    `json:"created_at"`
 	UpdatedAt        time.Time    `json:"updated_at"`

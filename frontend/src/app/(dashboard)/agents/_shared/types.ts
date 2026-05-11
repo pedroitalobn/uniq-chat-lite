@@ -56,6 +56,7 @@ export type AgentForm = {
   };
   trigger_mode: "any" | "keyword" | "webhook";
   trigger_keywords: string[];
+  trigger_message_types: string[];
   trigger_webhook_slug: string;
   trigger_webhook_secret: string;
   response_pace: "instant" | "natural" | "thoughtful" | "very_human";
@@ -120,6 +121,7 @@ export function emptyForm(): AgentForm {
     schedule: { timezone: "America/Sao_Paulo", days: {} },
     trigger_mode: "any",
     trigger_keywords: [],
+    trigger_message_types: ["text"],
     trigger_webhook_slug: "",
     trigger_webhook_secret: "",
     response_pace: "natural",
@@ -201,6 +203,7 @@ export function mapAgent(data: any): AgentForm {
     })(),
     trigger_mode: ["any", "keyword", "webhook"].includes(data?.trigger_mode) ? data.trigger_mode : "any",
     trigger_keywords: parseJSONArray<string[]>(data?.trigger_keywords, []),
+    trigger_message_types: parseJSONArray<string[]>(data?.trigger_message_types, ["text"]),
     trigger_webhook_slug: data?.trigger_webhook_slug || "",
     trigger_webhook_secret: data?.trigger_webhook_secret || "",
     response_pace: ["instant", "natural", "thoughtful", "very_human"].includes(data?.response_pace)

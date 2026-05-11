@@ -83,6 +83,7 @@ export function useAgentForm(instanceId: string | undefined, agentId: string | u
           schedule: form.schedule,
           trigger_mode: form.trigger_mode,
           trigger_keywords: form.trigger_keywords,
+          trigger_message_types: form.trigger_message_types,
           trigger_webhook_secret: form.trigger_webhook_secret,
           response_pace: form.response_pace,
           response_length: form.response_length,

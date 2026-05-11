@@ -77,6 +77,19 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		r.logSkippedNoAgent(instUUID, text, started, fromJID)
 		return false
 	}
+	if !agentAllowsMessageType(agent.TriggerMessageTypes, messageType) {
+		log.Debug().
+			Str("instance", instanceID).
+			Str("agent", agent.AgentName).
+			Str("message_type", messageType).
+			Msg("agent-runtime: tipo de mensagem não habilitado")
+		r.logExecution(models.AgentExecution{
+			AgentID: agent.ID, InstanceID: instUUID,
+			Trigger: "inbound", Status: "skipped", SkipReason: "message_type_not_allowed",
+			InputPreview: text, DurationMs: int(time.Since(started).Milliseconds()),
+		})
+		return false
+	}
 
 	// Resolve LLM integration. Prioridade:
 	//   1. Agent.Integration (custom escolhida pelo user em /agents)
@@ -296,6 +309,7 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		Reply:      reply,
 		AgentName:  agent.AgentName,
 		Pace:       agent.ResponsePace,
+		MessageID:  messageID,
 	})
 
 	log.Info().
@@ -311,6 +325,24 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		DurationMs: int(time.Since(started).Milliseconds()),
 	})
 	return true
+}
+
+func agentAllowsMessageType(raw, messageType string) bool {
+	mt := strings.ToLower(strings.TrimSpace(messageType))
+	if mt == "" {
+		mt = "text"
+	}
+	var allowed []string
+	if err := json.Unmarshal([]byte(raw), &allowed); err != nil || len(allowed) == 0 {
+		allowed = []string{"text"}
+	}
+	for _, item := range allowed {
+		v := strings.ToLower(strings.TrimSpace(item))
+		if v == "all" || v == mt {
+			return true
+		}
+	}
+	return false
 }
 
 // saveSuggestion persiste a última sugestão gerada no modo observing.
@@ -609,12 +641,12 @@ func (r *AgentRuntime) recentHistory(instanceID uuid.UUID, fromJID string, limit
 // Returns true if audio was sent successfully.
 //
 // Resolução do provider de voz:
-//   1. cfg.WorkspaceVoiceID = "uniq:<voice_id>" → usa Uniq Voice (platform)
-//      com a voz <voice_id>. Gated por plano (AllowVoice).
-//   2. cfg.WorkspaceVoiceID = UUID → carrega WorkspaceVoice + Provider
-//      próprio do workspace.
-//   3. cfg.WorkspaceVoiceID vazio + plano libera + Uniq Voice ativo →
-//      usa Uniq Voice com a primeira voz da config global.
+//  1. cfg.WorkspaceVoiceID = "uniq:<voice_id>" → usa Uniq Voice (platform)
+//     com a voz <voice_id>. Gated por plano (AllowVoice).
+//  2. cfg.WorkspaceVoiceID = UUID → carrega WorkspaceVoice + Provider
+//     próprio do workspace.
+//  3. cfg.WorkspaceVoiceID vazio + plano libera + Uniq Voice ativo →
+//     usa Uniq Voice com a primeira voz da config global.
 func (r *AgentRuntime) trySendAudio(ctx context.Context, client interface {
 	SendAudioMessage(string, []byte, string, bool, uint32) (string, error)
 }, agent *models.InstanceAgent, toJID, text string) bool {
@@ -627,8 +659,8 @@ func (r *AgentRuntime) trySendAudio(ctx context.Context, client interface {
 	// próprio, OU do PlatformVoice (Uniq Voice) quando o user não tem
 	// VoiceProvider configurado e o plano libera.
 	var (
-		voiceProvider  *models.VoiceProvider
-		voiceExternal  string
+		voiceProvider *models.VoiceProvider
+		voiceExternal string
 	)
 
 	if strings.HasPrefix(cfg.WorkspaceVoiceID, "uniq:") {
@@ -741,9 +773,9 @@ func parseAgentVoiceConfig(raw string) (*agentVoiceConfig, bool) {
 // adapters do TTSService. O voice_id externo default vem da primeira
 // entrada do array de Voices da config (JSON), ou de defaults conhecidos
 // por provider quando vazio. Retorna nil se:
-//   • plano do user não libera FeatureVoice
-//   • Não há PlatformVoice ativo configurado pelo super admin
-//   • PlatformVoice tem provider name fora do conjunto suportado pelo TTSService
+//   - plano do user não libera FeatureVoice
+//   - Não há PlatformVoice ativo configurado pelo super admin
+//   - PlatformVoice tem provider name fora do conjunto suportado pelo TTSService
 func (r *AgentRuntime) resolvePlatformVoiceProvider(ctx context.Context, instanceID uuid.UUID) (*models.VoiceProvider, string) {
 	// Acha o user dono da instância e seu plano.
 	var inst models.Instance
@@ -1268,11 +1300,11 @@ func shouldTriggerAgent(agent *models.InstanceAgent, inboundText string) bool {
 // (texto que vira input do LLM). Variables é livre — o agente pode
 // referenciar via {{variables.X}} no system prompt se quiser.
 type AgentWebhookPayload struct {
-	To        string                 `json:"to"`        // JID, e.164, ou phone bruto
-	Message   string                 `json:"message"`   // texto do "evento" pra alimentar o LLM
-	FromName  string                 `json:"from_name"` // opcional — nome do contato pra contexto
-	Variables map[string]any         `json:"variables"` // opcional — ficam disponíveis pro prompt
-	Metadata  map[string]any         `json:"metadata"`  // opcional — só pra log/audit
+	To        string         `json:"to"`        // JID, e.164, ou phone bruto
+	Message   string         `json:"message"`   // texto do "evento" pra alimentar o LLM
+	FromName  string         `json:"from_name"` // opcional — nome do contato pra contexto
+	Variables map[string]any `json:"variables"` // opcional — ficam disponíveis pro prompt
+	Metadata  map[string]any `json:"metadata"`  // opcional — só pra log/audit
 }
 
 // TriggerByWebhook — dispara o agente fora do fluxo inbound regular.

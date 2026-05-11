@@ -1352,6 +1352,7 @@ export const integrationsApi = {
     // Trigger
     trigger_mode?: "any" | "keyword" | "webhook";
     trigger_keywords?: string[];
+    trigger_message_types?: string[];
     trigger_webhook_secret?: string;
     // Ritmo + tamanho
     response_pace?: "instant" | "natural" | "thoughtful" | "very_human";

@@ -143,13 +143,13 @@ func validateOrFallbackTZ(tz string) string {
 
 // workspaceLocation devolve o time.Location pra avaliar agendamento da
 // campanha. Cascade:
-//   1. Campaign.TimeZone (escolha explícita do user no setup) — permite
-//      disparar pra contatos em fuso diferente da conta. Ex: agência em
-//      São Paulo agendando campanha pra clientes em Orlando, escolhe
-//      "America/New_York" e o "10:00" do schedule é horário de Orlando.
-//   2. Workspace.Timezone (default da conta).
-//   3. America/Sao_Paulo.
-//   4. UTC.
+//  1. Campaign.TimeZone (escolha explícita do user no setup) — permite
+//     disparar pra contatos em fuso diferente da conta. Ex: agência em
+//     São Paulo agendando campanha pra clientes em Orlando, escolhe
+//     "America/New_York" e o "10:00" do schedule é horário de Orlando.
+//  2. Workspace.Timezone (default da conta).
+//  3. America/Sao_Paulo.
+//  4. UTC.
 func (h *CampaignHandler) workspaceLocation(c *models.Campaign) *time.Location {
 	tzName := strings.TrimSpace(c.TimeZone)
 	if tzName == "" && c.WorkspaceID != nil {
@@ -171,13 +171,13 @@ func (h *CampaignHandler) workspaceLocation(c *models.Campaign) *time.Location {
 // slot autorizado. Suporta DOIS formatos no JSON do schedule_hours
 // pra retrocompat:
 //
-//   1. Legacy "hours array": [9, 10, 14, 15] — granularidade de hora.
-//      Match se hour ∈ array.
-//   2. New "window array":   [{"from":"09:00","to":"11:30"},
-//                             {"from":"14:00","to":"18:00"}]
-//      Granularidade de minuto. Match se now está em qualquer janela
-//      [from, to). Janela cruzando meia-noite (from > to) é tratada
-//      como dois ranges (from→23:59 + 00:00→to).
+//  1. Legacy "hours array": [9, 10, 14, 15] — granularidade de hora.
+//     Match se hour ∈ array.
+//  2. New "window array":   [{"from":"09:00","to":"11:30"},
+//     {"from":"14:00","to":"18:00"}]
+//     Granularidade de minuto. Match se now está em qualquer janela
+//     [from, to). Janela cruzando meia-noite (from > to) é tratada
+//     como dois ranges (from→23:59 + 00:00→to).
 //
 // Empty/[] = qualquer hora (sempre true).
 //
@@ -440,6 +440,8 @@ func (h *CampaignHandler) processCampaign(c models.Campaign, today string) {
 			Type:       msgType,
 			Payload:    payload,
 			Options:    opts,
+			LogToInbox: true,
+			Source:     "campaign",
 		}
 
 		var sendErr error
@@ -567,21 +569,21 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 		TemplateLanguage  string            `json:"template_language"`
 		TemplateVariables map[string]string `json:"template_variables"`
 		TemplateHeaderURL string            `json:"template_header_url"`
-		StartDate     *time.Time `json:"start_date"`
-		EndDate       *time.Time `json:"end_date"`
+		StartDate         *time.Time        `json:"start_date"`
+		EndDate           *time.Time        `json:"end_date"`
 		// TimeZone — IANA TZ em que start_date+schedule_hours foram
 		// escolhidos pelo user. Frontend converte datetime-local pra
 		// UTC usando este TZ; backend usa pra avaliar schedule_hours.
-		TimeZone      string     `json:"time_zone"`
-		TimesTotal    int        `json:"times_total"`
-		TimesPerDay   int        `json:"times_per_day"`
-		ScheduleHours string     `json:"schedule_hours"`
+		TimeZone      string `json:"time_zone"`
+		TimesTotal    int    `json:"times_total"`
+		TimesPerDay   int    `json:"times_per_day"`
+		ScheduleHours string `json:"schedule_hours"`
 		// Safety / rate limiting
 		DelaySeconds         int `json:"delay_seconds"`
 		DelayMinSeconds      int `json:"delay_min_seconds"`
 		DelayMaxSeconds      int `json:"delay_max_seconds"`
 		DailyLimitPerAccount int `json:"daily_limit_per_account"`
-		Recipients []struct {
+		Recipients           []struct {
 			Phone string `json:"phone"`
 			Name  string `json:"name"`
 			// Extra — colunas adicionais do CSV/paste pra render Liquid via
@@ -590,20 +592,20 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 			Extra map[string]any `json:"extra,omitempty"`
 		} `json:"recipients"`
 		SegmentFilter struct {
-			Funnel     string   `json:"funnel,omitempty"`
-			Stage      string   `json:"stage,omitempty"`
+			Funnel string `json:"funnel,omitempty"`
+			Stage  string `json:"stage,omitempty"`
 			// CRM v2: filtros via FK (cross-entity)
-			FunnelID     string `json:"funnel_id,omitempty"`
-			StageID      string `json:"stage_id,omitempty"`
-			DealStatus   string `json:"deal_status,omitempty"`
-			CompanyID    string `json:"company_id,omitempty"`
-			MinDealValue int64  `json:"min_deal_value,omitempty"`
-			MaxDealValue int64  `json:"max_deal_value,omitempty"`
-			Journey    string   `json:"journey,omitempty"`
-			Tags       []string `json:"tags,omitempty"`
-			Owner      string   `json:"owner,omitempty"`
-			ExternalID string   `json:"external_id,omitempty"`
-			SegmentID  string   `json:"segment_id,omitempty"`
+			FunnelID     string   `json:"funnel_id,omitempty"`
+			StageID      string   `json:"stage_id,omitempty"`
+			DealStatus   string   `json:"deal_status,omitempty"`
+			CompanyID    string   `json:"company_id,omitempty"`
+			MinDealValue int64    `json:"min_deal_value,omitempty"`
+			MaxDealValue int64    `json:"max_deal_value,omitempty"`
+			Journey      string   `json:"journey,omitempty"`
+			Tags         []string `json:"tags,omitempty"`
+			Owner        string   `json:"owner,omitempty"`
+			ExternalID   string   `json:"external_id,omitempty"`
+			SegmentID    string   `json:"segment_id,omitempty"`
 			// Shop / purchase history filters
 			PurchasedShopID    string  `json:"purchased_shop_id,omitempty"`
 			PurchasedSinceDays int     `json:"purchased_since_days,omitempty"`
@@ -704,27 +706,27 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 	}
 
 	campaign := models.Campaign{
-		UserID:               user.ID,
-		InstanceID:           instanceID,
-		Name:                 req.Name,
-		Channel:              channel,
-		ActionType:           actionType,
-		ChannelConfig:        channelConfig,
-		RecipientType:        recipientType,
-		SegmentFilter:        segmentJSON,
-		PostActions:          req.PostActions,
-		MessageType:          msgType,
-		MessageText:          req.MessageText,
-		Caption:              req.Caption,
-		MediaB64:             req.MediaB64,
-		MediaMime:            req.MediaMime,
-		MediaName:            req.MediaName,
-		TemplateName:         req.TemplateName,
-		TemplateLanguage:     req.TemplateLanguage,
-		TemplateVariables:    tplVarsJSON,
-		TemplateHeaderURL:    req.TemplateHeaderURL,
-		StartDate:            req.StartDate,
-		EndDate:              req.EndDate,
+		UserID:            user.ID,
+		InstanceID:        instanceID,
+		Name:              req.Name,
+		Channel:           channel,
+		ActionType:        actionType,
+		ChannelConfig:     channelConfig,
+		RecipientType:     recipientType,
+		SegmentFilter:     segmentJSON,
+		PostActions:       req.PostActions,
+		MessageType:       msgType,
+		MessageText:       req.MessageText,
+		Caption:           req.Caption,
+		MediaB64:          req.MediaB64,
+		MediaMime:         req.MediaMime,
+		MediaName:         req.MediaName,
+		TemplateName:      req.TemplateName,
+		TemplateLanguage:  req.TemplateLanguage,
+		TemplateVariables: tplVarsJSON,
+		TemplateHeaderURL: req.TemplateHeaderURL,
+		StartDate:         req.StartDate,
+		EndDate:           req.EndDate,
 		// validateOrFallbackTZ ignora valores que não resolvem em
 		// time.LoadLocation — typo do user não quebra o scheduler
 		// silenciosamente; o workspaceLocation cai pro workspace tz.
@@ -789,34 +791,34 @@ func (h *CampaignHandler) Create(c *fiber.Ctx) error {
 // deals, então um filtro por stage_id retorna todos os contatos que
 // têm deal naquele stage.
 func (h *CampaignHandler) resolveSegmentedContacts(userID uuid.UUID, filter struct {
-	Funnel                   string   `json:"funnel,omitempty"`
-	Stage                    string   `json:"stage,omitempty"`
+	Funnel string `json:"funnel,omitempty"`
+	Stage  string `json:"stage,omitempty"`
 	// CRM v2: FKs preferidas (cross-entity via JOIN com deals)
-	FunnelID                 string   `json:"funnel_id,omitempty"`
-	StageID                  string   `json:"stage_id,omitempty"`
-	DealStatus               string   `json:"deal_status,omitempty"`     // open/won/lost/all
-	CompanyID                string   `json:"company_id,omitempty"`
-	MinDealValue             int64    `json:"min_deal_value,omitempty"`
-	MaxDealValue             int64    `json:"max_deal_value,omitempty"`
-	Journey                  string   `json:"journey,omitempty"`
-	Tags                     []string `json:"tags,omitempty"`
-	Owner                    string   `json:"owner,omitempty"`
-	ExternalID               string   `json:"external_id,omitempty"`
-	SegmentID                string   `json:"segment_id,omitempty"`
-	PurchasedShopID          string   `json:"purchased_shop_id,omitempty"`
-	PurchasedSinceDays       int      `json:"purchased_since_days,omitempty"`
-	PurchasedMinTotal        float64  `json:"purchased_min_total,omitempty"`
-	PurchasedStatus          string   `json:"purchased_status,omitempty"`
-	NeverPurchased           bool     `json:"never_purchased,omitempty"`
-	PassedAgentID            string   `json:"passed_agent_id,omitempty"`
-	InboxAssignedTo          string   `json:"inbox_assigned_to,omitempty"`
-	InboxDepartment          string   `json:"inbox_department,omitempty"`
-	InboxTeam                string   `json:"inbox_team,omitempty"`
-	InboxQueue               string   `json:"inbox_queue,omitempty"`
-	InboxResponseTimeMax     int      `json:"inbox_response_time_max,omitempty"`
-	InboxConversationCountMin int     `json:"inbox_conversation_count_min,omitempty"`
-	InboxLastContactAfter    string   `json:"inbox_last_contact_after,omitempty"`
-	ParticipatedCampaignID   string   `json:"participated_campaign_id,omitempty"`
+	FunnelID                  string   `json:"funnel_id,omitempty"`
+	StageID                   string   `json:"stage_id,omitempty"`
+	DealStatus                string   `json:"deal_status,omitempty"` // open/won/lost/all
+	CompanyID                 string   `json:"company_id,omitempty"`
+	MinDealValue              int64    `json:"min_deal_value,omitempty"`
+	MaxDealValue              int64    `json:"max_deal_value,omitempty"`
+	Journey                   string   `json:"journey,omitempty"`
+	Tags                      []string `json:"tags,omitempty"`
+	Owner                     string   `json:"owner,omitempty"`
+	ExternalID                string   `json:"external_id,omitempty"`
+	SegmentID                 string   `json:"segment_id,omitempty"`
+	PurchasedShopID           string   `json:"purchased_shop_id,omitempty"`
+	PurchasedSinceDays        int      `json:"purchased_since_days,omitempty"`
+	PurchasedMinTotal         float64  `json:"purchased_min_total,omitempty"`
+	PurchasedStatus           string   `json:"purchased_status,omitempty"`
+	NeverPurchased            bool     `json:"never_purchased,omitempty"`
+	PassedAgentID             string   `json:"passed_agent_id,omitempty"`
+	InboxAssignedTo           string   `json:"inbox_assigned_to,omitempty"`
+	InboxDepartment           string   `json:"inbox_department,omitempty"`
+	InboxTeam                 string   `json:"inbox_team,omitempty"`
+	InboxQueue                string   `json:"inbox_queue,omitempty"`
+	InboxResponseTimeMax      int      `json:"inbox_response_time_max,omitempty"`
+	InboxConversationCountMin int      `json:"inbox_conversation_count_min,omitempty"`
+	InboxLastContactAfter     string   `json:"inbox_last_contact_after,omitempty"`
+	ParticipatedCampaignID    string   `json:"participated_campaign_id,omitempty"`
 }) []models.Contact {
 	query := h.db.Where("contacts.user_id = ?", userID)
 
@@ -1395,8 +1397,8 @@ func (h *CampaignHandler) processCampaignWABA(c models.Campaign, today string) {
 			"to":                r.Phone,
 			"type":              "template",
 			"template": map[string]any{
-				"name":     c.TemplateName,
-				"language": map[string]any{"code": c.TemplateLanguage},
+				"name":       c.TemplateName,
+				"language":   map[string]any{"code": c.TemplateLanguage},
 				"components": components,
 			},
 		}
@@ -1610,12 +1612,12 @@ func (h *CampaignHandler) Diagnose(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"campaign_id":  camp.ID,
-		"name":         camp.Name,
-		"would_run":    wouldRun,
-		"now":          now.Format(time.RFC3339),
-		"checks":       checks,
-		"server_time":  now.Format(time.RFC3339),
+		"campaign_id": camp.ID,
+		"name":        camp.Name,
+		"would_run":   wouldRun,
+		"now":         now.Format(time.RFC3339),
+		"checks":      checks,
+		"server_time": now.Format(time.RFC3339),
 	})
 }
 
@@ -1651,7 +1653,6 @@ func (h *CampaignHandler) RunNow(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"ok": true, "message": "tick disparado"})
 }
-
 
 // firstWord — extrai primeiro nome para {{contact.first_name}} no Liquid.
 // Caller usa em saudações: "Olá {{contact.first_name}}, ..." em vez do nome

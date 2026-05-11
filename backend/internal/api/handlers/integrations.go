@@ -577,15 +577,16 @@ func (h *IntegrationHandler) GetAgent(c *fiber.Ctx) error {
 	}
 	if err := q.First(&agent).Error; err != nil {
 		return c.JSON(fiber.Map{
-			"instance_id":     inst.ID,
-			"rag_enabled":     true,
-			"faq":             "[]",
-			"variables":       "[]",
-			"voice":           "{}",
-			"skills":          "[]",
-			"app_access":      "[]",
-			"assets":          []models.AgentAsset{},
-			"compiled_prompt": "",
+			"instance_id":           inst.ID,
+			"rag_enabled":           true,
+			"faq":                   "[]",
+			"variables":             "[]",
+			"voice":                 "{}",
+			"skills":                "[]",
+			"app_access":            "[]",
+			"trigger_message_types": `["text"]`,
+			"assets":                []models.AgentAsset{},
+			"compiled_prompt":       "",
 		})
 	}
 	if agent.Integration != nil {
@@ -618,6 +619,19 @@ func (h *IntegrationHandler) GetAgent(c *fiber.Ctx) error {
 		"mcp_server_url":           agent.MCPServerURL,
 		"assets":                   agent.Assets,
 		"compiled_prompt":          services.BuildAgentSystemPrompt(&agent, agent.Assets),
+		"role":                     agent.Role,
+		"handoff_skills":           safeJSONArray(agent.HandoffSkills),
+		"action_confirmation":      agent.ActionConfirmation,
+		"activation_mode":          agent.ActivationMode,
+		"schedule":                 safeJSONObject(agent.Schedule),
+		"context_rules":            safeJSONObject(agent.ContextRules),
+		"trigger_mode":             agent.TriggerMode,
+		"trigger_keywords":         safeJSONArray(agent.TriggerKeywords),
+		"trigger_message_types":    safeJSONArray(agent.TriggerMessageTypes),
+		"trigger_webhook_slug":     agent.TriggerWebhookSlug,
+		"trigger_webhook_secret":   agent.TriggerWebhookSecret,
+		"response_pace":            agent.ResponsePace,
+		"response_length":          agent.ResponseLength,
 		"access_restricted":        agent.AccessRestricted,
 		"editor_role_ids":          safeJSONArray(agent.EditorRoleIDs),
 		"created_at":               agent.CreatedAt,
@@ -627,12 +641,12 @@ func (h *IntegrationHandler) GetAgent(c *fiber.Ctx) error {
 
 // canEditAgent — checa se o user atual pode editar este agente.
 // Hierarquia:
-//   1. Super-admin global → sempre pode
-//   2. Dono do workspace (UserWorkspace.IsOwner=true) → sempre pode
-//   3. !AccessRestricted → pode (já passou pelo middleware de perm
-//      do workspace antes de chegar aqui)
-//   4. AccessRestricted + papel do user em EditorRoleIDs → pode
-//   5. Caso contrário → não pode
+//  1. Super-admin global → sempre pode
+//  2. Dono do workspace (UserWorkspace.IsOwner=true) → sempre pode
+//  3. !AccessRestricted → pode (já passou pelo middleware de perm
+//     do workspace antes de chegar aqui)
+//  4. AccessRestricted + papel do user em EditorRoleIDs → pode
+//  5. Caso contrário → não pode
 func canEditAgent(db *gorm.DB, user *models.User, agent *models.InstanceAgent, workspaceID uuid.UUID) bool {
 	if user == nil {
 		return false
@@ -848,6 +862,7 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		// Trigger — em qual condição o agente inicia/responde.
 		TriggerMode          *string   `json:"trigger_mode"`
 		TriggerKeywords      *[]string `json:"trigger_keywords"`
+		TriggerMessageTypes  *[]string `json:"trigger_message_types"`
 		TriggerWebhookSecret *string   `json:"trigger_webhook_secret"`
 		// Ritmo e tamanho das respostas.
 		ResponsePace   *string `json:"response_pace"`
@@ -872,19 +887,20 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 	}
 	if err := q.First(&agent).Error; err != nil {
 		agent = models.InstanceAgent{
-			InstanceID:         inst.ID,
-			FAQ:                "[]",
-			Variables:          "[]",
-			Voice:              "{}",
-			Skills:             "[]",
-			AppAccess:          "[]",
-			HandoffSkills:      "[]",
-			EditorRoleIDs:      "[]",
-			RAGEnabled:         true,
-			IsPrimary:          true,
-			Role:               "primary",
-			Priority:           100,
-			ActionConfirmation: "client",
+			InstanceID:          inst.ID,
+			FAQ:                 "[]",
+			Variables:           "[]",
+			Voice:               "{}",
+			Skills:              "[]",
+			AppAccess:           "[]",
+			HandoffSkills:       "[]",
+			TriggerMessageTypes: `["text"]`,
+			EditorRoleIDs:       "[]",
+			RAGEnabled:          true,
+			IsPrimary:           true,
+			Role:                "primary",
+			Priority:            100,
+			ActionConfirmation:  "client",
 		}
 	}
 
@@ -931,8 +947,8 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		name := strings.TrimSpace(*req.AgentName)
 		if len([]rune(name)) > 120 {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "nome do agente excede 120 caracteres",
-				"hint":  "Use só o nome curto (ex: 'Gabriel'). Personalidade longa vai em Identidade ou Prompt do sistema.",
+				"error":  "nome do agente excede 120 caracteres",
+				"hint":   "Use só o nome curto (ex: 'Gabriel'). Personalidade longa vai em Identidade ou Prompt do sistema.",
 				"length": len([]rune(name)),
 			})
 		}
@@ -1063,6 +1079,9 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 	if req.TriggerKeywords != nil {
 		agent.TriggerKeywords = marshalJSONString(*req.TriggerKeywords, "[]")
 	}
+	if req.TriggerMessageTypes != nil {
+		agent.TriggerMessageTypes = marshalJSONString(cleanAgentMessageTypes(*req.TriggerMessageTypes), `["text"]`)
+	}
 	if req.TriggerWebhookSecret != nil {
 		// Vazio = remove (sem auth obrigatória); preenchido = setado.
 		agent.TriggerWebhookSecret = strings.TrimSpace(*req.TriggerWebhookSecret)
@@ -1091,8 +1110,8 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		// type character varying" indica field overflow). Antes era genérico.
 		log.Error().Err(err).Str("instance", inst.ID.String()).Msg("agent: save failed")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error":   "falha ao salvar agente",
-			"detail":  err.Error(),
+			"error":  "falha ao salvar agente",
+			"detail": err.Error(),
 		})
 	}
 
@@ -1421,6 +1440,30 @@ func safeJSONObject(v string) string {
 		return "{}"
 	}
 	return v
+}
+
+func cleanAgentMessageTypes(values []string) []string {
+	allowed := map[string]bool{
+		"text": true, "image": true, "video": true, "gif": true,
+		"audio": true, "document": true, "sticker": true,
+		"location": true, "live_location": true, "contact": true,
+		"contacts": true, "poll": true, "interactive": true,
+		"list": true, "buttons": true, "reaction": true,
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values))
+	for _, raw := range values {
+		v := strings.ToLower(strings.TrimSpace(raw))
+		if !allowed[v] || seen[v] {
+			continue
+		}
+		seen[v] = true
+		out = append(out, v)
+	}
+	if len(out) == 0 {
+		return []string{"text"}
+	}
+	return out
 }
 
 var xmlTagRegex = regexp.MustCompile(`<[^>]+>`)
@@ -2079,9 +2122,9 @@ func openAIOneShot(i *models.UserIntegration, prompt string) (string, error) {
 		model = "gpt-4o-mini"
 	}
 	body, _ := json.Marshal(map[string]interface{}{
-		"model":       model,
-		"messages":    []map[string]string{{"role": "user", "content": prompt}},
-		"temperature": 0.7,
+		"model":           model,
+		"messages":        []map[string]string{{"role": "user", "content": prompt}},
+		"temperature":     0.7,
 		"response_format": map[string]string{"type": "json_object"},
 	})
 	req, _ := http.NewRequest(http.MethodPost, strings.TrimRight(endpoint, "/")+"/chat/completions", bytes.NewReader(body))
@@ -2276,8 +2319,8 @@ func (h *IntegrationHandler) ListAgentLogs(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"items":     logs,
-		"agent_id":  agent.ID,
+		"items":      logs,
+		"agent_id":   agent.ID,
 		"agent_name": agent.AgentName,
 	})
 }

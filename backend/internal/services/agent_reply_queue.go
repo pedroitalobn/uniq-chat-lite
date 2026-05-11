@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/whatsapp"
 )
 
@@ -30,6 +31,7 @@ type AgentReplyJob struct {
 	ToJID      string
 	Reply      string
 	AgentName  string // só pra log
+	MessageID  string // inbound stanza que originou a resposta, só pra rastreio
 	// Pace do agente — controla a magnitude do delay de "digitação" e
 	// dos cooldowns. Valores: "instant" | "natural" | "thoughtful" |
 	// "very_human". Vazio cai pra "natural".
@@ -81,13 +83,13 @@ func (q *AgentReplyQueue) getOrCreateQueue(instanceID string) chan AgentReplyJob
 }
 
 // worker — consome jobs serialmente. Pra cada job:
-//   1. Liga "digitando…" (presence)
-//   2. Sleep com jitter proporcional ao tamanho da resposta (mimetiza
-//      velocidade de digitação humana ~ 200-400 chars/min).
-//   3. Envia a mensagem via SendTextMessage.
-//   4. Desliga "digitando…".
-//   5. Cooldown final de 1.5s a 3s antes de aceitar próximo job (evita
-//      rajada de mensagens consecutivas).
+//  1. Liga "digitando…" (presence)
+//  2. Sleep com jitter proporcional ao tamanho da resposta (mimetiza
+//     velocidade de digitação humana ~ 200-400 chars/min).
+//  3. Envia a mensagem via SendTextMessage.
+//  4. Desliga "digitando…".
+//  5. Cooldown final de 1.5s a 3s antes de aceitar próximo job (evita
+//     rajada de mensagens consecutivas).
 func (q *AgentReplyQueue) worker(instanceID string, ch chan AgentReplyJob) {
 	for job := range ch {
 		client := q.manager.GetInstance(instanceID)
@@ -100,12 +102,23 @@ func (q *AgentReplyQueue) worker(instanceID string, ch chan AgentReplyJob) {
 		_ = client.SendTyping(job.ToJID, true)
 		time.Sleep(typingDelay)
 
-		if _, err := client.SendTextMessage(job.ToJID, job.Reply); err != nil {
+		msgID, err := client.SendTextMessage(job.ToJID, job.Reply)
+		if err != nil {
 			log.Error().Err(err).
 				Str("instance", instanceID).
 				Str("to", job.ToJID).
 				Msg("agent-reply-queue: send falhou")
 		} else {
+			if q.manager != nil {
+				_ = q.manager.SaveMessageEx(whatsapp.SaveMessageInput{
+					InstanceID:        instanceID,
+					ToJID:             job.ToJID,
+					Content:           job.Reply,
+					Direction:         models.DirectionOut,
+					Type:              "text",
+					ExternalMessageID: msgID,
+				})
+			}
 			log.Info().
 				Str("instance", instanceID).
 				Str("to", job.ToJID).
@@ -125,8 +138,8 @@ func (q *AgentReplyQueue) worker(instanceID string, ch chan AgentReplyJob) {
 // paceProfile — multipliers + floors por modo. Mantido em uma função
 // só pra facilitar tunar tudo no mesmo lugar.
 type paceProfile struct {
-	msPerChar   int           // base
-	jitterPct   int           // ±N%
+	msPerChar   int // base
+	jitterPct   int // ±N%
 	minDelay    time.Duration
 	maxDelay    time.Duration
 	cooldownMin int // ms

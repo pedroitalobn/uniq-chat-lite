@@ -82,10 +82,10 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		Prompt        string    `json:"prompt"`
-		IntegrationID string    `json:"integration_id"`
-		InstanceID    string    `json:"instance_id"`
-		RenderedText  string    `json:"rendered_text,omitempty"`
+		Prompt        string `json:"prompt"`
+		IntegrationID string `json:"integration_id"`
+		InstanceID    string `json:"instance_id"`
+		RenderedText  string `json:"rendered_text,omitempty"`
 		// OriginalInput é a mensagem CRUA que o usuário escreveu (com tokens
 		// @[label](type:id) embutidos). Salva em Journey.Prompt pra exibir
 		// "Prompt original" no card da jornada; sem isso acabávamos salvando
@@ -360,9 +360,10 @@ func (h *JourneyHandler) CreateJourney(c *fiber.Ctx) error {
 // generateJourneyName gera um nome descritivo para a jornada
 // generateJourneyName monta um nome descritivo baseado nos campos
 // estruturados da jornada. Formato: "<trigger abreviado> → <ação>". Ex:
-//  - "keyword 'arroz' → DM: feijão"
-//  - "menção em grupo → grupo: o que foi?"
-//  - "1ª msg → IA"
+//   - "keyword 'arroz' → DM: feijão"
+//   - "menção em grupo → grupo: o que foi?"
+//   - "1ª msg → IA"
+//
 // Cai pra um fallback genérico quando não há dados suficientes.
 func generateJourneyName(prompt string, triggerType models.TriggerType) string {
 	return buildJourneyName(prompt, triggerType, nil, "", "")
@@ -969,9 +970,18 @@ func (h *JourneyHandler) ExecuteJourney(journey *models.Journey, fromJID, fromNa
 		recipientJID = fromJID + "@s.whatsapp.net"
 	}
 
-	if _, err := client.SendTextMessage(recipientJID, responseMsg); err != nil {
+	msgID, err := client.SendTextMessage(recipientJID, responseMsg)
+	if err != nil {
 		return err
 	}
+	_ = h.manager.SaveMessageEx(whatsapp.SaveMessageInput{
+		InstanceID:        journey.InstanceID,
+		ToJID:             recipientJID,
+		Content:           responseMsg,
+		Direction:         models.DirectionOut,
+		Type:              "text",
+		ExternalMessageID: msgID,
+	})
 
 	// Update invocation count
 	now := time.Now()
@@ -1193,10 +1203,10 @@ func (h *JourneyHandler) CreateFromTemplate(c *fiber.Ctx) error {
 // não tem executor injetado.
 type nopSender struct{}
 
-func (nopSender) SendText(_, _, _ string) error                                 { return nil }
-func (nopSender) SendButtons(_, _, _ string, _ []services.Button) error         { return nil }
-func (nopSender) SendList(_, _, _, _ string, _ []services.ListSection) error    { return nil }
-func (nopSender) SendMedia(_, _, _, _, _ string) error                          { return nil }
+func (nopSender) SendText(_, _, _ string) error                              { return nil }
+func (nopSender) SendButtons(_, _, _ string, _ []services.Button) error      { return nil }
+func (nopSender) SendList(_, _, _, _ string, _ []services.ListSection) error { return nil }
+func (nopSender) SendMedia(_, _, _, _, _ string) error                       { return nil }
 
 func buildResponseFromJourney(journey *models.Journey, fromName string) string {
 	if journey.MessageTemplate != "" {
@@ -1452,17 +1462,17 @@ func (h *JourneyHandler) UpdateTrigger(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		Name           *string  `json:"name,omitempty"`
-		TriggerType    *string  `json:"trigger_type,omitempty"`
-		TriggerFilter  *string  `json:"trigger_filter,omitempty"`
-		Keywords       []string `json:"keywords,omitempty"`
-		GroupJID       *string  `json:"group_jid,omitempty"`
-		InstanceID     *string  `json:"instance_id,omitempty"`
-		ResponseMode   *string  `json:"response_mode,omitempty"`
+		Name          *string  `json:"name,omitempty"`
+		TriggerType   *string  `json:"trigger_type,omitempty"`
+		TriggerFilter *string  `json:"trigger_filter,omitempty"`
+		Keywords      []string `json:"keywords,omitempty"`
+		GroupJID      *string  `json:"group_jid,omitempty"`
+		InstanceID    *string  `json:"instance_id,omitempty"`
+		ResponseMode  *string  `json:"response_mode,omitempty"`
 		// Customer.io-inspired
-		GoalEvent      *string  `json:"goal_event,omitempty"`
-		ExitConditions *string  `json:"exit_conditions,omitempty"`
-		ReEntryRule    *string  `json:"re_entry_rule,omitempty"`
+		GoalEvent      *string `json:"goal_event,omitempty"`
+		ExitConditions *string `json:"exit_conditions,omitempty"`
+		ReEntryRule    *string `json:"re_entry_rule,omitempty"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "requisição inválida"})

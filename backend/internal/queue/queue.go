@@ -20,11 +20,11 @@ import (
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const (
-	ExchangeName = "uniqchat"        // main topic exchange
+	ExchangeName = "uniqchat"       // main topic exchange
 	DLXName      = "uniqchat.dlx"   // dead-letter exchange (fanout)
 	DLQName      = "uniqchat.dlq"   // dead-letter queue
 	queuePrefix  = "uniqchat.send." // per-instance queue prefix
-	routingPfx   = "send."           // routing key prefix
+	routingPfx   = "send."          // routing key prefix
 	maxRetries   = 3
 )
 
@@ -82,6 +82,8 @@ type SendJob struct {
 	Type       MessageType `json:"type"`
 	Payload    SendPayload `json:"payload"`
 	Options    SendOptions `json:"options"`
+	LogToInbox bool        `json:"log_to_inbox,omitempty"`
+	Source     string      `json:"source,omitempty"`
 	RetryCount int         `json:"retry_count"`
 	CreatedAt  time.Time   `json:"created_at"`
 }
@@ -91,13 +93,13 @@ type SendJob struct {
 // Manager owns the single persistent AMQP connection and a shared publish channel.
 // Each instance gets its own consumer goroutine with a dedicated channel.
 type Manager struct {
-	url     string
-	mu      sync.Mutex
-	conn    *amqp.Connection
-	pubCh   *amqp.Channel // shared publish channel (mutex-protected)
-	queues  map[string]struct{}
-	done    chan struct{}
-	once    sync.Once
+	url    string
+	mu     sync.Mutex
+	conn   *amqp.Connection
+	pubCh  *amqp.Channel // shared publish channel (mutex-protected)
+	queues map[string]struct{}
+	done   chan struct{}
+	once   sync.Once
 }
 
 // GlobalQueue is the application-wide singleton.
@@ -279,9 +281,9 @@ func (m *Manager) Enqueue(job SendJob) error {
 		Timestamp:    job.CreatedAt,
 		MessageId:    job.ID.String(),
 		Headers: amqp.Table{
-			"X-Instance-ID":   job.InstanceID,
-			"X-Message-Type":  string(job.Type),
-			"X-Retry-Count":   int64(job.RetryCount),
+			"X-Instance-ID":  job.InstanceID,
+			"X-Message-Type": string(job.Type),
+			"X-Retry-Count":  int64(job.RetryCount),
 		},
 	})
 }

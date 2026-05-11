@@ -64,6 +64,7 @@ export function WhenRespondsCard({ form, update }: Props) {
           trigger={{
             mode: form.trigger_mode,
             keywords: form.trigger_keywords,
+            message_types: form.trigger_message_types,
             webhook_slug: form.trigger_webhook_slug,
             webhook_secret: form.trigger_webhook_secret,
           }}
@@ -72,6 +73,7 @@ export function WhenRespondsCard({ form, update }: Props) {
               ...p,
               trigger_mode: t.mode,
               trigger_keywords: t.keywords,
+              trigger_message_types: t.message_types,
               trigger_webhook_secret: t.webhook_secret,
             }))
           }

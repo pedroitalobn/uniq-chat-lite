@@ -788,6 +788,7 @@ func (m *Manager) refetchGroupNameLater(instanceID, groupJID string) {
 //   - Cria/atualiza Contact pelo phone (extrai do JID).
 //   - Atualiza MessageLog.contact_name onde ainda está com o número/JID.
 //   - Atualiza Conversation.push_name (campo dedicado pro nome de exibição).
+//
 // Idempotente — sobrescreve só quando o registro tem nome vazio ou igual
 // ao número (heurística pra não pisar em renomeações manuais via CRM).
 func upsertPushName(m *Manager, instanceID, jid, name string) {
@@ -1464,7 +1465,8 @@ func (m *Manager) executeJourney(journey *models.Journey, fromJID, fromName, gro
 		recipientJID = recipientJID + "@s.whatsapp.net"
 	}
 
-	if _, err := client.SendTextMessage(recipientJID, responseMsg); err != nil {
+	msgID, err := client.SendTextMessage(recipientJID, responseMsg)
+	if err != nil {
 		log.Error().Err(err).Str("journey", journey.ID).Str("to", recipientJID).Msg("failed to send journey message")
 		execution.Status = models.ExecutionFailed
 		execution.ErrorMessage = err.Error()
@@ -1473,6 +1475,14 @@ func (m *Manager) executeJourney(journey *models.Journey, fromJID, fromName, gro
 		m.db.Save(execution)
 		return fmt.Errorf("failed to send message: %w", err)
 	}
+	_ = m.SaveMessageEx(SaveMessageInput{
+		InstanceID:        journey.InstanceID,
+		ToJID:             recipientJID,
+		Content:           responseMsg,
+		Direction:         models.DirectionOut,
+		Type:              "text",
+		ExternalMessageID: msgID,
+	})
 
 	// Add outbound message
 	execution.AddMessage("outbound", responseMsg, "send")

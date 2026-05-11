@@ -1476,7 +1476,6 @@ func buildNativeFlowButtons(buttons []ButtonItem) []*waE2E.InteractiveMessage_Na
 	return out
 }
 
-
 // ensureLID garante que o LID (Linked Identity) do destinatário esteja
 // no store local do whatsmeow antes do envio. Sem isso, accounts modernas
 // falham com "no LID found for X@s.whatsapp.net from server" no encrypt
@@ -2135,9 +2134,11 @@ func (ic *InstanceClient) SendWithFallback(job queue.SendJob) (string, error) {
 	if job.Options.SimulateTyping {
 		ic.simulateTyping(job.Payload.To, job.Payload.Text, job.Options.TypingDurationMs)
 	}
+	var msgID string
+	var err error
 	switch job.Type {
 	case queue.TypeText:
-		return ic.SendTextMessage(job.Payload.To, job.Payload.Text)
+		msgID, err = ic.SendTextMessage(job.Payload.To, job.Payload.Text)
 	case queue.TypeImage:
 		data, err := ic.resolveMedia(job.Payload)
 		if err != nil {
@@ -2147,7 +2148,7 @@ func (ic *InstanceClient) SendWithFallback(job queue.SendJob) (string, error) {
 		if mime == "" {
 			mime = "image/jpeg"
 		}
-		return ic.SendImageMessage(job.Payload.To, data, mime, job.Payload.Caption)
+		msgID, err = ic.SendImageMessage(job.Payload.To, data, mime, job.Payload.Caption)
 	case queue.TypeVideo:
 		data, err := ic.resolveMedia(job.Payload)
 		if err != nil {
@@ -2157,16 +2158,21 @@ func (ic *InstanceClient) SendWithFallback(job queue.SendJob) (string, error) {
 		if mime == "" {
 			mime = "video/mp4"
 		}
-		return ic.SendVideoMessage(job.Payload.To, data, mime, job.Payload.Caption)
+		msgID, err = ic.SendVideoMessage(job.Payload.To, data, mime, job.Payload.Caption)
 	case queue.TypeDocument:
 		data, err := ic.resolveMedia(job.Payload)
 		if err != nil {
 			return "", err
 		}
-		return ic.SendDocumentMessage(job.Payload.To, data, job.Payload.MimeType, job.Payload.Filename)
+		msgID, err = ic.SendDocumentMessage(job.Payload.To, data, job.Payload.MimeType, job.Payload.Filename)
 	default:
-		return ic.SendTextMessage(job.Payload.To, job.Payload.Text)
+		msgID, err = ic.SendTextMessage(job.Payload.To, job.Payload.Text)
 	}
+	if err != nil {
+		return "", err
+	}
+	ic.logQueuedOutbound(job, msgID)
+	return msgID, nil
 }
 
 // ── Anti-ban send engine ──────────────────────────────────────────────────────
@@ -2188,9 +2194,10 @@ func (ic *InstanceClient) ProcessQueueJob(job queue.SendJob) error {
 
 	// 2. Send the message
 	var sendErr error
+	var msgID string
 	switch job.Type {
 	case queue.TypeText:
-		_, sendErr = ic.SendTextMessage(job.Payload.To, job.Payload.Text)
+		msgID, sendErr = ic.SendTextMessage(job.Payload.To, job.Payload.Text)
 
 	case queue.TypeImage:
 		imageData, err := ic.resolveMedia(job.Payload)
@@ -2201,7 +2208,7 @@ func (ic *InstanceClient) ProcessQueueJob(job queue.SendJob) error {
 		if mime == "" {
 			mime = "image/jpeg"
 		}
-		_, sendErr = ic.SendImageMessage(job.Payload.To, imageData, mime, job.Payload.Caption)
+		msgID, sendErr = ic.SendImageMessage(job.Payload.To, imageData, mime, job.Payload.Caption)
 
 	case queue.TypeVideo:
 		videoData, err := ic.resolveMedia(job.Payload)
@@ -2212,7 +2219,7 @@ func (ic *InstanceClient) ProcessQueueJob(job queue.SendJob) error {
 		if mime == "" {
 			mime = "video/mp4"
 		}
-		_, sendErr = ic.SendVideoMessage(job.Payload.To, videoData, mime, job.Payload.Caption)
+		msgID, sendErr = ic.SendVideoMessage(job.Payload.To, videoData, mime, job.Payload.Caption)
 
 	case queue.TypeDocument:
 		docData, err := ic.resolveMedia(job.Payload)
@@ -2227,7 +2234,7 @@ func (ic *InstanceClient) ProcessQueueJob(job queue.SendJob) error {
 		if fname == "" {
 			fname = "file"
 		}
-		_, sendErr = ic.SendDocumentMessage(job.Payload.To, docData, mime, fname)
+		msgID, sendErr = ic.SendDocumentMessage(job.Payload.To, docData, mime, fname)
 
 	case queue.TypeAudio:
 		audioData, err := ic.resolveMedia(job.Payload)
@@ -2251,18 +2258,18 @@ func (ic *InstanceClient) ProcessQueueJob(job queue.SendJob) error {
 				secOut = dur
 			}
 		}
-		_, sendErr = ic.SendAudioMessage(job.Payload.To, audioOut, mimeOut, pttOut, secOut)
+		msgID, sendErr = ic.SendAudioMessage(job.Payload.To, audioOut, mimeOut, pttOut, secOut)
 
 	case queue.TypeLocation:
-		_, sendErr = ic.SendLocationMessage(job.Payload.To,
+		msgID, sendErr = ic.SendLocationMessage(job.Payload.To,
 			job.Payload.Latitude, job.Payload.Longitude, job.Payload.LocationName)
 
 	case queue.TypeReaction:
-		_, sendErr = ic.SendReaction(job.Payload.To, job.Payload.MessageID,
+		msgID, sendErr = ic.SendReaction(job.Payload.To, job.Payload.MessageID,
 			job.Payload.SenderJID, job.Payload.Reaction)
 
 	case queue.TypeRevoke:
-		_, sendErr = ic.RevokeMessage(job.Payload.To, job.Payload.MessageID, job.Payload.SenderJID)
+		msgID, sendErr = ic.RevokeMessage(job.Payload.To, job.Payload.MessageID, job.Payload.SenderJID)
 
 	default:
 		return fmt.Errorf("unknown job type: %s", job.Type)
@@ -2271,6 +2278,7 @@ func (ic *InstanceClient) ProcessQueueJob(job queue.SendJob) error {
 	if sendErr != nil {
 		return sendErr
 	}
+	ic.logQueuedOutbound(job, msgID)
 
 	// 3. Post-send delay + random jitter (anti-ban)
 	delayMs := job.Options.DelayMs
@@ -2281,6 +2289,47 @@ func (ic *InstanceClient) ProcessQueueJob(job queue.SendJob) error {
 	time.Sleep(time.Duration(delayMs+jitter) * time.Millisecond)
 
 	return nil
+}
+
+func (ic *InstanceClient) logQueuedOutbound(job queue.SendJob, msgID string) {
+	if !job.LogToInbox || GlobalManager == nil || job.Payload.To == "" {
+		return
+	}
+	content := queuedOutboundContent(job)
+	_ = GlobalManager.SaveMessageEx(SaveMessageInput{
+		InstanceID:        job.InstanceID,
+		ToJID:             job.Payload.To,
+		Content:           content,
+		Direction:         models.DirectionOut,
+		Type:              string(job.Type),
+		ExternalMessageID: msgID,
+	})
+}
+
+func queuedOutboundContent(job queue.SendJob) string {
+	switch job.Type {
+	case queue.TypeImage, queue.TypeVideo:
+		if job.Payload.Caption != "" {
+			return job.Payload.Caption
+		}
+	case queue.TypeDocument:
+		if job.Payload.Filename != "" {
+			return job.Payload.Filename
+		}
+	case queue.TypeAudio:
+		return "Áudio"
+	case queue.TypeLocation:
+		if b, err := json.Marshal(map[string]any{
+			"latitude":  job.Payload.Latitude,
+			"longitude": job.Payload.Longitude,
+			"name":      job.Payload.LocationName,
+		}); err == nil {
+			return string(b)
+		}
+	case queue.TypeReaction:
+		return job.Payload.Reaction
+	}
+	return job.Payload.Text
 }
 
 // simulateTyping sends a typing presence indicator for a natural duration.
@@ -2901,7 +2950,7 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		}()
 
 		// Check and execute journeys for incoming messages
-		if evName == "message.received" && !isFromMe {
+		if evName == "message.received" && !isFromMe && chatJID != "status@broadcast" {
 			if GlobalManager != nil {
 				journeyChatJID := chatJID
 				journeySenderJID := senderJID
