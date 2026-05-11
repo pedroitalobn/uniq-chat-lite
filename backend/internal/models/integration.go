@@ -210,6 +210,12 @@ type InstanceAgent struct {
 	//   "thoughtful"  → pausa pra pensar (~400ms/char + cooldowns maiores)
 	//   "very_human"  → bem devagar, parece atendente humano (~600ms/char)
 	ResponsePace string `gorm:"type:varchar(20);default:'natural'" json:"response_pace,omitempty"`
+	// PaceSettings — JSON com overrides finos por modo de ritmo.
+	// Estrutura: { "instant": { "ms_per_char":40, "min_delay":600, "max_delay":4000,
+	//   "jitter_pct":30, "cooldown_min":400, "cooldown_max":900,
+	//   "first_msg_min":2000, "first_msg_max":4000 }, "natural": {...}, ... }
+	// Campos ausentes usam o default hardcoded do paceProfileFor.
+	PaceSettings string `gorm:"type:text;default:'{}'" json:"pace_settings,omitempty"`
 	// ResponseLength — orienta o LLM sobre o tamanho da resposta. Injetado
 	// no system prompt como diretriz dura. Não trunca a saída do LLM —
 	// só guia o estilo.

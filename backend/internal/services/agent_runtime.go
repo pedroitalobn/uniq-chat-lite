@@ -299,17 +299,30 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		return true
 	}
 
+	// Detecta se é a primeira mensagem do agente nesta conversa — aciona
+	// delay extra (first_message_delay) antes do typing indicator.
+	isFirstMessage := false
+	if convForActionsLoaded && convForActions.ID != uuid.Nil {
+		var agentMsgCount int64
+		r.db.Model(&models.MessageLog{}).
+			Where("conversation_id = ? AND direction = ? AND type = ?", convForActions.ID, models.DirectionOut, "text").
+			Count(&agentMsgCount)
+		isFirstMessage = agentMsgCount == 0
+	}
+
 	// Texto: enfileira via AgentReplyQueue. Worker per-instance aplica
 	// "digitando…" + sleep proporcional ao tamanho da resposta + jitter
 	// + cooldown final. Mimetiza humano único atendendo, reduz risco de
 	// banimento por padrão robótico.
 	r.replyQueue.Enqueue(AgentReplyJob{
-		InstanceID: instanceID,
-		ToJID:      fromJID,
-		Reply:      reply,
-		AgentName:  agent.AgentName,
-		Pace:       agent.ResponsePace,
-		MessageID:  messageID,
+		InstanceID:       instanceID,
+		ToJID:            fromJID,
+		Reply:            reply,
+		AgentName:        agent.AgentName,
+		Pace:             agent.ResponsePace,
+		PaceSettingsJSON: agent.PaceSettings,
+		MessageID:        messageID,
+		IsFirstMessage:   isFirstMessage,
 	})
 
 	log.Info().

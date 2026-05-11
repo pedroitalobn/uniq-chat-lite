@@ -77,9 +77,9 @@ export function WhenRespondsCard({ form, update }: Props) {
               trigger_webhook_secret: t.webhook_secret,
             }))
           }
-          responseStyle={{ pace: form.response_pace, length: form.response_length }}
+          responseStyle={{ pace: form.response_pace, length: form.response_length, pace_settings: form.pace_settings }}
           onChangeResponseStyle={(s) =>
-            update((p) => ({ ...p, response_pace: s.pace, response_length: s.length }))
+            update((p) => ({ ...p, response_pace: s.pace, response_length: s.length, pace_settings: s.pace_settings }))
           }
         />
       </div>

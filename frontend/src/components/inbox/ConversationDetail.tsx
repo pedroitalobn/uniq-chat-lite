@@ -436,6 +436,15 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
     },
   });
 
+  const resetAgentMemoryMut = useMutation({
+    mutationFn: () => conversationsApi.resetAgentMemory(wsId as string, conversationId),
+    onSuccess: () => {
+      toast.success("Memória do agente resetada");
+      qc.invalidateQueries({ queryKey: ["agent-state", wsId, conversationId] });
+    },
+    onError: () => toast.error("Falha ao resetar memória"),
+  });
+
   // Hidrata convMode a partir do backend ao abrir a conversa pra UI
   // refletir o estado real (não só o último click). Sem isso, ao
   // navegar entre conversas o seletor mostrava sempre "Humano".
@@ -1245,6 +1254,27 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                 </div>
               ))}
             </dl>
+          </div>
+
+          {/* Resetar memória do agente nesta conversa */}
+          <div className="mt-3 rounded-xl p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+            <div className="font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--text-4)", fontSize: 9 }}>Ações</div>
+            <button
+              onClick={() => {
+                if (confirm('Resetar memória do agente para esta conversa? O agente vai "esquecer" tudo sobre este contato.')) {
+                  resetAgentMemoryMut.mutate();
+                }
+              }}
+              disabled={resetAgentMemoryMut.isPending}
+              className="w-full text-left text-[11px] rounded-lg px-2.5 py-1.5 font-medium transition"
+              style={{
+                background: "rgba(248,113,113,0.08)",
+                border: "1px solid rgba(248,113,113,0.18)",
+                color: "#f87171",
+              }}
+            >
+              {resetAgentMemoryMut.isPending ? "Resetando…" : "Resetar memória do agente"}
+            </button>
           </div>
         </div>
       </aside>

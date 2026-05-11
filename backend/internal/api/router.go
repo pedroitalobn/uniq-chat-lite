@@ -1264,6 +1264,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	// liberar o módulo inteiro de tickets.
 	convoViewPerms := []string{models.PermTicketsView, models.PermInboxViewConversations}
 	conversations.Get("/", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.List)
+	conversations.Post("/", middleware.RequireWorkspacePermission(db, models.PermInboxSend), conversationH.StartConversation)
 	conversations.Get("/count", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.Count)
 	conversations.Get("/inbox-stats", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.InboxStats)
 	conversations.Get("/messages/search", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.SearchMessages)
@@ -1306,6 +1307,8 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	conversations.Get("/:id/agent-state", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.GetAgentState)
 	conversations.Patch("/:id/agent-state", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.SetAgentState)
 	conversations.Post("/:id/agent/suggest", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.SuggestAgentReply)
+	conversations.Delete("/:id/agent-memory", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.ResetAgentMemory)
+	conversations.Delete("/agent-memory/all", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.ResetAllAgentMemory)
 	// WABA window keeper — toggle automático para manter janela de 24h aberta
 	conversations.Patch("/:id/window-keeper", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.SetWindowKeeper)
 

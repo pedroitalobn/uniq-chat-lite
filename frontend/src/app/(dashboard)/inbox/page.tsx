@@ -11,7 +11,7 @@ import {
   Lock, Search, ChevronDown, User as UserIcon, MessageSquare,
   Layers, Smartphone, Radio, RefreshCw, Check, BarChart3,
   MoreVertical, Users, Building2, Zap, Bell, BellOff, X, Phone, PhoneMissed, Sparkles,
-  Filter, UserCircle2, Megaphone,
+  Filter, UserCircle2, Megaphone, Plus, Trash2,
 } from "lucide-react";
 import { usePreferences } from "@/lib/preferences";
 import {
@@ -23,6 +23,7 @@ import { ConversationList, type ConversationRow } from "@/components/atendimento
 import { PullToRefresh } from "@/components/mobile/PullToRefresh";
 import { ConversationDetail } from "@/components/inbox/ConversationDetail";
 import { InboxReports } from "@/components/inbox/InboxReports";
+import { NewConversationModal } from "@/components/inbox/NewConversationModal";
 import { useConversationWS } from "@/hooks/useConversationWS";
 import { useDesktopNotifications } from "@/hooks/useDesktopNotifications";
 import { useIsMobile } from "@/hooks/useMediaQuery";
@@ -237,6 +238,12 @@ function InboxPage() {
   const [statusTab, setStatusTab] = useState<StatusTab>("open");
   const [viewKind, setViewKind] = useState<ViewKind>("all");
   const [q, setQ] = useState("");
+  const [showNewConvModal, setShowNewConvModal] = useState(false);
+  const [newConvInstanceId, setNewConvInstanceId] = useState("");
+  const [newConvTo, setNewConvTo] = useState("");
+  const [newConvBody, setNewConvBody] = useState("");
+  const [showDangerZone, setShowDangerZone] = useState(false);
+  const [dangerConfirm, setDangerConfirm] = useState("");
   const filtersHydratedRef = useRef(false);
 
   // Persiste sempre que algum filtro muda. q (busca) intencionalmente fora —
@@ -525,6 +532,39 @@ function InboxPage() {
     onError: () => toast.error("Falha ao sincronizar — tente novamente"),
   });
 
+  const createConversation = useMutation({
+    mutationFn: (data: { instance_id: string; to: string; body: string }) =>
+      conversationsApi.create(wsId as string, data),
+    onSuccess: (res) => {
+      toast.success("Conversa iniciada");
+      setShowNewConvModal(false);
+      setNewConvInstanceId("");
+      setNewConvTo("");
+      setNewConvBody("");
+      qc.invalidateQueries({ queryKey: ["conversations", wsId] });
+      qc.invalidateQueries({ queryKey: ["inbox-stats", wsId] });
+      const conv = res.data as ConversationRow;
+      if (conv?.id) {
+        router.push(`/inbox?c=${conv.id}`);
+      }
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error || "Falha ao iniciar conversa");
+    },
+  });
+
+  const resetAllAgentMemory = useMutation({
+    mutationFn: () => conversationsApi.resetAllAgentMemory(wsId as string, "RESETAR TUDO"),
+    onSuccess: () => {
+      toast.success("Memória do agente resetada em todas as conversas");
+      setShowDangerZone(false);
+      setDangerConfirm("");
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error || "Falha ao resetar memória");
+    },
+  });
+
   // CUIDADO: este useMutation precisa ficar ANTES dos early returns. Antes
   // estava depois do `if (!wsId) return <PageSkeleton />` lá embaixo, o que
   // violava as Rules of Hooks — quando wsId virava truthy, React via 1 hook
@@ -647,6 +687,69 @@ function InboxPage() {
 
   return (
     <div className="flex h-full flex-col uniq-page rounded-xl overflow-hidden">
+      <NewConversationModal
+        open={showNewConvModal}
+        onClose={() => setShowNewConvModal(false)}
+        instances={connectedInstances}
+        onSubmit={(data) => createConversation.mutate(data)}
+        isPending={createConversation.isPending}
+      />
+
+      {/* Danger Zone — resetar memória do agente em todas as conversas */}
+      {showDangerZone && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }}>
+          <div className="w-full max-w-md rounded-xl border p-5" style={{ background: "hsl(240 12% 8%)", borderColor: "rgba(255,255,255,0.08)" }}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Danger Zone</h3>
+              <button onClick={() => setShowDangerZone(false)} className="p-1 rounded-lg hover:bg-white/5">
+                <X className="w-4 h-4" style={{ color: "var(--text-3)" }} />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <p className="text-xs" style={{ color: "var(--text-3)" }}>
+                Isso vai apagar a memória do agente em <strong style={{ color: "#f87171" }}>TODAS</strong> as conversas deste workspace.
+                O agente vai "esquecer" tudo que aprendeu sobre todos os contatos.
+                Esta ação é <strong>irreversível</strong>.
+              </p>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "var(--text-3)" }}>
+                  Digite <strong>RESETAR TUDO</strong> para confirmar
+                </label>
+                <input
+                  value={dangerConfirm}
+                  onChange={(e) => setDangerConfirm(e.target.value)}
+                  placeholder="RESETAR TUDO"
+                  className="w-full rounded-lg px-3 py-2 text-xs outline-none"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)", color: "hsl(240 15% 90%)" }}
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  onClick={() => setShowDangerZone(false)}
+                  className="rounded-lg px-3 py-2 text-xs font-medium"
+                  style={{ background: "rgba(255,255,255,0.06)", color: "var(--text-2)" }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => resetAllAgentMemory.mutate()}
+                  disabled={dangerConfirm !== "RESETAR TUDO" || resetAllAgentMemory.isPending}
+                  className="rounded-lg px-3 py-2 text-xs font-medium"
+                  style={{
+                    background: "rgba(248,113,113,0.18)",
+                    border: "1px solid rgba(248,113,113,0.30)",
+                    color: "#fca5a5",
+                    opacity: dangerConfirm !== "RESETAR TUDO" || resetAllAgentMemory.isPending ? 0.5 : 1,
+                  }}
+                >
+                  {resetAllAgentMemory.isPending ? "Resetando…" : "Resetar tudo"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Incoming call banner */}
       {incomingCall && (
         <div
@@ -715,6 +818,32 @@ function InboxPage() {
 
           {viewMode === "conversations" && (
             <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+              <button
+                onClick={() => setShowNewConvModal(true)}
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium"
+                style={{
+                  background: "rgba(59,130,246,0.12)",
+                  border: "1px solid rgba(59,130,246,0.25)",
+                  color: "#60a5fa",
+                }}
+                title="Nova conversa"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Nova conversa</span>
+              </button>
+              <button
+                onClick={() => setShowDangerZone(true)}
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium"
+                style={{
+                  background: "rgba(248,113,113,0.10)",
+                  border: "1px solid rgba(248,113,113,0.22)",
+                  color: "#f87171",
+                }}
+                title="Danger Zone — Resetar memória do agente"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Danger Zone</span>
+              </button>
               <NotificationsButton
                 permission={notifPerm}
                 muted={notifMuted}

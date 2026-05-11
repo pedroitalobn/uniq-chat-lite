@@ -61,6 +61,7 @@ export type AgentForm = {
   trigger_webhook_secret: string;
   response_pace: "instant" | "natural" | "thoughtful" | "very_human";
   response_length: "concise" | "balanced" | "detailed";
+  pace_settings: string;
   // Acesso da equipe — quando access_restricted=true, só os papéis
   // listados em editor_role_ids (+ dono do workspace + super-admin)
   // podem editar este agente.
@@ -126,6 +127,7 @@ export function emptyForm(): AgentForm {
     trigger_webhook_secret: "",
     response_pace: "natural",
     response_length: "balanced",
+    pace_settings: "{}",
     access_restricted: false,
     editor_role_ids: [],
   };
@@ -212,6 +214,7 @@ export function mapAgent(data: any): AgentForm {
     response_length: ["concise", "balanced", "detailed"].includes(data?.response_length)
       ? data.response_length
       : "balanced",
+    pace_settings: typeof data?.pace_settings === "string" ? data.pace_settings : "{}",
     access_restricted: !!data?.access_restricted,
     editor_role_ids: parseJSONArray<string[]>(data?.editor_role_ids, []),
   };

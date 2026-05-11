@@ -870,6 +870,7 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		// Ritmo e tamanho das respostas.
 		ResponsePace   *string `json:"response_pace"`
 		ResponseLength *string `json:"response_length"`
+		PaceSettings   *string `json:"pace_settings"`
 		// Acesso da equipe — quem do workspace pode editar este agente.
 		// AccessRestricted=false (default) preserva comportamento legado.
 		AccessRestricted *bool     `json:"access_restricted"`
@@ -1105,6 +1106,14 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		switch strings.ToLower(strings.TrimSpace(*req.ResponseLength)) {
 		case "concise", "balanced", "detailed":
 			agent.ResponseLength = strings.ToLower(*req.ResponseLength)
+		}
+	}
+	if req.PaceSettings != nil {
+		// Validação mínima: tenta parsear como JSON genérico pra evitar
+		// strings malformadas quebrando o worker depois.
+		var tmp map[string]interface{}
+		if json.Unmarshal([]byte(*req.PaceSettings), &tmp) == nil {
+			agent.PaceSettings = strings.TrimSpace(*req.PaceSettings)
 		}
 	}
 

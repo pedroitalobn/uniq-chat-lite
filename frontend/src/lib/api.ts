@@ -1732,6 +1732,8 @@ export const conversationsApi = {
    *  diferenciar "backend antigo sem /v1/conversations" de "rota OK mas
    *  erro de tabela / permissão". */
   health: () => api.get("/v1/conversations/health"),
+  create: (workspaceId: string, data: { instance_id: string; to: string; body?: string; type?: string }) =>
+    api.post("/v1/conversations", data, { headers: wsHeaders(workspaceId) }),
   get: (workspaceId: string, id: string) =>
     api.get(`/v1/conversations/${id}`, { headers: wsHeaders(workspaceId) }),
   timeline: (workspaceId: string, id: string, opts?: { before?: string; limit?: number }) =>
@@ -1830,6 +1832,10 @@ export const conversationsApi = {
     api.get(`/v1/conversations/${id}/agent-state`, { headers: wsHeaders(workspaceId) }),
   setAgentState: (workspaceId: string, id: string, data: { mode: "active" | "observing" | "disabled"; agent_id?: string; handoff_reason?: string }) =>
     api.patch(`/v1/conversations/${id}/agent-state`, data, { headers: wsHeaders(workspaceId) }),
+  resetAgentMemory: (workspaceId: string, id: string) =>
+    api.delete(`/v1/conversations/${id}/agent-memory`, { headers: wsHeaders(workspaceId) }),
+  resetAllAgentMemory: (workspaceId: string, confirm: string) =>
+    api.delete(`/v1/conversations/agent-memory/all`, { data: { confirm }, headers: wsHeaders(workspaceId) }),
   suggestAgentReply: (workspaceId: string, id: string) =>
     api.post(`/v1/conversations/${id}/agent/suggest`, {}, { headers: wsHeaders(workspaceId) }),
 

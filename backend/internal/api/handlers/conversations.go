@@ -42,6 +42,149 @@ func NewConversationHandler(
 
 // -- list -------------------------------------------------------------------
 
+// StartConversation POST /v1/conversations/start
+// Cria uma conversation para um contato ainda não atendido (ou retorna a
+// existente) e envia uma mensagem inicial opcional. Usado pelo frontend pra
+// "Nova conversa" no inbox unificado.
+func (h *ConversationHandler) StartConversation(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	userID := middleware.GetCurrentUserID(c)
+
+	var body struct {
+		InstanceID string `json:"instance_id"`
+		To         string `json:"to"`
+		Body       string `json:"body,omitempty"`
+		Type       string `json:"type,omitempty"`
+	}
+	if err := c.BodyParser(&body); err != nil || body.InstanceID == "" || body.To == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instance_id e to são obrigatórios"})
+	}
+
+	instID, err := uuid.Parse(body.InstanceID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "instance_id inválido"})
+	}
+
+	var inst models.Instance
+	if err := h.db.First(&inst, "id = ? AND workspace_id = ?", instID, ws).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada neste workspace"})
+	}
+
+	to := body.To
+	channelType := string(inst.Channel)
+	if channelType == "" {
+		channelType = "whatsapp"
+	}
+	if channelType == "whatsapp" || channelType == "waba" {
+		if !strings.Contains(to, "@") && !strings.HasSuffix(to, "@g.us") {
+			to = to + "@s.whatsapp.net"
+		}
+	}
+
+	// Busca conversation live existente
+	var conv models.Conversation
+	err = h.db.
+		Where("workspace_id = ? AND instance_id = ? AND channel_key = ?", ws, instID, to).
+		Where("status IN ?", []models.ConversationStatus{
+			models.ConversationStatusOpen,
+			models.ConversationStatusPending,
+			models.ConversationStatusSnoozed,
+		}).
+		Order("updated_at DESC").
+		First(&conv).Error
+
+	if err != nil {
+		conv = models.Conversation{
+			WorkspaceID: ws,
+			InstanceID:  instID,
+			ChannelType: channelType,
+			ChannelKey:  to,
+			Status:      models.ConversationStatusOpen,
+			Priority:    models.ConversationPriorityNormal,
+		}
+		if err := h.db.Create(&conv).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+	}
+
+	// Envia mensagem inicial se houver body
+	if strings.TrimSpace(body.Body) != "" {
+		msgType := body.Type
+		if msgType == "" {
+			msgType = "text"
+		}
+		contentStrBytes, _ := json.Marshal(body.Body)
+		logRow := models.MessageLog{
+			InstanceID:     conv.InstanceID,
+			WorkspaceID:    &ws,
+			UserID:         &userID,
+			ConversationID: &conv.ID,
+			Direction:      models.DirectionOut,
+			Type:           msgType,
+			ToJID:          conv.ChannelKey,
+			Content:        string(contentStrBytes),
+			Status:         models.MessageStatusPending,
+		}
+		if err := h.db.Create(&logRow).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+
+		if h.outbound != nil {
+			ctx, cancel := context.WithTimeout(c.UserContext(), 60*time.Second)
+			defer cancel()
+			res, sendErr := h.outbound.Send(ctx, &inst, outbound.OutboundMessage{
+				To:   conv.ChannelKey,
+				Type: msgType,
+				Body: body.Body,
+			})
+			if sendErr != nil {
+				h.db.Model(&logRow).Updates(map[string]any{
+					"status":  models.MessageStatusFailed,
+					"content": string(contentStrBytes) + " /* err: " + truncate(sendErr.Error(), 200) + " */",
+				})
+			} else if res != nil && res.ExternalID != "" {
+				h.db.Model(&logRow).Update("external_message_id", res.ExternalID)
+				h.db.Model(&logRow).Update("status", models.MessageStatusSent)
+			} else {
+				h.db.Model(&logRow).Update("status", models.MessageStatusSent)
+			}
+		}
+
+		now := time.Now()
+		h.db.Model(&conv).Updates(map[string]any{
+			"last_message_at":      now,
+			"last_message_preview": body.Body,
+			"last_message_type":    msgType,
+			"last_message_from_me": true,
+			"last_agent_msg_at":    now,
+			"agent_unread_count":   0,
+			"message_count":        gorm.Expr("message_count + 1"),
+		})
+		if conv.FirstResponseAt == nil {
+			h.db.Model(&conv).Update("first_response_at", now)
+		}
+		h.db.Create(&models.ConversationEvent{
+			ConversationID: conv.ID,
+			WorkspaceID:    ws,
+			ActorType:      models.ActorUser,
+			ActorUserID:    &userID,
+			EventType:      models.ConvEventMessage,
+			MessageLogID:   &logRow.ID,
+			Payload:        `{"direction":"out","type":"` + msgType + `"}`,
+		})
+		h.broadcast(&conv, "conversation.message", map[string]any{"message": logRow})
+	}
+
+	// Preload relacionamentos pra resposta completa
+	h.db.Preload("Contact").Preload("AssignedUser").
+		Preload("Instance", func(tx *gorm.DB) *gorm.DB {
+			return tx.Select("id, name, channel, phone_number")
+		}).
+		First(&conv, "id = ?", conv.ID)
+
+	return c.JSON(conv)
+}
+
 // Health GET /v1/conversations/health
 // Cheap sanity check the frontend uses to distinguish "route missing / old
 // deploy" (404) from "route exists but handler blew up" (500). Uses the
@@ -265,7 +408,7 @@ func (h *ConversationHandler) Timeline(c *fiber.Ctx) error {
 	type entry = timelineEntry
 
 	var messages []models.MessageLog
-	msgQ := h.db.Where("conversation_id = ?", id).Order("created_at DESC").Limit(limit)
+	msgQ := h.db.Where("conversation_id = ? AND is_deleted = ?", id, false).Order("created_at DESC").Limit(limit)
 	if before != "" {
 		if t, err := time.Parse(time.RFC3339, before); err == nil {
 			msgQ = msgQ.Where("created_at < ?", t)
@@ -986,20 +1129,33 @@ func (h *ConversationHandler) RevokeMessage(c *fiber.Ctx) error {
 	if msg.Direction != models.DirectionOut {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "só é possível apagar mensagens enviadas pela equipe"})
 	}
-	if msg.ExternalMessageID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "mensagem não tem id externo — não pode ser apagada no canal"})
-	}
 
-	// Dispara revoke no canal — best-effort. Se falhar, ainda marcamos no DB
-	// (pelo menos some da inbox da equipe).
-	if h.manager != nil {
-		if client := h.manager.GetInstance(conv.InstanceID.String()); client != nil && client.IsConnected() {
-			senderJID := msg.SenderJID
-			if senderJID == "" {
-				senderJID = client.OwnerJID()
-			}
-			_, _ = client.RevokeMessage(conv.ChannelKey, msg.ExternalMessageID, senderJID)
+	// Carrega instância para saber qual canal está sendo usado.
+	var inst models.Instance
+	h.db.First(&inst, "id = ?", conv.InstanceID)
+
+	channelRevoked := false
+
+	switch inst.Channel {
+	case models.ChannelWhatsApp:
+		if msg.ExternalMessageID == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "mensagem não tem id externo — não pode ser apagada no canal"})
 		}
+		if h.manager != nil {
+			if client := h.manager.GetInstance(conv.InstanceID.String()); client != nil && client.IsConnected() {
+				senderJID := msg.SenderJID
+				if senderJID == "" {
+					senderJID = client.OwnerJID()
+				}
+				_, _ = client.RevokeMessage(conv.ChannelKey, msg.ExternalMessageID, senderJID)
+				channelRevoked = true
+			}
+		}
+	default:
+		// WABA, Instagram, Telegram, TikTok, Kwai, LinkedIn e webchat não
+		// oferecem API pública para revogar/apagar mensagens enviadas.
+		// Fazemos apenas soft-delete local.
+		channelRevoked = false
 	}
 
 	h.db.Model(&models.MessageLog{}).Where("id = ?", msgID).Updates(map[string]any{
@@ -1010,7 +1166,11 @@ func (h *ConversationHandler) RevokeMessage(c *fiber.Ctx) error {
 	var updated models.MessageLog
 	h.db.First(&updated, "id = ?", msgID)
 	h.broadcast(conv, "conversation.message_updated", map[string]any{"message": updated})
-	return c.JSON(updated)
+	return c.JSON(fiber.Map{
+		"message":            updated,
+		"channel_revoked":    channelRevoked,
+		"channel":            inst.Channel,
+	})
 }
 
 // EditMessage PATCH /v1/conversations/:id/messages/:msgId/content { body }
@@ -2961,6 +3121,65 @@ func (h *ConversationHandler) SuggestAgentReply(c *fiber.Ctx) error {
 		"agent_name":    agent.AgentName,
 		"model":         agent.Model,
 	})
+}
+
+// ResetAgentMemory DELETE /v1/conversations/:id/agent-memory
+// Apaga o estado operacional do agente (ConversationAgentState) e a memória
+// de longo prazo (ContactMemory) do contato associado à conversa.
+func (h *ConversationHandler) ResetAgentMemory(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	if err := h.assertAccess(ws, id); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	var conv models.Conversation
+	if err := h.db.Select("id, contact_id").Where("id = ? AND workspace_id = ?", id, ws).First(&conv).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "conversa não encontrada"})
+	}
+
+	// Apaga ConversationAgentState da conversa
+	h.db.Where("conversation_id = ?", id).Delete(&models.ConversationAgentState{})
+
+	// Apaga ContactMemory do contato (se houver)
+	if conv.ContactID != nil {
+		h.db.Where("contact_id = ?", *conv.ContactID).Delete(&models.ContactMemory{})
+	}
+
+	return c.JSON(fiber.Map{"ok": true, "conversation_id": id, "contact_memory_cleared": conv.ContactID != nil})
+}
+
+// ResetAllAgentMemory DELETE /v1/conversations/agent-memory/all
+// Apaga TODOS os estados operacionais e memórias de longo prazo do agente no
+// workspace. Operação irreversível — requer confirmação explícita no frontend.
+func (h *ConversationHandler) ResetAllAgentMemory(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+
+	var body struct {
+		Confirm string `json:"confirm"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
+	}
+	if body.Confirm != "RESETAR TUDO" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "confirmação inválida — digite RESETAR TUDO"})
+	}
+
+	var convIDs []uuid.UUID
+	h.db.Model(&models.Conversation{}).Where("workspace_id = ?", ws).Pluck("id", &convIDs)
+
+	// Apaga ConversationAgentState de todas as conversas do workspace
+	if len(convIDs) > 0 {
+		h.db.Where("conversation_id IN ?", convIDs).Delete(&models.ConversationAgentState{})
+	}
+
+	// Apaga ContactMemory de todos os contatos do workspace
+	h.db.Where("workspace_id = ?", ws).Delete(&models.ContactMemory{})
+
+	return c.JSON(fiber.Map{"ok": true, "conversations_affected": len(convIDs)})
 }
 
 // SetWindowKeeper PATCH /v1/conversations/:id/window-keeper

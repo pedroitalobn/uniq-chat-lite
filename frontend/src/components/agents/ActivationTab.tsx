@@ -8,7 +8,7 @@
 // limpo pra atendimento humano sem precisar tocar nada mais.
 
 import { useMemo, useState } from "react";
-import { Calendar, Clock, Copy, Hash, Plus, Trash2, UserPlus, Webhook, Zap } from "lucide-react";
+import { Calendar, Clock, Copy, Hash, Plus, Trash2, UserPlus, Webhook, Zap, X } from "lucide-react";
 import { toast } from "sonner";
 
 type ScheduleRange = { from: string; to: string };
@@ -30,9 +30,21 @@ type TriggerConfig = {
   webhook_secret: string;
 };
 
+type PaceSettingsMap = Record<string, {
+  ms_per_char?: number;
+  jitter_pct?: number;
+  min_delay?: number;
+  max_delay?: number;
+  cooldown_min?: number;
+  cooldown_max?: number;
+  first_msg_min?: number;
+  first_msg_max?: number;
+}>;
+
 type ResponseStyleConfig = {
   pace: ResponsePace;
   length: ResponseLength;
+  pace_settings: string;
 };
 
 const DAYS: Array<{ key: string; label: string }> = [
@@ -271,12 +283,46 @@ const LENGTH_OPTIONS: Array<{ id: ResponseLength; title: string; desc: string }>
   { id: "detailed", title: "Detalhado",        desc: "Pode explicar com profundidade. Bom pra suporte técnico ou onboarding educativo." },
 ];
 
+function parsePaceSettings(raw: string): PaceSettingsMap {
+  try {
+    return JSON.parse(raw || "{}") as PaceSettingsMap;
+  } catch {
+    return {};
+  }
+}
+
+function stringifyPaceSettings(map: PaceSettingsMap): string {
+  return JSON.stringify(map);
+}
+
+const DEFAULT_PACE_PROFILES: Record<ResponsePace, Required<NonNullable<PaceSettingsMap[string]>>> = {
+  instant: { ms_per_char: 40, jitter_pct: 30, min_delay: 600, max_delay: 4000, cooldown_min: 400, cooldown_max: 900, first_msg_min: 2000, first_msg_max: 4000 },
+  natural: { ms_per_char: 220, jitter_pct: 25, min_delay: 1200, max_delay: 12000, cooldown_min: 1500, cooldown_max: 3000, first_msg_min: 4000, first_msg_max: 8000 },
+  thoughtful: { ms_per_char: 400, jitter_pct: 25, min_delay: 2200, max_delay: 18000, cooldown_min: 2500, cooldown_max: 4500, first_msg_min: 5000, first_msg_max: 12000 },
+  very_human: { ms_per_char: 600, jitter_pct: 30, min_delay: 3500, max_delay: 25000, cooldown_min: 3500, cooldown_max: 7000, first_msg_min: 8000, first_msg_max: 20000 },
+};
+
 function ResponseStyleSection({
   style, onChange,
 }: {
   style: ResponseStyleConfig;
   onChange: (s: ResponseStyleConfig) => void;
 }) {
+  const [showModal, setShowModal] = useState(false);
+  const settings = parsePaceSettings(style.pace_settings);
+  const current = settings[style.pace] || {};
+  const defaults = DEFAULT_PACE_PROFILES[style.pace];
+
+  const updateField = (key: keyof typeof defaults, val: number) => {
+    const next: PaceSettingsMap = { ...settings, [style.pace]: { ...current, [key]: val } };
+    onChange({ ...style, pace_settings: stringifyPaceSettings(next) });
+  };
+
+  const resetToDefaults = () => {
+    const next: PaceSettingsMap = { ...settings, [style.pace]: { ...defaults } };
+    onChange({ ...style, pace_settings: stringifyPaceSettings(next) });
+  };
+
   return (
     <div className="space-y-4 pt-2 border-t" style={{ borderColor: "var(--surface-border)" }}>
       <div>
@@ -335,6 +381,86 @@ function ResponseStyleSection({
           })}
         </div>
       </div>
+
+      {/* Ajustes finos de delay */}
+      <div className="flex items-center justify-between rounded-xl p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+        <div>
+          <p className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Ajustes finos de delay</p>
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
+            Edite ms/char, delays mín/máx, cooldowns e primeiro delay.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowModal(true)}
+          className="text-xs font-medium rounded-lg px-3 py-1.5"
+          style={{ background: "rgba(59,130,246,0.12)", color: "#60a5fa", border: "1px solid rgba(59,130,246,0.25)" }}
+        >
+          Editar
+        </button>
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }}>
+          <div className="w-full max-w-lg rounded-xl border p-5 max-h-[90vh] overflow-auto" style={{ background: "hsl(240 12% 8%)", borderColor: "rgba(255,255,255,0.08)" }}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Ajustes finos — {PACE_OPTIONS.find(p => p.id === style.pace)?.title}</h3>
+              <button onClick={() => setShowModal(false)} className="p-1 rounded-lg hover:bg-white/5">
+                <X className="w-4 h-4" style={{ color: "var(--text-3)" }} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <NumberField label="ms por caractere" value={current.ms_per_char ?? defaults.ms_per_char} onChange={v => updateField("ms_per_char", v)} />
+                <NumberField label="Jitter (%)" value={current.jitter_pct ?? defaults.jitter_pct} onChange={v => updateField("jitter_pct", v)} />
+                <NumberField label="Delay mínimo (ms)" value={current.min_delay ?? defaults.min_delay} onChange={v => updateField("min_delay", v)} />
+                <NumberField label="Delay máximo (ms)" value={current.max_delay ?? defaults.max_delay} onChange={v => updateField("max_delay", v)} />
+                <NumberField label="Cooldown mín (ms)" value={current.cooldown_min ?? defaults.cooldown_min} onChange={v => updateField("cooldown_min", v)} />
+                <NumberField label="Cooldown máx (ms)" value={current.cooldown_max ?? defaults.cooldown_max} onChange={v => updateField("cooldown_max", v)} />
+                <NumberField label="Primeira msg mín (ms)" value={current.first_msg_min ?? defaults.first_msg_min} onChange={v => updateField("first_msg_min", v)} />
+                <NumberField label="Primeira msg máx (ms)" value={current.first_msg_max ?? defaults.first_msg_max} onChange={v => updateField("first_msg_max", v)} />
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  type="button"
+                  onClick={resetToDefaults}
+                  className="text-xs font-medium rounded-lg px-3 py-2"
+                  style={{ background: "rgba(248,113,113,0.10)", color: "#f87171", border: "1px solid rgba(248,113,113,0.22)" }}
+                >
+                  Restaurar padrão
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="text-xs font-medium rounded-lg px-4 py-2"
+                  style={{ background: "rgba(59,130,246,0.18)", color: "#93c5fd", border: "1px solid rgba(59,130,246,0.30)" }}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <div>
+      <label className="block text-[11px] mb-1" style={{ color: "var(--text-3)" }}>{label}</label>
+      <input
+        type="number"
+        min={0}
+        step={100}
+        value={value}
+        onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)}
+        className="w-full rounded-lg px-2.5 py-1.5 text-xs outline-none"
+        style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)", color: "hsl(240 15% 90%)" }}
+      />
     </div>
   );
 }

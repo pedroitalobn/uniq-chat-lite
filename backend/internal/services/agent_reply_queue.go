@@ -14,6 +14,7 @@ package services
 // paralelos (cada instância = "uma pessoa").
 
 import (
+	"encoding/json"
 	mathrand "math/rand"
 	"strings"
 	"sync"
@@ -36,6 +37,11 @@ type AgentReplyJob struct {
 	// dos cooldowns. Valores: "instant" | "natural" | "thoughtful" |
 	// "very_human". Vazio cai pra "natural".
 	Pace string
+	// PaceSettingsJSON — overrides finos vindos do InstanceAgent.pace_settings.
+	PaceSettingsJSON string
+	// IsFirstMessage — true quando é a primeira resposta do agente nesta
+	// conversa. Aciona um delay extra (first_msg_min/max) antes do typing.
+	IsFirstMessage bool
 }
 
 // AgentReplyQueue — gerencia uma fila por instância. Singleton no boot;
@@ -98,7 +104,19 @@ func (q *AgentReplyQueue) worker(instanceID string, ch chan AgentReplyJob) {
 			continue
 		}
 
-		typingDelay := computeTypingDelay(job.Reply, job.Pace)
+		// Delay extra na primeira mensagem — simula o humano abrindo o chat
+		// e lendo antes de começar a digitar.
+		if job.IsFirstMessage {
+			fmd := firstMessageDelay(job.Pace, job.PaceSettingsJSON)
+			log.Info().
+				Str("instance", instanceID).
+				Str("to", job.ToJID).
+				Dur("first_msg_delay", fmd).
+				Msg("agent-reply-queue: primeiro delay (conversa iniciada)")
+			time.Sleep(fmd)
+		}
+
+		typingDelay := computeTypingDelay(job.Reply, job.Pace, job.PaceSettingsJSON)
 		_ = client.SendTyping(job.ToJID, true)
 		time.Sleep(typingDelay)
 
@@ -130,7 +148,7 @@ func (q *AgentReplyQueue) worker(instanceID string, ch chan AgentReplyJob) {
 		_ = client.SendTyping(job.ToJID, false)
 
 		// Cooldown entre mensagens consecutivas, escalado pelo pace.
-		minCD, maxCD := cooldownRange(job.Pace)
+		minCD, maxCD := cooldownRange(job.Pace, job.PaceSettingsJSON)
 		time.Sleep(jitterMS(minCD, maxCD))
 	}
 }
@@ -146,38 +164,120 @@ type paceProfile struct {
 	cooldownMax int // ms
 }
 
-func paceProfileFor(mode string) paceProfile {
+// paceSettingsMode — formato esperado no JSON de override do agente.
+type paceSettingsMode struct {
+	MsPerChar   int `json:"ms_per_char"`
+	JitterPct   int `json:"jitter_pct"`
+	MinDelay    int `json:"min_delay"`    // ms
+	MaxDelay    int `json:"max_delay"`    // ms
+	CooldownMin int `json:"cooldown_min"` // ms
+	CooldownMax int `json:"cooldown_max"` // ms
+	FirstMsgMin int `json:"first_msg_min"` // ms
+	FirstMsgMax int `json:"first_msg_max"` // ms
+}
+
+func loadPaceOverrides(settingsJSON, mode string) paceSettingsMode {
+	var root map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(settingsJSON), &root); err != nil {
+		return paceSettingsMode{}
+	}
+	key := strings.ToLower(strings.TrimSpace(mode))
+	if key == "" {
+		key = "natural"
+	}
+	raw, ok := root[key]
+	if !ok {
+		return paceSettingsMode{}
+	}
+	var s paceSettingsMode
+	_ = json.Unmarshal(raw, &s)
+	return s
+}
+
+func applyOverrides(p paceProfile, o paceSettingsMode) paceProfile {
+	if o.MsPerChar > 0 {
+		p.msPerChar = o.MsPerChar
+	}
+	if o.JitterPct > 0 {
+		p.jitterPct = o.JitterPct
+	}
+	if o.MinDelay > 0 {
+		p.minDelay = time.Duration(o.MinDelay) * time.Millisecond
+	}
+	if o.MaxDelay > 0 {
+		p.maxDelay = time.Duration(o.MaxDelay) * time.Millisecond
+	}
+	if o.CooldownMin > 0 {
+		p.cooldownMin = o.CooldownMin
+	}
+	if o.CooldownMax > 0 {
+		p.cooldownMax = o.CooldownMax
+	}
+	return p
+}
+
+func paceProfileFor(mode, settingsJSON string) paceProfile {
+	var p paceProfile
 	switch strings.ToLower(strings.TrimSpace(mode)) {
 	case "instant":
-		return paceProfile{
+		p = paceProfile{
 			msPerChar: 40, jitterPct: 30,
 			minDelay: 600 * time.Millisecond, maxDelay: 4 * time.Second,
 			cooldownMin: 400, cooldownMax: 900,
 		}
 	case "thoughtful":
-		return paceProfile{
+		p = paceProfile{
 			msPerChar: 400, jitterPct: 25,
 			minDelay: 2200 * time.Millisecond, maxDelay: 18 * time.Second,
 			cooldownMin: 2500, cooldownMax: 4500,
 		}
 	case "very_human":
-		return paceProfile{
+		p = paceProfile{
 			msPerChar: 600, jitterPct: 30,
 			minDelay: 3500 * time.Millisecond, maxDelay: 25 * time.Second,
 			cooldownMin: 3500, cooldownMax: 7000,
 		}
+	default:
+		// "natural" / vazio / desconhecido → default humano padrão.
+		p = paceProfile{
+			msPerChar: 220, jitterPct: 25,
+			minDelay: 1200 * time.Millisecond, maxDelay: 12 * time.Second,
+			cooldownMin: 1500, cooldownMax: 3000,
+		}
 	}
-	// "natural" / vazio / desconhecido → default humano padrão.
-	return paceProfile{
-		msPerChar: 220, jitterPct: 25,
-		minDelay: 1200 * time.Millisecond, maxDelay: 12 * time.Second,
-		cooldownMin: 1500, cooldownMax: 3000,
-	}
+	overrides := loadPaceOverrides(settingsJSON, mode)
+	return applyOverrides(p, overrides)
 }
 
-func cooldownRange(pace string) (int, int) {
-	p := paceProfileFor(pace)
+func cooldownRange(pace, settingsJSON string) (int, int) {
+	p := paceProfileFor(pace, settingsJSON)
 	return p.cooldownMin, p.cooldownMax
+}
+
+// firstMessageDelay — delay extra antes do typing indicator quando é a
+// primeira resposta do agente na conversa. Mimetiza o tempo de um humano
+// abrir o chat, ler a mensagem e começar a digitar.
+func firstMessageDelay(pace, settingsJSON string) time.Duration {
+	overrides := loadPaceOverrides(settingsJSON, pace)
+	minMS := overrides.FirstMsgMin
+	maxMS := overrides.FirstMsgMax
+	if minMS <= 0 && maxMS <= 0 {
+		// Defaults por modo quando o agente não configurou override.
+		switch strings.ToLower(strings.TrimSpace(pace)) {
+		case "instant":
+			minMS, maxMS = 2000, 4000
+		case "thoughtful":
+			minMS, maxMS = 5000, 12000
+		case "very_human":
+			minMS, maxMS = 8000, 20000
+		default:
+			minMS, maxMS = 4000, 8000
+		}
+	}
+	if maxMS <= minMS {
+		return time.Duration(minMS) * time.Millisecond
+	}
+	return time.Duration(minMS+mathrand.Intn(maxMS-minMS)) * time.Millisecond
 }
 
 // computeTypingDelay — calcula tempo de "digitação" baseado em:
@@ -186,8 +286,8 @@ func cooldownRange(pace string) (int, int) {
 //   - jitter random pra não ser determinístico
 //   - pisos/tetos por pace pra cliente não esperar eternamente nem
 //     receber resposta instantânea (gatilho de banimento)
-func computeTypingDelay(reply, pace string) time.Duration {
-	prof := paceProfileFor(pace)
+func computeTypingDelay(reply, pace, settingsJSON string) time.Duration {
+	prof := paceProfileFor(pace, settingsJSON)
 	chars := len([]rune(reply))
 	baseMS := chars * prof.msPerChar
 	jitterRange := baseMS * prof.jitterPct / 100
