@@ -4,21 +4,13 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/rs/zerolog/log"
+	"github.com/uniq-chat/backend/internal/models"
 )
 
 func LoadPaymentSettings(db *gorm.DB) error {
-	var settings struct {
-		StripeSecretKey        string
-		StripeWebhookSecret    string
-		AsaasAPIKey            string
-		AsaasWebhookSecret     string
-		AsaasEnvironment       string
-		AbacatepayAPIKey       string
-		AbacatepayWebhookSecret string
-		AbacatepayEnvironment  string
-	}
+	var settings models.PaymentSettings
 
-	if err := db.First(&settings).Error; err != nil {
+	if err := db.First(&settings, "id = ?", "default").Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil
 		}

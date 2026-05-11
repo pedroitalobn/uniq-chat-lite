@@ -11,6 +11,7 @@ import (
 	"image/png"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -674,7 +675,7 @@ func (h *AbacatePayHandler) handleCheckoutPaid(data *checkoutWebhookData) {
 				ToPlanName:   plan.Name,
 				Source:       models.PlanChangeSourceAbacatepay,
 			})
-			go h.emailSvc.SendPaymentConfirmed(user.Email, user.Name, plan.Name, plan.Price)
+			h.sendPaymentConfirmedAsync(user.Email, user.Name, plan.Name, plan.Price)
 		}
 	}
 }
@@ -755,7 +756,7 @@ func (h *AbacatePayHandler) materializePendingRegistration(pendingIDStr, planIDS
 			Source:     models.PlanChangeSourceAbacatepay,
 			Notes:      "materializado via webhook abacatepay",
 		})
-		go h.emailSvc.SendPaymentConfirmed(user.Email, user.Name, plan.Name, plan.Price)
+		h.sendPaymentConfirmedAsync(user.Email, user.Name, plan.Name, plan.Price)
 	}
 	go h.emailSvc.SendWelcome(user.Email, user.Name)
 }
@@ -810,7 +811,7 @@ func (h *AbacatePayHandler) handleSubscriptionActivated(data *checkoutWebhookDat
 			ToPlanName: plan.Name,
 			Source:     models.PlanChangeSourceAbacatepay,
 		})
-		go h.emailSvc.SendPaymentConfirmed(user.Email, user.Name, plan.Name, plan.Price)
+		h.sendPaymentConfirmedAsync(user.Email, user.Name, plan.Name, plan.Price)
 	}
 }
 
@@ -872,9 +873,9 @@ func (h *AbacatePayHandler) GetSubscription(c *fiber.Ctx) error {
 
 	if user.AbacatepaySubscriptionID == "" {
 		return c.JSON(fiber.Map{
-			"provider":        "abacatepay",
+			"provider":         "abacatepay",
 			"has_subscription": false,
-			"message":         "Nenhuma assinatura AbacatePay encontrada",
+			"message":          "Nenhuma assinatura AbacatePay encontrada",
 		})
 	}
 
@@ -903,11 +904,39 @@ func (h *AbacatePayHandler) GetCheckoutStatus(checkoutID string) (status string,
 		ID     string `json:"id"`
 		Status string `json:"status"`
 	}
-	if err := h.apiRequestV2("GET", "/checkouts/"+checkoutID, nil, &resp); err != nil {
+	escapedID := url.QueryEscape(checkoutID)
+	err = h.apiRequestV2("GET", "/transparents/check?id="+escapedID, nil, &resp)
+	if err != nil {
+		err = h.apiRequestV2("GET", "/checkouts/get?id="+escapedID, nil, &resp)
+	}
+	if err != nil {
 		return "", false, fmt.Errorf("erro ao consultar checkout: %w", err)
 	}
 
-	return resp.Status, resp.Status == "paid", nil
+	return resp.Status, abacatepayPaidStatus(resp.Status), nil
+}
+
+func abacatepayPaidStatus(status string) bool {
+	switch strings.ToUpper(strings.TrimSpace(status)) {
+	case "PAID", "COMPLETED", "APPROVED":
+		return true
+	default:
+		return false
+	}
+}
+
+func (h *AbacatePayHandler) sendPaymentConfirmedAsync(to, name, planName string, amount float64) {
+	if h.emailSvc == nil {
+		return
+	}
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error().Interface("panic", r).Str("to", to).Msg("abacatepay email: SendPaymentConfirmed panic")
+			}
+		}()
+		h.emailSvc.SendPaymentConfirmed(to, name, planName, amount)
+	}()
 }
 
 func (h *AbacatePayHandler) TestConnection(c *fiber.Ctx) error {
