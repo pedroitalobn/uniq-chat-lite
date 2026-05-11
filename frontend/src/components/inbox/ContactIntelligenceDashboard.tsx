@@ -13,6 +13,9 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { crmApi, dealsApi, conversationsApi, queuesApi, workspacesApi } from "@/lib/api";
+import AgentOrchestrator from "@/components/inbox/AgentOrchestrator";
+import CRMQuickActions from "@/components/inbox/CRMQuickActions";
+import CampaignJourneyPanel from "@/components/inbox/CampaignJourneyPanel";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { relativeTime } from "@/components/atendimento/ConversationList";
@@ -690,6 +693,8 @@ interface ContactIntelligenceDashboardProps {
   onPin: () => void;
   onMute: () => void;
   onAvatarClick: (url: string, name: string) => void;
+  convMode?: "human" | "ai" | "observing";
+  onModeChange?: (mode: "human" | "ai" | "observing") => void;
 }
 
 export function ContactIntelligenceDashboard({
@@ -709,6 +714,8 @@ export function ContactIntelligenceDashboard({
   onPin,
   onMute,
   onAvatarClick,
+  convMode = "human",
+  onModeChange,
 }: ContactIntelligenceDashboardProps) {
   const { currentWorkspace } = useWorkspace();
   const wsId = currentWorkspace?.id ?? "";
@@ -719,6 +726,27 @@ export function ContactIntelligenceDashboard({
       {/* Scrollable dashboard content */}
       <div className="flex-1 overflow-auto p-4 space-y-3 custom-scrollbar">
         <ContactHeroCard conv={conversation} presence={presence} onAvatarClick={onAvatarClick} />
+
+        {/* Agent Orchestrator */}
+        {conversation?.id && (
+          <AgentOrchestrator
+            conversationId={conversation.id}
+            instanceId={conversation.instance_id}
+            convMode={convMode}
+            onModeChange={onModeChange || (() => {})}
+          />
+        )}
+
+        {/* CRM Quick Actions */}
+        {conversation?.id && (
+          <CRMQuickActions
+            conversationId={conversation.id}
+            contactId={contactId}
+          />
+        )}
+
+        {/* Campaigns & Journeys */}
+        <CampaignJourneyPanel contactId={contactId} />
 
         <QuickActions
           conv={conversation}

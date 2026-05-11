@@ -313,6 +313,7 @@ export const instancesApi = {
   reconnect: (id: string) => api.post(`/v1/instances/${id}/reconnect`),
   status: (id: string) => api.get(`/v1/instances/${id}/status`),
   profile: (id: string) => api.get(`/v1/instances/${id}/profile`),
+  listAgents: (id: string) => api.get(`/v1/instances/${id}/agents`),
   contactInfo: (id: string, data: { phone?: string; jid?: string }) =>
     api.post(`/v1/instances/${id}/contact/info`, data),
   contactAvatar: (id: string, data: { phone?: string; jid?: string }) =>
@@ -1840,6 +1841,8 @@ export const conversationsApi = {
     api.delete(`/v1/conversations/agent-memory/all`, { data: { confirm }, headers: wsHeaders(workspaceId) }),
   suggestAgentReply: (workspaceId: string, id: string) =>
     api.post(`/v1/conversations/${id}/agent/suggest`, {}, { headers: wsHeaders(workspaceId) }),
+  sendAgentCommand: (workspaceId: string, id: string, data: { command: string }) =>
+    api.post(`/v1/conversations/${id}/agent-command`, data, { headers: wsHeaders(workspaceId) }),
 
   // Notes
   listNotes: (workspaceId: string, id: string) =>

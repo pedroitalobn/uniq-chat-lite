@@ -1310,6 +1310,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	conversations.Get("/:id/agent-state", middleware.RequireAnyWorkspacePermission(db, convoViewPerms...), conversationH.GetAgentState)
 	conversations.Patch("/:id/agent-state", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.SetAgentState)
 	conversations.Post("/:id/agent/suggest", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.SuggestAgentReply)
+	conversations.Post("/:id/agent-command", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.AgentCommand)
 	conversations.Delete("/:id/agent-memory", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.ResetAgentMemory)
 	conversations.Delete("/agent-memory/all", middleware.RequireWorkspacePermission(db, models.PermTicketsUpdate), conversationH.ResetAllAgentMemory)
 	// WABA window keeper — toggle automático para manter janela de 24h aberta

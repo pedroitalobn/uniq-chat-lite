@@ -177,6 +177,15 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 			systemPrompt += "\n\n" + mem
 		}
 	}
+	// Contexto personalizado do operador para esta conversa.
+	if conv := r.resolveConversation(instUUID, fromJID); conv.ID != uuid.Nil {
+		var state models.ConversationAgentState
+		if err := r.db.Where("conversation_id = ?", conv.ID).First(&state).Error; err == nil {
+			if ctx := strings.TrimSpace(state.CustomContext); ctx != "" {
+				systemPrompt += "\n\nINSTRUÇÕES ADICIONAIS DO OPERADOR PARA ESTA CONVERSA\n" + ctx
+			}
+		}
+	}
 	userPrompt := r.buildUserPrompt(instUUID, fromJID, fromName, text, messageType)
 	if strings.TrimSpace(systemPrompt) == "" {
 		systemPrompt = "Você é um assistente de atendimento útil, profissional e objetivo."
@@ -1553,4 +1562,19 @@ func (r *AgentRuntime) resolveContactID(instanceID uuid.UUID, fromJID string) uu
 		return *conv.ContactID
 	}
 	return uuid.Nil
+}
+
+// resolveConversation — lookup da conversation ativa pra uma instance+jid.
+func (r *AgentRuntime) resolveConversation(instanceID uuid.UUID, fromJID string) models.Conversation {
+	var conv models.Conversation
+	r.db.
+		Where("instance_id = ? AND channel_key = ?", instanceID, fromJID).
+		Where("status IN ?", []models.ConversationStatus{
+			models.ConversationStatusOpen,
+			models.ConversationStatusPending,
+			models.ConversationStatusSnoozed,
+		}).
+		Order("updated_at DESC").
+		First(&conv)
+	return conv
 }

@@ -2951,6 +2951,7 @@ func (h *ConversationHandler) GetAgentState(c *fiber.Ctx) error {
 			"mode":            mode,
 			"agent_id":        nil,
 			"agent":           nil,
+			"custom_context":  "",
 			"last_suggestion": "",
 			"suggestion_at":   nil,
 			"handoff_reason":  "",
@@ -2976,6 +2977,7 @@ func (h *ConversationHandler) SetAgentState(c *fiber.Ctx) error {
 		Mode          string  `json:"mode"`
 		AgentID       *string `json:"agent_id"`
 		HandoffReason string  `json:"handoff_reason"`
+		CustomContext string  `json:"custom_context"`
 	}
 	if err := c.BodyParser(&body); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
@@ -3004,11 +3006,12 @@ func (h *ConversationHandler) SetAgentState(c *fiber.Ctx) error {
 			Mode:           mode,
 			AgentID:        agentID,
 			HandoffReason:  body.HandoffReason,
+			CustomContext:  body.CustomContext,
 		}
 		h.db.Create(&state)
 	} else {
 		// Update
-		updates := map[string]any{"mode": mode, "handoff_reason": body.HandoffReason}
+		updates := map[string]any{"mode": mode, "handoff_reason": body.HandoffReason, "custom_context": body.CustomContext}
 		if agentID != nil {
 			updates["agent_id"] = agentID
 		}
@@ -3160,6 +3163,178 @@ func (h *ConversationHandler) SuggestAgentReply(c *fiber.Ctx) error {
 		"agent_name":    agent.AgentName,
 		"model":         agent.Model,
 	})
+}
+
+// AgentCommand POST /v1/conversations/:id/agent-command
+// Operador envia comando pro agente. O agente processa usando o mesmo
+// system prompt + tool catalog do runtime inbound, mas responde pro operador
+// em vez de enviar pro cliente.
+func (h *ConversationHandler) AgentCommand(c *fiber.Ctx) error {
+	if h.llm == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "LLM não configurado"})
+	}
+	ws := middleware.GetWorkspaceID(c)
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+	if err := h.assertAccess(ws, id); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	var body struct {
+		Command string `json:"command"`
+	}
+	if err := c.BodyParser(&body); err != nil || strings.TrimSpace(body.Command) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "command é obrigatório"})
+	}
+
+	// Load conversation with contact + instance
+	var conv models.Conversation
+	if err := h.db.Preload("Contact").Preload("Instance").Where("id = ? AND workspace_id = ?", id, ws).First(&conv).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "conversa não encontrada"})
+	}
+
+	// Resolve agent: check ConversationAgentState override first
+	var agent models.InstanceAgent
+	var state models.ConversationAgentState
+	hasState := h.db.Preload("Agent").Where("conversation_id = ?", id).First(&state).Error == nil
+
+	if hasState && state.AgentID != nil {
+		if err := h.db.Preload("Integration").Preload("Assets", func(tx *gorm.DB) *gorm.DB {
+			return tx.Where("is_active = ?", true)
+		}).Where("id = ? AND is_active = ?", *state.AgentID, true).First(&agent).Error; err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "agente configurado não encontrado"})
+		}
+	} else {
+		if err := h.db.Preload("Integration").Preload("Assets", func(tx *gorm.DB) *gorm.DB {
+			return tx.Where("is_active = ?", true)
+		}).Where("instance_id = ? AND is_active = ?", conv.InstanceID, true).
+			Order("is_primary DESC, priority ASC, created_at ASC").First(&agent).Error; err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "nenhum agente ativo nesta instância"})
+		}
+	}
+
+	if agent.Integration == nil {
+		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{"error": "agente sem integração de LLM configurada"})
+	}
+
+	// Build system prompt
+	systemPrompt := services.BuildAgentSystemPrompt(&agent, agent.Assets)
+	if tools := services.BuildToolsPromptSection(&agent); tools != "" {
+		systemPrompt += "\n\n" + tools
+	}
+	// Inject custom context from operator
+	if hasState && strings.TrimSpace(state.CustomContext) != "" {
+		systemPrompt += "\n\nINSTRUÇÕES ADICIONAIS DO OPERADOR PARA ESTA CONVERSA\n" + strings.TrimSpace(state.CustomContext)
+	}
+	// Operator context — tell the agent it's receiving a command from the human operator
+	systemPrompt += "\n\nCONTEXTO ATUAL\nVocê está recebendo um comando do OPERADOR HUMANO da plataforma (não do cliente). " +
+		"O operador pode te pedir para executar ações no sistema (CRM, tags, deals, etc.) usando os markers [[action:NAME({...})]]. " +
+		"Responda de forma direta e objetiva ao operador. Se executar ações, confirme o resultado."
+
+	// Build user prompt with conversation context
+	var logs []models.MessageLog
+	h.db.Where("conversation_id = ?", id).Order("created_at DESC").Limit(10).Find(&logs)
+
+	var historyLines []string
+	for i := len(logs) - 1; i >= 0; i-- {
+		l := logs[i]
+		content := l.Content
+		var s string
+		if json.Unmarshal([]byte(content), &s) == nil {
+			content = s
+		}
+		content = strings.TrimSpace(content)
+		if content == "" {
+			continue
+		}
+		role := "Cliente"
+		if l.Direction == models.DirectionOut {
+			role = "Agente"
+		}
+		historyLines = append(historyLines, "- "+role+": "+content)
+	}
+
+	contactName := ""
+	if conv.Contact != nil {
+		contactName = conv.Contact.Name
+	}
+
+	userPrompt := "Contexto da conversa.\n" +
+		"Contato: " + contactName + "\n" +
+		"Canal: " + string(conv.ChannelType) + "\n"
+	if len(historyLines) > 0 {
+		userPrompt += "\nÚltimas mensagens:\n" + strings.Join(historyLines, "\n") + "\n"
+	}
+	userPrompt += "\nComando do operador:\n" + strings.TrimSpace(body.Command) + "\n\nResponda ao operador."
+
+	integration := agent.Integration
+	if model := strings.TrimSpace(agent.Model); model != "" {
+		integCopy := *integration
+		if b, err := json.Marshal([]string{model}); err == nil {
+			integCopy.Models = string(b)
+		}
+		integration = &integCopy
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+
+	reply, err := h.llm.CallChatWithSystem(ctx, integration, systemPrompt, userPrompt, false)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "falha ao processar comando: " + err.Error()})
+	}
+	reply = strings.TrimSpace(reply)
+
+	// Parse and execute tools
+	var toolResults []services.AgentToolResult
+	if reply != "" {
+		toolCtx := services.AgentToolContext{
+			DB:           h.db,
+			Agent:        &agent,
+			Conversation: &conv,
+			WorkspaceID:  ws,
+		}
+		if conv.Contact != nil {
+			toolCtx.Contact = conv.Contact
+		}
+		// Resolve user owner of instance for CreatedByID
+		var inst models.Instance
+		if err := h.db.Select("id, user_id, workspace_id").First(&inst, "id = ?", conv.InstanceID).Error; err == nil {
+			toolCtx.CreatedByID = inst.UserID
+		}
+		var results []services.AgentToolResult
+		reply, results = services.ParseAndExecuteActions(toolCtx, reply)
+		toolResults = results
+	}
+
+	return c.JSON(fiber.Map{
+		"reply": reply,
+		"tools": toolResults,
+	})
+}
+
+// ListInstanceAgents GET /v1/instances/:id/agents
+// Lista agentes ativos de uma instância (para dropdown de seleção).
+func (h *ConversationHandler) ListInstanceAgents(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	instID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
+	}
+
+	var inst models.Instance
+	if err := h.db.Where("id = ? AND workspace_id = ?", instID, ws).First(&inst).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "instância não encontrada"})
+	}
+
+	var agents []models.InstanceAgent
+	h.db.Where("instance_id = ? AND is_active = ?", instID, true).
+		Order("is_primary DESC, priority ASC, created_at ASC").
+		Find(&agents)
+
+	return c.JSON(fiber.Map{"items": agents})
 }
 
 // ResetAgentMemory DELETE /v1/conversations/:id/agent-memory

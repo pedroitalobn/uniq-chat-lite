@@ -36,3 +36,4 @@ npm-debug.log*
 .claude/
 instagram-bridge/node_modules/
 instagram-bridge/package-lock.json
+backend/main

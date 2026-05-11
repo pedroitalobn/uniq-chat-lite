@@ -720,6 +720,13 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
           onPin={() => patchConv.mutate({ is_pinned: !convQ.data?.is_pinned })}
           onMute={() => patchConv.mutate({ is_muted: !convQ.data?.is_muted })}
           onAvatarClick={(url, name) => setViewerSource({ type: "image", url, filename: `${name}.jpg` })}
+          convMode={convMode}
+          onModeChange={(mode) => {
+            setConvMode(mode);
+            const dbMode = mode === "ai" ? "active" : mode === "observing" ? "observing" : "disabled";
+            agentStateMut.mutate(dbMode);
+            bot.mutate(mode === "ai");
+          }}
         />
       </div>
 
@@ -749,36 +756,6 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
               >
                 <ArrowLeft className="h-4 w-4" />
               </Link>
-            )}
-
-            {/* Mode selector: Humano / IA / Observando — movido pro topo */}
-            {conv && (
-              <div className="flex items-center rounded-lg overflow-hidden border flex-shrink-0"
-                style={{ border: "1px solid var(--border-default)", background: "rgba(255,255,255,0.03)" }}>
-                {([
-                  { id: "human",     label: "Humano", icon: UserCheck },
-                  { id: "ai",        label: "IA",     icon: Bot },
-                  { id: "observing", label: "Obs",    icon: Eye },
-                ] as const).map(({ id, label, icon: Icon }) => (
-                  <button key={id}
-                    onClick={() => {
-                      setConvMode(id);
-                      const dbMode = id === "ai" ? "active" : id === "observing" ? "observing" : "disabled";
-                      agentStateMut.mutate(dbMode);
-                      bot.mutate(id === "ai");
-                    }}
-                    className="px-2 sm:px-2.5 py-1.5 text-[10px] font-medium flex items-center gap-1 transition-all"
-                    title={label}
-                    aria-label={label}
-                    style={{
-                      background: convMode === id ? (id === "ai" ? "rgba(167,139,250,0.2)" : id === "human" ? "rgba(0,212,106,0.15)" : "rgba(255,255,255,0.08)") : "transparent",
-                      color: convMode === id ? (id === "ai" ? "#c4b5fd" : id === "human" ? "#00d46a" : "hsl(240 15% 80%)") : "var(--text-3)",
-                    }}>
-                    <Icon className="h-3 w-3" />
-                    <span className="hidden sm:inline">{label}</span>
-                  </button>
-                ))}
-              </div>
             )}
 
             <div className="flex-1" />
@@ -820,16 +797,7 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
                     className="absolute right-0 top-full mt-1 z-50 rounded-lg overflow-hidden min-w-[180px]"
                     style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}
                   >
-                    {conv?.contact_id && (
-                      <button
-                        onClick={() => { setDealModalOpen(true); setMobileActionsOpen(false); }}
-                        className="w-full text-left flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-white/5"
-                        style={{ color: "#fbbf24" }}
-                      >
-                        <Briefcase className="h-3.5 w-3.5" />
-                        Criar negociação
-                      </button>
-                    )}
+
                     {(conv?.channel_type === "whatsapp") && conv?.instance_id && conv?.channel_key && (
                       <button
                         onClick={() => setMobileActionsOpen(false)}
@@ -983,14 +951,6 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
 
             {/* Ações secundárias desktop */}
             <div className="hidden sm:flex items-center gap-2">
-              {conv?.contact_id && (
-                <button onClick={() => setDealModalOpen(true)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium flex-shrink-0"
-                  style={{ background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.2)", color: "#fbbf24" }}>
-                  <Briefcase className="h-3 w-3" />
-                  <span>Negociação</span>
-                </button>
-              )}
               {(conv?.channel_type === "whatsapp") && conv?.instance_id && conv?.channel_key && (
                 <CallButton instanceId={conv.instance_id} jid={conv.channel_key} />
               )}

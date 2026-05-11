@@ -30,6 +30,9 @@ type ConversationAgentState struct {
 	Mode          AgentMode `json:"mode"           gorm:"type:varchar(20);default:'active';not null"`
 	HandoffReason string    `json:"handoff_reason"` // motivo do último handoff registrado
 
+	// Contexto personalizado do operador para esta conversa — injetado no system prompt.
+	CustomContext string `json:"custom_context" gorm:"type:text"`
+
 	// Última sugestão gerada em modo "observing" — exibida no inbox ao humano.
 	LastSuggestion  string     `json:"last_suggestion"`
 	SuggestionAt    *time.Time `json:"suggestion_at"`
