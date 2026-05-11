@@ -345,7 +345,7 @@ func (h *AbacatePayHandler) createRedirectCheckout(plan models.Plan, externalID 
 		Items: []abacatepayItem{
 			{ID: productID, Quantity: 1},
 		},
-		Methods:       []string{"PIX"},
+		Methods:       []string{"CARD"},
 		ExternalID:    externalID,
 		CompletionURL: h.webhookURL(baseURL),
 		ReturnURL:     baseURL + "/dashboard",

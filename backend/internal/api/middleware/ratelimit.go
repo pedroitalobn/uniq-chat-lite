@@ -61,10 +61,15 @@ func RateLimit(limit int) fiber.Handler {
 			return c.Next()
 		}
 
-		key := clientIP(c)
+		subject := clientIP(c)
 		if user := GetCurrentUser(c); user != nil {
-			key = "user:" + user.ID.String()
+			subject = "user:" + user.ID.String()
 		}
+		routeKey := c.Route().Path
+		if routeKey == "" {
+			routeKey = c.Path()
+		}
+		key := "rl:" + c.Method() + ":" + routeKey + ":" + subject
 
 		entry := getOrCreateLimiter(key)
 
@@ -84,9 +89,15 @@ func RateLimit(limit int) fiber.Handler {
 		entry.mu.Unlock()
 
 		if count > limit {
+			retryAfter := int(time.Until(resetAt).Seconds())
+			if retryAfter < 1 {
+				retryAfter = 1
+			}
+			c.Set("Retry-After", itoa(retryAfter))
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
-				"error":       "muitas requisições",
-				"retry_after": resetAt.UTC().Format(time.RFC3339),
+				"error":               "muitas requisições",
+				"retry_after":         resetAt.UTC().Format(time.RFC3339),
+				"retry_after_seconds": retryAfter,
 			})
 		}
 

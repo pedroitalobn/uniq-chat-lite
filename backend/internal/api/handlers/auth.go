@@ -50,6 +50,25 @@ func resolveFrontendURL() string {
 	return ""
 }
 
+func normalizeSignupPhone(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	var b strings.Builder
+	for _, r := range raw {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func validSignupPhone(phone string) bool {
+	n := len(phone)
+	return n >= 8 && n <= 15
+}
+
 func loadStripeConfigFromDB(db *gorm.DB) {
 	var settings models.PaymentSettings
 	if db.Where("id = ?", "default").First(&settings).Error == nil {
@@ -1317,7 +1336,7 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 	req.Username = strings.TrimSpace(strings.ToLower(req.Username))
 	req.WorkspaceName = strings.TrimSpace(req.WorkspaceName)
 	req.Password = strings.TrimSpace(req.Password)
-	req.Phone = strings.TrimSpace(req.Phone)
+	req.Phone = normalizeSignupPhone(req.Phone)
 
 	if req.PendingRegistrationID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "pending_registration_id é obrigatório"})
@@ -1330,6 +1349,9 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 	}
 	if req.Phone == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "telefone é obrigatório"})
+	}
+	if !validSignupPhone(req.Phone) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "telefone inválido — informe DDI + número, ex: +5511999998888"})
 	}
 
 	prID, err := uuid.Parse(req.PendingRegistrationID)

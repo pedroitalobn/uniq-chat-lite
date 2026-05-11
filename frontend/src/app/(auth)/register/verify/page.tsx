@@ -171,19 +171,22 @@ function CompleteForm({
   const planLabel = hasPrefilledPlan ? prefilledPlanName : selectedPlan?.name;
   const planPriceVal = hasPrefilledPlan ? prefilledPlanPrice : selectedPlan?.price;
 
-  function formatPhone(v: string) {
-    const d = v.replace(/\D/g, "").slice(0, 11);
-    if (d.length <= 2) return d;
-    if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
-    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  function normalizePhoneInput(v: string) {
+    let out = v.replace(/[^\d+\s().-]/g, "");
+    out = out.replace(/(?!^)\+/g, "");
+    return out.slice(0, 24);
+  }
+
+  function phoneDigits(v: string) {
+    return v.replace(/\D/g, "");
   }
 
   function validate() {
     const e: Record<string, string> = {};
     if (!name.trim()) e.name = "Nome é obrigatório";
-    const rawPhone = phone.replace(/\D/g, "");
+    const rawPhone = phoneDigits(phone);
     if (!rawPhone) e.phone = "Telefone é obrigatório";
-    else if (rawPhone.length < 10) e.phone = "Telefone inválido — mínimo 10 dígitos";
+    else if (rawPhone.length < 8 || rawPhone.length > 15) e.phone = "Telefone inválido — use DDI + número, ex: +55 11 99999-8888";
     if (password.length < 8) e.password = "Mínimo 8 caracteres";
     if (confirmPassword !== password) e.confirmPassword = "Senhas não coincidem";
     setErrors(e);
@@ -204,7 +207,7 @@ function CompleteForm({
           username: username.trim().toLowerCase() || undefined,
           workspace_name: company.trim() || undefined,
           password,
-          phone: phone.replace(/\D/g, ""),
+          phone: phoneDigits(phone),
           plan_id: selectedPlanID || undefined,
         }),
       });
@@ -295,9 +298,9 @@ function CompleteForm({
       <Field label="Seu nome" value={name} onChange={setName} placeholder="João Silva"
         autoFocus icon={<User className="w-4 h-4" />} error={errors.name} />
 
-      <Field label="Telefone" value={phone} onChange={v => setPhone(formatPhone(v))}
-        placeholder="(11) 99999-8888" icon={<Phone className="w-4 h-4" />}
-        hint="WhatsApp para notificações" error={errors.phone} />
+      <Field label="Telefone" value={phone} onChange={v => setPhone(normalizePhoneInput(v))}
+        placeholder="+55 11 99999-8888" icon={<Phone className="w-4 h-4" />}
+        hint="Inclua o DDI do país. Ex: +55, +1, +351" error={errors.phone} />
 
       <Field label="Username (opcional)" value={username} onChange={setUsername}
         placeholder="@joaosilva" icon={<AtSign className="w-4 h-4" />}

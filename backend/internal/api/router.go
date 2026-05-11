@@ -12,9 +12,9 @@ import (
 	"github.com/uniq-chat/backend/internal/api/handlers"
 	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/config"
+	"github.com/uniq-chat/backend/internal/crmtasks"
 	"github.com/uniq-chat/backend/internal/email"
 	"github.com/uniq-chat/backend/internal/models"
-	"github.com/uniq-chat/backend/internal/crmtasks"
 	"github.com/uniq-chat/backend/internal/outbound"
 	"github.com/uniq-chat/backend/internal/services"
 	"github.com/uniq-chat/backend/internal/storage"
@@ -434,10 +434,10 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	// bloquear flow legítimo. RateLimit usa IP real (CF-Connecting-IP)
 	// agora; antes todos compartilhavam o IP do proxy e 5/min estourava
 	// com 1-2 users simultâneos no onboarding.
-	authRegister := middleware.RateLimit(10)
-	authSensitive := middleware.RateLimit(5)  // forgot/reset/verify (anti-enum, mas não tão agressivo a ponto de bloquear sequência completa)
-	authLogin := middleware.RateLimit(15)     // typo + multi-device + multi-aba toleráveis; brute force inviável (precisa senha correta)
-	authValidate := middleware.RateLimit(60)  // UI faz polling, mantém alto
+	authRegister := middleware.RateLimit(30)
+	authSensitive := middleware.RateLimit(5) // forgot/reset/verify (anti-enum, mas não tão agressivo a ponto de bloquear sequência completa)
+	authLogin := middleware.RateLimit(15)    // typo + multi-device + multi-aba toleráveis; brute force inviável (precisa senha correta)
+	authValidate := middleware.RateLimit(60) // UI faz polling, mantém alto
 	auth := app.Group("/auth")
 	auth.Post("/login", authLogin, authH.Login)
 	auth.Post("/register", authRegister, authH.Register)
