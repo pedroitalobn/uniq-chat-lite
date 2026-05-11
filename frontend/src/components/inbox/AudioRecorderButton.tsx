@@ -8,6 +8,7 @@ interface Props {
   onRecorded: (file: File) => void;
   disabled?: boolean;
   title?: string;
+  label?: string;
 }
 
 // Botão de gravar áudio. Click → começa a gravar (mostra timer + waveform mock)
@@ -17,7 +18,7 @@ interface Props {
 //   1. audio/mp4         — iOS Safari nativo, melhor compat WhatsApp
 //   2. audio/webm;codecs=opus — Chrome/Firefox padrão
 //   3. audio/webm        — fallback genérico
-export function AudioRecorderButton({ onRecorded, disabled, title = "Gravar áudio" }: Props) {
+export function AudioRecorderButton({ onRecorded, disabled, title = "Gravar áudio", label }: Props) {
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -165,13 +166,16 @@ export function AudioRecorderButton({ onRecorded, disabled, title = "Gravar áud
       onClick={start}
       disabled={disabled}
       title={title}
-      className="flex h-10 w-10 items-center justify-center rounded-md transition-colors disabled:opacity-40"
+      className={`flex h-10 items-center justify-center rounded-md transition-colors disabled:opacity-40 ${
+        label ? "gap-1.5 px-2.5 text-xs font-medium" : "w-10"
+      }`}
       style={{
         background: "var(--surface-2)",
         border: "1px solid var(--border-default)",
         color: "hsl(240 8% 52%)",
       }}>
       <Mic className="h-4 w-4" />
+      {label}
     </button>
   );
 }

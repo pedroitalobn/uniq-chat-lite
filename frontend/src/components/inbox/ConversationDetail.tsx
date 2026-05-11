@@ -3912,6 +3912,8 @@ function Composer({
   const composerBg = mode === "note" ? "rgba(245,158,11,0.06)" : "hsl(240 18% 6.5%)";
 
   const hasAttachment = pending.length > 0;
+  const hasText = text.trim().length > 0;
+  const canSubmitContent = hasText || hasAttachment;
 
   return (
     <div
@@ -4185,11 +4187,8 @@ function Composer({
           </div>
         )}
 
-        {/* ───── Composer mobile (estilo WhatsApp) ─────
-             Single-row: [+ attach] [textarea round] [mic-or-send round].
-             Hold-to-record no mic, slide-up trava no cadeado.
-             O "+" abre BottomSheet com Foto, Documento, Emoji, Nota interna.
-             Em modo nota, borda âmbar no input + chip de modo. */}
+        {/* ───── Composer mobile ─────
+             Barra de ferramentas acima + linha principal só com texto/envio. */}
         {isMobile && mode === "note" && (
           <div className="mb-2 flex items-center gap-2">
             <span
@@ -4209,27 +4208,71 @@ function Composer({
             </button>
           </div>
         )}
-        <div className="md:hidden flex items-end gap-2">
+        <div className="md:hidden mb-2 flex items-center gap-2">
           <button
             type="button"
             onClick={() => setAttachOpen(true)}
             disabled={!canSend}
             aria-label="Anexar"
-            className="flex items-center justify-center rounded-full transition-colors disabled:opacity-40 flex-shrink-0"
+            className="flex h-10 min-w-[76px] items-center justify-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors disabled:opacity-40"
             style={{
-              width: 44,
-              height: 44,
               background: "var(--surface-2)",
               border: "1px solid var(--border-default)",
-              color: "hsl(240 8% 70%)",
+              color: "var(--text-2)",
             }}
           >
-            <Plus className="h-5 w-5" />
+            <Plus className="h-4 w-4" />
+            Anexo
           </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setEmojiOpen((v) => !v)}
+              disabled={!canSend || mode !== "message"}
+              aria-label="Emoji"
+              className="flex h-10 min-w-[74px] items-center justify-center gap-1.5 rounded-full px-3 text-xs font-medium disabled:opacity-40"
+              style={{
+                background: "var(--surface-2)",
+                border: "1px solid var(--border-default)",
+                color: emojiOpen ? "var(--green)" : "var(--text-2)",
+              }}
+            >
+              <Smile className="h-4 w-4" />
+              Emoji
+            </button>
+            {emojiOpen && (
+              <EmojiPickerPanel
+                onPick={(e) => {
+                  const ta = textareaRef.current;
+                  if (!ta) {
+                    setText((t) => t + e);
+                    return;
+                  }
+                  const start = ta.selectionStart ?? text.length;
+                  const end = ta.selectionEnd ?? text.length;
+                  const next = text.slice(0, start) + e + text.slice(end);
+                  setText(next);
+                  requestAnimationFrame(() => {
+                    ta.focus();
+                    const pos = start + e.length;
+                    ta.setSelectionRange(pos, pos);
+                  });
+                }}
+                onClose={() => setEmojiOpen(false)}
+              />
+            )}
+          </div>
+          <AudioHoldButton
+            disabled={!canSend || mode !== "message" || !instanceId || !allowsType("audio") || hasText || hasAttachment}
+            onRecorded={(file) => acceptFiles([file])}
+            size={40}
+          />
+        </div>
+        <div className="md:hidden flex items-end gap-2">
           <div className="relative flex-1 min-w-0">
             <textarea
               ref={isMobile ? textareaRef : undefined}
-              className="w-full resize-none rounded-3xl pl-4 pr-11 py-2.5 text-[15px] outline-none"
+              className="w-full resize-none rounded-3xl px-4 py-2.5 text-[15px] outline-none"
               style={{
                 background: "var(--surface-2)",
                 border: `1px solid ${mode === "note" ? "rgba(245,158,11,0.45)" : "var(--border-default)"}`,
@@ -4259,204 +4302,172 @@ function Composer({
                 }
               }}
             />
-            <button
-              type="button"
-              onClick={() => setEmojiOpen((v) => !v)}
-              disabled={!canSend || mode !== "message"}
-              aria-label="Emoji"
-              className="absolute right-2 bottom-1.5 flex h-9 w-9 items-center justify-center rounded-full disabled:opacity-40"
-              style={{ color: emojiOpen ? "var(--green)" : "var(--text-3)" }}
-            >
-              <Smile className="h-5 w-5" />
-            </button>
-            {emojiOpen && (
-              <EmojiPickerPanel
-                onPick={(e) => {
-                  const ta = textareaRef.current;
-                  if (!ta) {
-                    setText((t) => t + e);
-                    return;
-                  }
-                  const start = ta.selectionStart ?? text.length;
-                  const end = ta.selectionEnd ?? text.length;
-                  const next = text.slice(0, start) + e + text.slice(end);
-                  setText(next);
-                  requestAnimationFrame(() => {
-                    ta.focus();
-                    const pos = start + e.length;
-                    ta.setSelectionRange(pos, pos);
-                  });
-                }}
-                onClose={() => setEmojiOpen(false)}
-              />
-            )}
           </div>
-          {/* Quando há texto OU anexo: botão Send.
-              Quando vazio: hold-to-record (estilo WhatsApp). */}
-          {text.trim() || hasAttachment ? (
-            <button
-              type="button"
-              onClick={hasAttachment ? sendAttachment : submit}
-              disabled={
+          <button
+            type="button"
+            onClick={hasAttachment ? sendAttachment : submit}
+            disabled={
+              !canSubmitContent || (
                 hasAttachment
                   ? uploading
                   : disabled || isSending || isNoting
-              }
-              aria-label={mode === "note" ? "Adicionar nota" : "Enviar"}
-              className="flex items-center justify-center rounded-full disabled:opacity-50 flex-shrink-0"
-              style={{
-                width: 44,
-                height: 44,
-                background: accentBg,
-                color: accentFg,
-                boxShadow: "0 2px 8px rgba(0,212,106,0.25)",
-              }}
-            >
-              {mode === "note" ? <StickyNote className="h-5 w-5" /> : <Send className="h-5 w-5" />}
-            </button>
-          ) : (
-            <AudioHoldButton
-              disabled={!canSend || mode !== "message" || !instanceId || !allowsType("audio")}
-              onRecorded={(file) => acceptFiles([file])}
-            />
-          )}
-        </div>
-
-        {/* ───── Composer desktop (mantém layout original) ───── */}
-        <div className="hidden md:flex items-end gap-2">
-          <button
-            type="button"
-            onClick={onPickFile}
-            disabled={!canSend || mode !== "message" || !instanceId || uploading || !allowsType("image")}
-            title={
-              !instanceId
-                ? "Instância não disponível"
-                : !allowsType("image")
-                  ? "Canal não aceita anexos"
-                  : "Anexar arquivo (foto, vídeo, áudio, doc)"
+              )
             }
-            className="flex h-10 w-10 items-center justify-center rounded-md transition-colors disabled:opacity-40"
+            aria-label={mode === "note" ? "Adicionar nota" : "Enviar"}
+            className="flex items-center justify-center rounded-full disabled:opacity-40 flex-shrink-0"
             style={{
-              background: "var(--surface-2)",
-              border: "1px solid var(--border-default)",
-              color: "hsl(240 8% 52%)",
+              width: 44,
+              height: 44,
+              background: accentBg,
+              color: accentFg,
+              boxShadow: "0 2px 8px rgba(0,212,106,0.25)",
             }}
           >
-            <Paperclip className="h-4 w-4" />
+            {mode === "note" ? <StickyNote className="h-5 w-5" /> : <Send className="h-5 w-5" />}
           </button>
+        </div>
 
-          {/* Gravar áudio direto da plataforma — entrega como anexo pendente */}
-          <AudioRecorderButton
-            disabled={!canSend || mode !== "message" || !instanceId || uploading || !allowsType("audio")}
-            onRecorded={(file) => acceptFiles([file])}
-            title={
-              !instanceId
-                ? "Instância não disponível"
-                : !allowsType("audio")
-                  ? "Canal não aceita áudio"
-                  : "Gravar áudio"
-            }
-          />
-
-          <div className="relative">
+        {/* ───── Composer desktop ───── */}
+        <div className="hidden md:flex md:flex-col md:gap-2">
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setEmojiOpen((v) => !v)}
-              disabled={!canSend || mode !== "message"}
-              title="Emoji"
-              className="flex h-10 w-10 items-center justify-center rounded-md transition-colors disabled:opacity-40"
+              onClick={onPickFile}
+              disabled={!canSend || mode !== "message" || !instanceId || uploading || !allowsType("image")}
+              title={
+                !instanceId
+                  ? "Instância não disponível"
+                  : !allowsType("image")
+                    ? "Canal não aceita anexos"
+                    : "Anexar arquivo (foto, vídeo, áudio, doc)"
+              }
+              className="flex h-9 items-center justify-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors disabled:opacity-40"
               style={{
                 background: "var(--surface-2)",
                 border: "1px solid var(--border-default)",
-                color: emojiOpen ? "#00d46a" : "hsl(240 8% 52%)",
+                color: "var(--text-2)",
               }}
             >
-              <Smile className="h-4 w-4" />
+              <Paperclip className="h-4 w-4" />
+              Anexo
             </button>
-            {emojiOpen && (
-              <EmojiPickerPanel
-                onPick={(e) => {
-                  const ta = textareaRef.current;
-                  if (!ta) {
-                    setText((t) => t + e);
-                    return;
-                  }
-                  const start = ta.selectionStart ?? text.length;
-                  const end = ta.selectionEnd ?? text.length;
-                  const next = text.slice(0, start) + e + text.slice(end);
-                  setText(next);
-                  // Reposiciona cursor após o emoji
-                  requestAnimationFrame(() => {
-                    ta.focus();
-                    const pos = start + e.length;
-                    ta.setSelectionRange(pos, pos);
-                  });
-                }}
-                onClose={() => setEmojiOpen(false)}
-              />
-            )}
-          </div>
 
-          <textarea
-            ref={textareaRef}
-            className="min-h-[44px] max-h-40 flex-1 resize-y rounded-md px-3 py-2 text-sm outline-none"
-            style={{
-              background: "var(--surface-2)",
-              border: `1px solid ${mode === "note" ? "rgba(245,158,11,0.35)" : "var(--border-default)"}`,
-              color: "var(--text-1)",
-            }}
-            placeholder={mode === "message"
-              ? (hasAttachment ? "Legenda do anexo (opcional)…" : "Digite sua mensagem… (/ para respostas rápidas)")
-              : "Registre uma nota interna…"}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (pickerOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
-                e.preventDefault();
-                setPickerIndex((i) => {
-                  if (e.key === "ArrowDown") return Math.min(i + 1, pickerItems.length - 1);
-                  return Math.max(i - 1, 0);
-                });
-                return;
+            <AudioRecorderButton
+              disabled={!canSend || mode !== "message" || !instanceId || uploading || !allowsType("audio")}
+              onRecorded={(file) => acceptFiles([file])}
+              label="Áudio"
+              title={
+                !instanceId
+                  ? "Instância não disponível"
+                  : !allowsType("audio")
+                    ? "Canal não aceita áudio"
+                    : "Gravar áudio"
               }
-              if (pickerOpen && e.key === "Tab") {
-                e.preventDefault();
-                const selected = pickerItems[pickerIndex];
-                if (selected) applyQuickReply(selected);
-                return;
-              }
-              if (e.key === "Escape" && pickerOpen) {
-                e.preventDefault();
-                setText("");
-                return;
-              }
-              if (e.key === "Enter" && !e.shiftKey) {
-                if (pickerOpen) {
+            />
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setEmojiOpen((v) => !v)}
+                disabled={!canSend || mode !== "message"}
+                title="Emoji"
+                className="flex h-9 items-center justify-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors disabled:opacity-40"
+                style={{
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border-default)",
+                  color: emojiOpen ? "#00d46a" : "var(--text-2)",
+                }}
+              >
+                <Smile className="h-4 w-4" />
+                Emoji
+              </button>
+              {emojiOpen && (
+                <EmojiPickerPanel
+                  onPick={(e) => {
+                    const ta = textareaRef.current;
+                    if (!ta) {
+                      setText((t) => t + e);
+                      return;
+                    }
+                    const start = ta.selectionStart ?? text.length;
+                    const end = ta.selectionEnd ?? text.length;
+                    const next = text.slice(0, start) + e + text.slice(end);
+                    setText(next);
+                    requestAnimationFrame(() => {
+                      ta.focus();
+                      const pos = start + e.length;
+                      ta.setSelectionRange(pos, pos);
+                    });
+                  }}
+                  onClose={() => setEmojiOpen(false)}
+                />
+              )}
+            </div>
+          </div>
+          <div className="flex items-end gap-2">
+            <textarea
+              ref={textareaRef}
+              className="min-h-[44px] max-h-40 flex-1 resize-y rounded-md px-3 py-2 text-sm outline-none"
+              style={{
+                background: "var(--surface-2)",
+                border: `1px solid ${mode === "note" ? "rgba(245,158,11,0.35)" : "var(--border-default)"}`,
+                color: "var(--text-1)",
+              }}
+              placeholder={mode === "message"
+                ? (hasAttachment ? "Legenda do anexo (opcional)…" : "Digite sua mensagem… (/ para respostas rápidas)")
+                : "Registre uma nota interna…"}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (pickerOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+                  e.preventDefault();
+                  setPickerIndex((i) => {
+                    if (e.key === "ArrowDown") return Math.min(i + 1, pickerItems.length - 1);
+                    return Math.max(i - 1, 0);
+                  });
+                  return;
+                }
+                if (pickerOpen && e.key === "Tab") {
                   e.preventDefault();
                   const selected = pickerItems[pickerIndex];
                   if (selected) applyQuickReply(selected);
                   return;
                 }
-                e.preventDefault();
-                if (hasAttachment) sendAttachment();
-                else submit();
+                if (e.key === "Escape" && pickerOpen) {
+                  e.preventDefault();
+                  setText("");
+                  return;
+                }
+                if (e.key === "Enter" && !e.shiftKey) {
+                  if (pickerOpen) {
+                    e.preventDefault();
+                    const selected = pickerItems[pickerIndex];
+                    if (selected) applyQuickReply(selected);
+                    return;
+                  }
+                  e.preventDefault();
+                  if (hasAttachment) sendAttachment();
+                  else submit();
+                }
+              }}
+            />
+            <button
+              onClick={hasAttachment ? sendAttachment : submit}
+              disabled={
+                !canSubmitContent || (
+                  hasAttachment
+                    ? uploading
+                    : disabled || isSending || isNoting
+                )
               }
-            }}
-          />
-          <button
-            onClick={hasAttachment ? sendAttachment : submit}
-            disabled={
-              hasAttachment
-                ? uploading
-                : disabled || isSending || isNoting
-            }
-            className="flex h-10 items-center gap-1.5 rounded-md px-3 text-sm font-medium disabled:opacity-50"
-            style={{ background: accentBg, color: accentFg }}
-            type="button"
-          >
-            {mode === "note" ? <StickyNote className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-            {hasAttachment ? (uploading ? "Enviando…" : "Enviar") : (mode === "note" ? "Adicionar" : "Enviar")}
-          </button>
+              className="flex h-11 min-w-[116px] items-center justify-center gap-1.5 rounded-md px-4 text-sm font-medium disabled:opacity-50"
+              style={{ background: accentBg, color: accentFg }}
+              type="button"
+            >
+              {mode === "note" ? <StickyNote className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+              {hasAttachment ? (uploading ? "Enviando…" : "Enviar") : (mode === "note" ? "Adicionar" : "Enviar")}
+            </button>
+          </div>
         </div>
 
         {/* Char counter — só aparece quando passa de 80% do limite do canal */}
