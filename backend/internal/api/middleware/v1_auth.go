@@ -16,9 +16,9 @@ import (
 // /v1/instances/:id, /v1/workspaces/:id/members, etc. Sem esse bypass, todos
 // caem em "server not found" 404.
 var reservedV1Namespaces = map[string]bool{
-	"admin":               true,
-	"agent":               true,
-	"agents":              true,
+	"admin":  true,
+	"agent":  true,
+	"agents": true,
 	// "ai" cobre /v1/ai/chat (Uniq AI) e /v1/ai/tools — sem entry aqui o
 	// middleware tentava resolver server.slug="ai", falhava e devolvia
 	// "server not found" pra todo request de chat do platform AI.
@@ -64,6 +64,7 @@ var reservedV1Namespaces = map[string]bool{
 	"teams":               true,
 	"tiktok":              true, // OAuth/callbacks do TikTok integration
 	"triggers":            true,
+	"usage":               true, // painel de consumo (/v1/usage/*)
 	"voices":              true, // CRUD de vozes (TTS) por workspace
 	"waba":                true,
 	"warmup":              true,
@@ -75,10 +76,10 @@ var reservedV1Namespaces = map[string]bool{
 
 // ResolveV1Instance resolves a request for /v1/:server_slug/:instance_slug/*
 // and authorizes it. Aceita dois formatos de token:
-//   1. Instance token (`instances.token`) — acesso escopado a UMA instância
-//   2. Global API key (`sk_...`) do dono da instância — destrava todas as
-//      instâncias daquele user, útil pra n8n/integrações que gerenciam
-//      várias instâncias com uma credencial só.
+//  1. Instance token (`instances.token`) — acesso escopado a UMA instância
+//  2. Global API key (`sk_...`) do dono da instância — destrava todas as
+//     instâncias daquele user, útil pra n8n/integrações que gerenciam
+//     várias instâncias com uma credencial só.
 func ResolveV1Instance(db *gorm.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		serverSlug := c.Params("server_slug")
