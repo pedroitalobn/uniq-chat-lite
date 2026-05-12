@@ -114,9 +114,13 @@ func suspiciousSignupEmail(email string) string {
 		}
 	}
 
-	// 3. Local part muito curto (< 3 chars) ou só dígitos.
+	// 3. Local part vazio ou claramente sintético.
+	//
+	// Observação importante: emails válidos como "p@dominio.org" e
+	// "x@empresa.co" são raros, mas legítimos, e estavam sendo barrados
+	// aqui. Então não rejeitamos mais local-part curto por si só.
 	cleanLocal := strings.ReplaceAll(strings.ReplaceAll(local, ".", ""), "+", "")
-	if len(cleanLocal) < 3 {
+	if len(cleanLocal) == 0 {
 		return "email inválido"
 	}
 	return ""
