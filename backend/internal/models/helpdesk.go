@@ -114,8 +114,8 @@ type HelpDeskConfig struct {
 	HideUniqBranding bool `gorm:"default:false" json:"hide_uniq_branding"`
 
 	// ── Access control ──────────────────────────────────────────────────
-	// Visibility: "public" | "workspace_users" | "password"
-	Visibility     string `gorm:"type:varchar(20);default:'public'" json:"visibility"`
+	// Visibility: "public" | "workspace_users" | "uniq_users" | "password"
+	Visibility string `gorm:"type:varchar(20);default:'public'" json:"visibility"`
 	AccessPassword string `gorm:"type:varchar(255)" json:"-"` // bcrypt hash, never exposed in JSON
 
 	CreatedAt time.Time `json:"created_at"`

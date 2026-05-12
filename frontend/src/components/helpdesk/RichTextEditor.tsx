@@ -10,21 +10,9 @@ import Placeholder from "@tiptap/extension-placeholder";
 import {
   Bold, Italic, Strikethrough, List, ListOrdered, Quote, Code,
   Heading1, Heading2, Heading3, Image as ImageIcon, Link as LinkIcon,
-  Youtube as YoutubeIcon, Code2, Undo2, Redo2, Pilcrow,
+  Video, Code2, Undo2, Redo2, Pilcrow,
 } from "lucide-react";
-
-// RichTextEditor — Tiptap dentro do tema dark do app. Usado pelo editor de
-// artigos do help-desk. Suporta:
-//   - Headings, parágrafos, listas, blockquote, code block
-//   - Bold/italic/strike
-//   - Links + imagens (URL ou upload futuro)
-//   - YouTube embed (cola URL → vira iframe responsivo)
-//   - HTML embed bruto via blockquote/codeblock (futuro)
-// Conteúdo é HTML (gravado em article.content). Markdown legacy é injetado
-// como texto e re-salvo como HTML na primeira edição.
-//
-// O editor é controlado: passa value (HTML), recebe onChange. Re-monta o
-// conteúdo se a prop value muda externamente (ex.: gerar com IA).
+import { parseVideoUrl } from "./VideoPlayer";
 
 export function RichTextEditor({
   value, onChange, placeholder,
@@ -34,7 +22,7 @@ export function RichTextEditor({
   placeholder?: string;
 }) {
   const editor = useEditor({
-    immediatelyRender: false, // SSR-safe: evita hydration mismatch
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
@@ -44,9 +32,7 @@ export function RichTextEditor({
       Image.configure({
         inline: false,
         allowBase64: true,
-        HTMLAttributes: {
-          class: "rounded-lg max-w-full",
-        },
+        HTMLAttributes: { class: "rounded-lg max-w-full" },
       }),
       Link.configure({
         openOnClick: false,
@@ -60,9 +46,7 @@ export function RichTextEditor({
       Youtube.configure({
         controls: true,
         nocookie: true,
-        HTMLAttributes: {
-          class: "rounded-lg w-full aspect-video",
-        },
+        HTMLAttributes: { class: "rounded-lg w-full aspect-video" },
       }),
       Placeholder.configure({
         placeholder: placeholder ?? "Escreva o conteúdo do artigo… use a barra acima pra formatar.",
@@ -73,7 +57,6 @@ export function RichTextEditor({
       attributes: {
         class:
           "prose prose-invert max-w-none focus:outline-none min-h-[400px] px-5 py-4 " +
-          // tipografia base do app
           "[&_h1]:text-2xl [&_h1]:font-semibold [&_h1]:mt-6 [&_h1]:mb-2 " +
           "[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-5 [&_h2]:mb-2 " +
           "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2 " +
@@ -82,8 +65,8 @@ export function RichTextEditor({
           "[&_blockquote]:border-l-2 [&_blockquote]:border-[var(--border-strong)] [&_blockquote]:pl-3 [&_blockquote]:italic " +
           "[&_code]:bg-[var(--border-subtle)] [&_code]:px-1 [&_code]:rounded [&_code]:text-[0.9em] " +
           "[&_pre]:bg-[rgba(0,0,0,0.45)] [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:overflow-x-auto " +
-          "[&_iframe]:rounded-lg [&_iframe]:my-3 " +
-          "[&_img]:rounded-lg [&_img]:my-3",
+          "[&_iframe]:rounded-lg [&_iframe]:my-3 [&_iframe]:aspect-video [&_iframe]:w-full " +
+          "[&_video]:rounded-lg [&_video]:my-3 [&_img]:rounded-lg [&_img]:my-3",
       },
     },
     onUpdate: ({ editor }) => {
@@ -91,14 +74,11 @@ export function RichTextEditor({
     },
   });
 
-  // Sincroniza valor externo (ex.: IA gerou novo content) sem destruir o
-  // editor inteiro. O check evita loop de update durante digitação.
   useEffect(() => {
     if (!editor) return;
     if (value !== editor.getHTML()) {
       editor.commands.setContent(value || "", { emitUpdate: false });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, editor]);
 
   if (!editor) {
@@ -126,9 +106,6 @@ export function RichTextEditor({
   );
 }
 
-// Toolbar — botões compactos no topo. Cada um chama um command do Tiptap.
-// Items que só fazem sentido no estado atual (undo/redo) usam `can()` pra
-// desabilitar visualmente.
 function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
   if (!editor) return null;
 
@@ -138,10 +115,27 @@ function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
     editor.chain().focus().setImage({ src: url }).run();
   };
 
-  const insertYouTube = () => {
-    const url = window.prompt("Cole a URL do vídeo do YouTube:");
+  const insertVideo = () => {
+    const url = window.prompt("Cole a URL do vídeo (YouTube, Vimeo ou MP4/WebM):");
     if (!url) return;
-    editor.commands.setYoutubeVideo({ src: url, width: 640, height: 360 });
+    const vs = parseVideoUrl(url);
+    if (!vs) {
+      window.alert("URL não reconhecida. Use YouTube, Vimeo ou link direto de vídeo (.mp4/.webm).");
+      return;
+    }
+    if (vs.type === "youtube") {
+      editor.commands.setYoutubeVideo({ src: url, width: 640, height: 360 });
+      return;
+    }
+    if (vs.type === "vimeo") {
+      const iframe = `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:14px;margin:16px 0"><iframe src="https://player.vimeo.com/video/${vs.id}?byline=0&portrait=0" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen allow="autoplay;encrypted-media"></iframe></div>`;
+      editor.chain().focus().insertContent(iframe).run();
+      return;
+    }
+    if (vs.type === "html5") {
+      const video = `<video controls playsinline style="width:100%;border-radius:14px;margin:16px 0"><source src="${vs.src}" type="${vs.mimeType}"></video>`;
+      editor.chain().focus().insertContent(video).run();
+    }
   };
 
   const insertLink = () => {
@@ -217,8 +211,8 @@ function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
       <ToolbarButton onClick={insertImage} title="Imagem">
         <ImageIcon className="w-4 h-4" />
       </ToolbarButton>
-      <ToolbarButton onClick={insertYouTube} title="Vídeo YouTube">
-        <YoutubeIcon className="w-4 h-4" />
+      <ToolbarButton onClick={insertVideo} title="Vídeo (YouTube, Vimeo, MP4)">
+        <Video className="w-4 h-4" />
       </ToolbarButton>
       <ToolbarButton onClick={insertHTML} title="HTML embed (iframe / áudio / vídeo)">
         <Code2 className="w-4 h-4" />

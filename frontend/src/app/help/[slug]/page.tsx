@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { use, useEffect, useRef, useState } from "react";
+import { getSession } from "next-auth/react";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -304,6 +305,7 @@ export default function HelpCenterPage({
 }) {
   const { slug } = use(params);
   const [API] = useState(() => getApiBase());
+  const [authHeader, setAuthHeader] = useState<Record<string, string>>({});
   const [config, setConfig] = useState<Config | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
@@ -328,11 +330,19 @@ export default function HelpCenterPage({
 
   useEffect(() => {
     async function load() {
+      let headers: Record<string, string> = {};
+      try {
+        const session = await getSession();
+        if (session?.accessToken) {
+          headers = { Authorization: `Bearer ${session.accessToken}` };
+        }
+      } catch {}
+      setAuthHeader(headers);
       try {
         const [cfgRes, catsRes, artsRes] = await Promise.all([
-          fetch(`${API}/v1/public/helpdesk/${slug}/config`),
-          fetch(`${API}/v1/public/helpdesk/${slug}/categories`),
-          fetch(`${API}/v1/public/helpdesk/${slug}/articles`),
+          fetch(`${API}/v1/public/helpdesk/${slug}/config`, { headers }),
+          fetch(`${API}/v1/public/helpdesk/${slug}/categories`, { headers }),
+          fetch(`${API}/v1/public/helpdesk/${slug}/articles`, { headers }),
         ]);
         if (cfgRes.status === 404) {
           setNotFound(true);
@@ -355,8 +365,8 @@ export default function HelpCenterPage({
         } else if (cfgData.visibility === "password") {
           const unlocked = sessionStorage.getItem(`hc_unlock_${slug}`) === "1";
           setAccessGranted(unlocked);
-        } else if (cfgData.visibility === "workspace_users") {
-          setAccessGranted(false); // requires login — handled in UI
+        } else if (cfgData.visibility === "uniq_users" || cfgData.visibility === "workspace_users") {
+          setAccessGranted(false);
         }
 
         if (catsRes.ok) {
@@ -377,7 +387,7 @@ export default function HelpCenterPage({
     try {
       const res = await fetch(`${API}/v1/public/helpdesk/${slug}/verify-access`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeader },
         body: JSON.stringify({ password: passwordInput }),
       });
       const data = await res.json();
@@ -423,7 +433,8 @@ export default function HelpCenterPage({
     searchTimer.current = setTimeout(async () => {
       try {
         const res = await fetch(
-          `${API}/v1/public/helpdesk/${slug}/articles?q=${encodeURIComponent(search)}`
+          `${API}/v1/public/helpdesk/${slug}/articles?q=${encodeURIComponent(search)}`,
+          { headers: authHeader }
         );
         setSearchResults((await res.json()) as Article[]);
       } catch {
@@ -578,6 +589,7 @@ export default function HelpCenterPage({
 
   if (!accessGranted && config) {
     const isPassword = config.visibility === "password";
+    const isUniqUsers = config.visibility === "uniq_users";
     const isWorkspace = config.visibility === "workspace_users";
     return (
       <div style={{ minHeight: "100vh", background: t.bg, fontFamily, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
@@ -592,6 +604,8 @@ export default function HelpCenterPage({
             <p style={{ margin: "8px 0 0", fontSize: 14, color: t.text3, lineHeight: 1.5 }}>
               {isPassword
                 ? "Esta central de ajuda requer uma senha para acessar."
+                : isUniqUsers
+                ? "Apenas usuários logados no Uniq têm acesso a esta central."
                 : "Apenas membros da workspace têm acesso a esta central."}
             </p>
           </div>
@@ -637,7 +651,7 @@ export default function HelpCenterPage({
               </button>
             </div>
           )}
-          {isWorkspace && (
+          {(isUniqUsers || isWorkspace) && (
             <a
               href="/login"
               style={{
@@ -970,11 +984,11 @@ export default function HelpCenterPage({
                   const ans = document.getElementById("hc-ai-answer");
                   if (btn) { btn.disabled = true; btn.textContent = "Pensando..."; }
                   try {
-                    const res = await fetch(`${API}/v1/public/helpdesk/${slug}/ask`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ question: q }),
-                    });
+              const res = await fetch(`${API}/v1/public/helpdesk/${slug}/ask`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...authHeader },
+                body: JSON.stringify({ question: q }),
+              });
                     const data = await res.json();
                     if (ans) {
                       ans.innerHTML = `

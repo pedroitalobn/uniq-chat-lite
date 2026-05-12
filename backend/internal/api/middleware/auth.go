@@ -252,6 +252,56 @@ func tryAPIKeyValue(c *fiber.Ctx, db *gorm.DB, key string) error {
 	return c.Next()
 }
 
+// OptionalAuth extracts JWT/API key if present but does NOT require
+// authentication. If a valid token is found, it populates c.Locals("user")
+// and c.Locals("user_id") just like RequireAuth. If not, the request
+// continues as unauthenticated. Used by public help desk routes that need
+// to check visibility (workspace_users / uniq_users).
+func OptionalAuth(db *gorm.DB) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if instance := c.Locals("instance"); instance != nil {
+			if user := c.Locals("user"); user != nil {
+				return c.Next()
+			}
+		}
+
+		tokenStr := extractToken(c)
+		if tokenStr == "" {
+			key := c.Get("apikey")
+			if key == "" {
+				key = c.Get("X-API-Key")
+			}
+			if key == "" {
+				key = c.Query("token")
+			}
+			if key != "" {
+				_ = tryAPIKeyValue(c, db, key)
+			}
+			return c.Next()
+		}
+
+		claims, err := ParseAccessToken(tokenStr)
+		if err != nil {
+			if strings.HasPrefix(tokenStr, "sk_") {
+				_ = tryAPIKeyValue(c, db, tokenStr)
+			}
+			return c.Next()
+		}
+
+		var user models.User
+		if err := db.Preload("Plan").First(&user, "id = ?", claims.UserID).Error; err != nil {
+			return c.Next()
+		}
+		if user.IsBlocked() {
+			return c.Next()
+		}
+
+		c.Locals("user", &user)
+		c.Locals("user_id", user.ID)
+		return c.Next()
+	}
+}
+
 // GetCurrentUser helper
 func GetCurrentUser(c *fiber.Ctx) *models.User {
 	user, _ := c.Locals("user").(*models.User)

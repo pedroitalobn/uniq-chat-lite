@@ -72,7 +72,7 @@ export interface HelpDeskConfig {
   created_at: string;
   updated_at: string;
   // access control
-  visibility: "public" | "workspace_users" | "password";
+  visibility: "public" | "uniq_users" | "workspace_users" | "password";
   access_password?: string;
 }
 

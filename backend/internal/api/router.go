@@ -505,14 +505,15 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	app.Post("/v1/public/webchat/:token/message", middleware.RateLimit(30), webChatH.PublicMessage)
 	app.Get("/v1/public/webchat/:token/articles", webChatH.PublicListArticles)
 
-	// Public Help Desk endpoints (no auth — accessed by public knowledge base)
-	app.Get("/v1/public/helpdesk/:workspace_slug/config", helpDeskH.PublicGetConfig)
-	app.Post("/v1/public/helpdesk/:workspace_slug/verify-access", helpDeskH.PublicVerifyAccess)
-	app.Get("/v1/public/helpdesk/:workspace_slug/categories", helpDeskH.PublicListCategories)
-	app.Get("/v1/public/helpdesk/:workspace_slug/articles", helpDeskH.PublicListArticles)
-	app.Get("/v1/public/helpdesk/:workspace_slug/articles/:slug", helpDeskH.PublicGetArticle)
-	app.Post("/v1/public/helpdesk/:workspace_slug/ask", middleware.RateLimit(20), helpDeskH.PublicAsk)
-	app.Post("/v1/public/helpdesk/:workspace_slug/articles/:article_slug/ask", middleware.RateLimit(20), helpDeskH.PublicAskArticle)
+	// Public Help Desk endpoints — OptionalAuth extracts user if present so
+	// checkHelpDeskVisibility can enforce workspace_users / uniq_users access.
+	app.Get("/v1/public/helpdesk/:workspace_slug/config", middleware.OptionalAuth(db), helpDeskH.PublicGetConfig)
+	app.Post("/v1/public/helpdesk/:workspace_slug/verify-access", middleware.OptionalAuth(db), helpDeskH.PublicVerifyAccess)
+	app.Get("/v1/public/helpdesk/:workspace_slug/categories", middleware.OptionalAuth(db), helpDeskH.PublicListCategories)
+	app.Get("/v1/public/helpdesk/:workspace_slug/articles", middleware.OptionalAuth(db), helpDeskH.PublicListArticles)
+	app.Get("/v1/public/helpdesk/:workspace_slug/articles/:slug", middleware.OptionalAuth(db), helpDeskH.PublicGetArticle)
+	app.Post("/v1/public/helpdesk/:workspace_slug/ask", middleware.OptionalAuth(db), middleware.RateLimit(20), helpDeskH.PublicAsk)
+	app.Post("/v1/public/helpdesk/:workspace_slug/articles/:article_slug/ask", middleware.OptionalAuth(db), middleware.RateLimit(20), helpDeskH.PublicAskArticle)
 
 	// CSAT public endpoints (no auth — customer answers via tokenized link)
 	app.Get("/csat/:token", csatH.GetPublic)

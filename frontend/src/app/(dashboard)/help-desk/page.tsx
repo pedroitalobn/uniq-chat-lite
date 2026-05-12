@@ -458,9 +458,10 @@ function AccessSettings({ workspaceId }: { workspaceId: string }) {
 
         <div className="space-y-2">
           {([
-            { id: "public", label: "Público", desc: "Qualquer pessoa pode acessar a central de ajuda." },
-            { id: "workspace_users", label: "Membros da workspace", desc: "Apenas usuários logados da workspace têm acesso." },
-            { id: "password", label: "Protegido por senha", desc: "Acesso público, mas exige uma senha para entrar." },
+                { id: "public", label: "Público", desc: "Qualquer pessoa pode acessar a central de ajuda." },
+                { id: "uniq_users", label: "Usuários Uniq logados", desc: "Apenas usuários logados na plataforma Uniq têm acesso." },
+                { id: "workspace_users", label: "Membros da workspace", desc: "Apenas membros desta workspace têm acesso." },
+                { id: "password", label: "Protegido por senha", desc: "Acesso público, mas exige uma senha para entrar." },
           ] as const).map((opt) => (
             <label
               key={opt.id}

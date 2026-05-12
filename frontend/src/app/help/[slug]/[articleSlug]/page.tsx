@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
+import Plyr from "plyr";
+import "plyr/dist/plyr.css";
+import { getSession } from "next-auth/react";
 
 function getApiBase(): string {
   const env = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -26,6 +29,7 @@ interface Config {
   theme_mode: "dark" | "light" | "system";
   font_family: string;
   hide_uniq_branding: boolean;
+  visibility?: string;
 }
 
 interface Article {
@@ -49,14 +53,89 @@ const FONT_STACKS: Record<string, string> = {
   jetbrains: "'JetBrains Mono', monospace",
 };
 
+function ArticleContent({ html, color }: { html: string; color: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const plyrs = useRef<Plyr[]>([]);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    plyrs.current.forEach((p) => p.destroy());
+    plyrs.current = [];
+
+    const el = ref.current;
+    el.querySelectorAll("iframe").forEach((iframe) => {
+      const src = iframe.getAttribute("src") || "";
+      const isYouTube = /youtube\.com|youtu\.be/.test(src);
+      const isVimeo = /vimeo\.com/.test(src);
+      if (!isYouTube && !isVimeo) return;
+      const wrapper = document.createElement("div");
+      wrapper.style.cssText = "position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:14px;margin:20px 0";
+      iframe.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;border:0";
+      iframe.parentElement?.insertBefore(wrapper, iframe);
+      wrapper.appendChild(iframe);
+    });
+
+    el.querySelectorAll("video").forEach((v) => {
+      const p = new Plyr(v, {
+        youtube: { noCookie: true },
+        vimeo: { byline: false, portrait: false },
+      });
+      plyrs.current.push(p);
+    });
+
+    el.querySelectorAll("iframe").forEach((iframe) => {
+      const src = iframe.getAttribute("src") || "";
+      const isYouTube = /youtube\.com/.test(src);
+      const isVimeo = /vimeo\.com/.test(src);
+      if (!isYouTube && !isVimeo) return;
+      const parent = iframe.parentElement;
+      if (!parent) return;
+      const video = document.createElement("video");
+      if (isYouTube) {
+        const match = src.match(/embed\/([a-zA-Z0-9_-]+)/);
+        if (match) video.dataset.src = match[1];
+        video.dataset.provider = "youtube";
+      } else {
+        const match = src.match(/video\/(\d+)/);
+        if (match) video.dataset.src = match[1];
+        video.dataset.provider = "vimeo";
+      }
+      video.playsInline = true;
+      parent.replaceChild(video, iframe);
+      try {
+        const p = new Plyr(video, {
+          youtube: { noCookie: true },
+          vimeo: { byline: false, portrait: false },
+        });
+        plyrs.current.push(p);
+      } catch {}
+    });
+
+    return () => {
+      plyrs.current.forEach((p) => p.destroy());
+      plyrs.current = [];
+    };
+  }, [html]);
+
+  return (
+    <div
+      ref={ref}
+      className="article-body"
+      dangerouslySetInnerHTML={{ __html: html }}
+      style={{ "--plyr-color-main": color } as React.CSSProperties}
+    />
+  );
+}
+
 function ArticleAgentChat({
-  slug, articleSlug, apiBase, color, t,
+  slug, articleSlug, apiBase, color, t, authHeader,
 }: {
   slug: string;
   articleSlug: string;
   apiBase: string;
   color: string;
   t: { bg: string; surface: string; border: string; text: string; text2: string; text3: string };
+  authHeader?: Record<string, string>;
 }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
@@ -72,7 +151,7 @@ function ArticleAgentChat({
     try {
       const res = await fetch(`${apiBase}/v1/public/helpdesk/${slug}/articles/${articleSlug}/ask`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeader },
         body: JSON.stringify({ question: question.trim() }),
       });
       const data = await res.json();
@@ -185,6 +264,7 @@ export default function ArticlePage({
 }) {
   const { slug, articleSlug } = use(params);
   const [API] = useState(() => getApiBase());
+  const [authHeader, setAuthHeader] = useState<Record<string, string>>({});
   const [config, setConfig] = useState<Config | null>(null);
   const [article, setArticle] = useState<Article | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -192,17 +272,29 @@ export default function ArticlePage({
 
   useEffect(() => {
     async function load() {
+      let headers: Record<string, string> = {};
+      try {
+        const session = await getSession();
+        if (session?.accessToken) {
+          headers = { Authorization: `Bearer ${session.accessToken}` };
+        }
+      } catch {}
+      setAuthHeader(headers);
       try {
         setLoading(true);
         const [cfgRes, artRes] = await Promise.all([
-          fetch(`${API}/v1/public/helpdesk/${slug}/config`),
-          fetch(`${API}/v1/public/helpdesk/${slug}/articles/${articleSlug}`),
+          fetch(`${API}/v1/public/helpdesk/${slug}/config`, { headers }),
+          fetch(`${API}/v1/public/helpdesk/${slug}/articles/${articleSlug}`, { headers }),
         ]);
         if (cfgRes.ok) setConfig(await cfgRes.json());
-        if (!artRes.ok) {
+      if (!artRes.ok) {
+        if (artRes.status === 401 || artRes.status === 403) {
+          setError("Acesso restrito. Faça login para visualizar este artigo.");
+        } else {
           setError(artRes.status === 404 ? "Artigo não encontrado." : "Erro ao carregar artigo.");
-          return;
         }
+        return;
+      }
         setArticle(await artRes.json());
       } catch {
         setError("Erro de conexão.");
@@ -296,6 +388,16 @@ export default function ArticlePage({
           max-width: 100%;
           border-radius: 14px;
           margin: 20px 0;
+        }
+        .article-body iframe {
+          max-width: 100%;
+          border-radius: 14px;
+          margin: 20px 0;
+        }
+        .article-body .plyr {
+          border-radius: 14px;
+          margin: 20px 0;
+          overflow: hidden;
         }
         .article-body blockquote {
           border-left: 3px solid ${color};
@@ -517,11 +619,8 @@ export default function ArticlePage({
               </span>
             </div>
 
-            {/* Content */}
-            <div
-              className="article-body"
-              dangerouslySetInnerHTML={{ __html: article.content || "" }}
-            />
+        {/* Content */}
+        <ArticleContent html={article.content || ""} color={color} />
           </article>
         )}
       </main>
@@ -534,6 +633,7 @@ export default function ArticlePage({
           apiBase={API}
           color={color}
           t={{ bg: t.bg, surface: t.surface, border: t.border, text: t.text, text2: t.text2, text3: t.text3 }}
+          authHeader={authHeader}
         />
       )}
 

@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+	"github.com/uniq-chat/backend/internal/api/middleware"
 	"github.com/uniq-chat/backend/internal/models"
 	"github.com/uniq-chat/backend/internal/services"
 	"github.com/uniq-chat/backend/internal/storage"
@@ -580,6 +581,56 @@ func (h *HelpDeskHandler) UpdateConfig(c *fiber.Ctx) error {
 
 // ─── Public endpoints ─────────────────────────────────────────────────────────
 
+// checkHelpDeskVisibility enforces the visibility setting of a workspace's
+// help center on public endpoints. Returns nil if access is allowed, or a
+// Fiber error if blocked. Must be called AFTER OptionalAuth so c.Locals("user")
+// is available when a JWT was sent.
+//
+//   - "public"         → always allowed
+//   - "password"       → allowed (password is verified separately via PublicVerifyAccess)
+//   - "workspace_users" → requires a logged-in user who is a member of the workspace
+//   - "uniq_users"     → requires any logged-in user (any workspace)
+func (h *HelpDeskHandler) checkHelpDeskVisibility(c *fiber.Ctx, wsID uuid.UUID) error {
+	var cfg models.HelpDeskConfig
+	if err := h.db.Where("workspace_id = ?", wsID).First(&cfg).Error; err != nil {
+		return nil
+	}
+
+	switch cfg.Visibility {
+	case "public", "password":
+		return nil
+	case "uniq_users":
+		user := middleware.GetCurrentUser(c)
+		if user == nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error":      "autenticação necessária",
+				"visibility": "uniq_users",
+			})
+		}
+		return nil
+	case "workspace_users":
+		user := middleware.GetCurrentUser(c)
+		if user == nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error":      "autenticação necessária",
+				"visibility": "workspace_users",
+			})
+		}
+		var count int64
+		h.db.Model(&models.UserWorkspace{}).
+			Where("user_id = ? AND workspace_id = ?", user.ID, wsID).
+			Count(&count)
+		if count == 0 {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error":      "acesso restrito a membros da workspace",
+				"visibility": "workspace_users",
+			})
+		}
+		return nil
+	}
+	return nil
+}
+
 // lookupWorkspaceBySlug resolves by workspace.slug OR HelpDeskConfig.custom_slug
 // OR workspace.id (UUID direto). Comparação case-insensitive em todos os
 // lookups. Aceita UUID pra permitir preview funcionar mesmo quando o
@@ -695,6 +746,10 @@ func (h *HelpDeskHandler) PublicVerifyAccess(c *fiber.Ctx) error {
 		return h.publicNotFound(c, slug, "verify-access")
 	}
 
+	if err := h.checkHelpDeskVisibility(c, ws.ID); err != nil {
+		return err
+	}
+
 	var cfg models.HelpDeskConfig
 	if err := h.db.Where("workspace_id = ?", ws.ID).First(&cfg).Error; err != nil {
 		return c.JSON(fiber.Map{"valid": false})
@@ -730,6 +785,10 @@ func (h *HelpDeskHandler) PublicListCategories(c *fiber.Ctx) error {
 		return h.publicNotFound(c, slug, "categories")
 	}
 
+	if err := h.checkHelpDeskVisibility(c, ws.ID); err != nil {
+		return err
+	}
+
 	var cats []models.HelpDeskCategory
 	if err := h.db.Where("workspace_id = ?", ws.ID).
 		Order("position ASC, created_at ASC").
@@ -762,6 +821,10 @@ func (h *HelpDeskHandler) PublicListArticles(c *fiber.Ctx) error {
 		return h.publicNotFound(c, slug, "articles")
 	}
 
+	if err := h.checkHelpDeskVisibility(c, ws.ID); err != nil {
+		return err
+	}
+
 	query := h.db.Model(&models.HelpDeskArticle{}).
 		Preload("Category").
 		Where("workspace_id = ? AND status = ?", ws.ID, models.ArticlePublished)
@@ -791,6 +854,10 @@ func (h *HelpDeskHandler) PublicGetArticle(c *fiber.Ctx) error {
 	ws, err := h.lookupWorkspaceBySlug(wsSlug)
 	if err != nil {
 		return h.publicNotFound(c, wsSlug, "article")
+	}
+
+	if err := h.checkHelpDeskVisibility(c, ws.ID); err != nil {
+		return err
 	}
 
 	identifier := strings.TrimSpace(c.Params("slug"))
@@ -847,11 +914,11 @@ func (h *HelpDeskHandler) PublicGetArticle(c *fiber.Ctx) error {
 		slugs[i] = a.Slug
 	}
 	return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-		"error":              "artigo não encontrado ou não publicado",
-		"requested_slug":     identifier,
-		"workspace":          ws.Slug,
-		"sample_published":   slugs,
-		"hint":               "verifique se o artigo está em status='published' e o slug bate.",
+		"error":            "artigo não encontrado ou não publicado",
+		"requested_slug":   identifier,
+		"workspace":        ws.Slug,
+		"sample_published": slugs,
+		"hint":             "verifique se o artigo está em status='published' e o slug bate.",
 	})
 }
 
@@ -861,6 +928,10 @@ func (h *HelpDeskHandler) PublicAsk(c *fiber.Ctx) error {
 	ws, err := h.lookupWorkspaceBySlug(slug)
 	if err != nil {
 		return h.publicNotFound(c, slug, "ask")
+	}
+
+	if err := h.checkHelpDeskVisibility(c, ws.ID); err != nil {
+		return err
 	}
 
 	var body struct {
@@ -954,6 +1025,10 @@ func (h *HelpDeskHandler) PublicAskArticle(c *fiber.Ctx) error {
 	ws, err := h.lookupWorkspaceBySlug(slug)
 	if err != nil {
 		return h.publicNotFound(c, slug, "ask-article")
+	}
+
+	if err := h.checkHelpDeskVisibility(c, ws.ID); err != nil {
+		return err
 	}
 
 	articleSlug := c.Params("article_slug")
