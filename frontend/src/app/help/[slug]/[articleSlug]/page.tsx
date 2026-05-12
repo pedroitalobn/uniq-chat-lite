@@ -269,8 +269,14 @@ export default function ArticlePage({
   const [article, setArticle] = useState<Article | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accessGranted, setAccessGranted] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState(false);
+  const [checkingPassword, setCheckingPassword] = useState(false);
+  const [forbiddenMsg, setForbiddenMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       let headers: Record<string, string> = {};
       try {
@@ -282,28 +288,115 @@ export default function ArticlePage({
       setAuthHeader(headers);
       try {
         setLoading(true);
-        const [cfgRes, artRes] = await Promise.all([
-          fetch(`${API}/v1/public/helpdesk/${slug}/config`, { headers }),
-          fetch(`${API}/v1/public/helpdesk/${slug}/articles/${articleSlug}`, { headers }),
-        ]);
-        if (cfgRes.ok) setConfig(await cfgRes.json());
+        const cfgRes = await fetch(`${API}/v1/public/helpdesk/${slug}/config`, { headers });
+        if (!cfgRes.ok) {
+          setError("Central não encontrada.");
+          return;
+        }
+        const cfgData: Config = await cfgRes.json();
+        if (cancelled) return;
+        setConfig(cfgData);
+
+        const vis = cfgData.visibility || "public";
+        let granted = false;
+
+        if (vis === "public") {
+          granted = true;
+        } else if (vis === "password") {
+          const unlocked = sessionStorage.getItem(`hc_unlock_${slug}`) === "1";
+          granted = unlocked;
+        } else if (vis === "uniq_users") {
+          granted = !!headers.Authorization;
+        } else if (vis === "workspace_users") {
+          granted = !!headers.Authorization;
+        }
+
+        setAccessGranted(granted);
+
+        if (!granted) {
+          setLoading(false);
+          return;
+        }
+
+        const artRes = await fetch(`${API}/v1/public/helpdesk/${slug}/articles/${articleSlug}`, { headers });
+        if (cancelled) return;
+        if (!artRes.ok) {
+          if (artRes.status === 403) {
+            const data = await artRes.json().catch(() => ({}));
+            setForbiddenMsg(data.error || "Acesso restrito a membros da workspace.");
+            setAccessGranted(false);
+          } else if (artRes.status === 401) {
+            setAccessGranted(false);
+          } else {
+            setError(artRes.status === 404 ? "Artigo não encontrado." : "Erro ao carregar artigo.");
+          }
+          return;
+        }
+        setArticle(await artRes.json());
+      } catch {
+        if (!cancelled) setError("Erro de conexão.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [slug, articleSlug, API]);
+
+  const loadArticle = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const artRes = await fetch(`${API}/v1/public/helpdesk/${slug}/articles/${articleSlug}`, { headers: authHeader });
       if (!artRes.ok) {
-        if (artRes.status === 401 || artRes.status === 403) {
-          setError("Acesso restrito. Faça login para visualizar este artigo.");
+        if (artRes.status === 403) {
+          const data = await artRes.json().catch(() => ({}));
+          setForbiddenMsg(data.error || "Acesso restrito a membros da workspace.");
+          setAccessGranted(false);
+        } else if (artRes.status === 401) {
+          setAccessGranted(false);
         } else {
           setError(artRes.status === 404 ? "Artigo não encontrado." : "Erro ao carregar artigo.");
         }
         return;
       }
-        setArticle(await artRes.json());
-      } catch {
-        setError("Erro de conexão.");
-      } finally {
-        setLoading(false);
-      }
+      setArticle(await artRes.json());
+    } catch {
+      setError("Erro de conexão.");
+    } finally {
+      setLoading(false);
     }
-    load();
-  }, [slug, articleSlug, API]);
+  };
+
+  useEffect(() => {
+    if (accessGranted && !article && !error) {
+      loadArticle();
+    }
+  }, [accessGranted]);
+
+  const verifyPassword = async () => {
+    if (!passwordInput.trim()) return;
+    setCheckingPassword(true);
+    setPasswordError(false);
+    try {
+      const res = await fetch(`${API}/v1/public/helpdesk/${slug}/verify-access`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader },
+        body: JSON.stringify({ password: passwordInput }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        sessionStorage.setItem(`hc_unlock_${slug}`, "1");
+        setAccessGranted(true);
+      } else {
+        setPasswordError(true);
+      }
+    } catch {
+      setPasswordError(true);
+    } finally {
+      setCheckingPassword(false);
+    }
+  };
 
   const color = config?.primary_color || "#00d46a";
   const themeMode = config?.theme_mode ?? "dark";
@@ -522,6 +615,102 @@ export default function ArticlePage({
             >
               Voltar à central
             </Link>
+          </div>
+        )}
+
+        {!loading && !error && !accessGranted && config && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", animation: "hc-fade-in 0.3s ease" }}>
+            <div style={{ maxWidth: 380, width: "100%", textAlign: "center", display: "flex", flexDirection: "column", gap: 20 }}>
+              <div style={{ width: 64, height: 64, borderRadius: "50%", background: `${color}18`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, margin: "0 auto" }}>
+                {config.visibility === "password" ? "🔒" : "🛡️"}
+              </div>
+              <div>
+                <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: t.text }}>
+                  {config.visibility === "password" ? "Acesso protegido" : "Acesso restrito"}
+                </h1>
+                <p style={{ margin: "8px 0 0", fontSize: 14, color: t.text3, lineHeight: 1.5 }}>
+                  {forbiddenMsg
+                    ? forbiddenMsg
+                    : config.visibility === "password"
+                      ? "Esta central de ajuda requer uma senha para acessar."
+                      : config.visibility === "uniq_users"
+                        ? "Apenas usuários logados no Uniq têm acesso a esta central."
+                        : "Apenas membros da workspace têm acesso a esta central."}
+                </p>
+              </div>
+              {config.visibility === "password" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <input
+                    type="password"
+                    value={passwordInput}
+                    onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(false); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") verifyPassword(); }}
+                    placeholder="Digite a senha..."
+                    style={{
+                      width: "100%",
+                      padding: "12px 16px",
+                      borderRadius: 12,
+                      border: `1px solid ${passwordError ? "#ef4444" : t.border}`,
+                      background: t.surface,
+                      color: t.text,
+                      fontSize: 14,
+                      outline: "none",
+                    }}
+                  />
+                  {passwordError && (
+                    <p style={{ margin: 0, fontSize: 12, color: "#ef4444" }}>Senha incorreta. Tente novamente.</p>
+                  )}
+                  <button
+                    onClick={verifyPassword}
+                    disabled={checkingPassword || !passwordInput.trim()}
+                    style={{
+                      width: "100%",
+                      padding: "12px",
+                      borderRadius: 12,
+                      border: "none",
+                      background: color,
+                      color: "#fff",
+                      fontSize: 14,
+                      fontWeight: 700,
+                      cursor: checkingPassword || !passwordInput.trim() ? "not-allowed" : "pointer",
+                      opacity: checkingPassword || !passwordInput.trim() ? 0.7 : 1,
+                    }}
+                  >
+                    {checkingPassword ? "Verificando..." : "Entrar"}
+                  </button>
+                </div>
+              )}
+              {(config.visibility === "uniq_users" || config.visibility === "workspace_users") && (
+                <a
+                  href="/login"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    padding: "12px 24px",
+                    borderRadius: 12,
+                    background: color,
+                    color: "#fff",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    textDecoration: "none",
+                  }}
+                >
+                  Fazer login
+                </a>
+              )}
+              <Link
+                href={`/help/${slug}`}
+                style={{
+                  fontSize: 13,
+                  color: t.text3,
+                  textDecoration: "none",
+                }}
+              >
+                ← Voltar à central
+              </Link>
+            </div>
           </div>
         )}
 
