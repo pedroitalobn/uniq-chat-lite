@@ -303,6 +303,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	crmtasks.NewCrmTaskRunner(db, llmService, outboundReg).Start(context.Background())
 	// Shared pipeline reference so the backfill endpoint can run it on demand.
 	conversationPipeline := services.NewInboundPipeline(db, whatsapp.GetHub())
+	conversationPipeline.SetAutomationHandler(manager)
 	conversationH := handlers.NewConversationHandler(db, manager, outboundReg, conversationPipeline, llmService)
 	departmentH := handlers.NewDepartmentHandler(db)
 	teamH := handlers.NewTeamHandler(db)

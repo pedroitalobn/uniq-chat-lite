@@ -50,13 +50,20 @@ type Broadcaster interface {
 	Broadcast(event *whatsapp.Event)
 }
 
+// AutomationHandler is the small surface used to hand a normalized inbound
+// message to journeys and agents after async processing, such as STT.
+type AutomationHandler interface {
+	HandleIncomingAutomation(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool)
+}
+
 // InboundPipeline is the channel-agnostic entry point.
 type InboundPipeline struct {
-	db       *gorm.DB
-	hub      Broadcaster
-	dispatch *DispatchService
-	triggers *TriggerService // optional — wired by SetTriggerService
-	stt      *STTService     // optional — quando set, transcreve voice notes recebidos via Whisper
+	db         *gorm.DB
+	hub        Broadcaster
+	dispatch   *DispatchService
+	triggers   *TriggerService   // optional — wired by SetTriggerService
+	automation AutomationHandler // optional — journeys/agents after async enrichment
+	stt        *STTService       // optional — quando set, transcreve voice notes recebidos via Whisper
 }
 
 func NewInboundPipeline(db *gorm.DB, hub Broadcaster) *InboundPipeline {
@@ -67,6 +74,12 @@ func NewInboundPipeline(db *gorm.DB, hub Broadcaster) *InboundPipeline {
 // pipeline. Optional — quando nil, triggers ficam inertes.
 func (p *InboundPipeline) SetTriggerService(s *TriggerService) {
 	p.triggers = s
+}
+
+// SetAutomationHandler wires journeys/agents into async inbound enrichments.
+// Audio messages reach the agent only after STT produces usable text.
+func (p *InboundPipeline) SetAutomationHandler(h AutomationHandler) {
+	p.automation = h
 }
 
 // HasSTT — true se a pipeline tem STTService injetado e disponível.
@@ -850,6 +863,56 @@ func (p *InboundPipeline) transcribeAudioAsync(msg *models.MessageLog, conv *mod
 		Str("msg_id", msg.ID.String()).
 		Int("text_len", len(text)).
 		Msg("stt: voice note transcrito")
+
+	p.dispatchTranscribedAudioToAutomation(msg, conv, text)
+}
+
+func (p *InboundPipeline) dispatchTranscribedAudioToAutomation(msg *models.MessageLog, conv *models.Conversation, text string) {
+	if p == nil || p.automation == nil || msg == nil {
+		return
+	}
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return
+	}
+
+	channelKey := strings.TrimSpace(msg.ToJID)
+	if channelKey == "" && conv != nil {
+		channelKey = strings.TrimSpace(conv.ChannelKey)
+	}
+	fromJID := channelKey
+	fromName := strings.TrimSpace(msg.ContactName)
+	if fromName == "" {
+		fromName = strings.TrimSpace(msg.SenderName)
+	}
+
+	groupJID := ""
+	isGroup := strings.Contains(strings.ToLower(channelKey), "@g.us")
+	if isGroup {
+		groupJID = channelKey
+		if strings.TrimSpace(msg.SenderJID) != "" {
+			fromJID = strings.TrimSpace(msg.SenderJID)
+		}
+	}
+	if fromJID == "" {
+		return
+	}
+
+	messageID := strings.TrimSpace(msg.ExternalMessageID)
+	if messageID == "" {
+		messageID = msg.ID.String()
+	}
+
+	go p.automation.HandleIncomingAutomation(
+		msg.InstanceID.String(),
+		messageID,
+		fromJID,
+		fromName,
+		groupJID,
+		text,
+		"audio",
+		isGroup,
+	)
 }
 
 // extractAudioRefs vasculha o JSON do Content em busca da URL de mídia e do

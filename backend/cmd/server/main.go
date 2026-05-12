@@ -85,13 +85,12 @@ func main() {
 			END $$;`).Error
 	}
 
-
-		// Phone column — precisa rodar ANTES do AutoMigrate porque o
-		// GORM lê a tag `gorm:"not null"` do model e gera ALTER TABLE
-		// sem DEFAULT, quebrando em tabelas com dados existentes.
-		// ADD COLUMN IF NOT EXISTS com DEFAULT '' resolve na frente.
-		db.Exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NOT NULL DEFAULT ''")
-		db.Exec("ALTER TABLE pending_registrations ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NOT NULL DEFAULT ''")
+	// Phone column — precisa rodar ANTES do AutoMigrate porque o
+	// GORM lê a tag `gorm:"not null"` do model e gera ALTER TABLE
+	// sem DEFAULT, quebrando em tabelas com dados existentes.
+	// ADD COLUMN IF NOT EXISTS com DEFAULT '' resolve na frente.
+	db.Exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NOT NULL DEFAULT ''")
+	db.Exec("ALTER TABLE pending_registrations ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NOT NULL DEFAULT ''")
 
 	// Auto-migrate. Em prod uma migration ruim (ex: default JSONB
 	// inválido, FK pendente) derrubava o boot inteiro — o que
@@ -277,6 +276,7 @@ func main() {
 	// Conversations for the new atendimento module). Wired into the same
 	// SaveMessage hook used by legacy Inbox — co-exists during migration.
 	inboundPipeline := services.NewInboundPipeline(db, whatsapp.GetHub())
+	inboundPipeline.SetAutomationHandler(manager)
 	// Sprint 8: keyword triggers (autoresponder simples)
 	triggerSvc := services.NewTriggerService(db, manager)
 	inboundPipeline.SetTriggerService(triggerSvc)
@@ -354,6 +354,12 @@ func main() {
 	// expiradas pela Meta. Roda a cada 20min, max ~200 lookups por tick.
 	profileSyncCron := services.NewProfileSyncCron(db, manager)
 	profileSyncCron.Start()
+
+	// Message sync cron — sincroniza mensagens automaticamente a cada 15min
+	// para instâncias conectadas. Detecta instâncias "stuck" (sem mensagens
+	// inbound há > 30min) e dispara history sync / reconnect automaticamente.
+	messageSyncCron := services.NewMessageSyncCron(db, manager)
+	messageSyncCron.Start()
 
 	// Overage invoice cron — roda 1x por dia. Pra cada UsageQuota com
 	// period_end vencido E overage_cents_accumulated > 0 cria invoice
@@ -649,8 +655,8 @@ func seedPlans(db *gorm.DB) {
 			// StripePriceID lido de STRIPE_PRICE_STARTER abaixo via setPriceID.
 			// Antes ficava hardcoded num price antigo (price_1TFmWy...) que
 			// sobreviveu pra rows existentes mesmo após o admin trocar o env.
-			StripePriceID:         os.Getenv("STRIPE_PRICE_STARTER"),
-			AbacatepayProductID:   os.Getenv("ABACATEPAY_PRODUCT_STARTER"),
+			StripePriceID:       os.Getenv("STRIPE_PRICE_STARTER"),
+			AbacatepayProductID: os.Getenv("ABACATEPAY_PRODUCT_STARTER"),
 		},
 		{
 			Name:                  "Pro",
@@ -1162,4 +1168,3 @@ func seedPermissions(db *gorm.DB) {
 	}
 	log.Info().Msg("permissions seeded")
 }
-

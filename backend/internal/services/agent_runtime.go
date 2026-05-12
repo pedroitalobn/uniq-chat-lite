@@ -534,6 +534,9 @@ func (r *AgentRuntime) buildUserPrompt(instanceID uuid.UUID, fromJID, fromName, 
 	b.WriteString("Contexto da conversa em tempo real.\n")
 	b.WriteString(fmt.Sprintf("Contato: %s\n", strings.TrimSpace(fromName)))
 	b.WriteString(fmt.Sprintf("Canal: WhatsApp\nTipo da mensagem: %s\n", messageType))
+	if messageType == "audio" {
+		b.WriteString("A última mensagem foi uma mensagem de voz. Use a transcrição automática abaixo como conteúdo do cliente.\n")
+	}
 	if history != "" {
 		b.WriteString("\nHistórico recente:\n")
 		b.WriteString(history)
@@ -647,6 +650,9 @@ func (r *AgentRuntime) recentHistory(instanceID uuid.UUID, fromJID string, limit
 	lines := make([]string, 0, len(logs))
 	for i := len(logs) - 1; i >= 0; i-- {
 		content := strings.TrimSpace(logContent(logs[i].Content))
+		if logs[i].Type == "audio" && strings.TrimSpace(logs[i].Transcription) != "" {
+			content = "[áudio transcrito] " + strings.TrimSpace(logs[i].Transcription)
+		}
 		if content == "" {
 			continue
 		}
