@@ -355,6 +355,12 @@ func main() {
 	profileSyncCron := services.NewProfileSyncCron(db, manager)
 	profileSyncCron.Start()
 
+	// Message sync cron — sincroniza mensagens automaticamente a cada 15min
+	// para instâncias conectadas. Detecta instâncias "stuck" (sem mensagens
+	// inbound há > 30min) e dispara history sync / reconnect automaticamente.
+	messageSyncCron := services.NewMessageSyncCron(db, manager)
+	messageSyncCron.Start()
+
 	// Overage invoice cron — roda 1x por dia. Pra cada UsageQuota com
 	// period_end vencido E overage_cents_accumulated > 0 cria invoice
 	// avulsa na Stripe + zera o acumulador. Free PAYG sem stripe_customer
