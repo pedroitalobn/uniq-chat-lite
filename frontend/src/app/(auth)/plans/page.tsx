@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Check, ArrowRight, Zap, Building2, Sparkles,
   MessageSquare, Shield, Globe, Headphones,
-  Users, Loader2, ChevronLeft, Star, Flame, Ticket,
+  Users, Loader2, ChevronLeft, Star, Flame, Ticket, Mail, Briefcase,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
@@ -227,6 +227,16 @@ function PlansContent() {
     queryKey: ["plans-public"],
     queryFn: () => fetch(`${API_BASE}/stripe/plans`).then((r) => r.json()),
   });
+  const visiblePlans = plans.filter((plan) => plan.name?.toLowerCase() !== "lifetime");
+  const planCount = visiblePlans.length;
+  const gridClass =
+    planCount <= 1
+      ? "grid grid-cols-1 max-w-sm mx-auto"
+      : planCount === 2
+        ? "grid grid-cols-1 md:grid-cols-2 max-w-3xl mx-auto"
+      : planCount === 3
+          ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 max-w-6xl mx-auto"
+          : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4";
 
   useEffect(() => {
     fetch(`${API_BASE}/invites/status`)
@@ -344,13 +354,69 @@ function PlansContent() {
             <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--text-4)" }} />
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-10 pb-6 pt-2 items-stretch">
-            {plans.map((plan) => (
-              <div key={plan.id} className="w-full h-full min-w-0">
-                <PlanCard plan={plan} onSelect={handleSelect} loading={selecting === plan.id} disabled={!canSelect} />
+          <>
+            <div className={cn(gridClass, "gap-3 sm:gap-4 mb-5 sm:mb-6 pb-2 pt-2 items-stretch")}>
+              {visiblePlans.map((plan) => (
+                <div key={plan.id} className="w-full h-full min-w-0">
+                  <PlanCard plan={plan} onSelect={handleSelect} loading={selecting === plan.id} disabled={!canSelect} />
+                </div>
+              ))}
+            </div>
+
+            <div
+              className="relative overflow-hidden rounded-2xl p-4 sm:p-5 mb-10"
+              style={{
+                background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(167,139,250,0.06) 55%, rgba(255,255,255,0.03) 100%)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                boxShadow: "0 12px 40px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05)",
+              }}
+            >
+              <div
+                className="pointer-events-none absolute -right-10 top-1/2 h-36 w-36 -translate-y-1/2 rounded-full"
+                style={{ background: "radial-gradient(circle, rgba(0,212,106,0.14) 0%, transparent 72%)" }}
+              />
+              <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div
+                      className="flex h-9 w-9 items-center justify-center rounded-xl"
+                      style={{ background: "rgba(0,212,106,0.12)", border: "1px solid rgba(0,212,106,0.2)", color: "var(--green)" }}
+                    >
+                      <Briefcase className="w-4 h-4" />
+                    </div>
+                    <span
+                      className="rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.24em]"
+                      style={{ background: "rgba(255,255,255,0.05)", color: "var(--text-3)", border: "1px solid rgba(255,255,255,0.06)" }}
+                    >
+                      Plano customizado
+                    </span>
+                  </div>
+                  <h2 className="text-lg sm:text-xl font-semibold mb-1" style={{ color: "var(--text-1)" }}>
+                    Precisa de um plano sob medida?
+                  </h2>
+                  <p className="text-sm max-w-2xl leading-relaxed" style={{ color: "var(--text-3)" }}>
+                    Montamos condições personalizadas para operação com mais volume, multi-workspace, necessidades enterprise,
+                    onboarding dedicado e regras comerciais específicas.
+                  </p>
+                </div>
+
+                <a
+                  href="mailto:comercial@uniq.chat?subject=Plano%20customizado%20Uniq"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-150 active:scale-[0.98] sm:min-w-[220px]"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(0,212,106,0.18) 0%, rgba(0,212,106,0.1) 100%)",
+                    color: "var(--green)",
+                    border: "1px solid rgba(0,212,106,0.28)",
+                    boxShadow: "0 0 18px rgba(0,212,106,0.12)",
+                  }}
+                >
+                  <Mail className="w-4 h-4" />
+                  Falar com time comercial
+                  <ArrowRight className="w-4 h-4" />
+                </a>
               </div>
-            ))}
-          </div>
+            </div>
+          </>
         )}
 
         <div className="flex items-center justify-center gap-6 flex-wrap">
