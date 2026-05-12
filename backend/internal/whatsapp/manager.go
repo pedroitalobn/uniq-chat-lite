@@ -456,6 +456,16 @@ func (m *Manager) SaveMessageEx(in SaveMessageInput) error {
 	// Use a Go-computed cutoff instead of datetime('now', ...) so the query
 	// works on both SQLite (dev) and Postgres (prod).
 	var count int64
+	if in.ExternalMessageID != "" {
+		m.db.Model(&models.MessageLog{}).Where(
+			"instance_id = ? AND external_message_id = ?",
+			instUUID, in.ExternalMessageID,
+		).Count(&count)
+		if count > 0 {
+			log.Printf("DEBUG: Skipping duplicate external message %s for %s", in.ExternalMessageID, toJID)
+			return nil
+		}
+	}
 	cutoff := time.Now().Add(-2 * time.Second)
 	m.db.Model(&models.MessageLog{}).Where(
 		"instance_id = ? AND to_jid = ? AND content = ? AND direction = ? AND created_at > ?",
@@ -620,6 +630,52 @@ func (m *Manager) UpdateEditedMessage(instanceID, originalStanzaID, newContent s
 		return false
 	}
 	return res.RowsAffected > 0
+}
+
+func (m *Manager) MarkMessageRevoked(instanceID, originalStanzaID string) bool {
+	if m.db == nil || originalStanzaID == "" {
+		return false
+	}
+	instUUID, err := uuid.Parse(instanceID)
+	if err != nil {
+		return false
+	}
+	var msg models.MessageLog
+	if err := m.db.
+		Where("instance_id = ? AND external_message_id = ?", instUUID, originalStanzaID).
+		Order("created_at DESC").
+		First(&msg).Error; err != nil {
+		return false
+	}
+	if err := m.db.Model(&msg).Updates(map[string]any{
+		"is_deleted": true,
+		"type":       "revoke",
+		"content":    "",
+	}).Error; err != nil {
+		log.Warn().Err(err).Msg("MarkMessageRevoked: falhou")
+		return false
+	}
+	msg.IsDeleted = true
+	msg.Type = "revoke"
+	msg.Content = ""
+	if hub := GetHub(); hub != nil && msg.ConversationID != nil {
+		payload := map[string]any{
+			"conversation_id": msg.ConversationID.String(),
+			"message_id":      msg.ID.String(),
+			"message":         msg,
+		}
+		workspaceID := ""
+		if msg.WorkspaceID != nil {
+			workspaceID = msg.WorkspaceID.String()
+		}
+		hub.Broadcast(&Event{
+			Type:      "conversation.message_updated",
+			Instance:  instanceID,
+			Workspace: workspaceID,
+			Payload:   payload,
+		})
+	}
+	return true
 }
 
 // ApplyReceipt persiste delivery/read receipts vindo do whatsmeow.
@@ -1411,6 +1467,9 @@ func (m *Manager) CheckJourneys(instanceID, messageID, fromJID, fromName, groupJ
 // HandleIncomingAutomation runs journeys first and only falls back to the
 // instance agent when no journey consumed the incoming message.
 func (m *Manager) HandleIncomingAutomation(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) {
+	if !m.shouldRunAutomation(instanceID, fromJID, groupJID, messageType) {
+		return
+	}
 	handledByJourney := false
 	if ex := m.JourneyExecutorRef(); ex != nil {
 		handledByJourney = ex.HandleIncoming(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType, isGroup)
@@ -1423,6 +1482,63 @@ func (m *Manager) HandleIncomingAutomation(instanceID, messageID, fromJID, fromN
 	if rt := m.AgentRuntimeRef(); rt != nil {
 		rt.HandleIncoming(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType, isGroup)
 	}
+}
+
+func (m *Manager) shouldRunAutomation(instanceID, fromJID, groupJID, messageType string) bool {
+	mt := strings.ToLower(strings.TrimSpace(messageType))
+	switch mt {
+	case "protocol", "revoke", "reaction", "status":
+		return false
+	}
+	identity := strings.ToLower(strings.TrimSpace(fromJID + " " + groupJID))
+	if strings.Contains(identity, "status@broadcast") || strings.Contains(identity, "@newsletter") {
+		return false
+	}
+	if m.isManagedWhatsAppSender(instanceID, fromJID) {
+		m.LogInstanceEvent(instanceID, "warn", "automation", "managed_instance_sender_blocked", "Automação bloqueada para evitar loop entre instâncias Uniq", map[string]any{"from_jid": fromJID})
+		return false
+	}
+	return true
+}
+
+func (m *Manager) isManagedWhatsAppSender(currentInstanceID, fromJID string) bool {
+	if m == nil || m.db == nil {
+		return false
+	}
+	fromPhone := digitsOnly(extractPhoneFromJID(fromJID))
+	if fromPhone == "" {
+		return false
+	}
+	currentID, _ := uuid.Parse(currentInstanceID)
+	var instances []models.Instance
+	if err := m.db.Select("id, phone_number").
+		Where("channel IN ? AND phone_number <> ''", []models.ChannelType{models.ChannelWhatsApp, models.ChannelWABA}).
+		Find(&instances).Error; err != nil {
+		return false
+	}
+	for _, inst := range instances {
+		if currentID != uuid.Nil && inst.ID == currentID {
+			continue
+		}
+		phone := digitsOnly(inst.PhoneNumber)
+		if phone == "" {
+			continue
+		}
+		if phone == fromPhone || strings.HasSuffix(fromPhone, phone) || strings.HasSuffix(phone, fromPhone) {
+			return true
+		}
+	}
+	return false
+}
+
+func digitsOnly(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 // completeExecution marca uma execução como completa

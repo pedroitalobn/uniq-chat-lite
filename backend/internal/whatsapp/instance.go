@@ -2806,8 +2806,32 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 			msgType = "ephemeral"
 			text = "Mensagem efêmera"
 		case v.Message.GetProtocolMessage() != nil:
-			msgType = "protocol"
-			text = "Mensagem removida"
+			protocol := v.Message.GetProtocolMessage()
+			targetID := ""
+			if key := protocol.GetKey(); key != nil {
+				targetID = key.GetID()
+			}
+			data := map[string]interface{}{
+				"id":                v.Info.ID,
+				"from":              v.Info.Sender.String(),
+				"chat":              v.Info.Chat.String(),
+				"timestamp":         v.Info.Timestamp,
+				"type":              "revoke",
+				"protocol_type":     protocol.GetType().String(),
+				"target_message_id": targetID,
+				"is_group":          isGroup,
+				"from_me":           isFromMe,
+				"push_name":         v.Info.PushName,
+			}
+			addJIDDuality(data, v.Info.MessageSource)
+			ic.broadcastWS("message.deleted", data)
+			ic.dispatchEvent("message.deleted", data, ctx)
+			if protocol.GetType() == waE2E.ProtocolMessage_REVOKE && targetID != "" && GlobalManager != nil {
+				if !GlobalManager.MarkMessageRevoked(ic.ID, targetID) {
+					GlobalManager.LogInstanceEvent(ic.ID, "warn", "whatsapp", "revoke_unmatched", "WhatsApp informou remoção de mensagem não encontrada no histórico local", data)
+				}
+			}
+			return
 		default:
 			log.Printf("DEBUG: Unknown message type: %T", v.Message)
 			msgType = "text"
@@ -2950,7 +2974,7 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		}()
 
 		// Check and execute journeys for incoming messages
-		if evName == "message.received" && !isFromMe && chatJID != "status@broadcast" {
+		if evName == "message.received" && !isFromMe && chatJID != "status@broadcast" && !strings.Contains(strings.ToLower(chatJID), "@newsletter") {
 			if GlobalManager != nil {
 				journeyChatJID := chatJID
 				journeySenderJID := senderJID

@@ -52,6 +52,10 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 	if text == "" || text == "—" {
 		return false
 	}
+	mt := strings.ToLower(strings.TrimSpace(messageType))
+	if mt == "protocol" || mt == "revoke" || mt == "status" || strings.Contains(strings.ToLower(fromJID), "@newsletter") {
+		return false
+	}
 	if strings.HasPrefix(text, "/") {
 		return false
 	}
