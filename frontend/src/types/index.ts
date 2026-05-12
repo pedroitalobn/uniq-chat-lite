@@ -283,6 +283,9 @@ export interface MessageLog {
   direction: "in" | "out";
   type: string;
   to_jid?: string;
+  sender_jid?: string;
+  sender_name?: string;
+  contact_name?: string;
   content: string;
   status: string;
   created_at: string;
