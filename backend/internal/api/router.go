@@ -583,6 +583,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 
 	registerPreInst("GET", "/profile", instanceH.Profile)
 	registerPreInst("GET", "/status", instanceH.Status)
+	registerPreInst("GET", "/safety", instanceH.SafetyStatus)
+	registerPreInst("POST", "/safety/resume", instanceH.ResumeSafety)
+	registerPreInst("POST", "/safety/review", instanceH.KeepSafetyPaused)
 	registerPreInst("GET", "/qr", instanceH.GetQR)
 	registerPreInst("GET", "/chats", msgH.GetChats)
 	registerPreInst("GET", "/contacts", msgH.GetContacts)
@@ -875,6 +878,9 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	instance.Post("/disconnect", instanceH.Disconnect)
 	instance.Post("/reconnect", instanceH.Reconnect)
 	instance.Get("/status", instanceH.Status)
+	instance.Get("/safety", instanceH.SafetyStatus)
+	instance.Post("/safety/resume", instanceH.ResumeSafety)
+	instance.Post("/safety/review", instanceH.KeepSafetyPaused)
 	instance.Post("/contact/info", instanceH.ContactInfo)
 	instance.Post("/contact/avatar", instanceH.ContactAvatar)
 
@@ -982,6 +988,10 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	instance.Get("/mcp/sse", mcpH.SSE)
 	instance.Post("/mcp/message", mcpH.Message)
 	instance.Get("/mcp/tools", mcpH.Tools)
+
+	instance.Get("/safety", instanceH.SafetyStatus)
+	instance.Post("/safety/resume", instanceH.ResumeSafety)
+	instance.Post("/safety/review", instanceH.KeepSafetyPaused)
 
 	// Proxy (read-only na instância — config fica no server)
 	instance.Get("/proxy", proxyH.Get)

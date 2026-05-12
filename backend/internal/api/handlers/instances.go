@@ -1058,6 +1058,11 @@ func (h *InstanceHandler) InstagramSendDM(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "body inválido"})
 	}
+	if h.manager != nil {
+		if err := h.manager.CheckOutboundSafety(instance.ID.String(), req.Recipient, req.Message, "instagram_dm"); err != nil {
+			return c.Status(423).JSON(fiber.Map{"error": err.Error()})
+		}
+	}
 
 	resp, err := h.instagram.SendDM(c.Context(), instance.ID.String(), req.Recipient, req.Message)
 	if err != nil {
@@ -1402,6 +1407,11 @@ func (h *InstanceHandler) InstagramDMReply(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil || req.ThreadID == "" || req.Text == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "thread_id e text são obrigatórios"})
 	}
+	if h.manager != nil {
+		if err := h.manager.CheckOutboundSafety(instance.ID.String(), req.ThreadID, req.Text, "instagram_dm_reply"); err != nil {
+			return c.Status(423).JSON(fiber.Map{"error": err.Error()})
+		}
+	}
 	if err := h.instagram.ReplyDM(c.Context(), instance.ID.String(), req.ThreadID, req.Text); err != nil {
 		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -1485,7 +1495,7 @@ func generateDeviceID(username string) string {
 var _ = uuid.Nil
 
 // unsubscribeWABA — chamado antes do Delete da instância WABA pra:
-//   1. DELETE /{waba_id}/subscribed_apps  (Meta para de mandar webhooks)
+//  1. DELETE /{waba_id}/subscribed_apps  (Meta para de mandar webhooks)
 //
 // Best-effort: erros são logados mas não bloqueiam a deleção local.
 func (h *InstanceHandler) unsubscribeWABA(waba *models.WABAInstance) {

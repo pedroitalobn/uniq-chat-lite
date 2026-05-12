@@ -9,6 +9,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -639,7 +640,40 @@ func (ic *InstanceClient) cacheRecipient(phoneJID, resolved types.JID) {
 // preventivo.
 func (ic *InstanceClient) sendMessage(ctx context.Context, recipient types.JID, msg *waE2E.Message) (whatsmeow.SendResponse, error) {
 	recipient = ic.resolveRecipient(ctx, recipient)
+	if ic.manager != nil {
+		msgType, content := safetyMessageSummary(msg)
+		if err := ic.manager.CheckOutboundSafety(ic.ID, recipient.String(), content, msgType); err != nil {
+			return whatsmeow.SendResponse{}, err
+		}
+	}
 	return ic.client.SendMessage(ctx, recipient, msg)
+}
+
+func safetyMessageSummary(msg *waE2E.Message) (string, string) {
+	if msg == nil {
+		return "unknown", ""
+	}
+	switch {
+	case msg.GetConversation() != "":
+		return "text", msg.GetConversation()
+	case msg.GetExtendedTextMessage() != nil:
+		return "text", msg.GetExtendedTextMessage().GetText()
+	case msg.GetImageMessage() != nil:
+		return "image", msg.GetImageMessage().GetCaption()
+	case msg.GetVideoMessage() != nil:
+		return "video", msg.GetVideoMessage().GetCaption()
+	case msg.GetAudioMessage() != nil:
+		return "audio", "audio"
+	case msg.GetDocumentMessage() != nil:
+		return "document", msg.GetDocumentMessage().GetFileName()
+	case msg.GetStickerMessage() != nil:
+		return "sticker", "sticker"
+	case msg.GetReactionMessage() != nil:
+		return "reaction", msg.GetReactionMessage().GetText()
+	case msg.GetProtocolMessage() != nil:
+		return "protocol", msg.GetProtocolMessage().GetType().String()
+	}
+	return strings.TrimPrefix(reflect.TypeOf(msg).String(), "*"), ""
 }
 
 func (ic *InstanceClient) SendTextMessage(to, text string) (string, error) {

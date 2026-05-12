@@ -50,6 +50,16 @@ type Manager struct {
 	executor   JourneyExecutor
 	agentRT    AgentRuntime
 	inboundP   InboundProcessor
+	safetyMu   sync.Mutex
+	safety     map[string][]safetySendEvent
+}
+
+type safetySendEvent struct {
+	At        time.Time
+	To        string
+	Content   string
+	ContentFP string
+	MsgType   string
 }
 
 // SetJourneyExecutor injeta o executor (chamado no bootstrap do servidor)
@@ -99,6 +109,7 @@ func NewManager(sessionDir string, db *gorm.DB) *Manager {
 		consumers:  make(map[string]context.CancelFunc),
 		sessionDir: sessionDir,
 		db:         db,
+		safety:     make(map[string][]safetySendEvent),
 	}
 	GlobalManager = m
 	return m
@@ -134,8 +145,180 @@ func (m *Manager) LogInstanceEvent(instanceID, level, source, event, message str
 	}).Error
 }
 
+func (m *Manager) IsInstancePaused(instanceID string) bool {
+	if m == nil || m.db == nil || instanceID == "" {
+		return false
+	}
+	var paused bool
+	_ = m.db.Model(&models.Instance{}).Select("is_paused").Where("id = ?", instanceID).Scan(&paused).Error
+	return paused
+}
+
+func (m *Manager) CheckOutboundSafety(instanceID, toJID, content, msgType string) error {
+	if m == nil || m.db == nil {
+		return nil
+	}
+	if m.IsInstancePaused(instanceID) {
+		return fmt.Errorf("instância pausada por segurança anti-ban")
+	}
+	now := time.Now()
+	fp := safetyFingerprint(content)
+	event := safetySendEvent{At: now, To: toJID, Content: content, ContentFP: fp, MsgType: msgType}
+
+	m.safetyMu.Lock()
+	events := append(m.safety[instanceID], event)
+	cutoff := now.Add(-10 * time.Minute)
+	kept := events[:0]
+	for _, e := range events {
+		if e.At.After(cutoff) {
+			kept = append(kept, e)
+		}
+	}
+	m.safety[instanceID] = kept
+	risky, reason, message, meta := evaluateSafetyRisk(kept, now)
+	m.safetyMu.Unlock()
+
+	if !risky {
+		return nil
+	}
+	m.PauseInstanceForSafety(instanceID, reason, message, meta)
+	return fmt.Errorf("envio bloqueado por segurança anti-ban: %s", message)
+}
+
+func evaluateSafetyRisk(events []safetySendEvent, now time.Time) (bool, string, string, map[string]any) {
+	lastMinute := 0
+	perRecipient := map[string]int{}
+	perContent := map[string]int{}
+	shortGaps := 0
+	var prev *safetySendEvent
+	for i := range events {
+		e := events[i]
+		if e.At.After(now.Add(-1 * time.Minute)) {
+			lastMinute++
+			perRecipient[e.To]++
+			if e.ContentFP != "" {
+				perContent[e.ContentFP]++
+			}
+		}
+		if prev != nil && e.At.Sub(prev.At) < 2*time.Second {
+			shortGaps++
+		}
+		prev = &events[i]
+	}
+	meta := map[string]any{"last_minute": lastMinute, "short_gaps": shortGaps}
+	if lastMinute >= 10 {
+		return true, "burst_outbound", "muitas mensagens enviadas em menos de 1 minuto", meta
+	}
+	for to, count := range perRecipient {
+		if count >= 6 {
+			meta["recipient"] = to
+			meta["recipient_count"] = count
+			return true, "recipient_burst", "envios repetidos para o mesmo destino em curto intervalo", meta
+		}
+	}
+	for fp, count := range perContent {
+		if count >= 4 {
+			meta["content_fingerprint"] = fp
+			meta["same_content_count"] = count
+			return true, "repeated_content", "mesmo conteúdo enviado repetidamente em curto intervalo", meta
+		}
+	}
+	if shortGaps >= 5 {
+		return true, "missing_delay", "envios em sequência sem delay humano suficiente", meta
+	}
+	return false, "", "", meta
+}
+
+func (m *Manager) PauseInstanceForSafety(instanceID, reason, message string, metadata map[string]any) {
+	if m == nil || m.db == nil {
+		return
+	}
+	instID, err := uuid.Parse(instanceID)
+	if err != nil {
+		return
+	}
+	meta := ""
+	if metadata != nil {
+		if b, err := json.Marshal(metadata); err == nil {
+			meta = string(b)
+		}
+	}
+	now := time.Now()
+	m.db.Model(&models.Instance{}).Where("id = ?", instID).Updates(map[string]any{
+		"is_paused": true,
+		"status":    models.StatusDisconnected,
+	})
+	m.db.Model(&models.InstanceSafetyIncident{}).
+		Where("instance_id = ? AND status = ?", instID, "active").
+		Updates(map[string]any{"status": "resolved", "resolved_at": now})
+	_ = m.db.Create(&models.InstanceSafetyIncident{
+		InstanceID: instID,
+		Status:     "active",
+		Severity:   "high",
+		Reason:     reason,
+		Message:    message,
+		Metadata:   meta,
+	}).Error
+	m.StopInstance(instanceID)
+	m.LogInstanceEvent(instanceID, "error", "safety", "instance_paused", "Instância pausada por segurança anti-ban", map[string]any{"reason": reason, "message": message, "metadata": metadata})
+	if hub := GetHub(); hub != nil {
+		hub.BroadcastInstanceStatus(instanceID, "disconnected", "")
+	}
+}
+
+func (m *Manager) ResumeInstanceSafety(instanceID string) error {
+	if m == nil || m.db == nil {
+		return nil
+	}
+	instID, err := uuid.Parse(instanceID)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	if err := m.db.Model(&models.InstanceSafetyIncident{}).
+		Where("instance_id = ? AND status = ?", instID, "active").
+		Updates(map[string]any{"status": "resolved", "resolved_at": now}).Error; err != nil {
+		return err
+	}
+	if err := m.db.Model(&models.Instance{}).Where("id = ?", instID).Update("is_paused", false).Error; err != nil {
+		return err
+	}
+	m.safetyMu.Lock()
+	delete(m.safety, instanceID)
+	m.safetyMu.Unlock()
+
+	var inst models.Instance
+	if err := m.db.First(&inst, "id = ?", instID).Error; err != nil {
+		return err
+	}
+	m.LogInstanceEvent(instanceID, "info", "safety", "instance_resumed", "Instância retomada após pausa anti-ban", nil)
+	if inst.Channel == models.ChannelWhatsApp {
+		inst.Status = models.StatusDisconnected
+		if err := m.StartInstance(&inst); err != nil {
+			return err
+		}
+		m.db.Model(&inst).Update("status", models.StatusConnecting)
+	}
+	return nil
+}
+
+func safetyFingerprint(content string) string {
+	normalized := strings.ToLower(strings.Join(strings.Fields(content), " "))
+	if normalized == "" {
+		return ""
+	}
+	if len(normalized) > 180 {
+		normalized = normalized[:180]
+	}
+	return normalized
+}
+
 // StartInstance starts (or restarts) the WhatsApp client for the given instance.
 func (m *Manager) StartInstance(instance *models.Instance) error {
+	if instance.IsPaused {
+		m.LogInstanceEvent(instance.ID.String(), "warn", "safety", "start_blocked_paused", "Inicialização bloqueada: instância pausada por segurança", nil)
+		return fmt.Errorf("instância pausada por segurança anti-ban")
+	}
 	// Defensive check: bloqueia status terminais (banned/error). Aceitamos
 	// connected/disconnected E connecting — esse último é estado transitório
 	// que persiste no DB quando o backend é reiniciado durante o handshake
@@ -1044,6 +1227,10 @@ func (m *Manager) RestartWithProxy(instance *models.Instance) error {
 
 // StartInstanceForPairing starts the instance in phone-pairing mode (no QR channel).
 func (m *Manager) StartInstanceForPairing(instance *models.Instance) error {
+	if instance.IsPaused {
+		m.LogInstanceEvent(instance.ID.String(), "warn", "safety", "pairing_blocked_paused", "Pareamento bloqueado: instância pausada por segurança", nil)
+		return fmt.Errorf("instância pausada por segurança anti-ban")
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -1467,6 +1654,9 @@ func (m *Manager) CheckJourneys(instanceID, messageID, fromJID, fromName, groupJ
 // HandleIncomingAutomation runs journeys first and only falls back to the
 // instance agent when no journey consumed the incoming message.
 func (m *Manager) HandleIncomingAutomation(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) {
+	if m.IsInstancePaused(instanceID) {
+		return
+	}
 	if !m.shouldRunAutomation(instanceID, fromJID, groupJID, messageType) {
 		return
 	}

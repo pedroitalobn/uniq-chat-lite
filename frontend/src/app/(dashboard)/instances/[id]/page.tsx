@@ -29,6 +29,20 @@ import ProxyConfigForm from "@/components/instances/ProxyConfigForm";
 
 type Tab = "geral" | "proxy" | "webhooks" | "logs" | "recovery" | "dm" | "actions" | "scraping" | "posts" | "stories" | "media";
 
+interface InstanceSafetyIncident {
+  id: string;
+  reason: string;
+  message: string;
+  metadata?: string;
+  created_at: string;
+}
+
+interface InstanceSafetyStatus {
+  is_paused: boolean;
+  active: boolean;
+  incident?: InstanceSafetyIncident;
+}
+
 const STATUS_MAP: Record<string, { label: string; dot: string; bg: string; color: string }> = {
   connected:    { label: "Conectado",    dot: "#00d46a", bg: "rgba(0,212,106,0.08)",   color: "#00d46a" },
   connecting:   { label: "Conectando",   dot: "#fbbf24", bg: "rgba(251,191,36,0.08)",  color: "#fbbf24" },
@@ -2597,6 +2611,7 @@ export default function InstanceDetailPage() {
   const instanceId = params.id as string;
   const [activeTab, setActiveTab] = useState<Tab>("geral");
   const [deleting, setDeleting] = useState(false);
+  const [safetyDismissed, setSafetyDismissed] = useState(false);
 
   const { data: instance, isLoading } = useQuery<Instance>({
     queryKey: ["instance", instanceId],
@@ -2621,6 +2636,33 @@ export default function InstanceDetailPage() {
       router.replace(`/instances/${instanceId}/waba`);
     }
   }, [instance?.channel, instanceId, router]);
+
+  const { data: safety } = useQuery<InstanceSafetyStatus>({
+    queryKey: ["instance-safety", instanceId],
+    queryFn: () => instancesApi.safety(instanceId).then((r) => r.data),
+    enabled: !!instance,
+    refetchInterval: 10_000,
+  });
+
+  const resumeSafetyMutation = useMutation({
+    mutationFn: () => instancesApi.resumeSafety(instanceId),
+    onSuccess: () => {
+      toast.success("Instância retomada");
+      setSafetyDismissed(true);
+      queryClient.invalidateQueries({ queryKey: ["instance", instanceId] });
+      queryClient.invalidateQueries({ queryKey: ["instance-safety", instanceId] });
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao retomar instância"),
+  });
+
+  const reviewSafetyMutation = useMutation({
+    mutationFn: () => instancesApi.reviewSafety(instanceId),
+    onSuccess: () => {
+      setSafetyDismissed(true);
+      toast.message("Instância permanece pausada para revisão");
+      queryClient.invalidateQueries({ queryKey: ["instance-safety", instanceId] });
+    },
+  });
 
   const handleDelete = async () => {
     if (!await showConfirm(`Remover a instância "${instance?.name}"? Esta ação é irreversível.`, { title: "Remover instância", confirmLabel: "Remover" })) return;
@@ -2708,9 +2750,61 @@ export default function InstanceDetailPage() {
   }
 
   const isConnected = instance.status === "connected";
+  const showSafetyModal = !!safety?.active && !!safety?.is_paused && !safetyDismissed;
 
   return (
     <div className="space-y-7">
+      {showSafetyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.68)" }}>
+          <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl" style={{ background: "var(--surface-solid)", border: "1px solid rgba(239,68,68,0.28)" }}>
+            <div className="p-5 flex items-start gap-3" style={{ borderBottom: "1px solid var(--border-default)" }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.24)" }}>
+                <ShieldAlert className="w-5 h-5" style={{ color: "#ef4444" }} />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold" style={{ color: "var(--text-1)" }}>Instância pausada por segurança</h2>
+                <p className="text-sm mt-1" style={{ color: "hsl(240 8% 58%)" }}>
+                  Detectamos um padrão que pode elevar risco de banimento. Os envios e automações desta instância foram interrompidos.
+                </p>
+              </div>
+            </div>
+            <div className="p-5 space-y-3">
+              <div className="rounded-xl p-3" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.16)" }}>
+                <p className="text-xs font-medium uppercase tracking-wider" style={{ color: "#ef4444" }}>{safety.incident?.reason || "risco_detectado"}</p>
+                <p className="text-sm mt-1" style={{ color: "var(--text-1)" }}>{safety.incident?.message || "Atividade anômala detectada."}</p>
+                {safety.incident?.created_at && (
+                  <p className="text-[11px] mt-2" style={{ color: "var(--text-4)" }}>
+                    {new Date(safety.incident.created_at).toLocaleString("pt-BR")}
+                  </p>
+                )}
+              </div>
+              <p className="text-xs" style={{ color: "hsl(240 8% 52%)" }}>
+                Retomar reconecta a instância e limpa a pausa. Revisar mantém tudo pausado para você abrir logs, agentes e jornadas antes de religar.
+              </p>
+            </div>
+            <div className="p-4 flex flex-col sm:flex-row gap-2 justify-end" style={{ borderTop: "1px solid var(--border-default)" }}>
+              <button
+                onClick={() => reviewSafetyMutation.mutate()}
+                disabled={reviewSafetyMutation.isPending}
+                className="px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 62%)" }}
+              >
+                Revisar antes
+              </button>
+              <button
+                onClick={() => resumeSafetyMutation.mutate()}
+                disabled={resumeSafetyMutation.isPending}
+                className="px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.25)", color: "#00d46a" }}
+              >
+                {resumeSafetyMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                Retomar instância
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
@@ -2744,6 +2838,14 @@ export default function InstanceDetailPage() {
                 {instance.name}
               </h1>
               <StatusBadge status={instance.status} />
+              {(instance.is_paused || safety?.is_paused) && (
+                <span
+                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full"
+                  style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)", color: "#ef4444" }}
+                >
+                  <ShieldAlert className="w-3 h-3" />Pausada por segurança
+                </span>
+              )}
               {instance.proxy_enabled && instance.proxy_status === "ok" && (
                 <span
                   className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full"
