@@ -138,9 +138,13 @@ func (h *UsageHandler) GetMyTimeseries(c *fiber.Ctx) error {
 		Credits  int64  `json:"credits"`
 	}
 	var rows []bucket
+	dayExpr := "to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD')"
+	if h.db.Dialector.Name() == "sqlite" {
+		dayExpr = "strftime('%Y-%m-%d', occurred_at)"
+	}
 	if err := h.db.Raw(`
 		SELECT
-		  to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day,
+		  `+dayExpr+` AS day,
 		  category,
 		  COALESCE(SUM(credits), 0) AS credits
 		FROM usage_events
@@ -250,8 +254,8 @@ func buildUsageView(user *models.User, plan *models.Plan, q *models.UsageQuota, 
 		periodEnd = periodStart.AddDate(0, 1, 0)
 	}
 	return fiber.Map{
-		"period_start":     periodStart,
-		"period_end":       periodEnd,
+		"period_start": periodStart,
+		"period_end":   periodEnd,
 		"plan": fiber.Map{
 			"name": planName(plan),
 			"is_payg": plan == nil ||
@@ -260,31 +264,31 @@ func buildUsageView(user *models.User, plan *models.Plan, q *models.UsageQuota, 
 		"overage_allowed":           overageAllowed,
 		"overage_cents_accumulated": overageCents,
 		"ai": fiber.Map{
-			"limit":          aiLimit,
-			"used":           aiUsed,
-			"topup":          aiTopup,
-			"overage":        aiOverage,
-			"available":      aiLimit + aiTopup - aiUsed,
-			"percent":        percentOf(aiUsed, aiLimit+aiTopup),
-			"hard_stopped":   aiHardStopped,
+			"limit":        aiLimit,
+			"used":         aiUsed,
+			"topup":        aiTopup,
+			"overage":      aiOverage,
+			"available":    aiLimit + aiTopup - aiUsed,
+			"percent":      percentOf(aiUsed, aiLimit+aiTopup),
+			"hard_stopped": aiHardStopped,
 		},
 		"voice": fiber.Map{
-			"limit":          voiceLimit,
-			"used":           voiceUsed,
-			"topup":          voiceTopup,
-			"overage":        voiceOverage,
-			"available":      voiceLimit + voiceTopup - voiceUsed,
-			"percent":        percentOf(voiceUsed, voiceLimit+voiceTopup),
-			"hard_stopped":   voiceHardStopped,
+			"limit":        voiceLimit,
+			"used":         voiceUsed,
+			"topup":        voiceTopup,
+			"overage":      voiceOverage,
+			"available":    voiceLimit + voiceTopup - voiceUsed,
+			"percent":      percentOf(voiceUsed, voiceLimit+voiceTopup),
+			"hard_stopped": voiceHardStopped,
 		},
 		"message": fiber.Map{
-			"limit":          msgLimit,
-			"used":           msgUsed,
-			"topup":          msgTopup,
-			"overage":        msgOverage,
-			"available":      msgLimit + msgTopup - msgUsed,
-			"percent":        percentOf(msgUsed, msgLimit+msgTopup),
-			"hard_stopped":   msgHardStopped,
+			"limit":        msgLimit,
+			"used":         msgUsed,
+			"topup":        msgTopup,
+			"overage":      msgOverage,
+			"available":    msgLimit + msgTopup - msgUsed,
+			"percent":      percentOf(msgUsed, msgLimit+msgTopup),
+			"hard_stopped": msgHardStopped,
 		},
 		"notifications": fiber.Map{
 			"at_50": notified50,

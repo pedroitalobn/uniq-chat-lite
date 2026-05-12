@@ -281,9 +281,15 @@ func (h *AdminHandler) GetGlobalUsage(c *fiber.Ctx) error {
 		EventCount   int64  `json:"event_count"`
 	}
 	var byProvider []provRow
+	providerExpr := "COALESCE(NULLIF(SPLIT_PART(resource, ':', 1), ''), 'unknown')"
+	dayExpr := "to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD')"
+	if h.db.Dialector.Name() == "sqlite" {
+		providerExpr = "COALESCE(NULLIF(CASE WHEN instr(resource, ':') > 0 THEN substr(resource, 1, instr(resource, ':') - 1) ELSE resource END, ''), 'unknown')"
+		dayExpr = "strftime('%Y-%m-%d', occurred_at)"
+	}
 	h.db.Raw(`
 		SELECT
-		  COALESCE(NULLIF(SPLIT_PART(resource, ':', 1), ''), 'unknown') AS provider,
+		  `+providerExpr+` AS provider,
 		  category,
 		  COALESCE(SUM(cost_usd_micro), 0) AS cost_usd_micro,
 		  COALESCE(SUM(credits), 0) AS credits,
@@ -325,7 +331,7 @@ func (h *AdminHandler) GetGlobalUsage(c *fiber.Ctx) error {
 	}
 	var timeseries []tsRow
 	h.db.Raw(`
-		SELECT to_char(occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day,
+		SELECT `+dayExpr+` AS day,
 		  COALESCE(SUM(credits), 0) AS credits,
 		  COALESCE(SUM(cost_usd_micro), 0) AS cost_usd_micro
 		FROM usage_events WHERE occurred_at >= ?
