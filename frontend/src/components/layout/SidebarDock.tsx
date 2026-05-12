@@ -16,6 +16,7 @@ import { usePreferences } from "@/lib/preferences";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { PERM, useWorkspacePermissions } from "@/contexts/WorkspacePermissionsContext";
 import { WorkspaceCustomizeDialog, resolveWorkspaceIcon } from "@/components/layout/WorkspaceCustomizeDialog";
+import { UsageBanner } from "@/components/layout/UsageBanner";
 import { conversationsApi } from "@/lib/api";
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
@@ -859,6 +860,8 @@ function UserSection({
           )}
         </AnimatePresence>
       </button>
+
+      <UsageBanner collapsed={!expanded} />
 
       <button
         onClick={onLogout}

@@ -240,6 +240,16 @@ func buildUsageView(user *models.User, plan *models.Plan, q *models.UsageQuota, 
 		notified50 = q.NotifiedAt50 != nil
 		notified80 = q.NotifiedAt80 != nil
 		notified95 = q.NotifiedAt95 != nil
+		if plan != nil {
+			// Existing quota rows are a snapshot, but admins can edit plan
+			// credits mid-cycle. For the dashboard, never show stale lower
+			// limits than the active plan now grants; this covers upgrades
+			// and plan-credit fixes for Business/Pro/Starter without losing
+			// already recorded usage/topups.
+			aiLimit = maxInt64(aiLimit, plan.AICreditsIncludedPerCycle)
+			voiceLimit = maxInt64(voiceLimit, plan.VoiceCreditsIncludedPerCycle)
+			msgLimit = maxInt64(msgLimit, plan.MessageCreditsIncludedPerCycle)
+		}
 	} else {
 		// Sem quota row — usa limits do plano e ciclo derivado da data
 		// de criação do user (mesmo helper do recorder).
@@ -322,6 +332,13 @@ func planName(p *models.Plan) string {
 		return "Free"
 	}
 	return p.Name
+}
+
+func maxInt64(a, b int64) int64 {
+	if b > a {
+		return b
+	}
+	return a
 }
 
 // avoid unused import warning when middleware import is only used by
