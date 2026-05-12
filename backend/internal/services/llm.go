@@ -44,6 +44,20 @@ type LLMService struct {
 	db *gorm.DB
 }
 
+type LLMUsage struct {
+	InputTokens  int64
+	OutputTokens int64
+	TotalTokens  int64
+	Estimated    bool
+}
+
+type LLMResult struct {
+	Content  string
+	Provider string
+	Model    string
+	Usage    LLMUsage
+}
+
 func NewLLMService() *LLMService {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	var client *openai.Client
@@ -96,6 +110,14 @@ func (s *LLMService) ParseJourneyPrompt(ctx context.Context, integration *models
 
 // CallChatWithSystem calls LLM with explicit system + user messages
 func (s *LLMService) CallChatWithSystem(ctx context.Context, i *models.UserIntegration, system, user string, jsonMode bool) (string, error) {
+	res, err := s.CallChatWithSystemResult(ctx, i, system, user, jsonMode)
+	if err != nil {
+		return "", err
+	}
+	return res.Content, nil
+}
+
+func (s *LLMService) CallChatWithSystemResult(ctx context.Context, i *models.UserIntegration, system, user string, jsonMode bool) (LLMResult, error) {
 	if system == "" {
 		system = "Você é um assistente útil e conciso. Responda de forma direta e amigável."
 	}
@@ -104,7 +126,7 @@ func (s *LLMService) CallChatWithSystem(ctx context.Context, i *models.UserInteg
 		return s.callProvider(ctx, resolved, system, user, jsonMode)
 	}
 	if s.defaultClient == nil {
-		return "", fmt.Errorf("nenhuma integração de IA configurada — admin precisa configurar em /admin/providers → Uniq AI")
+		return LLMResult{}, fmt.Errorf("nenhuma integração de IA configurada — admin precisa configurar em /admin/providers → Uniq AI")
 	}
 	req := openai.ChatCompletionRequest{
 		Model: openai.GPT4oMini,
@@ -119,12 +141,29 @@ func (s *LLMService) CallChatWithSystem(ctx context.Context, i *models.UserInteg
 	}
 	resp, err := s.defaultClient.CreateChatCompletion(ctx, req)
 	if err != nil {
-		return "", err
+		return LLMResult{}, err
 	}
-	return resp.Choices[0].Message.Content, nil
+	return LLMResult{
+		Content:  resp.Choices[0].Message.Content,
+		Provider: string(models.ProviderOpenAI),
+		Model:    req.Model,
+		Usage: LLMUsage{
+			InputTokens:  int64(resp.Usage.PromptTokens),
+			OutputTokens: int64(resp.Usage.CompletionTokens),
+			TotalTokens:  int64(resp.Usage.TotalTokens),
+		},
+	}, nil
 }
 
 func (s *LLMService) CallChat(ctx context.Context, i *models.UserIntegration, prompt string, jsonMode bool) (string, error) {
+	res, err := s.CallChatResult(ctx, i, prompt, jsonMode)
+	if err != nil {
+		return "", err
+	}
+	return res.Content, nil
+}
+
+func (s *LLMService) CallChatResult(ctx context.Context, i *models.UserIntegration, prompt string, jsonMode bool) (LLMResult, error) {
 	systemPrompt := "Você é um assistente útil e conciso. Responda de forma direta e amigável."
 	if jsonMode {
 		systemPrompt = `Você é um orquestrador de automação que converte intenções de usuários em linguagem natural para um pipeline estruturado (Gatilho → Ações).
@@ -224,7 +263,7 @@ Responda APENAS com JSON, sem markdown.`
 
 	// Fallback to default OpenAI
 	if s.defaultClient == nil {
-		return "", fmt.Errorf("nenhuma integração de IA configurada — admin precisa configurar em /admin/providers → Uniq AI (ou setar OPENAI_API_KEY)")
+		return LLMResult{}, fmt.Errorf("nenhuma integração de IA configurada — admin precisa configurar em /admin/providers → Uniq AI (ou setar OPENAI_API_KEY)")
 	}
 
 	req := openai.ChatCompletionRequest{
@@ -241,12 +280,21 @@ Responda APENAS com JSON, sem markdown.`
 
 	resp, err := s.defaultClient.CreateChatCompletion(ctx, req)
 	if err != nil {
-		return "", err
+		return LLMResult{}, err
 	}
-	return resp.Choices[0].Message.Content, nil
+	return LLMResult{
+		Content:  resp.Choices[0].Message.Content,
+		Provider: string(models.ProviderOpenAI),
+		Model:    req.Model,
+		Usage: LLMUsage{
+			InputTokens:  int64(resp.Usage.PromptTokens),
+			OutputTokens: int64(resp.Usage.CompletionTokens),
+			TotalTokens:  int64(resp.Usage.TotalTokens),
+		},
+	}, nil
 }
 
-func (s *LLMService) callProvider(ctx context.Context, i *models.UserIntegration, system, user string, jsonMode bool) (string, error) {
+func (s *LLMService) callProvider(ctx context.Context, i *models.UserIntegration, system, user string, jsonMode bool) (LLMResult, error) {
 	switch i.Provider {
 	case models.ProviderClaude:
 		return s.callClaude(ctx, i, system, user, jsonMode)
@@ -254,11 +302,11 @@ func (s *LLMService) callProvider(ctx context.Context, i *models.UserIntegration
 		models.ProviderKilo, models.ProviderZai, models.ProviderKimi,
 		models.ProviderQwen, models.ProviderMiniMax, models.ProviderManus,
 		models.ProviderMistral:
-		return s.callOpenAICompat(i, system, user, jsonMode)
+		return s.callOpenAICompat(ctx, i, system, user, jsonMode)
 	case models.ProviderGemini:
-		return s.callGemini(i, system+"\n\nUsuário: "+user, jsonMode)
+		return s.callGemini(ctx, i, system+"\n\nUsuário: "+user, jsonMode)
 	default:
-		return "", fmt.Errorf("provider %s não suportado", i.Provider)
+		return LLMResult{}, fmt.Errorf("provider %s não suportado", i.Provider)
 	}
 }
 
@@ -276,7 +324,7 @@ func PlatformAIToIntegration(pai *models.PlatformAI) *models.UserIntegration {
 
 // ─── Provider Specific Calls (logic moved from IntegrationHandler) ───────────
 
-func (s *LLMService) callClaude(ctx context.Context, i *models.UserIntegration, system, user string, jsonMode bool) (string, error) {
+func (s *LLMService) callClaude(ctx context.Context, i *models.UserIntegration, system, user string, jsonMode bool) (LLMResult, error) {
 	model := i.GetFirstModel()
 	if model == "" {
 		model = "claude-3-5-sonnet-latest"
@@ -309,7 +357,7 @@ func (s *LLMService) callClaude(ctx context.Context, i *models.UserIntegration, 
 	client := &http.Client{Timeout: 40 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return LLMResult{}, err
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
@@ -318,21 +366,38 @@ func (s *LLMService) callClaude(ctx context.Context, i *models.UserIntegration, 
 		Content []struct {
 			Text string `json:"text"`
 		} `json:"content"`
+		Model string `json:"model"`
+		Usage struct {
+			InputTokens  int64 `json:"input_tokens"`
+			OutputTokens int64 `json:"output_tokens"`
+		} `json:"usage"`
 		Error struct {
 			Message string `json:"message"`
 		} `json:"error"`
 	}
 	json.Unmarshal(raw, &result)
 	if len(result.Content) > 0 {
-		return result.Content[0].Text, nil
+		if result.Model == "" {
+			result.Model = model
+		}
+		return LLMResult{
+			Content:  result.Content[0].Text,
+			Provider: string(i.Provider),
+			Model:    result.Model,
+			Usage: LLMUsage{
+				InputTokens:  result.Usage.InputTokens,
+				OutputTokens: result.Usage.OutputTokens,
+				TotalTokens:  result.Usage.InputTokens + result.Usage.OutputTokens,
+			},
+		}, nil
 	}
 	if result.Error.Message != "" {
-		return "", fmt.Errorf("claude error: %s", result.Error.Message)
+		return LLMResult{}, fmt.Errorf("claude error: %s", result.Error.Message)
 	}
-	return "", fmt.Errorf("resposta vazia da Claude API (status %d)", resp.StatusCode)
+	return LLMResult{}, fmt.Errorf("resposta vazia da Claude API (status %d)", resp.StatusCode)
 }
 
-func (s *LLMService) callOpenAICompat(i *models.UserIntegration, system, user string, jsonMode bool) (string, error) {
+func (s *LLMService) callOpenAICompat(ctx context.Context, i *models.UserIntegration, system, user string, jsonMode bool) (LLMResult, error) {
 	baseURL, chatPath := resolveOpenAICompatBase(i.Provider, i.BaseURL)
 	model := i.GetFirstModel()
 	if model == "" {
@@ -353,36 +418,58 @@ func (s *LLMService) callOpenAICompat(i *models.UserIntegration, system, user st
 
 	body, _ := json.Marshal(payload)
 	url := baseURL + chatPath
-	req, _ := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+i.APIKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{Timeout: 40 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return LLMResult{}, err
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
 
 	var result struct {
+		Model   string `json:"model"`
 		Choices []struct {
 			Message struct {
 				Content string `json:"content"`
 			} `json:"message"`
 		} `json:"choices"`
+		Usage struct {
+			PromptTokens     int64 `json:"prompt_tokens"`
+			CompletionTokens int64 `json:"completion_tokens"`
+			TotalTokens      int64 `json:"total_tokens"`
+		} `json:"usage"`
 		Error struct {
 			Message string `json:"message"`
 		} `json:"error"`
 	}
 	json.Unmarshal(raw, &result)
 	if len(result.Choices) > 0 {
-		return result.Choices[0].Message.Content, nil
+		if result.Model == "" {
+			result.Model = model
+		}
+		total := result.Usage.TotalTokens
+		if total == 0 {
+			total = result.Usage.PromptTokens + result.Usage.CompletionTokens
+		}
+		return LLMResult{
+			Content:  result.Choices[0].Message.Content,
+			Provider: string(i.Provider),
+			Model:    result.Model,
+			Usage: LLMUsage{
+				InputTokens:  result.Usage.PromptTokens,
+				OutputTokens: result.Usage.CompletionTokens,
+				TotalTokens:  total,
+			},
+		}, nil
 	}
 	if result.Error.Message != "" {
-		return "", fmt.Errorf("%s error: %s", i.Provider, result.Error.Message)
+		return LLMResult{}, fmt.Errorf("%s error: %s", i.Provider, result.Error.Message)
 	}
-	return "", fmt.Errorf("resposta vazia da API %s", i.Provider)
+	return LLMResult{}, fmt.Errorf("resposta vazia da API %s", i.Provider)
 }
 
 // resolveOpenAICompatBase retorna (baseURL, chatCompletionsPath) para cada provider.
@@ -457,7 +544,7 @@ func providerSupportsJSONMode(p models.IntegrationProvider) bool {
 	}
 }
 
-func (s *LLMService) callGemini(i *models.UserIntegration, prompt string, jsonMode bool) (string, error) {
+func (s *LLMService) callGemini(ctx context.Context, i *models.UserIntegration, prompt string, jsonMode bool) (LLMResult, error) {
 	model := i.GetFirstModel()
 	if model == "" {
 		model = "gemini-1.5-flash"
@@ -475,13 +562,13 @@ func (s *LLMService) callGemini(i *models.UserIntegration, prompt string, jsonMo
 		},
 		"generationConfig": config,
 	})
-	req, _ := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{Timeout: 40 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return LLMResult{}, err
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
@@ -494,10 +581,30 @@ func (s *LLMService) callGemini(i *models.UserIntegration, prompt string, jsonMo
 				} `json:"parts"`
 			} `json:"content"`
 		} `json:"candidates"`
+		UsageMetadata struct {
+			PromptTokenCount     int64 `json:"promptTokenCount"`
+			CandidatesTokenCount int64 `json:"candidatesTokenCount"`
+			TotalTokenCount      int64 `json:"totalTokenCount"`
+			ThoughtsTokenCount   int64 `json:"thoughtsTokenCount"`
+		} `json:"usageMetadata"`
 	}
 	json.Unmarshal(raw, &result)
 	if len(result.Candidates) > 0 && len(result.Candidates[0].Content.Parts) > 0 {
-		return result.Candidates[0].Content.Parts[0].Text, nil
+		outputTokens := result.UsageMetadata.CandidatesTokenCount + result.UsageMetadata.ThoughtsTokenCount
+		total := result.UsageMetadata.TotalTokenCount
+		if total == 0 {
+			total = result.UsageMetadata.PromptTokenCount + outputTokens
+		}
+		return LLMResult{
+			Content:  result.Candidates[0].Content.Parts[0].Text,
+			Provider: string(i.Provider),
+			Model:    model,
+			Usage: LLMUsage{
+				InputTokens:  result.UsageMetadata.PromptTokenCount,
+				OutputTokens: outputTokens,
+				TotalTokens:  total,
+			},
+		}, nil
 	}
-	return "", fmt.Errorf("resposta vazia do Gemini")
+	return LLMResult{}, fmt.Errorf("resposta vazia do Gemini")
 }

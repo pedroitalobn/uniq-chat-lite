@@ -194,7 +194,7 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 
-	reply, err := r.llm.CallChatWithSystem(ctx, integration, systemPrompt, userPrompt, false)
+	llmResult, err := r.llm.CallChatWithSystemResult(ctx, integration, systemPrompt, userPrompt, false)
 	if err != nil {
 		log.Error().Err(err).Str("instance", instanceID).Str("chat", fromJID).Msg("agent-runtime: falha ao gerar resposta")
 		r.logExecution(models.AgentExecution{
@@ -204,11 +204,8 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		})
 		return false
 	}
-	// Grava consumo (estimado por chars/4 ≈ tokens — temos ~erro de 10-20%
-	// pra português, aceitável até refatorarmos LLMService pra retornar
-	// usage real). Resource = "<provider>:<model>" pra resolver custo na
-	// PricingConfig.LLMCostMatrix.
-	recordLLMUsageEstimate(ctx, r.db, instUUID, integration, userPrompt+systemPrompt, reply)
+	reply := llmResult.Content
+	recordLLMUsage(ctx, r.db, instUUID, integration, llmResult, userPrompt+systemPrompt, reply)
 
 	reply = sanitizeAssistantReply(reply)
 	if reply == "" {
@@ -1443,9 +1440,10 @@ func (r *AgentRuntime) TriggerByWebhook(agent *models.InstanceAgent, payload Age
 
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
-	reply, err := r.llm.CallChatWithSystem(ctx, integration, systemPrompt, userPrompt.String(), false)
+	llmResult, err := r.llm.CallChatWithSystemResult(ctx, integration, systemPrompt, userPrompt.String(), false)
+	reply := llmResult.Content
 	if reply != "" {
-		recordLLMUsageEstimate(ctx, r.db, agent.InstanceID, integration, userPrompt.String()+systemPrompt, reply)
+		recordLLMUsage(ctx, r.db, agent.InstanceID, integration, llmResult, userPrompt.String()+systemPrompt, reply)
 	}
 	if err != nil {
 		return "", fmt.Errorf("LLM falhou: %w", err)

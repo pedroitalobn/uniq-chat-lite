@@ -97,7 +97,7 @@ export function PricingConfigPanel() {
           <textarea
             value={draft.llm_cost_matrix || ""}
             onChange={(e) => update("llm_cost_matrix", e.target.value)}
-            placeholder={`{"openai:gpt-4o":{"in":2500,"out":10000},"anthropic:claude-3-5-sonnet":{"in":3000,"out":15000}}`}
+            placeholder={`{"openai:gpt-4o":{"in":2500,"out":10000},"claude:claude-3-5-sonnet-latest":{"in":3000,"out":15000}}`}
             rows={4}
             className="input-field w-full text-xs font-mono"
             style={{ resize: "vertical" }}

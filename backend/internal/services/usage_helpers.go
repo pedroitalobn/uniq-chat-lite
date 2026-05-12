@@ -19,6 +19,13 @@ import (
 // Layout do Resource: "<provider>:<model>" pra ComputeCredits resolver
 // preço via LLMCostMatrix da PricingConfig.
 func recordLLMUsageEstimate(ctx context.Context, db *gorm.DB, instanceID uuid.UUID, integ *models.UserIntegration, fullPrompt, reply string) {
+	recordLLMUsage(ctx, db, instanceID, integ, LLMResult{
+		Content: reply,
+		Usage:   LLMUsage{Estimated: true},
+	}, fullPrompt, reply)
+}
+
+func recordLLMUsage(ctx context.Context, db *gorm.DB, instanceID uuid.UUID, integ *models.UserIntegration, result LLMResult, fullPrompt, reply string) {
 	rec := GetGlobalUsageRecorder()
 	if rec == nil {
 		return
@@ -31,22 +38,35 @@ func recordLLMUsageEstimate(ctx context.Context, db *gorm.DB, instanceID uuid.UU
 		return
 	}
 
-	// Estimativa: ~4 chars / token pra português. Levemente conservadora
-	// pra inputs com markdown/JSON (mais densos).
-	inTokens := int64(len(fullPrompt)) / 4
-	outTokens := int64(len(reply)) / 4
+	inTokens := result.Usage.InputTokens
+	outTokens := result.Usage.OutputTokens
+	totalTokens := result.Usage.TotalTokens
+	estimated := result.Usage.Estimated || inTokens == 0 && outTokens == 0
+	if estimated {
+		// Estimativa: ~4 chars / token pra português. Levemente conservadora
+		// pra inputs com markdown/JSON (mais densos).
+		inTokens = int64(len(fullPrompt)) / 4
+		outTokens = int64(len(reply)) / 4
+	}
 	if inTokens == 0 {
 		inTokens = 1
 	}
 	if outTokens == 0 {
 		outTokens = 1
 	}
+	if totalTokens == 0 {
+		totalTokens = inTokens + outTokens
+	}
 
-	model := ""
-	provider := ""
+	model := result.Model
+	provider := result.Provider
 	if integ != nil {
-		provider = string(integ.Provider)
-		model = integ.GetFirstModel()
+		if provider == "" {
+			provider = string(integ.Provider)
+		}
+		if model == "" {
+			model = integ.GetFirstModel()
+		}
 	}
 	resource := provider
 	if model != "" {
@@ -62,8 +82,13 @@ func recordLLMUsageEstimate(ctx context.Context, db *gorm.DB, instanceID uuid.UU
 		InputTokens:  inTokens,
 		OutputTokens: outTokens,
 		Metadata: map[string]any{
-			"instance_id": instanceID.String(),
-			"estimated":   true,
+			"instance_id":     instanceID.String(),
+			"provider":        provider,
+			"model":           model,
+			"input_tokens":    inTokens,
+			"output_tokens":   outTokens,
+			"total_tokens":    totalTokens,
+			"usage_estimated": estimated,
 		},
 	})
 }
