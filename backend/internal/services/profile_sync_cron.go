@@ -47,7 +47,7 @@ func NewProfileSyncCron(db *gorm.DB, manager *whatsapp.Manager) *ProfileSyncCron
 
 func (c *ProfileSyncCron) Start() {
 	go c.loop()
-	log.Info().Msg("profile sync cron: started (20min interval)")
+	log.Info().Msg("profile sync cron: started (10min interval)")
 }
 
 func (c *ProfileSyncCron) Stop() { close(c.stop) }
@@ -55,10 +55,10 @@ func (c *ProfileSyncCron) Stop() { close(c.stop) }
 func (c *ProfileSyncCron) loop() {
 	// Espera 90s na primeira iteração pra dar tempo do manager carregar
 	// instâncias e abrir socket — sem isso o primeiro tick acha "0 instances
-	// connected" e desperdiça uma janela de 20min.
+	// connected" e desperdiça uma janela de 10min.
 	time.Sleep(90 * time.Second)
 	c.tick()
-	t := time.NewTicker(20 * time.Minute)
+	t := time.NewTicker(10 * time.Minute)
 	defer t.Stop()
 	for {
 		select {
