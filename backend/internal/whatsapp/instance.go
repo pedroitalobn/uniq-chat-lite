@@ -3307,6 +3307,9 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		}
 		ic.broadcastWS("instance.paired", data)
 		ic.dispatchEvent("instance.paired", data, eventContext{})
+		if ic.manager != nil {
+			ic.manager.LogInstanceEvent(ic.ID, "info", "whatsapp", "paired", "Pareamento WhatsApp concluído", data)
+		}
 		log.Info().Str("instance", ic.ID).Str("id", v.ID.String()).Msg("WhatsApp paired successfully")
 
 	case *events.Connected:
@@ -3327,6 +3330,9 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 			}
 			ic.broadcastWS("status", map[string]string{"status": "connected"})
 			ic.dispatchEvent("instance.connected", map[string]string{"status": "connected"}, eventContext{})
+			if ic.manager != nil {
+				ic.manager.LogInstanceEvent(ic.ID, "info", "whatsapp", "connected", "WebSocket WhatsApp conectado", nil)
+			}
 			log.Info().Str("instance", ic.ID).Msg("WhatsApp connected")
 		} else {
 			log.Debug().Str("instance", ic.ID).Msg("WebSocket connected but not logged in yet — waiting for QR pairing")
@@ -3339,6 +3345,9 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		}
 		ic.broadcastWS("status", map[string]string{"status": "disconnected"})
 		ic.dispatchEvent("instance.disconnected", map[string]string{"status": "disconnected"}, eventContext{})
+		if ic.manager != nil {
+			ic.manager.LogInstanceEvent(ic.ID, "warn", "whatsapp", "disconnected", "WebSocket WhatsApp desconectado", nil)
+		}
 		log.Info().Str("instance", ic.ID).Msg("WhatsApp disconnected")
 
 	case *events.LoggedOut:
@@ -3348,6 +3357,9 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		}
 		ic.broadcastWS("status", map[string]string{"status": "logged_out"})
 		ic.dispatchEvent("instance.disconnected", map[string]string{"status": "logged_out"}, eventContext{})
+		if ic.manager != nil {
+			ic.manager.LogInstanceEvent(ic.ID, "warn", "whatsapp", "logged_out", "WhatsApp fez logout da sessão", nil)
+		}
 		log.Warn().Str("instance", ic.ID).Msg("WhatsApp logged out")
 
 	case *events.TemporaryBan:
@@ -3362,9 +3374,15 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 		}
 		ic.broadcastWS("instance.banned", data)
 		ic.dispatchEvent("instance.banned", data, eventContext{})
+		if ic.manager != nil {
+			ic.manager.LogInstanceEvent(ic.ID, "error", "whatsapp", "temporary_ban", "WhatsApp sinalizou banimento temporário", data)
+		}
 		log.Warn().Str("instance", ic.ID).Str("reason", v.Code.String()).Msg("WhatsApp temporarily banned")
 
 	case *events.KeepAliveTimeout:
+		if ic.manager != nil {
+			ic.manager.LogInstanceEvent(ic.ID, "warn", "whatsapp", "keepalive_timeout", "Keep-alive do WhatsApp expirou", map[string]interface{}{"error_count": v.ErrorCount})
+		}
 		log.Warn().Str("instance", ic.ID).Int("error_count", v.ErrorCount).Msg("WhatsApp keep-alive timeout")
 	}
 }

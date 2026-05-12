@@ -154,7 +154,7 @@ func (r *CrmTaskRunner) buildContext(t *models.CrmTask) string {
 	if t.DealID != nil {
 		var d models.Deal
 		if r.db.First(&d, "id = ?", t.DealID).Error == nil {
-			fmt.Fprintf(&b, "Negócio: %s (R$ %.2f)\n", d.Title, d.Value)
+			fmt.Fprintf(&b, "Negócio: %s (R$ %.2f)\n", d.Title, float64(d.Value)/100)
 		}
 	}
 	if t.MeetingID != nil {

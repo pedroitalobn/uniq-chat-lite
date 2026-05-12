@@ -99,7 +99,11 @@ func (m *ProxyMonitor) testProxy(p *models.Proxy) bool {
 		return false
 	}
 	resp.Body.Close()
-	return resp.StatusCode < 500
+	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
+		log.Warn().Str("proxy", p.Name).Int("status", resp.StatusCode).Msg("proxy monitor: proxy respondeu status inválido")
+		return false
+	}
+	return true
 }
 
 func (m *ProxyMonitor) handleResult(proxyID uuid.UUID, name string, healthy bool) {

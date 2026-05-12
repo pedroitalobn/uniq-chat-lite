@@ -180,6 +180,21 @@ func (ic *InstanceClient) SetGroupLockedMode(groupJID string, locked bool) error
 	return ic.client.SetGroupLocked(context.Background(), jid, locked)
 }
 
+func (ic *InstanceClient) JoinGroupWithLink(code string) (string, error) {
+	code = strings.TrimSpace(code)
+	code = strings.TrimPrefix(code, "https://chat.whatsapp.com/")
+	code = strings.TrimPrefix(code, "http://chat.whatsapp.com/")
+	code = strings.Trim(code, "/")
+	if code == "" {
+		return "", fmt.Errorf("código do convite vazio")
+	}
+	jid, err := ic.client.JoinGroupWithLink(context.Background(), code)
+	if err != nil {
+		return "", err
+	}
+	return jid.String(), nil
+}
+
 // ─── Labels (estrelinhas/cores do WhatsApp) ────────────────────────
 
 // LabelChat associa ou desassocia uma label a uma conversa inteira.
@@ -585,4 +600,3 @@ func (ic *InstanceClient) ResolveContactQRLink(code string) (*types.ContactQRLin
 func (ic *InstanceClient) GetContactQRLink(revoke bool) (string, error) {
 	return ic.client.GetContactQRLink(context.Background(), revoke)
 }
-

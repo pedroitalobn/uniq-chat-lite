@@ -56,6 +56,35 @@ func (h *RecoveryHandler) takeSnapshot(instanceID string) (int, error) {
 	groupsJSON, _ := json.Marshal(entries)
 
 	instID, _ := uuid.Parse(instanceID)
+	var contacts []models.ContactSnapshotEntry
+	h.db.Raw(`
+		SELECT
+			jid,
+			REPLACE(REPLACE(jid, '@s.whatsapp.net', ''), '@lid', '') AS phone,
+			MAX(name) AS name,
+			COUNT(*) AS message_count,
+			MAX(created_at) AS last_message
+		FROM (
+			SELECT
+				CASE WHEN direction = 'out' THEN to_jid ELSE COALESCE(NULLIF(sender_jid, ''), to_jid) END AS jid,
+				CASE WHEN direction = 'out' THEN contact_name ELSE sender_name END AS name,
+				created_at
+			FROM message_logs
+			WHERE instance_id = ?
+			  AND (to_jid != '' OR sender_jid != '')
+		) AS contacts_src
+		WHERE jid != ''
+		  AND jid NOT LIKE '%@g.us'
+		  AND jid NOT LIKE '%broadcast%'
+		  AND jid NOT LIKE '%status%'
+		GROUP BY jid
+		ORDER BY last_message DESC
+		LIMIT 1000
+	`, instID).Scan(&contacts)
+	if contacts == nil {
+		contacts = []models.ContactSnapshotEntry{}
+	}
+	contactsJSON, _ := json.Marshal(contacts)
 
 	// Upsert: find or create, then update
 	var snap models.RecoverySnapshot
@@ -68,9 +97,16 @@ func (h *RecoveryHandler) takeSnapshot(instanceID string) (int, error) {
 
 	if err := h.db.Model(&snap).Updates(map[string]interface{}{
 		"groups":     string(groupsJSON),
+		"contacts":   string(contactsJSON),
 		"updated_at": time.Now(),
 	}).Error; err != nil {
 		return 0, fiber.NewError(fiber.StatusInternalServerError, "erro ao salvar snapshot: "+err.Error())
+	}
+	if h.manager != nil {
+		h.manager.LogInstanceEvent(instanceID, "info", "recovery", "snapshot_saved", "Snapshot de recovery salvo", map[string]interface{}{
+			"groups":   len(entries),
+			"contacts": len(contacts),
+		})
 	}
 
 	return len(entries), nil
@@ -123,6 +159,9 @@ func (h *RecoveryHandler) SetSchedule(c *fiber.Ctx) error {
 		h.db.Create(&snap)
 	}
 	h.db.Model(&snap).Update("snapshot_schedule", req.Schedule)
+	if h.manager != nil {
+		h.manager.LogInstanceEvent(instance.ID.String(), "info", "recovery", "schedule_updated", "Agendamento de recovery atualizado", map[string]interface{}{"schedule": req.Schedule})
+	}
 
 	label := map[string]string{"": "desativado", "daily": "diário", "weekly": "semanal"}[req.Schedule]
 	return c.JSON(fiber.Map{"message": "agendamento " + label, "schedule": req.Schedule})
@@ -147,30 +186,38 @@ func (h *RecoveryHandler) Get(c *fiber.Ctx) error {
 		groups = []models.GroupSnapshotEntry{}
 	}
 
-	type ContactEntry struct {
-		JID          string    `json:"jid"`
-		Phone        string    `json:"phone"`
-		MessageCount int       `json:"message_count"`
-		LastMessage  time.Time `json:"last_message"`
+	var contacts []models.ContactSnapshotEntry
+	if snap.Contacts != "" {
+		_ = json.Unmarshal([]byte(snap.Contacts), &contacts)
 	}
-	var contacts []ContactEntry
-	h.db.Raw(`
-		SELECT
-			to_jid AS jid,
-			REPLACE(to_jid, '@s.whatsapp.net', '') AS phone,
-			COUNT(*) AS message_count,
-			MAX(created_at) AS last_message
-		FROM message_logs
-		WHERE instance_id = ?
-		  AND direction = 'out'
-		  AND to_jid != ''
-		  AND to_jid NOT LIKE '%@g.us'
-		GROUP BY to_jid
-		ORDER BY last_message DESC
-		LIMIT 200
-	`, instance.ID).Scan(&contacts)
+	if contacts == nil || len(contacts) == 0 {
+		h.db.Raw(`
+			SELECT
+				jid,
+				REPLACE(REPLACE(jid, '@s.whatsapp.net', ''), '@lid', '') AS phone,
+				MAX(name) AS name,
+				COUNT(*) AS message_count,
+				MAX(created_at) AS last_message
+			FROM (
+				SELECT
+					CASE WHEN direction = 'out' THEN to_jid ELSE COALESCE(NULLIF(sender_jid, ''), to_jid) END AS jid,
+					CASE WHEN direction = 'out' THEN contact_name ELSE sender_name END AS name,
+					created_at
+				FROM message_logs
+				WHERE instance_id = ?
+				  AND (to_jid != '' OR sender_jid != '')
+			) AS contacts_src
+			WHERE jid != ''
+			  AND jid NOT LIKE '%@g.us'
+			  AND jid NOT LIKE '%broadcast%'
+			  AND jid NOT LIKE '%status%'
+			GROUP BY jid
+			ORDER BY last_message DESC
+			LIMIT 1000
+		`, instance.ID).Scan(&contacts)
+	}
 	if contacts == nil {
-		contacts = []ContactEntry{}
+		contacts = []models.ContactSnapshotEntry{}
 	}
 
 	var snapshotAt *time.Time
@@ -198,6 +245,9 @@ func (h *RecoveryHandler) Reset(c *fiber.Ctx) error {
 
 	if err := h.manager.ResetSession(instance.ID.String()); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao resetar sessão: " + err.Error()})
+	}
+	if h.manager != nil {
+		h.manager.LogInstanceEvent(instance.ID.String(), "warn", "recovery", "session_reset", "Sessão resetada para recovery", nil)
 	}
 
 	h.db.Model(instance).Updates(map[string]interface{}{

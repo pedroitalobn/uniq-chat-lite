@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { instancesApi, webhooksApi, messagesApi, settingsApi, mcpApi, recoveryApi, tiktokApi, globalWebhooksApi, mediaUploadApi, type WebhookPayload } from "@/lib/api";
+import { instancesApi, webhooksApi, messagesApi, settingsApi, mcpApi, recoveryApi, instanceLogsApi, groupsApi, tiktokApi, globalWebhooksApi, mediaUploadApi, type WebhookPayload } from "@/lib/api";
 import {
   Smartphone, ArrowLeft, Globe, AlertTriangle,
   QrCode, Power, Trash2, Plus, X, Send, ChevronRight,
@@ -592,62 +592,108 @@ function WebhooksTab({ instanceId, instance }: { instanceId: string; instance: I
 }
 
 // ─── Logs tab ─────────────────────────────────────────────────────────────────
+interface InstanceEventLog {
+  id: string;
+  level: "info" | "warn" | "error" | string;
+  source: string;
+  event: string;
+  message: string;
+  metadata?: string;
+  created_at: string;
+}
+
 function LogsTab({ instanceId }: { instanceId: string }) {
   const { data, isLoading } = useQuery<{ data: MessageLog[]; total: number }>({
     queryKey: ["messages", instanceId],
     queryFn: () => messagesApi.list(instanceId, { limit: 50 }).then((r) => r.data),
     refetchInterval: 10_000,
   });
+  const { data: eventData, isLoading: eventsLoading } = useQuery<{ data: InstanceEventLog[]; total: number }>({
+    queryKey: ["instance-event-logs", instanceId],
+    queryFn: () => instanceLogsApi.list(instanceId, { limit: 120 }).then((r) => r.data),
+    refetchInterval: 10_000,
+  });
 
   const messages = data?.data ?? [];
+  const events = eventData?.data ?? [];
 
-  if (isLoading) return <div className="skeleton h-40 rounded-2xl" />;
+  if (isLoading || eventsLoading) return <div className="skeleton h-40 rounded-2xl" />;
 
   return (
-    <div className="space-y-2 animate-fade-in-up">
-      {messages.length === 0 ? (
-        <div
-          className="rounded-2xl p-10 text-center"
-          style={{ background: "var(--surface-solid)", border: "1px dashed var(--border-default)" }}
-        >
-          <Activity className="w-7 h-7 mx-auto mb-3" style={{ color: "hsl(240 8% 30%)" }} />
-          <p className="text-sm" style={{ color: "hsl(240 8% 42%)" }}>Nenhuma mensagem registrada</p>
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] animate-fade-in-up">
+      <div className="rounded-2xl overflow-hidden" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
+        <div className="p-4 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border-default)" }}>
+          <Activity className="w-4 h-4" style={{ color: "#f59e0b" }} />
+          <span className="font-medium text-sm" style={{ color: "var(--text-1)" }}>Histórico da instância</span>
         </div>
-      ) : (
-        messages.map((msg) => (
-          <div
-            key={msg.id}
-            className="rounded-xl p-4 flex items-start gap-3"
-            style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}
-          >
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
-              style={{
-                background: msg.direction === "in" ? "rgba(96,165,250,0.08)" : "rgba(0,212,106,0.08)",
-                border: msg.direction === "in" ? "1px solid rgba(96,165,250,0.15)" : "1px solid rgba(0,212,106,0.15)",
-              }}
-            >
-              {msg.direction === "in"
-                ? <ChevronRight className="w-3.5 h-3.5" style={{ color: "#60a5fa" }} />
-                : <Send className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
-              }
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-medium" style={{ color: "hsl(240 8% 52%)" }}>
-                  {msg.direction === "in" ? "Recebida" : "Enviada"}
-                </span>
-                <span style={{ color: "hsl(240 8% 25%)" }}>·</span>
-                <span className="text-xs font-mono" style={{ color: "var(--text-4)" }}>{msg.to_jid}</span>
-              </div>
-              <p className="text-sm truncate" style={{ color: "hsl(240 15% 80%)" }}>{msg.content}</p>
-            </div>
-            <div className="text-xs flex-shrink-0" style={{ color: "var(--text-4)" }}>
-              {new Date(msg.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-            </div>
+        {events.length === 0 ? (
+          <div className="p-8 text-center">
+            <Activity className="w-7 h-7 mx-auto mb-3 opacity-25" />
+            <p className="text-sm" style={{ color: "hsl(240 8% 42%)" }}>Nenhum evento operacional registrado</p>
           </div>
-        ))
-      )}
+        ) : (
+          <div className="divide-y max-h-[560px] overflow-auto" style={{ borderColor: "var(--border-default)" }}>
+            {events.map((event) => {
+              const tone = event.level === "error" ? "#ef4444" : event.level === "warn" ? "#f59e0b" : "#60a5fa";
+              return (
+                <div key={event.id} className="p-3.5 flex items-start gap-3">
+                  <div className="w-2 h-2 rounded-full mt-2 flex-shrink-0" style={{ background: tone }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-semibold" style={{ color: tone }}>{event.source}</span>
+                      <span className="text-[11px] font-mono" style={{ color: "var(--text-4)" }}>{event.event}</span>
+                    </div>
+                    <p className="text-sm mt-1" style={{ color: "var(--text-1)" }}>{event.message}</p>
+                    {event.metadata ? <p className="text-[11px] font-mono truncate mt-1" style={{ color: "var(--text-4)" }}>{event.metadata}</p> : null}
+                  </div>
+                  <span className="text-[11px] flex-shrink-0" style={{ color: "var(--text-4)" }}>
+                    {new Date(event.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-2xl overflow-hidden" style={{ background: "var(--surface-solid)", border: "1px solid var(--border)" }}>
+        <div className="p-4 flex items-center gap-2" style={{ borderBottom: "1px solid var(--border-default)" }}>
+          <MessageSquareText className="w-4 h-4" style={{ color: "#00d46a" }} />
+          <span className="font-medium text-sm" style={{ color: "var(--text-1)" }}>Últimas mensagens</span>
+        </div>
+        {messages.length === 0 ? (
+          <div className="p-8 text-center">
+            <MessageSquareText className="w-7 h-7 mx-auto mb-3 opacity-25" />
+            <p className="text-sm" style={{ color: "hsl(240 8% 42%)" }}>Nenhuma mensagem registrada</p>
+          </div>
+        ) : (
+          <div className="divide-y max-h-[560px] overflow-auto" style={{ borderColor: "var(--border-default)" }}>
+            {messages.map((msg) => (
+              <div key={msg.id} className="p-3.5 flex items-start gap-3">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                  style={{
+                    background: msg.direction === "in" ? "rgba(96,165,250,0.08)" : "rgba(0,212,106,0.08)",
+                    border: msg.direction === "in" ? "1px solid rgba(96,165,250,0.15)" : "1px solid rgba(0,212,106,0.15)",
+                  }}>
+                  {msg.direction === "in"
+                    ? <ChevronRight className="w-3.5 h-3.5" style={{ color: "#60a5fa" }} />
+                    : <Send className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-medium" style={{ color: "hsl(240 8% 52%)" }}>{msg.direction === "in" ? "Recebida" : "Enviada"}</span>
+                    <span className="text-xs font-mono truncate" style={{ color: "var(--text-4)" }}>{msg.sender_jid || msg.to_jid}</span>
+                  </div>
+                  <p className="text-sm truncate" style={{ color: "hsl(240 15% 80%)" }}>{msg.content}</p>
+                </div>
+                <div className="text-xs flex-shrink-0" style={{ color: "var(--text-4)" }}>
+                  {new Date(msg.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -2166,16 +2212,24 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
 // ─── Recovery Tab ─────────────────────────────────────────────────────────────
 
 interface GroupSnapshot { jid: string; name: string; description: string; member_count: number; is_admin: boolean; invite_link?: string; }
-interface ContactEntry  { jid: string; phone: string; message_count: number; last_message: string; }
+interface ContactEntry  { jid: string; phone: string; name?: string; message_count: number; last_message: string; }
 interface RecoveryData  { status: string; snapshot_at: string; schedule: "" | "daily" | "weekly"; groups: GroupSnapshot[]; contacts: ContactEntry[]; }
+interface GroupJoinJob { id: string; invite_link: string; invite_code: string; group_jid?: string; status: string; error?: string; scheduled_at: string; finished_at?: string; created_at: string; }
 
 function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: Instance }) {
   const [copiedJid, setCopiedJid] = useState<string | null>(null);
+  const [joinCSV, setJoinCSV] = useState("");
+  const [joinInterval, setJoinInterval] = useState(300);
   const queryClient = useQueryClient();
 
   const { data, isLoading, refetch } = useQuery<RecoveryData>({
     queryKey: ["recovery", instanceId],
     queryFn: () => recoveryApi.get(instanceId).then(r => r.data),
+  });
+  const { data: joinJobsData } = useQuery<{ data: GroupJoinJob[]; total: number }>({
+    queryKey: ["group-join-jobs", instanceId],
+    queryFn: () => groupsApi.joinJobs(instanceId).then(r => r.data),
+    refetchInterval: 10_000,
   });
 
   const snapshotMutation = useMutation({
@@ -2200,6 +2254,18 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
     onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao salvar agendamento"),
   });
 
+  const joinLinksMutation = useMutation({
+    mutationFn: () => groupsApi.joinLinks(instanceId, [], joinCSV, joinInterval),
+    onSuccess: (res) => {
+      const count = res.data?.count ?? 0;
+      toast.success(`${count} link${count === 1 ? "" : "s"} adicionado${count === 1 ? "" : "s"} à fila`);
+      setJoinCSV("");
+      queryClient.invalidateQueries({ queryKey: ["group-join-jobs", instanceId] });
+      queryClient.invalidateQueries({ queryKey: ["instance-event-logs", instanceId] });
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao adicionar links"),
+  });
+
   const copy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopiedJid(key);
@@ -2210,6 +2276,7 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
   const snapshotAt = data?.snapshot_at ? new Date(data.snapshot_at) : null;
   const hasSnapshot = snapshotAt && snapshotAt.getFullYear() > 2000;
   const currentSchedule = data?.schedule ?? "";
+  const joinJobs = joinJobsData?.data ?? [];
 
   const cardStyle = { background: "var(--surface-solid)", border: "1px solid var(--border)" };
   const dimText = { color: "hsl(240 8% 42%)" };
@@ -2288,6 +2355,74 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
             );
           })}
         </div>
+      </div>
+
+      <div className="rounded-2xl" style={cardStyle}>
+        <div className="p-4 flex items-center justify-between gap-3" style={{ borderBottom: "1px solid var(--border-default)" }}>
+          <div className="flex items-center gap-2">
+            <LogIn className="w-4 h-4" style={{ color: "#00d46a" }} />
+            <span className="font-medium text-sm" style={valText}>Entrar em grupos por link</span>
+          </div>
+          <span className="text-[11px]" style={dimText}>Fila gradual para reduzir risco de bloqueio</span>
+        </div>
+        <div className="p-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+          <textarea
+            value={joinCSV}
+            onChange={(e) => setJoinCSV(e.target.value)}
+            rows={5}
+            placeholder="Cole links do chat.whatsapp.com separados por linha, vírgula ou CSV"
+            className="w-full rounded-xl px-3 py-2 text-sm resize-none outline-none"
+            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "var(--text-1)" }}
+          />
+          <div className="space-y-3">
+            <label className="block">
+              <span className="text-[11px] font-medium" style={dimText}>Intervalo entre entradas</span>
+              <div className="mt-1 flex items-center gap-2">
+                <input
+                  type="number"
+                  min={60}
+                  max={86400}
+                  value={joinInterval}
+                  onChange={(e) => setJoinInterval(Math.max(60, Number(e.target.value) || 300))}
+                  className="w-full rounded-xl px-3 py-2 text-sm outline-none"
+                  style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "var(--text-1)" }}
+                />
+                <span className="text-xs" style={dimText}>seg</span>
+              </div>
+            </label>
+            <button
+              onClick={() => joinLinksMutation.mutate()}
+              disabled={joinLinksMutation.isPending || !joinCSV.trim() || instance.status !== "connected"}
+              className="w-full flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl transition-all disabled:opacity-50"
+              style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.25)", color: "#00d46a" }}
+            >
+              {joinLinksMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+              Adicionar à fila
+            </button>
+          </div>
+        </div>
+        {joinJobs.length > 0 && (
+          <div className="px-4 pb-4">
+            <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-default)" }}>
+              {joinJobs.slice(0, 8).map((job) => {
+                const tone = job.status === "joined" ? "#00d46a" : job.status === "failed" ? "#ef4444" : job.status === "running" ? "#60a5fa" : "#f59e0b";
+                return (
+                  <div key={job.id} className="p-3 flex items-center gap-3 border-b last:border-b-0" style={{ borderColor: "var(--border-default)" }}>
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: tone }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-mono truncate" style={valText}>{job.invite_link}</p>
+                      {job.error ? <p className="text-[11px] truncate mt-0.5" style={{ color: "#ef4444" }}>{job.error}</p> : null}
+                    </div>
+                    <span className="text-[11px] font-medium" style={{ color: tone }}>{job.status}</span>
+                    <span className="text-[11px] hidden sm:block" style={dimText}>
+                      {new Date(job.scheduled_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {isLoading ? (
@@ -2380,9 +2515,9 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
                       <User className="w-3.5 h-3.5" style={{ color: "#a78bfa" }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium font-mono" style={valText}>+{c.phone}</p>
+                      <p className="text-sm font-medium truncate" style={valText}>{c.name || `+${c.phone}`}</p>
                       <p className="text-[11px] mt-0.5" style={dimText}>
-                        {c.message_count} mensagem{c.message_count !== 1 ? "s" : ""} ·{" "}
+                        +{c.phone} · {c.message_count} mensagem{c.message_count !== 1 ? "s" : ""} ·{" "}
                         {new Date(c.last_message).toLocaleDateString("pt-BR")}
                       </p>
                     </div>

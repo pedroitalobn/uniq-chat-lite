@@ -15,8 +15,10 @@ type RecoverySnapshot struct {
 	InstanceID uuid.UUID `gorm:"type:uuid;uniqueIndex;not null"`
 	// Groups is a JSON-encoded array of GroupSnapshotEntry.
 	Groups string `gorm:"type:text"`
+	// Contacts is a JSON-encoded array of ContactSnapshotEntry.
+	Contacts string `gorm:"type:text"`
 	// SnapshotSchedule: "", "daily", "weekly"
-	SnapshotSchedule string    `gorm:"type:varchar(20);default:''"`
+	SnapshotSchedule string `gorm:"type:varchar(20);default:''"`
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 }
@@ -36,4 +38,12 @@ type GroupSnapshotEntry struct {
 	MemberCount int    `json:"member_count"`
 	IsAdmin     bool   `json:"is_admin"`
 	InviteLink  string `json:"invite_link,omitempty"`
+}
+
+type ContactSnapshotEntry struct {
+	JID          string    `json:"jid"`
+	Phone        string    `json:"phone"`
+	Name         string    `json:"name,omitempty"`
+	MessageCount int       `json:"message_count"`
+	LastMessage  time.Time `json:"last_message"`
 }

@@ -470,6 +470,8 @@ func autoMigrate(db *gorm.DB) error {
 		&models.Server{},
 		&models.UserIntegration{},
 		&models.RecoverySnapshot{},
+		&models.InstanceEventLog{},
+		&models.GroupJoinJob{},
 		&models.InstanceAgent{},
 		&models.AgentAsset{},
 		&models.AgentExecution{},

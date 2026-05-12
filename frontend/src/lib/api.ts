@@ -958,6 +958,11 @@ export const recoveryApi = {
     api.put(`/v1/instances/${id}/recovery/schedule`, { schedule }),
 };
 
+export const instanceLogsApi = {
+  list: (id: string, params?: { limit?: number; level?: string; source?: string }) =>
+    api.get(`/v1/instances/${id}/logs/events`, { params }),
+};
+
 export const mcpApi = {
   tools: (id: string) => api.get(`/v1/instances/${id}/mcp/tools`),
 };
@@ -1031,6 +1036,12 @@ export const groupsApi = {
     api.get(`/v1/instances/${instanceId}/groups/${jid}/invite`, { params: { reset } }),
   leave: (instanceId: string, jid: string) =>
     api.post(`/v1/instances/${instanceId}/groups/${jid}/leave`),
+  joinLink: (instanceId: string, link: string, intervalSeconds?: number) =>
+    api.post(`/v1/instances/${instanceId}/groups/join-link`, { link, interval_seconds: intervalSeconds }),
+  joinLinks: (instanceId: string, links: string[], csv?: string, intervalSeconds?: number) =>
+    api.post(`/v1/instances/${instanceId}/groups/join-links`, { links, csv, interval_seconds: intervalSeconds }),
+  joinJobs: (instanceId: string) =>
+    api.get(`/v1/instances/${instanceId}/groups/join-jobs`),
 };
 
 export const crmApi = {

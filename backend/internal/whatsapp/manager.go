@@ -104,6 +104,36 @@ func NewManager(sessionDir string, db *gorm.DB) *Manager {
 	return m
 }
 
+func (m *Manager) LogInstanceEvent(instanceID, level, source, event, message string, metadata interface{}) {
+	if m == nil || m.db == nil || instanceID == "" {
+		return
+	}
+	id, err := uuid.Parse(instanceID)
+	if err != nil {
+		return
+	}
+	meta := ""
+	if metadata != nil {
+		if b, err := json.Marshal(metadata); err == nil {
+			meta = string(b)
+		}
+	}
+	if level == "" {
+		level = "info"
+	}
+	if source == "" {
+		source = "whatsapp"
+	}
+	_ = m.db.Create(&models.InstanceEventLog{
+		InstanceID: id,
+		Level:      level,
+		Source:     source,
+		Event:      event,
+		Message:    message,
+		Metadata:   meta,
+	}).Error
+}
+
 // StartInstance starts (or restarts) the WhatsApp client for the given instance.
 func (m *Manager) StartInstance(instance *models.Instance) error {
 	// Defensive check: bloqueia status terminais (banned/error). Aceitamos
@@ -119,12 +149,17 @@ func (m *Manager) StartInstance(instance *models.Instance) error {
 			Msg("refusing to start instance with invalid status")
 		return fmt.Errorf("cannot start instance with status %s", instance.Status)
 	}
+	m.LogInstanceEvent(instance.ID.String(), "info", "manager", "start_requested", "Inicializando cliente WhatsApp", map[string]interface{}{
+		"status":  instance.Status,
+		"channel": instance.Channel,
+	})
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	// If already running, stop first
 	if existing, ok := m.clients[instance.ID.String()]; ok {
+		m.LogInstanceEvent(instance.ID.String(), "warn", "manager", "client_replaced", "Cliente existente encerrado antes de reiniciar", nil)
 		existing.Disconnect()
 		delete(m.clients, instance.ID.String())
 	}
@@ -140,14 +175,18 @@ func (m *Manager) StartInstance(instance *models.Instance) error {
 
 	client, err := NewInstanceClient(instance.ID.String(), m.sessionDir, proxyCfg, webhooks, settings)
 	if err != nil {
+		m.LogInstanceEvent(instance.ID.String(), "error", "manager", "client_create_failed", "Falha ao criar cliente WhatsApp", map[string]interface{}{"error": err.Error()})
 		return fmt.Errorf("failed to create instance client: %w", err)
 	}
+	client.manager = m
 
 	if err := client.Connect(); err != nil {
+		m.LogInstanceEvent(instance.ID.String(), "error", "manager", "connect_failed", "Falha ao conectar cliente WhatsApp", map[string]interface{}{"error": err.Error()})
 		return fmt.Errorf("failed to connect instance: %w", err)
 	}
 
 	m.clients[instance.ID.String()] = client
+	m.LogInstanceEvent(instance.ID.String(), "info", "manager", "client_started", "Cliente WhatsApp iniciado", nil)
 	log.Info().Str("instance", instance.ID.String()).Msg("WhatsApp instance started")
 
 	// Watch for status updates and persist to DB
@@ -1059,14 +1098,17 @@ func (m *Manager) startReconnectionChecker() {
 			if exists && client != nil && !client.IsLoggedIn() {
 				log.Info().Str("instance", inst.ID.String()).
 					Msg("reconnect checker: sem sessão no store — marcando como disconnected")
+				m.LogInstanceEvent(inst.ID.String(), "warn", "manager", "session_missing", "Reconnect automático bloqueado: sessão local ausente", nil)
 				m.db.Model(&inst).Update("status", models.StatusDisconnected)
 				m.StopInstance(inst.ID.String())
 				continue
 			}
 
 			log.Info().Str("instance", inst.ID.String()).Msg("attempting auto-reconnect")
+			m.LogInstanceEvent(inst.ID.String(), "warn", "manager", "auto_reconnect", "Tentando reconectar instância automaticamente", nil)
 			if err := m.StartInstance(&inst); err != nil {
 				log.Error().Err(err).Str("instance", inst.ID.String()).Msg("auto-reconnect failed")
+				m.LogInstanceEvent(inst.ID.String(), "error", "manager", "auto_reconnect_failed", "Falha ao reconectar automaticamente", map[string]interface{}{"error": err.Error()})
 			}
 		}
 	}
@@ -1247,6 +1289,7 @@ func (m *Manager) watchStatus(instanceID string, client *InstanceClient) {
 				Where("id = ? AND status = ?", instanceID, models.StatusConnecting).
 				Update("status", models.StatusDisconnected)
 			log.Info().Str("instance", instanceID).Msg("connection timeout — reset to disconnected")
+			m.LogInstanceEvent(instanceID, "warn", "manager", "connect_timeout", "Tempo limite de conexão atingido; status voltou para desconectado", nil)
 		}
 	})
 
@@ -1285,6 +1328,7 @@ func (m *Manager) watchStatus(instanceID string, client *InstanceClient) {
 			if hub := GetHub(); hub != nil {
 				hub.BroadcastInstanceStatus(instanceID, "connected", phone)
 			}
+			m.LogInstanceEvent(instanceID, "info", "manager", "status_connected", "Instância marcada como conectada", map[string]interface{}{"phone": phone})
 		} else {
 			// Debounce: hold the disconnect for disconnectedDebounce. If a
 			// "connected" arrives before then, cancel and never surface the
@@ -1305,6 +1349,7 @@ func (m *Manager) watchStatus(instanceID string, client *InstanceClient) {
 					hub.BroadcastInstanceStatus(instanceID, "disconnected", phoneCopy)
 				}
 				log.Info().Str("instance", instanceID).Msg("disconnect sustained past debounce window — surfacing")
+				m.LogInstanceEvent(instanceID, "warn", "manager", "status_disconnected", "Desconexão persistiu após debounce", map[string]interface{}{"phone": phoneCopy})
 			})
 			disconnectTimerMu.Unlock()
 		}
