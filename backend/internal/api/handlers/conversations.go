@@ -297,7 +297,7 @@ func (h *ConversationHandler) List(c *fiber.Ctx) error {
 	}
 
 	limit := atoiDefault(c.Query("limit"), 50)
-	if limit < 1 || limit > 200 {
+	if limit < 1 || limit > 500 {
 		limit = 50
 	}
 

@@ -86,6 +86,9 @@ func NewRegistry(db *gorm.DB, waManager *whatsapp.Manager, igSvc *services.Insta
 // Send delivers the message via the appropriate channel.
 // Returns a status "sent" on success and "failed" on any adapter error.
 func (r *Registry) Send(ctx context.Context, inst *models.Instance, msg OutboundMessage) (*SendResult, error) {
+	if err := r.checkSafety(inst, msg, "inbox"); err != nil {
+		return nil, err
+	}
 	switch inst.Channel {
 	case models.ChannelWhatsApp:
 		return r.sendWhatsApp(ctx, inst, msg)
@@ -97,6 +100,32 @@ func (r *Registry) Send(ctx context.Context, inst *models.Instance, msg Outbound
 		return r.sendTikTok(ctx, inst, msg)
 	}
 	return nil, ErrChannelNotSupported
+}
+
+func (r *Registry) checkSafety(inst *models.Instance, msg OutboundMessage, source string) error {
+	if r == nil || r.waManager == nil || inst == nil {
+		return nil
+	}
+	if inst.Channel == models.ChannelWhatsApp {
+		// WhatsApp QR passa pelo InstanceClient.sendMessage, que roda o
+		// circuit breaker depois de normalizar o JID e antes do envio real.
+		return nil
+	}
+	content := msg.Body
+	if content == "" {
+		content = msg.Caption
+	}
+	if content == "" {
+		content = msg.Filename
+	}
+	if content == "" && msg.TemplateName != "" {
+		content = msg.TemplateName
+	}
+	msgType := msg.Type
+	if msgType == "" {
+		msgType = "text"
+	}
+	return r.waManager.CheckOutboundSafetyWithSource(inst.ID.String(), msg.To, content, string(inst.Channel)+"_"+msgType, source)
 }
 
 // WindowOpen returns whether the 24h customer-service window is currently

@@ -98,6 +98,13 @@ func (q *AgentReplyQueue) getOrCreateQueue(instanceID string) chan AgentReplyJob
 //     rajada de mensagens consecutivas).
 func (q *AgentReplyQueue) worker(instanceID string, ch chan AgentReplyJob) {
 	for job := range ch {
+		if q.manager != nil && q.manager.IsInstancePaused(instanceID) {
+			log.Warn().
+				Str("instance", instanceID).
+				Str("agent", job.AgentName).
+				Msg("agent-reply-queue: instância pausada por segurança, descartando job")
+			continue
+		}
 		client := q.manager.GetInstance(instanceID)
 		if client == nil || !client.IsConnected() {
 			log.Warn().Str("instance", instanceID).Msg("agent-reply-queue: instância desconectada, descartando job")
@@ -168,10 +175,10 @@ type paceProfile struct {
 type paceSettingsMode struct {
 	MsPerChar   int `json:"ms_per_char"`
 	JitterPct   int `json:"jitter_pct"`
-	MinDelay    int `json:"min_delay"`    // ms
-	MaxDelay    int `json:"max_delay"`    // ms
-	CooldownMin int `json:"cooldown_min"` // ms
-	CooldownMax int `json:"cooldown_max"` // ms
+	MinDelay    int `json:"min_delay"`     // ms
+	MaxDelay    int `json:"max_delay"`     // ms
+	CooldownMin int `json:"cooldown_min"`  // ms
+	CooldownMax int `json:"cooldown_max"`  // ms
 	FirstMsgMin int `json:"first_msg_min"` // ms
 	FirstMsgMax int `json:"first_msg_max"` // ms
 }

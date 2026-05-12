@@ -155,6 +155,10 @@ func (m *Manager) IsInstancePaused(instanceID string) bool {
 }
 
 func (m *Manager) CheckOutboundSafety(instanceID, toJID, content, msgType string) error {
+	return m.CheckOutboundSafetyWithSource(instanceID, toJID, content, msgType, "")
+}
+
+func (m *Manager) CheckOutboundSafetyWithSource(instanceID, toJID, content, msgType, source string) error {
 	if m == nil || m.db == nil {
 		return nil
 	}
@@ -180,6 +184,12 @@ func (m *Manager) CheckOutboundSafety(instanceID, toJID, content, msgType string
 
 	if !risky {
 		return nil
+	}
+	if source != "" {
+		meta["source"] = source
+	}
+	if msgType != "" {
+		meta["message_type"] = msgType
 	}
 	m.PauseInstanceForSafety(instanceID, reason, message, meta)
 	return fmt.Errorf("envio bloqueado por segurança anti-ban: %s", message)

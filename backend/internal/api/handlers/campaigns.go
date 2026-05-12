@@ -1404,6 +1404,20 @@ func (h *CampaignHandler) processCampaignWABA(c models.Campaign, today string) {
 		}
 		body, _ := json.Marshal(payload)
 
+		if h.manager != nil {
+			if err := h.manager.CheckOutboundSafetyWithSource(c.InstanceID.String(), r.Phone, c.TemplateName, "waba_template", "campaign"); err != nil {
+				log.Warn().Err(err).Str("campaign", c.ID.String()).Str("phone", r.Phone).Msg("campaign WABA: envio bloqueado pelo safety")
+				h.db.Model(r).Updates(map[string]any{
+					"status": models.RecipientStatusFailed,
+					"error":  err.Error(),
+				})
+				h.db.Model(&c).Updates(map[string]any{
+					"status": models.CampaignStatusPaused,
+				})
+				return
+			}
+		}
+
 		// Helper SendWABATemplateWithRetry encapsula:
 		//   • Backoff exponencial 2/4/8/16/32s em 429 e 5xx
 		//   • Honra header Retry-After da Meta quando presente

@@ -38,6 +38,9 @@ interface InstanceSafetyIncident {
 }
 
 interface InstanceSafetyStatus {
+  monitoring?: boolean;
+  state?: "normal" | "critical" | "warning";
+  severity?: string;
   is_paused: boolean;
   active: boolean;
   incident?: InstanceSafetyIncident;
@@ -2751,6 +2754,11 @@ export default function InstanceDetailPage() {
 
   const isConnected = instance.status === "connected";
   const showSafetyModal = !!safety?.active && !!safety?.is_paused && !safetyDismissed;
+  const safetyState = safety?.state || ((instance.is_paused || safety?.is_paused || safety?.active) ? "critical" : "normal");
+  const safetyIsCritical = safetyState === "critical";
+  const safetyTone = safetyIsCritical
+    ? { bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.2)", color: "#ef4444", label: "Crítico", detail: safety?.incident?.message || "Envios e automações pausados para revisão." }
+    : { bg: "rgba(0,212,106,0.08)", border: "rgba(0,212,106,0.18)", color: "#00d46a", label: "Normal", detail: "Monitorando inbox, campanhas, jornadas e eventos silenciosos em tempo real." };
 
   return (
     <div className="space-y-7">
@@ -2888,6 +2896,30 @@ export default function InstanceDetailPage() {
           {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
           Remover
         </button>
+      </div>
+
+      <div
+        className="rounded-2xl px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+        style={{ background: safetyTone.bg, border: `1px solid ${safetyTone.border}` }}
+      >
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,0,0,0.14)", color: safetyTone.color }}>
+            {safetyIsCritical ? <ShieldAlert className="w-4 h-4" /> : <Activity className="w-4 h-4" />}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Safety anti-ban monitorando</p>
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ background: "rgba(0,0,0,0.14)", color: safetyTone.color, border: `1px solid ${safetyTone.border}` }}>
+                {safetyTone.label}
+              </span>
+            </div>
+            <p className="text-xs mt-1 truncate" style={{ color: "hsl(240 8% 58%)" }}>{safetyTone.detail}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] font-medium" style={{ color: "hsl(240 8% 52%)" }}>
+          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: safetyTone.color }} />
+          {safety?.active ? `Incidente: ${safety.incident?.reason || "risco_detectado"}` : "Circuit breaker ativo"}
+        </div>
       </div>
 
       {/* Tabs */}

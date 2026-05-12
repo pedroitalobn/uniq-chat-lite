@@ -16,6 +16,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, CheckCircle2, Loader2, Phone, Plus, Send, Trash2, Webhook, Sparkles, AlertCircle, Copy, Pencil, Check, X,
+  Activity, ShieldAlert,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -55,6 +56,20 @@ interface Template {
   components: TemplateComponent[];
 }
 
+interface InstanceSafetyIncident {
+  reason?: string;
+  message?: string;
+}
+
+interface InstanceSafetyStatus {
+  monitoring?: boolean;
+  state?: "normal" | "critical" | "warning";
+  severity?: string;
+  is_paused: boolean;
+  active: boolean;
+  incident?: InstanceSafetyIncident;
+}
+
 export default function WABAManagePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const qc = useQueryClient();
@@ -90,6 +105,18 @@ export default function WABAManagePage({ params }: { params: Promise<{ id: strin
     enabled: !!waba,
   });
   const templates = templatesRes?.items || [];
+
+  const { data: safety } = useQuery<InstanceSafetyStatus>({
+    queryKey: ["instance-safety", id],
+    queryFn: () => instancesApi.safety(id).then((r) => r.data),
+    enabled: !!waba,
+    refetchInterval: 10_000,
+  });
+  const safetyState = safety?.state || ((safety?.is_paused || safety?.active) ? "critical" : "normal");
+  const safetyIsCritical = safetyState === "critical";
+  const safetyTone = safetyIsCritical
+    ? { bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.2)", color: "#ef4444", label: "Crítico", detail: safety?.incident?.message || "Envios e automações pausados para revisão." }
+    : { bg: "rgba(0,212,106,0.08)", border: "rgba(0,212,106,0.18)", color: "var(--green)", label: "Normal", detail: "Monitorando inbox, campanhas e eventos da instância em tempo real." };
 
   const subscribeMut = useMutation({
     mutationFn: () => wabaApi.subscribe(id),
@@ -188,6 +215,28 @@ export default function WABAManagePage({ params }: { params: Promise<{ id: strin
             </span>
           )}
           <ReconnectButton instanceId={id} />
+        </div>
+      </div>
+
+      <div className="rounded-2xl px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+        style={{ background: safetyTone.bg, border: `1px solid ${safetyTone.border}` }}>
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,0,0,0.14)", color: safetyTone.color }}>
+            {safetyIsCritical ? <ShieldAlert className="w-4 h-4" /> : <Activity className="w-4 h-4" />}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>Safety anti-ban monitorando</p>
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ background: "rgba(0,0,0,0.14)", color: safetyTone.color, border: `1px solid ${safetyTone.border}` }}>
+                {safetyTone.label}
+              </span>
+            </div>
+            <p className="text-xs mt-1 truncate" style={{ color: "var(--text-3)" }}>{safetyTone.detail}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] font-medium" style={{ color: "var(--text-3)" }}>
+          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: safetyTone.color }} />
+          {safety?.active ? `Incidente: ${safety.incident?.reason || "risco_detectado"}` : "Circuit breaker ativo"}
         </div>
       </div>
 

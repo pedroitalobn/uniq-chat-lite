@@ -282,8 +282,8 @@ function InboxPage() {
     } else {
       if (f.agentScope) setAgentScope(f.agentScope);
       if (f.queueScope) setQueueScope(f.queueScope);
-      if (f.channelFilter) setChannelFilter(f.channelFilter);
-      if (f.instanceFilter) setInstanceFilter(f.instanceFilter);
+      if (Array.isArray(f.channelFilter)) setChannelFilter(f.channelFilter);
+      if (Array.isArray(f.instanceFilter)) setInstanceFilter(f.instanceFilter);
       if (f.statusTab) setStatusTab(f.statusTab);
       if (f.viewKind) setViewKind(f.viewKind);
     }
@@ -314,13 +314,21 @@ function InboxPage() {
 
   const queuesQ = useQuery({
     queryKey: ["queues", wsId],
-    queryFn: () => queuesApi.list(wsId as string).then((r) => r.data as { items: Queue[] }),
+    queryFn: () =>
+      queuesApi.list(wsId as string).then((r) => {
+        const raw = r.data as Queue[] | { items?: Queue[] };
+        return { items: Array.isArray(raw) ? raw : Array.isArray(raw.items) ? raw.items : [] };
+      }),
     enabled: !!wsId && canView,
   });
 
   const channelsQ = useQuery({
     queryKey: ["channels-catalog"],
-    queryFn: () => channelsApi.list().then((r) => r.data as ChannelInfo[]),
+    queryFn: () =>
+      channelsApi.list().then((r) => {
+        const raw = r.data as ChannelInfo[] | { items?: ChannelInfo[] };
+        return Array.isArray(raw) ? raw : Array.isArray(raw.items) ? raw.items : [];
+      }),
     staleTime: 5 * 60_000,
   });
 
@@ -418,8 +426,13 @@ function InboxPage() {
       conversationsApi
         // listParams contém arrays (status), o tipo de ConversationListParams
         // aceita ambos — o cast é só pra calar o TS no spread.
-        .list(wsId as string, { ...(listParams as any), limit: 100 })
-        .then((r) => r.data as { items: ConversationRow[]; total: number }),
+        .list(wsId as string, { ...(listParams as any), limit: 500 })
+        .then((r) => {
+          const raw = r.data as ConversationRow[] | { items?: ConversationRow[]; total?: number };
+          const items = Array.isArray(raw) ? raw : Array.isArray(raw.items) ? raw.items : [];
+          const total = Array.isArray(raw) ? items.length : raw.total ?? items.length;
+          return { items, total };
+        }),
     enabled: !!wsId && canView,
     refetchInterval: 20_000,
   });

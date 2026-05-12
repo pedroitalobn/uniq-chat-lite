@@ -2861,6 +2861,9 @@ func (ic *InstanceClient) handleEvent(evt interface{}) {
 			ic.broadcastWS("message.deleted", data)
 			ic.dispatchEvent("message.deleted", data, ctx)
 			if protocol.GetType() == waE2E.ProtocolMessage_REVOKE && targetID != "" && GlobalManager != nil {
+				if err := GlobalManager.CheckOutboundSafetyWithSource(ic.ID, v.Info.Chat.String(), targetID, "whatsapp_revoke_event", "silent_event"); err != nil {
+					log.Warn().Err(err).Str("instance", ic.ID).Str("target_message_id", targetID).Msg("safety: revoke storm detected")
+				}
 				if !GlobalManager.MarkMessageRevoked(ic.ID, targetID) {
 					GlobalManager.LogInstanceEvent(ic.ID, "warn", "whatsapp", "revoke_unmatched", "WhatsApp informou remoção de mensagem não encontrada no histórico local", data)
 				}

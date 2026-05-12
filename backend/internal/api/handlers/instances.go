@@ -1103,6 +1103,11 @@ func (h *InstanceHandler) InstagramFollow(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "body inválido"})
 	}
 
+	if h.manager != nil {
+		if err := h.manager.CheckOutboundSafetyWithSource(instance.ID.String(), req.Target, req.Target, "instagram_follow", "instance_action"); err != nil {
+			return c.Status(423).JSON(fiber.Map{"error": err.Error()})
+		}
+	}
 	if err := h.instagram.Follow(c.Context(), instance.ID.String(), req.Target); err != nil {
 		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -1124,6 +1129,11 @@ func (h *InstanceHandler) InstagramUnfollow(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "body inválido"})
 	}
 
+	if h.manager != nil {
+		if err := h.manager.CheckOutboundSafetyWithSource(instance.ID.String(), req.Target, req.Target, "instagram_unfollow", "instance_action"); err != nil {
+			return c.Status(423).JSON(fiber.Map{"error": err.Error()})
+		}
+	}
 	if err := h.instagram.Unfollow(c.Context(), instance.ID.String(), req.Target); err != nil {
 		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -1173,6 +1183,11 @@ func (h *InstanceHandler) InstagramPublishPost(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "image_url ou video_url é obrigatório"})
 	}
 
+	if h.manager != nil {
+		if err := h.manager.CheckOutboundSafetyWithSource(instance.ID.String(), "instagram:feed", req.Caption, "instagram_post", "instance_action"); err != nil {
+			return c.Status(423).JSON(fiber.Map{"error": err.Error()})
+		}
+	}
 	resp, err := h.instagram.PublishPost(c.Context(), instance.ID.String(), req.ImageURL, req.VideoURL, req.Caption)
 	if err != nil {
 		return c.Status(502).JSON(fiber.Map{"error": err.Error()})
@@ -1201,6 +1216,11 @@ func (h *InstanceHandler) InstagramUploadStory(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "image_url ou video_url é obrigatório"})
 	}
 
+	if h.manager != nil {
+		if err := h.manager.CheckOutboundSafetyWithSource(instance.ID.String(), "instagram:story", req.Caption, "instagram_story", "instance_action"); err != nil {
+			return c.Status(423).JSON(fiber.Map{"error": err.Error()})
+		}
+	}
 	resp, err := h.instagram.UploadStory(c.Context(), instance.ID.String(), req.ImageURL, req.VideoURL, req.Caption)
 	if err != nil {
 		return c.Status(502).JSON(fiber.Map{"error": err.Error()})

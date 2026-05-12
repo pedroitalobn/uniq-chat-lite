@@ -254,7 +254,7 @@ export function relativeTime(iso?: string): string {
 }
 
 export function ConversationList({
-  items,
+  items = [],
   isLoading,
   emptyLabel = "Nenhum atendimento por aqui.",
   actionLabel,
@@ -270,7 +270,7 @@ export function ConversationList({
   scrollParent,
   onLongPressActions,
 }: {
-  items: ConversationRow[];
+  items?: ConversationRow[];
   isLoading?: boolean;
   emptyLabel?: string;
   /** Text for the inline action button (e.g. "Atender"). When provided, clicking it does NOT navigate. */
@@ -303,6 +303,19 @@ export function ConversationList({
    *  abrir contato, atribuir, mudar prioridade. Não passar = sem menu. */
   onLongPressActions?: (conv: ConversationRow) => QuickAction[];
 }) {
+  const safeItems = Array.isArray(items) ? items : [];
+  const isCompact = density === "compact";
+  const pad = isCompact ? "px-3 py-2.5" : "px-6 py-4";
+  const avatarSize = isCompact ? 38 : 44;
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
+  const [pressMenu, setPressMenu] = useState<{
+    conv: ConversationRow;
+    x: number;
+    y: number;
+  } | null>(null);
+
   if (isLoading) {
     return (
       <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -318,7 +331,7 @@ export function ConversationList({
       </ul>
     );
   }
-  if (items.length === 0) {
+  if (safeItems.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center text-zinc-500">
         <MessageCircle className="h-10 w-10 opacity-30" />
@@ -326,13 +339,6 @@ export function ConversationList({
       </div>
     );
   }
-
-  const isCompact = density === "compact";
-  const pad = isCompact ? "px-3 py-2.5" : "px-6 py-4";
-  const avatarSize = isCompact ? 38 : 44;
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState("");
-  const editInputRef = useRef<HTMLInputElement>(null);
 
   const startEdit = (convId: string, currentName: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -352,12 +358,6 @@ export function ConversationList({
 
   // Long-press menu — estado compartilhado entre todas as rows. Só uma row
   // pode estar com menu aberto por vez. anchor.x/y é a posição do dedo.
-  const [pressMenu, setPressMenu] = useState<{
-    conv: ConversationRow;
-    x: number;
-    y: number;
-  } | null>(null);
-
   const renderRow = (conv: ConversationRow) => {
         const status = STATUS_STYLES[conv.status] ?? STATUS_STYLES.open;
         const isSelected = selectedId === conv.id;
@@ -604,11 +604,11 @@ export function ConversationList({
     />
   ) : null;
 
-  if (items.length >= VIRTUALIZE_THRESHOLD) {
+  if (safeItems.length >= VIRTUALIZE_THRESHOLD) {
     return (
       <>
         <Virtuoso
-          data={items}
+          data={safeItems}
           style={scrollParent ? undefined : { height: "100%" }}
           customScrollParent={scrollParent ?? undefined}
           itemContent={(_idx, conv) => renderRow(conv)}
@@ -622,7 +622,7 @@ export function ConversationList({
 
   return (
     <>
-      <div>{items.map((conv) => renderRow(conv))}</div>
+      <div>{safeItems.map((conv) => renderRow(conv))}</div>
       {menu}
     </>
   );

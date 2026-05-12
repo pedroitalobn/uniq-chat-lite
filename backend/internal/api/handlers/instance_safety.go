@@ -16,10 +16,22 @@ func (h *InstanceHandler) SafetyStatus(c *fiber.Ctx) error {
 	active := h.db.Where("instance_id = ? AND status = ?", instance.ID, "active").
 		Order("created_at DESC").
 		First(&incident).Error == nil
+	state := "normal"
+	severity := "low"
+	if instance.IsPaused || active {
+		state = "critical"
+		severity = "high"
+		if incident.Severity != "" {
+			severity = incident.Severity
+		}
+	}
 	return c.JSON(fiber.Map{
-		"is_paused": instance.IsPaused,
-		"active":    active,
-		"incident":  incident,
+		"monitoring": true,
+		"state":      state,
+		"severity":   severity,
+		"is_paused":  instance.IsPaused,
+		"active":     active,
+		"incident":   incident,
 	})
 }
 
