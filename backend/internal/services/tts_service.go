@@ -120,11 +120,11 @@ func (s *TTSService) elevenLabsListVoices(ctx context.Context, provider *models.
 
 	var result struct {
 		Voices []struct {
-			VoiceID  string `json:"voice_id"`
-			Name     string `json:"name"`
-			Category string `json:"category"`
+			VoiceID    string `json:"voice_id"`
+			Name       string `json:"name"`
+			Category   string `json:"category"`
 			PreviewURL string `json:"preview_url"`
-			Labels   struct {
+			Labels     struct {
 				Language string `json:"language"`
 				Gender   string `json:"gender"`
 				UseCase  string `json:"use_case"`
@@ -138,13 +138,15 @@ func (s *TTSService) elevenLabsListVoices(ctx context.Context, provider *models.
 
 	voices := make([]models.WorkspaceVoice, 0, len(result.Voices))
 	for _, v := range result.Voices {
+		providerID := provider.ID
 		cat := v.Category
 		if cat == "" {
 			cat = "preset"
 		}
 		voices = append(voices, models.WorkspaceVoice{
 			WorkspaceID:     provider.WorkspaceID,
-			VoiceProviderID: provider.ID,
+			VoiceProviderID: &providerID,
+			Source:          "workspace_provider",
 			ExternalID:      v.VoiceID,
 			Name:            v.Name,
 			PreviewURL:      v.PreviewURL,
@@ -183,10 +185,10 @@ func (s *TTSService) qwenTTS(ctx context.Context, apiKey string, req TTSRequest)
 			"voice": req.VoiceID,
 		},
 		"parameters": map[string]interface{}{
-			"format":  "mp3",
-			"rate":    int(req.Speed * 100),
-			"volume":  100,
-			"pitch":   0,
+			"format": "mp3",
+			"rate":   int(req.Speed * 100),
+			"volume": 100,
+			"pitch":  0,
 		},
 	}
 
@@ -245,9 +247,11 @@ func (s *TTSService) qwenTTS(ctx context.Context, apiKey string, req TTSRequest)
 func (s *TTSService) qwenListVoices(ctx context.Context, provider *models.VoiceProvider) ([]models.WorkspaceVoice, error) {
 	voices := make([]models.WorkspaceVoice, 0, len(qwenPresetVoices))
 	for _, v := range qwenPresetVoices {
+		providerID := provider.ID
 		voices = append(voices, models.WorkspaceVoice{
 			WorkspaceID:     provider.WorkspaceID,
-			VoiceProviderID: provider.ID,
+			VoiceProviderID: &providerID,
+			Source:          "workspace_provider",
 			ExternalID:      v.id,
 			Name:            v.name,
 			Category:        "preset",
@@ -314,9 +318,11 @@ func (s *TTSService) openAITTS(ctx context.Context, apiKey string, req TTSReques
 func (s *TTSService) openAIListVoices(ctx context.Context, provider *models.VoiceProvider) ([]models.WorkspaceVoice, error) {
 	voices := make([]models.WorkspaceVoice, 0, len(openAIVoices))
 	for _, v := range openAIVoices {
+		providerID := provider.ID
 		voices = append(voices, models.WorkspaceVoice{
 			WorkspaceID:     provider.WorkspaceID,
-			VoiceProviderID: provider.ID,
+			VoiceProviderID: &providerID,
+			Source:          "workspace_provider",
 			ExternalID:      v.id,
 			Name:            v.name,
 			Category:        "preset",

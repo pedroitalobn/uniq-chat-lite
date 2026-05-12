@@ -2313,6 +2313,10 @@ export const voicesApi = {
     api.post(`/v1/voices/providers/${providerId}/clone`, form, {
       headers: { ...wsHeaders(workspaceId), "Content-Type": "multipart/form-data" },
     }),
+  cloneUniqVoice: (workspaceId: string, form: FormData) =>
+    api.post("/v1/voices/uniq/clone", form, {
+      headers: { ...wsHeaders(workspaceId), "Content-Type": "multipart/form-data" },
+    }),
   listVoices: (workspaceId: string, params?: { provider_id?: string; active?: string }) =>
     api.get("/v1/voices/", { headers: wsHeaders(workspaceId), params }),
   toggleVoice: (workspaceId: string, id: string, is_active: boolean) =>

@@ -1431,6 +1431,7 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	voices.Get("/providers/:id/usage", voiceH.GetUsage)
 	voices.Post("/providers/:id/sync", voiceH.SyncVoices)
 	voices.Post("/providers/:id/clone", voiceH.CloneVoice)
+	voices.Post("/uniq/clone", voiceH.CloneUniqVoice)
 	voices.Get("/", voiceH.ListVoices)
 	voices.Patch("/:id", voiceH.ToggleVoice)
 	voices.Delete("/:id", voiceH.DeleteVoice)

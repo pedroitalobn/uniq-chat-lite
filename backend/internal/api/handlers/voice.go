@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -111,8 +113,10 @@ func (h *VoiceHandler) SyncVoices(c *fiber.Ctx) error {
 
 	// Upsert: atualiza se external_id já existe, senão cria
 	for i := range fetched {
+		providerID := provider.ID
 		fetched[i].WorkspaceID = ws
-		fetched[i].VoiceProviderID = provider.ID
+		fetched[i].VoiceProviderID = &providerID
+		fetched[i].Source = "workspace_provider"
 		var existing models.WorkspaceVoice
 		if h.db.Where("workspace_id = ? AND voice_provider_id = ? AND external_id = ?", ws, provider.ID, fetched[i].ExternalID).First(&existing).Error == nil {
 			h.db.Model(&existing).Updates(map[string]any{
@@ -138,7 +142,7 @@ func (h *VoiceHandler) SyncVoices(c *fiber.Ctx) error {
 // Query: provider_id, category, language, active
 func (h *VoiceHandler) ListVoices(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
-	q := h.db.Preload("Provider").Where("workspace_voices.workspace_id = ?", ws)
+	q := h.db.Preload("Provider").Preload("PlatformVoice").Where("workspace_voices.workspace_id = ?", ws)
 	if pid := c.Query("provider_id"); pid != "" {
 		q = q.Where("voice_provider_id = ?", pid)
 	}
@@ -201,21 +205,25 @@ func (h *VoiceHandler) TestTTS(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "voice_id inválido"})
 	}
 	var voice models.WorkspaceVoice
-	if err := h.db.Preload("Provider").
+	if err := h.db.Preload("Provider").Preload("PlatformVoice").
 		Where("id = ? AND workspace_id = ?", id, ws).
 		First(&voice).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "voz não encontrada"})
 	}
-	if voice.Provider == nil {
+	provider := voice.Provider
+	if provider == nil && voice.PlatformVoice != nil {
+		provider = platformVoiceAsProvider(voice.PlatformVoice)
+	}
+	if provider == nil {
 		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{"error": "provider não encontrado"})
 	}
 
 	ctx, cancel := context.WithTimeout(c.Context(), 60*time.Second)
 	defer cancel()
 
-	audioData, mime, err := h.tts.Synthesize(ctx, voice.Provider, services.TTSRequest{
-		Text:    text,
-		VoiceID: voice.ExternalID,
+	audioData, mime, err := h.tts.Synthesize(ctx, provider, services.TTSRequest{
+		Text:      text,
+		VoiceID:   voice.ExternalID,
 		Stability: 0.5, Similarity: 0.75, Style: 0.5, Speed: 1.0,
 	})
 	if err != nil {
@@ -336,7 +344,8 @@ func (h *VoiceHandler) CloneVoice(c *fiber.Ctx) error {
 
 	wv := models.WorkspaceVoice{
 		WorkspaceID:     ws,
-		VoiceProviderID: p.ID,
+		VoiceProviderID: &p.ID,
+		Source:          "workspace_provider",
 		ExternalID:      voiceID,
 		Name:            voiceName,
 		Category:        "clone",
@@ -345,6 +354,61 @@ func (h *VoiceHandler) CloneVoice(c *fiber.Ctx) error {
 	}
 	if err := h.db.Create(&wv).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "voz clonada no provider mas falhou ao persistir local"})
+	}
+	return c.Status(fiber.StatusCreated).JSON(wv)
+}
+
+// CloneUniqVoice POST /v1/voices/uniq/clone (multipart)
+// Usa o provider global da plataforma (Uniq Voice) para clonar uma voz e
+// persiste o resultado no workspace, sem exigir API key própria do cliente.
+func (h *VoiceHandler) CloneUniqVoice(c *fiber.Ctx) error {
+	ws := middleware.GetWorkspaceID(c)
+	if !h.userCanUseUniqVoice(c) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Uniq Voice não disponível no plano atual"})
+	}
+
+	var pv models.PlatformVoice
+	if err := h.db.Where("is_active = ?", true).Order("created_at ASC").First(&pv).Error; err != nil {
+		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{"error": "Uniq Voice não está configurada"})
+	}
+	provider := platformVoiceAsProvider(&pv)
+	if provider == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "provider Uniq Voice não suporta clonagem"})
+	}
+	if provider.Provider != models.VoiceProviderElevenLabs {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "clonagem via Uniq Voice está disponível quando o provider global é ElevenLabs"})
+	}
+
+	input, err := parseCloneVoiceInput(c)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+	if input.Labels == nil {
+		input.Labels = map[string]string{}
+	}
+	input.Labels["source"] = "uniq_voice"
+	input.Labels["workspace_id"] = ws.String()
+
+	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Minute)
+	defer cancel()
+	voiceID, voiceName, err := h.tts.CloneElevenLabsVoice(ctx, provider.APIKey, input)
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "falha na clonagem: " + err.Error()})
+	}
+
+	wv := models.WorkspaceVoice{
+		WorkspaceID:     ws,
+		VoiceProviderID: &pv.ID, // compat: DBs antigas ainda exigem NOT NULL; Source define o runtime real.
+		PlatformVoiceID: &pv.ID,
+		Source:          "uniq_voice",
+		ExternalID:      voiceID,
+		Name:            voiceName,
+		Category:        "clone",
+		Description:     input.Description,
+		IsActive:        true,
+	}
+	if err := h.db.Create(&wv).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "voz clonada na Uniq Voice mas falhou ao persistir local"})
 	}
 	return c.Status(fiber.StatusCreated).JSON(wv)
 }
@@ -359,7 +423,7 @@ func (h *VoiceHandler) DeleteVoice(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id inválido"})
 	}
 	var v models.WorkspaceVoice
-	if err := h.db.Preload("Provider").Where("id = ? AND workspace_id = ?", id, ws).First(&v).Error; err != nil {
+	if err := h.db.Preload("Provider").Preload("PlatformVoice").Where("id = ? AND workspace_id = ?", id, ws).First(&v).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "voz não encontrada"})
 	}
 	// Só apaga no provider quando é uma voz clonada (preset é compartilhado).
@@ -372,11 +436,103 @@ func (h *VoiceHandler) DeleteVoice(c *fiber.Ctx) error {
 			c.Set("X-Provider-Delete-Error", err.Error())
 		}
 	}
+	if v.Category == "clone" && v.Provider == nil && v.PlatformVoice != nil {
+		provider := platformVoiceAsProvider(v.PlatformVoice)
+		if provider != nil && provider.Provider == models.VoiceProviderElevenLabs {
+			ctx, cancel := context.WithTimeout(c.Context(), 30*time.Second)
+			defer cancel()
+			if err := h.tts.DeleteElevenLabsVoice(ctx, provider.APIKey, v.ExternalID); err != nil {
+				c.Set("X-Provider-Delete-Error", err.Error())
+			}
+		}
+	}
 	h.db.Delete(&v)
 	return c.JSON(fiber.Map{"ok": true})
 }
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
+
+func parseCloneVoiceInput(c *fiber.Ctx) (services.CloneVoiceInput, error) {
+	form, err := c.MultipartForm()
+	if err != nil {
+		return services.CloneVoiceInput{}, fmt.Errorf("esperado multipart/form-data")
+	}
+	name := strings.TrimSpace(c.FormValue("name"))
+	if name == "" {
+		return services.CloneVoiceInput{}, fmt.Errorf("name obrigatório")
+	}
+	files := form.File["files"]
+	if len(files) == 0 {
+		return services.CloneVoiceInput{}, fmt.Errorf("ao menos 1 arquivo de áudio (campo 'files') é necessário")
+	}
+
+	samples := make([]services.CloneVoiceSample, 0, len(files))
+	for _, fh := range files {
+		if fh.Size > 25*1024*1024 {
+			return services.CloneVoiceInput{}, fmt.Errorf("cada arquivo deve ter até 25MB")
+		}
+		fr, err := fh.Open()
+		if err != nil {
+			return services.CloneVoiceInput{}, fmt.Errorf("falha ao ler arquivo: %s", fh.Filename)
+		}
+		data, readErr := io.ReadAll(fr)
+		fr.Close()
+		if readErr != nil {
+			return services.CloneVoiceInput{}, fmt.Errorf("falha ao ler arquivo: %s", fh.Filename)
+		}
+		samples = append(samples, services.CloneVoiceSample{Filename: fh.Filename, Data: data})
+	}
+
+	labels := map[string]string{}
+	if raw := c.FormValue("labels"); raw != "" {
+		_ = json.Unmarshal([]byte(raw), &labels)
+	}
+	return services.CloneVoiceInput{
+		Name:        name,
+		Description: c.FormValue("description"),
+		Samples:     samples,
+		Labels:      labels,
+	}, nil
+}
+
+func platformVoiceAsProvider(pv *models.PlatformVoice) *models.VoiceProvider {
+	if pv == nil || !pv.IsActive || strings.TrimSpace(pv.APIKey) == "" {
+		return nil
+	}
+	provider := models.VoiceProviderType("")
+	switch strings.ToLower(strings.TrimSpace(pv.Provider)) {
+	case "elevenlabs":
+		provider = models.VoiceProviderElevenLabs
+	case "qwen_tts", "qwen":
+		provider = models.VoiceProviderQwenTTS
+	case "openai_tts", "openai":
+		provider = models.VoiceProviderOpenAITTS
+	default:
+		return nil
+	}
+	return &models.VoiceProvider{
+		ID:       pv.ID,
+		Provider: provider,
+		Name:     pv.Name,
+		APIKey:   pv.APIKey,
+		IsActive: true,
+	}
+}
+
+func (h *VoiceHandler) userCanUseUniqVoice(c *fiber.Ctx) bool {
+	user := middleware.GetCurrentUser(c)
+	if user == nil {
+		return false
+	}
+	if user.Role == models.RoleSuperAdmin {
+		return true
+	}
+	var fresh models.User
+	if err := h.db.Preload("Plan").First(&fresh, "id = ?", user.ID).Error; err != nil {
+		return false
+	}
+	return fresh.Plan != nil && fresh.Plan.HasFeature(models.FeatureVoice)
+}
 
 func maskKey(key string) string {
 	if len(key) <= 8 {

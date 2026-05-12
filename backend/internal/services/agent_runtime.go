@@ -709,10 +709,18 @@ func (r *AgentRuntime) trySendAudio(ctx context.Context, client interface {
 		if r.db.Preload("Provider").First(&voice, "id = ?", voiceID).Error != nil {
 			return false
 		}
-		if voice.Provider == nil || !voice.Provider.IsActive {
-			return false
+		if voice.Source == "uniq_voice" || voice.PlatformVoiceID != nil {
+			vp, _ := r.resolvePlatformVoiceProvider(ctx, agent.InstanceID)
+			if vp == nil {
+				return false
+			}
+			voiceProvider = vp
+		} else {
+			if voice.Provider == nil || !voice.Provider.IsActive {
+				return false
+			}
+			voiceProvider = voice.Provider
 		}
-		voiceProvider = voice.Provider
 		voiceExternal = voice.ExternalID
 	} else {
 		// audio_enabled=true mas sem voice_id setado — tenta Uniq Voice

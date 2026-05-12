@@ -48,6 +48,8 @@ type WorkspaceVoice = {
   description?: string;
   is_active: boolean;
   voice_provider_id: string;
+  platform_voice_id?: string;
+  source?: "workspace_provider" | "uniq_voice";
   provider?: VoiceProvider;
 };
 
@@ -109,8 +111,8 @@ export function VoiceCard({ form, update }: Props) {
       ...localVoices.map((v) => ({
         id: v.id,
         name: v.name,
-        source: "workspace" as const,
-        provider: v.provider?.provider,
+        source: v.source === "uniq_voice" ? ("uniq" as const) : ("workspace" as const),
+        provider: v.source === "uniq_voice" ? "uniq" : v.provider?.provider,
         language: v.language,
         gender: v.gender,
         category: v.category,
@@ -437,7 +439,7 @@ function VoiceStudioModal({
   const providers = providersQuery.data || [];
   const voices = voicesQuery.data || [];
   const elevenLabsProviders = providers.filter((p) => p.provider === "elevenlabs");
-  const cloneProvider = cloneProviderId || elevenLabsProviders[0]?.id || "";
+  const cloneProvider = cloneProviderId || "uniq";
 
   const createProvider = useMutation({
     mutationFn: () =>
@@ -473,6 +475,7 @@ function VoiceStudioModal({
       form.append("description", cloneDescription.trim());
       form.append("labels", JSON.stringify({ source: "uniq_agent_builder" }));
       cloneFiles.forEach((file) => form.append("files", file));
+      if (cloneProvider === "uniq") return voicesApi.cloneUniqVoice(workspaceId, form);
       return voicesApi.cloneVoice(workspaceId, cloneProvider, form);
     },
     onSuccess: async (res) => {
@@ -596,10 +599,10 @@ function VoiceStudioModal({
             <aside className="space-y-3">
               <div className="rounded-xl p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
                 <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
-                  Conectar ElevenLabs
+                  Provider próprio
                 </p>
                 <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>
-                  Necessário para clonar vozes dentro da Uniq.
+                  Opcional: use sua própria conta ElevenLabs, Qwen ou OpenAI TTS.
                 </p>
                 <input
                   value={providerName}
@@ -636,6 +639,17 @@ function VoiceStudioModal({
                   {providersQuery.isLoading && <Loader2 className="w-3 h-3 animate-spin" style={{ color: "var(--text-3)" }} />}
                 </div>
                 <div className="mt-2 space-y-2">
+                  <div className="flex items-center gap-2 rounded-lg px-2 py-2" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.22)" }}>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-semibold truncate" style={{ color: "var(--text-1)" }}>
+                        Uniq Voice
+                      </p>
+                      <p className="text-[9px]" style={{ color: "#f59e0b" }}>
+                        Presetado pela plataforma
+                      </p>
+                    </div>
+                    <Check className="w-3.5 h-3.5" style={{ color: "#f59e0b" }} />
+                  </div>
                   {providers.length === 0 ? (
                     <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
                       Nenhum provider próprio conectado.
@@ -678,19 +692,15 @@ function VoiceStudioModal({
                 <select
                   value={cloneProvider}
                   onChange={(e) => setCloneProviderId(e.target.value)}
-                  disabled={elevenLabsProviders.length === 0}
                   style={inputStyle}
                   className="mt-3"
                 >
-                  {elevenLabsProviders.length === 0 ? (
-                    <option value="">Conecte ElevenLabs primeiro</option>
-                  ) : (
-                    elevenLabsProviders.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))
-                  )}
+                  <option value="uniq">Uniq Voice - provider da plataforma</option>
+                  {elevenLabsProviders.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} - ElevenLabs próprio
+                    </option>
+                  ))}
                 </select>
 
                 <input
