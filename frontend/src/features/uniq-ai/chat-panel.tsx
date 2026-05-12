@@ -17,10 +17,11 @@ import {
   type ThreadMessageLike,
   type ExternalStoreAdapter,
 } from "@assistant-ui/react";
-import { Loader2, SendHorizonal, Sparkles, Square, Wand2, CheckCircle2 } from "lucide-react";
+import { Loader2, SendHorizonal, Square, Wand2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { agentsApi, instancesApi, journeysApi } from "@/lib/api";
 import { MentionPicker, type Mention, type MentionPickerHandles } from "@/components/MentionPicker";
+import { UniqAIBrandMark } from "@/components/uniq-ai/brand-mark";
 import { type Message } from "./atoms";
 import {
   AuiThreadMessages,
@@ -257,7 +258,7 @@ export function UniqAIChatPanel({
               className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
               style={{ background: "var(--green)" }}
             >
-              <Sparkles className="w-3.5 h-3.5 text-white" />
+              <UniqAIBrandMark className="w-3.5 h-3.5" stroke="white" />
             </div>
             <span className="text-sm font-medium" style={{ color: "var(--text-1)" }}>Uniq AI</span>
             <div className="ml-auto">
@@ -273,7 +274,7 @@ export function UniqAIChatPanel({
           {isEmpty && (
             <div className="flex-1 min-h-0 overflow-y-auto">
               <div className="min-h-full flex flex-col items-center justify-center py-6 sm:py-10 px-4">
-                <div className="w-full max-w-2xl space-y-3">
+                <div className="w-full max-w-6xl space-y-3">
                   <EmptyStateView onSuggestionClick={handleSuggestionClick} />
                 </div>
               </div>

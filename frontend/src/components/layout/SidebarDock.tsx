@@ -519,11 +519,11 @@ export function SidebarDock() {
       {/* Mobile hamburger removido — toda navegação mobile vive no
           MobileDock + sheet "Mais". Hamburger flutuante criava conflito
           visual com o ModuleHeader e era confuso ("não tenho noção de
-          como usar"). Em md+ a sidebar dock continua visível. */}
+          como usar"). Em tablet/desktop a sidebar dock continua visível. */}
 
       {/* Desktop floating dock */}
       <div
-        className="hidden lg:flex"
+        className="hidden md:flex"
         style={{
           position: "fixed",
           left: 10,
@@ -539,7 +539,7 @@ export function SidebarDock() {
           estado SAVED (userExpanded) — não acompanha hover, pra não fazer
           a UI inteira mexer enquanto o dock expande temporariamente. */}
       <motion.div
-        className="hidden lg:block"
+        className="hidden md:block"
         animate={{ width: spacerW + 20 }}
         transition={{ type: "spring", damping: 26, stiffness: 280 }}
         style={{ flexShrink: 0 }}
@@ -550,7 +550,7 @@ export function SidebarDock() {
         {mobileOpen && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+            className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
         )}
@@ -564,7 +564,7 @@ export function SidebarDock() {
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="lg:hidden fixed top-0 left-0 z-50"
+            className="md:hidden fixed top-0 left-0 z-50"
             style={{
               // 100dvh respeita a barra do browser mobile (Chrome/Safari) —
               // inset-y-0 ou 100vh deixavam o rodapé do drawer (logout +

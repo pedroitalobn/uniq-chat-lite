@@ -16,19 +16,22 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  LayoutDashboard, Headset, Contact, MoreHorizontal, Sparkles,
+  LayoutDashboard, Headset, MoreHorizontal,
   Megaphone, Wand2, Bot, Smartphone, Plug, Settings, Building2,
-  LifeBuoy, ShoppingBag, X, Database, Server,
+  LifeBuoy, ShoppingBag, X, Database, Server, Zap, LogOut,
 } from "lucide-react";
 import { useUniqAIIsland } from "@/components/uniq-ai/island-context";
+import { UniqAIBrandMark } from "@/components/uniq-ai/brand-mark";
 import { haptic } from "@/lib/haptics";
 
 type NavEntry = {
-  href: string;
+  href?: string;
   label: string;
   icon: typeof LayoutDashboard;
+  action?: () => void;
 };
 
 const PRIMARY_LEFT: NavEntry[] = [
@@ -40,6 +43,8 @@ const PRIMARY_RIGHT: NavEntry[] = [
   { href: "/crm",       label: "CRM",       icon: Database },
 ];
 
+const SLOT_CENTERS = ["10%", "30%", "50%", "70%", "90%"] as const;
+
 // "Mais" — todos os módulos secundários acessíveis pelo sheet.
 const MORE: NavEntry[] = [
   { href: "/campaigns",    label: "Campanhas",   icon: Megaphone },
@@ -50,8 +55,10 @@ const MORE: NavEntry[] = [
   { href: "/instances",    label: "Instâncias",  icon: Smartphone },
   { href: "/servers",      label: "Servidores",  icon: Server },
   { href: "/integrations", label: "Integrações", icon: Plug },
+  { href: "/usage",        label: "Consumo",     icon: Zap },
   { href: "/workspace",    label: "Workspace",   icon: Building2 },
   { href: "/settings",     label: "Configurações", icon: Settings },
+  { label: "Sair",         icon: LogOut,         action: () => signOut({ callbackUrl: "/login" }) },
 ];
 
 export function MobileDock() {
@@ -64,6 +71,17 @@ export function MobileDock() {
   const isMoreActive =
     MORE.some((i) => isActive(i.href)) ||
     (pathname?.startsWith("/uniq-ai") ?? false);
+  const activeSlot = pathname?.startsWith("/uniq-ai")
+    ? 2
+    : isActive("/dashboard")
+      ? 0
+      : isActive("/inbox")
+        ? 1
+        : isActive("/crm")
+          ? 3
+          : isMoreActive
+            ? 4
+            : null;
 
   // Esc fecha sheet (UX teclado).
   useEffect(() => {
@@ -110,6 +128,38 @@ export function MobileDock() {
             boxShadow: "0 12px 40px rgba(0,0,0,0.50), 0 -2px 12px rgba(0,212,106,0.08), inset 0 1px 0 var(--border-default)",
           }}
         >
+          <div
+            className="pointer-events-none absolute inset-x-5 top-0 h-px"
+            style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)" }}
+          />
+          <motion.div
+            className="pointer-events-none absolute bottom-1.5 h-10 w-[58px] -translate-x-1/2 rounded-[18px]"
+            style={{
+              left: activeSlot == null ? "-20%" : SLOT_CENTERS[activeSlot],
+              background: "linear-gradient(180deg, rgba(0,212,106,0.16) 0%, rgba(0,212,106,0.05) 72%, transparent 100%)",
+              boxShadow: "0 0 24px rgba(0,212,106,0.16)",
+            }}
+            animate={{
+              left: activeSlot == null ? "-20%" : SLOT_CENTERS[activeSlot],
+              opacity: activeSlot == null ? 0 : 1,
+            }}
+            transition={{ type: "spring", stiffness: 360, damping: 30, mass: 0.8 }}
+          />
+          <motion.div
+            className="pointer-events-none absolute bottom-[7px] h-[3px] w-11 -translate-x-1/2 rounded-full"
+            style={{
+              left: activeSlot == null ? "-20%" : SLOT_CENTERS[activeSlot],
+              background: "linear-gradient(90deg, rgba(0,212,106,0.12), rgba(110,255,178,0.98), rgba(0,212,106,0.12))",
+              boxShadow: "0 0 12px rgba(0,212,106,0.55), 0 0 26px rgba(0,212,106,0.22)",
+            }}
+            animate={{
+              left: activeSlot == null ? "-20%" : SLOT_CENTERS[activeSlot],
+              opacity: activeSlot == null ? 0 : 1,
+              width: activeSlot === 2 ? 36 : 44,
+            }}
+            transition={{ type: "spring", stiffness: 380, damping: 30, mass: 0.75 }}
+          />
+
           {PRIMARY_LEFT.map((item, i) => (
             <DockItem key={item.href} item={item} active={isActive(item.href)} index={i} />
           ))}
@@ -127,13 +177,45 @@ export function MobileDock() {
             className="flex flex-col items-center justify-center gap-0.5 flex-1 h-full rounded-2xl"
             style={{
               transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
-              background: isMoreActive ? "rgba(0,212,106,0.10)" : "transparent",
-              color: isMoreActive ? "var(--green)" : "var(--text-3)",
+              background: "transparent",
+              color: isMoreActive ? "rgba(255,255,255,0.92)" : "var(--text-3)",
             }}
             aria-label="Mais"
           >
-            <MoreHorizontal className="w-5 h-5" />
-            <span className="text-[10px] font-medium leading-none">Mais</span>
+            <span
+              className="relative flex items-center justify-center rounded-xl"
+              style={{
+                width: 32,
+                height: 32,
+                background: isMoreActive ? "radial-gradient(circle, rgba(0,212,106,0.24) 0%, rgba(0,212,106,0.08) 72%, transparent 100%)" : "transparent",
+                boxShadow: isMoreActive ? "0 0 18px rgba(0,212,106,0.2), inset 0 1px 0 rgba(255,255,255,0.08)" : "none",
+              }}
+            >
+              {isMoreActive && (
+                <motion.span
+                  className="absolute inset-0 rounded-xl"
+                  style={{ border: "1px solid rgba(0,212,106,0.28)" }}
+                  animate={{ opacity: [0.55, 1, 0.55], scale: [1, 1.06, 1] }}
+                  transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+                />
+              )}
+              <MoreHorizontal className="w-5 h-5" />
+            </span>
+            <span className="relative inline-flex flex-col items-center text-[10px] font-medium leading-none">
+              <span>Mais</span>
+              <motion.span
+                className="mt-1 h-[2px] rounded-full"
+                style={{
+                  background: "linear-gradient(90deg, rgba(0,212,106,0.2), rgba(0,212,106,0.95), rgba(0,212,106,0.2))",
+                  boxShadow: "0 0 8px rgba(0,212,106,0.4)",
+                }}
+                animate={{
+                  width: isMoreActive ? "100%" : "0%",
+                  opacity: isMoreActive ? 1 : 0,
+                }}
+                transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+              />
+            </span>
           </button>
         </div>
       </nav>
@@ -188,36 +270,56 @@ export function MobileDock() {
               </div>
               <div className="grid grid-cols-3 gap-2 p-4 pb-2">
                 {MORE.map((item, index) => {
-                  const active = isActive(item.href);
+                  const active = item.href ? isActive(item.href) : false;
+                  const cardStyle = active
+                    ? {
+                        background: "rgba(0,212,106,0.14)",
+                        border: "1px solid rgba(0,212,106,0.30)",
+                        color: "var(--green)",
+                        boxShadow: "0 0 18px rgba(0,212,106,0.18)",
+                      }
+                    : item.action
+                      ? {
+                          background: "rgba(248,113,113,0.08)",
+                          border: "1px solid rgba(248,113,113,0.18)",
+                          color: "#fca5a5",
+                        }
+                      : {
+                          background: "var(--input)",
+                          border: "1px solid var(--border-default)",
+                          color: "var(--text-1)",
+                        };
                   return (
                     <motion.div
-                      key={item.href}
+                      key={item.href || item.label}
                       initial={{ opacity: 0, scale: 0.95, y: 8 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       transition={{ delay: index * 0.03, duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
                     >
-                      <Link
-                        href={item.href}
-                        onClick={() => setSheetOpen(false)}
-                        className="flex flex-col items-center gap-1.5 p-3 rounded-2xl"
-                        style={
-                          active
-                            ? {
-                                background: "rgba(0,212,106,0.14)",
-                                border: "1px solid rgba(0,212,106,0.30)",
-                                color: "var(--green)",
-                                boxShadow: "0 0 18px rgba(0,212,106,0.18)",
-                              }
-                            : {
-                                background: "var(--input)",
-                                border: "1px solid var(--border-default)",
-                                color: "var(--text-1)",
-                              }
-                        }
-                      >
-                        <item.icon className="w-5 h-5" />
-                        <span className="text-[11px] font-medium text-center leading-tight">{item.label}</span>
-                      </Link>
+                      {item.href ? (
+                        <Link
+                          href={item.href}
+                          onClick={() => setSheetOpen(false)}
+                          className="flex flex-col items-center gap-1.5 p-3 rounded-2xl"
+                          style={cardStyle}
+                        >
+                          <item.icon className="w-5 h-5" />
+                          <span className="text-[11px] font-medium text-center leading-tight">{item.label}</span>
+                        </Link>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            haptic.tap();
+                            setSheetOpen(false);
+                            item.action?.();
+                          }}
+                          className="flex w-full flex-col items-center gap-1.5 p-3 rounded-2xl"
+                          style={cardStyle}
+                        >
+                          <item.icon className="w-5 h-5" />
+                          <span className="text-[11px] font-medium text-center leading-tight">{item.label}</span>
+                        </button>
+                      )}
                     </motion.div>
                   );
                 })}
@@ -244,18 +346,53 @@ function DockItem({ item, active, index }: { item: NavEntry; active: boolean; in
         className="flex flex-col items-center justify-center gap-0.5 flex-1 h-full rounded-2xl"
         style={{
           transition: "all 0.2s cubic-bezier(0.16,1,0.3,1)",
-          background: active ? "rgba(0,212,106,0.12)" : "transparent",
-          color: active ? "var(--green)" : "var(--text-3)",
+          background: "transparent",
+          color: active ? "rgba(255,255,255,0.92)" : "var(--text-3)",
         }}
       >
-        <item.icon className="w-5 h-5" />
-        <span className="text-[10px] font-medium leading-none">{item.label}</span>
+        <span
+          className="relative flex items-center justify-center rounded-xl"
+          style={{
+            width: 32,
+            height: 32,
+            background: active ? "radial-gradient(circle, rgba(0,212,106,0.24) 0%, rgba(0,212,106,0.08) 72%, transparent 100%)" : "transparent",
+            boxShadow: active ? "0 0 18px rgba(0,212,106,0.2), inset 0 1px 0 rgba(255,255,255,0.08)" : "none",
+          }}
+        >
+          {active && (
+            <motion.span
+              className="absolute inset-0 rounded-xl"
+              style={{ border: "1px solid rgba(0,212,106,0.28)" }}
+              animate={{ opacity: [0.55, 1, 0.55], scale: [1, 1.06, 1] }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+            />
+          )}
+          <item.icon className="w-5 h-5" />
+        </span>
+        <span className="relative inline-flex flex-col items-center text-[10px] font-medium leading-none">
+          <span>{item.label}</span>
+          <motion.span
+            className="mt-1 h-[2px] rounded-full"
+            style={{
+              background: "linear-gradient(90deg, rgba(0,212,106,0.2), rgba(0,212,106,0.95), rgba(0,212,106,0.2))",
+              boxShadow: "0 0 8px rgba(0,212,106,0.4)",
+            }}
+            animate={{
+              width: active ? "100%" : "0%",
+              opacity: active ? 1 : 0,
+            }}
+            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+          />
+        </span>
       </Link>
     </motion.div>
   );
 }
 
 function UniqAICenterButton({ open }: { open: () => void }) {
+  const pathname = usePathname();
+  const isActive = pathname?.startsWith("/uniq-ai") ?? false;
+
   return (
     <div
       className="relative flex items-center justify-center"
@@ -270,16 +407,22 @@ function UniqAICenterButton({ open }: { open: () => void }) {
           height: 56,
           top: -16, // raised acima da linha do dock
           background: "linear-gradient(135deg, #00d46a 0%, #00b259 100%)",
-          boxShadow: "0 8px 24px rgba(0,212,106,0.45), 0 0 0 4px rgba(10,10,20,0.78), inset 0 1px 0 var(--border-strong)",
+          boxShadow: isActive
+            ? "0 10px 28px rgba(0,212,106,0.52), 0 0 0 4px rgba(10,10,20,0.78), 0 0 0 1px rgba(167,255,205,0.85), inset 0 1px 0 rgba(255,255,255,0.32)"
+            : "0 8px 24px rgba(0,212,106,0.45), 0 0 0 4px rgba(10,10,20,0.78), inset 0 1px 0 var(--border-strong)",
         }}
         aria-label="Abrir Uniq AI"
       >
-        <Sparkles className="w-6 h-6" style={{ color: "#0a0a14" }} />
+        {isActive && (
+          <motion.span
+            className="absolute inset-0 rounded-full"
+            style={{ border: "1px solid rgba(167,255,205,0.7)" }}
+            animate={{ scale: [1, 1.08, 1], opacity: [0.55, 1, 0.55] }}
+            transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
+          />
+        )}
+        <UniqAIBrandMark className="w-6 h-6" stroke="#0a0a14" />
       </motion.button>
-      {/* Espaço-fantasma pra o item central não comprimir os outros */}
-      <span className="text-[9px] font-medium absolute bottom-1" style={{ color: "var(--text-3)" }}>
-        Uniq AI
-      </span>
     </div>
   );
 }

@@ -20,6 +20,7 @@ import { CheckCircle2, Loader2, MessageSquare, Sparkles, X } from "lucide-react"
 import { UniqAIChatPanel } from "@/features/uniq-ai/chat-panel";
 import type { Message } from "@/features/uniq-ai/atoms";
 import { loadModelPref } from "@/features/uniq-ai/model-preference";
+import { UniqAIBrandMark } from "@/components/uniq-ai/brand-mark";
 import { useUniqAIIsland } from "./island-context";
 import { useConversationWS } from "@/hooks/useConversationWS";
 
@@ -137,7 +138,7 @@ export function UniqAIIsland() {
               ? <Loader2 className="w-6 h-6 text-white animate-spin" />
               : state.mode === "result"
                 ? <CheckCircle2 className="w-6 h-6 text-white" />
-                : <Sparkles className="w-6 h-6 text-white" />}
+                : <UniqAIBrandMark className="w-6 h-6" stroke="white" />}
           </motion.button>
         )}
 
@@ -257,7 +258,7 @@ export function UniqAIIsland() {
         ) : state.mode === "notification" ? (
           notifKindIcon(state.notification.kind)
         ) : (
-          <Sparkles className="w-3.5 h-3.5 text-white" />
+          <UniqAIBrandMark className="w-3.5 h-3.5" stroke="white" />
         )}
       </div>
 
@@ -380,4 +381,3 @@ function notifKindIcon(kind: string) {
     default:         return <MessageSquare className="w-3.5 h-3.5 text-white" />;
   }
 }
-

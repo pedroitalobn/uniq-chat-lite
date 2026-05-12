@@ -8,11 +8,12 @@
 // Fecha ao pressionar Esc, clicar no backdrop, ou chamar close().
 
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Sparkles, Maximize2, ExternalLink } from "lucide-react";
+import { X, Maximize2, ExternalLink } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { UniqAIChatPanel } from "@/features/uniq-ai/chat-panel";
 import type { Message } from "@/features/uniq-ai/atoms";
+import { UniqAIBrandMark } from "@/components/uniq-ai/brand-mark";
 import { useUniqAIIsland } from "./island-context";
 
 const PANEL_WIDTH = 400;
@@ -169,7 +170,7 @@ export function AmbientAIPanel() {
                   boxShadow: "0 0 12px rgba(0,212,106,0.2)",
                 }}
               >
-                <Sparkles className="w-4 h-4" style={{ color: "var(--green)" }} />
+                <UniqAIBrandMark className="w-4 h-4" stroke="var(--green)" />
               </div>
 
               <div className="flex-1 min-w-0">

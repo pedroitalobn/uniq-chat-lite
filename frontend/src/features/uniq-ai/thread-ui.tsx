@@ -33,10 +33,10 @@ import {
   Send,
   Smartphone,
   Square,
-  Sparkles,
   User,
   Users,
 } from "lucide-react";
+import { UniqAIBrandMark } from "@/components/uniq-ai/brand-mark";
 import { cn } from "@/lib/utils";
 
 // ─── Thinking dots ────────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ export function ThinkingMessage({ phase }: { phase: string }) {
         className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ring-2 ring-green-500/30"
         style={{ background: "var(--green)" }}
       >
-        <Sparkles className="w-4 h-4 text-white" />
+        <UniqAIBrandMark className="w-4 h-4" stroke="white" />
       </div>
       <div className="flex-1 min-w-0 space-y-2">
         <p className="text-xs font-semibold" style={{ color: "var(--green)" }}>Uniq AI</p>
@@ -376,13 +376,13 @@ export function UserMessage() {
 export function AssistantMessage() {
   return (
     <MessagePrimitive.Root className="group flex gap-3 px-4 sm:px-8 py-4">
-      <div
-        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ring-1 ring-green-500/25"
-        style={{
-          background: "linear-gradient(135deg, var(--green) 0%, rgba(0,212,106,0.7) 100%)",
-        }}
-      >
-        <Sparkles className="w-4 h-4 text-white" />
+        <div
+          className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ring-1 ring-green-500/25"
+          style={{
+            background: "linear-gradient(135deg, var(--green) 0%, rgba(0,212,106,0.7) 100%)",
+          }}
+        >
+        <UniqAIBrandMark className="w-4 h-4" stroke="white" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold mb-2" style={{ color: "var(--green)" }}>Uniq AI</p>
@@ -425,7 +425,7 @@ export function RunningMessage({ phase }: { phase: string }) {
             animate={{ rotate: 360 }}
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
           >
-            <Sparkles className="w-4 h-4 text-white" />
+            <UniqAIBrandMark className="w-4 h-4" stroke="white" />
           </motion.div>
         </div>
         <div className="flex-1 min-w-0 space-y-1.5">
@@ -506,10 +506,10 @@ const ORBIT_MODULES = [
   },
 ];
 
-const ORBIT_SIZE   = 440;
+const ORBIT_SIZE   = 520;
 const ORBIT_CENTER = ORBIT_SIZE / 2;
-const ORBIT_RADIUS = 155;
-const MODULE_SIZE  = 64;
+const ORBIT_RADIUS = 184;
+const MODULE_SIZE  = 78;
 
 function getTooltipPos(angle: number): React.CSSProperties {
   const a = ((angle % 360) + 360) % 360;
@@ -529,92 +529,131 @@ function OrbitModule({
   angle: number; onSuggestionClick: (text: string) => void;
 }) {
   const [hovered, setHovered] = useState(false);
-  const rad = ((angle - 90) * Math.PI) / 180;
-  const x   = ORBIT_CENTER + ORBIT_RADIUS * Math.cos(rad) - MODULE_SIZE / 2;
-  const y   = ORBIT_CENTER + ORBIT_RADIUS * Math.sin(rad) - MODULE_SIZE / 2;
 
   return (
-    <motion.button
-      onClick={() => onSuggestionClick(prompt)}
-      onHoverStart={() => setHovered(true)}
-      onHoverEnd={() => setHovered(false)}
-      style={{ position: "absolute", left: x, top: y, width: MODULE_SIZE, height: MODULE_SIZE }}
-      initial={{ opacity: 0, scale: 0.5 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay: 0.3 + (angle / 360) * 0.5, duration: 0.45, type: "spring", bounce: 0.35 }}
-      whileHover={{ scale: 1.18, zIndex: 20 }}
-      whileTap={{ scale: 0.93 }}
+    <motion.div
+      className="absolute inset-0"
+      initial={{ opacity: 0, scale: 0.9, rotate: angle - 16 }}
+      animate={{ opacity: 1, scale: 1, rotate: [angle, angle + 360] }}
+      transition={{
+        opacity: { delay: 0.2 + (angle / 360) * 0.45, duration: 0.35 },
+        scale: { delay: 0.2 + (angle / 360) * 0.45, duration: 0.35 },
+        rotate: { duration: 28 + (angle % 5) * 2.4, repeat: Infinity, ease: "linear" },
+      }}
+      style={{ transformOrigin: `${ORBIT_CENTER}px ${ORBIT_CENTER}px` }}
     >
-      <div
+      <motion.button
+        onClick={() => onSuggestionClick(prompt)}
+        onHoverStart={() => setHovered(true)}
+        onHoverEnd={() => setHovered(false)}
+        className="absolute left-1/2 top-1/2"
         style={{
-          width: "100%",
-          height: "100%",
-          borderRadius: 18,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 4,
-          background: hovered
-            ? `linear-gradient(135deg, ${color}22, ${color}10)`
-            : "var(--input)",
-          border: `1px solid ${hovered ? color + "66" : "var(--border-default)"}`,
-          boxShadow: hovered
-            ? `0 0 28px ${color}44, 0 8px 24px rgba(0,0,0,0.4), inset 0 1px 0 var(--border-default)`
-            : "inset 0 1px 0 var(--input)",
-          backdropFilter: "blur(14px)",
-          WebkitBackdropFilter: "blur(14px)",
-          transition: "background 0.2s, border-color 0.2s, box-shadow 0.2s",
-          cursor: "pointer",
-          position: "relative",
+          width: MODULE_SIZE,
+          height: MODULE_SIZE,
+          marginLeft: -(MODULE_SIZE / 2),
+          marginTop: -(ORBIT_RADIUS + MODULE_SIZE / 2),
         }}
+        whileHover={{ scale: 1.12, y: -4, zIndex: 20 }}
+        whileTap={{ scale: 0.94 }}
       >
-        <Icon
+        <motion.div
+          animate={{ rotate: hovered ? 0 : [-angle, -angle - 360] }}
+          transition={{ rotate: { duration: 28 + (angle % 5) * 2.4, repeat: Infinity, ease: "linear" } }}
           style={{
-            width: 20, height: 20,
+            width: "100%",
+            height: "100%",
+            borderRadius: 22,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 5,
+            background: hovered
+              ? `linear-gradient(165deg, ${color}30 0%, rgba(10,14,24,0.96) 70%)`
+              : "linear-gradient(165deg, rgba(16,20,32,0.94) 0%, rgba(8,10,18,0.92) 100%)",
+            border: `1px solid ${hovered ? color + "88" : "rgba(255,255,255,0.09)"}`,
+            boxShadow: hovered
+              ? `0 0 0 1px ${color}25, 0 0 30px ${color}42, 0 18px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12)`
+              : "0 14px 28px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.08)",
+            backdropFilter: "blur(18px) saturate(170%)",
+            WebkitBackdropFilter: "blur(18px) saturate(170%)",
+            transition: "background 0.2s, border-color 0.2s, box-shadow 0.2s",
+            cursor: "pointer",
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          <motion.div
+            className="absolute inset-x-[18%] top-0 h-px"
+            style={{ background: `linear-gradient(90deg, transparent, ${color}, transparent)` }}
+            animate={{ opacity: hovered ? [0.35, 1, 0.35] : [0.18, 0.5, 0.18] }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div
+            className="absolute inset-0"
+            style={{ background: `radial-gradient(circle at 50% 0%, ${color}16 0%, transparent 52%)` }}
+            animate={{ opacity: hovered ? [0.5, 0.9, 0.5] : [0.2, 0.45, 0.2] }}
+            transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <Icon
+            style={{
+              width: 22, height: 22,
+              color: hovered ? color : "rgba(255,255,255,0.64)",
+              filter: hovered ? `drop-shadow(0 0 12px ${color})` : "none",
+              transition: "color 0.2s, filter 0.2s",
+            }}
+            strokeWidth={1.8}
+          />
+          <span style={{
+            fontSize: 9, fontWeight: 700, letterSpacing: "0.09em",
+            textTransform: "uppercase",
             color: hovered ? color : "rgba(255,255,255,0.5)",
             transition: "color 0.2s",
-          }}
-          strokeWidth={1.8}
-        />
-        <span style={{
-          fontSize: 9, fontWeight: 600, letterSpacing: "0.05em",
-          color: hovered ? color : "rgba(255,255,255,0.4)",
-          transition: "color 0.2s",
-        }}>
-          {label}
-        </span>
+          }}>
+            {label}
+          </span>
+          <span
+            className="absolute bottom-2 left-1/2 -translate-x-1/2"
+            style={{
+              width: 16,
+              height: 2,
+              borderRadius: 999,
+              background: hovered ? color : "rgba(255,255,255,0.14)",
+              boxShadow: hovered ? `0 0 10px ${color}` : "none",
+            }}
+          />
 
-        <AnimatePresence>
-          {hovered && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.92 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.92 }}
-              transition={{ duration: 0.13 }}
-              style={{
-                position: "absolute",
-                ...getTooltipPos(angle),
-                pointerEvents: "none",
-                zIndex: 50,
-                width: 190,
-                padding: "8px 12px",
-                borderRadius: 12,
-                background: "rgba(8,8,16,0.97)",
-                border: `1px solid ${color}33`,
-                boxShadow: `0 12px 32px rgba(0,0,0,0.55), 0 0 0 1px ${color}11`,
-                backdropFilter: "blur(20px)",
-              }}
-            >
-              <p style={{ fontSize: 10, fontWeight: 700, color, marginBottom: 3, letterSpacing: "0.03em" }}>{label}</p>
-              <p style={{ fontSize: 10, color: "rgba(255,255,255,0.62)", lineHeight: 1.5 }}>
-                {prompt.length > 90 ? prompt.slice(0, 90) + "…" : prompt}
-              </p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </motion.button>
+          <AnimatePresence>
+            {hovered && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.92 }}
+                transition={{ duration: 0.13 }}
+                style={{
+                  position: "absolute",
+                  ...getTooltipPos(angle),
+                  pointerEvents: "none",
+                  zIndex: 50,
+                  width: 210,
+                  padding: "10px 12px",
+                  borderRadius: 14,
+                  background: "linear-gradient(180deg, rgba(9,12,20,0.98) 0%, rgba(6,8,14,0.96) 100%)",
+                  border: `1px solid ${color}44`,
+                  boxShadow: `0 16px 36px rgba(0,0,0,0.58), 0 0 0 1px ${color}16`,
+                  backdropFilter: "blur(22px)",
+                }}
+              >
+                <p style={{ fontSize: 10, fontWeight: 700, color, marginBottom: 4, letterSpacing: "0.08em", textTransform: "uppercase" }}>{label}</p>
+                <p style={{ fontSize: 10, color: "rgba(255,255,255,0.66)", lineHeight: 1.55 }}>
+                  {prompt.length > 96 ? prompt.slice(0, 96) + "…" : prompt}
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </motion.button>
+    </motion.div>
   );
 }
 
@@ -701,7 +740,12 @@ function UniqOrbHero({ size = 120 }: { size?: number }) {
             animate={{ scale: [0.85, 1.12, 0.85], opacity: [0.7, 1, 0.7] }}
             transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
           >
-            <Sparkles className="w-8 h-8" style={{ color: "var(--text-1)", filter: "drop-shadow(0 0 8px rgba(0,212,106,0.8))" }} />
+            <UniqAIBrandMark
+              className="w-8 h-8"
+              stroke="var(--text-1)"
+              glow
+              style={{ filter: "drop-shadow(0 0 8px rgba(0,212,106,0.8))" }}
+            />
           </motion.div>
         </div>
       </motion.div>
@@ -712,19 +756,49 @@ function UniqOrbHero({ size = 120 }: { size?: number }) {
 export function EmptyStateView({ onSuggestionClick }: { onSuggestionClick: (text: string) => void }) {
   return (
     <ThreadPrimitive.Empty>
-      <div className="flex flex-col items-center justify-center h-full gap-3 px-4 py-6 text-center">
+      <div className="flex flex-col items-center justify-center h-full gap-4 px-4 py-6 text-center">
 
         {/* ── Desktop orbit ── */}
         <div className="hidden sm:block relative flex-shrink-0" style={{ width: ORBIT_SIZE, height: ORBIT_SIZE }}>
+          <div
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: "radial-gradient(circle, rgba(0,212,106,0.12) 0%, rgba(0,212,106,0.05) 38%, transparent 72%)",
+              filter: "blur(12px)",
+              transform: "scale(1.12)",
+            }}
+          />
 
-          {/* Dashed orbit ring */}
+          <motion.div
+            className="absolute inset-[10%] rounded-full"
+            style={{
+              border: "1px solid rgba(255,255,255,0.05)",
+              boxShadow: "0 0 80px rgba(0,212,106,0.08), inset 0 0 50px rgba(0,212,106,0.04)",
+            }}
+            animate={{ rotate: [0, 360] }}
+            transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
+          />
+
           <svg className="absolute inset-0 pointer-events-none" width={ORBIT_SIZE} height={ORBIT_SIZE}>
             <motion.circle
+              cx={ORBIT_CENTER} cy={ORBIT_CENTER} r={ORBIT_RADIUS + 34}
+              fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={1} strokeDasharray="2 12"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 70, repeat: Infinity, ease: "linear" }}
+              style={{ transformOrigin: "center" }}
+            />
+            <motion.circle
               cx={ORBIT_CENTER} cy={ORBIT_CENTER} r={ORBIT_RADIUS}
-              fill="none" stroke="var(--border-strong)" strokeWidth={1} strokeDasharray="5 9"
+              fill="none" stroke="rgba(110,231,183,0.35)" strokeWidth={1.1} strokeDasharray="5 9"
               initial={{ pathLength: 0, opacity: 0 }}
               animate={{ pathLength: 1, opacity: 1 }}
               transition={{ duration: 1.2, delay: 0.2, ease: "easeOut" }}
+            />
+            <motion.circle
+              cx={ORBIT_CENTER} cy={ORBIT_CENTER} r={ORBIT_RADIUS - 34}
+              fill="none" stroke="rgba(96,165,250,0.18)" strokeWidth={1} strokeDasharray="3 10"
+              animate={{ pathLength: [0.72, 1, 0.72], opacity: [0.25, 0.55, 0.25] }}
+              transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
             />
           </svg>
 
@@ -764,6 +838,23 @@ export function EmptyStateView({ onSuggestionClick }: { onSuggestionClick: (text
             }} />
           </motion.div>
 
+          <motion.div
+            className="absolute left-1/2 top-8 -translate-x-1/2 rounded-full px-3 py-1"
+            style={{
+              background: "linear-gradient(180deg, rgba(10,14,22,0.95) 0%, rgba(6,8,14,0.92) 100%)",
+              border: "1px solid rgba(0,212,106,0.18)",
+              boxShadow: "0 12px 30px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.06)",
+              backdropFilter: "blur(18px)",
+            }}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45, duration: 0.45 }}
+          >
+            <span className="text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ color: "rgba(255,255,255,0.62)" }}>
+              Neural Orbit
+            </span>
+          </motion.div>
+
           {/* Module nodes */}
           {ORBIT_MODULES.map((mod, i) => (
             <OrbitModule
@@ -775,11 +866,7 @@ export function EmptyStateView({ onSuggestionClick }: { onSuggestionClick: (text
           ))}
 
           {/* Central orb */}
-          <div style={{
-            position: "absolute",
-            left: ORBIT_CENTER - 80 * 1.1,
-            top: ORBIT_CENTER - 80 * 1.1,
-          }}>
+          <div style={{ position: "absolute", left: ORBIT_CENTER - 88, top: ORBIT_CENTER - 88 }}>
             <UniqOrbHero size={80} />
           </div>
         </div>
@@ -794,15 +881,16 @@ export function EmptyStateView({ onSuggestionClick }: { onSuggestionClick: (text
                 onClick={() => onSuggestionClick(mod.prompt)}
                 style={{
                   display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                  gap: 4, padding: "10px 4px", borderRadius: 14,
-                  background: "var(--input)",
-                  border: "1px solid var(--border-default)",
+                  gap: 5, padding: "12px 4px", borderRadius: 16,
+                  background: "linear-gradient(160deg, rgba(12,16,24,0.96) 0%, rgba(7,9,16,0.92) 100%)",
+                  border: "1px solid rgba(255,255,255,0.09)",
+                  boxShadow: "0 14px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)",
                 }}
-                whileHover={{ scale: 1.06, borderColor: mod.color + "55", background: mod.color + "11" }}
+                whileHover={{ scale: 1.06, borderColor: mod.color + "66", background: `linear-gradient(160deg, ${mod.color}24 0%, rgba(7,9,16,0.95) 85%)` }}
                 whileTap={{ scale: 0.93 }}
               >
                 <mod.icon style={{ width: 18, height: 18, color: mod.color }} strokeWidth={1.8} />
-                <span style={{ fontSize: 8, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.04em" }}>
+                <span style={{ fontSize: 8, fontWeight: 700, color: "rgba(255,255,255,0.62)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
                   {mod.label}
                 </span>
               </motion.button>
@@ -812,20 +900,33 @@ export function EmptyStateView({ onSuggestionClick }: { onSuggestionClick: (text
 
         {/* Headline */}
         <motion.div
-          className="space-y-1.5"
-          style={{ marginTop: "-12px" }}
+          className="space-y-2"
+          style={{ marginTop: "-8px" }}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4, duration: 0.5 }}
         >
+          <div className="flex items-center justify-center">
+            <span
+              className="rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em]"
+              style={{
+                color: "rgba(255,255,255,0.64)",
+                background: "linear-gradient(180deg, rgba(13,16,25,0.94) 0%, rgba(8,10,18,0.9) 100%)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                boxShadow: "0 10px 24px rgba(0,0,0,0.24)",
+              }}
+            >
+              Control Core
+            </span>
+          </div>
           <h2 className="text-xl font-semibold tracking-tight" style={{ color: "var(--text-1)" }}>
             Olá, sou a{" "}
             <span style={{ color: "var(--green)", textShadow: "0 0 20px rgba(0,212,106,0.5)" }}>
               Uniq AI
             </span>
           </h2>
-          <p className="text-sm max-w-xs mx-auto" style={{ color: "var(--text-3)" }}>
-            Clique em um módulo ou escreva o que você precisa
+          <p className="text-sm max-w-md mx-auto leading-relaxed" style={{ color: "var(--text-3)" }}>
+            Toque em um módulo orbitando para disparar uma ação rápida ou descreva o que você quer fazer em linguagem natural.
           </p>
         </motion.div>
       </div>
