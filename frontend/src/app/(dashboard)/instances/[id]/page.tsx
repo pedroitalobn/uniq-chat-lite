@@ -849,6 +849,143 @@ function InstagramQuickActions({ instanceId, cardStyle }: { instanceId: string; 
   );
 }
 
+interface GroupJoinJob { id: string; invite_link: string; invite_code: string; group_jid?: string; status: string; error?: string; scheduled_at: string; finished_at?: string; created_at: string; }
+
+function GroupJoinPanel({ instance, instanceId, cardStyle }: { instance: Instance; instanceId: string; cardStyle: React.CSSProperties }) {
+  const queryClient = useQueryClient();
+  const [joinCSV, setJoinCSV] = useState("");
+  const [joinInterval, setJoinInterval] = useState(300);
+
+  const { data: joinJobsData } = useQuery<{ data: GroupJoinJob[]; total: number }>({
+    queryKey: ["group-join-jobs", instanceId],
+    queryFn: () => groupsApi.joinJobs(instanceId).then(r => r.data),
+    refetchInterval: 10_000,
+  });
+
+  const joinLinksMutation = useMutation({
+    mutationFn: () => groupsApi.joinLinks(instanceId, [], joinCSV, joinInterval),
+    onSuccess: (res) => {
+      const count = res.data?.count ?? 0;
+      toast.success(`${count} link${count === 1 ? "" : "s"} adicionado${count === 1 ? "" : "s"} à fila`);
+      setJoinCSV("");
+      queryClient.invalidateQueries({ queryKey: ["group-join-jobs", instanceId] });
+      queryClient.invalidateQueries({ queryKey: ["instance-event-logs", instanceId] });
+    },
+    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao adicionar links"),
+  });
+
+  const joinJobs = joinJobsData?.data ?? [];
+  const dimText = { color: "hsl(240 8% 42%)" };
+  const valText = { color: "var(--text-1)" };
+
+  const downloadTemplate = () => {
+    const csv = "invite_link\nhttps://chat.whatsapp.com/EXEMPLO1234567890\n";
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "template-grupos-whatsapp.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleFile = async (file?: File | null) => {
+    if (!file) return;
+    const text = await file.text();
+    const cleaned = text
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(line => line && !/^invite_link\s*$/i.test(line))
+      .join("\n");
+    setJoinCSV(prev => [prev.trim(), cleaned].filter(Boolean).join("\n"));
+  };
+
+  return (
+    <div className="rounded-2xl" style={cardStyle}>
+      <div className="p-4 flex flex-wrap items-center justify-between gap-3" style={{ borderBottom: "1px solid var(--border-default)" }}>
+        <div className="flex items-center gap-2">
+          <LogIn className="w-4 h-4" style={{ color: "#00d46a" }} />
+          <span className="font-medium text-sm" style={valText}>Entrar em grupos por link</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={downloadTemplate}
+            className="flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg transition-all"
+            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "hsl(240 8% 58%)" }}>
+            <Download className="w-3 h-3" />Template CSV
+          </button>
+          <span className="text-[11px]" style={dimText}>Fila gradual para reduzir risco</span>
+        </div>
+      </div>
+      <div className="p-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_240px]">
+        <div className="space-y-2">
+          <textarea
+            value={joinCSV}
+            onChange={(e) => setJoinCSV(e.target.value)}
+            rows={5}
+            placeholder="Cole links do chat.whatsapp.com separados por linha, vírgula ou CSV"
+            className="w-full rounded-xl px-3 py-2 text-sm resize-none outline-none"
+            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "var(--text-1)" }}
+          />
+          <label className="flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm cursor-pointer transition-all"
+            style={{ background: "var(--surface-2)", border: "1px dashed var(--border-default)", color: "hsl(240 8% 58%)" }}>
+            <Upload className="w-4 h-4" />
+            Subir CSV de links
+            <input type="file" accept=".csv,text/csv,text/plain" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
+          </label>
+        </div>
+        <div className="space-y-3">
+          <label className="block">
+            <span className="text-[11px] font-medium" style={dimText}>Intervalo entre entradas</span>
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                type="number"
+                min={60}
+                max={86400}
+                value={joinInterval}
+                onChange={(e) => setJoinInterval(Math.max(60, Number(e.target.value) || 300))}
+                className="w-full rounded-xl px-3 py-2 text-sm outline-none"
+                style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "var(--text-1)" }}
+              />
+              <span className="text-xs" style={dimText}>seg</span>
+            </div>
+          </label>
+          <button
+            onClick={() => joinLinksMutation.mutate()}
+            disabled={joinLinksMutation.isPending || !joinCSV.trim() || instance.status !== "connected"}
+            className="w-full flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl transition-all disabled:opacity-50"
+            style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.25)", color: "#00d46a" }}
+          >
+            {joinLinksMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+            Adicionar à fila
+          </button>
+        </div>
+      </div>
+      {joinJobs.length > 0 && (
+        <div className="px-4 pb-4">
+          <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-default)" }}>
+            {joinJobs.slice(0, 8).map((job) => {
+              const tone = job.status === "joined" ? "#00d46a" : job.status === "failed" ? "#ef4444" : job.status === "running" ? "#60a5fa" : "#f59e0b";
+              return (
+                <div key={job.id} className="p-3 flex items-center gap-3 border-b last:border-b-0" style={{ borderColor: "var(--border-default)" }}>
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: tone }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-mono truncate" style={valText}>{job.invite_link}</p>
+                    {job.error ? <p className="text-[11px] truncate mt-0.5" style={{ color: "#ef4444" }}>{job.error}</p> : null}
+                  </div>
+                  <span className="text-[11px] font-medium" style={{ color: tone }}>{job.status}</span>
+                  <span className="text-[11px] hidden sm:block" style={dimText}>
+                    {new Date(job.scheduled_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Geral tab ────────────────────────────────────────────────────────────────
 function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: string }) {
   const queryClient = useQueryClient();
@@ -1881,6 +2018,10 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
         </div>
       )}
 
+      {instance.status === "connected" && !isInstagram && (
+        <GroupJoinPanel instance={instance} instanceId={instanceId} cardStyle={cardStyle} />
+      )}
+
       {/* Advanced settings */}
       <div className="rounded-2xl p-5 space-y-1" style={cardStyle}>
         <h3 className="text-xs font-medium uppercase tracking-widest mb-4" style={{ color: "hsl(240 8% 42%)" }}>
@@ -2214,22 +2355,14 @@ function GeralTab({ instance, instanceId }: { instance: Instance; instanceId: st
 interface GroupSnapshot { jid: string; name: string; description: string; member_count: number; is_admin: boolean; invite_link?: string; }
 interface ContactEntry  { jid: string; phone: string; name?: string; message_count: number; last_message: string; }
 interface RecoveryData  { status: string; snapshot_at: string; schedule: "" | "daily" | "weekly"; groups: GroupSnapshot[]; contacts: ContactEntry[]; }
-interface GroupJoinJob { id: string; invite_link: string; invite_code: string; group_jid?: string; status: string; error?: string; scheduled_at: string; finished_at?: string; created_at: string; }
 
 function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: Instance }) {
   const [copiedJid, setCopiedJid] = useState<string | null>(null);
-  const [joinCSV, setJoinCSV] = useState("");
-  const [joinInterval, setJoinInterval] = useState(300);
   const queryClient = useQueryClient();
 
   const { data, isLoading, refetch } = useQuery<RecoveryData>({
     queryKey: ["recovery", instanceId],
     queryFn: () => recoveryApi.get(instanceId).then(r => r.data),
-  });
-  const { data: joinJobsData } = useQuery<{ data: GroupJoinJob[]; total: number }>({
-    queryKey: ["group-join-jobs", instanceId],
-    queryFn: () => groupsApi.joinJobs(instanceId).then(r => r.data),
-    refetchInterval: 10_000,
   });
 
   const snapshotMutation = useMutation({
@@ -2254,18 +2387,6 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
     onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao salvar agendamento"),
   });
 
-  const joinLinksMutation = useMutation({
-    mutationFn: () => groupsApi.joinLinks(instanceId, [], joinCSV, joinInterval),
-    onSuccess: (res) => {
-      const count = res.data?.count ?? 0;
-      toast.success(`${count} link${count === 1 ? "" : "s"} adicionado${count === 1 ? "" : "s"} à fila`);
-      setJoinCSV("");
-      queryClient.invalidateQueries({ queryKey: ["group-join-jobs", instanceId] });
-      queryClient.invalidateQueries({ queryKey: ["instance-event-logs", instanceId] });
-    },
-    onError: (e: unknown) => toast.error((e as { response?: { data?: { error?: string } } })?.response?.data?.error || "Erro ao adicionar links"),
-  });
-
   const copy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopiedJid(key);
@@ -2276,7 +2397,6 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
   const snapshotAt = data?.snapshot_at ? new Date(data.snapshot_at) : null;
   const hasSnapshot = snapshotAt && snapshotAt.getFullYear() > 2000;
   const currentSchedule = data?.schedule ?? "";
-  const joinJobs = joinJobsData?.data ?? [];
 
   const cardStyle = { background: "var(--surface-solid)", border: "1px solid var(--border)" };
   const dimText = { color: "hsl(240 8% 42%)" };
@@ -2355,74 +2475,6 @@ function RecoveryTab({ instanceId, instance }: { instanceId: string; instance: I
             );
           })}
         </div>
-      </div>
-
-      <div className="rounded-2xl" style={cardStyle}>
-        <div className="p-4 flex items-center justify-between gap-3" style={{ borderBottom: "1px solid var(--border-default)" }}>
-          <div className="flex items-center gap-2">
-            <LogIn className="w-4 h-4" style={{ color: "#00d46a" }} />
-            <span className="font-medium text-sm" style={valText}>Entrar em grupos por link</span>
-          </div>
-          <span className="text-[11px]" style={dimText}>Fila gradual para reduzir risco de bloqueio</span>
-        </div>
-        <div className="p-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
-          <textarea
-            value={joinCSV}
-            onChange={(e) => setJoinCSV(e.target.value)}
-            rows={5}
-            placeholder="Cole links do chat.whatsapp.com separados por linha, vírgula ou CSV"
-            className="w-full rounded-xl px-3 py-2 text-sm resize-none outline-none"
-            style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "var(--text-1)" }}
-          />
-          <div className="space-y-3">
-            <label className="block">
-              <span className="text-[11px] font-medium" style={dimText}>Intervalo entre entradas</span>
-              <div className="mt-1 flex items-center gap-2">
-                <input
-                  type="number"
-                  min={60}
-                  max={86400}
-                  value={joinInterval}
-                  onChange={(e) => setJoinInterval(Math.max(60, Number(e.target.value) || 300))}
-                  className="w-full rounded-xl px-3 py-2 text-sm outline-none"
-                  style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)", color: "var(--text-1)" }}
-                />
-                <span className="text-xs" style={dimText}>seg</span>
-              </div>
-            </label>
-            <button
-              onClick={() => joinLinksMutation.mutate()}
-              disabled={joinLinksMutation.isPending || !joinCSV.trim() || instance.status !== "connected"}
-              className="w-full flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl transition-all disabled:opacity-50"
-              style={{ background: "rgba(0,212,106,0.1)", border: "1px solid rgba(0,212,106,0.25)", color: "#00d46a" }}
-            >
-              {joinLinksMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
-              Adicionar à fila
-            </button>
-          </div>
-        </div>
-        {joinJobs.length > 0 && (
-          <div className="px-4 pb-4">
-            <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-default)" }}>
-              {joinJobs.slice(0, 8).map((job) => {
-                const tone = job.status === "joined" ? "#00d46a" : job.status === "failed" ? "#ef4444" : job.status === "running" ? "#60a5fa" : "#f59e0b";
-                return (
-                  <div key={job.id} className="p-3 flex items-center gap-3 border-b last:border-b-0" style={{ borderColor: "var(--border-default)" }}>
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: tone }} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-mono truncate" style={valText}>{job.invite_link}</p>
-                      {job.error ? <p className="text-[11px] truncate mt-0.5" style={{ color: "#ef4444" }}>{job.error}</p> : null}
-                    </div>
-                    <span className="text-[11px] font-medium" style={{ color: tone }}>{job.status}</span>
-                    <span className="text-[11px] hidden sm:block" style={dimText}>
-                      {new Date(job.scheduled_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
 
       {isLoading ? (

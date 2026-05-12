@@ -366,6 +366,9 @@ func parseWhatsAppInviteCode(raw string) (string, string, error) {
 	if raw == "" {
 		return "", "", fiber.NewError(fiber.StatusBadRequest, "link vazio")
 	}
+	if header := strings.ToLower(raw); header == "invite_link" || header == "link" || header == "url" || header == "group_link" || header == "grupo" {
+		return "", "", fiber.NewError(fiber.StatusBadRequest, "cabeçalho CSV ignorado")
+	}
 	if strings.Contains(raw, "chat.whatsapp.com/") {
 		u, err := url.Parse(raw)
 		if err != nil {
