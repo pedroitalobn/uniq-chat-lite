@@ -81,7 +81,7 @@ func (c *ProfileSyncCron) tick() {
 	if c.manager == nil {
 		return
 	}
-	missing := c.RunOnce(ctx, 150, 50)
+	missing := c.RunOnce(ctx, 300, 100)
 	log.Info().Int("processed", missing).Msg("profile sync tick complete")
 }
 

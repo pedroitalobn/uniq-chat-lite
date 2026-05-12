@@ -92,7 +92,15 @@ func PersistAvatar(ctx context.Context, jid, signedURL string) string {
 		}
 	}
 	if err != nil {
-		log.Warn().Err(err).Str("jid", jid).Msg("avatar: all download attempts failed, keeping signed URL temporarily")
+		// Se o download falhou com 401/403/410, a URL assinada expirou.
+		// Limpa o cache para forçar re-fetch de uma URL fresca na próxima
+		// mensagem ou tick do cron.
+		if strings.Contains(err.Error(), "401") || strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), "410") {
+			clearAvatarCache(jid)
+			log.Warn().Err(err).Str("jid", jid).Msg("avatar: URL expired (401/403/410), cache cleared — will retry fresh URL")
+		} else {
+			log.Warn().Err(err).Str("jid", jid).Msg("avatar: all download attempts failed, keeping signed URL temporarily")
+		}
 		return signedURL
 	}
 
@@ -141,6 +149,13 @@ func downloadAvatar(ctx context.Context, signedURL string) ([]byte, string, erro
 	return data, resp.Header.Get("Content-Type"), nil
 }
 
+// clearAvatarCache remove o JID do cache em memória. Chamado quando o
+// download falha com 401/403 (URL expirada), forçando re-fetch na próxima
+// mensagem ou tick do cron.
+func clearAvatarCache(jid string) {
+	avatarCache.Delete(jid)
+}
+
 // avatarObjectKey — sha1 do JID dá uma chave determinística e curta sem
 // expor o número direto no path do storage. Path: avatars/<hash>.<ext>
 func avatarObjectKey(jid, ext string) string {
@@ -162,6 +177,10 @@ func looksLikeWhatsappCDN(url string) bool {
 		"fbcdn.net",
 		"cdninstagram.com",
 		"fna.fbcdn.net",
+		"scontent.whatsapp.net",
+		"pps.whatsapp.net",
+		"mmg.whatsapp.net",
+		"media.whatsapp.net",
 	}
 	for _, h := range hosts {
 		if strings.Contains(low, h) {
