@@ -522,11 +522,6 @@ export function Sidebar() {
         )}
       </nav>
 
-      {/* Usage banner — clicável, leva pra /usage. Mostra a categoria
-         mais crítica + mini-barras por categoria. Substitui o item de
-         menu "Consumo" — agora vive como widget visual no rodapé. */}
-      <UsageBanner collapsed={collapsed} />
-
       {/* Upgrade prompt — só pro dono, plano free */}
       {!collapsed && canSeeBilling && planName?.toLowerCase() === "free" && (
         <div className="px-2 pb-2">
@@ -597,6 +592,7 @@ export function Sidebar() {
             </div>
           )}
         </div>
+        <UsageBanner collapsed={collapsed} />
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
           className={cn(

@@ -2,17 +2,12 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Zap, ArrowUpRight } from "lucide-react";
+import { Zap, ArrowUpRight, Sparkles, Mic2, MessageSquare } from "lucide-react";
 import { usageApi, type UsageView } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-// Banner clicável da sidebar — mostra um resumo da quota do ciclo: barra
-// de progresso única (categoria mais crítica) + 3 mini-barras por
-// categoria (AI / Voice / Mensagens). Clicar leva pra /usage.
-//
-// Cor da barra principal acompanha o nível: <60% verde, 60-80% laranja,
-// >=80% vermelho. Quando a sidebar está collapsed, vira só um ícone
-// com a porcentagem do top embaixo.
+// Preview clicável da sidebar — mostra a média dos consumos do ciclo
+// (AI, Voz e Mensagens) com uma barra agregada que acompanha o refetch.
 
 const CAT_COLOR: Record<string, string> = {
   ai: "#a78bfa",
@@ -26,6 +21,12 @@ const CAT_LABEL_SHORT: Record<string, string> = {
   message: "Msg",
 };
 
+const CAT_ICON = {
+  ai: Sparkles,
+  voice: Mic2,
+  message: MessageSquare,
+};
+
 function levelColor(pct: number) {
   if (pct >= 100) return "#ef4444";
   if (pct >= 80) return "#f59e0b";
@@ -37,7 +38,7 @@ export function UsageBanner({ collapsed }: { collapsed: boolean }) {
   const { data, isLoading } = useQuery<UsageView>({
     queryKey: ["usage", "me", "banner"],
     queryFn: () => usageApi.me().then(r => r.data),
-    refetchInterval: 60_000,
+    refetchInterval: 10_000,
     retry: 1,
     // Endpoint pode 401/403 em sessões antigas — silenciar erro pra não
     // quebrar a sidebar; quando não houver dados o banner some.
@@ -75,17 +76,18 @@ export function UsageBanner({ collapsed }: { collapsed: boolean }) {
     { key: "voice" as const, data: data.voice },
     { key: "message" as const, data: data.message },
   ];
-  const top = [...cats].sort((a, b) => b.data.percent - a.data.percent)[0];
-  const topPct = Math.min(999, top.data.percent);
-  const barColor = levelColor(topPct);
-  const isOver = top.data.percent >= 100;
+  const averagePct = Math.min(999, Math.round(
+    cats.reduce((sum, cat) => sum + cat.data.percent, 0) / cats.length
+  ));
+  const barColor = levelColor(averagePct);
+  const isOver = averagePct >= 100;
 
   // ─── Collapsed: ícone + % minúscula ───────────────────────────────
   if (collapsed) {
     return (
       <Link
         href="/usage"
-        title={`Consumo · ${topPct}% (${CAT_LABEL_SHORT[top.key]})`}
+        title={`Consumo médio · ${averagePct}%`}
         className="mx-1.5 mb-2 flex flex-col items-center justify-center py-1.5 rounded-xl transition-all"
         style={{
           background: `linear-gradient(135deg, ${barColor}1f, ${barColor}08)`,
@@ -96,19 +98,19 @@ export function UsageBanner({ collapsed }: { collapsed: boolean }) {
       >
         <Zap className="w-3.5 h-3.5" />
         <span className="text-[9px] font-semibold tabular-nums mt-0.5" style={{ color: barColor }}>
-          {topPct}%
+          {averagePct}%
         </span>
       </Link>
     );
   }
 
-  // ─── Expanded: banner completo ────────────────────────────────────
+  // ─── Expanded: preview completo ────────────────────────────────────
   const planName = data.plan?.name || "";
   return (
     <Link
       href="/usage"
       className={cn(
-        "group mx-2 mb-2 block rounded-xl px-3 py-2.5",
+        "group mx-0 mt-2 block rounded-xl px-3 py-2.5",
         "transition-all duration-200"
       )}
       style={{
@@ -119,7 +121,6 @@ export function UsageBanner({ collapsed }: { collapsed: boolean }) {
           : `0 2px 10px rgba(0,0,0,0.20), inset 0 1px 0 var(--input)`,
       }}
     >
-      {/* Header */}
       <div className="flex items-center gap-2 mb-1.5">
         <span
           className="flex items-center justify-center w-5 h-5 rounded-md flex-shrink-0"
@@ -132,12 +133,17 @@ export function UsageBanner({ collapsed }: { collapsed: boolean }) {
         >
           <Zap className="w-3 h-3" />
         </span>
-        <span className="text-[11px] font-semibold uppercase tracking-wider"
+        <div className="min-w-0 flex-1">
+          <span className="block text-[11px] font-semibold uppercase tracking-wider"
           style={{ color: "var(--text-2)" }}>
-          Consumo
-        </span>
-        <span className="ml-auto text-[11px] font-bold tabular-nums" style={{ color: barColor }}>
-          {topPct}%
+            Consumo
+          </span>
+          <span className="block text-[9px] leading-tight" style={{ color: "var(--text-4)" }}>
+            Média em tempo real
+          </span>
+        </div>
+        <span className="text-[11px] font-bold tabular-nums" style={{ color: barColor }}>
+          {averagePct}%
         </span>
         <ArrowUpRight
           className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
@@ -145,29 +151,29 @@ export function UsageBanner({ collapsed }: { collapsed: boolean }) {
         />
       </div>
 
-      {/* Barra principal — categoria mais crítica */}
       <div className="h-1.5 rounded-full overflow-hidden mb-2"
         style={{ background: "var(--border-subtle)" }}>
         <div
           className="h-full rounded-full transition-[width] duration-700 ease-out"
           style={{
-            width: `${Math.min(100, topPct)}%`,
+            width: `${Math.min(100, averagePct)}%`,
             background: `linear-gradient(90deg, ${barColor}, ${barColor}cc)`,
             boxShadow: `0 0 8px ${barColor}88`,
           }}
         />
       </div>
 
-      {/* Mini barras por categoria */}
       <div className="grid grid-cols-3 gap-1.5">
         {cats.map(({ key, data: c }) => {
           const pct = Math.min(100, c.percent);
           const color = CAT_COLOR[key];
           const over = c.percent >= 100;
+          const Icon = CAT_ICON[key];
           return (
             <div key={key} className="flex flex-col gap-0.5">
-              <div className="flex items-baseline justify-between gap-1">
-                <span className="text-[9px] font-medium" style={{ color: "var(--text-3)" }}>
+              <div className="flex items-center justify-between gap-1">
+                <span className="flex items-center gap-1 text-[9px] font-medium" style={{ color: "var(--text-3)" }}>
+                  <Icon className="h-2.5 w-2.5" style={{ color }} />
                   {CAT_LABEL_SHORT[key]}
                 </span>
                 <span className="text-[9px] font-mono tabular-nums"
@@ -190,7 +196,6 @@ export function UsageBanner({ collapsed }: { collapsed: boolean }) {
         })}
       </div>
 
-      {/* Footer — plano */}
       {planName && (
         <p className="text-[9px] mt-2 truncate" style={{ color: "var(--text-4)" }}>
           Plano <span style={{ color: "var(--text-3)" }}>{planName}</span>
