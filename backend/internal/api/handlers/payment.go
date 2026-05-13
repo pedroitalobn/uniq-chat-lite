@@ -251,14 +251,17 @@ func (h *PaymentHandler) materializeFromPending(p *models.PendingRegistration) (
 	}
 
 	user := models.User{
-		Name:         p.Name,
-		Email:        p.Email,
-		Phone:        p.Phone,
-		CountryCode:  p.CountryCode,
-		TaxID:        p.TaxID,
-		Role:         models.RoleCustomer,
-		IsActive:     true,
-		PasswordHash: p.PasswordHash,
+		Name:              p.Name,
+		Email:             p.Email,
+		Phone:             p.Phone,
+		CountryCode:       p.CountryCode,
+		TaxID:             p.TaxID,
+		AccountType:       p.AccountType,
+		CompanyName:       p.CompanyName,
+		CompanyIdentifier: p.CompanyIdentifier,
+		Role:              models.RoleCustomer,
+		IsActive:          true,
+		PasswordHash:      p.PasswordHash,
 	}
 	if p.Username != "" {
 		u := p.Username

@@ -28,17 +28,20 @@ type PendingRegistration struct {
 	// depois que o Stripe confirmar o pagamento via webhook. Antes a conta
 	// era criada inativa antes do checkout, agora só existe se o pagamento
 	// passou.
-	Name             string `gorm:"type:varchar(255)" json:"-"`
-	Phone            string `gorm:"type:varchar(30)" json:"-"`
-	CountryCode      string `gorm:"type:varchar(2)" json:"-"`
-	TaxID            string `gorm:"type:varchar(64)" json:"-"`
-	Username         string `gorm:"type:varchar(60)" json:"-"`
-	WorkspaceName    string `gorm:"type:varchar(120)" json:"-"`
-	PasswordHash     string `gorm:"type:varchar(255)" json:"-"`
-	StripeCustomerID   string `gorm:"type:varchar(64);index" json:"-"`
-	StripeSessionID    string `gorm:"type:varchar(128);index" json:"-"`
-	StripePIID         string `gorm:"type:varchar(128);index" json:"-"`
-	AbaCustID          string `gorm:"type:varchar(128);index" json:"-"`
+	Name                string `gorm:"type:varchar(255)" json:"-"`
+	Phone               string `gorm:"type:varchar(30)" json:"-"`
+	CountryCode         string `gorm:"type:varchar(2)" json:"-"`
+	TaxID               string `gorm:"type:varchar(64)" json:"-"`
+	AccountType         string `gorm:"type:varchar(20);default:'personal'" json:"-"`
+	CompanyName         string `gorm:"type:varchar(160)" json:"-"`
+	CompanyIdentifier   string `gorm:"type:varchar(64)" json:"-"`
+	Username            string `gorm:"type:varchar(60)" json:"-"`
+	WorkspaceName       string `gorm:"type:varchar(120)" json:"-"`
+	PasswordHash        string `gorm:"type:varchar(255)" json:"-"`
+	StripeCustomerID    string `gorm:"type:varchar(64);index" json:"-"`
+	StripeSessionID     string `gorm:"type:varchar(128);index" json:"-"`
+	StripePIID          string `gorm:"type:varchar(128);index" json:"-"`
+	AbaCustID           string `gorm:"type:varchar(128);index" json:"-"`
 	AsaasSubscriptionID string `gorm:"type:varchar(128);index" json:"-"`
 }
 

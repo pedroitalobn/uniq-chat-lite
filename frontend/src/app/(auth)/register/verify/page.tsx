@@ -341,6 +341,30 @@ interface PlanOption {
   is_default?: boolean;
 }
 
+function safeText(value: unknown, fallback = ""): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (value == null) return fallback;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function safeErrorMessage(value: unknown, fallback: string): string {
+  if (typeof value === "string" && value.trim()) return value;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    if (typeof record.error === "string" && record.error.trim()) return record.error;
+    if (typeof record.message === "string" && record.message.trim()) return record.message;
+    const serialized = safeText(value, "");
+    if (serialized) return serialized;
+  }
+  return fallback;
+}
+
 function CompleteForm({
   email, pendingId, prefilledPlanID, prefilledPlanName, prefilledPlanPrice,
 }: {
@@ -353,7 +377,9 @@ function CompleteForm({
   const router = useRouter();
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
+  const [accountType, setAccountType] = useState<"personal" | "business">("personal");
   const [company, setCompany] = useState("");
+  const [companyIdentifier, setCompanyIdentifier] = useState("");
   const [phoneCountry, setPhoneCountry] = useState("BR");
   const [localPhone, setLocalPhone] = useState("");
   const [taxId, setTaxId] = useState("");
@@ -361,6 +387,7 @@ function CompleteForm({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [step, setStep] = useState(0);
   // Quando o pending já traz plan_id (user veio de /plans → /register?plan_id=...)
   // pulamos o picker — ele já escolheu, não faz sentido perguntar de novo.
   // Caso contrário busca a lista pública e deixa escolher.
@@ -380,7 +407,15 @@ function CompleteForm({
         if (!r.ok) return;
         const data = await r.json();
         if (cancelled) return;
-        const items: PlanOption[] = Array.isArray(data) ? data : data.items ?? data.plans ?? [];
+        const rawItems: any[] = Array.isArray(data) ? data : data.items ?? data.plans ?? [];
+        const items: PlanOption[] = rawItems.map((item) => ({
+          id: safeText(item?.id),
+          name: safeText(item?.name, "Plano"),
+          price: typeof item?.price === "number" ? item.price : Number(item?.price ?? 0),
+          currency: safeText(item?.currency || "", ""),
+          description: safeText(item?.description || "", ""),
+          is_default: Boolean(item?.is_default),
+        })).filter((item) => item.id);
         setPlans(items);
         const def = items.find((p) => p.is_default) ?? items.find((p) => p.price === 0) ?? items[0];
         if (def) setSelectedPlanID(def.id);
@@ -422,26 +457,55 @@ function CompleteForm({
     return v.replace(/[^a-zA-Z0-9]/g, "").length;
   }
 
-  function validate() {
+  function validateStep(nextStep = step) {
     const e: Record<string, string> = {};
-    if (!name.trim()) e.name = "Nome é obrigatório";
-    const localDigits = phoneDigits(localPhone);
-    const rawPhone = fullPhoneDigits();
-    if (!localDigits) e.phone = "Celular é obrigatório";
-    else if (rawPhone.length < 8 || rawPhone.length > 15) e.phone = "Celular inválido para o país selecionado";
-    const rawTaxID = taxIDValue(taxId);
-    const taxLen = taxIDLength(rawTaxID);
-    if (!rawTaxID) e.taxId = "CPF, CNPJ ou Tax ID é obrigatório";
-    else if (taxLen < 4 || taxLen > 32) e.taxId = "Identificador fiscal inválido";
-    if (password.length < 8) e.password = "Mínimo 8 caracteres";
-    if (confirmPassword !== password) e.confirmPassword = "Senhas não coincidem";
+    if (nextStep === 0) {
+      if (!name.trim()) e.name = "Nome é obrigatório";
+      if (accountType === "business" && !company.trim()) e.company = "Nome da empresa é obrigatório";
+    }
+    if (nextStep === 1) {
+      const localDigits = phoneDigits(localPhone);
+      const rawPhone = fullPhoneDigits();
+      if (!localDigits) e.phone = "Celular é obrigatório";
+      else if (rawPhone.length < 8 || rawPhone.length > 15) e.phone = "Celular inválido para o país selecionado";
+
+      const rawTaxID = taxIDValue(taxId);
+      const taxLen = taxIDLength(rawTaxID);
+      if (!rawTaxID) {
+        e.taxId = accountType === "business"
+          ? "CNPJ, EIN ou Tax ID da empresa é obrigatório"
+          : "CPF ou Tax ID é obrigatório";
+      } else if (taxLen < 4 || taxLen > 32) {
+        e.taxId = "Identificador fiscal inválido";
+      }
+
+      if (accountType === "business") {
+        const companyId = taxIDValue(companyIdentifier);
+        const companyIdLen = taxIDLength(companyId);
+        if (!companyId) e.companyIdentifier = "Identificador da empresa é obrigatório";
+        else if (companyIdLen < 4 || companyIdLen > 32) e.companyIdentifier = "Identificador da empresa inválido";
+      }
+    }
+    if (nextStep === 2) {
+      if (password.length < 8) e.password = "Mínimo 8 caracteres";
+      if (confirmPassword !== password) e.confirmPassword = "Senhas não coincidem";
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
+  function nextStep() {
+    if (!validateStep(step)) return;
+    setStep((s) => Math.min(s + 1, 2));
+  }
+
+  function prevStep() {
+    setStep((s) => Math.max(s - 1, 0));
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validateStep(2)) return;
     setLoading(true);
     try {
       const res = await fetch(`${API}/v1/auth/register/complete`, {
@@ -456,15 +520,19 @@ function CompleteForm({
           phone: fullPhoneDigits(),
           country_code: phoneCountry,
           tax_id: taxIDValue(taxId),
+          account_type: accountType,
+          company_name: company.trim() || undefined,
+          company_identifier: taxIDValue(companyIdentifier) || undefined,
           plan_id: selectedPlanID || undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        if (data.error?.includes("username")) {
-          setErrors({ username: data.error });
+        const errorMessage = safeErrorMessage(data?.error, "Erro ao criar conta");
+        if (errorMessage.includes("username")) {
+          setErrors({ username: errorMessage });
         } else {
-          setErrors({ global: data.error || "Erro ao criar conta" });
+          setErrors({ global: errorMessage });
         }
         return;
       }
@@ -475,7 +543,7 @@ function CompleteForm({
           window.location.href = data.url;
           return;
         }
-        setErrors({ global: data.message || "Erro ao gerar link de pagamento. Verifique se o gateway está configurado." });
+        setErrors({ global: safeErrorMessage(data.message, "Erro ao gerar link de pagamento. Verifique se o gateway está configurado.") });
         return;
       }
       // Paid plan, transparent PIX (AbacatePay)
@@ -546,7 +614,7 @@ function CompleteForm({
             style={{ background: "rgba(0,212,106,0.08)", border: "1px solid rgba(0,212,106,0.2)", color: "#00d46a" }}
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
-            {email}
+            {safeText(email)}
           </div>
         </div>
         <h1 className="text-2xl font-bold text-[hsl(240_15%_92%)] tracking-tight">
@@ -557,150 +625,285 @@ function CompleteForm({
         </p>
       </div>
 
-      <Field label="Seu nome" value={name} onChange={setName} placeholder="João Silva"
-        autoFocus icon={<User className="w-4 h-4" />} error={errors.name} />
-
-      <PhoneField
-        countryCode={phoneCountry}
-        onCountryChange={setPhoneCountry}
-        localPhone={localPhone}
-        onLocalPhoneChange={setLocalPhone}
-        error={errors.phone}
-      />
-
-      <Field label="CPF, CNPJ ou Tax ID" value={taxId} onChange={v => setTaxId(normalizeTaxIDInput(v))}
-        placeholder="CPF, CNPJ, SSN, ITIN ou EIN" icon={<FileText className="w-4 h-4" />}
-        hint="Brasil: CPF/CNPJ. EUA: SSN/ITIN/EIN. Outros países: ID fiscal local." error={errors.taxId} />
-
-      <Field label="Username (opcional)" value={username} onChange={setUsername}
-        placeholder="@joaosilva" icon={<AtSign className="w-4 h-4" />}
-        hint="Visível para outros usuários" error={errors.username} />
-
-      <Field label="Nome da empresa (opcional)" value={company} onChange={setCompany}
-        placeholder="Minha Empresa" icon={<Building2 className="w-4 h-4" />} />
-
-      <div className="flex flex-col gap-2">
-        <Field
-          label="Crie uma senha"
-          type={showPass ? "text" : "password"}
-          value={password}
-          onChange={setPassword}
-          placeholder="Mínimo 8 caracteres"
-          icon={<Lock className="w-4 h-4" />}
-          error={errors.password}
-          rightEl={
-            <button type="button" onClick={() => setShowPass(s => !s)}
-              className="text-[hsl(240_8%_40%)] hover:text-[hsl(240_15%_65%)] transition-colors">
-              {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          }
-        />
-        <PasswordStrength password={password} />
+      <div className="flex items-center justify-center gap-1.5">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <div
+              className="rounded-full transition-all duration-300"
+              style={{
+                width: i === step ? 24 : 7,
+                height: 7,
+                background: i <= step ? "#00d46a" : "var(--border-default)",
+                opacity: i <= step ? 1 : 0.45,
+              }}
+            />
+            {i < 2 && (
+              <div
+                className="h-px w-6 transition-all duration-300"
+                style={{ background: i < step ? "#00d46a" : "var(--border-default)" }}
+              />
+            )}
+          </div>
+        ))}
       </div>
 
-      <Field
-        label="Repita a senha"
-        type={showConfirm ? "text" : "password"}
-        value={confirmPassword}
-        onChange={setConfirmPassword}
-        placeholder="Digite a senha novamente"
-        icon={<Lock className="w-4 h-4" />}
-        error={errors.confirmPassword}
-        rightEl={
-          <button type="button" onClick={() => setShowConfirm(s => !s)}
-            className="text-[hsl(240_8%_40%)] hover:text-[hsl(240_15%_65%)] transition-colors">
-            {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
-        }
-      />
+      <AnimatePresence mode="wait">
+        {step === 0 && (
+          <motion.div
+            key="step-0"
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -16 }}
+            className="flex flex-col gap-5"
+          >
+            <Field label="Seu nome" value={name} onChange={setName} placeholder="João Silva"
+              autoFocus icon={<User className="w-4 h-4" />} error={errors.name} />
 
-      {hasPrefilledPlan && planLabel && (
-        <div className="flex flex-col gap-2">
-          <label className="text-xs font-medium text-[hsl(240_15%_65%)]">Plano selecionado</label>
-          <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl"
-            style={{
-              background: isPaid ? "rgba(0,212,106,0.06)" : "rgba(99,91,255,0.06)",
-              border: `1px solid ${isPaid ? "rgba(0,212,106,0.25)" : "rgba(99,91,255,0.25)"}`,
-            }}>
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold text-[hsl(240_15%_92%)]">{planLabel}</span>
-              <span className="text-xs text-[hsl(240_8%_50%)]">
-                {isPaid
-                  ? "Você será redirecionado para o pagamento após criar o perfil."
-                  : "Plano grátis — sem cartão de crédito."}
-              </span>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-medium text-[hsl(240_15%_65%)]">Tipo de conta</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: "personal", label: "Conta pessoal", hint: "CPF, SSN, ITIN ou Tax ID pessoal" },
+                  { id: "business", label: "Conta empresa", hint: "CNPJ, EIN e dados da empresa" },
+                ].map((option) => {
+                  const active = accountType === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setAccountType(option.id as "personal" | "business")}
+                      className="rounded-xl px-4 py-3 text-left transition-all"
+                      style={{
+                        background: active ? "rgba(0,212,106,0.06)" : "hsl(240 18% 5%)",
+                        border: `1px solid ${active ? "#00d46a" : "var(--border-default)"}`,
+                        boxShadow: active ? "0 0 0 3px rgba(0,212,106,0.10)" : "none",
+                      }}
+                    >
+                      <span className="block text-sm font-semibold text-[hsl(240_15%_92%)]">{safeText(option.label)}</span>
+                      <span className="mt-1 block text-xs text-[hsl(240_8%_50%)]">{safeText(option.hint)}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <span className="text-sm font-semibold" style={{ color: isPaid ? "#00d46a" : "#a5a3ff" }}>
-              {(planPriceVal ?? 0) > 0
-                ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(planPriceVal as number)
-                : "Grátis"}
-            </span>
-          </div>
-        </div>
-      )}
 
-      {!hasPrefilledPlan && !loadingPlans && plans.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <label className="text-xs font-medium text-[hsl(240_15%_65%)]">Escolha seu plano</label>
-          <div className="grid grid-cols-1 gap-2">
-            {plans.map((p) => {
-              const active = p.id === selectedPlanID;
-              const priceLabel = p.price === 0
-                ? "Grátis"
-                : new Intl.NumberFormat("pt-BR", { style: "currency", currency: p.currency || "BRL" }).format(p.price);
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setSelectedPlanID(p.id)}
-                  className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-left transition-all"
-                  style={{
-                    background: active ? "rgba(0,212,106,0.06)" : "hsl(240 18% 5%)",
-                    border: `1px solid ${active ? "#00d46a" : "var(--border-default)"}`,
-                    boxShadow: active ? "0 0 0 3px rgba(0,212,106,0.10)" : "none",
-                  }}
-                >
-                  <div className="flex flex-col">
-                    <span className="text-sm font-semibold text-[hsl(240_15%_92%)]">{p.name}</span>
-                    {p.description && (
-                      <span className="text-xs text-[hsl(240_8%_50%)]">{p.description}</span>
-                    )}
-                  </div>
-                  <span className="text-sm font-semibold" style={{ color: active ? "#00d46a" : "hsl(240 15% 80%)" }}>
-                    {priceLabel}
-                  </span>
+            <Field
+              label={accountType === "business" ? "Nome da empresa" : "Nome da empresa ou workspace (opcional)"}
+              value={company}
+              onChange={setCompany}
+              placeholder={accountType === "business" ? "Minha Empresa LLC" : "Minha empresa"}
+              icon={<Building2 className="w-4 h-4" />}
+              error={errors.company}
+              hint={accountType === "business" ? "Usaremos esse nome também no workspace inicial." : "Opcional. Se vazio, criamos um workspace com seu nome."}
+            />
+          </motion.div>
+        )}
+
+        {step === 1 && (
+          <motion.div
+            key="step-1"
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -16 }}
+            className="flex flex-col gap-5"
+          >
+            <PhoneField
+              countryCode={phoneCountry}
+              onCountryChange={setPhoneCountry}
+              localPhone={localPhone}
+              onLocalPhoneChange={setLocalPhone}
+              error={errors.phone}
+            />
+
+            <Field
+              label={accountType === "business" ? "CNPJ, EIN ou Tax ID da empresa" : "CPF ou Tax ID"}
+              value={taxId}
+              onChange={v => setTaxId(normalizeTaxIDInput(v))}
+              placeholder={accountType === "business" ? "CNPJ, EIN ou VAT ID" : "CPF, SSN, ITIN ou Tax ID"}
+              icon={<FileText className="w-4 h-4" />}
+              hint={accountType === "business"
+                ? "Brasil: CNPJ. EUA: EIN. Outros países: ID fiscal da empresa."
+                : "Brasil: CPF. EUA: SSN/ITIN. Outros países: ID fiscal pessoal."}
+              error={errors.taxId}
+            />
+
+            {accountType === "business" && (
+              <Field
+                label="Identificador da empresa"
+                value={companyIdentifier}
+                onChange={v => setCompanyIdentifier(normalizeTaxIDInput(v))}
+                placeholder="State ID, registro mercantil ou identificador local"
+                icon={<Building2 className="w-4 h-4" />}
+                hint="Use o identificador corporativo complementar exigido no seu país ou estado."
+                error={errors.companyIdentifier}
+              />
+            )}
+          </motion.div>
+        )}
+
+        {step === 2 && (
+          <motion.div
+            key="step-2"
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -16 }}
+            className="flex flex-col gap-5"
+          >
+            <Field label="Username (opcional)" value={username} onChange={setUsername}
+              placeholder="@joaosilva" icon={<AtSign className="w-4 h-4" />}
+              hint="Visível para outros usuários" error={errors.username} />
+
+            <div className="flex flex-col gap-2">
+              <Field
+                label="Crie uma senha"
+                type={showPass ? "text" : "password"}
+                value={password}
+                onChange={setPassword}
+                placeholder="Mínimo 8 caracteres"
+                icon={<Lock className="w-4 h-4" />}
+                error={errors.password}
+                rightEl={
+                  <button type="button" onClick={() => setShowPass(s => !s)}
+                    className="text-[hsl(240_8%_40%)] hover:text-[hsl(240_15%_65%)] transition-colors">
+                    {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                }
+              />
+              <PasswordStrength password={password} />
+            </div>
+
+            <Field
+              label="Repita a senha"
+              type={showConfirm ? "text" : "password"}
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+              placeholder="Digite a senha novamente"
+              icon={<Lock className="w-4 h-4" />}
+              error={errors.confirmPassword}
+              rightEl={
+                <button type="button" onClick={() => setShowConfirm(s => !s)}
+                  className="text-[hsl(240_8%_40%)] hover:text-[hsl(240_15%_65%)] transition-colors">
+                  {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
-              );
-            })}
-          </div>
-          {isPaid && (
-            <p className="text-xs text-[hsl(240_8%_50%)] pl-0.5">
-              Você será redirecionado para o pagamento após criar o perfil.
-            </p>
-          )}
-        </div>
-      )}
+              }
+            />
+
+            {hasPrefilledPlan && planLabel && (
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium text-[hsl(240_15%_65%)]">Plano selecionado</label>
+                <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl"
+                  style={{
+                    background: isPaid ? "rgba(0,212,106,0.06)" : "rgba(99,91,255,0.06)",
+                    border: `1px solid ${isPaid ? "rgba(0,212,106,0.25)" : "rgba(99,91,255,0.25)"}`,
+                  }}>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-[hsl(240_15%_92%)]">{safeText(planLabel, "Plano")}</span>
+                    <span className="text-xs text-[hsl(240_8%_50%)]">
+                      {isPaid
+                        ? "Você será redirecionado para o pagamento após criar o perfil."
+                        : "Plano grátis — sem cartão de crédito."}
+                    </span>
+                  </div>
+                  <span className="text-sm font-semibold" style={{ color: isPaid ? "#00d46a" : "#a5a3ff" }}>
+                    {(planPriceVal ?? 0) > 0
+                      ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(planPriceVal as number)
+                      : "Grátis"}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {!hasPrefilledPlan && !loadingPlans && plans.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium text-[hsl(240_15%_65%)]">Escolha seu plano</label>
+                <div className="grid grid-cols-1 gap-2">
+                  {plans.map((p) => {
+                    const active = p.id === selectedPlanID;
+                    const priceLabel = p.price === 0
+                      ? "Grátis"
+                      : new Intl.NumberFormat("pt-BR", { style: "currency", currency: p.currency || "BRL" }).format(p.price);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setSelectedPlanID(p.id)}
+                        className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-left transition-all"
+                        style={{
+                          background: active ? "rgba(0,212,106,0.06)" : "hsl(240 18% 5%)",
+                          border: `1px solid ${active ? "#00d46a" : "var(--border-default)"}`,
+                          boxShadow: active ? "0 0 0 3px rgba(0,212,106,0.10)" : "none",
+                        }}
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-[hsl(240_15%_92%)]">{safeText(p.name, "Plano")}</span>
+                          {p.description && (
+                            <span className="text-xs text-[hsl(240_8%_50%)]">{safeText(p.description)}</span>
+                          )}
+                        </div>
+                        <span className="text-sm font-semibold" style={{ color: active ? "#00d46a" : "hsl(240 15% 80%)" }}>
+                          {priceLabel}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {isPaid && (
+                  <p className="text-xs text-[hsl(240_8%_50%)] pl-0.5">
+                    Você será redirecionado para o pagamento após criar o perfil.
+                  </p>
+                )}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {errors.global && (
         <div className="flex items-start gap-2 p-3 rounded-xl border text-sm"
           style={{ background: "rgba(239,68,68,0.06)", borderColor: "rgba(239,68,68,0.2)", color: "#fca5a5" }}>
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-          {errors.global}
+          {safeText(errors.global)}
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150 disabled:opacity-60"
-        style={{ background: "#00d46a", color: "#050508" }}
-        onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.background = "#00bf60"; }}
-        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "#00d46a"}
-      >
-        {loading
-          ? <Loader2 className="w-4 h-4 animate-spin" />
-          : <><span>{isPaid ? "Continuar para pagamento" : "Criar conta"}</span><ArrowRight className="w-4 h-4" /></>}
-      </button>
+      <div className="flex gap-3">
+        {step > 0 && (
+          <button
+            type="button"
+            onClick={prevStep}
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-150"
+            style={{ background: "var(--surface-solid)", border: "1px solid var(--border)", color: "var(--text-2)" }}
+          >
+            Voltar
+          </button>
+        )}
+
+        {step < 2 ? (
+          <button
+            type="button"
+            onClick={nextStep}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150"
+            style={{ background: "#00d46a", color: "#050508" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#00bf60"; }}
+            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "#00d46a"}
+          >
+            <span>Continuar</span><ArrowRight className="w-4 h-4" />
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150 disabled:opacity-60"
+            style={{ background: "#00d46a", color: "#050508" }}
+            onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.background = "#00bf60"; }}
+            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "#00d46a"}
+          >
+            {loading
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <><span>{isPaid ? "Continuar para pagamento" : "Criar conta"}</span><ArrowRight className="w-4 h-4" /></>}
+          </button>
+        )}
+      </div>
     </form>
   );
 }

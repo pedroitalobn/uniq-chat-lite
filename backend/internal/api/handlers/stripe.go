@@ -765,15 +765,18 @@ func (h *StripeHandler) materializePending(pendingIDStr, planIDStr, subscription
 	}
 
 	user := models.User{
-		Name:             pending.Name,
-		Email:            pending.Email,
-		Phone:            pending.Phone,
-		CountryCode:      pending.CountryCode,
-		TaxID:            pending.TaxID,
-		Role:             models.RoleCustomer,
-		IsActive:         true,
-		PasswordHash:     pending.PasswordHash,
-		StripeCustomerID: pending.StripeCustomerID,
+		Name:              pending.Name,
+		Email:             pending.Email,
+		Phone:             pending.Phone,
+		CountryCode:       pending.CountryCode,
+		TaxID:             pending.TaxID,
+		AccountType:       pending.AccountType,
+		CompanyName:       pending.CompanyName,
+		CompanyIdentifier: pending.CompanyIdentifier,
+		Role:              models.RoleCustomer,
+		IsActive:          true,
+		PasswordHash:      pending.PasswordHash,
+		StripeCustomerID:  pending.StripeCustomerID,
 	}
 	if pending.Username != "" {
 		u := pending.Username

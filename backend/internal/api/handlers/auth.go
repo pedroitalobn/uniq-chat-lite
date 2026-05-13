@@ -100,6 +100,46 @@ func validTaxID(taxID string) bool {
 	return n >= 4 && n <= 32 && len(taxID) <= 64
 }
 
+func normalizeAccountType(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "business", "company", "empresa":
+		return "business"
+	default:
+		return "personal"
+	}
+}
+
+func normalizeCompanyIdentifier(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	var b strings.Builder
+	for _, r := range raw {
+		switch {
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r - 'a' + 'A')
+		case r >= 'A' && r <= 'Z':
+			b.WriteRune(r)
+		case r == '.' || r == '-' || r == '/' || r == ' ':
+			b.WriteRune(r)
+		}
+	}
+	return strings.TrimSpace(b.String())
+}
+
+func validCompanyIdentifier(v string) bool {
+	var n int
+	for _, r := range v {
+		if (r >= '0' && r <= '9') || (r >= 'A' && r <= 'Z') {
+			n++
+		}
+	}
+	return n >= 4 && n <= 32 && len(v) <= 64
+}
+
 func loadStripeConfigFromDB(db *gorm.DB) {
 	var settings models.PaymentSettings
 	if db.Where("id = ?", "default").First(&settings).Error == nil {
@@ -1361,6 +1401,9 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		Phone                 string `json:"phone"`
 		CountryCode           string `json:"country_code"`
 		TaxID                 string `json:"tax_id"`
+		AccountType           string `json:"account_type"`
+		CompanyName           string `json:"company_name"`
+		CompanyIdentifier     string `json:"company_identifier"`
 		PlanID                string `json:"plan_id"` // override plan if different from start
 	}
 	if err := c.BodyParser(&req); err != nil {
@@ -1376,6 +1419,9 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		req.CountryCode = inferCountryFromPhone(req.Phone)
 	}
 	req.TaxID = normalizeTaxID(req.TaxID)
+	req.AccountType = normalizeAccountType(req.AccountType)
+	req.CompanyName = strings.TrimSpace(req.CompanyName)
+	req.CompanyIdentifier = normalizeCompanyIdentifier(req.CompanyIdentifier)
 
 	if req.PendingRegistrationID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "pending_registration_id é obrigatório"})
@@ -1390,13 +1436,27 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "telefone é obrigatório"})
 	}
 	if !validSignupPhone(req.Phone) {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "telefone inválido — informe DDI + número, ex: +5511999998888"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "telefone inválido — informe um número completo para o país selecionado"})
 	}
 	if req.TaxID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "identificador fiscal é obrigatório (CPF/CNPJ/Tax ID)"})
+		if req.AccountType == "business" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "identificador fiscal da empresa é obrigatório (CNPJ, EIN ou Tax ID empresarial)"})
+		}
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "identificador fiscal é obrigatório (CPF/Tax ID)"})
 	}
 	if !validTaxID(req.TaxID) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "identificador fiscal inválido — informe CPF, CNPJ, SSN, ITIN, EIN ou Tax ID local"})
+	}
+	if req.AccountType == "business" {
+		if req.CompanyName == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nome da empresa é obrigatório para conta empresa"})
+		}
+		if req.CompanyIdentifier == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "identificador da empresa é obrigatório para conta empresa"})
+		}
+		if !validCompanyIdentifier(req.CompanyIdentifier) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "identificador da empresa inválido"})
+		}
 	}
 
 	prID, err := uuid.Parse(req.PendingRegistrationID)
@@ -1451,11 +1511,15 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 
 	// Workspace name fallback
 	if req.WorkspaceName == "" {
-		first := strings.Fields(req.Name)
-		if len(first) > 0 {
-			req.WorkspaceName = first[0] + "'s Workspace"
+		if req.AccountType == "business" && req.CompanyName != "" {
+			req.WorkspaceName = req.CompanyName
 		} else {
-			req.WorkspaceName = "Meu Workspace"
+			first := strings.Fields(req.Name)
+			if len(first) > 0 {
+				req.WorkspaceName = first[0] + "'s Workspace"
+			} else {
+				req.WorkspaceName = "Meu Workspace"
+			}
 		}
 	}
 
@@ -1473,14 +1537,17 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		// Snapshot comum a todos os providers — User+Workspace só
 		// nasce quando o pagamento confirma (webhook ou fallback).
 		patch := map[string]any{
-			"name":           req.Name,
-			"username":       req.Username,
-			"workspace_name": req.WorkspaceName,
-			"password_hash":  hashed,
-			"plan_id":        plan.ID,
-			"phone":          req.Phone,
-			"country_code":   req.CountryCode,
-			"tax_id":         req.TaxID,
+			"name":               req.Name,
+			"username":           req.Username,
+			"workspace_name":     req.WorkspaceName,
+			"password_hash":      hashed,
+			"plan_id":            plan.ID,
+			"phone":              req.Phone,
+			"country_code":       req.CountryCode,
+			"tax_id":             req.TaxID,
+			"account_type":       req.AccountType,
+			"company_name":       req.CompanyName,
+			"company_identifier": req.CompanyIdentifier,
 		}
 		pending.Name = req.Name
 		pending.Username = req.Username
@@ -1490,6 +1557,9 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		pending.Phone = req.Phone
 		pending.CountryCode = req.CountryCode
 		pending.TaxID = req.TaxID
+		pending.AccountType = req.AccountType
+		pending.CompanyName = req.CompanyName
+		pending.CompanyIdentifier = req.CompanyIdentifier
 
 		// Lê provider ativo do DB pra decidir qual gateway usar.
 		var settings models.PaymentSettings
@@ -1747,13 +1817,16 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 	var freePlan models.Plan
 	h.db.First(&freePlan, "name = 'Free'")
 	user := models.User{
-		Name:        req.Name,
-		Email:       pending.Email,
-		Phone:       req.Phone,
-		CountryCode: req.CountryCode,
-		TaxID:       req.TaxID,
-		Role:        models.RoleCustomer,
-		IsActive:    true,
+		Name:              req.Name,
+		Email:             pending.Email,
+		Phone:             req.Phone,
+		CountryCode:       req.CountryCode,
+		TaxID:             req.TaxID,
+		AccountType:       req.AccountType,
+		CompanyName:       req.CompanyName,
+		CompanyIdentifier: req.CompanyIdentifier,
+		Role:              models.RoleCustomer,
+		IsActive:          true,
 	}
 	if freePlan.ID != uuid.Nil {
 		user.PlanID = &freePlan.ID

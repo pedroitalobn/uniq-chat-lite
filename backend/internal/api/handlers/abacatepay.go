@@ -290,9 +290,6 @@ func formatAbacatePayCellphone(phone string) string {
 	if phone == "" {
 		return ""
 	}
-	if strings.HasPrefix(phone, "+") {
-		return phone
-	}
 	var b strings.Builder
 	for _, r := range phone {
 		if r >= '0' && r <= '9' {
@@ -303,7 +300,16 @@ func formatAbacatePayCellphone(phone string) string {
 	if digits == "" {
 		return ""
 	}
-	return "+" + digits
+	// A AbacatePay valida melhor celulares BR no formato nacional
+	// (DDD + número), sem prefixo +55. Mantemos isso só aqui, sem
+	// mexer no telefone canônico salvo no cadastro.
+	if len(digits) >= 12 && strings.HasPrefix(digits, "55") {
+		brLocal := strings.TrimLeft(strings.TrimPrefix(digits, "55"), "0")
+		if len(brLocal) >= 10 && len(brLocal) <= 11 {
+			return brLocal
+		}
+	}
+	return digits
 }
 
 func formatAbacatePayTaxID(taxID string) string {
@@ -405,13 +411,16 @@ func (h *AbacatePayHandler) CreateCheckout(c *fiber.Ctx) error {
 
 	successURL := abacatepayDashboardURL(c.BaseURL())
 	result, err := h.createCheckout(plan, user.ID.String(), map[string]string{
-		"user_id":   user.ID.String(),
-		"plan_id":   plan.ID.String(),
-		"plan_name": plan.Name,
-		"email":     user.Email,
-		"name":      user.Name,
-		"phone":     user.Phone,
-		"tax_id":    user.TaxID,
+		"user_id":            user.ID.String(),
+		"plan_id":            plan.ID.String(),
+		"plan_name":          plan.Name,
+		"email":              user.Email,
+		"name":               user.Name,
+		"phone":              user.Phone,
+		"tax_id":             user.TaxID,
+		"account_type":       user.AccountType,
+		"company_name":       user.CompanyName,
+		"company_identifier": user.CompanyIdentifier,
 	}, customer, successURL, successURL, mode)
 	if err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
@@ -446,13 +455,16 @@ func (h *AbacatePayHandler) CreateCheckoutForPending(pending *models.PendingRegi
 	successURL := abacatepayPendingSuccessURL(baseURL, pending.ID.String())
 	returnURL := abacatepayFrontendBaseURL(baseURL) + "/register/verify?token=" + url.QueryEscape(pending.Token)
 	result, err := h.createCheckout(*plan, pending.ID.String(), map[string]string{
-		"pending_id": pending.ID.String(),
-		"plan_id":    plan.ID.String(),
-		"plan_name":  plan.Name,
-		"email":      pending.Email,
-		"name":       pending.Name,
-		"phone":      pending.Phone,
-		"tax_id":     pending.TaxID,
+		"pending_id":         pending.ID.String(),
+		"plan_id":            plan.ID.String(),
+		"plan_name":          plan.Name,
+		"email":              pending.Email,
+		"name":               pending.Name,
+		"phone":              pending.Phone,
+		"tax_id":             pending.TaxID,
+		"account_type":       pending.AccountType,
+		"company_name":       pending.CompanyName,
+		"company_identifier": pending.CompanyIdentifier,
 	}, customer, successURL, returnURL, mode)
 	if err != nil {
 		return nil, err
@@ -867,14 +879,17 @@ func (h *AbacatePayHandler) materializePendingRegistration(pendingIDStr, planIDS
 	}
 
 	user := models.User{
-		Name:         pending.Name,
-		Email:        pending.Email,
-		Phone:        pending.Phone,
-		CountryCode:  pending.CountryCode,
-		TaxID:        pending.TaxID,
-		Role:         models.RoleCustomer,
-		IsActive:     true,
-		PasswordHash: pending.PasswordHash,
+		Name:              pending.Name,
+		Email:             pending.Email,
+		Phone:             pending.Phone,
+		CountryCode:       pending.CountryCode,
+		TaxID:             pending.TaxID,
+		AccountType:       pending.AccountType,
+		CompanyName:       pending.CompanyName,
+		CompanyIdentifier: pending.CompanyIdentifier,
+		Role:              models.RoleCustomer,
+		IsActive:          true,
+		PasswordHash:      pending.PasswordHash,
 	}
 	if pending.Username != "" {
 		u := pending.Username

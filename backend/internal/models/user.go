@@ -22,21 +22,24 @@ const (
 )
 
 type User struct {
-	ID           uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
-	Name         string     `gorm:"not null" json:"name"`
-	Email        string     `gorm:"uniqueIndex;not null" json:"email"`
-	Phone        string     `gorm:"not null;index" json:"phone"`
-	CountryCode  string     `gorm:"type:varchar(2);index" json:"country_code,omitempty"`
-	TaxID        string     `gorm:"type:varchar(64);index" json:"-"`
-	Username     *string    `gorm:"uniqueIndex" json:"username,omitempty"`
-	PasswordHash string     `gorm:"not null" json:"-"`
-	Role         UserRole   `gorm:"type:varchar(15);default:'customer'" json:"role"`
-	IsBeta       bool       `gorm:"default:false" json:"is_beta"`
-	PlanID       *uuid.UUID `gorm:"type:uuid" json:"plan_id"`
-	Plan         *Plan      `gorm:"foreignKey:PlanID" json:"plan,omitempty"`
-	IsActive     bool       `gorm:"default:true" json:"is_active"`
-	BlockedUntil *time.Time `json:"blocked_until,omitempty"`
-	LastLoginAt  *time.Time `json:"last_login_at,omitempty"`
+	ID                uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
+	Name              string     `gorm:"not null" json:"name"`
+	Email             string     `gorm:"uniqueIndex;not null" json:"email"`
+	Phone             string     `gorm:"not null;index" json:"phone"`
+	CountryCode       string     `gorm:"type:varchar(2);index" json:"country_code,omitempty"`
+	TaxID             string     `gorm:"type:varchar(64);index" json:"-"`
+	AccountType       string     `gorm:"type:varchar(20);default:'personal';index" json:"account_type,omitempty"`
+	CompanyName       string     `gorm:"type:varchar(160)" json:"company_name,omitempty"`
+	CompanyIdentifier string     `gorm:"type:varchar(64)" json:"company_identifier,omitempty"`
+	Username          *string    `gorm:"uniqueIndex" json:"username,omitempty"`
+	PasswordHash      string     `gorm:"not null" json:"-"`
+	Role              UserRole   `gorm:"type:varchar(15);default:'customer'" json:"role"`
+	IsBeta            bool       `gorm:"default:false" json:"is_beta"`
+	PlanID            *uuid.UUID `gorm:"type:uuid" json:"plan_id"`
+	Plan              *Plan      `gorm:"foreignKey:PlanID" json:"plan,omitempty"`
+	IsActive          bool       `gorm:"default:true" json:"is_active"`
+	BlockedUntil      *time.Time `json:"blocked_until,omitempty"`
+	LastLoginAt       *time.Time `json:"last_login_at,omitempty"`
 	// Email verification (anti-bot signup). Quando EmailVerifiedAt é nil,
 	// o usuário só consegue logar se REQUIRE_EMAIL_VERIFICATION=false.
 	EmailVerifiedAt         *time.Time `json:"email_verified_at,omitempty"`
