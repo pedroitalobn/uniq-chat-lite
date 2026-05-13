@@ -1143,11 +1143,20 @@ func (h *ConversationHandler) loadMessageInWS(c *fiber.Ctx, ws uuid.UUID, convID
 	return &msg, &conv, nil
 }
 
-// RevokeMessage DELETE /v1/conversations/:id/messages/:msgId
-// Apaga uma mensagem enviada pelo agente (delete-for-everyone). Funciona
-// apenas em mensagens outbound nossas com external_message_id (stanza_id).
-// Marca is_deleted=true + content="" no DB e dispara whatsmeow Revoke
-// pra remover do dispositivo do destinatário também.
+// RevokeMessage DELETE /v1/conversations/:id/messages/:msgId?scope=me|everyone
+// Apaga uma mensagem. Espelha o comportamento do WhatsApp:
+//
+//   scope=me        → apaga só pro nosso lado (qualquer direção, qualquer
+//                      mensagem). Local soft-delete, nada vai pro canal.
+//                      Funciona sem external_message_id.
+//   scope=everyone  → apaga pra todos no canal (whatsmeow Revoke). Só
+//                      vale pra mensagens OUTBOUND da plataforma com
+//                      external_message_id (limitação do protocolo
+//                      WhatsApp). Fallback automático pra "me" quando
+//                      essas pré-condições não baterem.
+//
+// Default permanece "everyone" pra preservar a UX clássica. Frontend agora
+// envia explícito conforme a opção escolhida no diálogo.
 func (h *ConversationHandler) RevokeMessage(c *fiber.Ctx) error {
 	ws := middleware.GetWorkspaceID(c)
 	convID, err := uuid.Parse(c.Params("id"))
@@ -1158,40 +1167,56 @@ func (h *ConversationHandler) RevokeMessage(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "msgId inválido"})
 	}
+	scope := strings.ToLower(strings.TrimSpace(c.Query("scope")))
+	if scope != "me" && scope != "everyone" {
+		scope = "everyone"
+	}
 	msg, conv, errResp := h.loadMessageInWS(c, ws, convID, msgID)
 	if errResp != nil {
 		return errResp
 	}
-	if msg.Direction != models.DirectionOut {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "só é possível apagar mensagens enviadas pela equipe"})
-	}
 
-	// Carrega instância para saber qual canal está sendo usado.
 	var inst models.Instance
 	h.db.First(&inst, "id = ?", conv.InstanceID)
 
 	channelRevoked := false
+	finalScope := scope
+	fallbackReason := ""
 
-	switch inst.Channel {
-	case models.ChannelWhatsApp:
-		if msg.ExternalMessageID == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "mensagem não tem id externo — não pode ser apagada no canal"})
-		}
-		if h.manager != nil {
-			if client := h.manager.GetInstance(conv.InstanceID.String()); client != nil && client.IsConnected() {
-				senderJID := msg.SenderJID
-				if senderJID == "" {
-					senderJID = client.OwnerJID()
+	if scope == "everyone" {
+		// WhatsApp só permite revoke de mensagens OUT da própria conta.
+		// Inbound do cliente ou mensagem sem external_id → fallback pra
+		// "me" (soft-delete local) em vez de devolver erro como antes,
+		// que deixava o user travado.
+		switch {
+		case msg.Direction != models.DirectionOut:
+			finalScope = "me"
+			fallbackReason = "inbound_no_remote_revoke"
+		case inst.Channel != models.ChannelWhatsApp:
+			finalScope = "me"
+			fallbackReason = "channel_no_remote_revoke"
+		case msg.ExternalMessageID == "":
+			finalScope = "me"
+			fallbackReason = "missing_external_id"
+		default:
+			if h.manager != nil {
+				if client := h.manager.GetInstance(conv.InstanceID.String()); client != nil && client.IsConnected() {
+					senderJID := msg.SenderJID
+					if senderJID == "" {
+						senderJID = client.OwnerJID()
+					}
+					if _, err := client.RevokeMessage(conv.ChannelKey, msg.ExternalMessageID, senderJID); err != nil {
+						finalScope = "me"
+						fallbackReason = "revoke_failed"
+					} else {
+						channelRevoked = true
+					}
+				} else {
+					finalScope = "me"
+					fallbackReason = "instance_disconnected"
 				}
-				_, _ = client.RevokeMessage(conv.ChannelKey, msg.ExternalMessageID, senderJID)
-				channelRevoked = true
 			}
 		}
-	default:
-		// WABA, Instagram, Telegram, TikTok, Kwai, LinkedIn e webchat não
-		// oferecem API pública para revogar/apagar mensagens enviadas.
-		// Fazemos apenas soft-delete local.
-		channelRevoked = false
 	}
 
 	h.db.Model(&models.MessageLog{}).Where("id = ?", msgID).Updates(map[string]any{
@@ -1206,6 +1231,8 @@ func (h *ConversationHandler) RevokeMessage(c *fiber.Ctx) error {
 		"message":         updated,
 		"channel_revoked": channelRevoked,
 		"channel":         inst.Channel,
+		"scope":           finalScope,
+		"fallback_reason": fallbackReason,
 	})
 }
 

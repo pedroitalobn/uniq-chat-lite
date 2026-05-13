@@ -480,9 +480,18 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
   });
 
   const revokeMsg = useMutation({
-    mutationFn: (msgId: string) => conversationsApi.revokeMessage(wsId as string, conversationId, msgId),
-    onSuccess: () => {
-      toast.success("Mensagem apagada");
+    mutationFn: ({ msgId, scope }: { msgId: string; scope: "me" | "everyone" }) =>
+      conversationsApi.revokeMessage(wsId as string, conversationId, msgId, scope),
+    onSuccess: (res, vars) => {
+      const data = (res as any)?.data ?? {};
+      // Backend faz fallback transparente quando o canal não suporta
+      // revoke (msg inbound, sem external_id, etc.) — avisa o user pra
+      // ele saber que ficou só do nosso lado.
+      if (vars.scope === "everyone" && data.scope === "me") {
+        toast.success("Mensagem apagada só pra você (canal não permite remover do destinatário)");
+      } else {
+        toast.success(vars.scope === "me" ? "Mensagem apagada pra você" : "Mensagem apagada pra todos");
+      }
       qc.invalidateQueries({ queryKey: ["conversation-timeline", wsId, conversationId] });
     },
     onError: () => toast.error("Falha ao apagar"),
@@ -951,17 +960,14 @@ export function ConversationDetail({ conversationId, onClose }: ConversationDeta
       )}
 
       {confirmRevokeMsg && (
-        <ConfirmDialog
-          title="Apagar mensagem"
-          body="A mensagem será removida pra você e pro destinatário no canal. Não pode ser desfeito."
-          confirmLabel="Apagar"
-          variant="danger"
-          onConfirm={() => {
-            revokeMsg.mutate(confirmRevokeMsg.id);
+        <RevokeMessageDialog
+          message={confirmRevokeMsg}
+          isPending={revokeMsg.isPending}
+          onCancel={() => setConfirmRevokeMsg(null)}
+          onConfirm={(scope) => {
+            revokeMsg.mutate({ msgId: confirmRevokeMsg.id, scope });
             setConfirmRevokeMsg(null);
           }}
-          onCancel={() => setConfirmRevokeMsg(null)}
-          isPending={revokeMsg.isPending}
         />
       )}
 
@@ -2574,7 +2580,9 @@ function MessageActionsToolbar({
   onInfo?: (m: MessagePayload) => void;
 }) {
   const [emojiOpen, setEmojiOpen] = useState(false);
-  const canRevoke = isOut && !!onRevoke && m.type !== "revoke";
+  // Permite apagar tanto out quanto inbound — diálogo decide se vai pra
+  // canal (out) ou só local (inbound, fallback automático no backend).
+  const canRevoke = !!onRevoke && m.type !== "revoke";
   const canEdit = isOut && !!onEdit && m.type === "text";
   const QUICK_EMOJI = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
   return (
@@ -2694,7 +2702,7 @@ function MessageActionsToolbar({
           type="button"
           onClick={() => onRevoke!(m)}
           className="rounded-full p-1 hover:bg-red-500/20"
-          title="Apagar para todos"
+          title="Apagar mensagem"
           style={{ color: "#ef4444" }}
         >
           <Trash2 className="h-3 w-3" />
@@ -4761,5 +4769,75 @@ function CallButton({ instanceId, jid }: { instanceId: string; jid: string }) {
       <Phone className="h-3 w-3" />
       <span className="hidden sm:inline">{calling ? "Ligando..." : "Ligar"}</span>
     </button>
+  );
+}
+
+// RevokeMessageDialog — dialog estilo WhatsApp pra escolher o escopo da
+// remoção. Inbound vê só "Apagar pra mim" (canal não permite revogar
+// mensagem alheia). Outbound recebe os dois botões + nota explicativa.
+function RevokeMessageDialog({
+  message,
+  isPending,
+  onCancel,
+  onConfirm,
+}: {
+  message: MessagePayload;
+  isPending: boolean;
+  onCancel: () => void;
+  onConfirm: (scope: "me" | "everyone") => void;
+}) {
+  const isOut = message.direction === "out";
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center"
+      style={{ background: "rgba(10,10,20,0.6)", backdropFilter: "blur(4px)" }}
+      onClick={onCancel}
+    >
+      <div
+        className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-5 mx-0 sm:mx-4"
+        style={{ background: "var(--surface-1)", border: "1px solid var(--surface-border)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-sm font-semibold mb-1" style={{ color: "var(--text-1)" }}>
+          Apagar mensagem
+        </p>
+        <p className="text-xs mb-4" style={{ color: "var(--text-3)" }}>
+          {isOut
+            ? "Você pode apagar a mensagem só pra você ou também remover do destinatário no canal."
+            : "Você pode apagar a mensagem só pra você. O canal não permite remover mensagens recebidas do destinatário."}
+        </p>
+        <div className="flex flex-col gap-2">
+          {isOut && (
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => onConfirm("everyone")}
+              className="w-full rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50"
+              style={{ background: "#ef4444", color: "#fff" }}
+            >
+              Apagar pra todos
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => onConfirm("me")}
+            className="w-full rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50"
+            style={{ background: "var(--surface-2)", color: "var(--text-1)", border: "1px solid var(--surface-border)" }}
+          >
+            Apagar pra mim
+          </button>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={onCancel}
+            className="w-full rounded-xl px-4 py-2 text-xs transition disabled:opacity-50"
+            style={{ color: "var(--text-3)" }}
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

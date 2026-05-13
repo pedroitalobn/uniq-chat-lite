@@ -1796,8 +1796,11 @@ export const conversationsApi = {
     data: { is_pinned?: boolean; is_favorite?: boolean; is_archived?: boolean; is_deleted?: boolean },
   ) => api.patch(`/v1/conversations/${id}/messages/${msgId}`, data, { headers: wsHeaders(workspaceId) }),
   // Message-level actions: revoke, edit, react, forward.
-  revokeMessage: (workspaceId: string, id: string, msgId: string) =>
-    api.delete(`/v1/conversations/${id}/messages/${msgId}`, { headers: wsHeaders(workspaceId) }),
+  revokeMessage: (workspaceId: string, id: string, msgId: string, scope: "me" | "everyone" = "everyone") =>
+    api.delete(`/v1/conversations/${id}/messages/${msgId}`, {
+      headers: wsHeaders(workspaceId),
+      params: { scope },
+    }),
   editMessage: (workspaceId: string, id: string, msgId: string, body: string) =>
     api.patch(`/v1/conversations/${id}/messages/${msgId}/content`, { body }, { headers: wsHeaders(workspaceId) }),
   reactToMessage: (workspaceId: string, id: string, msgId: string, emoji: string) =>
