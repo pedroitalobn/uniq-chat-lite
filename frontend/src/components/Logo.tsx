@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { cn } from "@/lib/utils";
 
 interface LogoProps {
@@ -22,6 +23,15 @@ const t = (p: typeof A) => `translate(${p.cx} ${p.cy}) rotate(${p.r})`;
 
 export function Logo({ className, height = 32 }: LogoProps) {
   const fontSize = Math.round(height * 0.52);
+  // IDs únicos por instância. SVG mask IDs são globais no documento — quando
+  // o Logo aparece em mais de um lugar (header + mobile dock + página de
+  // auth simultaneamente em mobile) os masks "uc-ma/uc-mb/uc-mc" colidiam,
+  // o navegador resolvia pra primeira instância e os outros logos
+  // renderizavam com interlock errado, parecendo "quebrados".
+  const uid = useId().replace(/:/g, "");
+  const idA = `uc-ma-${uid}`;
+  const idB = `uc-mb-${uid}`;
+  const idC = `uc-mc-${uid}`;
 
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
@@ -36,30 +46,19 @@ export function Logo({ className, height = 32 }: LogoProps) {
         aria-hidden="true"
       >
         <defs>
-          {/*
-           * Cyclic interlocking: A over C, C over B, B over A
-           * Each mask hides the "behind" loop where the "front" loop's
-           * stroke crosses over it.
-           */}
-
-          {/* mask-a: hide A where B goes over it */}
-          <mask id="uc-ma">
+          <mask id={idA}>
             <rect width="36" height="36" fill="white" />
             <path d={LOOP} transform={t(B)} fill="none"
               stroke="black" strokeWidth="3.8"
               strokeLinecap="round" strokeLinejoin="round" />
           </mask>
-
-          {/* mask-c: hide C where A goes over it */}
-          <mask id="uc-mc">
+          <mask id={idC}>
             <rect width="36" height="36" fill="white" />
             <path d={LOOP} transform={t(A)} fill="none"
               stroke="black" strokeWidth="3.8"
               strokeLinecap="round" strokeLinejoin="round" />
           </mask>
-
-          {/* mask-b: hide B where C goes over it */}
-          <mask id="uc-mb">
+          <mask id={idB}>
             <rect width="36" height="36" fill="white" />
             <path d={LOOP} transform={t(C)} fill="none"
               stroke="black" strokeWidth="3.8"
@@ -67,18 +66,13 @@ export function Logo({ className, height = 32 }: LogoProps) {
           </mask>
         </defs>
 
-        {/* Loop A — top */}
-        <path d={LOOP} transform={t(A)} mask="url(#uc-ma)"
+        <path d={LOOP} transform={t(A)} mask={`url(#${idA})`}
           stroke={GREEN} strokeWidth="3"
           strokeLinecap="round" strokeLinejoin="round" />
-
-        {/* Loop C — bottom-left */}
-        <path d={LOOP} transform={t(C)} mask="url(#uc-mc)"
+        <path d={LOOP} transform={t(C)} mask={`url(#${idC})`}
           stroke={GREEN} strokeWidth="3"
           strokeLinecap="round" strokeLinejoin="round" />
-
-        {/* Loop B — bottom-right */}
-        <path d={LOOP} transform={t(B)} mask="url(#uc-mb)"
+        <path d={LOOP} transform={t(B)} mask={`url(#${idB})`}
           stroke={GREEN} strokeWidth="3"
           strokeLinecap="round" strokeLinejoin="round" />
       </svg>
