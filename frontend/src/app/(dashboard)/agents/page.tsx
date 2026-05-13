@@ -26,8 +26,12 @@ type InstanceRow = {
   id: string;
   name: string;
   phone?: string;
-  is_active?: boolean;
   channel?: string;
+  // status: connected | connecting | disconnected | banned. O model
+  // backend não tem is_active, então antes o pill aqui virava sempre
+  // "off" porque is_active vinha undefined.
+  status?: "connected" | "connecting" | "disconnected" | "banned";
+  is_paused?: boolean;
 };
 
 export default function AgentsListPage() {
@@ -148,25 +152,50 @@ function InstanceCard({
               {instance.phone || instance.channel || "instância"}
             </p>
           </div>
-          {instance.is_active ? (
-            <span
-              className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full font-mono"
-              style={{
-                background: "rgba(0,212,106,0.10)",
-                color: "var(--green)",
-                border: "1px solid rgba(0,212,106,0.20)",
-              }}
-            >
-              online
-            </span>
-          ) : (
-            <span
-              className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full font-mono"
-              style={{ background: "var(--surface-2)", color: "var(--text-4)" }}
-            >
-              off
-            </span>
-          )}
+          {(() => {
+            const paused = !!instance.is_paused;
+            const status = instance.status || "disconnected";
+            // Pausa por segurança tem prioridade visual — bloqueia o agente
+            // mesmo com o socket conectado.
+            if (paused) {
+              return (
+                <span
+                  className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full font-mono"
+                  style={{
+                    background: "rgba(245,158,11,0.10)",
+                    color: "#fbbf24",
+                    border: "1px solid rgba(245,158,11,0.25)",
+                  }}
+                  title="Instância pausada por segurança anti-ban — agente não dispara"
+                >
+                  pausado
+                </span>
+              );
+            }
+            if (status === "connected") {
+              return (
+                <span
+                  className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full font-mono"
+                  style={{
+                    background: "rgba(0,212,106,0.10)",
+                    color: "var(--green)",
+                    border: "1px solid rgba(0,212,106,0.20)",
+                  }}
+                >
+                  online
+                </span>
+              );
+            }
+            return (
+              <span
+                className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full font-mono"
+                style={{ background: "var(--surface-2)", color: "var(--text-4)" }}
+                title={status === "banned" ? "Conta banida" : status === "connecting" ? "Reconectando" : "Desconectada — agente não recebe mensagens"}
+              >
+                {status === "banned" ? "banido" : status === "connecting" ? "conectando" : "off"}
+              </span>
+            );
+          })()}
         </div>
       </div>
 
