@@ -356,6 +356,32 @@ func (e *JourneyExecutor) HandleIncoming(instanceID, messageID, fromJID, fromNam
 	triggered := false
 	for i := range journeys {
 		j := &journeys[i]
+		capability, supported := SupportsInboundWhatsAppTrigger(models.TriggerType(j.TriggerType))
+		if !supported {
+			log.Warn().
+				Str("journey", j.ID).
+				Str("name", j.Name).
+				Str("trigger_type", j.TriggerType).
+				Msg("journey: trigger inbound WhatsApp fora da matriz de capacidades — ignorando no runtime único")
+			continue
+		}
+		if capability.Status == JourneyCapabilityPartial {
+			log.Info().
+				Str("journey", j.ID).
+				Str("trigger_type", j.TriggerType).
+				Str("capability_family", capability.Family).
+				Str("capability_notes", capability.Notes).
+				Msg("journey: trigger com suporte parcial na matriz de capacidades")
+		}
+		if models.TriggerType(j.TriggerType) == models.TriggerFirstMessage &&
+			!e.isFirstInboundMessage(instanceID, messageID, fromJID) {
+			log.Info().
+				Str("journey", j.ID).
+				Str("trigger_type", j.TriggerType).
+				Str("from", fromJID).
+				Msg("journey: trigger NÃO bateu — contato já possui inbound anterior")
+			continue
+		}
 		reason := triggerMatchReason(j, messageText, groupJID, messageType, isGroup)
 		if reason != "" {
 			log.Info().
@@ -387,6 +413,23 @@ func (e *JourneyExecutor) HandleIncoming(instanceID, messageID, fromJID, fromNam
 		go e.startNew(j, fromJID, fromName, groupJID, messageText)
 	}
 	return triggered
+}
+
+func (e *JourneyExecutor) isFirstInboundMessage(instanceID, messageID, fromJID string) bool {
+	var count int64
+	query := e.db.Model(&models.MessageLog{}).
+		Where("instance_id = ? AND sender_jid = ? AND direction = ?", instanceID, fromJID, models.DirectionIn)
+	if messageID != "" {
+		query = query.Where("external_message_id <> ? OR external_message_id = ''", messageID)
+	}
+	if err := query.Count(&count).Error; err != nil {
+		log.Warn().Err(err).
+			Str("instance", instanceID).
+			Str("from", fromJID).
+			Msg("journey: não consegui avaliar first_message; permitindo avaliação do trigger")
+		return true
+	}
+	return count == 0
 }
 
 // canReEnter aplica Journey.ReEntryRule. Default "never" (1 vez por contato).
@@ -688,6 +731,23 @@ func (e *JourneyExecutor) startNew(journey *models.Journey, fromJID, fromName, g
 	// com self-loops (next_step_id == id do próprio step) ou refs pra
 	// steps inexistentes. Isso é o que causava "manda 50x a mesma msg".
 	sanitizeFlowForExec(flow)
+	if unsupported := UnsupportedFlowSteps(flow); len(unsupported) > 0 {
+		types := make([]string, 0, len(unsupported))
+		for _, step := range unsupported {
+			types = append(types, string(step.Type))
+		}
+		log.Warn().
+			Str("journey", journey.ID).
+			Strs("unsupported_step_types", types).
+			Msg("journey: flow contém steps fora da matriz de capacidades")
+		if strings.TrimSpace(journey.MessageTemplate) != "" {
+			log.Info().
+				Str("journey", journey.ID).
+				Msg("journey: usando legacyFallback porque flow tem step sem suporte e há messageTemplate")
+			e.legacyFallback(journey, fromJID, fromName, groupJID, messageText)
+			return
+		}
+	}
 
 	start := flow.FirstStep()
 	if start == nil {
@@ -838,9 +898,9 @@ func (e *JourneyExecutor) resumeWithInput(journey *models.Journey, execution *mo
 
 // run executa steps sequencialmente até fim, wait ou input.
 // Proteções contra ciclo no flow (evita "manda a mesma mensagem 50x"):
-//  - MaxSteps total (limite duro global)
-//  - MaxStepVisits por step ID (detecta revisita excessiva)
-//  - self-loop check (step.NextStepID == step.ID → encerra)
+//   - MaxSteps total (limite duro global)
+//   - MaxStepVisits por step ID (detecta revisita excessiva)
+//   - self-loop check (step.NextStepID == step.ID → encerra)
 func (e *JourneyExecutor) run(ctx *execCtx, step *models.FlowStep) {
 	visits := make(map[string]int)
 	for step != nil {
@@ -925,6 +985,20 @@ func (e *JourneyExecutor) run(ctx *execCtx, step *models.FlowStep) {
 
 // executeStep processa um step e retorna (próximo step, pausar para input, erro)
 func (e *JourneyExecutor) executeStep(ctx *execCtx, step *models.FlowStep) (next *models.FlowStep, pause bool, err error) {
+	capability, supported := SupportsExecutableStep(step.Type)
+	if !supported {
+		return nil, false, fmt.Errorf("unsupported journey step type %q", step.Type)
+	}
+	if capability.Status == JourneyCapabilityPartial {
+		log.Info().
+			Str("journey", ctx.journey.ID).
+			Str("step", step.ID).
+			Str("step_type", string(step.Type)).
+			Str("capability_family", capability.Family).
+			Str("capability_notes", capability.Notes).
+			Msg("journey: executando step com suporte parcial na matriz de capacidades")
+	}
+
 	// Instrumentação de métricas (Fase 5). Skip em simulação pra não
 	// poluir contadores com previews. "entered" sempre incrementa;
 	// "completed/errored" baseado no resultado via defer.
@@ -955,7 +1029,7 @@ func (e *JourneyExecutor) executeStep(ctx *execCtx, step *models.FlowStep) (next
 		return e.stepCondition(ctx, step)
 	case models.StepTypeAIResponse:
 		return e.stepAIResponse(ctx, step)
-	case models.StepTypeHTTP:
+	case models.StepTypeHTTP, models.StepTypeWebhook:
 		return e.stepHTTP(ctx, step)
 	case models.StepTypeMedia:
 		return e.stepMedia(ctx, step)
@@ -993,8 +1067,7 @@ func (e *JourneyExecutor) executeStep(ctx *execCtx, step *models.FlowStep) (next
 	case models.StepTypeEnd:
 		return nil, false, nil
 	default:
-		// Step desconhecido: segue para next
-		return ctx.flow.FindStep(step.NextStepID), false, nil
+		return nil, false, fmt.Errorf("journey step type %q is marked supported but has no executor", step.Type)
 	}
 }
 
@@ -1118,11 +1191,11 @@ func (e *JourneyExecutor) stepInput(ctx *execCtx, step *models.FlowStep) (*model
 
 // stepWait — política de espera com 2 caminhos:
 //
-//   • Curtos (<= deferThreshold, default 60s): time.Sleep síncrono na
+//   - Curtos (<= deferThreshold, default 60s): time.Sleep síncrono na
 //     própria goroutine. Mais rápido, sem overhead de DB. Risco de
 //     perder em crash é aceitável (segundos).
 //
-//   • Longos (> 60s OU acima de 24h): cria JourneyDeferredStep
+//   - Longos (> 60s OU acima de 24h): cria JourneyDeferredStep
 //     persistente, marca execution.status="waiting" + CurrentStep
 //     no próximo step, e retorna pause=true pra sair da goroutine.
 //     O worker DeferredStepRunner pega quando fire_at <= now e chama
@@ -1266,12 +1339,12 @@ func (e *JourneyExecutor) stepCondition(ctx *execCtx, step *models.FlowStep) (*m
 
 func (e *JourneyExecutor) stepAIResponse(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
 	var cfg struct {
-		SystemPrompt   string `json:"system_prompt"`
-		UserPrompt     string `json:"user_prompt"`
-		IntegrationID  string `json:"integration_id"`
-		VariableName   string `json:"variable_name"` // opcional: salva resposta em var
-		SendToUser     bool   `json:"send_to_user"`
-		Mode           string `json:"mode"`
+		SystemPrompt  string `json:"system_prompt"`
+		UserPrompt    string `json:"user_prompt"`
+		IntegrationID string `json:"integration_id"`
+		VariableName  string `json:"variable_name"` // opcional: salva resposta em var
+		SendToUser    bool   `json:"send_to_user"`
+		Mode          string `json:"mode"`
 	}
 	_ = json.Unmarshal(step.Config, &cfg)
 
@@ -1320,12 +1393,12 @@ func (e *JourneyExecutor) stepAIResponse(ctx *execCtx, step *models.FlowStep) (*
 
 func (e *JourneyExecutor) stepHTTP(ctx *execCtx, step *models.FlowStep) (*models.FlowStep, bool, error) {
 	var cfg struct {
-		Method      string            `json:"method"`
-		URL         string            `json:"url"`
-		Headers     map[string]string `json:"headers"`
-		Body        string            `json:"body"`
-		SaveResult  string            `json:"save_result"`  // nome da variável
-		SaveField   string            `json:"save_field"`   // dot-path no JSON de resposta
+		Method     string            `json:"method"`
+		URL        string            `json:"url"`
+		Headers    map[string]string `json:"headers"`
+		Body       string            `json:"body"`
+		SaveResult string            `json:"save_result"` // nome da variável
+		SaveField  string            `json:"save_field"`  // dot-path no JSON de resposta
 	}
 	_ = json.Unmarshal(step.Config, &cfg)
 	method := strings.ToUpper(cfg.Method)
@@ -1666,8 +1739,8 @@ func (e *JourneyExecutor) applyUpdateStage(ctx *execCtx, stageID, funnelID strin
 	} else {
 		now := time.Now()
 		if err := e.db.Model(&deal).Updates(map[string]any{
-			"stage_id":         stageUUID,
-			"stage_change_at":  now,
+			"stage_id":        stageUUID,
+			"stage_change_at": now,
 		}).Error; err != nil {
 			return fmt.Errorf("update stage: %w", err)
 		}
