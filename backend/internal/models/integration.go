@@ -223,6 +223,16 @@ type InstanceAgent struct {
 	//   "balanced"  → mistura — detalha quando precisa (default)
 	//   "detailed"  → respostas completas e didáticas
 	ResponseLength string `gorm:"type:varchar(20);default:'balanced'" json:"response_length,omitempty"`
+	// AudioReplyMode — como o agente responde mensagens recebidas em áudio
+	// (e, no caso "always", também as recebidas em texto):
+	//   "text"        → sempre responde em texto (default).
+	//   "audio"       → sempre tenta responder em áudio (TTS); se voz não
+	//                    estiver configurada ou TTS falhar, faz fallback
+	//                    pra texto automaticamente.
+	//   "match_input" → espelha o tipo da mensagem do cliente: áudio in →
+	//                    áudio out (com fallback pra texto); texto in →
+	//                    texto out.
+	AudioReplyMode string `gorm:"type:varchar(20);default:'text'" json:"audio_reply_mode,omitempty"`
 	// n8n / webhook passthrough
 	WebhookURL    string `gorm:"type:varchar(255)" json:"webhook_url,omitempty"`
 	WebhookSecret string `gorm:"type:varchar(255)" json:"webhook_secret,omitempty"`

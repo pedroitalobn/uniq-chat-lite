@@ -194,27 +194,47 @@ export function VoiceCard({ form, update }: Props) {
           }}
         >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={enabled}
-                onChange={(e) =>
-                  update((p) => ({
-                    ...p,
-                    voice: { ...p.voice, audio_enabled: e.target.checked },
-                  }))
-                }
-                className="mt-0.5 accent-amber-500"
-              />
-              <span>
-                <span className="block text-xs font-semibold" style={{ color: "var(--text-1)" }}>
-                  Responder com áudio
-                </span>
-                <span className="block text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>
-                  Usa Uniq Voice ou uma voz própria do workspace quando o plano permitir.
-                </span>
-              </span>
-            </label>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
+                Quando responder em áudio
+              </p>
+              <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>
+                Se voz não estiver configurada quando precisar enviar áudio, o agente cai pra texto automaticamente.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {([
+                  { id: "text", label: "Sempre texto", desc: "Nunca usa áudio" },
+                  { id: "match_input", label: "Espelhar cliente", desc: "Áudio responde áudio · texto responde texto" },
+                  { id: "audio", label: "Sempre áudio", desc: "Tenta TTS em toda resposta" },
+                ] as const).map((opt) => {
+                  const active = form.audio_reply_mode === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() =>
+                        update((p) => ({
+                          ...p,
+                          audio_reply_mode: opt.id,
+                          // Liga audio_enabled automático quando user pede áudio,
+                          // pra UI da voz e a config de TTS ficarem coerentes.
+                          voice: { ...p.voice, audio_enabled: opt.id !== "text" },
+                        }))
+                      }
+                      title={opt.desc}
+                      className="text-[11px] px-2.5 py-1.5 rounded-lg transition"
+                      style={{
+                        background: active ? "rgba(245,158,11,0.14)" : "var(--surface-2)",
+                        color: active ? "#f59e0b" : "var(--text-2)",
+                        border: `1px solid ${active ? "rgba(245,158,11,0.35)" : "var(--surface-border)"}`,
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             <button
               type="button"

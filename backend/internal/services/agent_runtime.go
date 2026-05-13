@@ -297,9 +297,13 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		return true
 	}
 
-	// Tentar responder em áudio se voz estiver configurada — áudio segue
-	// path direto (TTS já tem latência natural + presence "gravando").
-	if r.tts != nil && r.trySendAudio(ctx, client, agent, fromJID, reply) {
+	// AudioReplyMode decide se o agente tenta responder em áudio:
+	//   text        → nunca (sempre texto).
+	//   audio       → sempre tenta (com fallback automático pra texto).
+	//   match_input → só se a inbound foi áudio (espelha o canal).
+	// Se trySendAudio falhar (voz não configurada, TTS down, etc.), cai pro
+	// path de texto via reply queue — fallback transparente.
+	if r.tts != nil && shouldReplyWithAudio(agent, messageType) && r.trySendAudio(ctx, client, agent, fromJID, reply) {
 		_ = client.SendTyping(fromJID, false)
 		log.Info().
 			Str("instance", instanceID).
@@ -664,6 +668,28 @@ func (r *AgentRuntime) recentHistory(instanceID uuid.UUID, fromJID string, limit
 		lines = append(lines, fmt.Sprintf("- %s: %s", role, content))
 	}
 	return strings.Join(lines, "\n")
+}
+
+// shouldReplyWithAudio decide se vamos tentar responder em áudio baseado
+// no AudioReplyMode do agente e no tipo da mensagem inbound. Quando volta
+// false, o caller pula trySendAudio e vai direto pro texto. Quando true,
+// trySendAudio ainda pode falhar silenciosamente (sem voz configurada /
+// TTS down) — nesse caso o caller também cai no texto. Resultado: o
+// fallback "áudio configurado mas voz faltando → texto" é automático.
+func shouldReplyWithAudio(agent *models.InstanceAgent, inboundType string) bool {
+	if agent == nil {
+		return false
+	}
+	mode := strings.ToLower(strings.TrimSpace(agent.AudioReplyMode))
+	switch mode {
+	case "audio":
+		return true
+	case "match_input":
+		return strings.EqualFold(strings.TrimSpace(inboundType), "audio")
+	case "text", "":
+		return false
+	}
+	return false
 }
 
 // trySendAudio converts reply text to audio via TTS and sends it as a PTT message.

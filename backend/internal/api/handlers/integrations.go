@@ -632,6 +632,7 @@ func (h *IntegrationHandler) GetAgent(c *fiber.Ctx) error {
 		"trigger_webhook_secret":   agent.TriggerWebhookSecret,
 		"response_pace":            agent.ResponsePace,
 		"response_length":          agent.ResponseLength,
+		"audio_reply_mode":         agent.AudioReplyMode,
 		"access_restricted":        agent.AccessRestricted,
 		"editor_role_ids":          safeJSONArray(agent.EditorRoleIDs),
 		"created_at":               agent.CreatedAt,
@@ -870,6 +871,7 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		// Ritmo e tamanho das respostas.
 		ResponsePace   *string `json:"response_pace"`
 		ResponseLength *string `json:"response_length"`
+		AudioReplyMode *string `json:"audio_reply_mode"`
 		PaceSettings   *string `json:"pace_settings"`
 		// Acesso da equipe — quem do workspace pode editar este agente.
 		// AccessRestricted=false (default) preserva comportamento legado.
@@ -1107,6 +1109,12 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		switch strings.ToLower(strings.TrimSpace(*req.ResponseLength)) {
 		case "concise", "balanced", "detailed":
 			agent.ResponseLength = strings.ToLower(*req.ResponseLength)
+		}
+	}
+	if req.AudioReplyMode != nil {
+		switch strings.ToLower(strings.TrimSpace(*req.AudioReplyMode)) {
+		case "text", "audio", "match_input":
+			agent.AudioReplyMode = strings.ToLower(*req.AudioReplyMode)
 		}
 	}
 	if req.PaceSettings != nil {
