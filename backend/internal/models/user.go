@@ -25,9 +25,9 @@ type User struct {
 	ID                uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
 	Name              string     `gorm:"not null" json:"name"`
 	Email             string     `gorm:"uniqueIndex;not null" json:"email"`
-	Phone             string     `gorm:"not null;index" json:"phone"`
+	Phone             string     `gorm:"not null;uniqueIndex" json:"phone"`
 	CountryCode       string     `gorm:"type:varchar(2);index" json:"country_code,omitempty"`
-	TaxID             string     `gorm:"type:varchar(64);index" json:"-"`
+	TaxID             string     `gorm:"type:varchar(64);uniqueIndex" json:"-"`
 	AccountType       string     `gorm:"type:varchar(20);default:'personal';index" json:"account_type,omitempty"`
 	CompanyName       string     `gorm:"type:varchar(160)" json:"company_name,omitempty"`
 	CompanyIdentifier string     `gorm:"type:varchar(64)" json:"company_identifier,omitempty"`

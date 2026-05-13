@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  User, Building2, AtSign, Lock, Eye, EyeOff,
+  User, Building2, Lock, Eye, EyeOff,
   ArrowRight, Loader2, AlertCircle, CheckCircle2, XCircle, FileText,
   Search, ChevronDown,
 } from "lucide-react";
@@ -376,10 +376,8 @@ function CompleteForm({
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [username, setUsername] = useState("");
   const [accountType, setAccountType] = useState<"personal" | "business">("personal");
   const [company, setCompany] = useState("");
-  const [companyIdentifier, setCompanyIdentifier] = useState("");
   const [phoneCountry, setPhoneCountry] = useState("BR");
   const [localPhone, setLocalPhone] = useState("");
   const [taxId, setTaxId] = useState("");
@@ -479,12 +477,6 @@ function CompleteForm({
         e.taxId = "Identificador fiscal inválido";
       }
 
-      if (accountType === "business") {
-        const companyId = taxIDValue(companyIdentifier);
-        const companyIdLen = taxIDLength(companyId);
-        if (!companyId) e.companyIdentifier = "Identificador da empresa é obrigatório";
-        else if (companyIdLen < 4 || companyIdLen > 32) e.companyIdentifier = "Identificador da empresa inválido";
-      }
     }
     if (nextStep === 2) {
       if (password.length < 8) e.password = "Mínimo 8 caracteres";
@@ -514,7 +506,6 @@ function CompleteForm({
         body: JSON.stringify({
           pending_registration_id: pendingId,
           name: name.trim(),
-          username: username.trim().toLowerCase() || undefined,
           workspace_name: company.trim() || undefined,
           password,
           phone: fullPhoneDigits(),
@@ -522,18 +513,13 @@ function CompleteForm({
           tax_id: taxIDValue(taxId),
           account_type: accountType,
           company_name: company.trim() || undefined,
-          company_identifier: taxIDValue(companyIdentifier) || undefined,
           plan_id: selectedPlanID || undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
         const errorMessage = safeErrorMessage(data?.error, "Erro ao criar conta");
-        if (errorMessage.includes("username")) {
-          setErrors({ username: errorMessage });
-        } else {
-          setErrors({ global: errorMessage });
-        }
+        setErrors({ global: errorMessage });
         return;
       }
 
@@ -727,17 +713,6 @@ function CompleteForm({
               error={errors.taxId}
             />
 
-            {accountType === "business" && (
-              <Field
-                label="Identificador da empresa"
-                value={companyIdentifier}
-                onChange={v => setCompanyIdentifier(normalizeTaxIDInput(v))}
-                placeholder="State ID, registro mercantil ou identificador local"
-                icon={<Building2 className="w-4 h-4" />}
-                hint="Use o identificador corporativo complementar exigido no seu país ou estado."
-                error={errors.companyIdentifier}
-              />
-            )}
           </motion.div>
         )}
 
@@ -749,10 +724,6 @@ function CompleteForm({
             exit={{ opacity: 0, x: -16 }}
             className="flex flex-col gap-5"
           >
-            <Field label="Username (opcional)" value={username} onChange={setUsername}
-              placeholder="@joaosilva" icon={<AtSign className="w-4 h-4" />}
-              hint="Visível para outros usuários" error={errors.username} />
-
             <div className="flex flex-col gap-2">
               <Field
                 label="Crie uma senha"

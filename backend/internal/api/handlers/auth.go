@@ -140,6 +140,61 @@ func validCompanyIdentifier(v string) bool {
 	return n >= 4 && n <= 32 && len(v) <= 64
 }
 
+// usernameSlug — gera um handle minúsculo a partir do nome do user.
+// Mantém só [a-z0-9] + remove acentos comuns. Resultado mínimo 3 chars,
+// caso o nome fique vazio devolve string vazia (caller decide fallback).
+func usernameSlug(name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	// Mapa básico de acentos pra ascii — evita import de norm/unicode pra
+	// algo desse porte. Cobre o que cai em nome PT-BR / ES / FR comum.
+	replacer := strings.NewReplacer(
+		"á", "a", "à", "a", "â", "a", "ã", "a", "ä", "a",
+		"é", "e", "è", "e", "ê", "e", "ë", "e",
+		"í", "i", "ì", "i", "î", "i", "ï", "i",
+		"ó", "o", "ò", "o", "ô", "o", "õ", "o", "ö", "o",
+		"ú", "u", "ù", "u", "û", "u", "ü", "u",
+		"ç", "c", "ñ", "n",
+	)
+	name = replacer.Replace(name)
+	var b strings.Builder
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+		}
+	}
+	slug := b.String()
+	if len(slug) < 3 {
+		return ""
+	}
+	if len(slug) > 24 {
+		slug = slug[:24]
+	}
+	return slug
+}
+
+// generateUniqueUsername — tenta usar o slug do nome; se já existir,
+// vai concatenando sufixos numéricos até achar livre. Limite de 50
+// tentativas é defensivo — na prática colisão >2 dígitos é rara.
+func generateUniqueUsername(db *gorm.DB, name string) string {
+	base := usernameSlug(name)
+	if base == "" {
+		base = "user"
+	}
+	var existing models.User
+	if db.Where("username = ?", base).First(&existing).Error != nil {
+		return base
+	}
+	for i := 1; i < 50; i++ {
+		candidate := fmt.Sprintf("%s%d", base, i)
+		if db.Where("username = ?", candidate).First(&existing).Error != nil {
+			return candidate
+		}
+	}
+	// Fallback teoricamente inalcançável: timestamp curto.
+	return fmt.Sprintf("%s%d", base, time.Now().UnixNano()%100000)
+}
+
 func loadStripeConfigFromDB(db *gorm.DB) {
 	var settings models.PaymentSettings
 	if db.Where("id = ?", "default").First(&settings).Error == nil {
@@ -1451,12 +1506,17 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		if req.CompanyName == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "nome da empresa é obrigatório para conta empresa"})
 		}
-		if req.CompanyIdentifier == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "identificador da empresa é obrigatório para conta empresa"})
-		}
-		if !validCompanyIdentifier(req.CompanyIdentifier) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "identificador da empresa inválido"})
-		}
+	}
+
+	// Unicidade — email, telefone e tax_id são keys individualizantes do
+	// user/empresa. Email já tem uniqueIndex no model; pre-check aqui
+	// devolve mensagem amigável em vez de bater no constraint do banco.
+	var dup models.User
+	if h.db.Where("phone = ?", req.Phone).First(&dup).Error == nil {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "telefone já cadastrado em outra conta"})
+	}
+	if h.db.Where("tax_id = ?", req.TaxID).First(&dup).Error == nil {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "CPF/CNPJ/Tax ID já cadastrado em outra conta"})
 	}
 
 	prID, err := uuid.Parse(req.PendingRegistrationID)
@@ -1484,12 +1544,11 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "e-mail já cadastrado"})
 	}
 
-	// Username uniqueness
-	if req.Username != "" {
-		if h.db.Where("username = ?", req.Username).First(&existing).Error == nil {
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "username já em uso"})
-		}
-	}
+	// Username é sempre auto-gerado a partir do nome — ignoramos o que vier
+	// do client. Sufixo numérico em caso de colisão (joaosilva, joaosilva1,
+	// joaosilva2, ...). Mantém o handle previsível e tira do user a
+	// decisão de inventar/lembrar de mais um identificador.
+	req.Username = generateUniqueUsername(h.db, req.Name)
 
 	// Resolve plan
 	planID := pending.PlanID
@@ -1634,10 +1693,9 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 			// Cria subscription recorrente PIX
 			subReq := AsaasSubscriptionRequest{
 				Customer:          customerID,
-				Plan:              plan.AsaasProductID,
-				Price:             plan.Price,
+				BillingType:       "PIX",
+				Value:             plan.Price,
 				Cycle:             "MONTHLY",
-				PaymentMethod:     "PIX",
 				NextDueDate:       time.Now().AddDate(0, 0, 1).Format("2006-01-02"),
 				Description:       "Assinatura " + plan.Name + " — Uniq Chat",
 				ExternalReference: pending.ID.String() + "|" + plan.ID.String(),
