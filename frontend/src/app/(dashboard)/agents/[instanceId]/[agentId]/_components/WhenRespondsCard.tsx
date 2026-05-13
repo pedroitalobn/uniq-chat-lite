@@ -55,7 +55,41 @@ export function WhenRespondsCard({ form, update }: Props) {
         </div>
       }
     >
-      <div className="pt-3">
+      <div className="pt-3 space-y-5">
+        <div className="rounded-xl p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)" }}>
+          <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
+            Agrupar mensagens em rajada
+          </p>
+          <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>
+            Quando o cliente manda várias mensagens seguidas, o agente espera ele terminar de digitar antes de responder — em vez de responder linha por linha. Mais natural.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {([
+              { id: "off", label: "Desligado", desc: "Responde cada mensagem na hora" },
+              { id: "smart", label: "Inteligente (~6s)", desc: "Espera silêncio curto antes de processar — recomendado" },
+              { id: "patient", label: "Paciente (~15s)", desc: "Bom pra quem digita devagar ou intercala áudios" },
+            ] as const).map((opt) => {
+              const active = form.message_batching === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => update((p) => ({ ...p, message_batching: opt.id }))}
+                  title={opt.desc}
+                  className="text-[11px] px-2.5 py-1.5 rounded-lg transition"
+                  style={{
+                    background: active ? "rgba(251,191,36,0.14)" : "var(--surface-1)",
+                    color: active ? "#fbbf24" : "var(--text-2)",
+                    border: `1px solid ${active ? "rgba(251,191,36,0.35)" : "var(--surface-border)"}`,
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <ActivationTab
           mode={form.activation_mode}
           schedule={form.schedule}

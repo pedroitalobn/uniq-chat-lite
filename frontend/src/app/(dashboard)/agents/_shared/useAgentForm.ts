@@ -87,6 +87,8 @@ export function useAgentForm(instanceId: string | undefined, agentId: string | u
           trigger_webhook_secret: form.trigger_webhook_secret,
           response_pace: form.response_pace,
           response_length: form.response_length,
+          audio_reply_mode: form.audio_reply_mode,
+          message_batching: form.message_batching,
           pace_settings: form.pace_settings,
           access_restricted: form.access_restricted,
           editor_role_ids: form.editor_role_ids,

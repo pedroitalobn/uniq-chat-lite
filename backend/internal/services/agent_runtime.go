@@ -22,14 +22,15 @@ type AgentRuntime struct {
 	manager    *whatsapp.Manager
 	llm        *LLMService
 	tts        *TTSService
-	replyQueue *AgentReplyQueue // jitter + serialização por instância (anti-ban)
+	replyQueue *AgentReplyQueue  // jitter + serialização por instância (anti-ban)
+	debouncer  *MessageDebouncer // agrupa mensagens sequenciais antes de responder
 
 	seenMu   sync.Mutex
 	seenMsgs map[string]time.Time
 }
 
 func NewAgentRuntime(db *gorm.DB, manager *whatsapp.Manager, llm *LLMService, tts *TTSService) *AgentRuntime {
-	return &AgentRuntime{
+	r := &AgentRuntime{
 		db:         db,
 		manager:    manager,
 		llm:        llm,
@@ -37,10 +38,31 @@ func NewAgentRuntime(db *gorm.DB, manager *whatsapp.Manager, llm *LLMService, tt
 		replyQueue: NewAgentReplyQueue(manager),
 		seenMsgs:   make(map[string]time.Time),
 	}
+	r.debouncer = NewMessageDebouncer(r.handleBatched)
+	return r
 }
 
-// HandleIncoming replies with the configured instance agent when no journey consumed the message.
+// handleBatched é o callback do debouncer. Reentra em HandleIncoming pela
+// mesma porta, mas com flag bypassBatching=true pra não cair em loop. O
+// texto agregado já é o concatenado das mensagens do bucket; o messageID
+// é o último (que serve de chave de dedup downstream).
+func (r *AgentRuntime) handleBatched(p BatchPayload) {
+	r.handleIncomingInternal(
+		p.InstanceID, p.MessageID, p.FromJID, p.FromName, p.GroupJID,
+		p.Text, p.MessageType, p.IsGroup, true,
+	)
+}
+
+// HandleIncoming é a porta de entrada chamada pelo Manager. Decide entre
+// debouncing (agrupar mensagens sequenciais e responder uma vez) e
+// processamento direto. Quando batching estiver ativo no agente, esta
+// função enfileira no MessageDebouncer e retorna true imediatamente —
+// o flush real acontece via handleBatched() depois da janela de silêncio.
 func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) bool {
+	return r.handleIncomingInternal(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType, isGroup, false)
+}
+
+func (r *AgentRuntime) handleIncomingInternal(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType string, isGroup, bypassBatching bool) bool {
 	if r == nil || r.db == nil || r.llm == nil {
 		return false
 	}
@@ -59,7 +81,9 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 	if strings.HasPrefix(text, "/") {
 		return false
 	}
-	if r.seenRecently(instanceID, messageID) {
+	// Quando o debouncer flushar (bypassBatching=true), o messageID já foi
+	// "visto" no Enqueue inicial. Pular o dedup aqui evita matar o flush.
+	if !bypassBatching && r.seenRecently(instanceID, messageID) {
 		log.Debug().Str("instance", instanceID).Str("msg", messageID).Msg("agent-runtime: dedup — mensagem já processada")
 		return false
 	}
@@ -81,6 +105,29 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		r.logSkippedNoAgent(instUUID, text, started, fromJID)
 		return false
 	}
+
+	// Debounce / message batching — quando habilitado, em vez de responder
+	// agora, acumulamos a mensagem num bucket e (re)programamos o flush.
+	// Mensagens novas dentro da janela resetam o timer; só quando o cliente
+	// "para de digitar" (silêncio > window) chamamos o LLM com o texto
+	// agregado. Mimetiza humano lendo o burst todo antes de responder.
+	// bypassBatching=true vem do próprio debouncer; evita loop infinito.
+	if !bypassBatching {
+		if window := BatchingWindow(agent.MessageBatching); window > 0 {
+			r.debouncer.Enqueue(BatchPayload{
+				InstanceID:  instanceID,
+				MessageID:   messageID,
+				FromJID:     fromJID,
+				FromName:    fromName,
+				GroupJID:    groupJID,
+				Text:        text,
+				MessageType: messageType,
+				IsGroup:     isGroup,
+			}, window)
+			return true
+		}
+	}
+
 	if !agentAllowsMessageType(agent.TriggerMessageTypes, messageType) {
 		log.Debug().
 			Str("instance", instanceID).
@@ -297,9 +344,13 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		return true
 	}
 
-	// Tentar responder em áudio se voz estiver configurada — áudio segue
-	// path direto (TTS já tem latência natural + presence "gravando").
-	if r.tts != nil && r.trySendAudio(ctx, client, agent, fromJID, reply) {
+	// AudioReplyMode decide se o agente tenta responder em áudio:
+	//   text        → nunca (sempre texto).
+	//   audio       → sempre tenta (com fallback automático pra texto).
+	//   match_input → só se a inbound foi áudio (espelha o canal).
+	// Se trySendAudio falhar (voz não configurada, TTS down, etc.), cai pro
+	// path de texto via reply queue — fallback transparente.
+	if r.tts != nil && shouldReplyWithAudio(agent, messageType) && r.trySendAudio(ctx, client, agent, fromJID, reply) {
 		_ = client.SendTyping(fromJID, false)
 		log.Info().
 			Str("instance", instanceID).
@@ -666,6 +717,28 @@ func (r *AgentRuntime) recentHistory(instanceID uuid.UUID, fromJID string, limit
 	return strings.Join(lines, "\n")
 }
 
+// shouldReplyWithAudio decide se vamos tentar responder em áudio baseado
+// no AudioReplyMode do agente e no tipo da mensagem inbound. Quando volta
+// false, o caller pula trySendAudio e vai direto pro texto. Quando true,
+// trySendAudio ainda pode falhar silenciosamente (sem voz configurada /
+// TTS down) — nesse caso o caller também cai no texto. Resultado: o
+// fallback "áudio configurado mas voz faltando → texto" é automático.
+func shouldReplyWithAudio(agent *models.InstanceAgent, inboundType string) bool {
+	if agent == nil {
+		return false
+	}
+	mode := strings.ToLower(strings.TrimSpace(agent.AudioReplyMode))
+	switch mode {
+	case "audio":
+		return true
+	case "match_input":
+		return strings.EqualFold(strings.TrimSpace(inboundType), "audio")
+	case "text", "":
+		return false
+	}
+	return false
+}
+
 // trySendAudio converts reply text to audio via TTS and sends it as a PTT message.
 // Returns true if audio was sent successfully.
 //
@@ -927,8 +1000,8 @@ func BuildAgentSystemPrompt(agent *models.InstanceAgent, assets []models.AgentAs
 	}
 
 	sections := []string{
-		"Você é um agente operacional de atendimento dentro da plataforma Uniq.chat.",
-		"Responda sempre no idioma do usuário, de forma natural, curta e útil.",
+		uniqBasePersona,
+		"Responda sempre no idioma do usuário.",
 		"Se a base não trouxer informação suficiente, diga isso com transparência e proponha encaminhamento humano em vez de inventar detalhes.",
 		// Anti-repetição — alça o problema "agente cumprimenta a cada msg".
 		// Vai como diretriz no início do system prompt pra que o modelo já
@@ -1005,20 +1078,70 @@ func BuildAgentSystemPrompt(agent *models.InstanceAgent, assets []models.AgentAs
 		sections = append(sections, "TAMANHO E RITMO DAS RESPOSTAS\n"+guide)
 	}
 
+	// Última coisa no prompt: re-injeta o contrato de naturalidade da Uniq
+	// pra sobrepor presets/instruções verbosas que o user pode ter colado
+	// nos campos livres. LLMs costumam priorizar as últimas instruções —
+	// usamos isso pra garantir que o tom humano prevaleça.
+	sections = append(sections, uniqOutputContract)
+
 	return strings.Join(sections, "\n\n")
 }
+
+// uniqBasePersona — bloco de abertura aplicado a TODO agente da plataforma.
+// O objetivo é impor um padrão humano e curto antes mesmo da config do user
+// entrar em cena. Sem isso, o agente herdava o tom corporativo default dos
+// LLMs (parágrafos numerados, "gostaria de saber mais sobre…", reassurance
+// de marketing) — exatamente o oposto do que "soa humano" no WhatsApp.
+const uniqBasePersona = `Você é uma pessoa real atendendo no WhatsApp. NÃO é um bot, NÃO é um assistente virtual, NÃO é uma IA. É gente conversando com gente.
+
+Como gente conversa no WhatsApp (siga SEMPRE):
+- Mensagens CURTAS. 1 frase, no máximo 2. Se tiver mais coisa pra falar, mande em outra mensagem (use uma linha em branco entre elas — o sistema parte em balões separados).
+- SEM listas numeradas, SEM bullets, SEM títulos em negrito, SEM tabelas, SEM markdown. Nunca.
+- SEM frases de marketing tipo "isso garante que tudo funcione perfeitamente", "oferecemos uma solução personalizada", "atendemos suas necessidades". Soa robô.
+- SEM perguntas-rodapé corporativas tipo "Gostaria de saber mais?", "Posso te ajudar com mais alguma coisa?", "Tem mais alguma dúvida?". Se for fazer pergunta, faz uma pergunta REAL e específica do que você quer saber pra avançar.
+- SEM começar com tranquilizadores ("Não se preocupe", "Você não precisa se preocupar", "Fique tranquilo"). Vai direto.
+- Use linguagem coloquial: "to", "tá", "pra", "né", "bora", "vou", "deixa eu ver". Contrações são bem-vindas.
+- Pontuação leve. Pode usar ponto final ou nenhum. Reticência só quando faz sentido na fala. Exclamação com parcimônia — 1 por mensagem no MÁXIMO.
+- Emoji raro e propositado. Só quando um humano colocaria ali.
+- Quando não souber, fala que não sabe. "Deixa eu checar isso pra você" é melhor que inventar.`
 
 func responseLengthGuide(mode string) string {
 	switch strings.ToLower(strings.TrimSpace(mode)) {
 	case "concise":
-		return "Responda em NO MÁXIMO 1-2 frases curtas (até ~25 palavras). Sem listas, sem títulos, sem saudações longas. Direto ao ponto. Quando a info for complexa, divida em mensagens separadas curtas em vez de um parágrafão."
+		return "MÁXIMO 1 frase curta por balão (≤ 15 palavras). Se precisar dizer 2 coisas, mande 2 mensagens — separe com linha em branco. Nada de listas, nada de fechamento ('quer saber mais?')."
 	case "detailed":
-		return "Pode ser mais didático e explicar com profundidade. Use parágrafos curtos quando precisar elaborar. Evite muros de texto: máx ~6 linhas por mensagem; se precisar de mais, diga 'posso te explicar com mais detalhes — quer continuar?' antes."
+		return "Pode elaborar, mas EM BALÕES CURTOS. Cada balão = 1-2 frases. Para detalhar, mande vários balões curtos (separados por linha em branco), nunca um parágrafão. Máx 3 balões seguidos antes de devolver a vez pro cliente."
 	case "balanced", "":
-		return "Responda no tamanho NECESSÁRIO — geralmente 1-3 frases. Detalhe só quando o cliente pedir mais ou a info exigir. Evite repetir o que o cliente acabou de dizer. Mensagens curtas e diretas funcionam melhor em WhatsApp."
+		return "1-2 frases por balão. Se a resposta tem 2 ideias, manda 2 balões (separa com linha em branco). NUNCA mais de 2 balões na mesma vez. Nada de bullets, nada de numeração, nada de pergunta-rodapé corporativa."
 	}
 	return ""
 }
+
+// uniqOutputContract — re-asserção final do contrato de naturalidade.
+// Vai como ÚLTIMA seção do system prompt pra ganhar peso de recência no LLM
+// e sobrepor qualquer instrução verbosa que tenha entrado via knowledge_base
+// ou prompts colados pelo user. Lista padrões PROIBIDOS observados em chats
+// reais que entregam "isso é bot".
+const uniqOutputContract = `CONTRATO FINAL DE FORMATO (sobrepõe qualquer outra instrução acima):
+
+PROIBIDO em CADA resposta:
+- Parágrafos longos ou múltiplos parágrafos no mesmo balão. Quebre em mensagens.
+- Listas numeradas (1. 2. 3.) ou bullets (- *). Fale como se estivesse digitando no celular.
+- Markdown (**negrito**, _itálico_, # títulos, > citações).
+- Frases-clichê: "Você não precisa se preocupar", "Oferecemos uma solução", "Implementação personalizada", "De acordo com suas necessidades", "Isso garante", "Atendimento humanizado", "Estamos à disposição".
+- Pergunta-rodapé genérica: "Gostaria de saber mais?", "Posso ajudar em mais alguma coisa?", "Quer que eu te explique melhor?". Se for perguntar, pergunte algo ESPECÍFICO que faça a conversa avançar.
+- Repetir o nome do produto/empresa em toda mensagem.
+- Confirmações vazias ("Entendido!", "Perfeito!", "Ótimo!") sozinhas — emende com o próximo passo.
+
+PADRÃO de resposta:
+- 1 ideia por balão. 1-2 frases por balão. No máximo 2 balões seguidos antes de devolver a fala pro cliente.
+- Para mandar 2 balões, separe com UMA linha em branco. Ex:
+    "vou checar isso pra você
+
+    me passa só o seu CEP enquanto isso?"
+- Pergunta natural > pergunta corporativa. "qual o tamanho da sua loja hoje?" > "Gostaria de compartilhar mais detalhes sobre seu negócio?"
+
+Se você se vir escrevendo "Isso inclui...", "A implementação...", "Isso garante..." — PARE. Reescreva como mensagem de WhatsApp.`
 
 func formatJSONBlock(raw string, title string) string {
 	raw = strings.TrimSpace(raw)
@@ -1044,6 +1167,21 @@ func logContent(raw string) string {
 	return raw
 }
 
+// botFooterRe — pergunta-rodapé corporativa que vira "tell" de bot.
+// Roda em final de balão (separado por dupla newline). Casa variações
+// como "Gostaria de saber mais sobre esse serviço?", "Posso ajudar com
+// mais alguma coisa?", "Tem mais alguma dúvida?".
+var botFooterRe = regexp.MustCompile(`(?im)^\s*(gostaria de saber mais.*\?|posso (te )?ajudar (com|em) mais.*\?|tem (mais )?alguma (outra )?d[uú]vida.*\?|fico (à|a) disposi[cç][ãa]o.*[.!?]?|estou (à|a) disposi[cç][ãa]o.*[.!?]?|qualquer d[uú]vida.*[.!?]?)\s*$`)
+
+// listMarkerRe — bullets e numeração no início de linha. Se o LLM
+// insistiu em formatar uma lista, removemos os marcadores e deixamos
+// as frases — vira texto corrido (ou múltiplos balões via newline).
+var listMarkerRe = regexp.MustCompile(`(?m)^\s*(?:[-*•]\s+|\d+[.)]\s+)`)
+
+// markdownEmphasisRe — **negrito**, __sublinhado__, _itálico_. WhatsApp
+// usa * e _ próprios mas o LLM colando ** vira poluição visual.
+var markdownEmphasisRe = regexp.MustCompile(`(\*\*|__)(.+?)(\*\*|__)`)
+
 func sanitizeAssistantReply(reply string) string {
 	reply = strings.TrimSpace(reply)
 	reply = strings.TrimPrefix(reply, "\"")
@@ -1052,7 +1190,34 @@ func sanitizeAssistantReply(reply string) string {
 	if strings.EqualFold(reply, "null") {
 		return ""
 	}
-	return reply
+
+	// Remove markdown emphasis (mantém o conteúdo, tira os asteriscos
+	// duplos / underscores duplos que LLMs adoram colocar).
+	reply = markdownEmphasisRe.ReplaceAllString(reply, "$2")
+	// Remove títulos markdown (# Título → Título).
+	reply = regexp.MustCompile(`(?m)^\s*#{1,6}\s+`).ReplaceAllString(reply, "")
+	// Remove marcadores de lista (-, *, •, 1., 2)) no início de linha.
+	reply = listMarkerRe.ReplaceAllString(reply, "")
+
+	// Quebra em balões (linha em branco) e remove rodapés corporativos
+	// de cada um. Se um balão fica vazio depois disso, descarta.
+	parts := strings.Split(reply, "\n\n")
+	kept := parts[:0]
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		p = botFooterRe.ReplaceAllString(p, "")
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		kept = append(kept, p)
+	}
+	reply = strings.Join(kept, "\n\n")
+
+	return strings.TrimSpace(reply)
 }
 
 func extractPhoneFromJIDLocal(jid string) string {

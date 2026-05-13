@@ -123,41 +123,81 @@ func (q *AgentReplyQueue) worker(instanceID string, ch chan AgentReplyJob) {
 			time.Sleep(fmd)
 		}
 
-		typingDelay := computeTypingDelay(job.Reply, job.Pace, job.PaceSettingsJSON)
-		_ = client.SendTyping(job.ToJID, true)
-		time.Sleep(typingDelay)
+		// Quebra a resposta em "balões" separados por linha em branco.
+		// Cada balão vai como mensagem própria, com "digitando…" + delay
+		// proporcional ao tamanho dele + mini-pausa entre balões. Mimetiza
+		// humano que digita ideia, manda, e digita a próxima — em vez de
+		// um parágrafão único.
+		bubbles := splitBubbles(job.Reply)
+		for idx, bubble := range bubbles {
+			typingDelay := computeTypingDelay(bubble, job.Pace, job.PaceSettingsJSON)
+			_ = client.SendTyping(job.ToJID, true)
+			time.Sleep(typingDelay)
 
-		msgID, err := client.SendTextMessage(job.ToJID, job.Reply)
-		if err != nil {
-			log.Error().Err(err).
-				Str("instance", instanceID).
-				Str("to", job.ToJID).
-				Msg("agent-reply-queue: send falhou")
-		} else {
-			if q.manager != nil {
-				_ = q.manager.SaveMessageEx(whatsapp.SaveMessageInput{
-					InstanceID:        instanceID,
-					ToJID:             job.ToJID,
-					Content:           job.Reply,
-					Direction:         models.DirectionOut,
-					Type:              "text",
-					ExternalMessageID: msgID,
-				})
+			msgID, err := client.SendTextMessage(job.ToJID, bubble)
+			if err != nil {
+				log.Error().Err(err).
+					Str("instance", instanceID).
+					Str("to", job.ToJID).
+					Msg("agent-reply-queue: send falhou")
+			} else {
+				if q.manager != nil {
+					_ = q.manager.SaveMessageEx(whatsapp.SaveMessageInput{
+						InstanceID:        instanceID,
+						ToJID:             job.ToJID,
+						Content:           bubble,
+						Direction:         models.DirectionOut,
+						Type:              "text",
+						ExternalMessageID: msgID,
+					})
+				}
+				log.Info().
+					Str("instance", instanceID).
+					Str("to", job.ToJID).
+					Str("agent", job.AgentName).
+					Str("pace", job.Pace).
+					Int("bubble", idx+1).
+					Int("bubbles_total", len(bubbles)).
+					Dur("typing_delay", typingDelay).
+					Msg("agent-reply-queue: enviado")
 			}
-			log.Info().
-				Str("instance", instanceID).
-				Str("to", job.ToJID).
-				Str("agent", job.AgentName).
-				Str("pace", job.Pace).
-				Dur("typing_delay", typingDelay).
-				Msg("agent-reply-queue: enviado")
+			_ = client.SendTyping(job.ToJID, false)
+			if idx < len(bubbles)-1 {
+				// Pausa curta entre balões (300-700ms) — humano não
+				// dispara duas mensagens no mesmo segundo.
+				time.Sleep(jitterMS(300, 700))
+			}
 		}
-		_ = client.SendTyping(job.ToJID, false)
 
 		// Cooldown entre mensagens consecutivas, escalado pelo pace.
 		minCD, maxCD := cooldownRange(job.Pace, job.PaceSettingsJSON)
 		time.Sleep(jitterMS(minCD, maxCD))
 	}
+}
+
+// splitBubbles — separa a reply em mensagens-balão. Critério primário:
+// linhas em branco (o prompt instrui o LLM a usar \n\n como separador).
+// Limite defensivo: máx 4 balões — se vier mais, junta os excedentes
+// pra evitar rajada que dispara antispam do WhatsApp.
+func splitBubbles(reply string) []string {
+	parts := strings.Split(reply, "\n\n")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		out = append(out, p)
+	}
+	if len(out) == 0 {
+		return []string{strings.TrimSpace(reply)}
+	}
+	const maxBubbles = 4
+	if len(out) > maxBubbles {
+		tail := strings.Join(out[maxBubbles-1:], "\n\n")
+		out = append(out[:maxBubbles-1], tail)
+	}
+	return out
 }
 
 // paceProfile — multipliers + floors por modo. Mantido em uma função

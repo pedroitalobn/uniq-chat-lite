@@ -141,7 +141,7 @@ type InstanceAgent struct {
 	Skills                  string           `gorm:"type:text;default:'[]'" json:"skills,omitempty"`
 	AppAccess               string           `gorm:"type:text;default:'[]'" json:"app_access,omitempty"`
 	RAGEnabled              bool             `gorm:"default:true" json:"rag_enabled"`
-	IsActive                bool             `gorm:"default:false" json:"is_active"`
+	IsActive                bool             `gorm:"default:true" json:"is_active"`
 	// Multi-agente — Role classifica a função (atendimento/fechamento/pós-venda),
 	// Priority desempata quando múltiplos podem responder, IsPrimary marca o
 	// fallback quando a conversa ainda não tem agente pinado.
@@ -223,6 +223,27 @@ type InstanceAgent struct {
 	//   "balanced"  → mistura — detalha quando precisa (default)
 	//   "detailed"  → respostas completas e didáticas
 	ResponseLength string `gorm:"type:varchar(20);default:'balanced'" json:"response_length,omitempty"`
+	// MessageBatching — debounce de mensagens sequenciais antes de responder.
+	// Humano não responde linha por linha quando o outro lado manda "oi" "tudo
+	// bem?" "queria saber X" em 3 mensagens em 5 segundos: ele LÊ tudo e
+	// responde uma vez. Aqui modelamos isso:
+	//   "off"     → comportamento legado, responde cada mensagem na hora.
+	//   "smart"   → aguarda ~6s de silêncio depois da última msg (default).
+	//                Cada msg nova resetа o timer. Quando o cliente para,
+	//                processamos o bloco todo de uma vez.
+	//   "patient" → aguarda ~15s. Bom pra clientes que digitam devagar ou
+	//                mandam áudios entremeados.
+	MessageBatching string `gorm:"type:varchar(20);default:'smart'" json:"message_batching,omitempty"`
+	// AudioReplyMode — como o agente responde mensagens recebidas em áudio
+	// (e, no caso "always", também as recebidas em texto):
+	//   "text"        → sempre responde em texto (default).
+	//   "audio"       → sempre tenta responder em áudio (TTS); se voz não
+	//                    estiver configurada ou TTS falhar, faz fallback
+	//                    pra texto automaticamente.
+	//   "match_input" → espelha o tipo da mensagem do cliente: áudio in →
+	//                    áudio out (com fallback pra texto); texto in →
+	//                    texto out.
+	AudioReplyMode string `gorm:"type:varchar(20);default:'text'" json:"audio_reply_mode,omitempty"`
 	// n8n / webhook passthrough
 	WebhookURL    string `gorm:"type:varchar(255)" json:"webhook_url,omitempty"`
 	WebhookSecret string `gorm:"type:varchar(255)" json:"webhook_secret,omitempty"`

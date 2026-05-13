@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { Settings, Sparkles, Loader2, Save, Power, MessageSquareDashed } from "lucide-react";
+import { Settings, Sparkles, Loader2, Save, Power, MessageSquareDashed, ScrollText } from "lucide-react";
 import { AgentFormProvider, useAgentFormContext } from "../../_shared/AgentFormContext";
 import { ChatPreviewPanel } from "./_components/ChatPreviewPanel";
 
@@ -27,6 +27,8 @@ function Inner({ children }: { children: React.ReactNode }) {
     useAgentFormContext();
   const isPrimary = params.agentId === "primary";
   const isSettings = pathname.endsWith("/settings");
+  const isLogs = pathname.endsWith("/logs");
+  const isStudio = !isSettings && !isLogs;
   const agentName = form.agent_name || (isPrimary ? "Agente primário" : "Agente");
   const active = !!form.is_active;
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -78,7 +80,7 @@ function Inner({ children }: { children: React.ReactNode }) {
         <div className="ml-auto flex items-center gap-1.5 flex-wrap">
           <TabLink
             href={`/agents/${params.instanceId}/${params.agentId}`}
-            active={!isSettings}
+            active={isStudio}
             icon={Sparkles}
             label="Studio"
           />
@@ -87,6 +89,12 @@ function Inner({ children }: { children: React.ReactNode }) {
             active={isSettings}
             icon={Settings}
             label="Settings"
+          />
+          <TabLink
+            href={`/agents/${params.instanceId}/${params.agentId}/logs`}
+            active={isLogs}
+            icon={ScrollText}
+            label="Logs"
           />
 
           <span className="hidden sm:block w-px h-5 mx-1" style={{ background: "var(--surface-border)" }} />

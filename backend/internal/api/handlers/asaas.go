@@ -89,12 +89,18 @@ type AsaasCustomerResponse struct {
 	ID string `json:"id"`
 }
 
+// AsaasSubscriptionRequest — payload de POST /api/v3/subscriptions.
+// IMPORTANTE: os nomes JSON têm que bater EXATAMENTE com a API Asaas v3:
+//   - billingType (era paymentMethod) — CREDIT_CARD | BOLETO | PIX | UNDEFINED.
+//   - value       (era price)         — valor da cobrança recorrente.
+// Asaas devolve invalid_billingType / invalid_value se vier qualquer outra
+// chave. "plan" é opcional/ignorado em assinatura recorrente — mantemos
+// como referência interna em externalReference.
 type AsaasSubscriptionRequest struct {
 	Customer          string  `json:"customer"`
-	Plan              string  `json:"plan"`
-	Price             float64 `json:"price"`
-	Cycle             string  `json:"cycle"`         // MONTHLY
-	PaymentMethod     string  `json:"paymentMethod"` // CREDIT_CARD, BOLETO, PIX
+	BillingType       string  `json:"billingType"`
+	Value             float64 `json:"value"`
+	Cycle             string  `json:"cycle"`
 	NextDueDate       string  `json:"nextDueDate"`
 	Description       string  `json:"description,omitempty"`
 	ExternalReference string  `json:"externalReference,omitempty"`
@@ -200,10 +206,9 @@ func (h *AsaasHandler) CreateCheckout(c *fiber.Ctx) error {
 	// próximas saem automaticamente todo mês na nextDueDate.
 	subReq := AsaasSubscriptionRequest{
 		Customer:          customerID,
-		Plan:              plan.AsaasProductID, // optional reference
-		Price:             plan.Price,
+		BillingType:       "PIX",
+		Value:             plan.Price,
 		Cycle:             "MONTHLY",
-		PaymentMethod:     "PIX",
 		NextDueDate:       time.Now().AddDate(0, 0, 1).Format("2006-01-02"), // 1 dia
 		Description:       "Assinatura " + plan.Name + " — Uniq Chat",
 		ExternalReference: user.ID.String() + "|" + plan.ID.String(),
