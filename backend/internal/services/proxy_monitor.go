@@ -95,12 +95,14 @@ func (m *ProxyMonitor) testProxy(p *models.Proxy) bool {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Warn().Err(err).Str("proxy", p.Name).Msg("proxy monitor: falha no teste")
+		// Log no nível Debug — handleResult abaixo emite o WARN de transição
+		// só na primeira falha. Mantinha-se WARN a cada 5min spammando.
+		log.Debug().Err(err).Str("proxy", p.Name).Msg("proxy monitor: falha no teste")
 		return false
 	}
 	resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		log.Warn().Str("proxy", p.Name).Int("status", resp.StatusCode).Msg("proxy monitor: proxy respondeu status inválido")
+		log.Debug().Str("proxy", p.Name).Int("status", resp.StatusCode).Msg("proxy monitor: proxy respondeu status inválido")
 		return false
 	}
 	return true
