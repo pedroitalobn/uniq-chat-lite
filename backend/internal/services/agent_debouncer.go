@@ -174,16 +174,20 @@ func (d *MessageDebouncer) Cancel(instanceID, fromJID string) {
 
 // BatchingWindow mapeia o enum salvo no agente pra duração concreta.
 // "off" devolve 0 — caller deve checar antes de chamar Enqueue.
+// String vazia trata como "off" também: agentes pre-existentes ficaram
+// com a coluna vazia depois do AutoMigrate (DDL default só vale pra
+// INSERT) e queremos que eles continuem respondendo na hora — opt-in
+// explícito em "smart"/"patient" via UI.
 func BatchingWindow(mode string) time.Duration {
 	switch strings.ToLower(strings.TrimSpace(mode)) {
 	case "patient":
 		return 15 * time.Second
-	case "smart", "":
+	case "smart":
 		return 6 * time.Second
-	case "off":
+	case "off", "":
 		return 0
 	}
-	return 6 * time.Second
+	return 0
 }
 
 func bucketKey(instanceID, fromJID string) string {

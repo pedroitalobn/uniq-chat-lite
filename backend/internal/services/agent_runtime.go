@@ -124,6 +124,12 @@ func (r *AgentRuntime) handleIncomingInternal(instanceID, messageID, fromJID, fr
 				MessageType: messageType,
 				IsGroup:     isGroup,
 			}, window)
+			log.Info().
+				Str("instance", instanceID).
+				Str("agent", agent.AgentName).
+				Str("chat", fromJID).
+				Dur("window", window).
+				Msg("agent-runtime: mensagem agrupada, aguardando silêncio antes de responder")
 			return true
 		}
 	}
