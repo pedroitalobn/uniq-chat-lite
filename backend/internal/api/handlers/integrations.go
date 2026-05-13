@@ -1478,6 +1478,10 @@ func cleanAgentMessageTypes(values []string) []string {
 		"location": true, "live_location": true, "contact": true,
 		"contacts": true, "poll": true, "interactive": true,
 		"list": true, "buttons": true, "reaction": true,
+		// Tipos adicionais cobrindo todo o leque inbound do WhatsApp /
+		// canais que a Uniq integra: pagamento PIX, template HSM (WABA),
+		// carrossel (cards rolantes em WABA/Instagram).
+		"pix": true, "template": true, "carousel": true,
 	}
 	seen := map[string]bool{}
 	out := make([]string, 0, len(values))

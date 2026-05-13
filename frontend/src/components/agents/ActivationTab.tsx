@@ -473,16 +473,25 @@ const TRIGGER_PRESETS: Array<{ id: TriggerMode; title: string; desc: string; ico
   { id: "webhook", title: "Por webhook (integração)",     desc: "Não responde mensagens normais. Inicia conversa ao receber POST no endpoint dedicado.",     icon: Webhook },
 ];
 
+// 15 tipos cobrindo todo o leque inbound dos canais que a Uniq integra
+// (WhatsApp pessoal, WABA, Instagram). Renderizado em grid 5×3 — ordem
+// importa: agrupado por afinidade (texto → mídia → engajamento → comércio).
 const MESSAGE_TYPE_OPTIONS: Array<{ id: string; label: string; desc: string }> = [
-  { id: "text", label: "Texto", desc: "Mensagens comuns e respostas digitadas." },
-  { id: "image", label: "Imagem", desc: "Fotos com ou sem legenda." },
-  { id: "video", label: "Vídeo", desc: "Vídeos recebidos pelo WhatsApp." },
-  { id: "audio", label: "Áudio", desc: "Áudios e voice notes." },
-  { id: "document", label: "Documento", desc: "PDFs, arquivos e anexos." },
-  { id: "sticker", label: "Sticker", desc: "Figurinhas." },
-  { id: "location", label: "Localização", desc: "Localização fixa." },
-  { id: "contact", label: "Contato", desc: "Cartões de contato/vCard." },
-  { id: "poll", label: "Enquete", desc: "Votações e polls." },
+  { id: "text",      label: "Texto",       desc: "Mensagens comuns e respostas digitadas." },
+  { id: "image",     label: "Imagem",      desc: "Fotos com ou sem legenda." },
+  { id: "document",  label: "Documento",   desc: "PDFs, arquivos e anexos." },
+  { id: "audio",     label: "Áudio",       desc: "Áudios e voice notes." },
+  { id: "video",     label: "Vídeo",       desc: "Vídeos recebidos pelo canal." },
+  { id: "location",  label: "Localização", desc: "Localização fixa ou em tempo real." },
+  { id: "contact",   label: "Contato",     desc: "Cartões de contato/vCard." },
+  { id: "reaction",  label: "Reação",      desc: "Emoji-reações em mensagens enviadas." },
+  { id: "poll",      label: "Enquete",     desc: "Votações e polls." },
+  { id: "sticker",   label: "Sticker",     desc: "Figurinhas." },
+  { id: "buttons",   label: "Botões",      desc: "Resposta a botões de quick reply." },
+  { id: "pix",       label: "PIX",         desc: "Pagamento PIX recebido pelo cliente." },
+  { id: "template",  label: "Template",    desc: "Resposta a mensagem template (WABA HSM)." },
+  { id: "list",      label: "Lista",       desc: "Resposta a mensagem lista." },
+  { id: "carousel",  label: "Carrossel",   desc: "Resposta a cards de carrossel." },
 ];
 
 function TriggerSection({
@@ -573,7 +582,11 @@ function TriggerSection({
               {selectedTypes.length} ativo{selectedTypes.length !== 1 ? "s" : ""}
             </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          {/* Grid 5×3 — 3 colunas em mobile (carregando, MESSAGE_TYPE_OPTIONS
+              tem 15 itens, então cai naturalmente em 5 linhas), 5 colunas
+              em telas md+. Cards ficam menores que a versão anterior pra
+              caber a grid completa sem rolagem. */}
+          <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
             {MESSAGE_TYPE_OPTIONS.map((option) => {
               const active = selectedTypes.includes(option.id);
               return (
@@ -581,14 +594,15 @@ function TriggerSection({
                   key={option.id}
                   type="button"
                   onClick={() => toggleType(option.id)}
-                  className="text-left rounded-lg p-3 transition"
+                  title={option.desc}
+                  className="text-left rounded-lg p-2 transition"
                   style={{
                     background: active ? "rgba(0,212,106,0.07)" : "var(--surface-3)",
                     border: `1px solid ${active ? "rgba(0,212,106,0.28)" : "var(--surface-border)"}`,
                   }}
                 >
                   <p className="text-xs font-medium" style={{ color: "var(--text-1)" }}>{option.label}</p>
-                  <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>{option.desc}</p>
+                  <p className="text-[10px] mt-0.5 line-clamp-2" style={{ color: "var(--text-3)" }}>{option.desc}</p>
                 </button>
               );
             })}
