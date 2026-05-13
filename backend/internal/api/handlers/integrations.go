@@ -901,6 +901,7 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 			TriggerMessageTypes: `["text"]`,
 			EditorRoleIDs:       "[]",
 			RAGEnabled:          true,
+			IsActive:            true,
 			IsPrimary:           true,
 			Role:                "primary",
 			Priority:            100,

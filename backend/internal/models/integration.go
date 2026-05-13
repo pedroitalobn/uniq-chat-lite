@@ -141,7 +141,7 @@ type InstanceAgent struct {
 	Skills                  string           `gorm:"type:text;default:'[]'" json:"skills,omitempty"`
 	AppAccess               string           `gorm:"type:text;default:'[]'" json:"app_access,omitempty"`
 	RAGEnabled              bool             `gorm:"default:true" json:"rag_enabled"`
-	IsActive                bool             `gorm:"default:false" json:"is_active"`
+	IsActive                bool             `gorm:"default:true" json:"is_active"`
 	// Multi-agente — Role classifica a função (atendimento/fechamento/pós-venda),
 	// Priority desempata quando múltiplos podem responder, IsPrimary marca o
 	// fallback quando a conversa ainda não tem agente pinado.
