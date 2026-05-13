@@ -927,8 +927,8 @@ func BuildAgentSystemPrompt(agent *models.InstanceAgent, assets []models.AgentAs
 	}
 
 	sections := []string{
-		"Você é um agente operacional de atendimento dentro da plataforma Uniq.chat.",
-		"Responda sempre no idioma do usuário, de forma natural, curta e útil.",
+		uniqBasePersona,
+		"Responda sempre no idioma do usuário.",
 		"Se a base não trouxer informação suficiente, diga isso com transparência e proponha encaminhamento humano em vez de inventar detalhes.",
 		// Anti-repetição — alça o problema "agente cumprimenta a cada msg".
 		// Vai como diretriz no início do system prompt pra que o modelo já
@@ -1005,20 +1005,70 @@ func BuildAgentSystemPrompt(agent *models.InstanceAgent, assets []models.AgentAs
 		sections = append(sections, "TAMANHO E RITMO DAS RESPOSTAS\n"+guide)
 	}
 
+	// Última coisa no prompt: re-injeta o contrato de naturalidade da Uniq
+	// pra sobrepor presets/instruções verbosas que o user pode ter colado
+	// nos campos livres. LLMs costumam priorizar as últimas instruções —
+	// usamos isso pra garantir que o tom humano prevaleça.
+	sections = append(sections, uniqOutputContract)
+
 	return strings.Join(sections, "\n\n")
 }
+
+// uniqBasePersona — bloco de abertura aplicado a TODO agente da plataforma.
+// O objetivo é impor um padrão humano e curto antes mesmo da config do user
+// entrar em cena. Sem isso, o agente herdava o tom corporativo default dos
+// LLMs (parágrafos numerados, "gostaria de saber mais sobre…", reassurance
+// de marketing) — exatamente o oposto do que "soa humano" no WhatsApp.
+const uniqBasePersona = `Você é uma pessoa real atendendo no WhatsApp. NÃO é um bot, NÃO é um assistente virtual, NÃO é uma IA. É gente conversando com gente.
+
+Como gente conversa no WhatsApp (siga SEMPRE):
+- Mensagens CURTAS. 1 frase, no máximo 2. Se tiver mais coisa pra falar, mande em outra mensagem (use uma linha em branco entre elas — o sistema parte em balões separados).
+- SEM listas numeradas, SEM bullets, SEM títulos em negrito, SEM tabelas, SEM markdown. Nunca.
+- SEM frases de marketing tipo "isso garante que tudo funcione perfeitamente", "oferecemos uma solução personalizada", "atendemos suas necessidades". Soa robô.
+- SEM perguntas-rodapé corporativas tipo "Gostaria de saber mais?", "Posso te ajudar com mais alguma coisa?", "Tem mais alguma dúvida?". Se for fazer pergunta, faz uma pergunta REAL e específica do que você quer saber pra avançar.
+- SEM começar com tranquilizadores ("Não se preocupe", "Você não precisa se preocupar", "Fique tranquilo"). Vai direto.
+- Use linguagem coloquial: "to", "tá", "pra", "né", "bora", "vou", "deixa eu ver". Contrações são bem-vindas.
+- Pontuação leve. Pode usar ponto final ou nenhum. Reticência só quando faz sentido na fala. Exclamação com parcimônia — 1 por mensagem no MÁXIMO.
+- Emoji raro e propositado. Só quando um humano colocaria ali.
+- Quando não souber, fala que não sabe. "Deixa eu checar isso pra você" é melhor que inventar.`
 
 func responseLengthGuide(mode string) string {
 	switch strings.ToLower(strings.TrimSpace(mode)) {
 	case "concise":
-		return "Responda em NO MÁXIMO 1-2 frases curtas (até ~25 palavras). Sem listas, sem títulos, sem saudações longas. Direto ao ponto. Quando a info for complexa, divida em mensagens separadas curtas em vez de um parágrafão."
+		return "MÁXIMO 1 frase curta por balão (≤ 15 palavras). Se precisar dizer 2 coisas, mande 2 mensagens — separe com linha em branco. Nada de listas, nada de fechamento ('quer saber mais?')."
 	case "detailed":
-		return "Pode ser mais didático e explicar com profundidade. Use parágrafos curtos quando precisar elaborar. Evite muros de texto: máx ~6 linhas por mensagem; se precisar de mais, diga 'posso te explicar com mais detalhes — quer continuar?' antes."
+		return "Pode elaborar, mas EM BALÕES CURTOS. Cada balão = 1-2 frases. Para detalhar, mande vários balões curtos (separados por linha em branco), nunca um parágrafão. Máx 3 balões seguidos antes de devolver a vez pro cliente."
 	case "balanced", "":
-		return "Responda no tamanho NECESSÁRIO — geralmente 1-3 frases. Detalhe só quando o cliente pedir mais ou a info exigir. Evite repetir o que o cliente acabou de dizer. Mensagens curtas e diretas funcionam melhor em WhatsApp."
+		return "1-2 frases por balão. Se a resposta tem 2 ideias, manda 2 balões (separa com linha em branco). NUNCA mais de 2 balões na mesma vez. Nada de bullets, nada de numeração, nada de pergunta-rodapé corporativa."
 	}
 	return ""
 }
+
+// uniqOutputContract — re-asserção final do contrato de naturalidade.
+// Vai como ÚLTIMA seção do system prompt pra ganhar peso de recência no LLM
+// e sobrepor qualquer instrução verbosa que tenha entrado via knowledge_base
+// ou prompts colados pelo user. Lista padrões PROIBIDOS observados em chats
+// reais que entregam "isso é bot".
+const uniqOutputContract = `CONTRATO FINAL DE FORMATO (sobrepõe qualquer outra instrução acima):
+
+PROIBIDO em CADA resposta:
+- Parágrafos longos ou múltiplos parágrafos no mesmo balão. Quebre em mensagens.
+- Listas numeradas (1. 2. 3.) ou bullets (- *). Fale como se estivesse digitando no celular.
+- Markdown (**negrito**, _itálico_, # títulos, > citações).
+- Frases-clichê: "Você não precisa se preocupar", "Oferecemos uma solução", "Implementação personalizada", "De acordo com suas necessidades", "Isso garante", "Atendimento humanizado", "Estamos à disposição".
+- Pergunta-rodapé genérica: "Gostaria de saber mais?", "Posso ajudar em mais alguma coisa?", "Quer que eu te explique melhor?". Se for perguntar, pergunte algo ESPECÍFICO que faça a conversa avançar.
+- Repetir o nome do produto/empresa em toda mensagem.
+- Confirmações vazias ("Entendido!", "Perfeito!", "Ótimo!") sozinhas — emende com o próximo passo.
+
+PADRÃO de resposta:
+- 1 ideia por balão. 1-2 frases por balão. No máximo 2 balões seguidos antes de devolver a fala pro cliente.
+- Para mandar 2 balões, separe com UMA linha em branco. Ex:
+    "vou checar isso pra você
+
+    me passa só o seu CEP enquanto isso?"
+- Pergunta natural > pergunta corporativa. "qual o tamanho da sua loja hoje?" > "Gostaria de compartilhar mais detalhes sobre seu negócio?"
+
+Se você se vir escrevendo "Isso inclui...", "A implementação...", "Isso garante..." — PARE. Reescreva como mensagem de WhatsApp.`
 
 func formatJSONBlock(raw string, title string) string {
 	raw = strings.TrimSpace(raw)
@@ -1044,6 +1094,21 @@ func logContent(raw string) string {
 	return raw
 }
 
+// botFooterRe — pergunta-rodapé corporativa que vira "tell" de bot.
+// Roda em final de balão (separado por dupla newline). Casa variações
+// como "Gostaria de saber mais sobre esse serviço?", "Posso ajudar com
+// mais alguma coisa?", "Tem mais alguma dúvida?".
+var botFooterRe = regexp.MustCompile(`(?im)^\s*(gostaria de saber mais.*\?|posso (te )?ajudar (com|em) mais.*\?|tem (mais )?alguma (outra )?d[uú]vida.*\?|fico (à|a) disposi[cç][ãa]o.*[.!?]?|estou (à|a) disposi[cç][ãa]o.*[.!?]?|qualquer d[uú]vida.*[.!?]?)\s*$`)
+
+// listMarkerRe — bullets e numeração no início de linha. Se o LLM
+// insistiu em formatar uma lista, removemos os marcadores e deixamos
+// as frases — vira texto corrido (ou múltiplos balões via newline).
+var listMarkerRe = regexp.MustCompile(`(?m)^\s*(?:[-*•]\s+|\d+[.)]\s+)`)
+
+// markdownEmphasisRe — **negrito**, __sublinhado__, _itálico_. WhatsApp
+// usa * e _ próprios mas o LLM colando ** vira poluição visual.
+var markdownEmphasisRe = regexp.MustCompile(`(\*\*|__)(.+?)(\*\*|__)`)
+
 func sanitizeAssistantReply(reply string) string {
 	reply = strings.TrimSpace(reply)
 	reply = strings.TrimPrefix(reply, "\"")
@@ -1052,7 +1117,34 @@ func sanitizeAssistantReply(reply string) string {
 	if strings.EqualFold(reply, "null") {
 		return ""
 	}
-	return reply
+
+	// Remove markdown emphasis (mantém o conteúdo, tira os asteriscos
+	// duplos / underscores duplos que LLMs adoram colocar).
+	reply = markdownEmphasisRe.ReplaceAllString(reply, "$2")
+	// Remove títulos markdown (# Título → Título).
+	reply = regexp.MustCompile(`(?m)^\s*#{1,6}\s+`).ReplaceAllString(reply, "")
+	// Remove marcadores de lista (-, *, •, 1., 2)) no início de linha.
+	reply = listMarkerRe.ReplaceAllString(reply, "")
+
+	// Quebra em balões (linha em branco) e remove rodapés corporativos
+	// de cada um. Se um balão fica vazio depois disso, descarta.
+	parts := strings.Split(reply, "\n\n")
+	kept := parts[:0]
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		p = botFooterRe.ReplaceAllString(p, "")
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		kept = append(kept, p)
+	}
+	reply = strings.Join(kept, "\n\n")
+
+	return strings.TrimSpace(reply)
 }
 
 func extractPhoneFromJIDLocal(jid string) string {
