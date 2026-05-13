@@ -25,11 +25,19 @@ type LogItem = {
 };
 
 const SKIP_REASON_LABELS: Record<string, string> = {
-  no_llm:                 "Sem LLM disponível",
-  instance_disconnected:  "Instância desconectada",
-  trigger_no_match:       "Mensagem não bateu com palavras-chave",
-  trigger_webhook_only:   "Modo webhook — não responde inbound",
-  outside_window:         "Fora da janela de ativação",
+  no_llm:                       "Sem LLM disponível",
+  instance_disconnected:        "Instância desconectada",
+  trigger_no_match:             "Mensagem não bateu com palavras-chave",
+  trigger_webhook_only:         "Modo webhook — não responde inbound",
+  outside_window:               "Fora da janela de ativação",
+  // Slugs emitidos hoje pelo runtime que estavam sem tradução — caíam no
+  // UI como o slug bruto, dificultando diagnóstico.
+  outside_activation_window:    "Fora da janela de ativação",
+  message_type_not_allowed:     "Tipo de mensagem não habilitado",
+  agent_inactive:               "Agente está desligado",
+  no_active_agent:              "Nenhum agente ativo na instância",
+  human_took_over:              "Humano assumiu a conversa",
+  bot_disabled_in_conversation: "Bot desligado nesta conversa",
 };
 
 export function AgentLogsTab({
