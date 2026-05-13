@@ -22,14 +22,15 @@ type AgentRuntime struct {
 	manager    *whatsapp.Manager
 	llm        *LLMService
 	tts        *TTSService
-	replyQueue *AgentReplyQueue // jitter + serialização por instância (anti-ban)
+	replyQueue *AgentReplyQueue  // jitter + serialização por instância (anti-ban)
+	debouncer  *MessageDebouncer // agrupa mensagens sequenciais antes de responder
 
 	seenMu   sync.Mutex
 	seenMsgs map[string]time.Time
 }
 
 func NewAgentRuntime(db *gorm.DB, manager *whatsapp.Manager, llm *LLMService, tts *TTSService) *AgentRuntime {
-	return &AgentRuntime{
+	r := &AgentRuntime{
 		db:         db,
 		manager:    manager,
 		llm:        llm,
@@ -37,10 +38,31 @@ func NewAgentRuntime(db *gorm.DB, manager *whatsapp.Manager, llm *LLMService, tt
 		replyQueue: NewAgentReplyQueue(manager),
 		seenMsgs:   make(map[string]time.Time),
 	}
+	r.debouncer = NewMessageDebouncer(r.handleBatched)
+	return r
 }
 
-// HandleIncoming replies with the configured instance agent when no journey consumed the message.
+// handleBatched é o callback do debouncer. Reentra em HandleIncoming pela
+// mesma porta, mas com flag bypassBatching=true pra não cair em loop. O
+// texto agregado já é o concatenado das mensagens do bucket; o messageID
+// é o último (que serve de chave de dedup downstream).
+func (r *AgentRuntime) handleBatched(p BatchPayload) {
+	r.handleIncomingInternal(
+		p.InstanceID, p.MessageID, p.FromJID, p.FromName, p.GroupJID,
+		p.Text, p.MessageType, p.IsGroup, true,
+	)
+}
+
+// HandleIncoming é a porta de entrada chamada pelo Manager. Decide entre
+// debouncing (agrupar mensagens sequenciais e responder uma vez) e
+// processamento direto. Quando batching estiver ativo no agente, esta
+// função enfileira no MessageDebouncer e retorna true imediatamente —
+// o flush real acontece via handleBatched() depois da janela de silêncio.
 func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) bool {
+	return r.handleIncomingInternal(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType, isGroup, false)
+}
+
+func (r *AgentRuntime) handleIncomingInternal(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType string, isGroup, bypassBatching bool) bool {
 	if r == nil || r.db == nil || r.llm == nil {
 		return false
 	}
@@ -59,7 +81,9 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 	if strings.HasPrefix(text, "/") {
 		return false
 	}
-	if r.seenRecently(instanceID, messageID) {
+	// Quando o debouncer flushar (bypassBatching=true), o messageID já foi
+	// "visto" no Enqueue inicial. Pular o dedup aqui evita matar o flush.
+	if !bypassBatching && r.seenRecently(instanceID, messageID) {
 		log.Debug().Str("instance", instanceID).Str("msg", messageID).Msg("agent-runtime: dedup — mensagem já processada")
 		return false
 	}
@@ -81,6 +105,29 @@ func (r *AgentRuntime) HandleIncoming(instanceID, messageID, fromJID, fromName, 
 		r.logSkippedNoAgent(instUUID, text, started, fromJID)
 		return false
 	}
+
+	// Debounce / message batching — quando habilitado, em vez de responder
+	// agora, acumulamos a mensagem num bucket e (re)programamos o flush.
+	// Mensagens novas dentro da janela resetam o timer; só quando o cliente
+	// "para de digitar" (silêncio > window) chamamos o LLM com o texto
+	// agregado. Mimetiza humano lendo o burst todo antes de responder.
+	// bypassBatching=true vem do próprio debouncer; evita loop infinito.
+	if !bypassBatching {
+		if window := BatchingWindow(agent.MessageBatching); window > 0 {
+			r.debouncer.Enqueue(BatchPayload{
+				InstanceID:  instanceID,
+				MessageID:   messageID,
+				FromJID:     fromJID,
+				FromName:    fromName,
+				GroupJID:    groupJID,
+				Text:        text,
+				MessageType: messageType,
+				IsGroup:     isGroup,
+			}, window)
+			return true
+		}
+	}
+
 	if !agentAllowsMessageType(agent.TriggerMessageTypes, messageType) {
 		log.Debug().
 			Str("instance", instanceID).

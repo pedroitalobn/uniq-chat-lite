@@ -633,6 +633,7 @@ func (h *IntegrationHandler) GetAgent(c *fiber.Ctx) error {
 		"response_pace":            agent.ResponsePace,
 		"response_length":          agent.ResponseLength,
 		"audio_reply_mode":         agent.AudioReplyMode,
+		"message_batching":         agent.MessageBatching,
 		"access_restricted":        agent.AccessRestricted,
 		"editor_role_ids":          safeJSONArray(agent.EditorRoleIDs),
 		"created_at":               agent.CreatedAt,
@@ -869,10 +870,11 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		TriggerMessageTypes  *[]string `json:"trigger_message_types"`
 		TriggerWebhookSecret *string   `json:"trigger_webhook_secret"`
 		// Ritmo e tamanho das respostas.
-		ResponsePace   *string `json:"response_pace"`
-		ResponseLength *string `json:"response_length"`
-		AudioReplyMode *string `json:"audio_reply_mode"`
-		PaceSettings   *string `json:"pace_settings"`
+		ResponsePace    *string `json:"response_pace"`
+		ResponseLength  *string `json:"response_length"`
+		AudioReplyMode  *string `json:"audio_reply_mode"`
+		MessageBatching *string `json:"message_batching"`
+		PaceSettings    *string `json:"pace_settings"`
 		// Acesso da equipe — quem do workspace pode editar este agente.
 		// AccessRestricted=false (default) preserva comportamento legado.
 		AccessRestricted *bool     `json:"access_restricted"`
@@ -1115,6 +1117,12 @@ func (h *IntegrationHandler) UpdateAgent(c *fiber.Ctx) error {
 		switch strings.ToLower(strings.TrimSpace(*req.AudioReplyMode)) {
 		case "text", "audio", "match_input":
 			agent.AudioReplyMode = strings.ToLower(*req.AudioReplyMode)
+		}
+	}
+	if req.MessageBatching != nil {
+		switch strings.ToLower(strings.TrimSpace(*req.MessageBatching)) {
+		case "off", "smart", "patient":
+			agent.MessageBatching = strings.ToLower(*req.MessageBatching)
 		}
 	}
 	if req.PaceSettings != nil {

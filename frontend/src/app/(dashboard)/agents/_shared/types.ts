@@ -66,6 +66,10 @@ export type AgentForm = {
   // não estiver configurada. "match_input" → espelha o canal da última
   // mensagem do cliente.
   audio_reply_mode: "text" | "audio" | "match_input";
+  // Debounce de mensagens sequenciais — agrupa rajadas do cliente antes
+  // de chamar o LLM. "off" responde linha-por-linha; "smart" espera
+  // ~6s de silêncio (default, recomendado); "patient" espera ~15s.
+  message_batching: "off" | "smart" | "patient";
   pace_settings: string;
   // Acesso da equipe — quando access_restricted=true, só os papéis
   // listados em editor_role_ids (+ dono do workspace + super-admin)
@@ -133,6 +137,7 @@ export function emptyForm(): AgentForm {
     response_pace: "natural",
     response_length: "balanced",
     audio_reply_mode: "text",
+    message_batching: "smart",
     pace_settings: "{}",
     access_restricted: false,
     editor_role_ids: [],
@@ -223,6 +228,9 @@ export function mapAgent(data: any): AgentForm {
     audio_reply_mode: ["text", "audio", "match_input"].includes(data?.audio_reply_mode)
       ? data.audio_reply_mode
       : "text",
+    message_batching: ["off", "smart", "patient"].includes(data?.message_batching)
+      ? data.message_batching
+      : "smart",
     pace_settings: typeof data?.pace_settings === "string" ? data.pace_settings : "{}",
     access_restricted: !!data?.access_restricted,
     editor_role_ids: parseJSONArray<string[]>(data?.editor_role_ids, []),
