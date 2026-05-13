@@ -1664,10 +1664,23 @@ func (m *Manager) CheckJourneys(instanceID, messageID, fromJID, fromName, groupJ
 // HandleIncomingAutomation runs journeys first and only falls back to the
 // instance agent when no journey consumed the incoming message.
 func (m *Manager) HandleIncomingAutomation(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) {
+	log.Debug().
+		Str("instance", instanceID).
+		Str("from", fromJID).
+		Str("type", messageType).
+		Bool("group", isGroup).
+		Int("text_len", len(messageText)).
+		Msg("automation: inbound recebido")
 	if m.IsInstancePaused(instanceID) {
+		log.Info().Str("instance", instanceID).Str("from", fromJID).Msg("automation: instância pausada — descartando inbound")
 		return
 	}
 	if !m.shouldRunAutomation(instanceID, fromJID, groupJID, messageType) {
+		log.Info().
+			Str("instance", instanceID).
+			Str("from", fromJID).
+			Str("type", messageType).
+			Msg("automation: shouldRunAutomation rejeitou — confira message_type ou loop-de-instância")
 		return
 	}
 	handledByJourney := false
@@ -1724,8 +1737,19 @@ func (m *Manager) isManagedWhatsAppSender(currentInstanceID, fromJID string) boo
 		if phone == "" {
 			continue
 		}
-		if phone == fromPhone || strings.HasSuffix(fromPhone, phone) || strings.HasSuffix(phone, fromPhone) {
+		// Match estrito: ou os números são idênticos, ou um é claramente um
+		// "tail" do outro com pelo menos 10 dígitos em comum (E.164 com DDD
+		// brasileiro tem 12-13 dígitos; suffix de 10 cobre prefixo do país
+		// variável sem falsamente capturar números de clientes que
+		// terminam com poucos dígitos parecidos).
+		const minSuffix = 10
+		if phone == fromPhone {
 			return true
+		}
+		if len(fromPhone) >= minSuffix && len(phone) >= minSuffix {
+			if strings.HasSuffix(fromPhone, phone) || strings.HasSuffix(phone, fromPhone) {
+				return true
+			}
 		}
 	}
 	return false
