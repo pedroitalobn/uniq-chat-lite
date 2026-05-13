@@ -16,10 +16,12 @@ import (
 )
 
 const (
-	// avatarDownloadTimeout é o timeout máximo para baixar um avatar do CDN.
-	// A Meta pode responder lentamente em regiões distantes; 60s dá margem
-	// suficiente sem travar o caller indefinidamente.
-	avatarDownloadTimeout = 60 * time.Second
+	// avatarAttemptTimeout é o budget por tentativa individual de download.
+	// Meta CDN ou responde em <10s ou é um problema — esticar não ajuda.
+	avatarAttemptTimeout = 15 * time.Second
+
+	// avatarUploadTimeout é o budget pro upload pra storage local.
+	avatarUploadTimeout = 20 * time.Second
 
 	// avatarMaxRetries é o número de tentativas de download em caso de falha.
 	avatarMaxRetries = 2
@@ -27,6 +29,22 @@ const (
 	// avatarRetryDelay é o delay base entre retries (backoff exponencial simples).
 	avatarRetryDelay = 2 * time.Second
 )
+
+// avatarHTTPClient — http.Client dedicado pra download de avatar com
+// timeouts de socket. Sem isso o http.DefaultClient só obedece o ctx, o
+// que não impede que uma conexão TLS lenta consuma todo o budget na
+// fase de handshake.
+var avatarHTTPClient = &http.Client{
+	Timeout: avatarAttemptTimeout,
+}
+
+// isExpiredStatus — true quando o status code indica URL signed expirada
+// (401 Unauthorized, 403 Forbidden, 410 Gone). Substitui o
+// strings.Contains(err.Error(), "401|403|410") que dava falso-positivo
+// em qualquer URL que tivesse esses 3 dígitos em hashes da Meta.
+func isExpiredStatus(status int) bool {
+	return status == 401 || status == 403 || status == 410
+}
 
 // PersistAvatar — baixa os bytes da signed URL da Meta e sobe pro nosso
 // MinIO/S3, retornando uma URL permanente que o frontend pode usar pra
@@ -69,40 +87,64 @@ func PersistAvatar(ctx context.Context, jid, signedURL string) string {
 		return signedURL
 	}
 
+	// Cada attempt recebe seu próprio timeout — antes os 3 attempts + sleeps
+	// + upload compartilhavam o mesmo budget de 60s, e como o ctx do caller
+	// (cron de profile sync) já vinha com 5min compartilhados entre 400
+	// conversas, qualquer atraso da Meta saturava tudo. Agora cada attempt
+	// tem fatia exclusiva e o caller pode cancelar via ctx pai.
 	var data []byte
 	var mime string
+	var status int
 	var err error
-	downloadCtx, cancel := context.WithTimeout(ctx, avatarDownloadTimeout)
-	defer cancel()
 
 	for attempt := 0; attempt <= avatarMaxRetries; attempt++ {
+		attemptCtx, cancelAttempt := context.WithTimeout(ctx, avatarAttemptTimeout)
 		var tryData []byte
 		var tryMime string
-		tryData, tryMime, err = downloadAvatar(downloadCtx, signedURL)
+		var tryStatus int
+		tryData, tryMime, tryStatus, err = downloadAvatar(attemptCtx, signedURL)
+		cancelAttempt()
 		if err == nil {
 			data = tryData
 			mime = tryMime
+			status = tryStatus
+			break
+		}
+		// Status conhecido de URL expirada: não adianta retry — gera nova.
+		if isExpiredStatus(tryStatus) {
+			status = tryStatus
 			break
 		}
 		if attempt < avatarMaxRetries {
 			delay := avatarRetryDelay * time.Duration(attempt+1)
 			log.Warn().Err(err).Str("jid", jid).Int("attempt", attempt+1).
 				Dur("retry_in", delay).Msg("avatar: download failed, retrying")
-			time.Sleep(delay)
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				return signedURL
+			}
 		}
 	}
 	if err != nil {
-		// Se o download falhou com 401/403/410, a URL assinada expirou.
-		// Limpa o cache para forçar re-fetch de uma URL fresca na próxima
-		// mensagem ou tick do cron.
-		if strings.Contains(err.Error(), "401") || strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), "410") {
+		// Diferencia URL expirada (status 401/403/410 — gera URL nova) de
+		// outras falhas (timeout, rede). Antes a comparação era por
+		// strings.Contains(err.Error(), "401|403|410"), mas a URL signed
+		// da Meta tem dígitos aleatórios que casavam essas substrings em
+		// timeouts → falso-positivo "URL expired" em log de deadline.
+		if isExpiredStatus(status) {
 			clearAvatarCache(jid)
-			log.Warn().Err(err).Str("jid", jid).Msg("avatar: URL expired (401/403/410), cache cleared — will retry fresh URL")
+			log.Warn().Err(err).Str("jid", jid).Int("status", status).
+				Msg("avatar: URL expired, cache cleared — will retry fresh URL")
 		} else {
 			log.Warn().Err(err).Str("jid", jid).Msg("avatar: all download attempts failed, keeping signed URL temporarily")
 		}
 		return signedURL
 	}
+	// downloadCtx pra upload — limite separado dos attempts pra não ser
+	// poluído pelo backoff.
+	downloadCtx, cancel := context.WithTimeout(ctx, avatarUploadTimeout)
+	defer cancel()
 
 	// Detecta MIME pela extensão da URL ou pelo magic byte. Meta serve
 	// JPEG por padrão, mas seja conservador.
@@ -124,29 +166,31 @@ func PersistAvatar(ctx context.Context, jid, signedURL string) string {
 }
 
 // downloadAvatar — baixa os bytes do avatar com contexto de timeout.
-// Retorna os bytes, o MIME e qualquer erro.
-func downloadAvatar(ctx context.Context, signedURL string) ([]byte, string, error) {
+// Retorna os bytes, o MIME, o status HTTP (0 se a request nem completou)
+// e qualquer erro. Caller usa o status pra decidir se vale retry ou se
+// é URL expirada (401/403/410).
+func downloadAvatar(ctx context.Context, signedURL string) ([]byte, string, int, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, signedURL, nil)
 	if err != nil {
-		return nil, "", err
+		return nil, "", 0, err
 	}
 	req.Header.Set("User-Agent", "uniq-chat/1.0")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := avatarHTTPClient.Do(req)
 	if err != nil {
-		return nil, "", err
+		return nil, "", 0, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return nil, "", fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, "", resp.StatusCode, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 	// Limita tamanho — avatares são pequenos (geralmente 5-50KB). Evita
 	// abuse de URL maliciosa servindo arquivo grande. Cap em 2MB.
 	body := io.LimitReader(resp.Body, 2*1024*1024)
 	data, err := io.ReadAll(body)
 	if err != nil || len(data) == 0 {
-		return nil, "", fmt.Errorf("read body: %w", err)
+		return nil, "", resp.StatusCode, fmt.Errorf("read body: %w", err)
 	}
-	return data, resp.Header.Get("Content-Type"), nil
+	return data, resp.Header.Get("Content-Type"), resp.StatusCode, nil
 }
 
 // clearAvatarCache remove o JID do cache em memória. Chamado quando o

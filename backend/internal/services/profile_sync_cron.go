@@ -126,16 +126,25 @@ func (c *ProfileSyncCron) fillMissing(ctx context.Context, limit int) int {
 	}
 	updated := 0
 	for _, r := range rows {
+		// Aborta cedo se o ctx pai (5min do tick) foi cancelado/expirou —
+		// não faz sentido tentar mais nada.
+		if ctx.Err() != nil {
+			return updated
+		}
 		client := c.manager.GetInstance(r.InstanceID.String())
 		if client == nil || !client.IsConnected() {
 			continue
 		}
+		// Cada conversa ganha seu próprio budget de 60s, independente do
+		// ctx pai. Antes uma conversa lenta (Meta CDN engasgado) drenava
+		// os 5min do tick inteiro e todas as próximas chegavam com
+		// deadline já estourado, gerando cascata de "context deadline
+		// exceeded" no avatar download E no update do DB.
+		convCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		newAvatar := r.AvatarURL
 		if newAvatar == "" {
 			if pic := client.GetContactProfilePicture(r.ChannelKey); pic != "" {
-				// Baixa do CDN da Meta e sobe pro nosso storage — sem isso
-				// a URL signed expira em horas e o avatar some.
-				newAvatar = whatsapp.PersistAvatar(ctx, r.ChannelKey, pic)
+				newAvatar = whatsapp.PersistAvatar(convCtx, r.ChannelKey, pic)
 			}
 		}
 		newPushName := r.PushName
@@ -152,15 +161,18 @@ func (c *ProfileSyncCron) fillMissing(ctx context.Context, limit int) int {
 			patch["push_name"] = newPushName
 		}
 		if len(patch) == 0 {
+			cancel()
 			continue
 		}
-		if err := c.db.WithContext(ctx).
+		if err := c.db.WithContext(convCtx).
 			Model(&models.Conversation{}).
 			Where("id = ?", r.ID).
 			Updates(patch).Error; err != nil {
 			log.Warn().Err(err).Str("conv_id", r.ID.String()).Msg("profile sync: update conversation failed")
+			cancel()
 			continue
 		}
+		cancel()
 		// Propaga pro Contact se vinculado e ele também estiver vazio/com
 		// telefone como nome. Não sobrescreve nome editado manualmente.
 		if r.ContactID != nil {
