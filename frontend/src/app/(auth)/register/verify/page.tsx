@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   User, Building2, Lock, Eye, EyeOff,
   ArrowRight, Loader2, AlertCircle, CheckCircle2, XCircle, FileText,
-  Search, ChevronDown,
+  Search, ChevronDown, ShieldCheck, BadgeCheck, KeyRound,
 } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { Logo } from "@/components/Logo";
@@ -494,7 +494,7 @@ function CompleteForm({
       if (password.length < 8) e.password = "Mínimo 8 caracteres";
       if (confirmPassword !== password) e.confirmPassword = "Senhas não coincidem";
     }
-    if (nextStep === 3 && isPaid && asaasMethod === "credit_card") {
+    if (nextStep === 4 && isPaid && asaasMethod === "credit_card") {
       if (!card.holderName.trim()) e.cardHolder = "Nome no cartão é obrigatório";
       const num = card.number.replace(/\D/g, "");
       if (num.length < 13 || num.length > 19) e.cardNumber = "Número inválido";
@@ -512,7 +512,7 @@ function CompleteForm({
 
   // Última etapa: 3 quando plano é pago (precisa do passo de pagamento),
   // 2 quando é grátis (só senha).
-  const maxStep = isPaid ? 3 : 2;
+  const maxStep = isPaid ? 4 : 2;
 
   function nextStep() {
     if (!validateStep(step)) return;
@@ -893,49 +893,14 @@ function CompleteForm({
             exit={{ opacity: 0, x: -16 }}
             className="flex flex-col gap-4"
           >
-            {/* Resumo do plano + selo de segurança no topo */}
-            <motion.div
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 }}
-              className="rounded-2xl p-4 flex items-center justify-between"
-              style={{
-                background: "linear-gradient(135deg, rgba(0,212,106,0.10), rgba(0,212,106,0.04))",
-                border: "1px solid rgba(0,212,106,0.25)",
-              }}
-            >
-              <div>
-                <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-3)" }}>
-                  Plano selecionado
-                </p>
-                <p className="text-sm font-bold mt-0.5" style={{ color: "var(--text-1)" }}>
-                  {planLabel ?? "—"}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px]" style={{ color: "var(--text-3)" }}>Total mensal</p>
-                <p className="text-base font-bold" style={{ color: "var(--green)" }}>
-                  R$ {Number(planPriceVal ?? 0).toFixed(2).replace(".", ",")}
-                </p>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.1 }}
-              className="flex items-center justify-center gap-2 text-[11px]"
-              style={{ color: "var(--text-3)" }}
-            >
-              <Lock className="w-3 h-3" />
-              <span>Pagamento criptografado · processado pelo Asaas (PCI-DSS)</span>
-            </motion.div>
-
-            {/* Seletor de método */}
-            <div className="grid grid-cols-2 gap-2">
+            <SecureHeader planLabel={planLabel} planPriceVal={planPriceVal} />
+            <p className="text-xs text-center" style={{ color: "var(--text-3)" }}>
+              Como você prefere pagar?
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {([
-                { id: "pix_automatic", label: "PIX Automático", hint: "Autoriza 1x · débito mensal sem QR novo" },
-                { id: "credit_card", label: "Cartão de crédito", hint: "Tokenizado · cobrança recorrente" },
+                { id: "pix_automatic", label: "PIX Automático", hint: "Autoriza 1x · débito mensal sem QR novo", icon: "⚡" },
+                { id: "credit_card", label: "Cartão de crédito", hint: "Tokenizado · cobrança recorrente", icon: "💳" },
               ] as const).map((opt) => {
                 const active = asaasMethod === opt.id;
                 return (
@@ -944,21 +909,35 @@ function CompleteForm({
                     key={opt.id}
                     onClick={() => setAsaasMethod(opt.id)}
                     whileTap={{ scale: 0.98 }}
-                    className="rounded-xl p-3 text-left transition"
+                    className="rounded-xl p-4 text-left transition flex items-start gap-3"
                     style={{
                       background: active ? "rgba(0,212,106,0.10)" : "var(--surface-2)",
                       border: `1px solid ${active ? "rgba(0,212,106,0.30)" : "var(--surface-border)"}`,
                       color: active ? "var(--green)" : "var(--text-2)",
                     }}
                   >
-                    <p className="text-sm font-semibold">{opt.label}</p>
-                    <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>{opt.hint}</p>
+                    <span className="text-xl">{opt.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold">{opt.label}</p>
+                      <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>{opt.hint}</p>
+                    </div>
                   </motion.button>
                 );
               })}
             </div>
+            <TrustBadges />
+          </motion.div>
+        )}
 
-            {/* Card preview animado + form (só pra cartão) */}
+        {step === 4 && isPaid && (
+          <motion.div
+            key="step-4"
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -16 }}
+            className="flex flex-col gap-4"
+          >
+            <SecureHeader planLabel={planLabel} planPriceVal={planPriceVal} />
             <AnimatePresence mode="wait">
               {asaasMethod === "credit_card" ? (
                 <motion.div
@@ -1017,6 +996,10 @@ function CompleteForm({
                       {errors.cardHolder || errors.cardNumber || errors.cardExpiry || errors.cardCvv || errors.cardZip || errors.cardAddrNum}
                     </p>
                   )}
+                  <p className="text-[10px] text-center mt-1" style={{ color: "var(--text-4)" }}>
+                    <Lock className="inline w-3 h-3 mr-1" />
+                    Dados do cartão criptografados em trânsito (TLS 1.3) e tokenizados pelo Asaas. A Uniq Chat não armazena CVV nem número completo.
+                  </p>
                 </motion.div>
               ) : (
                 <motion.div
@@ -1025,27 +1008,26 @@ function CompleteForm({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ type: "spring", stiffness: 220, damping: 22 }}
-                  className="rounded-2xl p-4 text-xs"
+                  className="rounded-2xl p-4 text-xs space-y-3"
                   style={{ background: "var(--surface-2)", border: "1px solid var(--surface-border)", color: "var(--text-2)" }}
                 >
-                  <p className="font-semibold mb-1" style={{ color: "var(--text-1)" }}>Como funciona o PIX Automático</p>
-                  <ol className="list-decimal pl-4 space-y-1" style={{ color: "var(--text-3)" }}>
-                    <li>Você paga 1 PIX agora, que já cobre a primeira mensalidade e autoriza o débito recorrente.</li>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">⚡</span>
+                    <p className="font-semibold" style={{ color: "var(--text-1)" }}>Como funciona o PIX Automático</p>
+                  </div>
+                  <ol className="list-decimal pl-5 space-y-1.5" style={{ color: "var(--text-3)" }}>
+                    <li>No próximo passo você verá o QR Code da autorização.</li>
+                    <li>Pagando esse PIX você cobre a primeira mensalidade <em>e</em> autoriza o débito recorrente.</li>
                     <li>Os meses seguintes são debitados automaticamente — sem QR novo, sem fatura manual.</li>
-                    <li>Pode cancelar quando quiser; revogar a autorização para o débito imediatamente.</li>
+                    <li>Pode cancelar quando quiser; a autorização é revogada imediatamente.</li>
                   </ol>
+                  <p className="text-[10px] pt-1" style={{ color: "var(--text-4)" }}>
+                    Autorização PIX gerida pelo BACEN via Asaas. A Uniq Chat não tem acesso à sua chave PIX nem à sua conta bancária.
+                  </p>
                 </motion.div>
               )}
             </AnimatePresence>
-
-            {/* Selos de confiança */}
-            <div className="flex items-center justify-center gap-3 pt-1 text-[10px]" style={{ color: "var(--text-4)" }}>
-              <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> SSL/TLS</span>
-              <span>·</span>
-              <span>PCI-DSS</span>
-              <span>·</span>
-              <span>Asaas (BACEN)</span>
-            </div>
+            <TrustBadges />
           </motion.div>
         )}
       </AnimatePresence>
@@ -1079,7 +1061,14 @@ function CompleteForm({
             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#00bf60"; }}
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "#00d46a"}
           >
-            <span>{step === 2 && isPaid ? "Continuar para pagamento" : "Continuar"}</span><ArrowRight className="w-4 h-4" />
+            <span>
+              {step === 2 && isPaid
+                ? "Continuar para pagamento"
+                : step === 3 && isPaid
+                  ? (asaasMethod === "credit_card" ? "Inserir dados do cartão" : "Ver QR Code do PIX")
+                  : "Continuar"}
+            </span>
+            <ArrowRight className="w-4 h-4" />
           </button>
         ) : (
           <button
@@ -1372,5 +1361,84 @@ function AnimatedCardPreview({ card }: { card: { holderName: string; number: str
         </div>
       </div>
     </motion.div>
+  );
+}
+
+// SecureHeader — banner do topo do checkout. Combina o resumo do plano
+// com um selo grande de "Pagamento seguro" pra reforçar confiança em
+// cada subetapa do pagamento (método + form).
+function SecureHeader({ planLabel, planPriceVal }: { planLabel?: string; planPriceVal?: number }) {
+  return (
+    <div className="space-y-2">
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="rounded-2xl p-4 flex items-center justify-between"
+        style={{
+          background: "linear-gradient(135deg, rgba(0,212,106,0.10), rgba(0,212,106,0.04))",
+          border: "1px solid rgba(0,212,106,0.25)",
+        }}
+      >
+        <div>
+          <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-3)" }}>
+            Plano selecionado
+          </p>
+          <p className="text-sm font-bold mt-0.5" style={{ color: "var(--text-1)" }}>
+            {planLabel ?? "—"}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px]" style={{ color: "var(--text-3)" }}>Total mensal</p>
+          <p className="text-base font-bold" style={{ color: "var(--green)" }}>
+            R$ {Number(planPriceVal ?? 0).toFixed(2).replace(".", ",")}
+          </p>
+        </div>
+      </motion.div>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.1 }}
+        className="flex items-center justify-center gap-2 text-[11px]"
+        style={{ color: "var(--text-3)" }}
+      >
+        <ShieldCheck className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
+        <span>Pagamento criptografado · processado pelo Asaas (autorizado pelo BACEN)</span>
+      </motion.div>
+    </div>
+  );
+}
+
+// TrustBadges — selos compactos de certificação/segurança. Reforça
+// percepção em cada step do pagamento.
+function TrustBadges() {
+  return (
+    <div className="space-y-2 pt-1">
+      <div className="grid grid-cols-4 gap-2 text-[10px]">
+        {[
+          { icon: Lock,        label: "SSL/TLS 1.3",   sub: "Criptografia" },
+          { icon: ShieldCheck, label: "PCI-DSS Nv.1",  sub: "Padrão cartão" },
+          { icon: BadgeCheck,  label: "Asaas · BACEN", sub: "Provedor autorizado" },
+          { icon: KeyRound,    label: "Sem CVV",       sub: "Tokenizado" },
+        ].map((b) => (
+          <div
+            key={b.label}
+            className="rounded-lg p-2 flex flex-col items-center gap-1 text-center"
+            style={{
+              background: "var(--surface-2)",
+              border: "1px solid var(--surface-border)",
+              color: "var(--text-3)",
+            }}
+          >
+            <b.icon className="w-3.5 h-3.5" style={{ color: "var(--green)" }} />
+            <span className="font-semibold text-[10px]" style={{ color: "var(--text-2)" }}>{b.label}</span>
+            <span className="text-[9px]" style={{ color: "var(--text-4)" }}>{b.sub}</span>
+          </div>
+        ))}
+      </div>
+      <p className="text-[10px] text-center" style={{ color: "var(--text-4)" }}>
+        Suas informações são protegidas. A Uniq Chat não armazena dados sensíveis de pagamento.
+      </p>
+    </div>
   );
 }
