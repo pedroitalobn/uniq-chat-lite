@@ -1795,6 +1795,10 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 					})
 				}
 				patch["asaas_subscription_id"] = auth.ID
+				// Marca o flow pra que o cron AsaasPixAutoCron saiba que
+				// precisa gerar a próxima cobrança via /api/v3/payments
+				// (regular subscriptions NÃO usam esse cron).
+				patch["asaas_flow"] = "pix_automatic"
 				h.db.Model(&pending).Updates(patch)
 
 				out := fiber.Map{
