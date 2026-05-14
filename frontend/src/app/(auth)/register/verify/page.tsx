@@ -661,12 +661,25 @@ function CompleteForm({
           </div>
         </div>
         <h1 className="text-2xl font-bold text-[hsl(240_15%_92%)] tracking-tight">
-          Complete seu perfil
+          {step === 3 && isPaid
+            ? "Como prefere pagar?"
+            : step === 4 && isPaid
+              ? (asaasMethod === "credit_card" ? "Dados do cartão" : "PIX Automático")
+              : "Complete seu perfil"}
         </h1>
         <p className="text-sm text-[hsl(240_8%_50%)]">
-          Quase lá — só mais algumas informações
+          {step === 3 && isPaid
+            ? "Escolha a forma de pagamento da sua assinatura"
+            : step === 4 && isPaid
+              ? (asaasMethod === "credit_card"
+                  ? "Preencha com segurança · dados tokenizados pelo Asaas"
+                  : "Pague o QR no próximo passo pra autorizar a recorrência")
+              : "Quase lá — só mais algumas informações"}
         </p>
       </div>
+      {/* Stepper visual — orienta o usuário em qual etapa está */}
+      <StepDots current={step} total={maxStep + 1} />
+
 
       <div className="flex items-center justify-center gap-1.5">
         {[0, 1, 2].map((i) => (
@@ -1439,6 +1452,37 @@ function TrustBadges() {
       <p className="text-[10px] text-center" style={{ color: "var(--text-4)" }}>
         Suas informações são protegidas. A Uniq Chat não armazena dados sensíveis de pagamento.
       </p>
+    </div>
+  );
+}
+
+// StepDots — pontinhos de progresso. Mostra em qual etapa do form o
+// user está agora. Os já completos ficam verdes; o atual verde com glow;
+// os futuros muted. Reforça percepção de progresso em fluxos longos.
+function StepDots({ current, total }: { current: number; total: number }) {
+  if (total <= 1) return null;
+  return (
+    <div className="flex items-center justify-center gap-1.5 pb-1">
+      {Array.from({ length: total }).map((_, i) => {
+        const done = i < current;
+        const active = i === current;
+        return (
+          <motion.span
+            key={i}
+            initial={false}
+            animate={{
+              width: active ? 18 : 6,
+              opacity: done || active ? 1 : 0.35,
+            }}
+            transition={{ type: "spring", stiffness: 280, damping: 24 }}
+            className="h-1.5 rounded-full"
+            style={{
+              background: done || active ? "var(--green)" : "var(--text-4)",
+              boxShadow: active ? "0 0 8px rgba(0,212,106,0.55)" : "none",
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
