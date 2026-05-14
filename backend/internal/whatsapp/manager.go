@@ -1676,7 +1676,7 @@ func (m *Manager) CheckJourneys(instanceID, messageID, fromJID, fromName, groupJ
 // HandleIncomingAutomation runs journeys first and only falls back to the
 // instance agent when no journey consumed the incoming message.
 func (m *Manager) HandleIncomingAutomation(instanceID, messageID, fromJID, fromName, groupJID, messageText, messageType string, isGroup bool) {
-	log.Debug().
+	log.Info().
 		Str("instance", instanceID).
 		Str("from", fromJID).
 		Str("type", messageType).
