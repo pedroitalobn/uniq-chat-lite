@@ -580,14 +580,25 @@ func (h *AsaasHandler) ListPlans(c *fiber.Ctx) error {
 // frequency é obrigatório (Asaas devolve parse_error sem ele); cycle
 // segue como complemento opcional pra ficar compatível com docs antigas
 // onde só cycle aparecia.
+// AsaasPixAutomaticAuthRequest — payload de criação da autorização
+// PIX Automático. Conjunto completo de campos observados como
+// obrigatórios pela API v3 do Asaas:
+//   - customer, value (basics)
+//   - frequency (MONTHLY etc.)
+//   - contractId (id único do contrato no merchant)
+//   - startDate (quando a autorização começa a valer)
+//   - nextDueDate (quando cobrar a primeira parcela)
+//   - expirationDate (quando o consentimento expira — anos no futuro)
+// description e externalReference são opcionais.
 type AsaasPixAutomaticAuthRequest struct {
 	Customer          string  `json:"customer"`
 	Value             float64 `json:"value"`
-	Frequency         string  `json:"frequency"`            // OBRIGATÓRIO — MONTHLY | WEEKLY | etc.
-	ContractID        string  `json:"contractId"`           // OBRIGATÓRIO — identificador único do contrato no merchant
-	Cycle             string  `json:"cycle,omitempty"`      // legacy, mantido por compatibilidade
-	NextDueDate       string  `json:"nextDueDate"`          // YYYY-MM-DD do primeiro charge
-	ExpirationDate    string  `json:"expirationDate,omitempty"`
+	Frequency         string  `json:"frequency"`
+	ContractID        string  `json:"contractId"`
+	StartDate         string  `json:"startDate"`
+	NextDueDate       string  `json:"nextDueDate"`
+	ExpirationDate    string  `json:"expirationDate"`
+	Cycle             string  `json:"cycle,omitempty"` // legacy compat
 	Description       string  `json:"description,omitempty"`
 	ExternalReference string  `json:"externalReference,omitempty"`
 }
