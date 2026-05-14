@@ -681,9 +681,7 @@ function CompleteForm({
           </div>
         </div>
         <h1 className="text-2xl font-bold text-[hsl(240_15%_92%)] tracking-tight">
-          {step === 3 && isPaid
-            ? (asaasMethod === "credit_card" ? "Dados de pagamento" : "PIX Automático")
-            : "Complete seu perfil"}
+          {step === 3 && isPaid ? "Selecione Pagamento" : "Complete seu perfil"}
         </h1>
         <p className="text-sm text-[hsl(240_8%_50%)]">
           {step === 3 && isPaid
@@ -998,6 +996,7 @@ function CompleteForm({
             </AnimatePresence>
 
             <TrustBadges />
+            <PoweredBy provider="asaas" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -1039,10 +1038,10 @@ function CompleteForm({
         ) : (
           <button
             type="submit"
-            disabled={loading}
-            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150 disabled:opacity-60"
+            disabled={loading || (isPaid && !asaasMethod)}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
             style={{ background: "#00d46a", color: "#050508" }}
-            onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.background = "#00bf60"; }}
+            onMouseEnter={e => { if (!loading && !(isPaid && !asaasMethod)) (e.currentTarget as HTMLButtonElement).style.background = "#00bf60"; }}
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "#00d46a"}
           >
             {loading
@@ -1050,7 +1049,15 @@ function CompleteForm({
               : (
                 <>
                   <Lock className="w-3.5 h-3.5" />
-                  <span>{isPaid ? (asaasMethod === "credit_card" ? "Pagar com cartão" : "Gerar PIX e finalizar") : "Criar conta"}</span>
+                  <span>
+                    {isPaid
+                      ? (!asaasMethod
+                          ? "Selecione uma forma de pagamento"
+                          : asaasMethod === "credit_card"
+                            ? "Pagar com cartão"
+                            : "Gerar PIX e finalizar")
+                      : "Criar conta"}
+                  </span>
                 </>
               )}
           </button>
@@ -1156,14 +1163,7 @@ function VerifyContent() {
           <Logo />
         </div>
 
-        <div
-          className="rounded-2xl p-7"
-          style={{
-            background: "var(--surface-solid)",
-            border: "1px solid var(--border)",
-            boxShadow: "0 32px 64px rgba(0,0,0,0.5)",
-          }}
-        >
+        <div>
           <AnimatePresence mode="wait">
             {state.status === "loading" && (
               <motion.div key="loading"
@@ -1178,22 +1178,6 @@ function VerifyContent() {
               <motion.div key="valid"
                 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.25 }}>
-                {/* Step dots — step 3 active */}
-                <div className="flex items-center justify-center gap-1 mb-6">
-                  {[0, 1, 2].map(i => (
-                    <div key={i} className="flex items-center gap-1">
-                      <div className="rounded-full transition-all duration-300"
-                        style={{
-                          width: i === 2 ? 24 : 7,
-                          height: 7,
-                          background: i < 2 ? "#00d46a" : i === 2 ? "#00d46a" : "var(--border-default)",
-                        }} />
-                      {i < 2 && (
-                        <div className="h-px w-6" style={{ background: "#00d46a" }} />
-                      )}
-                    </div>
-                  ))}
-                </div>
                 <CompleteForm
                   email={state.email}
                   pendingId={state.pendingId}
