@@ -1748,10 +1748,13 @@ func SetupRouter(db *gorm.DB, manager *whatsapp.Manager, agentRuntime *services.
 	// Admin Billing — visão consolidada + ações cirúrgicas sobre o
 	// faturamento de um user (overview, criar fatura avulsa, toggle de
 	// cobranças extras). Frontend: BillingPanelModal em /admin/users.
-	adminBillingH := handlers.NewAdminBillingHandler(db, asaasH)
+	adminBillingH := handlers.NewAdminBillingHandler(db, asaasH, emailSvc)
 	admin.Get("/users/:id/billing/overview", adminBillingH.Overview)
 	admin.Post("/users/:id/billing/custom-invoice", adminBillingH.CreateCustomInvoice)
 	admin.Patch("/users/:id/billing/overage", adminBillingH.ToggleOverage)
+	admin.Post("/users/:id/billing/refund", adminBillingH.RefundPayment)
+	admin.Post("/users/:id/billing/checkout-link", adminBillingH.CreateCheckoutLink)
+	admin.Post("/users/:id/billing/send-link", adminBillingH.SendCheckoutLink)
 
 	admin.Delete("/users/:id", adminH.DeleteUser)
 	admin.Get("/users/:id/delete-diagnose", adminH.UserDeleteDiagnose)
