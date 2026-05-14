@@ -48,7 +48,7 @@ export function BillingPanelModal({ user, onClose }: { user: User; onClose: () =
 
   const overviewQ = useQuery<Overview>({
     queryKey: ["admin-billing-overview", user.id],
-    queryFn: () => adminApi.billingOverview(user.id),
+    queryFn: () => adminApi.billingOverview(user.id).then((r) => r.data as Overview),
   });
 
   const refundMut = useMutation({
