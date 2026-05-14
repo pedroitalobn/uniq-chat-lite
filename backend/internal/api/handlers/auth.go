@@ -1723,112 +1723,17 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 			}
 			customerID := cust.ID
 
-			// Cria subscription recorrente. Default PIX (Asaas gera fatura
-			// nova todo mês com QR PIX próprio). Quando o frontend manda
-			// asaas_payment_method=credit_card + dados do cartão, criamos
-			// como CREDIT_CARD — Asaas tokeniza no primeiro charge e cobra
-			// automaticamente nas próximas faturas (transparente, sem
-			// redirect). pix_automatic usa o fluxo novo de autorização —
-			// cliente paga UMA vez (consentimento + 1ª parcela), as
-			// próximas são debitadas automaticamente sem QR.
+			// Asaas oferece DUAS formas de pagamento: PIX Automático
+			// (default) e Cartão de Crédito (transparente). Removemos a
+			// subscription-PIX legacy + Asaas Checkout — todo cliente que
+			// escolhe PIX vai por /v3/pix/automatic/authorizations e usa
+			// débito automático nos meses seguintes. Nada de fatura nova
+			// com QR todo mês.
 			payMethod := strings.ToLower(strings.TrimSpace(req.AsaasPaymentMethod))
-
-			// "checkout" — usa o endpoint POST /v3/checkouts (Asaas Checkout
-			// hospedado). Cria uma sessão recorrente que oferece PIX
-			// Automático + Cartão lado a lado, o cliente escolhe na página.
-			// Devolve URL pra redirect. Compatível com redirect "modo" do
-			// admin se o operador preferir oferecer as duas opções num só
-			// fluxo.
-			if payMethod == "checkout" {
-				frontendURL := resolveFrontendURL()
-				checkoutReq := AsaasCheckoutRequest{
-					BillingTypes:      []string{"PIX", "CREDIT_CARD"},
-					ChargeTypes:       []string{"RECURRENT"},
-					Customer:          customerID,
-					SubscriptionCycle: "MONTHLY",
-					Items: []AsaasCheckoutItem{{
-						Name:     plan.Name,
-						Quantity: 1,
-						Value:    plan.Price,
-					}},
-					ExternalReference: pending.ID.String() + "|" + plan.ID.String(),
-				}
-				if frontendURL != "" {
-					checkoutReq.Callback = &AsaasCheckoutCallback{
-						SuccessUrl: frontendURL + "/payment/success?pending_id=" + pending.ID.String(),
-						CancelUrl:  frontendURL + "/register/verify?token=" + pending.Token,
-					}
-				}
-				co, raw, err := h.asaasH.CreateAsaasCheckout(checkoutReq)
-				if err != nil || co == nil || co.URL == "" {
-					return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
-						"error":  "asaas_checkout_failed",
-						"detail": string(raw),
-					})
-				}
-				patch["asaas_subscription_id"] = co.ID
-				h.db.Model(&pending).Updates(patch)
-				return c.JSON(fiber.Map{
-					"checkout_type": "redirect",
-					"url":           co.URL,
-					"checkout_id":   co.ID,
-					"plan_name":     plan.Name,
-					"plan_price":    plan.Price,
-					"pending_id":    pending.ID.String(),
-				})
+			if payMethod == "" || payMethod == "pix" {
+				payMethod = "pix_automatic"
 			}
 
-			if payMethod == "pix_automatic" {
-				authReq := AsaasPixAutomaticAuthRequest{
-					Customer:          customerID,
-					Value:             plan.Price,
-					Cycle:             "MONTHLY",
-					NextDueDate:       time.Now().Format("2006-01-02"),
-					Description:       "Assinatura " + plan.Name + " — Uniq Chat",
-					ExternalReference: pending.ID.String() + "|" + plan.ID.String(),
-				}
-				auth, raw, err := h.asaasH.CreatePixAutomaticAuthorization(authReq)
-				if err != nil || auth == nil || auth.ID == "" {
-					return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
-						"error":  "asaas_pix_automatic_failed",
-						"detail": string(raw),
-					})
-				}
-				patch["asaas_subscription_id"] = auth.ID
-				// Marca o flow pra que o cron AsaasPixAutoCron saiba que
-				// precisa gerar a próxima cobrança via /api/v3/payments
-				// (regular subscriptions NÃO usam esse cron).
-				patch["asaas_flow"] = "pix_automatic"
-				h.db.Model(&pending).Updates(patch)
-
-				out := fiber.Map{
-					"checkout_type":    "pix_automatic",
-					"authorization_id": auth.ID,
-					"status":           auth.Status,
-					"plan_name":        plan.Name,
-					"plan_price":       plan.Price,
-					"pending_id":       pending.ID.String(),
-					"message":          "Pague o PIX abaixo pra confirmar a autorização. Os próximos meses serão debitados automaticamente.",
-				}
-				if auth.ImmediateQrCode != nil {
-					out["br_code"] = auth.ImmediateQrCode.Payload
-					out["br_code_base64"] = auth.ImmediateQrCode.EncodedImage
-					out["conciliation_identifier"] = auth.ImmediateQrCode.ConciliationIdentifier
-					if auth.ImmediateQrCode.ExpirationDate != "" {
-						out["expires_at"] = auth.ImmediateQrCode.ExpirationDate
-					}
-				}
-				return c.JSON(out)
-			}
-			subReq := AsaasSubscriptionRequest{
-				Customer:          customerID,
-				BillingType:       "PIX",
-				Value:             plan.Price,
-				Cycle:             "MONTHLY",
-				NextDueDate:       time.Now().AddDate(0, 0, 1).Format("2006-01-02"),
-				Description:       "Assinatura " + plan.Name + " — Uniq Chat",
-				ExternalReference: pending.ID.String() + "|" + plan.ID.String(),
-			}
 			if payMethod == "credit_card" {
 				if req.AsaasCard == nil || req.AsaasHolder == nil {
 					return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -1836,102 +1741,103 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 						"message": "Dados do cartão e endereço do titular são obrigatórios pra pagamento via cartão.",
 					})
 				}
-				subReq.BillingType = "CREDIT_CARD"
-				subReq.NextDueDate = time.Now().Format("2006-01-02") // cobra imediatamente
-				subReq.CreditCard = &AsaasCreditCard{
-					HolderName:  req.AsaasCard.HolderName,
-					Number:      req.AsaasCard.Number,
-					ExpiryMonth: req.AsaasCard.ExpiryMonth,
-					ExpiryYear:  req.AsaasCard.ExpiryYear,
-					Ccv:         req.AsaasCard.Cvv,
+				subReq := AsaasSubscriptionRequest{
+					Customer:          customerID,
+					BillingType:       "CREDIT_CARD",
+					Value:             plan.Price,
+					Cycle:             "MONTHLY",
+					NextDueDate:       time.Now().Format("2006-01-02"),
+					Description:       "Assinatura " + plan.Name + " — Uniq Chat",
+					ExternalReference: pending.ID.String() + "|" + plan.ID.String(),
+					CreditCard: &AsaasCreditCard{
+						HolderName:  req.AsaasCard.HolderName,
+						Number:      req.AsaasCard.Number,
+						ExpiryMonth: req.AsaasCard.ExpiryMonth,
+						ExpiryYear:  req.AsaasCard.ExpiryYear,
+						Ccv:         req.AsaasCard.Cvv,
+					},
+					CreditCardHolderInfo: &AsaasCreditCardHolderInfo{
+						Name:              req.Name,
+						Email:             pending.Email,
+						CpfCnpj:           cpf,
+						PostalCode:        req.AsaasHolder.PostalCode,
+						AddressNumber:     req.AsaasHolder.AddressNumber,
+						AddressComplement: req.AsaasHolder.AddressComplement,
+						Phone:             req.Phone,
+						MobilePhone:       req.Phone,
+					},
+					RemoteIP: c.IP(),
 				}
-				subReq.CreditCardHolderInfo = &AsaasCreditCardHolderInfo{
-					Name:              req.Name,
-					Email:             pending.Email,
-					CpfCnpj:           cpf,
-					PostalCode:        req.AsaasHolder.PostalCode,
-					AddressNumber:     req.AsaasHolder.AddressNumber,
-					AddressComplement: req.AsaasHolder.AddressComplement,
-					Phone:             req.Phone,
-					MobilePhone:       req.Phone,
+				subBody, _ := json.Marshal(subReq)
+				subRespBytes, err := h.asaasH.apiRequest("POST", "/api/v3/subscriptions", subBody)
+				if err != nil {
+					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar assinatura Asaas"})
 				}
-				subReq.RemoteIP = c.IP()
-			}
-			subBody, _ := json.Marshal(subReq)
-			subRespBytes, err := h.asaasH.apiRequest("POST", "/api/v3/subscriptions", subBody)
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "erro ao criar assinatura Asaas"})
-			}
-			var subResp AsaasSubscriptionResponse
-			if err := json.Unmarshal(subRespBytes, &subResp); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "resposta Asaas inválida"})
-			}
-			if subResp.ID == "" {
-				return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
-					"error":  "asaas_error",
-					"detail": string(subRespBytes),
-				})
-			}
-
-			patch["asaas_subscription_id"] = subResp.ID
-			h.db.Model(&pending).Updates(patch)
-
-			// Busca primeira fatura pra mostrar QR PIX
-			listResp, _ := h.asaasH.apiRequest("GET", "/api/v3/payments?subscription="+subResp.ID+"&limit=1", nil)
-			var listed struct {
-				Data []struct {
-					ID         string `json:"id"`
-					InvoiceURL string `json:"invoiceUrl"`
-					Status     string `json:"status"`
-				} `json:"data"`
-			}
-			json.Unmarshal(listResp, &listed)
-
-			firstInvoiceURL := ""
-			firstPaymentID := ""
-			if len(listed.Data) > 0 {
-				firstInvoiceURL = listed.Data[0].InvoiceURL
-				firstPaymentID = listed.Data[0].ID
-			}
-
-			// Honra o modo de checkout configurado no admin
-			// (/admin/payment-settings). Default "transparent" mantém o
-			// fluxo de subscription com fatura inline (frontend abre
-			// /checkout exibindo invoice + QR). "redirect" manda o user
-			// direto pra página hospedada da Asaas usando invoiceUrl
-			// — análogo ao redirect do Stripe Checkout Session.
-			mode := getAsaasCheckoutType(h.db)
-			if mode == "redirect" {
-				if firstInvoiceURL == "" {
+				var subResp AsaasSubscriptionResponse
+				if err := json.Unmarshal(subRespBytes, &subResp); err != nil {
+					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "resposta Asaas inválida"})
+				}
+				if subResp.ID == "" {
 					return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
-						"error":   "asaas_no_invoice",
-						"message": "Assinatura criada mas primeira fatura não retornada ainda — tente novamente em alguns segundos.",
+						"error":  "asaas_error",
+						"detail": string(subRespBytes),
 					})
 				}
+				patch["asaas_subscription_id"] = subResp.ID
+				patch["asaas_flow"] = "subscription"
+				h.db.Model(&pending).Updates(patch)
 				return c.JSON(fiber.Map{
-					"checkout_type":   "redirect",
-					"url":             firstInvoiceURL,
+					"checkout_type":   "subscription",
 					"subscription_id": subResp.ID,
 					"plan_name":       plan.Name,
 					"plan_price":      plan.Price,
+					"payment_method":  "CREDIT_CARD",
+					"recurrence":      "MONTHLY",
+					"status":          subResp.Status,
 					"pending_id":      pending.ID.String(),
+					"message":         "Cartão tokenizado e cobrança recorrente criada.",
 				})
 			}
 
-			out := fiber.Map{
-				"checkout_type":   "subscription",
-				"subscription_id": subResp.ID,
-				"plan_name":       plan.Name,
-				"plan_price":      plan.Price,
-				"payment_method":  "PIX",
-				"recurrence":      "MONTHLY",
-				"status":          subResp.Status,
-				"pending_id":      pending.ID.String(),
-				"message":         "Assinatura PIX recorrente criada. Pague a primeira fatura pra ativar.",
+			// Default: PIX Automático. Cliente paga 1 vez (consentimento
+			// + 1ª parcela); os meses 2+ são gerados pelo cron
+			// AsaasPixAutoCron via /api/v3/payments com
+			// pixAutomaticAuthorizationId.
+			authReq := AsaasPixAutomaticAuthRequest{
+				Customer:          customerID,
+				Value:             plan.Price,
+				Cycle:             "MONTHLY",
+				NextDueDate:       time.Now().Format("2006-01-02"),
+				Description:       "Assinatura " + plan.Name + " — Uniq Chat",
+				ExternalReference: pending.ID.String() + "|" + plan.ID.String(),
 			}
-			if firstInvoiceURL != "" {
-				out["first_invoice_url"] = firstInvoiceURL
-				out["first_payment_id"] = firstPaymentID
+			auth, raw, err := h.asaasH.CreatePixAutomaticAuthorization(authReq)
+			if err != nil || auth == nil || auth.ID == "" {
+				return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+					"error":  "asaas_pix_automatic_failed",
+					"detail": string(raw),
+				})
+			}
+			patch["asaas_subscription_id"] = auth.ID
+			patch["asaas_flow"] = "pix_automatic"
+			h.db.Model(&pending).Updates(patch)
+
+			out := fiber.Map{
+				"checkout_type":    "pix_automatic",
+				"authorization_id": auth.ID,
+				"status":           auth.Status,
+				"plan_name":        plan.Name,
+				"plan_price":       plan.Price,
+				"pending_id":       pending.ID.String(),
+				"message":          "Pague o PIX abaixo pra confirmar. Os próximos meses serão debitados automaticamente.",
+			}
+			if auth.ImmediateQrCode != nil {
+				out["br_code"] = auth.ImmediateQrCode.Payload
+				out["br_code_base64"] = auth.ImmediateQrCode.EncodedImage
+				out["conciliation_identifier"] = auth.ImmediateQrCode.ConciliationIdentifier
+				if auth.ImmediateQrCode.ExpirationDate != "" {
+					out["expires_at"] = auth.ImmediateQrCode.ExpirationDate
+				}
 			}
 			return c.JSON(out)
 

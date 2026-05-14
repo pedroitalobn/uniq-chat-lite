@@ -320,6 +320,12 @@ func main() {
 	asaasCron := services.NewAsaasCron(db)
 	asaasCron.Start()
 
+	// PIX Automático: cron mensal que gera /payments com
+	// pixAutomaticAuthorizationId. Sem ele autorização ativa fica
+	// sem cobrança nos meses 2+.
+	asaasPixAutoCron := services.NewAsaasPixAutoCron(db)
+	asaasPixAutoCron.Start()
+
 	// Security cleanup cron — deleta contas não-verificadas após 14d.
 	cleanupCron := services.NewCleanupCron(db)
 	cleanupCron.Start()
