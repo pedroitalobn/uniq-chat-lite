@@ -68,6 +68,16 @@ type User struct {
 	AsaasCustomerID         string `gorm:"type:varchar(255)" json:"-"`
 	AsaasSubscriptionID     string `gorm:"type:varchar(255)" json:"-"`
 	AsaasSubscriptionStatus string `gorm:"type:varchar(50)" json:"asaas_subscription_status,omitempty"`
+	// AsaasFlow — distingue qual API foi usada pra criar a cobrança.
+	// Valores: "subscription" (padrão; /api/v3/subscriptions com PIX ou
+	// CREDIT_CARD), "pix_automatic" (autorização PIX recorrente automático
+	// — exige cron mensal pra criar cada payment via pixAutomaticAuthorizationId),
+	// "checkout" (sessão Asaas Checkout hospedada).
+	AsaasFlow string `gorm:"type:varchar(40)" json:"-"`
+	// AsaasNextChargeAt — usado só pelo flow pix_automatic. Próxima data
+	// em que o cron deve gerar a cobrança mensal. Asaas exige criar entre
+	// 2 e 10 dias úteis antes da dueDate da cobrança.
+	AsaasNextChargeAt *time.Time `json:"-"`
 	// Asaas não suporta cancel-at-period-end nativo. Quando user pede pra
 	// cancelar mas manter acesso até o fim do ciclo, gravamos o timestamp
 	// aqui. Cron de billing checa diariamente e deleta a subscription

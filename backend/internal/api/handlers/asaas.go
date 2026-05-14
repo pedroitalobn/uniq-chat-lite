@@ -466,6 +466,58 @@ func (h *AsaasHandler) Webhook(c *fiber.Ctx) error {
 				}
 			}
 		}
+
+	// Eventos do PIX Automático. A autorização vai pra ACTIVE quando o
+	// cliente paga o immediateQrCode (consentimento + 1ª parcela). Daí
+	// pra frente cobranças mensais são criadas via cron e cada uma
+	// dispara um PAYMENT_RECEIVED no padrão já tratado acima — esses
+	// eventos abaixo são especificamente do ciclo de vida da autorização.
+	case "PIX_AUTOMATIC_AUTHORIZATION_ACTIVE",
+		"PIX_AUTOMATIC_AUTHORIZATION_CREATED":
+		authObj, _ := paymentEvent["pixAutomaticAuthorization"].(map[string]any)
+		if authObj == nil {
+			authObj = paymentEvent
+		}
+		authID, _ := authObj["id"].(string)
+		externalRef, _ := authObj["externalReference"].(string)
+		if externalRef != "" && authID != "" {
+			parts := strings.Split(externalRef, "|")
+			if len(parts) >= 2 {
+				userID := parts[0]
+				planID := parts[1]
+				var plan models.Plan
+				if h.db.First(&plan, "id = ?", planID).Error == nil {
+					h.db.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]any{
+						"plan_id":                   plan.ID,
+						"asaas_subscription_id":     authID,
+						"asaas_subscription_status": "active",
+					})
+				}
+			}
+		}
+
+	case "PIX_AUTOMATIC_AUTHORIZATION_CANCELED",
+		"PIX_AUTOMATIC_AUTHORIZATION_REVOKED",
+		"PIX_AUTOMATIC_AUTHORIZATION_EXPIRED":
+		authObj, _ := paymentEvent["pixAutomaticAuthorization"].(map[string]any)
+		if authObj == nil {
+			authObj = paymentEvent
+		}
+		authID, _ := authObj["id"].(string)
+		if authID != "" {
+			var user models.User
+			if h.db.Where("asaas_subscription_id = ?", authID).First(&user).Error == nil {
+				var freePlan models.Plan
+				if h.db.First(&freePlan, "name = 'Free'").Error == nil {
+					h.db.Model(&user).Updates(map[string]any{
+						"plan_id":                   freePlan.ID,
+						"asaas_subscription_id":     "",
+						"asaas_subscription_status": "canceled",
+					})
+					h.emailSvc.SendSubscriptionCanceled(user.Email, user.Name)
+				}
+			}
+		}
 	}
 
 	return c.JSON(fiber.Map{"received": true})
