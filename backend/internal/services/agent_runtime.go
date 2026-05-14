@@ -223,6 +223,16 @@ func (r *AgentRuntime) handleIncomingInternal(instanceID, messageID, fromJID, fr
 	if siblings := r.loadSiblingsForPrompt(agent); siblings != "" {
 		systemPrompt += "\n\n" + siblings
 	}
+	// Anti-repetição CROSS-conversa. O LLM tem cap de naturalidade
+	// quando recebe a mesma pergunta de várias pessoas e responde
+	// literalmente igual — isso explode o circuit breaker
+	// recipient_burst. Injetamos as últimas respostas que este agente
+	// mandou pra OUTROS clientes na mesma instância pra que o modelo
+	// varie tom/emoji/ordem das frases naturalmente.
+	recentInstanceReplies := r.recentInstanceOutboundTexts(instUUID, fromJID, 10)
+	if len(recentInstanceReplies) > 0 {
+		systemPrompt += "\n\n" + buildAntiRepetitionSection(recentInstanceReplies)
+	}
 	if tools := BuildToolsPromptSection(agent); tools != "" {
 		systemPrompt += "\n\n" + tools
 	}
@@ -273,6 +283,25 @@ func (r *AgentRuntime) handleIncomingInternal(instanceID, messageID, fromJID, fr
 	// na resposta imediatamente anterior do agente.
 	if prev := r.lastAgentReply(instUUID, fromJID); prev != "" {
 		reply = dedupAgainstPrevious(reply, prev)
+	}
+	// Anti-repetição cross-conversa: se o reply ainda saiu muito
+	// parecido com algo recente da MESMA instância pra OUTRO cliente,
+	// regeneramos UMA vez com instrução reforçada. Limiar 0.65 cobre
+	// o caso "Olá, tudo bem? Posso ajudar..." vs "Olá! Tudo certo,
+	// como posso ajudar..." que dispara o circuit breaker mesmo sendo
+	// quase idêntico semanticamente.
+	if len(recentInstanceReplies) > 0 && replyTooSimilar(reply, recentInstanceReplies, 0.65) {
+		log.Warn().Str("instance", instanceID).Str("chat", fromJID).
+			Msg("agent-runtime: reply muito similar a respostas recentes — regenerando com reforço")
+		retrySystem := systemPrompt + "\n\nATENÇÃO MÁXIMA: a resposta anterior que você gerou foi muito parecida com mensagens recentes pra outros clientes. REESCREVA usando palavras DIFERENTES, ordem DIFERENTE de frases, emoji DIFERENTE. Mantenha o significado, mude completamente a forma."
+		retryCtx, retryCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		if retryResult, retryErr := r.llm.CallChatWithSystemResult(retryCtx, integration, retrySystem, userPrompt, false); retryErr == nil && strings.TrimSpace(retryResult.Content) != "" {
+			retryClean := sanitizeAssistantReply(retryResult.Content)
+			if retryClean != "" && !replyTooSimilar(retryClean, recentInstanceReplies, 0.75) {
+				reply = retryClean
+			}
+		}
+		retryCancel()
 	}
 	if reply == "" {
 		r.logExecution(models.AgentExecution{
@@ -1876,4 +1905,129 @@ func (r *AgentRuntime) resolveConversation(instanceID uuid.UUID, fromJID string)
 		Order("updated_at DESC").
 		First(&conv)
 	return conv
+}
+
+// recentInstanceOutboundTexts — devolve até `limit` textos enviados
+// pelo AGENTE (direction=out, type=text) nesta instância nas últimas
+// 12h, EXCLUINDO a conversa atual (essa é tratada por lastAgentReply).
+// Deduplicado por content normalizado pra ranking mais limpo.
+//
+// Usado pra alimentar o bloco "VARIE A LINGUAGEM ENTRE CLIENTES" do
+// system prompt, prevenindo o agente de responder literalmente igual
+// pra perguntas idênticas vindas de pessoas diferentes — o que dispara
+// o circuit breaker antiban (recipient_burst).
+func (r *AgentRuntime) recentInstanceOutboundTexts(instanceID uuid.UUID, currentFromJID string, limit int) []string {
+	if r == nil || r.db == nil || limit <= 0 {
+		return nil
+	}
+	since := time.Now().Add(-12 * time.Hour)
+	rows := []struct {
+		Content    string
+		ChannelKey string
+	}{}
+	q := r.db.Table("message_logs").
+		Select("content, channel_key").
+		Where("instance_id = ? AND direction = ? AND type = ? AND content <> ''",
+			instanceID, models.DirectionOut, "text").
+		Where("created_at >= ?", since).
+		Order("created_at DESC").
+		Limit(limit * 4) // sobre-amostra pra deduplicar abaixo
+	if currentFromJID != "" {
+		q = q.Where("channel_key <> ?", currentFromJID)
+	}
+	_ = q.Scan(&rows).Error
+
+	seen := map[string]bool{}
+	out := make([]string, 0, limit)
+	for _, row := range rows {
+		txt := strings.TrimSpace(row.Content)
+		if txt == "" {
+			continue
+		}
+		key := normalizeForDedup(txt)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, txt)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out
+}
+
+// buildAntiRepetitionSection — bloco que vai no fim do system prompt.
+// Lista as respostas recentes pra OUTROS clientes e instrui o LLM a
+// variar palavras/ordem/emoji. O texto é cortado em 200 runes por
+// linha pra economizar tokens.
+func buildAntiRepetitionSection(recent []string) string {
+	var sb strings.Builder
+	sb.WriteString("VARIE A LINGUAGEM ENTRE CLIENTES — anti-repetição\n\n")
+	sb.WriteString("Estas são as últimas respostas que VOCÊ enviou pra OUTROS clientes nesta instância:\n")
+	for i, t := range recent {
+		sb.WriteString(fmt.Sprintf("%d. \"%s\"\n", i+1, firstNRunes(t, 200)))
+	}
+	sb.WriteString("\nRegra crítica: NUNCA repita literalmente nenhuma frase acima ao responder o cliente atual, ")
+	sb.WriteString("mesmo que a pergunta seja idêntica. Varie palavras (use sinônimos), reordene as frases, ")
+	sb.WriteString("alterne uso e posição de emoji, varie pontuação e energia. ")
+	sb.WriteString("Mensagens iguais em pessoas diferentes são tratadas como SPAM pelo WhatsApp e podem banir a conta.")
+	return sb.String()
+}
+
+// replyTooSimilar — Jaccard de tokens normalizados entre o reply
+// recém-gerado e cada uma das respostas recentes. Devolve true quando
+// algum par bate o limiar; nesse caso o caller pode regenerar.
+func replyTooSimilar(reply string, recent []string, threshold float64) bool {
+	a := tokenSetForSim(reply)
+	if len(a) == 0 {
+		return false
+	}
+	for _, prev := range recent {
+		b := tokenSetForSim(prev)
+		if len(b) == 0 {
+			continue
+		}
+		inter := 0
+		for tok := range a {
+			if b[tok] {
+				inter++
+			}
+		}
+		union := len(a) + len(b) - inter
+		if union == 0 {
+			continue
+		}
+		jaccard := float64(inter) / float64(union)
+		if jaccard >= threshold {
+			return true
+		}
+	}
+	return false
+}
+
+// tokenSetForSim — set de palavras lowercased, sem pontuação. Tokens
+// curtos (≤ 2 chars) são descartados — preposições/artigos não devem
+// pesar no julgamento de similaridade.
+func tokenSetForSim(s string) map[string]bool {
+	out := map[string]bool{}
+	var b strings.Builder
+	flush := func() {
+		w := b.String()
+		if len(w) > 2 {
+			out[w] = true
+		}
+		b.Reset()
+	}
+	for _, r := range strings.ToLower(s) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9',
+			r >= 192 && r <= 255:
+			b.WriteRune(r)
+		default:
+			flush()
+		}
+	}
+	flush()
+	return out
 }
