@@ -1476,6 +1476,22 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 		CompanyName           string `json:"company_name"`
 		CompanyIdentifier     string `json:"company_identifier"`
 		PlanID                string `json:"plan_id"` // override plan if different from start
+		// Asaas: forma de pagamento na cobrança recorrente. Default "pix"
+		// (mantém comportamento atual). "credit_card" exige AsaasCard +
+		// AsaasHolder preenchidos e usa fluxo transparente (sem redirect).
+		AsaasPaymentMethod string `json:"asaas_payment_method"`
+		AsaasCard          *struct {
+			HolderName  string `json:"holder_name"`
+			Number      string `json:"number"`
+			ExpiryMonth string `json:"expiry_month"`
+			ExpiryYear  string `json:"expiry_year"`
+			Cvv         string `json:"cvv"`
+		} `json:"asaas_card,omitempty"`
+		AsaasHolder *struct {
+			PostalCode        string `json:"postal_code"`
+			AddressNumber     string `json:"address_number"`
+			AddressComplement string `json:"address_complement"`
+		} `json:"asaas_holder,omitempty"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "body inválido"})
@@ -1707,7 +1723,13 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 			}
 			customerID := cust.ID
 
-			// Cria subscription recorrente PIX
+			// Cria subscription recorrente. Default PIX (Asaas gera fatura
+			// nova todo mês com QR PIX próprio). Quando o frontend manda
+			// asaas_payment_method=credit_card + dados do cartão, criamos
+			// como CREDIT_CARD — Asaas tokeniza no primeiro charge e cobra
+			// automaticamente nas próximas faturas (transparente, sem
+			// redirect).
+			payMethod := strings.ToLower(strings.TrimSpace(req.AsaasPaymentMethod))
 			subReq := AsaasSubscriptionRequest{
 				Customer:          customerID,
 				BillingType:       "PIX",
@@ -1716,6 +1738,34 @@ func (h *AuthHandler) RegisterComplete(c *fiber.Ctx) error {
 				NextDueDate:       time.Now().AddDate(0, 0, 1).Format("2006-01-02"),
 				Description:       "Assinatura " + plan.Name + " — Uniq Chat",
 				ExternalReference: pending.ID.String() + "|" + plan.ID.String(),
+			}
+			if payMethod == "credit_card" {
+				if req.AsaasCard == nil || req.AsaasHolder == nil {
+					return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+						"error":   "asaas_card_missing",
+						"message": "Dados do cartão e endereço do titular são obrigatórios pra pagamento via cartão.",
+					})
+				}
+				subReq.BillingType = "CREDIT_CARD"
+				subReq.NextDueDate = time.Now().Format("2006-01-02") // cobra imediatamente
+				subReq.CreditCard = &AsaasCreditCard{
+					HolderName:  req.AsaasCard.HolderName,
+					Number:      req.AsaasCard.Number,
+					ExpiryMonth: req.AsaasCard.ExpiryMonth,
+					ExpiryYear:  req.AsaasCard.ExpiryYear,
+					Ccv:         req.AsaasCard.Cvv,
+				}
+				subReq.CreditCardHolderInfo = &AsaasCreditCardHolderInfo{
+					Name:              req.Name,
+					Email:             pending.Email,
+					CpfCnpj:           cpf,
+					PostalCode:        req.AsaasHolder.PostalCode,
+					AddressNumber:     req.AsaasHolder.AddressNumber,
+					AddressComplement: req.AsaasHolder.AddressComplement,
+					Phone:             req.Phone,
+					MobilePhone:       req.Phone,
+				}
+				subReq.RemoteIP = c.IP()
 			}
 			subBody, _ := json.Marshal(subReq)
 			subRespBytes, err := h.asaasH.apiRequest("POST", "/api/v3/subscriptions", subBody)
