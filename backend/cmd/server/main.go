@@ -162,6 +162,11 @@ func main() {
 	// boot — corrigido no source, mídias novas já chegam corretas.
 	backfillDoubleEncodedMediaContent(db)
 
+	// White-label lite bootstrap (idempotente) — aplica migrations específicas
+	// do lite e mapeia ADMIN_EMAIL/ADMIN_PASSWORD para SUPER_ADMIN_* antes do
+	// bloco de criação do super admin abaixo.
+	liteBootstrap(db)
+
 	// Seed super admin if configured via env vars
 	log.Info().Str("email", os.Getenv("SUPER_ADMIN_EMAIL")).Str("password_set", fmt.Sprintf("%v", os.Getenv("SUPER_ADMIN_PASSWORD") != "")).Msg("checking super admin env vars")
 	if os.Getenv("SUPER_ADMIN_EMAIL") != "" && os.Getenv("SUPER_ADMIN_PASSWORD") != "" {
