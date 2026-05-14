@@ -263,6 +263,16 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
   // Step 5: Content
   type MsgType = typeof MSG_TYPES[number]["value"];
   const [msgType, setMsgType] = useState<MsgType>(prefill?.msgType ?? "text");
+  const [richMeta, setRichMeta] = useState<{
+    location?: { lat: string; lng: string; label: string };
+    contact?: { name: string; phone: string };
+    poll?: { question: string; options: string[] };
+    buttons?: { body: string; buttons: string[] };
+    list?: { body: string; items: string[] };
+    pix?: { key: string; amount: string; description: string };
+    template?: { name: string; lang: string; params: string };
+    carousel?: { cards: Array<{ title: string; image: string; button: string }> };
+  }>({});
   const [msgText, setMsgText]   = useState(prefill?.msgText ?? "");
   const [caption, setCaption]   = useState("");
   // Refs pra inserir variáveis Liquid na posição do cursor.
@@ -1330,15 +1340,24 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                 <>
                   <div>
                     <label className="text-xs font-medium block mb-2" style={{ color: "var(--text-3)" }}>Tipo</label>
-                    <div className="grid grid-cols-4 gap-2">
+                    {/* Grid compacto 7 colunas (2 linhas pra 14 tipos).
+                        Sem card pesado: pílulas pequenas com ícone +
+                        label minúscula. Em mobile cai pra 4 colunas
+                        com scroll horizontal natural. */}
+                    <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
                       {MSG_TYPES.map(({ value, label, icon: Icon }) => (
-                        <button key={value} type="button" onClick={() => { setMsgType(value); setMediaFile(null); }}
-                          className="flex flex-col items-center gap-1.5 py-2.5 px-2 rounded-xl border text-xs font-medium transition-all"
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => { setMsgType(value); setMediaFile(null); }}
+                          className="flex flex-col items-center justify-center gap-1 py-2 rounded-lg border text-[10px] font-medium transition-all"
                           style={msgType === value
-                            ? { background: "rgba(0,212,106,0.08)", borderColor: "rgba(0,212,106,0.25)", color: "var(--green)" }
-                            : { background: "var(--surface-2)", borderColor: "var(--border-default)", color: "hsl(240 8% 48%)" }}>
-                          <Icon className="w-4 h-4" />
-                          {label}
+                            ? { background: "rgba(0,212,106,0.10)", borderColor: "rgba(0,212,106,0.35)", color: "var(--green)" }
+                            : { background: "transparent", borderColor: "var(--border-default)", color: "hsl(240 8% 55%)" }}
+                          title={label}
+                        >
+                          <Icon className="w-3.5 h-3.5" />
+                          <span className="leading-none">{label}</span>
                         </button>
                       ))}
                     </div>
@@ -1430,6 +1449,233 @@ function CreateCampaignModal({ onClose, onCreated, prefill }: { onClose: () => v
                       </div>
                       <textarea ref={captionRef} value={caption} onChange={(e) => setCaption(e.target.value)}
                         rows={2} className="input-field w-full resize-none" />
+                    </div>
+                  )}
+
+                  {msgType === "sticker" && (
+                    <div>
+                      <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--text-3)" }}>Sticker *</label>
+                      <input type="file" accept="image/webp,image/png"
+                        onChange={(e) => setMediaFile(e.target.files?.[0] ?? null)}
+                        className="input-field w-full text-xs" />
+                      <p className="text-[10px] mt-1" style={{ color: "var(--text-4)" }}>
+                        Use WebP (512×512). PNG é aceito mas será convertido.
+                      </p>
+                    </div>
+                  )}
+
+                  {msgType === "location" && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <input type="text" placeholder="Latitude (ex: -23.5505)"
+                        value={richMeta.location?.lat || ""}
+                        onChange={(e) => setRichMeta((m) => ({ ...m, location: { lat: e.target.value, lng: m.location?.lng || "", label: m.location?.label || "" } }))}
+                        className="input-field text-xs" />
+                      <input type="text" placeholder="Longitude (ex: -46.6333)"
+                        value={richMeta.location?.lng || ""}
+                        onChange={(e) => setRichMeta((m) => ({ ...m, location: { lat: m.location?.lat || "", lng: e.target.value, label: m.location?.label || "" } }))}
+                        className="input-field text-xs" />
+                      <input type="text" placeholder="Nome do local (opcional)"
+                        value={richMeta.location?.label || ""}
+                        onChange={(e) => setRichMeta((m) => ({ ...m, location: { lat: m.location?.lat || "", lng: m.location?.lng || "", label: e.target.value } }))}
+                        className="input-field text-xs col-span-2" />
+                    </div>
+                  )}
+
+                  {msgType === "contact" && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <input type="text" placeholder="Nome do contato"
+                        value={richMeta.contact?.name || ""}
+                        onChange={(e) => setRichMeta((m) => ({ ...m, contact: { name: e.target.value, phone: m.contact?.phone || "" } }))}
+                        className="input-field text-xs" />
+                      <input type="text" placeholder="Telefone (E.164)"
+                        value={richMeta.contact?.phone || ""}
+                        onChange={(e) => setRichMeta((m) => ({ ...m, contact: { name: m.contact?.name || "", phone: e.target.value } }))}
+                        className="input-field text-xs" />
+                    </div>
+                  )}
+
+                  {msgType === "poll" && (
+                    <div className="space-y-2">
+                      <input type="text" placeholder="Pergunta da enquete"
+                        value={richMeta.poll?.question || ""}
+                        onChange={(e) => setRichMeta((m) => ({ ...m, poll: { question: e.target.value, options: m.poll?.options || ["", ""] } }))}
+                        className="input-field w-full text-xs" />
+                      {(richMeta.poll?.options || ["", ""]).map((opt, i) => (
+                        <div key={i} className="flex gap-1">
+                          <input type="text" placeholder={`Opção ${i + 1}`}
+                            value={opt}
+                            onChange={(e) => setRichMeta((m) => {
+                              const opts = [...(m.poll?.options || ["", ""])];
+                              opts[i] = e.target.value;
+                              return { ...m, poll: { question: m.poll?.question || "", options: opts } };
+                            })}
+                            className="input-field flex-1 text-xs" />
+                          {(richMeta.poll?.options?.length || 0) > 2 && (
+                            <button type="button"
+                              onClick={() => setRichMeta((m) => {
+                                const opts = [...(m.poll?.options || [])];
+                                opts.splice(i, 1);
+                                return { ...m, poll: { question: m.poll?.question || "", options: opts } };
+                              })}
+                              className="text-[10px] px-2 rounded" style={{ background: "rgba(239,68,68,0.10)", color: "#ef4444" }}>×</button>
+                          )}
+                        </div>
+                      ))}
+                      <button type="button"
+                        onClick={() => setRichMeta((m) => ({ ...m, poll: { question: m.poll?.question || "", options: [...(m.poll?.options || ["", ""]), ""] } }))}
+                        className="text-[11px] font-medium" style={{ color: "#a5b4fc" }}>+ Adicionar opção</button>
+                    </div>
+                  )}
+
+                  {msgType === "buttons" && (
+                    <div className="space-y-2">
+                      <textarea placeholder="Texto da mensagem"
+                        value={richMeta.buttons?.body || ""}
+                        onChange={(e) => setRichMeta((m) => ({ ...m, buttons: { body: e.target.value, buttons: m.buttons?.buttons || [""] } }))}
+                        rows={2} className="input-field w-full text-xs resize-none" />
+                      {(richMeta.buttons?.buttons || [""]).map((b, i) => (
+                        <div key={i} className="flex gap-1">
+                          <input type="text" placeholder={`Botão ${i + 1} (máx 20 chars)`} maxLength={20}
+                            value={b}
+                            onChange={(e) => setRichMeta((m) => {
+                              const bs = [...(m.buttons?.buttons || [""])];
+                              bs[i] = e.target.value;
+                              return { ...m, buttons: { body: m.buttons?.body || "", buttons: bs } };
+                            })}
+                            className="input-field flex-1 text-xs" />
+                          {(richMeta.buttons?.buttons?.length || 0) > 1 && (
+                            <button type="button"
+                              onClick={() => setRichMeta((m) => {
+                                const bs = [...(m.buttons?.buttons || [])];
+                                bs.splice(i, 1);
+                                return { ...m, buttons: { body: m.buttons?.body || "", buttons: bs } };
+                              })}
+                              className="text-[10px] px-2 rounded" style={{ background: "rgba(239,68,68,0.10)", color: "#ef4444" }}>×</button>
+                          )}
+                        </div>
+                      ))}
+                      {(richMeta.buttons?.buttons?.length || 0) < 3 && (
+                        <button type="button"
+                          onClick={() => setRichMeta((m) => ({ ...m, buttons: { body: m.buttons?.body || "", buttons: [...(m.buttons?.buttons || [""]), ""] } }))}
+                          className="text-[11px] font-medium" style={{ color: "#a5b4fc" }}>+ Adicionar botão (até 3)</button>
+                      )}
+                    </div>
+                  )}
+
+                  {msgType === "list" && (
+                    <div className="space-y-2">
+                      <textarea placeholder="Texto introdutório"
+                        value={richMeta.list?.body || ""}
+                        onChange={(e) => setRichMeta((m) => ({ ...m, list: { body: e.target.value, items: m.list?.items || [""] } }))}
+                        rows={2} className="input-field w-full text-xs resize-none" />
+                      {(richMeta.list?.items || [""]).map((it, i) => (
+                        <div key={i} className="flex gap-1">
+                          <input type="text" placeholder={`Item ${i + 1}`}
+                            value={it}
+                            onChange={(e) => setRichMeta((m) => {
+                              const items = [...(m.list?.items || [""])];
+                              items[i] = e.target.value;
+                              return { ...m, list: { body: m.list?.body || "", items } };
+                            })}
+                            className="input-field flex-1 text-xs" />
+                          {(richMeta.list?.items?.length || 0) > 1 && (
+                            <button type="button"
+                              onClick={() => setRichMeta((m) => {
+                                const items = [...(m.list?.items || [])];
+                                items.splice(i, 1);
+                                return { ...m, list: { body: m.list?.body || "", items } };
+                              })}
+                              className="text-[10px] px-2 rounded" style={{ background: "rgba(239,68,68,0.10)", color: "#ef4444" }}>×</button>
+                          )}
+                        </div>
+                      ))}
+                      <button type="button"
+                        onClick={() => setRichMeta((m) => ({ ...m, list: { body: m.list?.body || "", items: [...(m.list?.items || [""]), ""] } }))}
+                        className="text-[11px] font-medium" style={{ color: "#a5b4fc" }}>+ Adicionar item</button>
+                    </div>
+                  )}
+
+                  {msgType === "pix" && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <input type="text" placeholder="Chave PIX"
+                        value={richMeta.pix?.key || ""}
+                        onChange={(e) => setRichMeta((m) => ({ ...m, pix: { key: e.target.value, amount: m.pix?.amount || "", description: m.pix?.description || "" } }))}
+                        className="input-field text-xs col-span-2" />
+                      <input type="text" placeholder="Valor (R$)" inputMode="decimal"
+                        value={richMeta.pix?.amount || ""}
+                        onChange={(e) => setRichMeta((m) => ({ ...m, pix: { key: m.pix?.key || "", amount: e.target.value, description: m.pix?.description || "" } }))}
+                        className="input-field text-xs" />
+                      <input type="text" placeholder="Descrição"
+                        value={richMeta.pix?.description || ""}
+                        onChange={(e) => setRichMeta((m) => ({ ...m, pix: { key: m.pix?.key || "", amount: m.pix?.amount || "", description: e.target.value } }))}
+                        className="input-field text-xs" />
+                    </div>
+                  )}
+
+                  {msgType === "template" && !isWABA && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <input type="text" placeholder="Nome do template"
+                        value={richMeta.template?.name || ""}
+                        onChange={(e) => setRichMeta((m) => ({ ...m, template: { name: e.target.value, lang: m.template?.lang || "pt_BR", params: m.template?.params || "" } }))}
+                        className="input-field text-xs" />
+                      <input type="text" placeholder="Idioma (pt_BR)"
+                        value={richMeta.template?.lang || ""}
+                        onChange={(e) => setRichMeta((m) => ({ ...m, template: { name: m.template?.name || "", lang: e.target.value, params: m.template?.params || "" } }))}
+                        className="input-field text-xs" />
+                      <input type="text" placeholder="Variáveis separadas por vírgula"
+                        value={richMeta.template?.params || ""}
+                        onChange={(e) => setRichMeta((m) => ({ ...m, template: { name: m.template?.name || "", lang: m.template?.lang || "pt_BR", params: e.target.value } }))}
+                        className="input-field text-xs col-span-2" />
+                      <p className="text-[10px] col-span-2" style={{ color: "var(--text-4)" }}>
+                        Templates HSM exigem provider WABA. Use canal WABA pra fluxo completo de seleção.
+                      </p>
+                    </div>
+                  )}
+
+                  {msgType === "carousel" && (
+                    <div className="space-y-2">
+                      {(richMeta.carousel?.cards || [{ title: "", image: "", button: "" }]).map((card, i) => (
+                        <div key={i} className="rounded-lg p-2 space-y-1" style={{ background: "var(--surface-2)", border: "1px solid var(--border-default)" }}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-semibold" style={{ color: "var(--text-3)" }}>Card {i + 1}</span>
+                            {(richMeta.carousel?.cards?.length || 0) > 1 && (
+                              <button type="button"
+                                onClick={() => setRichMeta((m) => {
+                                  const cards = [...(m.carousel?.cards || [])];
+                                  cards.splice(i, 1);
+                                  return { ...m, carousel: { cards } };
+                                })}
+                                className="text-[10px]" style={{ color: "#ef4444" }}>Remover</button>
+                            )}
+                          </div>
+                          <input type="text" placeholder="Título" value={card.title}
+                            onChange={(e) => setRichMeta((m) => {
+                              const cards = [...(m.carousel?.cards || [])];
+                              cards[i] = { ...cards[i], title: e.target.value };
+                              return { ...m, carousel: { cards } };
+                            })}
+                            className="input-field w-full text-xs" />
+                          <input type="text" placeholder="URL da imagem" value={card.image}
+                            onChange={(e) => setRichMeta((m) => {
+                              const cards = [...(m.carousel?.cards || [])];
+                              cards[i] = { ...cards[i], image: e.target.value };
+                              return { ...m, carousel: { cards } };
+                            })}
+                            className="input-field w-full text-xs" />
+                          <input type="text" placeholder="Label do botão" value={card.button}
+                            onChange={(e) => setRichMeta((m) => {
+                              const cards = [...(m.carousel?.cards || [])];
+                              cards[i] = { ...cards[i], button: e.target.value };
+                              return { ...m, carousel: { cards } };
+                            })}
+                            className="input-field w-full text-xs" />
+                        </div>
+                      ))}
+                      {(richMeta.carousel?.cards?.length || 0) < 10 && (
+                        <button type="button"
+                          onClick={() => setRichMeta((m) => ({ ...m, carousel: { cards: [...(m.carousel?.cards || []), { title: "", image: "", button: "" }] } }))}
+                          className="text-[11px] font-medium" style={{ color: "#a5b4fc" }}>+ Adicionar card</button>
+                      )}
                     </div>
                   )}
                 </>
